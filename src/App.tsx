@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Clock,
@@ -17,6 +17,8 @@ import {
   Filter,
   Menu,
   X,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -52,7 +54,17 @@ const tools = [
   { path: '/deduplicate', label: 'Deduplicate', icon: Filter, component: ArrayDeduplicator },
 ];
 
-function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function Sidebar({
+  isOpen,
+  onClose,
+  isDark,
+  onToggleDark
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  isDark: boolean;
+  onToggleDark: () => void;
+}) {
   const location = useLocation();
 
   return (
@@ -62,45 +74,55 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
       )}
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-card border-r transition-transform duration-200 ease-in-out',
+          'fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-card border-r transition-transform duration-200 ease-in-out flex flex-col',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between p-6 border-b">
-            <h1 className="text-2xl font-bold">DevTool</h1>
+        <div className="flex items-center justify-between p-6 border-b">
+          <h1 className="text-2xl font-bold">DevTool</h1>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleDark}
+              title={isDark ? 'Light mode' : 'Dark mode'}
+            >
+              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={onClose}>
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <nav className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-1">
-              {tools.map((tool) => {
-                const Icon = tool.icon;
-                const isActive = location.pathname === tool.path;
-                return (
-                  <Link
-                    key={tool.path}
-                    to={tool.path}
-                    onClick={onClose}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-accent hover:text-accent-foreground'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-sm font-medium">{tool.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
-          <div className="p-4 border-t text-xs text-muted-foreground">
-            <p>v0.1.0</p>
-            <p>Developer Utilities</p>
+        </div>
+        <nav className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-1">
+            {tools.map((tool) => {
+              const Icon = tool.icon;
+              const isActive = location.pathname === tool.path;
+              return (
+                <Link
+                  key={tool.path}
+                  to={tool.path}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-md scale-105'
+                      : 'text-foreground hover:bg-accent/50 hover:text-accent-foreground'
+                  )}
+                >
+                  <Icon className={cn('transition-transform', isActive ? 'h-5 w-5 scale-110' : 'h-4 w-4')} />
+                  <span className={cn('text-sm font-medium transition-all', isActive && 'font-bold')}>
+                    {tool.label}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
+        </nav>
+        <div className="p-4 border-t text-xs text-muted-foreground">
+          <p>v0.1.0</p>
+          <p>Developer Utilities</p>
         </div>
       </aside>
     </>
@@ -109,17 +131,40 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
 
 function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('devtool-dark-mode');
+    if (saved !== null) return saved === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('devtool-dark-mode', isDark.toString());
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
+  const toggleDark = () => {
+    setIsDark(!isDark);
+  };
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDark={isDark} onToggleDark={toggleDark} />
       <main className="flex-1 overflow-y-auto">
         <div className="sticky top-0 z-30 bg-background border-b lg:hidden">
-          <div className="flex items-center gap-2 p-4">
-            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-              <Menu className="h-5 w-5" />
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+                <Menu className="h-5 w-5" />
+              </Button>
+              <h2 className="font-semibold">DevTool</h2>
+            </div>
+            <Button variant="ghost" size="icon" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
+              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            <h2 className="font-semibold">DevTool</h2>
           </div>
         </div>
         <div className="container mx-auto p-6 max-w-6xl">
