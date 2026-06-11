@@ -523,7 +523,6 @@ export function CronGenerator() {
             <button
               type="button"
               aria-label={`${mode} cron rule`}
-              title={modeRuleTooltip(mode)}
               className="group relative inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
             >
               <HelpCircle className="h-4 w-4" />
@@ -587,7 +586,8 @@ export function CronGenerator() {
                   >
                     <SelectTrigger
                       aria-label={`${rule.label} suggestions`}
-                      className="group relative h-8 w-9 flex-none px-0 text-muted-foreground hover:text-foreground"
+                      title="Suggestions"
+                      className="group relative h-8 w-9 flex-none justify-center px-0 text-muted-foreground hover:text-foreground [&>span]:hidden [&>svg:last-child]:hidden"
                     >
                       <Lightbulb className="h-4 w-4" />
                       <SelectValue className="sr-only" placeholder="Suggestions" />
