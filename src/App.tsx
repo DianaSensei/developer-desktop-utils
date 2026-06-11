@@ -89,17 +89,22 @@ function Sidebar({
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 lg:hidden" onClick={onClose} />
       )}
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-screen bg-card border-r transition-all duration-300 ease-in-out flex flex-col',
-          isCollapsed ? 'w-16' : 'w-64',
+          'fixed lg:sticky top-0 left-0 z-50 h-screen bg-card/95 backdrop-blur border-r transition-all duration-300 ease-in-out flex flex-col',
+          isCollapsed ? 'w-14' : 'w-56',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        <div className={cn('flex items-center border-b transition-all', isCollapsed ? 'justify-center py-3 px-2' : 'justify-between py-4 px-4')}>
-          {!isCollapsed && <h1 className="text-xl font-bold">DevTool</h1>}
+        <div className={cn('flex items-center border-b transition-all', isCollapsed ? 'justify-center py-2.5 px-2' : 'justify-between px-3 py-3')}>
+          {!isCollapsed && (
+            <div>
+              <h1 className="text-sm font-semibold leading-none">DevTool</h1>
+              <p className="mt-1 text-[11px] text-muted-foreground">{enabledTools.length} local tools</p>
+            </div>
+          )}
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -116,7 +121,7 @@ function Sidebar({
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-2 px-1">
+        <nav className={cn('flex-1 px-1.5 py-2', isCollapsed ? 'overflow-visible' : 'overflow-y-auto')}>
           <div className="space-y-0.5">
             {enabledTools.map((tool) => {
               const Icon = tool.icon;
@@ -128,14 +133,19 @@ function Sidebar({
                   onClick={onClose}
                   title={isCollapsed ? tool.label : undefined}
                   className={cn(
-                    'flex items-center rounded-md transition-all duration-150',
-                    isCollapsed ? 'justify-center py-2.5 px-2' : 'gap-3 py-2 px-3',
+                    'group relative flex items-center rounded-md transition-all duration-150',
+                    isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
                     isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   )}
-                >
-                  <Icon className="h-[18px] w-[18px] flex-shrink-0" />
+                  >
+                  <Icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
+                  {isCollapsed && (
+                    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
+                      {tool.label}
+                    </span>
+                  )}
                   {!isCollapsed && (
                     <span className={cn('text-sm transition-all whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
                       {tool.label}
@@ -147,12 +157,12 @@ function Sidebar({
           </div>
         </nav>
 
-        <div className={cn('border-t py-2 px-1 hidden lg:block')}>
+        <div className={cn('border-t px-1.5 py-2 hidden lg:block')}>
           <Button
             variant="ghost"
             size="sm"
             onClick={onToggleCollapse}
-            className={cn('w-full h-8 text-xs', isCollapsed && 'px-0')}
+            className={cn('w-full h-8 text-xs text-muted-foreground hover:text-foreground', isCollapsed && 'px-0')}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isCollapsed ? (
@@ -171,6 +181,8 @@ function Sidebar({
 }
 
 function AppContent() {
+  const location = useLocation();
+  const { isFeatureEnabled } = useFeatures();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('devtool-sidebar-collapsed');
@@ -203,8 +215,12 @@ function AppContent() {
     setIsCollapsed(!isCollapsed);
   };
 
+  const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
+  const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
+  const ActiveIcon = activeTool.icon;
+
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -213,23 +229,31 @@ function AppContent() {
         isCollapsed={isCollapsed}
         onToggleCollapse={toggleCollapse}
       />
-      <main className="flex-1 overflow-y-auto bg-background">
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b lg:hidden">
-          <div className="flex items-center justify-between px-4 py-3">
+      <main className="flex-1 overflow-y-auto">
+        <div className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+          <div className="flex items-center justify-between px-3 py-2.5 sm:px-4">
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-                <Menu className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
+                <Menu className="h-4 w-4" />
               </Button>
-              <h2 className="font-semibold">DevTool</h2>
+              <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-card">
+                <ActiveIcon className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold leading-none">{activeTool.label}</h2>
+                <p className="mt-1 hidden text-[11px] text-muted-foreground sm:block">
+                  Offline utility - {enabledTools.length} enabled
+                </p>
+              </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
           </div>
         </div>
-        <div className="w-full h-full p-4 md:p-6">
+        <div className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5">
           <Routes>
-            {allTools.map((tool) => (
+            {enabledTools.map((tool) => (
               <Route key={tool.path} path={tool.path} element={<tool.component />} />
             ))}
             <Route path="/settings" element={<Settings />} />

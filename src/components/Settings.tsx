@@ -46,10 +46,10 @@ export function Settings() {
   const enabledCount = Object.values(features).filter(Boolean).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Feature Settings</CardTitle>
               <CardDescription>
@@ -63,14 +63,14 @@ export function Settings() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 p-3 bg-muted rounded-lg">
+          <div className="mb-3 rounded-md border bg-muted/45 px-3 py-2">
             <p className="text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{enabledCount}</span> of{' '}
               {FEATURE_LIST.length} features enabled
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {FEATURE_LIST.map((feature) => {
               const Icon = feature.icon;
               const isEnabled = features[feature.id] !== false;
@@ -78,17 +78,17 @@ export function Settings() {
               return (
                 <div
                   key={feature.id}
-                  className={`flex items-center justify-between p-4 rounded-lg border transition-all ${
+                  className={`flex items-center justify-between rounded-md border px-3 py-2.5 transition-all ${
                     isEnabled
                       ? 'bg-card border-border'
-                      : 'bg-muted/50 border-muted opacity-60'
+                      : 'bg-muted/40 border-muted opacity-60'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`h-5 w-5 ${isEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <Icon className={`h-4 w-4 ${isEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
                     <Label
                       htmlFor={feature.id}
-                      className={`cursor-pointer font-medium ${
+                      className={`cursor-pointer text-sm font-medium ${
                         !isEnabled && 'text-muted-foreground'
                       }`}
                     >
@@ -100,13 +100,13 @@ export function Settings() {
                     role="switch"
                     aria-checked={isEnabled}
                     onClick={() => toggleFeature(feature.id)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-1 ${
                       isEnabled ? 'bg-primary' : 'bg-muted-foreground/30'
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        isEnabled ? 'translate-x-6' : 'translate-x-1'
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        isEnabled ? 'translate-x-5' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -122,7 +122,7 @@ export function Settings() {
           <CardTitle>About DevTool</CardTitle>
           <CardDescription>Developer utilities for daily tasks</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
+        <CardContent className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-3">
           <p>Version: 0.1.0</p>
           <p>Built with: Tauri, React, TypeScript, Tailwind CSS</p>
           <p>All tools run locally - your data never leaves your device</p>
