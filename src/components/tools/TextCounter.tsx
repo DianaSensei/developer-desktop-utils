@@ -1,11 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Check, FileText, X } from 'lucide-react';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function TextCounter() {
-  const [text, setText] = useState('');
+  const [text, setText] = usePersistentState('devtool:textCounter:text', '');
 
   const stats = useMemo(() => {
     const empty = {
@@ -114,6 +117,9 @@ export function TextCounter() {
     { name: 'UTF-32', detail: `${stats.utf32Bytes} bytes`, fits: true },
   ];
 
+  useQuickPaste((pasted) => setText(pasted));
+  useInputHistory(text, setText);
+
   const StatCard = ({ label, value, color = 'text-foreground' }: { label: string; value: number | string; color?: string }) => (
     <div className="flex flex-col items-center justify-center p-4 rounded-lg border bg-card">
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
@@ -133,7 +139,10 @@ export function TextCounter() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Text Input</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>Text Input</Label>
+              <span className="text-xs text-muted-foreground">{quickPasteHint}</span>
+            </div>
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}

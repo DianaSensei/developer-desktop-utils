@@ -51,7 +51,7 @@ const allTools = [
   { path: '/text-transform', label: 'Text Transformer', icon: Code, component: TextTransformer, featureId: 'text-transform' },
   { path: '/text-counter', label: 'Text Counter', icon: Type, component: TextCounter, featureId: 'text-counter' },
   { path: '/color-picker', label: 'Color Picker', icon: Palette, component: ColorPicker, featureId: 'color-picker' },
-  { path: '/base64', label: 'Base64', icon: Code, component: Base64Tool, featureId: 'base64' },
+  { path: '/base64', label: 'Encoder / Decoder', icon: Code, component: Base64Tool, featureId: 'base64' },
   { path: '/hash', label: 'Hash & Encrypt', icon: Hash, component: HashTool, featureId: 'hash' },
   { path: '/unix-time', label: 'Unix Time', icon: Clock, component: UnixTimeConverter, featureId: 'unix-time' },
   { path: '/json', label: 'JSON Formatter', icon: FileJson, component: JsonFormatter, featureId: 'json' },

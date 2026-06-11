@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
 type TransformMode =
   | 'single-line'
@@ -100,15 +103,15 @@ function toArray(text: string) {
 }
 
 export function TextTransformer() {
-  const [input, setInput] = useState('');
-  const [mode, setMode] = useState<TransformMode>('single-line');
+  const [input, setInput] = usePersistentState('devtool:textTransform:input', '');
+  const [mode, setMode] = usePersistentState<TransformMode>('devtool:textTransform:mode', 'single-line');
 
   // Single line options
-  const [removeLineWhitespace, setRemoveLineWhitespace] = useState(false);
-  const [removeChars, setRemoveChars] = useState('');
+  const [removeLineWhitespace, setRemoveLineWhitespace] = usePersistentState('devtool:textTransform:removeLineWs', false);
+  const [removeChars, setRemoveChars] = usePersistentState('devtool:textTransform:removeChars', '');
 
   // Multiple lines options
-  const [delimiters, setDelimiters] = useState(',;');
+  const [delimiters, setDelimiters] = usePersistentState('devtool:textTransform:delimiters', ',;');
 
   const output = useMemo(() => {
     if (!input) return '';
@@ -132,6 +135,9 @@ export function TextTransformer() {
         return input;
     }
   }, [input, mode, removeLineWhitespace, removeChars, delimiters]);
+
+  useQuickPaste((text) => setInput(text));
+  useInputHistory(input, setInput);
 
   const copyOutput = () => {
     navigator.clipboard.writeText(output);
@@ -204,7 +210,10 @@ export function TextTransformer() {
         </div>
 
         <div className="space-y-2">
-          <Label>Input Text</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label>Input Text</Label>
+            <span className="text-xs text-muted-foreground">{quickPasteHint}</span>
+          </div>
           <Textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}

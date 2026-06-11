@@ -26,7 +26,7 @@ const FEATURE_LIST = [
   { id: 'text-transform', label: 'Text Transformer', icon: Code },
   { id: 'text-counter', label: 'Text Counter', icon: Type },
   { id: 'color-picker', label: 'Color Picker', icon: Palette },
-  { id: 'base64', label: 'Base64 Encoder/Decoder', icon: Code },
+  { id: 'base64', label: 'Encoder / Decoder', icon: Code },
   { id: 'hash', label: 'Hash & Encrypt', icon: Hash },
   { id: 'unix-time', label: 'Unix Time Converter', icon: Clock },
   { id: 'json', label: 'JSON Formatter', icon: FileJson },

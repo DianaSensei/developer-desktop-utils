@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, CheckCircle2, Copy, HelpCircle, Lightbulb, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
 type CronMode = 'linux' | 'quartz';
 type FieldKey = 'seconds' | 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek' | 'year';
@@ -426,9 +429,11 @@ function explainExpression(mode: CronMode, fields: CronFields | null, errors: st
 }
 
 export function CronGenerator() {
-  const [mode, setMode] = useState<CronMode>('linux');
-  const [fields, setFields] = useState<CronFields>(DEFAULT_FIELDS);
-  const [expression, setExpression] = useState(expressionFromFields('linux', DEFAULT_FIELDS));
+  const [mode, setMode] = usePersistentState<CronMode>('devtool:cron:mode', 'linux');
+  const [fields, setFields] = usePersistentState<CronFields>('devtool:cron:fields', DEFAULT_FIELDS);
+  const [expression, setExpression] = usePersistentState('devtool:cron:expression', () =>
+    expressionFromFields('linux', DEFAULT_FIELDS)
+  );
 
   const inferredMode = inferMode(expression, mode);
   const rules = getRules(mode);
@@ -484,6 +489,9 @@ export function CronGenerator() {
     updateExpression(value);
   };
 
+  useQuickPaste((text) => updateExpression(text.trim()));
+  useInputHistory(expression, updateExpression);
+
   const reset = () => {
     setMode('linux');
     setFields(DEFAULT_FIELDS);
@@ -537,8 +545,10 @@ export function CronGenerator() {
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="cron-expression">Expression</Label>
-            {inferredMode !== mode && (
+            {inferredMode !== mode ? (
               <span className="text-xs text-muted-foreground">Looks like {inferredMode} cron</span>
+            ) : (
+              <span className="text-xs text-muted-foreground">{quickPasteHint}</span>
             )}
           </div>
           <div className="flex gap-2">
