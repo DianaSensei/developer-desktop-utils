@@ -1,5 +1,7 @@
 # DevTool - Developer Utilities
 
+> **🤖 AI Agent Optimized**: This project includes comprehensive documentation in [CLAUDE.md](CLAUDE.md) to help AI coding agents understand the codebase quickly and work efficiently.
+
 A modern, cross-platform desktop application built with Tauri, React, and TypeScript, providing essential developer utilities in a clean and functional interface.
 
 ## Features
@@ -97,6 +99,36 @@ const tools = [
 - **Scalable** - Easy to add new utilities
 - **Responsive** - Works on different screen sizes
 - **Accessible** - Built with accessibility in mind
+
+## Documentation
+
+### 📚 For Developers
+
+- **[CLAUDE.md](CLAUDE.md)** - Complete guide for AI coding agents (start here!)
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design decisions
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to add new tools and contribute
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+
+### 🔧 For Users
+
+- **[BUILD.md](BUILD.md)** - Build instructions for all platforms
+- **[SETUP.md](SETUP.md)** - Setup and installation guide
+- **[FEATURES.md](FEATURES.md)** - Feature toggle system documentation
+- **[LAYOUT.md](LAYOUT.md)** - UI/UX design principles
+
+### 📖 Tool-Specific
+
+- **[COLOR_PICKER.md](COLOR_PICKER.md)** - Color picker tool documentation
+- **[SIDEBAR.md](SIDEBAR.md)** - Sidebar behavior and features
+- **[src/components/tools/README.md](src/components/tools/README.md)** - Tools overview
+
+### 🚀 Quick Links
+
+**For AI Agents**: Start with [CLAUDE.md](CLAUDE.md) - it contains everything you need to understand and work on this project efficiently.
+
+**For Developers**: Read [CONTRIBUTING.md](CONTRIBUTING.md) to learn how to add new tools in ~5 minutes.
+
+**For Users**: Check [BUILD.md](BUILD.md) to create your own desktop app.
 
 ## License
 
