@@ -47,6 +47,10 @@ devtool/
 │   │   └── Settings.tsx     # Settings/feature management
 │   ├── contexts/
 │   │   └── FeatureContext.tsx  # Feature toggle state
+│   ├── hooks/               # Shared tool UX hooks (see "Shared Tool Hooks")
+│   │   ├── usePersistentState.ts  # useState that persists to localStorage
+│   │   ├── useQuickPaste.ts       # ⌘V / Ctrl+V pastes straight into a tool
+│   │   └── useInputHistory.ts     # ⌘Z / ⌘⇧Z undo/redo on a tool's input
 │   ├── lib/
 │   │   └── utils.ts         # Utility functions (cn, etc.)
 │   ├── styles/
@@ -77,7 +81,7 @@ devtool/
 - Persisted in localStorage
 
 ### 3. **Layout Philosophy**
-- Sidebar: Collapsible navigation (256px expanded, 64px collapsed)
+- Sidebar: Collapsible navigation (`w-56` / 224px expanded, `w-14` / 56px collapsed)
 - Content: Full width, maximum space for tools
 - Inspired by DevUtils.com - clean, focused, simple
 
@@ -93,24 +97,30 @@ devtool/
 
 ### 1. Create Tool Component
 
-Create `src/components/tools/YourTool.tsx`:
+Create `src/components/tools/YourTool.tsx`. Follow the **modern tool pattern**: process the
+input in real time (no "Process" button), persist the input across sessions, and wire up the
+shared paste/undo hooks. See [Shared Tool Hooks](#shared-tool-hooks-ux-conventions) for the why.
 
 ```tsx
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { YourIcon } from 'lucide-react';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function YourTool() {
-  const [input, setInput] = useState('');
-  const [output, setOutput] = useState('');
+  // Persisted input — survives app restarts. Key: 'devtool:<tool>:<field>'.
+  const [input, setInput] = usePersistentState('devtool:yourTool:input', '');
 
-  const process = () => {
-    // Your logic here
-    setOutput(input.toUpperCase());
-  };
+  // Recompute output on every keystroke instead of behind a button.
+  const output = useMemo(() => input.toUpperCase(), [input]);
+
+  // ⌘V pastes the clipboard straight into the input; ⌘Z / ⌘⇧Z undo/redo it.
+  useQuickPaste(setInput);
+  useInputHistory(input, setInput);
 
   return (
     <Card>
@@ -124,19 +134,17 @@ export function YourTool() {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label>Input</Label>
-          <Input 
-            value={input} 
-            onChange={(e) => setInput(e.target.value)} 
-            placeholder="Enter something"
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={`Enter something — ${quickPasteHint}`}
           />
         </div>
-
-        <Button onClick={process}>Process</Button>
 
         {output && (
           <div className="space-y-2">
             <Label>Output</Label>
-            <Input value={output} readOnly />
+            <Textarea value={output} readOnly />
           </div>
         )}
       </CardContent>
@@ -194,6 +202,50 @@ const FEATURE_LIST = [
 - ✅ Visible in sidebar
 - ✅ Toggle-able in Settings
 - ✅ Persistent across sessions
+
+---
+
+## Shared Tool Hooks (UX conventions)
+
+Tools share a small set of hooks in `src/hooks/` that encode the app's UX conventions.
+**New and edited tools should use them** so every tool behaves consistently: process in real
+time, remember their last input, and accept a one-keystroke paste. Prefer these over re-rolling
+local `useState` + a "Process" button.
+
+### `usePersistentState(key, initial)` — `src/hooks/usePersistentState.ts`
+Drop-in replacement for `useState` that persists the value to `localStorage` under `key`, so a
+tool keeps its input/selection after the app closes or you switch tools and back. JSON-serializable
+values only. Corrupt/blocked storage falls back to `initial` silently.
+
+```tsx
+const [input, setInput] = usePersistentState('devtool:json:input', '');
+```
+**Key convention:** `devtool:<toolName>:<field>` (e.g. `devtool:textCounter:text`). One key per
+field so tools don't clobber each other.
+
+### `useQuickPaste(onPaste, enabled?)` — `src/hooks/useQuickPaste.ts`
+While the tool is mounted, pressing ⌘V / Ctrl+V reads the clipboard and calls `onPaste(text)` —
+no extra click, no popup. In the Tauri desktop build it reads via the Rust backend (avoids the
+WebKit clipboard-permission prompt); in a browser it uses the Clipboard API. Also exports
+`quickPasteHint` (`"Press ⌘V to paste"` / `"Press Ctrl+V to paste"`) for placeholder/help text.
+
+```tsx
+useQuickPaste(setInput);
+```
+
+### `useInputHistory(value, applyValue, enabled?)` — `src/hooks/useInputHistory.ts`
+Adds undo/redo to a tool's primary input for the lifetime it's mounted. ⌘Z / Ctrl+Z undoes,
+⌘⇧Z / Ctrl+Shift+Z / Ctrl+Y redoes. User edits are debounced (~400ms) into history entries;
+programmatic changes (paste, format, clear) are captured too.
+
+```tsx
+useInputHistory(input, setInput);
+```
+
+> The convention is: **real-time output (`useMemo`), persisted input (`usePersistentState`),
+> quick paste (`useQuickPaste`), and undo/redo (`useInputHistory`)** — with a minimalist UI.
+> Some tools (e.g. UUID/QR generators) legitimately keep an action button where there is no
+> "input to transform"; use judgment.
 
 ---
 
@@ -344,7 +396,7 @@ resetToDefaults()
 
 ### Sidebar Collapse
 **Storage**: localStorage (`devtool-sidebar-collapsed`)  
-**Implementation**: Width change (256px ↔ 64px)  
+**Implementation**: Width change (`w-56` 224px ↔ `w-14` 56px)  
 **Location**: `App.tsx` (local state)
 
 ---
@@ -477,7 +529,7 @@ Edit `App.tsx`:
 ```tsx
 className={cn(
   'transition-all',
-  isCollapsed ? 'w-16' : 'w-64'  // Change these values
+  isCollapsed ? 'w-14' : 'w-56'  // Change these values
 )}
 ```
 
@@ -499,6 +551,7 @@ const saved = localStorage.getItem('my-setting');
 
 ### ✅ Safe to modify:
 - `src/components/tools/*.tsx` - Add/edit tools
+- `src/hooks/*.ts` - Shared tool hooks (edit carefully; many tools depend on them)
 - `src/styles/globals.css` - Theme changes
 - Tool-specific logic
 
@@ -577,7 +630,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 ### Most Used Utilities
 ```tsx
 import { cn } from '@/lib/utils';           // Merge classnames
-import { useFeatures } from '@/contexts/FeatureContext';  // Feature toggles
+import { useFeatures } from '@/contexts/FeatureContext';      // Feature toggles
+import { usePersistentState } from '@/hooks/usePersistentState';  // Persisted input
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';  // ⌘V paste
+import { useInputHistory } from '@/hooks/useInputHistory';    // ⌘Z undo/redo
 ```
 
 ### Most Used Icons
@@ -618,6 +674,6 @@ import { Copy, Check, X, Search, Settings } from 'lucide-react';
 
 ---
 
-*Last updated: 2026-06-11*  
+*Last updated: 2026-06-12*  
 *Maintainer: Project team*  
 *AI-friendly: Optimized for Claude, GPT-4, and other coding agents*

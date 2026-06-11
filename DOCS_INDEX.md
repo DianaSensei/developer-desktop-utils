@@ -14,6 +14,7 @@ Complete project overview, conventions, patterns, and quick reference. Read this
 **Contents:**
 - Project structure and architecture
 - Step-by-step guide to add new tools
+- Shared tool hooks (persistent state, quick paste, undo/redo) and the UX conventions
 - Code conventions and patterns
 - Common issues and solutions
 - Quick reference for components/utilities
@@ -326,6 +327,6 @@ Planned additions:
 
 ---
 
-*Last updated: 2026-06-11*  
+*Last updated: 2026-06-12*  
 *Maintained by: Project team*  
 *For: AI agents, developers, contributors*

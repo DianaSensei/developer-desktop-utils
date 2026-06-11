@@ -154,23 +154,36 @@ To add a new tool:
 4. Add `featureId` to `DEFAULT_FEATURES` in `src/contexts/FeatureContext.tsx`
 5. Add to `FEATURE_LIST` in `src/components/Settings.tsx`
 
+## Shared Hooks
+
+Tools use shared hooks in `src/hooks/` so they all behave consistently. Use them instead of
+re-implementing local state + a "Process" button:
+
+- `usePersistentState(key, initial)` — `useState` that persists to localStorage. Key format:
+  `devtool:<tool>:<field>`. Keeps a tool's input across restarts.
+- `useQuickPaste(onPaste)` — ⌘V / Ctrl+V pastes the clipboard straight into the tool. Also
+  exports `quickPasteHint` for placeholder text.
+- `useInputHistory(value, setValue)` — ⌘Z / ⌘⇧Z undo/redo on the tool's primary input.
+
 ## Tool Template
 
+Process in real time (`useMemo`), persist the input, and wire up paste/undo:
+
 ```tsx
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function YourTool() {
-  const [input, setInput] = useState('');
-  const [output, setOutput] = useState('');
+  const [input, setInput] = usePersistentState('devtool:yourTool:input', '');
+  const output = useMemo(() => input, [input]); // your transform here
 
-  const process = () => {
-    // Your logic
-    setOutput(input);
-  };
+  useQuickPaste(setInput);
+  useInputHistory(input, setInput);
 
   return (
     <Card>
@@ -181,15 +194,17 @@ export function YourTool() {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label>Input</Label>
-          <Input value={input} onChange={(e) => setInput(e.target.value)} />
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={quickPasteHint}
+          />
         </div>
-        
-        <Button onClick={process}>Process</Button>
-        
+
         {output && (
           <div className="space-y-2">
             <Label>Output</Label>
-            <Input value={output} readOnly />
+            <Textarea value={output} readOnly />
           </div>
         )}
       </CardContent>
@@ -202,9 +217,9 @@ export function YourTool() {
 
 - Keep tools focused on one task
 - Use Card components for consistency
+- Process input in real time — avoid a manual "Process" button where the tool just transforms input
+- Persist input with `usePersistentState`; support `useQuickPaste` + `useInputHistory`
 - Add copy buttons for outputs
 - Include helpful descriptions
 - Handle errors gracefully
-- Show loading states if needed
-- Add tooltips for complex features
 - Make it keyboard accessible
