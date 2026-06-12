@@ -1,63 +1,60 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Copy } from 'lucide-react';
+import { Copy, Hash } from 'lucide-react';
 import CryptoJS from 'crypto-js';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useQuickPaste } from '@/hooks/useQuickPaste';
+import { useInputHistory } from '@/hooks/useInputHistory';
+import { copyToClipboard } from '@/lib/clipboard';
+
+type AesMode = 'encrypt' | 'decrypt';
 
 export function HashTool() {
-  const [input, setInput] = useState('');
-  const [md5, setMd5] = useState('');
-  const [sha1, setSha1] = useState('');
-  const [sha256, setSha256] = useState('');
-  const [sha512, setSha512] = useState('');
+  const [input, setInput] = usePersistentState('devtool:hash:input', '');
+  const [encryptKey, setEncryptKey] = usePersistentState('devtool:hash:key', '');
+  const [aesMode, setAesMode] = usePersistentState<AesMode>('devtool:hash:aesMode', 'encrypt');
 
-  const [encryptKey, setEncryptKey] = useState('');
-  const [encrypted, setEncrypted] = useState('');
-  const [decrypted, setDecrypted] = useState('');
+  useQuickPaste(setInput);
+  useInputHistory(input, setInput);
 
-  const generateHashes = () => {
-    setMd5(CryptoJS.MD5(input).toString());
-    setSha1(CryptoJS.SHA1(input).toString());
-    setSha256(CryptoJS.SHA256(input).toString());
-    setSha512(CryptoJS.SHA512(input).toString());
-  };
+  const hashes = useMemo(() => {
+    if (!input) return { md5: '', sha1: '', sha256: '', sha512: '' };
+    return {
+      md5: CryptoJS.MD5(input).toString(),
+      sha1: CryptoJS.SHA1(input).toString(),
+      sha256: CryptoJS.SHA256(input).toString(),
+      sha512: CryptoJS.SHA512(input).toString(),
+    };
+  }, [input]);
 
-  const encrypt = () => {
-    if (!encryptKey) {
-      setEncrypted('Error: Please provide an encryption key');
-      return;
-    }
-    const result = CryptoJS.AES.encrypt(input, encryptKey).toString();
-    setEncrypted(result);
-  };
-
-  const decrypt = () => {
-    if (!encryptKey) {
-      setDecrypted('Error: Please provide a decryption key');
-      return;
-    }
+  const aesResult = useMemo(() => {
+    if (!input || !encryptKey) return '';
     try {
-      const bytes = CryptoJS.AES.decrypt(input, encryptKey);
-      const result = bytes.toString(CryptoJS.enc.Utf8);
-      setDecrypted(result || 'Error: Invalid key or encrypted text');
-    } catch (error) {
-      setDecrypted('Error: Decryption failed');
+      if (aesMode === 'encrypt') {
+        return CryptoJS.AES.encrypt(input, encryptKey).toString();
+      } else {
+        const bytes = CryptoJS.AES.decrypt(input, encryptKey);
+        const result = bytes.toString(CryptoJS.enc.Utf8);
+        return result || 'Error: Invalid key or encrypted text';
+      }
+    } catch {
+      return 'Error: Decryption failed';
     }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+  }, [input, encryptKey, aesMode]);
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Hash Generator</CardTitle>
-          <CardDescription>Generate various hash values from text</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Hash className="h-5 w-5" />
+            Hash Generator
+          </CardTitle>
+          <CardDescription>Generate MD5, SHA-1, SHA-256, SHA-512 hashes from text</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -65,27 +62,23 @@ export function HashTool() {
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Enter text to hash"
+              placeholder="Enter text to hash — Press ⌘V to paste"
               className="min-h-[100px]"
             />
           </div>
 
-          <Button onClick={generateHashes} className="w-full">
-            Generate Hashes
-          </Button>
-
           <div className="space-y-3">
-            {[
-              { label: 'MD5', value: md5 },
-              { label: 'SHA-1', value: sha1 },
-              { label: 'SHA-256', value: sha256 },
-              { label: 'SHA-512', value: sha512 },
-            ].map(({ label, value }) => (
+            {([
+              { label: 'MD5', value: hashes.md5 },
+              { label: 'SHA-1', value: hashes.sha1 },
+              { label: 'SHA-256', value: hashes.sha256 },
+              { label: 'SHA-512', value: hashes.sha512 },
+            ] as const).map(({ label, value }) => (
               <div key={label} className="space-y-1">
                 <Label className="text-xs text-muted-foreground">{label}</Label>
                 <div className="flex gap-2">
                   <Input value={value} readOnly className="font-mono text-xs" />
-                  <Button onClick={() => copyToClipboard(value)} size="icon" variant="outline">
+                  <Button onClick={() => copyToClipboard(value)} size="icon" variant="outline" disabled={!value}>
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
@@ -97,7 +90,7 @@ export function HashTool() {
 
       <Card>
         <CardHeader>
-          <CardTitle>AES Encryption/Decryption</CardTitle>
+          <CardTitle>AES Encryption / Decryption</CardTitle>
           <CardDescription>Encrypt or decrypt text using AES</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -111,29 +104,33 @@ export function HashTool() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Button onClick={encrypt}>Encrypt</Button>
-            <Button onClick={decrypt} variant="outline">
+          <div className="flex gap-2">
+            <Button
+              variant={aesMode === 'encrypt' ? 'default' : 'outline'}
+              className="flex-1"
+              onClick={() => setAesMode('encrypt')}
+            >
+              Encrypt
+            </Button>
+            <Button
+              variant={aesMode === 'decrypt' ? 'default' : 'outline'}
+              className="flex-1"
+              onClick={() => setAesMode('decrypt')}
+            >
               Decrypt
             </Button>
           </div>
 
-          {encrypted && (
+          {aesResult && (
             <div className="space-y-2">
-              <Label>Encrypted</Label>
-              <div className="flex gap-2">
-                <Textarea value={encrypted} readOnly className="min-h-[80px] font-mono text-xs" />
-                <Button onClick={() => copyToClipboard(encrypted)} size="icon" variant="outline">
-                  <Copy className="h-4 w-4" />
+              <div className="flex items-center justify-between">
+                <Label>{aesMode === 'encrypt' ? 'Encrypted' : 'Decrypted'}</Label>
+                <Button onClick={() => copyToClipboard(aesResult)} size="sm" variant="ghost">
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy
                 </Button>
               </div>
-            </div>
-          )}
-
-          {decrypted && (
-            <div className="space-y-2">
-              <Label>Decrypted</Label>
-              <Textarea value={decrypted} readOnly className="min-h-[80px]" />
+              <Textarea value={aesResult} readOnly className="min-h-[80px] font-mono text-xs" />
             </div>
           )}
         </CardContent>

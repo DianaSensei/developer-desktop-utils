@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Copy, RefreshCw } from 'lucide-react';
+import { copyToClipboard } from '@/lib/clipboard';
 import { v4 as uuidv4 } from 'uuid';
 
 export function UuidGenerator() {
@@ -15,12 +16,8 @@ export function UuidGenerator() {
     setUuids(newUuids);
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
   const copyAll = () => {
-    navigator.clipboard.writeText(uuids.join('\n'));
+    copyToClipboard(uuids.join('\n'));
   };
 
   return (

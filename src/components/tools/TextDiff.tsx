@@ -1,19 +1,18 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 import * as Diff from 'diff';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function TextDiff() {
-  const [text1, setText1] = useState('');
-  const [text2, setText2] = useState('');
-  const [diffResult, setDiffResult] = useState<Diff.Change[]>([]);
+  const [text1, setText1] = usePersistentState('devtool:diff:text1', '');
+  const [text2, setText2] = usePersistentState('devtool:diff:text2', '');
 
-  const compareDiff = () => {
-    const diff = Diff.diffWords(text1, text2);
-    setDiffResult(diff);
-  };
+  useInputHistory(text1, setText1);
+
+  const diffResult = useMemo(() => Diff.diffWords(text1, text2), [text1, text2]);
 
   return (
     <Card>
@@ -43,11 +42,7 @@ export function TextDiff() {
           </div>
         </div>
 
-        <Button onClick={compareDiff} className="w-full">
-          Compare
-        </Button>
-
-        {diffResult.length > 0 && (
+        {(text1 || text2) && (
           <div className="space-y-2">
             <Label>Diff Result</Label>
             <div className="border rounded-md p-4 bg-muted/30 min-h-[150px] overflow-auto">
@@ -68,11 +63,11 @@ export function TextDiff() {
             </div>
             <div className="flex gap-4 text-xs">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-red-200 dark:bg-red-900/40 rounded"></div>
+                <div className="w-4 h-4 bg-red-200 dark:bg-red-900/40 rounded" />
                 <span>Removed</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-200 dark:bg-green-900/40 rounded"></div>
+                <div className="w-4 h-4 bg-green-200 dark:bg-green-900/40 rounded" />
                 <span>Added</span>
               </div>
             </div>

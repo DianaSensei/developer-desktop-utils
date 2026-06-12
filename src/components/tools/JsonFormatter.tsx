@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { copyToClipboard } from '@/lib/clipboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -494,7 +495,7 @@ export function JsonFormatter() {
     });
   };
 
-  const copyText = (text: string) => navigator.clipboard.writeText(text);
+  const copyText = (text: string) => copyToClipboard(text);
   const outputText = mode === 'minify' ? minified : mode === 'string' ? jsonString : beautified;
 
   const renderValue = (line: FlatLine, bracketClass: string) => {

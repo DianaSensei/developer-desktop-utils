@@ -1,42 +1,42 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Shield } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function JwtDebugger() {
-  const [token, setToken] = useState('');
-  const [header, setHeader] = useState('');
-  const [payload, setPayload] = useState('');
-  const [error, setError] = useState('');
+  const [token, setToken] = usePersistentState('devtool:jwt:token', '');
 
-  const decodeToken = (jwt: string) => {
-    if (!jwt.trim()) {
-      setHeader('');
-      setPayload('');
-      setError('');
-      return;
-    }
+  useQuickPaste(setToken);
+  useInputHistory(token, setToken);
 
+  const decoded = useMemo(() => {
+    if (!token.trim()) return { header: '', payload: '', error: '' };
     try {
-      const decoded = jwtDecode(jwt, { header: true });
-      const parts = jwt.split('.');
-
+      const parts = token.split('.');
       const headerDecoded = JSON.parse(atob(parts[0]));
-      setHeader(JSON.stringify(headerDecoded, null, 2));
-      setPayload(JSON.stringify(decoded, null, 2));
-      setError('');
+      const payloadDecoded = jwtDecode(token, { header: false });
+      return {
+        header: JSON.stringify(headerDecoded, null, 2),
+        payload: JSON.stringify(payloadDecoded, null, 2),
+        error: '',
+      };
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid JWT token');
-      setHeader('');
-      setPayload('');
+      return { header: '', payload: '', error: err instanceof Error ? err.message : 'Invalid JWT token' };
     }
-  };
+  }, [token]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>JWT Debugger</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          JWT Debugger
+        </CardTitle>
         <CardDescription>Decode and inspect JWT tokens</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -44,27 +44,24 @@ export function JwtDebugger() {
           <Label>JWT Token</Label>
           <Textarea
             value={token}
-            onChange={(e) => {
-              setToken(e.target.value);
-              decodeToken(e.target.value);
-            }}
-            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            onChange={(e) => setToken(e.target.value)}
+            placeholder={`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... — ${quickPasteHint}`}
             className="min-h-[120px] font-mono text-sm"
           />
         </div>
 
-        {error && (
+        {decoded.error && (
           <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-            <p className="text-sm text-red-900 dark:text-red-300">{error}</p>
+            <p className="text-sm text-red-900 dark:text-red-300">{decoded.error}</p>
           </div>
         )}
 
-        {!error && header && (
+        {!decoded.error && decoded.header && (
           <>
             <div className="space-y-2">
               <Label className="text-blue-600 dark:text-blue-400">Header</Label>
               <Textarea
-                value={header}
+                value={decoded.header}
                 readOnly
                 className="min-h-[120px] font-mono text-sm bg-blue-50 dark:bg-blue-950/20"
               />
@@ -73,7 +70,7 @@ export function JwtDebugger() {
             <div className="space-y-2">
               <Label className="text-purple-600 dark:text-purple-400">Payload</Label>
               <Textarea
-                value={payload}
+                value={decoded.payload}
                 readOnly
                 className="min-h-[200px] font-mono text-sm bg-purple-50 dark:bg-purple-950/20"
               />

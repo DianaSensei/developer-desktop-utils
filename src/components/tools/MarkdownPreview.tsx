@@ -1,11 +1,12 @@
-import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import ReactMarkdown from 'react-markdown';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
-export function MarkdownPreview() {
-  const [markdown, setMarkdown] = useState(`# Heading 1
+const DEFAULT_MARKDOWN = `# Heading 1
 ## Heading 2
 ### Heading 3
 
@@ -28,7 +29,13 @@ console.log(code);
 \`\`\`
 
 > Blockquote
-`);
+`;
+
+export function MarkdownPreview() {
+  const [markdown, setMarkdown] = usePersistentState('devtool:markdown:content', DEFAULT_MARKDOWN);
+
+  useQuickPaste(setMarkdown);
+  useInputHistory(markdown, setMarkdown);
 
   return (
     <Card>
@@ -43,7 +50,7 @@ console.log(code);
             <Textarea
               value={markdown}
               onChange={(e) => setMarkdown(e.target.value)}
-              placeholder="Enter markdown here"
+              placeholder={`Enter markdown here — ${quickPasteHint}`}
               className="min-h-[500px] font-mono text-sm"
             />
           </div>

@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
+import { copyToClipboard } from '@/lib/clipboard';
 
 type TransformMode =
   | 'single-line'
@@ -140,7 +141,7 @@ export function TextTransformer() {
   useInputHistory(input, setInput);
 
   const copyOutput = () => {
-    navigator.clipboard.writeText(output);
+    copyToClipboard(output);
   };
 
   return (

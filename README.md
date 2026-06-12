@@ -1,6 +1,6 @@
 # DevTool - Developer Utilities
 
-> **🤖 AI Agent Optimized**: This project includes comprehensive documentation in [CLAUDE.md](CLAUDE.md) to help AI coding agents understand the codebase quickly and work efficiently.
+> **🤖 AI Agent Optimized**: This project includes comprehensive documentation in [docs/ai/CLAUDE.md](docs/ai/CLAUDE.md) to help AI coding agents understand the codebase quickly and work efficiently. Human contributor guides live in [docs/human/](docs/human/).
 
 A modern, cross-platform desktop application built with Tauri, React, and TypeScript, providing essential developer utilities in a clean and functional interface.
 

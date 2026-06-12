@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
+import { copyToClipboard } from '@/lib/clipboard';
 
 type CronMode = 'linux' | 'quartz';
 type FieldKey = 'seconds' | 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek' | 'year';
@@ -498,8 +499,8 @@ export function CronGenerator() {
     setExpression(expressionFromFields('linux', DEFAULT_FIELDS));
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(normalizeExpression(expression));
+  const copyCronToClipboard = () => {
+    copyToClipboard(normalizeExpression(expression));
   };
 
   return (
@@ -559,7 +560,7 @@ export function CronGenerator() {
               placeholder={mode === 'linux' ? '*/5 * * * *' : '0 */5 * ? * *'}
               className="font-mono"
             />
-            <Button onClick={copyToClipboard} size="icon" variant="outline" title="Copy expression">
+            <Button onClick={copyCronToClipboard} size="icon" variant="outline" title="Copy expression">
               <Copy className="h-4 w-4" />
             </Button>
             <Button onClick={reset} size="icon" variant="ghost" title="Reset">
