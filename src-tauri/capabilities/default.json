@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for DevTool",
+  "windows": ["main"],
+  "permissions": [
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:scope-appdata-recursive",
+    "fs:scope-resource-recursive",
+    "process:allow-restart",
+    "updater:allow-check",
+    "updater:allow-download-and-install"
+  ]
+}

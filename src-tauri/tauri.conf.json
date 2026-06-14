@@ -1,72 +1,15 @@
 {
+  "productName": "DevTool",
+  "version": "0.0.3",
+  "identifier": "com.devtool.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist",
-    "withGlobalTauri": false
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
   },
-  "package": {
-    "productName": "DevTool",
-    "version": "0.0.3"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "clipboard": {
-        "all": true,
-        "readText": true,
-        "writeText": true
-      },
-      "dialog": {
-        "all": true,
-        "open": true,
-        "save": true
-      },
-      "fs": {
-        "all": false,
-        "readFile": true,
-        "writeFile": true,
-        "scope": [
-          "$APPDATA/*",
-          "$RESOURCE/*"
-        ]
-      },
-      "process": {
-        "relaunch": true
-      }
-    },
-    "updater": {
-      "active": true,
-      "endpoints": [
-        "https://github.com/DianaSensei/developer-desktop-utils/releases/latest/download/latest.json"
-      ],
-      "dialog": false,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFFQjFGRDU1QUUzQTEzRDMKUldUVEV6cXVWZjJ4SGhCVm03YmdSUVN4VVZhQyt6bU0yakhRY3k5eUFpU1JHOXgvbTRoT1pSaFgK"
-    },
-    "bundle": {
-      "active": true,
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.ico",
-        "icons/icon.icns",
-        "icons/icon.png"
-      ],
-      "identifier": "com.devtool.app",
-      "targets": [
-        "app",
-        "dmg",
-        "msi",
-        "nsis",
-        "appimage",
-        "deb"
-      ]
-    },
-    "security": {
-      "csp": null
-    },
+  "app": {
+    "withGlobalTauri": false,
     "windows": [
       {
         "fullscreen": false,
@@ -77,6 +20,30 @@
         "minWidth": 800,
         "minHeight": 600
       }
-    ]
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "targets": ["app", "dmg", "msi", "nsis", "appimage", "deb"]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/DianaSensei/developer-desktop-utils/releases/latest/download/latest.json"
+      ],
+      "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFFQjFGRDU1QUUzQTEzRDMKUldUVEV6cXVWZjJ4SGhCVm03YmdSUVN4VVZhQyt6bU0yakhRY3k5eUFpU1JHOXgvbTRoT1pSaFgK"
+    }
   }
 }

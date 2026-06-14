@@ -231,16 +231,16 @@ async function renderToCanvas(opts: RenderOpts): Promise<HTMLCanvasElement | nul
 
 async function downloadPng(canvas: HTMLCanvasElement) {
   const dataUrl = canvas.toDataURL('image/png');
-  if (typeof window !== 'undefined' && '__TAURI_IPC__' in window) {
-    const { save }            = await import('@tauri-apps/api/dialog');
-    const { writeBinaryFile } = await import('@tauri-apps/api/fs');
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    const { save }      = await import('@tauri-apps/plugin-dialog');
+    const { writeFile } = await import('@tauri-apps/plugin-fs');
     const path = await save({ filters: [{ name: 'PNG Image', extensions: ['png'] }], defaultPath: 'qrcode.png' });
     if (!path) return;
     const base64 = dataUrl.split(',')[1];
     const binary = atob(base64);
     const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    await writeBinaryFile(path, bytes);
+    await writeFile(path, bytes);
   } else {
     const a = document.createElement('a');
     a.href = dataUrl;
@@ -253,12 +253,12 @@ async function downloadPng(canvas: HTMLCanvasElement) {
 
 async function pickImageFile(): Promise<{ dataUrl: string; img: HTMLImageElement } | null> {
   let dataUrl = '';
-  if (typeof window !== 'undefined' && '__TAURI_IPC__' in window) {
-    const { open }           = await import('@tauri-apps/api/dialog');
-    const { readBinaryFile } = await import('@tauri-apps/api/fs');
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    const { open }      = await import('@tauri-apps/plugin-dialog');
+    const { readFile }  = await import('@tauri-apps/plugin-fs');
     const selected = await open({ filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
     if (!selected || Array.isArray(selected)) return null;
-    const bytes  = await readBinaryFile(selected as string);
+    const bytes  = await readFile(selected as string);
     const base64 = btoa(String.fromCharCode(...bytes));
     const ext    = (selected as string).split('.').pop()?.toLowerCase() ?? 'png';
     dataUrl = `data:image/${ext};base64,${base64}`;
