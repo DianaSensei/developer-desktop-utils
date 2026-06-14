@@ -16,10 +16,13 @@ jobs:
           - platform: ubuntu-22.04
             args: ''
             rust-target: ''
-          - platform: macos-13          # Intel (x86_64) native runner
-            args: '--target x86_64-apple-darwin'
-            rust-target: x86_64-apple-darwin
-          - platform: macos-14          # Apple Silicon native runner (M1) — faster & free
+          # - platform: ubuntu-22.04-arm
+          #   args: ''
+          #   rust-target: ''
+          # - platform: macos-latest      # ARM runner — cross-compiles x86_64 (no Intel runner queue)
+          #   args: '--target x86_64-apple-darwin'
+          #   rust-target: x86_64-apple-darwin
+          - platform: macos-latest      # ARM runner — native aarch64 build
             args: '--target aarch64-apple-darwin'
             rust-target: aarch64-apple-darwin
           - platform: windows-latest
@@ -49,11 +52,11 @@ jobs:
           cache-on-failure: true
 
       - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm' # This must match the platform value defined above.
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
             patchelf
