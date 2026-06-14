@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Clock,
@@ -66,6 +66,36 @@ const allTools = [
   { path: '/settings', label: 'Settings', icon: SettingsIcon, component: Settings, featureId: 'settings' },
 ];
 
+const TOOL_ORDER_KEY = 'devtool-tool-order';
+
+function loadToolOrder(): string[] {
+  try {
+    const saved = localStorage.getItem(TOOL_ORDER_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToolOrder(order: string[]) {
+  localStorage.setItem(TOOL_ORDER_KEY, JSON.stringify(order));
+}
+
+function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder: string[]): T[] {
+  if (!savedOrder.length) return tools;
+  const map = new Map(tools.map((t) => [t.featureId, t]));
+  const ordered: T[] = [];
+  for (const id of savedOrder) {
+    const t = map.get(id);
+    if (t) ordered.push(t);
+  }
+  // append any new tools not in saved order
+  for (const t of tools) {
+    if (!savedOrder.includes(t.featureId)) ordered.push(t);
+  }
+  return ordered;
+}
+
 function Sidebar({
   isOpen,
   onClose,
@@ -84,7 +114,47 @@ function Sidebar({
   const location = useLocation();
   const { isFeatureEnabled } = useFeatures();
 
-  const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
+  const baseEnabled = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
+  const [orderedTools, setOrderedTools] = useState(() =>
+    applySavedOrder(baseEnabled, loadToolOrder())
+  );
+
+  // keep list in sync when enabled tools change
+  useEffect(() => {
+    setOrderedTools((prev) => {
+      const prevIds = prev.map((t) => t.featureId);
+      return applySavedOrder(baseEnabled, prevIds);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseEnabled.map((t) => t.featureId).join(',')]);
+
+  const dragIndex = useRef<number | null>(null);
+  const dragOverIndex = useRef<number | null>(null);
+
+  const handleDragStart = useCallback((index: number) => {
+    dragIndex.current = index;
+  }, []);
+
+  const handleDragEnter = useCallback((index: number) => {
+    dragOverIndex.current = index;
+    setOrderedTools((prev) => {
+      if (dragIndex.current === null || dragIndex.current === index) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex.current, 1);
+      next.splice(index, 0, moved);
+      dragIndex.current = index;
+      return next;
+    });
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setOrderedTools((prev) => {
+      saveToolOrder(prev.map((t) => t.featureId));
+      return prev;
+    });
+    dragIndex.current = null;
+    dragOverIndex.current = null;
+  }, []);
 
   return (
     <>
@@ -102,7 +172,7 @@ function Sidebar({
           {!isCollapsed && (
             <div>
               <h1 className="text-sm font-semibold leading-none">DevTool</h1>
-              <p className="mt-1 text-[11px] text-muted-foreground">{enabledTools.length} local tools</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{orderedTools.length} local tools</p>
             </div>
           )}
           <div className="flex items-center gap-1">
@@ -123,35 +193,43 @@ function Sidebar({
 
         <nav className={cn('flex-1 px-1.5 py-2', isCollapsed ? 'overflow-visible' : 'overflow-y-auto')}>
           <div className="space-y-0.5">
-            {enabledTools.map((tool) => {
+            {orderedTools.map((tool, index) => {
               const Icon = tool.icon;
               const isActive = location.pathname === tool.path;
               return (
-                <Link
+                <div
                   key={tool.path}
-                  to={tool.path}
-                  onClick={onClose}
-                  title={isCollapsed ? tool.label : undefined}
-                  className={cn(
-                    'group relative flex items-center rounded-md transition-all duration-150',
-                    isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
-                    isActive
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  )}
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragEnter={() => handleDragEnter(index)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => e.preventDefault()}
+                >
+                  <Link
+                    to={tool.path}
+                    onClick={onClose}
+                    title={isCollapsed ? tool.label : undefined}
+                    className={cn(
+                      'group relative flex items-center rounded-md transition-all duration-150 cursor-grab active:cursor-grabbing',
+                      isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
+                      isActive
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    )}
                   >
-                  <Icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
-                  {isCollapsed && (
-                    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
-                      {tool.label}
-                    </span>
-                  )}
-                  {!isCollapsed && (
-                    <span className={cn('text-sm transition-all whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
-                      {tool.label}
-                    </span>
-                  )}
-                </Link>
+                    <Icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
+                    {isCollapsed && (
+                      <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
+                        {tool.label}
+                      </span>
+                    )}
+                    {!isCollapsed && (
+                      <span className={cn('text-sm transition-all whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
+                        {tool.label}
+                      </span>
+                    )}
+                  </Link>
+                </div>
               );
             })}
           </div>
