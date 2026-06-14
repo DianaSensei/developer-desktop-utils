@@ -31,7 +31,18 @@
           "$APPDATA/*",
           "$RESOURCE/*"
         ]
+      },
+      "process": {
+        "relaunch": true
       }
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/OWNER/REPO/releases/latest/download/latest.json"
+      ],
+      "dialog": false,
+      "pubkey": ""
     },
     "bundle": {
       "active": true,

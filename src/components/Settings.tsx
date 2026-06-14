@@ -1,9 +1,14 @@
 import { useRef, useCallback, useState } from 'react';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
-import { RotateCcw, GripVertical, X, Search, CheckCheck } from 'lucide-react';
+import {
+  RotateCcw, GripVertical, X, Search, CheckCheck,
+  RefreshCw, Download, CheckCircle2, AlertCircle, Loader2,
+  Clipboard, FolderOpen, FolderClosed, Shield,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { TOOL_DEFS } from '@/lib/toolDefs';
+import { useUpdater } from '@/hooks/useUpdater';
 
 function applySavedOrder<T extends { id: string }>(tools: T[], savedOrder: string[]): T[] {
   if (!savedOrder.length) return tools;
@@ -38,8 +43,33 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
   );
 }
 
+const CURRENT_VERSION = '0.1.0';
+const isTauri = typeof window !== 'undefined' && '__TAURI_IPC__' in window;
+
+const APP_PERMISSIONS = [
+  {
+    Icon: Clipboard,
+    name: 'Clipboard',
+    description: 'Read text you\'ve copied; write tool output directly to your clipboard.',
+    scope: 'System clipboard only',
+  },
+  {
+    Icon: FolderOpen,
+    name: 'File System',
+    description: 'Read and write files for tools like Checksum and Image ↔ Base64.',
+    scope: 'AppData folder + app resources only',
+  },
+  {
+    Icon: FolderClosed,
+    name: 'File Dialogs',
+    description: 'Open file picker and save dialogs so you can browse for files.',
+    scope: 'Triggered by you only',
+  },
+];
+
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools } = useFeatures();
+  const { status: updateStatus, updateInfo, error: updateError, checkForUpdates, installUpdate } = useUpdater();
 
   const [displayTools, setDisplayTools] = useState(() => applySavedOrder(TOOL_DEFS, toolOrder));
 
@@ -177,6 +207,103 @@ export function Settings() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* Updates section — desktop only */}
+      {isTauri && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">Updates</h2>
+          <div className="rounded-lg border divide-y text-xs">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-muted-foreground">Current version</span>
+              <span className="font-mono font-medium">v{CURRENT_VERSION}</span>
+            </div>
+
+            {updateStatus === 'available' && updateInfo && (
+              <div className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[10px] font-semibold">
+                    <CheckCircle2 className="h-3 w-3" />
+                    v{updateInfo.version} available
+                  </span>
+                </div>
+                {updateInfo.body && (
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{updateInfo.body}</p>
+                )}
+              </div>
+            )}
+
+            {updateStatus === 'not-available' && (
+              <div className="flex items-center gap-2 px-4 py-3 text-muted-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                You are on the latest version.
+              </div>
+            )}
+
+            {updateStatus === 'error' && (
+              <div className="flex items-center gap-2 px-4 py-3 text-destructive">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span className="leading-relaxed">{updateError ?? 'Failed to check for updates.'}</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 px-4 py-3">
+              {updateStatus === 'available' ? (
+                <button
+                  onClick={installUpdate}
+                  disabled={updateStatus === 'available' && false}
+                  className="flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download &amp; Install
+                </button>
+              ) : updateStatus === 'checking' || updateStatus === 'downloading' ? (
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {updateStatus === 'checking' ? 'Checking for updates…' : 'Downloading update…'}
+                </span>
+              ) : (
+                <button
+                  onClick={checkForUpdates}
+                  className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Check for Updates
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Permissions section */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold">App Permissions</h2>
+          <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+        </div>
+        <p className="text-[11px] text-muted-foreground -mt-1">
+          DevTool cannot access your files outside the listed scope. No network requests are made.
+        </p>
+        {!isTauri && (
+          <p className="text-[11px] text-amber-500 dark:text-amber-400">
+            Running in browser — permissions listed below apply to the desktop app only.
+          </p>
+        )}
+        <div className="rounded-lg border divide-y">
+          {APP_PERMISSIONS.map(({ Icon, name, description, scope }) => (
+            <div key={name} className="flex items-start gap-3 px-4 py-3">
+              <Icon className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <p className="text-xs font-medium">{name}</p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">{description}</p>
+              </div>
+              <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {scope}
+              </span>
+            </div>
+          ))}
         </div>
       </section>
 
