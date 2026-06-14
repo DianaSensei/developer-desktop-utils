@@ -15,12 +15,16 @@ jobs:
         include:
           - platform: ubuntu-22.04
             args: ''
-          - platform: macos-latest
+            rust-target: ''
+          - platform: macos-13          # Intel (x86_64) native runner
             args: '--target x86_64-apple-darwin'
-          - platform: macos-latest
+            rust-target: x86_64-apple-darwin
+          - platform: macos-14          # Apple Silicon native runner (M1) — faster & free
             args: '--target aarch64-apple-darwin'
+            rust-target: aarch64-apple-darwin
           - platform: windows-latest
             args: ''
+            rust-target: ''
 
     runs-on: ${{ matrix.platform }}
 
@@ -36,7 +40,13 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.rust-target }}
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-on-failure: true
 
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -49,7 +59,7 @@ jobs:
             patchelf
 
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0

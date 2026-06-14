@@ -52,7 +52,7 @@
         "icons/128x128@2x.png"
       ],
       "identifier": "com.devtool.app",
-      "targets": "all"
+      "targets": ["app", "dmg", "msi", "nsis", "appimage", "deb"]
     },
     "security": {
       "csp": null
