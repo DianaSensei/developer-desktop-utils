@@ -1,133 +1,213 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { useRef, useCallback, useState } from 'react';
 import { useFeatures } from '@/contexts/FeatureContext';
-import {
-  Calendar,
-  Code,
-  Hash,
-  Clock,
-  FileJson,
-  Shield,
-  Search,
-  Link as LinkIcon,
-  Key,
-  GitCompare,
-  QrCode,
-  FileText,
-  Filter,
-  RotateCcw,
-  Type,
-  Palette,
-} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { RotateCcw, GripVertical, X, Search, CheckCheck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { TOOL_DEFS } from '@/lib/toolDefs';
 
-const FEATURE_LIST = [
-  { id: 'cron-generator', label: 'Cron Generator', icon: Calendar },
-  { id: 'text-transform', label: 'Text Transformer', icon: Code },
-  { id: 'text-counter', label: 'Text Counter', icon: Type },
-  { id: 'color-picker', label: 'Color Picker', icon: Palette },
-  { id: 'base64', label: 'Encoder / Decoder', icon: Code },
-  { id: 'hash', label: 'Hash & Encrypt', icon: Hash },
-  { id: 'unix-time', label: 'Unix Time Converter', icon: Clock },
-  { id: 'json', label: 'JSON Formatter', icon: FileJson },
-  { id: 'jwt', label: 'JWT Debugger', icon: Shield },
-  { id: 'regex', label: 'Regex Tester', icon: Search },
-  { id: 'url', label: 'URL Encoder/Decoder', icon: LinkIcon },
-  { id: 'uuid', label: 'UUID Generator', icon: Key },
-  { id: 'diff', label: 'Text Diff', icon: GitCompare },
-  { id: 'qrcode', label: 'QR Code Generator', icon: QrCode },
-  { id: 'markdown', label: 'Markdown Preview', icon: FileText },
-  { id: 'deduplicate', label: 'Array Deduplicator', icon: Filter },
-];
+function applySavedOrder<T extends { id: string }>(tools: T[], savedOrder: string[]): T[] {
+  if (!savedOrder.length) return tools;
+  const map = new Map(tools.map((t) => [t.id, t]));
+  const ordered: T[] = [];
+  for (const id of savedOrder) {
+    const t = map.get(id);
+    if (t) ordered.push(t);
+  }
+  for (const t of tools) {
+    if (!savedOrder.includes(t.id)) ordered.push(t);
+  }
+  return ordered;
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className={cn(
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        checked ? 'bg-primary' : 'bg-muted-foreground/25'
+      )}
+    >
+      <span className={cn(
+        'inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform',
+        checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
+      )} />
+    </button>
+  );
+}
 
 export function Settings() {
-  const { features, toggleFeature, resetToDefaults } = useFeatures();
+  const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools } = useFeatures();
 
-  const enabledCount = Object.values(features).filter(Boolean).length;
+  const [displayTools, setDisplayTools] = useState(() => applySavedOrder(TOOL_DEFS, toolOrder));
+
+  // keep in sync when toolOrder changes externally (e.g. reset)
+  const prevOrderKey = useRef(toolOrder.join());
+  const nextKey = toolOrder.join();
+  if (prevOrderKey.current !== nextKey) {
+    prevOrderKey.current = nextKey;
+    setDisplayTools(applySavedOrder(TOOL_DEFS, toolOrder));
+  }
+
+  const [toolQuery, setToolQuery] = useState('');
+  const enabledCount = displayTools.filter((t) => features[t.id] !== false).length;
+  const allEnabled = TOOL_DEFS.every((t) => features[t.id] !== false);
+
+  const enableAll = () => {
+    TOOL_DEFS.forEach((t) => { if (features[t.id] === false) toggleFeature(t.id); });
+  };
+  const visibleTools = toolQuery.trim()
+    ? displayTools.filter((t) =>
+        t.label.toLowerCase().includes(toolQuery.trim().toLowerCase()) ||
+        t.description.toLowerCase().includes(toolQuery.trim().toLowerCase())
+      )
+    : displayTools;
+  const isSearching = toolQuery.trim().length > 0;
+
+  const dragIndex = useRef<number | null>(null);
+
+  const handleDragStart = useCallback((index: number) => {
+    dragIndex.current = index;
+  }, []);
+
+  const handleDragEnter = useCallback((index: number) => {
+    setDisplayTools((prev) => {
+      if (dragIndex.current === null || dragIndex.current === index) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex.current, 1);
+      next.splice(index, 0, moved);
+      dragIndex.current = index;
+      return next;
+    });
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDisplayTools((prev) => {
+      reorderTools(prev.map((t) => t.id));
+      return prev;
+    });
+    dragIndex.current = null;
+  }, [reorderTools]);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>Feature Settings</CardTitle>
-              <CardDescription>
-                Enable or disable tools. Disabled tools won't appear in the sidebar.
-              </CardDescription>
-            </div>
-            <Button onClick={resetToDefaults} variant="outline" size="sm">
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset to Defaults
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-3 rounded-md border bg-muted/45 px-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{enabledCount}</span> of{' '}
-              {FEATURE_LIST.length} features enabled
+    <div className="max-w-2xl mx-auto space-y-8 py-2">
+
+      {/* Tools section */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold">Tools</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {enabledCount} of {TOOL_DEFS.length} enabled · drag to reorder · hidden tools are removed from the sidebar
             </p>
           </div>
-
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {FEATURE_LIST.map((feature) => {
-              const Icon = feature.icon;
-              const isEnabled = features[feature.id] !== false;
-
-              return (
-                <div
-                  key={feature.id}
-                  className={`flex items-center justify-between rounded-md border px-3 py-2.5 transition-all ${
-                    isEnabled
-                      ? 'bg-card border-border'
-                      : 'bg-muted/40 border-muted opacity-60'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`h-4 w-4 ${isEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <Label
-                      htmlFor={feature.id}
-                      className={`cursor-pointer text-sm font-medium ${
-                        !isEnabled && 'text-muted-foreground'
-                      }`}
-                    >
-                      {feature.label}
-                    </Label>
-                  </div>
-                  <button
-                    id={feature.id}
-                    role="switch"
-                    aria-checked={isEnabled}
-                    onClick={() => toggleFeature(feature.id)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-1 ${
-                      isEnabled ? 'bg-primary' : 'bg-muted-foreground/30'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                        isEnabled ? 'translate-x-5' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-2">
+            {!allEnabled && (
+              <button
+                onClick={enableAll}
+                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <CheckCheck className="h-3 w-3" />
+                Enable all
+              </button>
+            )}
+            <button
+              onClick={resetToDefaults}
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset
+            </button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>About DevTool</CardTitle>
-          <CardDescription>Developer utilities for daily tasks</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-3">
-          <p>Version: 0.1.0</p>
-          <p>Built with: Tauri, React, TypeScript, Tailwind CSS</p>
-          <p>All tools run locally - your data never leaves your device</p>
-        </CardContent>
-      </Card>
+        {/* Search */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+          <Input
+            value={toolQuery}
+            onChange={(e) => setToolQuery(e.target.value)}
+            placeholder="Search tools…"
+            className="pl-8 pr-8 h-8 text-xs bg-muted/40 border-muted focus-visible:ring-1"
+          />
+          {toolQuery && (
+            <button
+              onClick={() => setToolQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="rounded-lg border divide-y">
+          {visibleTools.length === 0 && isSearching && (
+            <p className="px-4 py-6 text-center text-[11px] text-muted-foreground">No tools match "{toolQuery}"</p>
+          )}
+          {visibleTools.map((tool) => {
+            const index = displayTools.indexOf(tool);
+            const Icon = tool.icon;
+            const enabled = features[tool.id] !== false;
+            return (
+              <div
+                key={tool.id}
+                draggable={!isSearching}
+                onDragStart={!isSearching ? () => handleDragStart(index) : undefined}
+                onDragEnter={!isSearching ? () => handleDragEnter(index) : undefined}
+                onDragEnd={!isSearching ? handleDragEnd : undefined}
+                onDragOver={!isSearching ? (e) => e.preventDefault() : undefined}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-3 transition-colors cursor-default',
+                  !enabled && 'opacity-50'
+                )}
+              >
+                {/* Drag handle — hidden while searching */}
+                <GripVertical className={cn(
+                  'h-3.5 w-3.5 shrink-0 text-muted-foreground/40 transition-opacity',
+                  isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing'
+                )} />
+                <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'text-muted-foreground')} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium leading-none">{tool.label}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{tool.description}</p>
+                </div>
+                <Toggle checked={enabled} onChange={() => toggleFeature(tool.id)} />
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* About section */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">About</h2>
+        <div className="rounded-lg border divide-y text-xs">
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-muted-foreground">Version</span>
+            <span className="font-mono font-medium">0.1.0</span>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-muted-foreground">Contact</span>
+            <span className="font-medium">thefirst1441999@gmail.com</span>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-muted-foreground">Built with</span>
+            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+              {['Tauri', 'React', 'TypeScript', 'Tailwind CSS'].map((t) => (
+                <span key={t} className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{t}</span>
+              ))}
+            </div>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-muted-foreground leading-relaxed">
+              All tools run entirely on your device. No data is sent to any server.
+            </p>
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 }

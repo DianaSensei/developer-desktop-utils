@@ -9,7 +9,11 @@ interface FeatureContextType {
   toggleFeature: (featureId: string) => void;
   isFeatureEnabled: (featureId: string) => boolean;
   resetToDefaults: () => void;
+  toolOrder: string[];
+  reorderTools: (order: string[]) => void;
 }
+
+const TOOL_ORDER_KEY = 'devtool-tool-order';
 
 const FeatureContext = createContext<FeatureContextType | undefined>(undefined);
 
@@ -24,19 +28,27 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'json': true,
   'jwt': true,
   'regex': true,
-  'url': true,
-  'uuid': true,
   'diff': true,
   'qrcode': true,
   'markdown': true,
   'deduplicate': true,
-  'settings': true, // Always enabled
+  'checksum': true,
+  'image-base64': true,
+  'generator': true,
+  'settings': true,
 };
 
 export function FeatureProvider({ children }: { children: ReactNode }) {
   const [features, setFeatures] = useState<FeatureSettings>(() => {
     const saved = localStorage.getItem('devtool-features');
     return saved ? JSON.parse(saved) : DEFAULT_FEATURES;
+  });
+
+  const [toolOrder, setToolOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(TOOL_ORDER_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   useEffect(() => {
@@ -58,8 +70,13 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
     setFeatures(DEFAULT_FEATURES);
   };
 
+  const reorderTools = (order: string[]) => {
+    setToolOrder(order);
+    localStorage.setItem(TOOL_ORDER_KEY, JSON.stringify(order));
+  };
+
   return (
-    <FeatureContext.Provider value={{ features, toggleFeature, isFeatureEnabled, resetToDefaults }}>
+    <FeatureContext.Provider value={{ features, toggleFeature, isFeatureEnabled, resetToDefaults, toolOrder, reorderTools }}>
       {children}
     </FeatureContext.Provider>
   );

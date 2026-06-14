@@ -1,20 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import {
-  Clock,
-  Code,
-  Hash,
-  Calendar,
-  FileJson,
-  Shield,
-  Search,
-  Link as LinkIcon,
-  Key,
-  GitCompare,
-  QrCode,
-  FileText,
-  Filter,
   Menu,
   X,
   Moon,
@@ -22,9 +10,11 @@ import {
   Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
-  Type,
-  Palette,
+  ChevronDown,
+  Search,
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { TOOL_DEFS, TOOL_DEF_MAP } from '@/lib/toolDefs';
 import { Button } from '@/components/ui/button';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
 
@@ -36,8 +26,9 @@ import { UnixTimeConverter } from '@/components/tools/UnixTimeConverter';
 import { JsonFormatter } from '@/components/tools/JsonFormatter';
 import { JwtDebugger } from '@/components/tools/JwtDebugger';
 import { RegexTester } from '@/components/tools/RegexTester';
-import { UrlTool } from '@/components/tools/UrlTool';
-import { UuidGenerator } from '@/components/tools/UuidGenerator';
+import { ChecksumTool } from '@/components/tools/ChecksumTool';
+import { ImageBase64Tool } from '@/components/tools/ImageBase64Tool';
+import { GeneratorTool } from '@/components/tools/GeneratorTool';
 import { TextDiff } from '@/components/tools/TextDiff';
 import { QRCodeTool } from '@/components/tools/QRCodeTool';
 import { MarkdownPreview } from '@/components/tools/MarkdownPreview';
@@ -46,40 +37,36 @@ import { TextCounter } from '@/components/tools/TextCounter';
 import { ColorPicker } from '@/components/tools/ColorPicker';
 import { Settings } from '@/components/Settings';
 
+const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType }> = {
+  'cron-generator': { path: '/',              component: CronGenerator },
+  'text-transform': { path: '/text-transform', component: TextTransformer },
+  'text-counter':   { path: '/text-counter',   component: TextCounter },
+  'color-picker':   { path: '/color-picker',   component: ColorPicker },
+  'base64':         { path: '/base64',         component: Base64Tool },
+  'hash':           { path: '/hash',           component: HashTool },
+  'unix-time':      { path: '/unix-time',      component: UnixTimeConverter },
+  'json':           { path: '/json',           component: JsonFormatter },
+  'jwt':            { path: '/jwt',            component: JwtDebugger },
+  'regex':          { path: '/regex',          component: RegexTester },
+  'diff':           { path: '/diff',           component: TextDiff },
+  'qrcode':         { path: '/qrcode',         component: QRCodeTool },
+  'markdown':       { path: '/markdown',       component: MarkdownPreview },
+  'deduplicate':    { path: '/deduplicate',    component: ArrayDeduplicator },
+  'checksum':       { path: '/checksum',       component: ChecksumTool },
+  'image-base64':   { path: '/image-base64',   component: ImageBase64Tool },
+  'generator':      { path: '/generator',      component: GeneratorTool },
+};
+
 const allTools = [
-  { path: '/', label: 'Cron Generator', icon: Calendar, component: CronGenerator, featureId: 'cron-generator' },
-  { path: '/text-transform', label: 'Text Transformer', icon: Code, component: TextTransformer, featureId: 'text-transform' },
-  { path: '/text-counter', label: 'Text Counter', icon: Type, component: TextCounter, featureId: 'text-counter' },
-  { path: '/color-picker', label: 'Color Picker', icon: Palette, component: ColorPicker, featureId: 'color-picker' },
-  { path: '/base64', label: 'Encoder / Decoder', icon: Code, component: Base64Tool, featureId: 'base64' },
-  { path: '/hash', label: 'Hash & Encrypt', icon: Hash, component: HashTool, featureId: 'hash' },
-  { path: '/unix-time', label: 'Date / Time', icon: Clock, component: UnixTimeConverter, featureId: 'unix-time' },
-  { path: '/json', label: 'JSON Formatter', icon: FileJson, component: JsonFormatter, featureId: 'json' },
-  { path: '/jwt', label: 'JWT Debugger', icon: Shield, component: JwtDebugger, featureId: 'jwt' },
-  { path: '/regex', label: 'Regex Tester', icon: Search, component: RegexTester, featureId: 'regex' },
-  { path: '/url', label: 'URL Encode', icon: LinkIcon, component: UrlTool, featureId: 'url' },
-  { path: '/uuid', label: 'UUID Generator', icon: Key, component: UuidGenerator, featureId: 'uuid' },
-  { path: '/diff', label: 'Text Diff', icon: GitCompare, component: TextDiff, featureId: 'diff' },
-  { path: '/qrcode', label: 'QR Code', icon: QrCode, component: QRCodeTool, featureId: 'qrcode' },
-  { path: '/markdown', label: 'Markdown', icon: FileText, component: MarkdownPreview, featureId: 'markdown' },
-  { path: '/deduplicate', label: 'Deduplicate', icon: Filter, component: ArrayDeduplicator, featureId: 'deduplicate' },
-  { path: '/settings', label: 'Settings', icon: SettingsIcon, component: Settings, featureId: 'settings' },
+  ...TOOL_DEFS.map((def) => ({
+    featureId: def.id,
+    label: def.label,
+    icon: def.icon,
+    description: def.description,
+    ...TOOL_ROUTES[def.id],
+  })),
+  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', path: '/settings', component: Settings },
 ];
-
-const TOOL_ORDER_KEY = 'devtool-tool-order';
-
-function loadToolOrder(): string[] {
-  try {
-    const saved = localStorage.getItem(TOOL_ORDER_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveToolOrder(order: string[]) {
-  localStorage.setItem(TOOL_ORDER_KEY, JSON.stringify(order));
-}
 
 function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder: string[]): T[] {
   if (!savedOrder.length) return tools;
@@ -94,6 +81,50 @@ function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder
     if (!savedOrder.includes(t.featureId)) ordered.push(t);
   }
   return ordered;
+}
+
+function NavTooltip({ label, description, children }: {
+  label: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const handleEnter = () => {
+    timer.current = setTimeout(() => {
+      if (wrapRef.current) {
+        const r = wrapRef.current.getBoundingClientRect();
+        setCoords({ top: r.top + r.height / 2, left: r.right + 10 });
+        setVisible(true);
+      }
+    }, 500);
+  };
+
+  const handleLeave = () => {
+    if (timer.current) clearTimeout(timer.current);
+    setVisible(false);
+  };
+
+  return (
+    <div ref={wrapRef} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+      {children}
+      {visible && createPortal(
+        <div
+          className="fixed z-[9999] pointer-events-none -translate-y-1/2 w-52 rounded-md border bg-popover px-3 py-2.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100"
+          style={{ top: coords.top, left: coords.left }}
+        >
+          <p className="text-xs font-semibold text-popover-foreground leading-none">{label}</p>
+          {description && (
+            <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">{description}</p>
+          )}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
 }
 
 function Sidebar({
@@ -112,49 +143,20 @@ function Sidebar({
   onToggleCollapse: () => void;
 }) {
   const location = useLocation();
-  const { isFeatureEnabled } = useFeatures();
+  const { isFeatureEnabled, toolOrder } = useFeatures();
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const baseEnabled = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
-  const [orderedTools, setOrderedTools] = useState(() =>
-    applySavedOrder(baseEnabled, loadToolOrder())
-  );
+  const orderedTools = applySavedOrder(baseEnabled, toolOrder);
 
-  // keep list in sync when enabled tools change
-  useEffect(() => {
-    setOrderedTools((prev) => {
-      const prevIds = prev.map((t) => t.featureId);
-      return applySavedOrder(baseEnabled, prevIds);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseEnabled.map((t) => t.featureId).join(',')]);
-
-  const dragIndex = useRef<number | null>(null);
-  const dragOverIndex = useRef<number | null>(null);
-
-  const handleDragStart = useCallback((index: number) => {
-    dragIndex.current = index;
-  }, []);
-
-  const handleDragEnter = useCallback((index: number) => {
-    dragOverIndex.current = index;
-    setOrderedTools((prev) => {
-      if (dragIndex.current === null || dragIndex.current === index) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(dragIndex.current, 1);
-      next.splice(index, 0, moved);
-      dragIndex.current = index;
-      return next;
-    });
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    setOrderedTools((prev) => {
-      saveToolOrder(prev.map((t) => t.featureId));
-      return prev;
-    });
-    dragIndex.current = null;
-    dragOverIndex.current = null;
-  }, []);
+  // Settings is pinned to the bottom — exclude from the nav list
+  const allNavTools = orderedTools.filter((t) => t.featureId !== 'settings');
+  const navTools = query.trim()
+    ? allNavTools.filter((t) => t.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : allNavTools;
+  const settingsTool = allTools.find((t) => t.featureId === 'settings')!;
+  const isSettingsActive = location.pathname === settingsTool.path;
 
   return (
     <>
@@ -168,90 +170,207 @@ function Sidebar({
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        <div className={cn('flex items-center border-b transition-all', isCollapsed ? 'justify-center py-2.5 px-2' : 'justify-between px-3 py-3')}>
+        {/* Header */}
+        <div className={cn(
+          'flex shrink-0 items-center border-b',
+          isCollapsed ? 'justify-center py-3 px-2' : 'justify-between px-3 py-3'
+        )}>
           {!isCollapsed && (
             <div>
               <h1 className="text-sm font-semibold leading-none">DevTool</h1>
-              <p className="mt-1 text-[11px] text-muted-foreground">{orderedTools.length} local tools</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{allNavTools.length} tools</p>
             </div>
           )}
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onToggleDark}
-              title={isDark ? 'Light mode' : 'Dark mode'}
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={onClose}>
+            {isCollapsed && (
+              <div className="h-6 w-6 flex items-center justify-center">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+              </div>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={onClose} title="Close menu">
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        <nav className={cn('flex-1 px-1.5 py-2', isCollapsed ? 'overflow-visible' : 'overflow-y-auto')}>
-          <div className="space-y-0.5">
-            {orderedTools.map((tool, index) => {
-              const Icon = tool.icon;
-              const isActive = location.pathname === tool.path;
-              return (
-                <div
-                  key={tool.path}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDragEnter={() => handleDragEnter(index)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={(e) => e.preventDefault()}
-                >
-                  <Link
-                    to={tool.path}
-                    onClick={onClose}
-                    title={isCollapsed ? tool.label : undefined}
-                    className={cn(
-                      'group relative flex items-center rounded-md transition-all duration-150 cursor-grab active:cursor-grabbing',
-                      isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
-                      isActive
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    )}
-                  >
-                    <Icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
-                    {isCollapsed && (
-                      <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
-                        {tool.label}
-                      </span>
-                    )}
-                    {!isCollapsed && (
-                      <span className={cn('text-sm transition-all whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
-                        {tool.label}
-                      </span>
-                    )}
-                  </Link>
-                </div>
-              );
-            })}
+        {/* Search */}
+        {isCollapsed ? (
+          <div className="shrink-0 flex justify-center px-2 pt-2">
+            <button
+              onClick={() => { /* expand handled by parent or tooltip */ }}
+              title="Search tools (expand sidebar to search)"
+              className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
           </div>
-        </nav>
+        ) : (
+          <div className="shrink-0 px-1.5 pt-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/60" />
+              <Input
+                ref={searchRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search tools…"
+                className="h-7 pl-7 pr-7 text-xs rounded-md bg-muted/40 border-muted focus-visible:ring-1"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
-        <div className={cn('border-t px-1.5 py-2 hidden lg:block')}>
-          <Button
-            variant="ghost"
-            size="sm"
+        {/* Scrollable tool list with overflow fade */}
+        {(() => {
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          const navRef = useRef<HTMLElement>(null);
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          const [hasMore, setHasMore] = useState(false);
+
+          const checkScroll = useCallback(() => {
+            const el = navRef.current;
+            if (!el) return;
+            setHasMore(el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+          }, []);
+
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          useLayoutEffect(() => {
+            checkScroll();
+            const el = navRef.current;
+            if (!el) return;
+            el.addEventListener('scroll', checkScroll);
+            const ro = new ResizeObserver(checkScroll);
+            ro.observe(el);
+            return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
+          }, [checkScroll, navTools.length, query]);
+
+          return (
+            <div className="relative flex-1 min-h-0">
+              <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
+                {navTools.length === 0 && query && (
+                  <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
+                )}
+                <div className="space-y-0.5">
+                  {navTools.map((tool) => {
+                    const Icon = tool.icon;
+                    const isActive = location.pathname === tool.path;
+                    const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
+                    return (
+                      <NavTooltip key={tool.path} label={tool.label} description={desc}>
+                        <Link
+                          to={tool.path}
+                          onClick={onClose}
+                          className={cn(
+                            'flex items-center rounded-md transition-all duration-150',
+                            isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
+                            isActive
+                              ? 'bg-accent text-accent-foreground'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          )}
+                        >
+                          <Icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
+                          {!isCollapsed && (
+                            <span className={cn('flex-1 text-sm whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
+                              {tool.label}
+                            </span>
+                          )}
+                        </Link>
+                      </NavTooltip>
+                    );
+                  })}
+                </div>
+              </nav>
+              {/* Fade + indicator when more items below */}
+              {hasMore && (
+                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 flex items-end justify-center pb-1"
+                  style={{ background: 'linear-gradient(to bottom, transparent, var(--card-bg, hsl(var(--card))) 85%)' }}>
+                  <span className={cn(
+                    'flex items-center gap-0.5 text-[9px] text-muted-foreground/60',
+                    isCollapsed ? 'flex-col' : 'flex-row'
+                  )}>
+                    <ChevronDown className="h-2.5 w-2.5" />
+                    {!isCollapsed && 'more'}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Pinned bottom bar — always visible, order: Collapse → Dark mode → Settings */}
+        <div className="shrink-0 border-t px-1.5 py-2 space-y-0.5">
+          {/* Collapse/expand — desktop only */}
+          <button
             onClick={onToggleCollapse}
-            className={cn('w-full h-8 text-xs text-muted-foreground hover:text-foreground', isCollapsed && 'px-0')}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-3.5 w-3.5" />
-            ) : (
-              <>
-                <ChevronLeft className="h-3.5 w-3.5 mr-2" />
-                <span className="text-muted-foreground">Collapse</span>
-              </>
+            className={cn(
+              'group relative hidden lg:flex w-full items-center rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted',
+              isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2'
             )}
-          </Button>
+          >
+            {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronLeft className="h-4 w-4 shrink-0" />}
+            {isCollapsed && (
+              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
+                {isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              </span>
+            )}
+            {!isCollapsed && <span className="text-sm whitespace-nowrap overflow-hidden">Collapse</span>}
+          </button>
+
+          {/* Dark / Light mode — icon reflects current mode */}
+          <button
+            onClick={onToggleDark}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            className={cn(
+              'group relative flex w-full items-center rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted',
+              isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2'
+            )}
+          >
+            {isDark ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
+            {isCollapsed && (
+              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
+                {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              </span>
+            )}
+            {!isCollapsed && (
+              <span className="text-sm whitespace-nowrap overflow-hidden">
+                {isDark ? 'Light mode' : 'Dark mode'}
+              </span>
+            )}
+          </button>
+
+          {/* Settings — always last */}
+          <Link
+            to={settingsTool.path}
+            onClick={onClose}
+            title="Settings"
+            className={cn(
+              'group relative flex items-center rounded-md transition-colors',
+              isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
+              isSettingsActive
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            )}
+          >
+            <SettingsIcon className={cn('h-4 w-4 shrink-0', isSettingsActive && 'text-primary')} />
+            {isCollapsed && (
+              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
+                Settings
+              </span>
+            )}
+            {!isCollapsed && (
+              <span className={cn('text-sm whitespace-nowrap overflow-hidden', isSettingsActive && 'font-medium')}>
+                Settings
+              </span>
+            )}
+          </Link>
         </div>
       </aside>
     </>
@@ -320,7 +439,7 @@ function AppContent() {
               <div>
                 <h2 className="text-sm font-semibold leading-none">{activeTool.label}</h2>
                 <p className="mt-1 hidden text-[11px] text-muted-foreground sm:block">
-                  Offline utility - {enabledTools.length} enabled
+                  Offline utility - {enabledTools.filter(t => t.featureId !== 'settings').length} enabled
                 </p>
               </div>
             </div>
