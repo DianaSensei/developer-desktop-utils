@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   publish:
     permissions:
@@ -50,6 +53,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
+          key: ${{ matrix.platform }}-${{ matrix.rust-target }}
 
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm' # This must match the platform value defined above.
