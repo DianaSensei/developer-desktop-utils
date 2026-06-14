@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { TOOL_DEFS, TOOL_DEF_MAP } from '@/lib/toolDefs';
 import { Button } from '@/components/ui/button';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
+import { AppLogo } from '@/components/AppLogo';
 
 import { CronGenerator } from '@/components/tools/CronGenerator';
 import { TextTransformer } from '@/components/tools/TextTransformer';
@@ -175,22 +176,20 @@ function Sidebar({
           'flex shrink-0 items-center border-b',
           isCollapsed ? 'justify-center py-3 px-2' : 'justify-between px-3 py-3'
         )}>
-          {!isCollapsed && (
-            <div>
-              <h1 className="text-sm font-semibold leading-none">DevTool</h1>
-              <p className="mt-1 text-[11px] text-muted-foreground">{allNavTools.length} tools</p>
+          {isCollapsed ? (
+            <AppLogo size={32} />
+          ) : (
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AppLogo size={30} />
+              <div>
+                <h1 className="text-sm font-semibold leading-none">DevTool</h1>
+                <p className="mt-1 text-[11px] text-muted-foreground">{allNavTools.length} tools</p>
+              </div>
             </div>
           )}
-          <div className="flex items-center gap-1">
-            {isCollapsed && (
-              <div className="h-6 w-6 flex items-center justify-center">
-                <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-              </div>
-            )}
-            <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={onClose} title="Close menu">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={onClose} title="Close menu">
+            <X className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Search */}

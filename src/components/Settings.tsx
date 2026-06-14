@@ -9,6 +9,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { TOOL_DEFS } from '@/lib/toolDefs';
 import { useUpdater } from '@/hooks/useUpdater';
+import { AppLogo } from '@/components/AppLogo';
 
 function applySavedOrder<T extends { id: string }>(tools: T[], savedOrder: string[]): T[] {
   if (!savedOrder.length) return tools;
@@ -311,6 +312,13 @@ export function Settings() {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">About</h2>
         <div className="rounded-lg border divide-y text-xs">
+          <div className="flex items-center gap-3 px-4 py-4">
+            <AppLogo size={44} />
+            <div>
+              <p className="font-semibold text-sm leading-none">DevTool</p>
+              <p className="text-muted-foreground mt-1 text-[11px]">Developer utilities for your desktop</p>
+            </div>
+          </div>
           <div className="flex items-center justify-between px-4 py-3">
             <span className="text-muted-foreground">Version</span>
             <span className="font-mono font-medium">0.1.0</span>

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#0D1F35"/>
+      <stop offset="100%" stop-color="#0A1628"/>
+    </linearGradient>
+
+    <!-- Subtle radial bloom behind the symbol -->
+    <radialGradient id="bloom" cx="50%" cy="52%" r="42%">
+      <stop offset="0%"   stop-color="#1A5A8A" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#0A1628" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Soft glow on the symbol -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="28" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bloom)"/>
+
+  <!-- > _ symbol, centered, large, glowing -->
+  <g filter="url(#glow)">
+    <!-- Caret ">" -->
+    <polyline
+      points="168,280 468,512 168,744"
+      fill="none"
+      stroke="#38BDF8"
+      stroke-width="96"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Underscore "_" — baseline-aligned with the caret bottom -->
+    <line
+      x1="530" y1="726"
+      x2="856" y2="726"
+      stroke="#38BDF8"
+      stroke-width="88"
+      stroke-linecap="round"
+    />
+  </g>
+</svg>
