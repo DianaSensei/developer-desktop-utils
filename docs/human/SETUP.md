@@ -1,28 +1,34 @@
 # DevTool Setup Guide
 
+## Platform Requirements
+
+| Platform | Minimum Version |
+|----------|----------------|
+| macOS | 11 (Big Sur) |
+| Windows | 10 / 11 |
+| Linux | Ubuntu 22.04+ |
+
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
+### 1. Node.js 18+
 
-### 1. Node.js and npm
 ```bash
-node --version  # Should be 18.x or higher
-npm --version
+node --version  # Must be 18.x or higher
 ```
 
-If not installed, download from [nodejs.org](https://nodejs.org/)
+Download from [nodejs.org](https://nodejs.org/) if not installed.
 
-### 2. Rust and Cargo (for Tauri)
+### 2. Rust (stable)
 
-**macOS/Linux:**
+**macOS / Linux:**
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
 ```
 
-**Windows:**
-Download and install from [rustup.rs](https://rustup.rs/)
+**Windows:** Download from [rustup.rs](https://rustup.rs/)
 
-Verify installation:
+Verify:
 ```bash
 rustc --version
 cargo --version
@@ -35,92 +41,71 @@ cargo --version
 xcode-select --install
 ```
 
-**Linux (Ubuntu/Debian):**
+**Linux (Ubuntu 22.04+):**
 ```bash
 sudo apt update
-sudo apt install libwebkit2gtk-4.0-dev \
+sudo apt install -y \
+    libwebkit2gtk-4.1-dev \
+    libjavascriptcoregtk-4.1-dev \
     build-essential \
     curl \
     wget \
     libssl-dev \
     libgtk-3-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev
+    libappindicator3-dev \
+    librsvg2-dev \
+    patchelf
 ```
 
 **Windows:**
-- Install Visual Studio C++ Build Tools
-- Install WebView2 (usually pre-installed on Windows 10/11)
+- Visual Studio C++ Build Tools
+- WebView2 (pre-installed on Windows 10/11)
+
+---
 
 ## Installation
 
-1. Clone or navigate to the project directory:
 ```bash
-cd /Users/thongnguyen/Documents/GitHub/devtool
-```
-
-2. Install dependencies (if not already done):
-```bash
+git clone https://github.com/DianaSensei/developer-desktop-utils.git
+cd developer-desktop-utils
 npm install
 ```
 
-3. Run in development mode:
+## Running
+
 ```bash
+# Web only (fast, no Rust compile)
+npm run dev
+
+# Full desktop app with hot reload
 npm run tauri:dev
 ```
 
-This will:
-- Start the Vite development server
-- Compile the Rust backend
-- Open the desktop application
-
-## Building for Production
-
-To create a distributable application:
+## Production Build
 
 ```bash
 npm run tauri:build
 ```
 
-The built application will be in `src-tauri/target/release/bundle/`
+Output in `src-tauri/target/release/bundle/`.
 
-## Development Workflow
-
-### Running the Web Version (without Tauri)
-```bash
-npm run dev
-```
-Then open http://localhost:1420 in your browser.
-
-### Running the Desktop App
-```bash
-npm run tauri:dev
-```
-
-### Hot Reload
-Changes to React components will hot-reload automatically. Rust changes require a restart.
+---
 
 ## Troubleshooting
 
-### "Command 'tauri' not found"
-Make sure @tauri-apps/cli is installed:
+### `tauri: command not found`
 ```bash
-npm install -D @tauri-apps/cli
+npm install  # reinstalls @tauri-apps/cli
 ```
 
-### Rust Compilation Errors
-Update Rust to the latest version:
+### Rust compilation errors
 ```bash
 rustup update
 ```
 
-### Icons Missing
-The app needs icons to build. See `src-tauri/icons/README.md` for instructions.
+### Linux: missing library errors
+Make sure you installed `libwebkit2gtk-4.1-dev` (not `4.0`). Tauri 2 requires the 4.1 version.
 
-For development, you can skip icon generation, but you'll need them for distribution.
+---
 
-## Next Steps
-
-- Read [README.md](README.md) for feature overview
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) to learn how to add new tools
-- Explore the codebase in `src/components/tools/` to see examples
+*Last updated: 2026-06-14*

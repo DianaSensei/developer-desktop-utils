@@ -4,18 +4,18 @@
 
 ## Project Overview
 
-**DevTool** is a cross-platform desktop application built with Tauri + React + TypeScript providing developer utilities (text processing, encoding, color tools, etc.).
+**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, color tools, etc.).
 
 **Key Technologies:**
-- **Frontend**: React 18, TypeScript, Vite
-- **Desktop**: Tauri (Rust backend)
+- **Frontend**: React 18, TypeScript, Vite 5
+- **Desktop**: Tauri 2 (Rust backend)
 - **UI**: Tailwind CSS, shadcn/ui components
 - **State**: React Context API
 - **Routing**: React Router v6
 
-**Version**: 0.1.0  
+**Version**: 0.0.3  
 **License**: MIT  
-**Platform Support**: macOS, Windows, Linux
+**Platform Support**: macOS 11+ · Windows 10/11 · Ubuntu 22.04+
 
 ---
 
@@ -58,10 +58,12 @@ devtool/
 │   │   └── globals.css      # Tailwind + theme variables
 │   ├── App.tsx              # Main app, routing, layout
 │   └── main.tsx             # React entry point
-├── src-tauri/               # Tauri (Rust) backend
-│   ├── src/main.rs          # Rust main
-│   ├── Cargo.toml           # Rust dependencies
-│   └── tauri.conf.json      # Tauri configuration
+├── src-tauri/               # Tauri 2 (Rust) backend
+│   ├── src/main.rs          # Rust main — registers all plugins
+│   ├── Cargo.toml           # Rust dependencies (tauri v2 + plugin crates)
+│   ├── capabilities/
+│   │   └── default.json     # Permission grants (replaces v1 allowlist)
+│   └── tauri.conf.json      # Tauri 2 configuration
 ├── docs/
 │   ├── ai/                  # AI agent guides (this file, ARCHITECTURE.md)
 │   └── human/               # Human contributor guides (CONTRIBUTING, SETUP, BUILD, etc.)
@@ -348,7 +350,12 @@ className={cn(
 - `react` + `react-dom`: UI library
 - `typescript`: Type safety
 - `vite`: Fast build tool
-- `@tauri-apps/api` + `@tauri-apps/cli`: Desktop app framework
+- `@tauri-apps/api@2` + `@tauri-apps/cli@2`: Tauri 2 framework
+- `@tauri-apps/plugin-clipboard-manager`: Clipboard read/write
+- `@tauri-apps/plugin-dialog`: Native open/save dialogs
+- `@tauri-apps/plugin-fs`: File system access
+- `@tauri-apps/plugin-process`: App relaunch (`relaunch()`)
+- `@tauri-apps/plugin-updater`: In-app auto-update (`check()` → `update.downloadAndInstall()`)
 
 ### UI
 - `tailwindcss`: Utility-first CSS
@@ -513,7 +520,17 @@ npm run tauri:build
 ### GitHub Actions
 CI/CD configured in `.github/workflows/release.yml`  
 Triggers on: `git push origin v*` tags  
-Builds for: macOS (x64 + ARM), Windows, Linux
+Builds for: macOS Apple Silicon (`macos-latest`), Windows, Linux (Ubuntu 22.04)
+
+**Signing secrets** (set in GitHub repo → Settings → Secrets → Actions):
+- `TAURI_SIGNING_PRIVATE_KEY` — private key from `npm run tauri signer generate`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — password for the key
+
+### Tauri 2 — Key differences from v1
+- **Permissions**: `src-tauri/capabilities/default.json` replaces the old `allowlist` in `tauri.conf.json`
+- **Plugin imports**: use `@tauri-apps/plugin-*` packages, not `@tauri-apps/api/*` subpaths
+- **Tauri detection**: check `'__TAURI_INTERNALS__' in window` (not `__TAURI_IPC__`)
+- **Config structure**: `build.devUrl` (not `devPath`), `build.frontendDist` (not `distDir`), `app.windows` (not `tauri.windows`), `plugins.updater` (not `tauri.updater`)
 
 ---
 
@@ -681,6 +698,6 @@ import { Copy, Check, X, Search, Settings } from 'lucide-react';
 
 ---
 
-*Last updated: 2026-06-12*  
+*Last updated: 2026-06-14*  
 *Maintainer: Project team*  
 *AI-friendly: Optimized for Claude, GPT-4, and other coding agents*

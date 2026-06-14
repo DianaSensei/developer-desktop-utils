@@ -381,21 +381,36 @@ function Component() {
 **Error**: `navigator.clipboard is undefined`
 
 **Solutions**:
-1. Check tauri.conf.json allowlist:
+1. Check `src-tauri/capabilities/default.json` includes:
    ```json
-   {
-     "allowlist": {
-       "clipboard": { "all": true }
-     }
-   }
+   "clipboard-manager:allow-read-text",
+   "clipboard-manager:allow-write-text"
    ```
 
-2. Use Tauri clipboard API:
+2. Use the Tauri v2 clipboard plugin (not the old `@tauri-apps/api/clipboard`):
    ```tsx
-   import { writeText } from '@tauri-apps/api/clipboard'
-   
+   import { writeText } from '@tauri-apps/plugin-clipboard-manager'
    await writeText('text to copy')
    ```
+
+3. Verify `tauri_plugin_clipboard_manager::init()` is registered in `src-tauri/src/main.rs`.
+
+---
+
+### Issue: Permission denied for fs / dialog / process
+
+**Cause**: Tauri 2 replaced the `allowlist` with a capability-based permission system.
+
+**Solution**: Add the permission to `src-tauri/capabilities/default.json`. Common ones:
+```json
+"fs:allow-read-file",
+"fs:allow-write-file",
+"fs:scope-appdata-recursive",
+"dialog:allow-open",
+"dialog:allow-save",
+"process:allow-restart"
+```
+The full valid list is printed in the build error when a permission name is wrong.
 
 ---
 

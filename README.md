@@ -1,9 +1,26 @@
 # DevTool
 
-A cross-platform desktop app for developers — 17 offline utilities in a clean, fast interface. Built with Tauri + React + TypeScript.
+A cross-platform desktop app for developers — 17 offline utilities in a clean, fast interface. Built with Tauri 2 + React + TypeScript.
 
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
+[![Release](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml/badge.svg)](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+---
+
+## Platform Support
+
+| Platform | Minimum Version | Formats |
+|----------|----------------|---------|
+| macOS | 11 (Big Sur) | `.dmg` — Intel (x86_64) and Apple Silicon (aarch64) |
+| Windows | 10 / 11 | `.msi`, `.exe` (NSIS) |
+| Linux | Ubuntu 22.04+ | `.AppImage`, `.deb` |
+
+All processing runs **locally**. No data leaves your machine.
+
+> **macOS note:** The app is not yet notarized with an Apple Developer certificate. If macOS says _"DevTool is damaged and can't be opened"_, run this once in Terminal after moving the app to Applications:
+> ```bash
+> xattr -cr /Applications/DevTool.app
+> ```
 
 ---
 
@@ -29,8 +46,6 @@ A cross-platform desktop app for developers — 17 offline utilities in a clean,
 | Image ↔ Base64 | Encode images to Base64 or decode Base64 back to images |
 | Generator | Generate UUIDs, random numbers, and random text |
 
-All processing runs locally. No data leaves your machine.
-
 ---
 
 ## Quick Start
@@ -51,25 +66,25 @@ npm run tauri:dev
 
 ## Releasing a New Version
 
-Releases are built automatically by GitHub Actions for macOS (Intel + Apple Silicon), Windows, and Linux when you push a version tag.
+Releases are built automatically by GitHub Actions for macOS (Apple Silicon), Windows, and Linux when you push a version tag.
 
-### 1. One-time setup (do this before your first release)
+### 1. One-time setup (before your first release)
 
 **Generate a signing keypair:**
 ```bash
-npx tauri signer generate -w ~/.tauri/devtool.key
+npm run tauri signer generate -- -w ~/.tauri/devtool.key
 ```
 
 Add two secrets to your GitHub repo (Settings → Secrets → Actions):
 
 | Secret | Value |
 |--------|-------|
-| `TAURI_PRIVATE_KEY` | Contents of `~/.tauri/devtool.key` |
-| `TAURI_KEY_PASSWORD` | Password you chose (leave empty if none) |
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of `~/.tauri/devtool.key` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password you chose (leave empty if none) |
 
 **Fill in `src-tauri/tauri.conf.json`:**
-- Set `updater.pubkey` to the public key printed by the generator
-- Set `updater.endpoints[0]` to `https://github.com/YOUR_ORG/YOUR_REPO/releases/latest/download/latest.json`
+- Set `plugins.updater.pubkey` to the public key printed by the generator
+- Set `plugins.updater.endpoints[0]` to `https://github.com/YOUR_ORG/YOUR_REPO/releases/latest/download/latest.json`
 
 ### 2. Ship a release
 
@@ -80,27 +95,27 @@ git tag v0.2.0
 git push origin main --tags
 ```
 
-GitHub Actions will build all platforms in parallel (~10–15 min) and create a **draft release** with:
-- `.dmg` — macOS (Intel + Apple Silicon)
+GitHub Actions builds all platforms in parallel (~10–15 min) and creates a **draft release** with:
+- `.dmg` — macOS Apple Silicon (aarch64)
 - `.msi` / `.exe` — Windows
 - `.AppImage` / `.deb` — Linux
 - `latest.json` — update manifest for the in-app updater
 
 Review the draft on GitHub Releases, then publish it. Users already running the app will see the update prompt in **Settings → Updates**.
 
-### Version note
-
-The app version is controlled by `src-tauri/tauri.conf.json` → `package.version`. The GitHub tag should match it. `package.json` version has no effect on the built binary or the updater.
+> **Version note:** The app version is controlled by `src-tauri/tauri.conf.json` → `"version"`. The GitHub tag must match it. `package.json` version has no effect on the built binary or updater.
 
 ---
 
 ## Tech Stack
 
-- [Tauri](https://tauri.app) — lightweight Rust-backed desktop framework
-- [React 18](https://react.dev) + [TypeScript](https://typescriptlang.org)
-- [Vite](https://vitejs.dev) — build tool
-- [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) — styling
-- [React Router v6](https://reactrouter.com) — routing
+| Layer | Technology |
+|-------|-----------|
+| Desktop | [Tauri 2](https://tauri.app) — Rust-backed, lightweight native shell |
+| Frontend | [React 18](https://react.dev) + [TypeScript](https://typescriptlang.org) |
+| Build | [Vite 5](https://vitejs.dev) |
+| Styling | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
+| Routing | [React Router v6](https://reactrouter.com) |
 
 ---
 
@@ -110,15 +125,15 @@ The app version is controlled by `src-tauri/tauri.conf.json` → `package.versio
 npm run dev           # Vite dev server (web only, http://localhost:1420)
 npm run tauri:dev     # Full desktop app with hot reload
 npm run tauri:build   # Production build
-npx tsc --noEmit      # Type check (run before committing)
+npx tsc --noEmit      # Type check
 ```
 
 ### Adding a tool
 
-1. Create `src/components/tools/YourTool.tsx`
-2. Add entry to `TOOL_DEFS` in `src/lib/toolDefs.ts`
-3. Add entry to `TOOL_ROUTES` in `src/App.tsx`
-4. Add `'your-tool': true` to `DEFAULT_FEATURES` in `src/contexts/FeatureContext.tsx`
+1. Create `src/components/tools/YourTool.tsx` — use `usePersistentState`, `useQuickPaste`, `useInputHistory` hooks
+2. Add entry to `allTools` in `src/App.tsx`
+3. Add `'your-tool': true` to `DEFAULT_FEATURES` in `src/contexts/FeatureContext.tsx`
+4. Add entry to `FEATURE_LIST` in `src/components/Settings.tsx`
 
 See [docs/human/CONTRIBUTING.md](docs/human/CONTRIBUTING.md) for a full walkthrough and [docs/ai/CLAUDE.md](docs/ai/CLAUDE.md) for the AI agent guide.
 
@@ -126,4 +141,4 @@ See [docs/human/CONTRIBUTING.md](docs/human/CONTRIBUTING.md) for a full walkthro
 
 ## License
 
-MIT
+[MIT](LICENSE) — free for personal and commercial use.

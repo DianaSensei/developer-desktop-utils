@@ -1,7 +1,7 @@
 {
   "productName": "DevTool",
-  "version": "0.0.3",
-  "identifier": "com.devtool.app",
+  "version": "0.0.7",
+  "identifier": "com.desktop-devtool-app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -35,7 +35,17 @@
       "icons/icon.icns",
       "icons/icon.png"
     ],
-    "targets": ["app", "dmg", "msi", "nsis", "appimage", "deb"]
+    "targets": [
+      "app",
+      "dmg",
+      "msi",
+      "nsis",
+      "appimage",
+      "deb"
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   },
   "plugins": {
     "updater": {

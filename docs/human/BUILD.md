@@ -1,333 +1,110 @@
 # Building DevTool Binaries
 
-This guide explains how to build distributable binaries for macOS, Windows, and Linux/Ubuntu.
+## Platform Support
+
+| Platform | Minimum OS | Output formats |
+|----------|-----------|---------------|
+| macOS (Apple Silicon) | macOS 11 (Big Sur) | `.dmg`, `.app` |
+| Windows | Windows 10 / 11 | `.msi`, `.exe` (NSIS) |
+| Linux | Ubuntu 22.04+ | `.AppImage`, `.deb` |
 
 ## Prerequisites
 
-### All Platforms
+All platforms: Node.js 18+, Rust stable.
 
-- Node.js 18+ and npm
-- Rust and Cargo (latest stable)
-
-### macOS
-
+**macOS:**
 ```bash
 xcode-select --install
 ```
 
-### Windows
-
-- Visual Studio C++ Build Tools
-- WebView2 (usually pre-installed on Windows 10/11)
-
-### Ubuntu/Linux
-
+**Linux (Ubuntu 22.04+):**
 ```bash
-sudo apt update
-sudo apt install libwebkit2gtk-4.0-dev \
-    build-essential \
-    curl \
-    wget \
-    libssl-dev \
-    libgtk-3-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev
+sudo apt update && sudo apt install -y \
+    libwebkit2gtk-4.1-dev \
+    libjavascriptcoregtk-4.1-dev \
+    libappindicator3-dev \
+    librsvg2-dev \
+    patchelf \
+    build-essential
 ```
+
+**Windows:** Visual Studio C++ Build Tools + WebView2 (pre-installed on Win 10/11).
 
 ---
 
-## Build Options
-
-### Option 1: Local Build on Each Platform (Simplest)
-
-Build on the platform you're targeting:
+## Local Build
 
 ```bash
+npm install
 npm run tauri:build
 ```
 
-**Outputs:**
-
-**macOS:**
-
-- `DevTool_0.1.0_x64.dmg` - DMG installer (drag & drop install)
-- `DevTool.app` - Unsigned app bundle
-
-**Windows:**
-
-- `DevTool_0.1.0_x64-setup.exe` - NSIS installer
-- `DevTool_0.1.0_x64.msi` - MSI installer
-
-**Linux:**
-
-- `devtool_0.1.0_amd64.AppImage` - Portable executable
-- `devtool_0.1.0_amd64.deb` - Debian package
-
-All artifacts are in `src-tauri/target/release/bundle/`
+Artifacts in `src-tauri/target/release/bundle/`.
 
 ---
 
-### Option 2: GitHub Actions (Recommended for Continuous Build)
+## GitHub Actions (Recommended)
 
-We've set up a GitHub Actions workflow that automatically builds for all platforms.
+The workflow at `.github/workflows/release.yml` builds all platforms automatically on version tag push.
 
-**Setup:**
+### One-time secret setup
 
-1. Initialize a git repository and push to GitHub:
-
+Generate a signing keypair:
 ```bash
-cd /Users/thongnguyen/Documents/GitHub/devtool
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/devtool.git
-git push -u origin main
+npm run tauri signer generate -- -w ~/.tauri/devtool.key
 ```
 
-2. Create a release tag:
+Add to GitHub repo → Settings → Secrets → Actions:
+
+| Secret | Value |
+|--------|-------|
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of `~/.tauri/devtool.key` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password you chose |
+
+Set `plugins.updater.pubkey` in `src-tauri/tauri.conf.json` to the public key printed above.
+
+### Trigger a release
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+# Bump "version" in src-tauri/tauri.conf.json first, then:
+git commit -am "chore: bump version to 0.2.0"
+git tag v0.2.0
+git push origin main --tags
 ```
 
-3. GitHub Actions will automatically:
-   - Build for macOS (Intel & ARM/M1+)
-   - Build for Windows
-   - Build for Linux
-   - Create a GitHub Release with all binaries
-
-The workflow file is already at `.github/workflows/release.yml`
+GitHub Actions will create a draft release with all platform binaries. Publish the draft when ready.
 
 ---
 
-### Option 3: Cross-Compilation (Advanced)
+## Build Output
 
-For building Windows & Linux binaries from macOS:
+| Platform | File | Location |
+|----------|------|----------|
+| macOS | `.dmg` | `bundle/dmg/` |
+| macOS | `.app` | `bundle/macos/` |
+| Windows | `.msi` | `bundle/msi/` |
+| Windows | `.exe` | `bundle/nsis/` |
+| Linux | `.AppImage` | `bundle/appimage/` |
+| Linux | `.deb` | `bundle/deb/` |
 
-```bash
-# Install cross-compilation tools
-cargo install cross
-
-# Build for different targets
-cross build --target x86_64-pc-windows-gnu --release
-cross build --target x86_64-unknown-linux-gnu --release
-cross build --target x86_64-apple-darwin --release
-```
-
-This requires Docker and is more complex - not recommended unless you need it.
+Approximate sizes: macOS DMG 50–80 MB · Windows MSI 60–100 MB · Linux AppImage 80–120 MB.
 
 ---
 
-## Step-by-Step: Build on macOS
+## Troubleshooting
 
-1. **Ensure dependencies are installed:**
-
-```bash
-cargo --version
-npm --version
-```
-
-2. **Generate icons** (optional but recommended for production):
-
-```bash
-# Create a 512x512 PNG icon named icon.png
-# Then run:
-npm install -g @tauri-apps/cli
-tauri icon src-tauri/icons/icon.png
-```
-
-3. **Build the app:**
-
-```bash
-npm run tauri:build
-```
-
-4. **Wait for compilation** (first time takes 2-5 minutes):
-
-```
-Building for macOS...
-Compiling devtool v0.1.0...
-```
-
-5. **Find your artifacts:**
-
-```bash
-ls -lh src-tauri/target/release/bundle/dmg/
-ls -lh src-tauri/target/release/bundle/macos/
-```
-
-6. **Test the built app:**
-
-```bash
-open src-tauri/target/release/bundle/macos/DevTool.app
-```
-
----
-
-## Step-by-Step: Build on Windows
-
-Same process as macOS, but use:
-
-```bash
-npm run tauri:build
-```
-
-Find artifacts in:
-
-- `src-tauri\target\release\bundle\msi\`
-- `src-tauri\target\release\bundle\nsis\`
-
----
-
-## Step-by-Step: Build on Ubuntu/Linux
-
-1. **Install dependencies:**
-
-```bash
-sudo apt update
-sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-```
-
-2. **Build:**
-
-```bash
-npm run tauri:build
-```
-
-3. **Find artifacts:**
-
-```bash
-ls -lh src-tauri/target/release/bundle/deb/
-ls -lh src-tauri/target/release/bundle/appimage/
-```
-
-4. **Test AppImage:**
-
-```bash
-./src-tauri/target/release/bundle/appimage/devtool_0.1.0_amd64.AppImage
-```
-
----
-
-## Signing & Notarization
-
-### macOS Code Signing (for distribution)
-
-For users outside your organization, you need code signing:
-
-```bash
-# Generate a certificate (requires Apple Developer account)
-# Follow: https://tauri.app/en/v1/guides/distribution/sign-macos/
-
-export APPLE_CERTIFICATE="<certificate_base64>"
-export APPLE_CERTIFICATE_PASSWORD="<password>"
-export APPLE_SIGNING_IDENTITY="<identity>"
-npm run tauri:build
-```
-
-### Windows Code Signing
-
-```bash
-export WINDOWS_CERTIFICATE_FILE="<path_to_cert>"
-export WINDOWS_CERTIFICATE_PASSWORD="<password>"
-npm run tauri:build
-```
-
----
-
-## Distribution Channels
-
-### Direct Download
-
-- Create a GitHub Release
-- Upload DMG, EXE, AppImage, and DEB files
-- Users download and install manually
-
-### Package Managers
-
-**macOS Homebrew:**
-
-```bash
-brew tap yourusername/devtool
-brew install devtool
-```
-
-**Ubuntu/Debian:**
-Host the .deb file in a PPA or personal repository
-
-**Windows Chocolatey:**
-Submit your MSI to Chocolatey repository
-
----
-
-## Troubleshooting Build Issues
-
-### "cargo not found"
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-```
-
-### "Icons not found"
-
-Set `"bundle": { "active": false }` in `src-tauri/tauri.conf.json` for dev builds (already done for you)
-
-### Build succeeds but app won't start
-
-- Check console for errors: `npm run tauri:dev`
-- Verify all dependencies are installed
-- Try a clean build: `cargo clean && npm run tauri:build`
-
-### Out of disk space
-
-Rust builds are large (~8-15 GB). Free up space or use:
-
+### Clean build
 ```bash
 cargo clean
-```
-
----
-
-## Build Output Summary
-
-| Platform | File Type | Location                     | Size       |
-| -------- | --------- | ---------------------------- | ---------- |
-| macOS    | DMG       | `bundle/dmg/*.dmg`           | 50-80 MB   |
-| macOS    | App       | `bundle/macos/*.app`         | 200-300 MB |
-| Windows  | MSI       | `bundle/msi/*.msi`           | 60-100 MB  |
-| Windows  | EXE       | `bundle/nsis/*.exe`          | 60-100 MB  |
-| Linux    | AppImage  | `bundle/appimage/*.AppImage` | 80-120 MB  |
-| Linux    | DEB       | `bundle/deb/*.deb`           | 40-60 MB   |
-
----
-
-## Quick Commands Reference
-
-```bash
-# Development
-npm run tauri:dev
-
-# Production build
 npm run tauri:build
-
-# Clean build (if having issues)
-cargo clean && npm run tauri:build
-
-# Check for compilation errors
-cargo check
-
-# Build for specific platform (must be on that platform)
-npm run tauri:build -- --target universal-apple-darwin  # macOS Intel + ARM
 ```
+
+### Linux: `libwebkit2gtk-4.0` errors
+Tauri 2 requires `libwebkit2gtk-4.1-dev`, not `4.0`. Re-run the apt install above.
+
+### First build is slow
+Normal — Rust compiles all dependencies from scratch (~5–10 min). Subsequent builds are ~1 min.
 
 ---
 
-## Next Steps
-
-1. **Test locally** on each platform with `npm run tauri:build`
-2. **Set up GitHub Actions** for automated builds
-3. **Sign binaries** for production distribution
-4. **Create release notes** for each version
-5. **Distribute** through GitHub Releases or package managers
+*Last updated: 2026-06-14*
