@@ -53,7 +53,7 @@ const allTools = [
   { path: '/color-picker', label: 'Color Picker', icon: Palette, component: ColorPicker, featureId: 'color-picker' },
   { path: '/base64', label: 'Encoder / Decoder', icon: Code, component: Base64Tool, featureId: 'base64' },
   { path: '/hash', label: 'Hash & Encrypt', icon: Hash, component: HashTool, featureId: 'hash' },
-  { path: '/unix-time', label: 'Unix Time', icon: Clock, component: UnixTimeConverter, featureId: 'unix-time' },
+  { path: '/unix-time', label: 'Date / Time', icon: Clock, component: UnixTimeConverter, featureId: 'unix-time' },
   { path: '/json', label: 'JSON Formatter', icon: FileJson, component: JsonFormatter, featureId: 'json' },
   { path: '/jwt', label: 'JWT Debugger', icon: Shield, component: JwtDebugger, featureId: 'jwt' },
   { path: '/regex', label: 'Regex Tester', icon: Search, component: RegexTester, featureId: 'regex' },
