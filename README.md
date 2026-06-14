@@ -1,134 +1,128 @@
-# DevTool - Developer Utilities
+# DevTool
 
-> **🤖 AI Agent Optimized**: This project includes comprehensive documentation in [docs/ai/CLAUDE.md](docs/ai/CLAUDE.md) to help AI coding agents understand the codebase quickly and work efficiently. Human contributor guides live in [docs/human/](docs/human/).
+A cross-platform desktop app for developers — 17 offline utilities in a clean, fast interface. Built with Tauri + React + TypeScript.
 
-A modern, cross-platform desktop application built with Tauri, React, and TypeScript, providing essential developer utilities in a clean and functional interface.
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-## Features
+---
 
-- **Cron Generator** - Create cron expressions with presets
-- **Text Transformer** - Convert text between single line, multiple lines, and arrays
-- **Base64 Encoder/Decoder** - Encode and decode Base64 strings
-- **Hash & Encrypt** - Generate MD5, SHA-1, SHA-256, SHA-512 hashes and AES encryption
-- **Unix Time Converter** - Convert between Unix timestamps and human-readable dates
-- **JSON Formatter** - Format, minify, and validate JSON
-- **JWT Debugger** - Decode and inspect JWT tokens
-- **Regex Tester** - Test regular expressions with common patterns
-- **URL Encoder/Decoder** - Encode and decode URL strings
-- **UUID Generator** - Generate UUIDs (v4)
-- **Text Diff** - Compare two texts and visualize differences
-- **QR Code Generator** - Generate QR codes from text or URLs
-- **Markdown Preview** - Write and preview Markdown in real-time
-- **Array Deduplicator** - Remove duplicate items from arrays
+## Tools
 
-## Tech Stack
+| Tool | Description |
+|------|-------------|
+| Cron Generator | Build cron expressions with a visual editor and human-readable output |
+| Text Transformer | Convert between single-line, multi-line, array, and case formats |
+| Text Counter | Count characters, words, lines, and sentences in real time |
+| Color Picker | Pick colors and get HEX, RGB, and HSL values |
+| Encoder / Decoder | Base64, URL, HTML, Hex, Morse encode and decode |
+| Hash & Encrypt | MD5, SHA-1, SHA-256, SHA-512 hashes and AES encryption |
+| Date / Time | Convert timestamps, diff dates, format across timezones |
+| JSON Formatter | Beautify, minify, stringify, and tree-view JSON |
+| JWT Debugger | Decode and inspect JWT header, payload, and signature |
+| Regex Tester | Test regex patterns with live match highlighting |
+| Text Diff | Side-by-side text comparison |
+| QR Code | Generate QR codes with custom frames and logo overlays |
+| Markdown | Live markdown preview |
+| Deduplicate | Remove duplicate lines or array items |
+| Checksum | Compute MD5/SHA checksums for any file |
+| Image ↔ Base64 | Encode images to Base64 or decode Base64 back to images |
+| Generator | Generate UUIDs, random numbers, and random text |
 
-- **Tauri** - Lightweight desktop framework (Rust backend)
-- **React** - UI library
-- **TypeScript** - Type-safe JavaScript
-- **Vite** - Fast build tool
-- **Tailwind CSS** - Utility-first CSS
-- **shadcn/ui** - Beautiful, accessible components
-- **React Router** - Client-side routing
+All processing runs locally. No data leaves your machine.
 
-## Getting Started
+---
 
-### Prerequisites
+## Quick Start
 
-- Node.js 18+ and npm
-- Rust and Cargo (for Tauri)
+**Prerequisites:** Node.js 18+, Rust (stable)
 
-### Installation
-
-1. Install dependencies:
 ```bash
 npm install
-```
 
-2. Run in development mode:
-```bash
+# Web only (fast iteration)
+npm run dev
+
+# Desktop app
 npm run tauri:dev
 ```
 
-3. Build for production:
+---
+
+## Releasing a New Version
+
+Releases are built automatically by GitHub Actions for macOS (Intel + Apple Silicon), Windows, and Linux when you push a version tag.
+
+### 1. One-time setup (do this before your first release)
+
+**Generate a signing keypair:**
 ```bash
-npm run tauri:build
+npx tauri signer generate -w ~/.tauri/devtool.key
 ```
+
+Add two secrets to your GitHub repo (Settings → Secrets → Actions):
+
+| Secret | Value |
+|--------|-------|
+| `TAURI_PRIVATE_KEY` | Contents of `~/.tauri/devtool.key` |
+| `TAURI_KEY_PASSWORD` | Password you chose (leave empty if none) |
+
+**Fill in `src-tauri/tauri.conf.json`:**
+- Set `updater.pubkey` to the public key printed by the generator
+- Set `updater.endpoints[0]` to `https://github.com/YOUR_ORG/YOUR_REPO/releases/latest/download/latest.json`
+
+### 2. Ship a release
+
+```bash
+# Bump version in src-tauri/tauri.conf.json → "version": "0.2.0"
+git commit -am "chore: bump version to 0.2.0"
+git tag v0.2.0
+git push origin main --tags
+```
+
+GitHub Actions will build all platforms in parallel (~10–15 min) and create a **draft release** with:
+- `.dmg` — macOS (Intel + Apple Silicon)
+- `.msi` / `.exe` — Windows
+- `.AppImage` / `.deb` — Linux
+- `latest.json` — update manifest for the in-app updater
+
+Review the draft on GitHub Releases, then publish it. Users already running the app will see the update prompt in **Settings → Updates**.
+
+### Version note
+
+The app version is controlled by `src-tauri/tauri.conf.json` → `package.version`. The GitHub tag should match it. `package.json` version has no effect on the built binary or the updater.
+
+---
+
+## Tech Stack
+
+- [Tauri](https://tauri.app) — lightweight Rust-backed desktop framework
+- [React 18](https://react.dev) + [TypeScript](https://typescriptlang.org)
+- [Vite](https://vitejs.dev) — build tool
+- [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) — styling
+- [React Router v6](https://reactrouter.com) — routing
+
+---
 
 ## Development
 
-- `npm run dev` - Start Vite dev server
-- `npm run build` - Build for production
-- `npm run tauri:dev` - Run Tauri in development mode
-- `npm run tauri:build` - Build Tauri application
-
-## Architecture
-
-The app follows a modular architecture where each utility is a self-contained component:
-
-```
-src/
-├── components/
-│   ├── ui/           # Reusable UI components (shadcn/ui)
-│   └── tools/        # Utility tool components
-├── lib/              # Utility functions
-├── styles/           # Global styles
-└── App.tsx           # Main app with routing
+```bash
+npm run dev           # Vite dev server (web only, http://localhost:1420)
+npm run tauri:dev     # Full desktop app with hot reload
+npm run tauri:build   # Production build
+npx tsc --noEmit      # Type check (run before committing)
 ```
 
-### Adding New Tools
+### Adding a tool
 
-To add a new utility tool:
+1. Create `src/components/tools/YourTool.tsx`
+2. Add entry to `TOOL_DEFS` in `src/lib/toolDefs.ts`
+3. Add entry to `TOOL_ROUTES` in `src/App.tsx`
+4. Add `'your-tool': true` to `DEFAULT_FEATURES` in `src/contexts/FeatureContext.tsx`
 
-1. Create a new component in `src/components/tools/YourTool.tsx`
-2. Import and register it in `src/App.tsx`:
+See [docs/human/CONTRIBUTING.md](docs/human/CONTRIBUTING.md) for a full walkthrough and [docs/ai/CLAUDE.md](docs/ai/CLAUDE.md) for the AI agent guide.
 
-```tsx
-import { YourTool } from '@/components/tools/YourTool';
-
-const tools = [
-  // ... existing tools
-  { path: '/your-tool', label: 'Your Tool', icon: YourIcon, component: YourTool },
-];
-```
-
-## Design Principles
-
-- **Clean UI/UX** - Intuitive interface with clear actions
-- **Functional** - Each tool does one thing well
-- **Scalable** - Easy to add new utilities
-- **Responsive** - Works on different screen sizes
-- **Accessible** - Built with accessibility in mind
-
-## Documentation
-
-### 📚 For Developers
-
-- **[CLAUDE.md](CLAUDE.md)** - Complete guide for AI coding agents (start here!)
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and design decisions
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to add new tools and contribute
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
-
-### 🔧 For Users
-
-- **[BUILD.md](BUILD.md)** - Build instructions for all platforms
-- **[SETUP.md](SETUP.md)** - Setup and installation guide
-- **[FEATURES.md](FEATURES.md)** - Feature toggle system documentation
-- **[LAYOUT.md](LAYOUT.md)** - UI/UX design principles
-
-### 📖 Tool-Specific
-
-- **[COLOR_PICKER.md](COLOR_PICKER.md)** - Color picker tool documentation
-- **[SIDEBAR.md](SIDEBAR.md)** - Sidebar behavior and features
-- **[src/components/tools/README.md](src/components/tools/README.md)** - Tools overview
-
-### 🚀 Quick Links
-
-**For AI Agents**: Start with [CLAUDE.md](CLAUDE.md) - it contains everything you need to understand and work on this project efficiently.
-
-**For Developers**: Read [CONTRIBUTING.md](CONTRIBUTING.md) to learn how to add new tools in ~5 minutes.
-
-**For Users**: Check [BUILD.md](BUILD.md) to create your own desktop app.
+---
 
 ## License
 
