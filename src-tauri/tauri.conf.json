@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "DevTool",
-    "version": "0.0.2"
+    "version": "0.0.3"
   },
   "tauri": {
     "allowlist": {
@@ -52,7 +52,14 @@
         "icons/128x128@2x.png"
       ],
       "identifier": "com.devtool.app",
-      "targets": ["app", "dmg", "msi", "nsis", "appimage", "deb"]
+      "targets": [
+        "app",
+        "dmg",
+        "msi",
+        "nsis",
+        "appimage",
+        "deb"
+      ]
     },
     "security": {
       "csp": null
