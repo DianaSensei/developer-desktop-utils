@@ -3,6 +3,7 @@ import { Loader2, AlertCircle, Search, Copy, Check, X, ArrowUp, ArrowDown, Arrow
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -545,17 +546,18 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-4 py-2.5 border-b shrink-0 bg-muted/10">
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Partition</Label>
-          <select
-            value={partition}
-            onChange={(e) => setPartition(Number(e.target.value))}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs font-mono min-w-[9rem]"
-          >
-            {partitions.map((p) => (
-              <option key={p.id} value={p.id}>
-                P{p.id} · {p.earliestOffset >= 0 ? p.earliestOffset.toLocaleString() : '?'} – {p.latestOffset >= 0 ? p.latestOffset.toLocaleString() : '?'}
-              </option>
-            ))}
-          </select>
+          <Select value={String(partition)} onValueChange={(v) => setPartition(Number(v))}>
+            <SelectTrigger className="h-8 text-xs font-mono min-w-[9rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {partitions.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  P{p.id} · {p.earliestOffset >= 0 ? p.earliestOffset.toLocaleString() : '?'} – {p.latestOffset >= 0 ? p.latestOffset.toLocaleString() : '?'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex flex-col gap-1">
@@ -620,13 +622,14 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         {mode !== 'range' && (
           <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground">Limit</Label>
-            <select
-              value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-            >
-              {LIMITS.map((l) => <option key={l} value={l}>{l}</option>)}
-            </select>
+            <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
+              <SelectTrigger className="h-8 text-xs w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LIMITS.map((l) => <SelectItem key={l} value={String(l)}>{l}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         )}
 

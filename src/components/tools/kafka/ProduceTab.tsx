@@ -3,6 +3,7 @@ import { Plus, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { kafkaApi, type PartitionInfo } from './types';
 
 interface Header { key: string; value: string; }
@@ -91,15 +92,16 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
           </div>
           {partitionMode === 'manual' && (
             <div className="mt-auto">
-              <select
-                value={partition}
-                onChange={(e) => setPartition(Number(e.target.value))}
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-              >
-                {partitions.map((p) => (
-                  <option key={p.id} value={p.id}>Partition {p.id}</option>
-                ))}
-              </select>
+              <Select value={String(partition)} onValueChange={(v) => setPartition(Number(v))}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {partitions.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>Partition {p.id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Copy, Clock, RotateCcw, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight, Calendar, Info, Timer,
@@ -323,16 +324,17 @@ function TzSelect({ label, value, onChange, availableTzs }: {
   return (
     <div className="flex items-center gap-2 flex-1">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="flex-1 rounded-md border bg-background px-2 py-1.5 text-xs"
-      >
-        {availableTzs.map((t) => {
-          const offset = getLocalTzLabel(t);
-          return <option key={t} value={t}>{t}{offset ? ` (${offset})` : ''}</option>;
-        })}
-      </select>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="flex-1 h-7 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {availableTzs.map((t) => {
+            const offset = getLocalTzLabel(t);
+            return <SelectItem key={t} value={t}>{t}{offset ? ` (${offset})` : ''}</SelectItem>;
+          })}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -419,14 +421,22 @@ function DateTimePicker({ initialValue, tz, onConfirm, onCancel }: {
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
         <div className="flex flex-1 gap-1">
-          <select value={viewMonth} onChange={(e) => { const m = parseInt(e.target.value); setViewMonth(m); setSelMonth(m); }}
-            className="flex-1 rounded border bg-background px-1.5 py-1 text-xs font-medium">
-            {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
-          </select>
-          <select value={viewYear} onChange={(e) => { const y = parseInt(e.target.value); setViewYear(y); setSelYear(y); }}
-            className="w-16 rounded border bg-background px-1.5 py-1 text-xs font-medium">
-            {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <Select value={String(viewMonth)} onValueChange={(v) => { const m = parseInt(v); setViewMonth(m); setSelMonth(m); }}>
+            <SelectTrigger className="flex-1 h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTH_NAMES.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={String(viewYear)} onValueChange={(v) => { const y = parseInt(v); setViewYear(y); setSelYear(y); }}>
+            <SelectTrigger className="w-16 h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {YEAR_OPTIONS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         <button type="button" onClick={nextMonth}
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0">

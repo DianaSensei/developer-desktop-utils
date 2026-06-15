@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X } from 'lucide-react';
 import type { BrokerConfig } from './types';
 
@@ -95,21 +95,20 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
 
           <div>
             <Label htmlFor="kf-sasl">SASL Mechanism</Label>
-            <select
-              id="kf-sasl"
-              value={form.saslMechanism ?? ''}
-              onChange={(e) => set('saslMechanism', e.target.value || '')}
-              className={cn(
-                'mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1',
-                'text-sm shadow-sm transition-colors focus-visible:outline-none',
-                'focus-visible:ring-1 focus-visible:ring-ring',
-              )}
+            <Select
+              value={form.saslMechanism || '__none__'}
+              onValueChange={(v) => set('saslMechanism', v === '__none__' ? '' : v)}
             >
-              <option value="">None</option>
-              <option value="PLAIN">PLAIN</option>
-              <option value="SCRAM-SHA-256">SCRAM-SHA-256</option>
-              <option value="SCRAM-SHA-512">SCRAM-SHA-512</option>
-            </select>
+              <SelectTrigger id="kf-sasl" className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                <SelectItem value="PLAIN">PLAIN</SelectItem>
+                <SelectItem value="SCRAM-SHA-256">SCRAM-SHA-256</SelectItem>
+                <SelectItem value="SCRAM-SHA-512">SCRAM-SHA-512</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {form.saslMechanism && (
