@@ -1,49 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%"   stop-color="#0D1F35"/>
-      <stop offset="100%" stop-color="#0A1628"/>
+      <stop offset="0%"   stop-color="#0E639C"/>
+      <stop offset="100%" stop-color="#003F6E"/>
     </linearGradient>
-
-    <!-- Subtle radial bloom behind the symbol -->
-    <radialGradient id="bloom" cx="50%" cy="52%" r="42%">
-      <stop offset="0%"   stop-color="#1A5A8A" stop-opacity="0.45"/>
-      <stop offset="100%" stop-color="#0A1628" stop-opacity="0"/>
-    </radialGradient>
-
-    <!-- Soft glow on the symbol -->
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="28" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
-  <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bloom)"/>
+  <!--
+    macOS icon canvas guidelines: icon artwork should sit within an ~820×820
+    area centred in the 1024×1024 canvas (≈10 % inset on each side).
+    macOS then renders its own squircle mask and drop shadow in the clear margin.
 
-  <!-- > _ symbol, centered, large, glowing -->
-  <g filter="url(#glow)">
-    <!-- Caret ">" -->
+    Transform: scale(0.8) first, then translate(102,102) → centres the 820×820 shape.
+    The rx=230 corner radius scales to 184 px (22.5 % of 820) which matches
+    the macOS squircle corner ratio exactly.
+  -->
+  <g transform="translate(102, 102) scale(0.800)">
+    <rect width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
+    <rect width="1024" height="1024" rx="230" ry="230" fill="url(#shine)"/>
+
+    <!-- > chevron -->
     <polyline
-      points="168,280 468,512 168,744"
+      points="192,272 456,512 192,752"
       fill="none"
-      stroke="#38BDF8"
-      stroke-width="96"
+      stroke="white"
+      stroke-width="84"
       stroke-linecap="round"
       stroke-linejoin="round"
+      opacity="0.94"
     />
-    <!-- Underscore "_" — baseline-aligned with the caret bottom -->
+    <!-- _ dash / cursor -->
     <line
-      x1="530" y1="726"
-      x2="856" y2="726"
-      stroke="#38BDF8"
-      stroke-width="88"
+      x1="500" y1="734"
+      x2="836" y2="734"
+      stroke="white"
+      stroke-width="74"
       stroke-linecap="round"
+      opacity="0.94"
     />
   </g>
 </svg>

@@ -17,45 +17,38 @@ export function AppLogo({ size = 28, className }: AppLogoProps) {
     >
       <defs>
         <linearGradient id="logo-bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0D1F35" />
-          <stop offset="100%" stopColor="#0A1628" />
+          <stop offset="0%"   stopColor="#0E639C" />
+          <stop offset="100%" stopColor="#003F6E" />
         </linearGradient>
-        <radialGradient id="logo-bloom" cx="50%" cy="52%" r="42%">
-          <stop offset="0%" stopColor="#1A5A8A" stopOpacity="0.45" />
-          <stop offset="100%" stopColor="#0A1628" stopOpacity="0" />
-        </radialGradient>
-        <filter id="logo-glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2.5" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
+        <linearGradient id="logo-shine" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"  stopColor="#FFFFFF" stopOpacity="0.10" />
+          <stop offset="55%" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
       </defs>
 
       {/* Background */}
       <rect width="100" height="100" rx="22" ry="22" fill="url(#logo-bg)" />
-      <rect width="100" height="100" rx="22" ry="22" fill="url(#logo-bloom)" />
+      <rect width="100" height="100" rx="22" ry="22" fill="url(#logo-shine)" />
 
-      {/* >_ symbol */}
-      <g filter="url(#logo-glow)">
-        <polyline
-          points="16,27 45,50 16,73"
-          fill="none"
-          stroke="#38BDF8"
-          strokeWidth="9.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <line
-          x1="52" y1="71"
-          x2="84" y2="71"
-          stroke="#38BDF8"
-          strokeWidth="8.5"
-          strokeLinecap="round"
-        />
-      </g>
+      {/* > chevron */}
+      <polyline
+        points="18.75,26.6 44.5,50 18.75,73.4"
+        fill="none"
+        stroke="white"
+        strokeWidth="8.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.94"
+      />
+      {/* _ dash / cursor */}
+      <line
+        x1="48.8" y1="71.7"
+        x2="81.6" y2="71.7"
+        stroke="white"
+        strokeWidth="7.2"
+        strokeLinecap="round"
+        opacity="0.94"
+      />
     </svg>
   );
 }
