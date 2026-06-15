@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { TOOL_DEFS } from '@/lib/toolDefs';
-import { useUpdater } from '@/hooks/useUpdater';
+import { useUpdate } from '@/contexts/UpdateContext';
 import { AppLogo } from '@/components/AppLogo';
 
 function applySavedOrder<T extends { id: string }>(tools: T[], savedOrder: string[]): T[] {
@@ -69,7 +69,7 @@ const APP_PERMISSIONS = [
 
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools } = useFeatures();
-  const { status: updateStatus, updateInfo, error: updateError, checkForUpdates, installUpdate } = useUpdater();
+  const { status: updateStatus, updateInfo, error: updateError, autoCheckEnabled, toggleAutoCheck, checkForUpdates, installUpdate } = useUpdate();
   const [currentVersion, setCurrentVersion] = useState('');
 
   useEffect(() => {
@@ -258,6 +258,15 @@ export function Settings() {
               <p className="text-muted-foreground mt-1 text-[11px]">Developer utilities for your desktop</p>
             </div>
           </div>
+          {isTauri && (
+            <div className="flex items-center justify-between px-4 py-3 text-xs">
+              <div>
+                <p className="font-medium">Auto-check for updates</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Check for new versions once a day</p>
+              </div>
+              <Toggle checked={autoCheckEnabled} onChange={toggleAutoCheck} />
+            </div>
+          )}
           <div className="flex items-center justify-between px-4 py-3 text-xs">
             <span className="text-muted-foreground">Version</span>
             <div className="flex items-center gap-2">

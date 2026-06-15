@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { TOOL_DEFS, TOOL_DEF_MAP } from '@/lib/toolDefs';
 import { Button } from '@/components/ui/button';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
+import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
 import { AppLogo } from '@/components/AppLogo';
 
 import { CronGenerator } from '@/components/tools/CronGenerator';
@@ -147,6 +148,7 @@ function Sidebar({
 }) {
   const location = useLocation();
   const { isFeatureEnabled, toolOrder } = useFeatures();
+  const { updateAvailable } = useUpdate();
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const pendingSearchFocus = useRef(false);
@@ -368,7 +370,12 @@ function Sidebar({
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             )}
           >
-            <SettingsIcon className={cn('h-4 w-4 shrink-0', isSettingsActive && 'text-primary')} />
+            <span className="relative shrink-0">
+              <SettingsIcon className={cn('h-4 w-4', isSettingsActive && 'text-primary')} />
+              {updateAvailable && (
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-background" />
+              )}
+            </span>
             {isCollapsed && (
               <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
                 Settings
@@ -484,9 +491,11 @@ function AppContent() {
 function App() {
   return (
     <FeatureProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <UpdateProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </UpdateProvider>
     </FeatureProvider>
   );
 }
