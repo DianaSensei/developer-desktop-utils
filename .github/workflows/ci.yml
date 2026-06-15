@@ -40,7 +40,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
-          key: ${{ matrix.platform }}-${{ matrix.rust-target }}
+          shared-key: ${{ matrix.platform }}-${{ matrix.rust-target }}
 
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
