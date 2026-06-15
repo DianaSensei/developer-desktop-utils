@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   CheckCircle, XCircle, Loader2, Pencil, Trash2, Plus,
-  ChevronDown, Search, RefreshCw, WifiOff, Wifi,
+  ChevronDown, ChevronRight, Search, RefreshCw, WifiOff, Wifi, Info,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ interface LeftPanelProps {
   selectedGroup: string | null;
   onSelectGroup: (g: string | null) => void;
   refreshKey: number;
+  onShowInfo: () => void;
 }
 
 export function LeftPanel({
@@ -38,6 +39,7 @@ export function LeftPanel({
   selectedGroup,
   onSelectGroup,
   refreshKey,
+  onShowInfo,
 }: LeftPanelProps) {
   const [configs, setConfigs] = useState<BrokerConfig[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -65,6 +67,7 @@ export function LeftPanel({
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupsRefreshTick, setGroupsRefreshTick] = useState(0);
+  const [groupsOpen, setGroupsOpen] = useState(true);
 
   const selectedConfig = configs.find((c) => c.id === selectedBrokerId) ?? null;
   const isDisconnected = connStatus[selectedBrokerId] === 'disconnected';
@@ -202,6 +205,18 @@ export function LeftPanel({
   return (
     <div className="flex flex-col h-full overflow-hidden text-sm">
 
+      {/* ── Panel header ── */}
+      <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Kafka</span>
+        <button
+          onClick={onShowInfo}
+          title="How Kafka Explorer accesses your cluster"
+          className="p-1 rounded text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60 transition-colors"
+        >
+          <Info className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
       {/* ── Broker section ── */}
       <div className="px-2 pt-2 pb-2 border-b shrink-0 space-y-1.5">
         {/* Dropdown trigger */}
@@ -293,7 +308,7 @@ export function LeftPanel({
       </div>
 
       {/* ── Topics section ── */}
-      <div className="flex flex-col border-b" style={{ minHeight: 0, maxHeight: '55%' }}>
+      <div className="flex flex-col border-b flex-1 min-h-0">
         {/* Header row */}
         <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
           <span className="text-xs font-medium text-muted-foreground">
@@ -427,16 +442,22 @@ export function LeftPanel({
       </div>
 
       {/* ── Groups section ── */}
-      <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
-          <span className="text-xs font-medium text-muted-foreground">
+      <div className={cn('flex flex-col shrink-0', groupsOpen && 'max-h-[220px]')}>
+        <div
+          className="flex items-center justify-between px-2 py-1.5 shrink-0 cursor-pointer hover:bg-muted/30 transition-colors"
+          onClick={() => setGroupsOpen((v) => !v)}
+        >
+          <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+            {groupsOpen
+              ? <ChevronDown className="w-3 h-3" />
+              : <ChevronRight className="w-3 h-3" />}
             Groups{groups.length > 0 ? ` (${groups.length})` : ''}
           </span>
           {isActive && (
             <button
               className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
               title="Refresh groups"
-              onClick={() => setGroupsRefreshTick((k) => k + 1)}
+              onClick={(e) => { e.stopPropagation(); setGroupsRefreshTick((k) => k + 1); }}
               disabled={groupsLoading}
             >
               <RefreshCw className={cn('w-3 h-3', groupsLoading && 'animate-spin')} />
@@ -444,27 +465,29 @@ export function LeftPanel({
           )}
         </div>
 
-        <div className="overflow-y-auto flex-1 min-h-0">
-          {groups.map((g) => (
-            <button
-              key={g.groupId}
-              className={cn(
-                'w-full flex items-center gap-1.5 px-2 py-1 text-left hover:bg-muted/50 transition-colors',
-                selectedGroup === g.groupId && 'bg-muted font-medium',
-              )}
-              onClick={() => onSelectGroup(g.groupId)}
-            >
-              <span className={cn(
-                'w-1.5 h-1.5 rounded-full shrink-0',
-                GROUP_STATE_BG[g.state] ?? 'bg-muted-foreground/30',
-              )} />
-              <span className="truncate text-xs">{g.groupId}</span>
-            </button>
-          ))}
-          {!groupsLoading && isActive && groups.length === 0 && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">No groups</div>
-          )}
-        </div>
+        {groupsOpen && (
+          <div className="overflow-y-auto flex-1 min-h-0">
+            {groups.map((g) => (
+              <button
+                key={g.groupId}
+                className={cn(
+                  'w-full flex items-center gap-1.5 px-2 py-1 text-left hover:bg-muted/50 transition-colors',
+                  selectedGroup === g.groupId && 'bg-muted font-medium',
+                )}
+                onClick={() => onSelectGroup(g.groupId)}
+              >
+                <span className={cn(
+                  'w-1.5 h-1.5 rounded-full shrink-0',
+                  GROUP_STATE_BG[g.state] ?? 'bg-muted-foreground/30',
+                )} />
+                <span className="truncate text-xs">{g.groupId}</span>
+              </button>
+            ))}
+            {!groupsLoading && isActive && groups.length === 0 && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">No groups</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* BrokerForm modal */}

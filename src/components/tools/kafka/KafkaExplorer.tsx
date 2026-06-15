@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Server } from 'lucide-react';
 import { LeftPanel } from './LeftPanel';
 import { TopicView } from './TopicView';
 import { GroupView } from './GroupView';
+import { KafkaInfoModal } from './KafkaInfoModal';
 import { useKafkaState } from './useKafkaState';
+import { usePersistentState } from '@/hooks/usePersistentState';
 
 export function KafkaExplorer() {
   const {
@@ -18,6 +21,9 @@ export function KafkaExplorer() {
     refresh,
   } = useKafkaState();
 
+  const [infoDismissed, setInfoDismissed] = usePersistentState('devtool:kafka:info-dismissed', false);
+  const [showInfo, setShowInfo] = useState(!infoDismissed);
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left panel */}
@@ -30,6 +36,7 @@ export function KafkaExplorer() {
           selectedGroup={selectedGroup}
           onSelectGroup={setSelectedGroup}
           refreshKey={refreshKey}
+          onShowInfo={() => setShowInfo(true)}
         />
       </div>
 
@@ -64,6 +71,17 @@ export function KafkaExplorer() {
           </div>
         )}
       </div>
+
+      {/* Info modal */}
+      {showInfo && (
+        <KafkaInfoModal
+          onClose={() => setShowInfo(false)}
+          onDismissPermanently={() => {
+            setInfoDismissed(true);
+            setShowInfo(false);
+          }}
+        />
+      )}
     </div>
   );
 }

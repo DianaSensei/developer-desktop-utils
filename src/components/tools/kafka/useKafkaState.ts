@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 
-export type KafkaTab = 'properties' | 'data' | 'partitions' | 'config' | 'consumers' | 'produce';
+export type KafkaTab = 'properties' | 'data' | 'config' | 'consumers' | 'produce';
 
 export interface KafkaState {
   selectedBrokerId: string;
@@ -20,7 +20,7 @@ export function useKafkaState(): KafkaState {
   const [selectedBrokerId, setSelectedBrokerId] = usePersistentState('devtool:kafka:selectedBrokerId', '');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<KafkaTab>('properties');
+  const [selectedTab, setSelectedTab] = useState<KafkaTab>('data');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = () => setRefreshKey((k) => k + 1);
@@ -34,7 +34,7 @@ export function useKafkaState(): KafkaState {
   const handleSetTopic = (t: string | null) => {
     setSelectedTopic(t);
     setSelectedGroup(null);
-    setSelectedTab('properties');
+    setSelectedTab('data');
   };
 
   const handleSetGroup = (g: string | null) => {

@@ -39,7 +39,7 @@ import { ColorPicker } from '@/components/tools/ColorPicker';
 import { Settings } from '@/components/Settings';
 import { KafkaExplorer } from '@/components/tools/kafka/KafkaExplorer';
 
-const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType }> = {
+const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator },
   'text-transform': { path: '/text-transform', component: TextTransformer },
   'text-counter':   { path: '/text-counter',   component: TextCounter },
@@ -57,7 +57,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'checksum':       { path: '/checksum',       component: ChecksumTool },
   'image-base64':   { path: '/image-base64',   component: ImageBase64Tool },
   'generator':      { path: '/generator',      component: GeneratorTool },
-  'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer },
+  'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer, fullHeight: true },
 };
 
 const allTools = [
@@ -149,6 +149,14 @@ function Sidebar({
   const { isFeatureEnabled, toolOrder } = useFeatures();
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const pendingSearchFocus = useRef(false);
+
+  useEffect(() => {
+    if (!isCollapsed && pendingSearchFocus.current) {
+      pendingSearchFocus.current = false;
+      searchRef.current?.focus();
+    }
+  }, [isCollapsed]);
 
   const baseEnabled = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
   const orderedTools = applySavedOrder(baseEnabled, toolOrder);
@@ -198,8 +206,8 @@ function Sidebar({
         {isCollapsed ? (
           <div className="shrink-0 flex justify-center px-2 pt-2">
             <button
-              onClick={() => { /* expand handled by parent or tooltip */ }}
-              title="Search tools (expand sidebar to search)"
+              onClick={() => { pendingSearchFocus.current = true; onToggleCollapse(); }}
+              title="Search tools"
               className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
@@ -416,6 +424,16 @@ function AppContent() {
   const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
   const ActiveIcon = activeTool.icon;
+  const isFullHeight = !!(activeTool as typeof allTools[0] & { fullHeight?: boolean }).fullHeight;
+
+  const routes = (
+    <Routes>
+      {enabledTools.map((tool) => (
+        <Route key={tool.path} path={tool.path} element={<tool.component />} />
+      ))}
+      <Route path="/settings" element={<Settings />} />
+    </Routes>
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
@@ -427,8 +445,8 @@ function AppContent() {
         isCollapsed={isCollapsed}
         onToggleCollapse={toggleCollapse}
       />
-      <main className="flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+      <main className={cn('flex-1 flex flex-col min-h-0', isFullHeight ? 'overflow-hidden' : 'overflow-y-auto')}>
+        <div className={cn('z-30 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shrink-0', !isFullHeight && 'sticky top-0')}>
           <div className="flex items-center justify-between px-3 py-2.5 sm:px-4">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
@@ -449,14 +467,15 @@ function AppContent() {
             </Button>
           </div>
         </div>
-        <div className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5">
-          <Routes>
-            {enabledTools.map((tool) => (
-              <Route key={tool.path} path={tool.path} element={<tool.component />} />
-            ))}
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </div>
+        {isFullHeight ? (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {routes}
+          </div>
+        ) : (
+          <div className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5">
+            {routes}
+          </div>
+        )}
       </main>
     </div>
   );

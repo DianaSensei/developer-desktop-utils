@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type TopicDetails } from './types';
 import { PropertiesTab } from './PropertiesTab';
-import { PartitionsTab } from './PartitionsTab';
 import { MessagesTab } from './MessagesTab';
 import { ConfigTab } from './ConfigTab';
 import { ConsumersTab } from './ConsumersTab';
@@ -12,9 +11,8 @@ import { ProduceTab } from './ProduceTab';
 import type { KafkaTab } from './useKafkaState';
 
 const TABS: { id: KafkaTab; label: string }[] = [
+  { id: 'data', label: 'Messages' },
   { id: 'properties', label: 'Properties' },
-  { id: 'data', label: 'Data' },
-  { id: 'partitions', label: 'Partitions' },
   { id: 'config', label: 'Config' },
   { id: 'consumers', label: 'Consumers' },
   { id: 'produce', label: 'Produce' },
@@ -101,7 +99,7 @@ export function TopicView({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {loading && !data ? (
           <div className="flex items-center gap-2 px-4 py-8 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" /> Loading topic details…
@@ -115,11 +113,6 @@ export function TopicView({
             )}
             {selectedTab === 'data' && (
               <MessagesTab brokerId={brokerId} topic={topic} partitions={data.partitions} />
-            )}
-            {selectedTab === 'partitions' && (
-              <div className="h-full overflow-y-auto">
-                <PartitionsTab partitions={data.partitions} />
-              </div>
             )}
             {selectedTab === 'config' && (
               <ConfigTab brokerId={brokerId} topic={topic} />

@@ -163,6 +163,9 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
             onChange={(e) => setValue(e.target.value)}
             placeholder='{"key": "value"}'
             rows={8}
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono shadow-sm resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
