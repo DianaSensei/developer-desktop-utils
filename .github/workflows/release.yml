@@ -5,9 +5,6 @@ on:
     tags:
       - 'v*'
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   publish:
     permissions:
@@ -56,7 +53,7 @@ jobs:
           key: ${{ matrix.platform }}-${{ matrix.rust-target }}
 
       - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm' # This must match the platform value defined above.
+        if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -75,8 +72,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # App is ad-hoc signed via "signingIdentity": "-" in tauri.conf.json.
-          # Add APPLE_CERTIFICATE + related secrets here only when you have an Apple Developer account.
         with:
           tagName: ${{ github.ref_name }}
           releaseName: DevTool ${{ github.ref_name }}
