@@ -1,7 +1,7 @@
 import {
   Calendar, Code, Hash, Clock, FileJson, Shield, Search,
   GitCompare, QrCode, FileText, Filter, Type, Palette,
-  FileCheck, ImageIcon, Shuffle,
+  FileCheck, ImageIcon, Shuffle, Server,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -80,6 +80,10 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     id: 'generator', label: 'Generator', icon: Shuffle,
     description: 'Generate UUIDs, random numbers, and text with custom character sets.',
+  },
+  {
+    id: 'kafka-explorer', label: 'Kafka Explorer', icon: Server,
+    description: 'Browse topics, inspect partitions and offsets, manage consumer groups, and produce messages.',
   },
 ];
 

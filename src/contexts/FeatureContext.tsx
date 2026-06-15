@@ -35,6 +35,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'checksum': true,
   'image-base64': true,
   'generator': true,
+  'kafka-explorer': true,
   'settings': true,
 };
 

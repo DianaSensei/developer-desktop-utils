@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod kafka;
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -8,6 +10,21 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            kafka::kafka_list_configs,
+            kafka::kafka_save_config,
+            kafka::kafka_delete_config,
+            kafka::kafka_test_connection,
+            kafka::kafka_list_topics,
+            kafka::kafka_topic_details,
+            kafka::kafka_create_topic,
+            kafka::kafka_list_groups,
+            kafka::kafka_group_details,
+            kafka::kafka_produce,
+            kafka::kafka_fetch_messages,
+            kafka::kafka_delete_topic,
+            kafka::kafka_topic_configs,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

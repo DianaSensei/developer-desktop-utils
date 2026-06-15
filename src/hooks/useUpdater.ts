@@ -45,7 +45,10 @@ export function useUpdater(): UseUpdaterReturn {
         setStatus('not-available');
       }
     } catch (e) {
-      setError(String(e));
+      const msg = String(e);
+      setError(msg.includes('fetch') || msg.includes('JSON') || msg.includes('release')
+        ? 'Could not reach the update server. Check your internet connection and try again.'
+        : msg);
       setStatus('error');
     }
   }, []);

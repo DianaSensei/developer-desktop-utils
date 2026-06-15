@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
 import {
@@ -44,8 +44,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
   );
 }
 
-const CURRENT_VERSION = '0.1.0';
-const isTauri = typeof window !== 'undefined' && '__TAURI_IPC__' in window;
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 const APP_PERMISSIONS = [
   {
@@ -71,6 +70,12 @@ const APP_PERMISSIONS = [
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools } = useFeatures();
   const { status: updateStatus, updateInfo, error: updateError, checkForUpdates, installUpdate } = useUpdater();
+  const [currentVersion, setCurrentVersion] = useState('');
+
+  useEffect(() => {
+    if (!isTauri) return;
+    import('@tauri-apps/api/app').then(({ getVersion }) => getVersion()).then(setCurrentVersion).catch(() => {});
+  }, []);
 
   const [displayTools, setDisplayTools] = useState(() => applySavedOrder(TOOL_DEFS, toolOrder));
 
@@ -211,72 +216,6 @@ export function Settings() {
         </div>
       </section>
 
-      {/* Updates section — desktop only */}
-      {isTauri && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold">Updates</h2>
-          <div className="rounded-lg border divide-y text-xs">
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-muted-foreground">Current version</span>
-              <span className="font-mono font-medium">v{CURRENT_VERSION}</span>
-            </div>
-
-            {updateStatus === 'available' && updateInfo && (
-              <div className="px-4 py-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[10px] font-semibold">
-                    <CheckCircle2 className="h-3 w-3" />
-                    v{updateInfo.version} available
-                  </span>
-                </div>
-                {updateInfo.body && (
-                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{updateInfo.body}</p>
-                )}
-              </div>
-            )}
-
-            {updateStatus === 'not-available' && (
-              <div className="flex items-center gap-2 px-4 py-3 text-muted-foreground">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                You are on the latest version.
-              </div>
-            )}
-
-            {updateStatus === 'error' && (
-              <div className="flex items-center gap-2 px-4 py-3 text-destructive">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                <span className="leading-relaxed">{updateError ?? 'Failed to check for updates.'}</span>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 px-4 py-3">
-              {updateStatus === 'available' ? (
-                <button
-                  onClick={installUpdate}
-                  disabled={updateStatus === 'available' && false}
-                  className="flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Download &amp; Install
-                </button>
-              ) : updateStatus === 'checking' || updateStatus === 'downloading' ? (
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {updateStatus === 'checking' ? 'Checking for updates…' : 'Downloading update…'}
-                </span>
-              ) : (
-                <button
-                  onClick={checkForUpdates}
-                  className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Check for Updates
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Permissions section */}
       <section className="space-y-3">
@@ -319,9 +258,54 @@ export function Settings() {
               <p className="text-muted-foreground mt-1 text-[11px]">Developer utilities for your desktop</p>
             </div>
           </div>
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center justify-between px-4 py-3 text-xs">
             <span className="text-muted-foreground">Version</span>
-            <span className="font-mono font-medium">0.1.0</span>
+            <div className="flex items-center gap-2">
+              {updateStatus === 'not-available' && (
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Up to date
+                </span>
+              )}
+              {updateStatus === 'available' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 text-[10px] font-semibold">
+                  v{updateInfo?.version} available
+                </span>
+              )}
+              {updateStatus === 'error' && (
+                <span className="flex items-center gap-1 text-destructive">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  {updateError ?? 'Update check failed'}
+                </span>
+              )}
+
+              {isTauri && (
+                updateStatus === 'available' ? (
+                  <button
+                    onClick={installUpdate}
+                    className="flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-2 py-1 text-[10px] font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    <Download className="h-3 w-3" />
+                    Install
+                  </button>
+                ) : (updateStatus === 'checking' || updateStatus === 'downloading') ? (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {updateStatus === 'checking' ? 'Checking…' : 'Downloading…'}
+                  </span>
+                ) : (
+                  <button
+                    onClick={checkForUpdates}
+                    className="flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Check
+                  </button>
+                )
+              )}
+
+              <span className="font-mono font-medium">{currentVersion || '…'}</span>
+            </div>
           </div>
           <div className="flex items-center justify-between px-4 py-3">
             <span className="text-muted-foreground">Contact</span>

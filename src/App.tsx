@@ -37,6 +37,7 @@ import { ArrayDeduplicator } from '@/components/tools/ArrayDeduplicator';
 import { TextCounter } from '@/components/tools/TextCounter';
 import { ColorPicker } from '@/components/tools/ColorPicker';
 import { Settings } from '@/components/Settings';
+import { KafkaExplorer } from '@/components/tools/kafka/KafkaExplorer';
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType }> = {
   'cron-generator': { path: '/',              component: CronGenerator },
@@ -56,6 +57,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'checksum':       { path: '/checksum',       component: ChecksumTool },
   'image-base64':   { path: '/image-base64',   component: ImageBase64Tool },
   'generator':      { path: '/generator',      component: GeneratorTool },
+  'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer },
 };
 
 const allTools = [
