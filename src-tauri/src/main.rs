@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod kafka;
+mod checksum;
 
 fn main() {
     tauri::Builder::default()
@@ -11,6 +12,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            checksum::hash_file,
             kafka::kafka_list_configs,
             kafka::kafka_save_config,
             kafka::kafka_delete_config,
