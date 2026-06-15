@@ -1,20 +1,19 @@
 # DevTool - Project Guide for AI Agents
 
-> **Purpose**: This file helps AI coding agents (Claude, etc.) quickly understand the project structure, conventions, and implementation patterns to work efficiently without needing extensive context.
+> Complete reference for AI coding agents. Read this before writing any code.
 
 ## Project Overview
 
-**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, color tools, etc.).
+**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, Kafka explorer, etc.).
 
 **Key Technologies:**
-- **Frontend**: React 18, TypeScript, Vite 5
+- **Frontend**: React 18, TypeScript, Vite 8 (Rolldown bundler)
 - **Desktop**: Tauri 2 (Rust backend)
-- **UI**: Tailwind CSS, shadcn/ui components
-- **State**: React Context API
+- **UI**: Tailwind CSS, shadcn/ui components (`src/components/ui/`)
+- **State**: React Context API (`FeatureContext`, `UpdateContext`)
 - **Routing**: React Router v6
 
 **Version**: 0.0.3  
-**License**: MIT  
 **Platform Support**: macOS 11+ · Windows 10/11 · Ubuntu 22.04+
 
 ---
@@ -22,17 +21,14 @@
 ## Quick Start Commands
 
 ```bash
-# Development
 npm run dev              # Web only (fast)
-npm run tauri:dev        # Desktop app (slower)
-
-# Build
-npm run build           # Build web assets
-npm run tauri:build     # Build desktop binary
-
-# Dependencies
-npm install             # Install all dependencies
+npm run tauri:dev        # Desktop app
+npm run build            # Build web assets
+npm run tauri:build      # Build desktop binary
 ```
+
+> **For AI agents — never run the app or dev server yourself.**
+> Do not execute `npm run dev`, `npm run tauri:dev`, or any command that opens a port or launches a window. Instead, tell the user to run it in their own terminal. The user must control when the app starts and stops. Only `npm run build` (asset build, exits cleanly) is safe to run without asking.
 
 ---
 
@@ -44,67 +40,79 @@ devtool/
 │   ├── components/
 │   │   ├── ui/              # shadcn/ui components (Button, Input, etc.)
 │   │   ├── tools/           # Tool components (one per utility)
-│   │   └── Settings.tsx     # Settings/feature management
+│   │   └── Settings.tsx     # Settings page (reads TOOL_DEFS; no FEATURE_LIST)
 │   ├── contexts/
-│   │   └── FeatureContext.tsx  # Feature toggle state
-│   ├── hooks/               # Shared tool UX hooks (see "Shared Tool Hooks")
-│   │   ├── usePersistentState.ts  # useState that persists to localStorage
-│   │   ├── useQuickPaste.ts       # ⌘V / Ctrl+V pastes straight into a tool
-│   │   └── useInputHistory.ts     # ⌘Z / ⌘⇧Z undo/redo on a tool's input
+│   │   ├── FeatureContext.tsx  # Tool enable/disable + sidebar order
+│   │   └── UpdateContext.tsx   # Auto-update state, badge, toggle
+│   ├── hooks/
+│   │   ├── usePersistentState.ts  # useState + localStorage
+│   │   ├── useQuickPaste.ts       # ⌘V / Ctrl+V clipboard paste
+│   │   └── useInputHistory.ts     # ⌘Z / ⌘⇧Z undo/redo
 │   ├── lib/
+│   │   ├── toolDefs.ts      # TOOL_DEFS array — single source of truth for tool metadata
 │   │   ├── utils.ts         # cn() classname merger
 │   │   └── clipboard.ts     # copyToClipboard() — Tauri-aware write helper
+│   ├── workers/             # Web Workers for heavy computation (e.g. checksum)
 │   ├── styles/
-│   │   └── globals.css      # Tailwind + theme variables
-│   ├── App.tsx              # Main app, routing, layout
+│   │   └── globals.css      # Tailwind + CSS theme variables
+│   ├── App.tsx              # Router, layout, TOOL_ROUTES, sidebar, UpdateProvider
 │   └── main.tsx             # React entry point
 ├── src-tauri/               # Tauri 2 (Rust) backend
 │   ├── src/main.rs          # Rust main — registers all plugins
-│   ├── Cargo.toml           # Rust dependencies (tauri v2 + plugin crates)
+│   ├── Cargo.toml           # Rust dependencies
 │   ├── capabilities/
-│   │   └── default.json     # Permission grants (replaces v1 allowlist)
+│   │   └── default.json     # Permission grants (Tauri 2 capability system)
 │   └── tauri.conf.json      # Tauri 2 configuration
 ├── docs/
-│   ├── ai/                  # AI agent guides (this file, ARCHITECTURE.md)
-│   └── human/               # Human contributor guides (CONTRIBUTING, SETUP, BUILD, etc.)
+│   ├── ai/                  # AI agent guides (this file)
+│   └── human/               # Human contributor guides
 ├── public/                  # Static assets
-└── package.json             # Node dependencies & scripts
+└── package.json
 ```
 
 ---
 
-## Architecture Principles
+## Design Principles (mandatory — read before writing any UI or feature code)
 
-### 1. **Component-Based Architecture**
-- Each tool is a self-contained React component
-- Tools are isolated and don't share state
-- All tools follow the same pattern
+### UI Components — always use the shared library, never OS-native
 
-### 2. **Feature Toggle System**
-- Users can enable/disable any tool
-- State managed in `FeatureContext`
-- Persisted in localStorage
+- **Always** use components from `src/components/ui/` (shadcn/ui) for every interactive element: buttons, inputs, selects, dialogs, toggles, checkboxes, dropdowns.
+- **Never** use browser- or OS-native elements (`<select>`, `window.alert`, `window.confirm`, native context menus, etc.). They break visual consistency across macOS / Windows / Linux.
+- If a needed component doesn't exist in `src/components/ui/`, create a new shadcn/ui-style component using Radix UI primitives and Tailwind.
 
-### 3. **Layout Philosophy**
-- Sidebar: Collapsible navigation (`w-56` / 224px expanded, `w-14` / 56px collapsed)
-- Content: Full width, maximum space for tools
-- Inspired by DevUtils.com - clean, focused, simple
+### UI / UX — minimalist, smooth, and user-first
 
-### 4. **Styling Convention**
-- Tailwind utility classes (no custom CSS)
-- shadcn/ui for consistent components
-- Dark mode via CSS variables
-- Responsive: mobile-first approach
+- **Minimalist**: Remove every element that isn't directly serving the user's task. No decorative chrome, no nested cards inside cards.
+- **Tool space first**: The content area is the hero. Inputs and outputs fill available width. Sidebars and controls shrink to the minimum.
+- **Rounded-corner design**: Use `rounded-lg` or `rounded-md` consistently. Never `rounded-none` for containers or interactive elements.
+- **Smooth and seamless**: All state transitions use CSS transitions or Tailwind's `transition-*` utilities. No jarring instant swaps.
+- **Follow user behavior**: Primary actions where eyes land first — top-left for input, inline or right for output, icon-only for secondary actions.
+- **Keyboard-first**: Respect `useQuickPaste` (⌘V) and `useInputHistory` (⌘Z/⌘⇧Z) on every text tool.
+
+### Stability and Resource Usage — the app must never be the problem
+
+- **No blocking the main thread**: offload heavy computation (hashing, large file reads, diffing) to a Web Worker (`src/workers/`) or a Tauri Rust command. If a task can block >16 ms, it doesn't belong in a React handler.
+- **Always responsive**: Show a progress indicator while background work runs; never freeze the UI.
+- **No memory leaks**: every `setInterval`, `setTimeout`, event listener, and worker must be torn down in its cleanup function.
+- **Lazy-load heavy libraries**: use dynamic `import()` inside `useEffect` or `useCallback` for libraries only needed conditionally.
+- **Minimize Tauri IPC**: batch or debounce calls. Never call a Tauri command in a render loop.
+
+### Transparency — the user must always know what the app is doing
+
+- **No silent network calls**: any network feature must be user-initiated or preceded by an explicit opt-in (toggle in Settings).
+- **Document permissions**: when adding a Tauri capability, add it to the App Permissions list in `Settings.tsx` so users see what the app can access.
+- **Visible progress**: file reads, downloads, and long async operations must show status (spinner, progress text, done/error state).
+- **Minimum-scope access**: use the narrowest Tauri capability that the feature needs (e.g. `fs:read-file` not `fs:allow-all`).
 
 ---
 
 ## Adding a New Tool (Step-by-Step)
 
-### 1. Create Tool Component
+Tool metadata, routing, and feature toggles are kept separate. All three need updating.
 
-Create `src/components/tools/YourTool.tsx`. Follow the **modern tool pattern** (required): process the
-input in real time (no "Process" button), persist the input across sessions, and wire up the
-shared paste/undo hooks. See [Shared Tool Hooks](#shared-tool-hooks-ux-conventions) for the why.
+### Step 1: Create the tool component
+
+Create `src/components/tools/YourTool.tsx`. Use the **modern tool pattern**: real-time output (no "Process" button), persisted input, quick-paste, and undo/redo.
 
 ```tsx
 import { useMemo } from 'react';
@@ -117,13 +125,9 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function YourTool() {
-  // Persisted input — survives app restarts. Key: 'devtool:<tool>:<field>'.
   const [input, setInput] = usePersistentState('devtool:yourTool:input', '');
-
-  // Recompute output on every keystroke instead of behind a button.
   const output = useMemo(() => input.toUpperCase(), [input]);
 
-  // ⌘V pastes the clipboard straight into the input; ⌘Z / ⌘⇧Z undo/redo it.
   useQuickPaste(setInput);
   useInputHistory(input, setInput);
 
@@ -145,7 +149,6 @@ export function YourTool() {
             placeholder={`Enter something — ${quickPasteHint}`}
           />
         </div>
-
         {output && (
           <div className="space-y-2">
             <Label>Output</Label>
@@ -158,486 +161,249 @@ export function YourTool() {
 }
 ```
 
-### 2. Register in App.tsx
+### Step 2: Add to TOOL_DEFS — `src/lib/toolDefs.ts`
 
-```tsx
-// Import icon
+`TOOL_DEFS` is the single source of truth for tool metadata (id, label, icon, description). Settings and the sidebar read from it automatically.
+
+```ts
 import { YourIcon } from 'lucide-react';
 
-// Import component
-import { YourTool } from '@/components/tools/YourTool';
-
-// Add to allTools array
-const allTools = [
+export const TOOL_DEFS: ToolDef[] = [
   // ... existing tools
-  { 
-    path: '/your-tool', 
-    label: 'Your Tool', 
-    icon: YourIcon, 
-    component: YourTool, 
-    featureId: 'your-tool' 
+  {
+    id: 'your-tool',
+    label: 'Your Tool',
+    icon: YourIcon,
+    description: 'One-line description shown in sidebar tooltip and Settings.',
   },
 ];
 ```
 
-### 3. Add to FeatureContext.tsx
+### Step 3: Register route in App.tsx
+
+```tsx
+// 1. Import component at top of App.tsx
+import { YourTool } from '@/components/tools/YourTool';
+
+// 2. Add entry to TOOL_ROUTES (maps id → path + component)
+const TOOL_ROUTES = {
+  // ... existing routes
+  'your-tool': { path: '/your-tool', component: YourTool },
+};
+```
+
+Use `fullHeight: true` in the route entry if your tool needs to stretch to full viewport height (e.g. KafkaExplorer).
+
+### Step 4: Enable by default — `src/contexts/FeatureContext.tsx`
 
 ```tsx
 const DEFAULT_FEATURES: FeatureSettings = {
-  // ... existing features
+  // ... existing
   'your-tool': true,
 };
 ```
 
-### 4. Add to Settings.tsx
-
-```tsx
-// Import icon
-import { YourIcon } from 'lucide-react';
-
-// Add to FEATURE_LIST
-const FEATURE_LIST = [
-  // ... existing features
-  { id: 'your-tool', label: 'Your Tool', icon: YourIcon },
-];
-```
-
-**That's it!** Your tool is now:
-- ✅ Accessible via `/your-tool` route
-- ✅ Visible in sidebar
-- ✅ Toggle-able in Settings
-- ✅ Persistent across sessions
+**That's it.** No changes needed in `Settings.tsx` — it reads `TOOL_DEFS` automatically.
 
 ---
 
 ## Shared Tool Hooks (UX conventions)
 
-Tools share a small set of hooks in `src/hooks/` that encode the app's UX conventions.
-**New and edited tools should use them** so every tool behaves consistently: process in real
-time, remember their last input, and accept a one-keystroke paste. Prefer these over re-rolling
-local `useState` + a "Process" button.
+All text tools must use these hooks for consistent behavior.
 
 ### `usePersistentState(key, initial)` — `src/hooks/usePersistentState.ts`
-Drop-in replacement for `useState` that persists the value to `localStorage` under `key`, so a
-tool keeps its input/selection after the app closes or you switch tools and back. JSON-serializable
-values only. Corrupt/blocked storage falls back to `initial` silently.
+
+Drop-in for `useState` that persists to `localStorage`. Key convention: `devtool:<toolName>:<field>`.
 
 ```tsx
 const [input, setInput] = usePersistentState('devtool:json:input', '');
 ```
-**Key convention:** `devtool:<toolName>:<field>` (e.g. `devtool:textCounter:text`). One key per
-field so tools don't clobber each other.
 
 ### `useQuickPaste(onPaste, enabled?)` — `src/hooks/useQuickPaste.ts`
-While the tool is mounted, pressing ⌘V / Ctrl+V reads the clipboard and calls `onPaste(text)` —
-no extra click, no popup. In the Tauri desktop build it reads via the Rust backend (avoids the
-WebKit clipboard-permission prompt); in a browser it uses the Clipboard API. Also exports
-`quickPasteHint` (`"Press ⌘V to paste"` / `"Press Ctrl+V to paste"`) for placeholder/help text.
+
+⌘V / Ctrl+V reads clipboard and calls `onPaste(text)` — no extra click. Uses Tauri clipboard plugin in the desktop app (avoids WebKit permission prompt). Also exports `quickPasteHint` for placeholder text.
 
 ```tsx
 useQuickPaste(setInput);
 ```
 
 ### `useInputHistory(value, applyValue, enabled?)` — `src/hooks/useInputHistory.ts`
-Adds undo/redo to a tool's primary input for the lifetime it's mounted. ⌘Z / Ctrl+Z undoes,
-⌘⇧Z / Ctrl+Shift+Z / Ctrl+Y redoes. User edits are debounced (~400ms) into history entries;
-programmatic changes (paste, format, clear) are captured too.
+
+Adds undo (⌘Z) / redo (⌘⇧Z / Ctrl+Y) to a tool's primary input. Debounces user edits ~400ms into history entries.
 
 ```tsx
 useInputHistory(input, setInput);
 ```
 
-> The convention is: **real-time output (`useMemo`), persisted input (`usePersistentState`),
-> quick paste (`useQuickPaste`), and undo/redo (`useInputHistory`)** — with a minimalist UI.
-> Some tools (e.g. UUID/QR generators) legitimately keep an action button where there is no
-> "input to transform"; use judgment.
+> Convention: **real-time output** (`useMemo`), **persisted input** (`usePersistentState`), **quick paste** (`useQuickPaste`), **undo/redo** (`useInputHistory`). Tools with no transformable input (UUID/QR generator) may keep an action button.
 
 ---
 
 ## Code Conventions
 
 ### Naming
-- **Components**: PascalCase (`ColorPicker.tsx`)
-- **Files**: kebab-case for routes (`color-picker`)
-- **Feature IDs**: kebab-case (`'color-picker'`)
-- **Variables**: camelCase (`isCollapsed`)
-- **Constants**: UPPER_SNAKE_CASE (`DEFAULT_FEATURES`)
-
-### TypeScript
-- Use interfaces for props
-- Use type for unions/intersections
-- Avoid `any` - use `unknown` if needed
-- Export interfaces with components
-
-### React Patterns
-```tsx
-// State
-const [value, setValue] = useState('');
-
-// Effects
-useEffect(() => {
-  // Side effects
-}, [dependency]);
-
-// Memoization (for expensive computations)
-const computed = useMemo(() => {
-  return expensiveCalculation(value);
-}, [value]);
-
-// Event handlers
-const handleClick = () => {
-  // Logic
-};
-```
+- Components: `PascalCase` (`ColorPicker.tsx`)
+- Feature/tool IDs: `kebab-case` (`'color-picker'`)
+- Variables: `camelCase`; Constants: `UPPER_SNAKE_CASE`
 
 ### Styling
 ```tsx
-// Use cn() for conditional classes
 className={cn(
   'base-classes',
   condition && 'conditional-classes',
   isActive ? 'active-classes' : 'inactive-classes'
 )}
+```
+Common: `space-y-4`, `flex gap-2`, `rounded-lg`, `border`, `p-4`, `text-xs`, `font-medium`.
 
-// Common patterns
-'space-y-4'        // Vertical spacing
-'flex gap-2'       // Horizontal spacing
-'rounded-lg'       // Border radius
-'border'           // Border
-'p-4'              // Padding
-'text-sm'          // Text size
-'font-medium'      // Font weight
+### TypeScript
+- Use interfaces for component props; `type` for unions
+- Avoid `any`; use `unknown` when the type is truly unknown
+- Export types alongside their components
+
+---
+
+## Key Patterns
+
+### Tauri detection
+```tsx
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 ```
 
----
+### Clipboard write (Tauri-aware)
+```tsx
+import { copyToClipboard } from '@/lib/clipboard';
+await copyToClipboard(text);
+```
 
-## Common Issues & Solutions
+### Persist a setting
+```tsx
+localStorage.setItem('devtool-my-setting', value);
+const saved = localStorage.getItem('devtool-my-setting');
+```
 
-### Issue 1: Tool not showing in sidebar
-**Cause**: Feature ID mismatch or not enabled  
-**Solution**: 
-1. Check `featureId` in `allTools` matches ID in `FeatureContext`
-2. Check feature is `true` in `DEFAULT_FEATURES`
-3. Clear localStorage: `localStorage.clear()`
+### Lazy-load a heavy library
+```tsx
+useEffect(() => {
+  import('heavy-library').then(({ util }) => util.doSomething(input));
+}, [input]);
+```
 
-### Issue 2: TypeScript errors after adding tool
-**Cause**: Missing imports or type definitions  
-**Solution**:
-1. Ensure all imports are correct
-2. Check component props have proper types
-3. Run `npm run build` to see all errors
-
-### Issue 3: Styles not applying
-**Cause**: Tailwind classes not recognized  
-**Solution**:
-1. Check `tailwind.config.js` includes your file
-2. Restart dev server
-3. Use standard Tailwind classes (no custom CSS)
-
-### Issue 4: Component not updating
-**Cause**: Missing dependencies in useEffect/useMemo  
-**Solution**: Add all used variables to dependency array
-
-### Issue 5: Build fails with "Icons not found"
-**Cause**: Tauri needs icons for bundling  
-**Solution**: Set `"bundle": { "active": false }` in `tauri.conf.json` for dev builds
-
----
-
-## Dependencies Rationale
-
-### Core
-- `react` + `react-dom`: UI library
-- `typescript`: Type safety
-- `vite`: Fast build tool
-- `@tauri-apps/api@2` + `@tauri-apps/cli@2`: Tauri 2 framework
-- `@tauri-apps/plugin-clipboard-manager`: Clipboard read/write
-- `@tauri-apps/plugin-dialog`: Native open/save dialogs
-- `@tauri-apps/plugin-fs`: File system access
-- `@tauri-apps/plugin-process`: App relaunch (`relaunch()`)
-- `@tauri-apps/plugin-updater`: In-app auto-update (`check()` → `update.downloadAndInstall()`)
-
-### UI
-- `tailwindcss`: Utility-first CSS
-- `@radix-ui/*`: Accessible UI primitives (used by shadcn)
-- `lucide-react`: Icon library
-- `class-variance-authority`: Component variants
-- `clsx` + `tailwind-merge`: Conditional classes
-
-### Routing
-- `react-router-dom`: Client-side routing
-
-### Utilities
-- `crypto-js`: Hashing & encryption
-- `date-fns`: Date formatting
-- `jwt-decode`: JWT decoding
-- `qrcode`: QR code generation
-- `uuid`: UUID generation
-- `diff`: Text diffing
-- `react-markdown`: Markdown rendering
+### Web Worker (for blocking computation)
+```tsx
+const worker = new Worker(new URL('../../workers/your.worker.ts', import.meta.url), { type: 'module' });
+```
+See `src/workers/checksum.worker.ts` for a reference implementation.
 
 ---
 
 ## State Management
 
-### FeatureContext
-**Purpose**: Manage which tools are enabled/disabled  
-**Location**: `src/contexts/FeatureContext.tsx`  
-**Storage**: localStorage (`devtool-features`)
+### FeatureContext — `src/contexts/FeatureContext.tsx`
+Manages tool enable/disable and sidebar drag order. Persisted in `localStorage` (`devtool-features`, `devtool-tool-order`).
 
-**API**:
 ```tsx
-const { features, toggleFeature, isFeatureEnabled, resetToDefaults } = useFeatures();
+const { features, toggleFeature, isFeatureEnabled, resetToDefaults, toolOrder, reorderTools } = useFeatures();
+```
 
-// Check if enabled
-isFeatureEnabled('color-picker') // true/false
+### UpdateContext — `src/contexts/UpdateContext.tsx`
+Auto-update polling, badge state, and install flow. Persisted in `localStorage` (`devtool-auto-update`, `devtool-last-update-check`).
 
-// Toggle
-toggleFeature('color-picker')
-
-// Reset all
-resetToDefaults()
+```tsx
+const { status, updateInfo, updateAvailable, autoCheckEnabled, toggleAutoCheck, checkForUpdates, installUpdate } = useUpdate();
 ```
 
 ### Dark Mode
-**Storage**: localStorage (`devtool-dark-mode`)  
-**Implementation**: CSS class on `<html>` element  
-**Location**: `App.tsx` (local state)
+`localStorage` key `devtool-dark-mode`. Class toggled on `<html>`. Managed in `App.tsx`.
 
 ### Sidebar Collapse
-**Storage**: localStorage (`devtool-sidebar-collapsed`)  
-**Implementation**: Width change (`w-56` 224px ↔ `w-14` 56px)  
-**Location**: `App.tsx` (local state)
+`localStorage` key `devtool-sidebar-collapsed`. Width: `w-56` (224 px) ↔ `w-14` (56 px).
 
 ---
 
-## Styling System
+## Tauri 2 Notes
 
-### Theme Variables
-Located in `src/styles/globals.css`:
+- **Permissions**: `src-tauri/capabilities/default.json` — Tauri 2 capability system, not the old v1 `allowlist`
+- **Plugin imports**: `@tauri-apps/plugin-*` packages (not `@tauri-apps/api/*` subpaths for plugins)
+- **Tauri detection**: `'__TAURI_INTERNALS__' in window` (not `__TAURI_IPC__`)
+- **Config keys**: `build.devUrl` (not `devPath`), `build.frontendDist` (not `distDir`), `plugins.updater` (not `tauri.updater`)
+- **Adding a capability**: add permission string to `capabilities/default.json` AND document it in the `APP_PERMISSIONS` array in `Settings.tsx`
 
-```css
-:root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --primary: 221.2 83.2% 53.3%;
-  /* ... more variables */
-}
-
-.dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  /* ... dark mode values */
-}
-```
-
-### Component Patterns
-
-**Card Layout** (most tools use this):
-```tsx
-<Card>
-  <CardHeader>
-    <CardTitle>Title</CardTitle>
-    <CardDescription>Description</CardDescription>
-  </CardHeader>
-  <CardContent className="space-y-4">
-    {/* Content */}
-  </CardContent>
-</Card>
-```
-
-**Input + Button**:
-```tsx
-<div className="flex gap-2">
-  <Input className="flex-1" />
-  <Button onClick={handler}>Action</Button>
-  <Button size="icon" variant="outline">
-    <Copy className="h-4 w-4" />
-  </Button>
-</div>
-```
-
-**Stats Display**:
-```tsx
-<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-  <StatCard label="Label" value={123} />
-</div>
-```
-
----
-
-## Performance Considerations
-
-### Do:
-- ✅ Use `useMemo` for expensive calculations
-- ✅ Use `useCallback` for event handlers passed to children
-- ✅ Keep component state local when possible
-- ✅ Lazy load heavy libraries if needed
-
-### Don't:
-- ❌ Don't add global state unless necessary
-- ❌ Don't re-render entire app on small changes
-- ❌ Don't load all tools at once (React Router handles this)
-- ❌ Don't use inline function definitions in render (use useCallback)
-
----
-
-## Testing Strategy
-
-**Current State**: No tests yet (MVP phase)
-
-**Recommended Testing Pyramid**:
-1. **Unit Tests**: Utility functions (`lib/utils.ts`)
-2. **Component Tests**: Individual tools (React Testing Library)
-3. **Integration Tests**: Feature toggle system
-4. **E2E Tests**: Critical user flows (Playwright)
-
-**To Add Tests**:
-```bash
-npm install -D vitest @testing-library/react @testing-library/jest-dom
+Common capability strings:
+```json
+"clipboard-manager:allow-read-text",
+"clipboard-manager:allow-write-text",
+"fs:allow-read-file",
+"fs:allow-write-file",
+"fs:scope-appdata-recursive",
+"dialog:allow-open",
+"dialog:allow-save",
+"process:allow-restart",
+"updater:allow-check",
+"updater:allow-download-and-install"
 ```
 
 ---
 
 ## Build & Deployment
 
-### Development Build
-```bash
-npm run dev           # Web: http://localhost:1420
-npm run tauri:dev     # Desktop: Opens native window
-```
-
-### Production Build
+### Production build
 ```bash
 npm run tauri:build
 ```
+Output: `src-tauri/target/release/bundle/`
+- macOS: `bundle/macos/DevTool.app`, `bundle/dmg/*.dmg`
+- Windows: `bundle/msi/*.msi`, `bundle/nsis/*.exe`
+- Linux: `bundle/appimage/*.AppImage`, `bundle/deb/*.deb`
 
-**Output locations**:
-- macOS: `src-tauri/target/release/bundle/macos/DevTool.app`
-- Windows: `src-tauri/target/release/bundle/msi/*.msi`
-- Linux: `src-tauri/target/release/bundle/appimage/*.AppImage`
+### CI/CD — GitHub Actions
+Configured in `.github/workflows/release.yml`. Triggers on `git push origin v*` tags.  
+Builds on: `macos-latest` (Apple Silicon), `windows-latest`, `ubuntu-22.04`.
 
-### GitHub Actions
-CI/CD configured in `.github/workflows/release.yml`  
-Triggers on: `git push origin v*` tags  
-Builds for: macOS Apple Silicon (`macos-latest`), Windows, Linux (Ubuntu 22.04)
+**Signing secrets** (GitHub repo → Settings → Secrets):
+- `TAURI_SIGNING_PRIVATE_KEY` — from `npm run tauri signer generate`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
 
-**Signing secrets** (set in GitHub repo → Settings → Secrets → Actions):
-- `TAURI_SIGNING_PRIVATE_KEY` — private key from `npm run tauri signer generate`
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` — password for the key
-
-### Tauri 2 — Key differences from v1
-- **Permissions**: `src-tauri/capabilities/default.json` replaces the old `allowlist` in `tauri.conf.json`
-- **Plugin imports**: use `@tauri-apps/plugin-*` packages, not `@tauri-apps/api/*` subpaths
-- **Tauri detection**: check `'__TAURI_INTERNALS__' in window` (not `__TAURI_IPC__`)
-- **Config structure**: `build.devUrl` (not `devPath`), `build.frontendDist` (not `distDir`), `app.windows` (not `tauri.windows`), `plugins.updater` (not `tauri.updater`)
-
----
-
-## Common Tasks
-
-### Add a new icon
-1. Find icon at [lucide.dev](https://lucide.dev)
-2. Import: `import { IconName } from 'lucide-react';`
-3. Use: `<IconName className="h-4 w-4" />`
-
-### Add a new route
-Already handled by adding tool to `allTools` array
-
-### Change sidebar width
-Edit `App.tsx`:
-```tsx
-className={cn(
-  'transition-all',
-  isCollapsed ? 'w-14' : 'w-56'  // Change these values
-)}
-```
-
-### Add new color theme
-Edit `src/styles/globals.css` and add CSS variables
-
-### Persist new setting
-```tsx
-// Save
-localStorage.setItem('my-setting', value);
-
-// Load
-const saved = localStorage.getItem('my-setting');
-```
-
----
-
-## File Modification Rules
-
-### ✅ Safe to modify:
-- `src/components/tools/*.tsx` - Add/edit tools
-- `src/hooks/*.ts` - Shared tool hooks (edit carefully; many tools depend on them)
-- `src/styles/globals.css` - Theme changes
-- Tool-specific logic
-
-### ⚠️ Modify with care:
-- `src/App.tsx` - Core routing/layout
-- `src/contexts/FeatureContext.tsx` - State management
-- `src/components/Settings.tsx` - Settings UI
-
-### ❌ Rarely modify:
-- `src/components/ui/*.tsx` - shadcn components (regenerate instead)
-- `vite.config.ts` - Build configuration
-- `tailwind.config.js` - Tailwind setup
-- `src-tauri/*` - Tauri backend (unless adding Rust features)
-
----
-
-## Debugging Tips
-
-### Check sidebar not showing tool
-```tsx
-// In browser console
-localStorage.getItem('devtool-features')
-// Should show: {"tool-name": true, ...}
-```
-
-### Force reload settings
-```tsx
-localStorage.clear()
-// Then refresh page
-```
-
-### Check route registration
-```tsx
-// Tools should appear in allTools array in App.tsx
-console.log(allTools.map(t => t.path))
-```
-
-### TypeScript errors
+### Trigger a release
 ```bash
-npm run build  # See all TS errors at once
+# Update "version" in src-tauri/tauri.conf.json, then:
+git tag v0.2.0
+git push origin main --tags
 ```
 
 ---
 
-## Future Enhancements (Roadmap)
+## Architecture
 
-### Planned Features
-- [ ] Command palette (Cmd+K) for quick tool access
-- [ ] Keyboard shortcuts per tool
-- [ ] Import/export settings
-- [ ] Custom themes
-- [ ] Plugin system for community tools
-- [ ] Cloud sync (optional)
+```
+┌──────────────────────────────────────────┐
+│           Desktop Shell (Tauri/Rust)     │
+│  ┌────────────────────────────────────┐  │
+│  │         WebView Container          │  │
+│  │  ┌──────────────────────────────┐  │  │
+│  │  │      React Application       │  │  │
+│  │  │  FeatureProvider             │  │  │
+│  │  │  └─ UpdateProvider           │  │  │
+│  │  │     └─ Router                │  │  │
+│  │  │        ├─ Sidebar (nav)      │  │  │
+│  │  │        └─ Tool Components    │  │  │
+│  │  └──────────────────────────────┘  │  │
+│  └────────────────────────────────────┘  │
+│  System APIs: Clipboard · FS · Dialogs   │
+└──────────────────────────────────────────┘
+         │                    │
+    localStorage         Tauri IPC (Rust)
+```
 
-### Technical Debt
-- [ ] Add unit tests
-- [ ] Add E2E tests
-- [ ] Improve error boundaries
-- [ ] Add logging system
-- [ ] Performance monitoring
+**Why Tauri over Electron**: ~3 MB bundle vs ~150 MB; native webview; lower memory; Rust backend.  
+**Why Context API over Redux/Zustand**: state is simple (feature flags + update status); no extra dependency.  
+**Why Tailwind over CSS Modules**: faster iteration; shadcn/ui compatibility; no naming conflicts.
 
 ---
 
-## Quick Reference
+## Dependencies Quick Reference
 
-### Most Used Components
+### Most Used UI Components
 ```tsx
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -649,55 +415,68 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 
 ### Most Used Utilities
 ```tsx
-import { cn } from '@/lib/utils';                              // Merge classnames
-import { copyToClipboard } from '@/lib/clipboard';            // Write to clipboard (Tauri-aware)
-import { useFeatures } from '@/contexts/FeatureContext';       // Feature toggles
-import { usePersistentState } from '@/hooks/usePersistentState';   // Persisted input
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';   // ⌘V paste
-import { useInputHistory } from '@/hooks/useInputHistory';     // ⌘Z undo/redo
+import { cn } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/clipboard';
+import { useFeatures } from '@/contexts/FeatureContext';
+import { useUpdate } from '@/contexts/UpdateContext';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useInputHistory } from '@/hooks/useInputHistory';
 ```
 
-### Most Used Icons
-```tsx
-import { Copy, Check, X, Search, Settings } from 'lucide-react';
-```
+### Key npm Packages
+- `@tauri-apps/plugin-clipboard-manager` — clipboard read/write
+- `@tauri-apps/plugin-dialog` — file open/save dialogs
+- `@tauri-apps/plugin-fs` — file system access
+- `@tauri-apps/plugin-process` — `relaunch()`
+- `@tauri-apps/plugin-updater` — `check()` → `update.downloadAndInstall()`
+- `crypto-js` — hashing & AES encryption
+- `rskafka` (Rust, v0.6) — Kafka client (pulled via `rustls 0.23`)
+- `diff` — text diffing
+- `qrcode` — QR generation
+- `react-markdown` — markdown rendering
 
 ---
 
-## Getting Help
+## Human Docs
 
-**Documentation Files**:
-- `README.md` — Project overview (root)
-- `docs/ai/CLAUDE.md` — This file (AI agent guide)
-- `docs/ai/ARCHITECTURE.md` — System architecture & design decisions
-- `docs/human/CONTRIBUTING.md` — How to add new tools
-- `docs/human/BUILD.md` — Build instructions
-- `docs/human/LAYOUT.md` — Layout design principles
-- `docs/human/FEATURES.md` — Feature toggle system
-- `docs/human/SETUP.md` — Installation & setup
-- `docs/human/TROUBLESHOOTING.md` — Common issues
-
-**External Resources**:
-- [Tauri Docs](https://tauri.app)
-- [React Docs](https://react.dev)
-- [Tailwind Docs](https://tailwindcss.com)
-- [shadcn/ui](https://ui.shadcn.com)
+| File | Contents |
+|------|----------|
+| [CONTRIBUTING.md](../human/CONTRIBUTING.md) | How to add a new tool (step-by-step) |
+| [SETUP.md](../human/SETUP.md) | Prerequisites, running, building, troubleshooting |
+| [TOOLS.md](../human/TOOLS.md) | Per-tool transparency: system access, permissions, storage, risk |
+| [kafka-explorer.md](../human/kafka-explorer.md) | Kafka Explorer — full operation-level Kafka API reference |
 
 ---
 
-## Cost Optimization Tips for AI Agents
+## File Modification Guide
 
-1. **Read this file first** before asking questions
-2. **Check existing tools** for patterns before creating new ones
-3. **Use the step-by-step guide** for adding tools (don't ask how)
-4. **Reference code conventions** section for style questions
-5. **Check common issues** before debugging
-6. **Follow the exact structure** - don't reinvent patterns
-
-**Time savings**: Following this guide should reduce context gathering by 70-80%.
+| Path | Safety |
+|---|---|
+| `src/components/tools/*.tsx` | ✅ Safe — add/edit tools freely |
+| `src/hooks/*.ts` | ⚠️ Careful — many tools depend on these |
+| `src/lib/toolDefs.ts` | ⚠️ Careful — all tools depend on this |
+| `src/App.tsx` | ⚠️ Careful — core routing and layout |
+| `src/contexts/*.tsx` | ⚠️ Careful — shared state |
+| `src/components/Settings.tsx` | ⚠️ Careful — Settings UI |
+| `src/components/ui/*.tsx` | ❌ Rarely — regenerate via shadcn CLI instead |
+| `vite.config.ts` | ❌ Rarely — build pipeline |
+| `src-tauri/*` | ❌ Rarely — only for new Rust features or capabilities |
 
 ---
 
-*Last updated: 2026-06-14*  
-*Maintainer: Project team*  
-*AI-friendly: Optimized for Claude, GPT-4, and other coding agents*
+## Common Issues
+
+**Tool not in sidebar**: check `id` in `TOOL_DEFS` matches key in `TOOL_ROUTES` and `DEFAULT_FEATURES`. Clear stale localStorage: `localStorage.clear()`.
+
+**TypeScript errors**: run `npm run build` to surface all errors at once.
+
+**Tailwind classes not applying**: restart dev server; ensure file is covered by `tailwind.config.js` content glob.
+
+**Tauri capability denied**: add the permission string to `src-tauri/capabilities/default.json` — the build error message prints the valid strings.
+
+**Worker build fails**: workers must be imported as `new Worker(new URL('./file.ts', import.meta.url), { type: 'module' })`. Do not use esbuild minify option — Vite 8 uses OXC (`minify: true` boolean).
+
+---
+
+*Last updated: 2026-06-15*

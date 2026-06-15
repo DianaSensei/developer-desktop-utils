@@ -1,51 +1,50 @@
 # Contributing to DevTool
 
-## Adding a New Utility Tool
+## Adding a New Tool
 
-Adding a new utility is straightforward and follows a consistent pattern.
+### Step 1: Create the component
 
-### Step 1: Create the Tool Component
-
-Create a new file in `src/components/tools/YourTool.tsx`:
+Create `src/components/tools/YourTool.tsx`. Use real-time output (no "Process" button), persist the input, and wire up the shared paste/undo hooks:
 
 ```tsx
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { YourIcon } from 'lucide-react';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function YourTool() {
-  const [input, setInput] = useState('');
-  const [output, setOutput] = useState('');
+  const [input, setInput] = usePersistentState('devtool:yourTool:input', '');
+  const output = useMemo(() => input.toUpperCase(), [input]);
 
-  const process = () => {
-    // Your logic here
-    setOutput(input.toUpperCase());
-  };
+  useQuickPaste(setInput);       // ⌘V / Ctrl+V pastes from clipboard
+  useInputHistory(input, setInput); // ⌘Z / ⌘⇧Z undo/redo
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your Tool Name</CardTitle>
-        <CardDescription>Brief description of what this tool does</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <YourIcon className="h-5 w-5" />
+          Your Tool
+        </CardTitle>
+        <CardDescription>Brief description</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label>Input</Label>
-          <Input 
-            value={input} 
-            onChange={(e) => setInput(e.target.value)} 
-            placeholder="Enter something"
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={`Enter something — ${quickPasteHint}`}
           />
         </div>
-
-        <Button onClick={process}>Process</Button>
-
         {output && (
           <div className="space-y-2">
             <Label>Output</Label>
-            <Input value={output} readOnly />
+            <Textarea value={output} readOnly />
           </div>
         )}
       </CardContent>
@@ -54,89 +53,95 @@ export function YourTool() {
 }
 ```
 
-### Step 2: Register the Tool
+### Step 2: Add to `src/lib/toolDefs.ts`
 
-Edit `src/App.tsx` and add your tool:
+`TOOL_DEFS` is the single source of truth for tool metadata. Settings and the sidebar read from it automatically.
 
-```tsx
-// 1. Import your tool
-import { YourTool } from '@/components/tools/YourTool';
-import { YourIcon } from 'lucide-react'; // Choose an appropriate icon
+```ts
+import { YourIcon } from 'lucide-react';
 
-// 2. Add to the tools array
-const tools = [
+export const TOOL_DEFS: ToolDef[] = [
   // ... existing tools
-  { 
-    path: '/your-tool', 
-    label: 'Your Tool', 
-    icon: YourIcon, 
-    component: YourTool 
+  {
+    id: 'your-tool',
+    label: 'Your Tool',
+    icon: YourIcon,
+    description: 'One-line description shown in sidebar tooltip and Settings.',
   },
 ];
 ```
 
-That's it! Your tool will automatically appear in the sidebar navigation.
+### Step 3: Register the route in `src/App.tsx`
 
-## Available UI Components
+```tsx
+// Import your component at the top
+import { YourTool } from '@/components/tools/YourTool';
 
-The app uses shadcn/ui components. Commonly used components:
+// Add to TOOL_ROUTES
+const TOOL_ROUTES = {
+  // ... existing
+  'your-tool': { path: '/your-tool', component: YourTool },
+};
+```
 
-- `Button` - Buttons with various styles
-- `Input` - Text inputs
-- `Textarea` - Multi-line text inputs
-- `Card, CardHeader, CardTitle, CardDescription, CardContent` - Card containers
-- `Label` - Form labels
-- `Select, SelectTrigger, SelectContent, SelectItem` - Dropdowns
+### Step 4: Enable by default in `src/contexts/FeatureContext.tsx`
 
-See `src/components/ui/` for all available components.
+```tsx
+const DEFAULT_FEATURES: FeatureSettings = {
+  // ... existing
+  'your-tool': true,
+};
+```
+
+**Done.** No changes needed in `Settings.tsx` — it reads `TOOL_DEFS` automatically.
+
+---
+
+## UI Components
+
+Always use components from `src/components/ui/` (shadcn/ui). Never use native browser elements like `<select>`, `window.alert`, or `window.confirm` — they break visual consistency across macOS/Windows/Linux.
+
+Commonly used:
+- `Button`, `Input`, `Textarea`, `Label`
+- `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`
+- `Select`, `SelectTrigger`, `SelectContent`, `SelectItem`
+
+See `src/components/ui/` for the full list.
+
+---
 
 ## Styling
 
-The app uses Tailwind CSS for styling. Common patterns:
+Tailwind CSS only — no custom CSS. Common patterns:
 
 ```tsx
-// Spacing
-<div className="space-y-4">  // Vertical spacing
-<div className="flex gap-2">  // Horizontal gap
-
-// Layout
-<div className="grid grid-cols-2 gap-4">  // Two columns
-<div className="flex items-center justify-between">
-
-// Colors
-<div className="bg-muted">  // Background
-<p className="text-muted-foreground">  // Text color
-
-// Borders and rounding
-<div className="border rounded-lg p-4">
+<div className="space-y-4">          // vertical spacing
+<div className="flex gap-2">         // horizontal gap
+<div className="rounded-lg border p-4">  // card-style container
+<p className="text-xs text-muted-foreground"> // secondary text
 ```
+
+Use `cn()` from `@/lib/utils` for conditional classes:
+
+```tsx
+import { cn } from '@/lib/utils';
+className={cn('base', isActive && 'text-primary')}
+```
+
+---
 
 ## Best Practices
 
-1. **Keep tools focused** - Each tool should do one thing well
-2. **Use Card layout** - Wrap your tool in a Card component for consistency
-3. **Provide feedback** - Show success/error states to users
-4. **Copy buttons** - Add copy-to-clipboard for outputs when useful
-5. **Placeholder text** - Use descriptive placeholders in inputs
-6. **Error handling** - Always handle errors gracefully
+- **No "Process" button**: compute output from input with `useMemo` — update on every keystroke
+- **Persist input**: use `usePersistentState` so the tool remembers its last value across restarts
+- **Copy button**: add a copy-to-clipboard button for outputs using `copyToClipboard` from `@/lib/clipboard`
+- **Heavy computation**: offload anything that could block >16ms to a Web Worker in `src/workers/`
+- **Error states**: always handle errors and show a message in the UI — never let it silently fail
 
-## Example: Copy to Clipboard
+---
 
-```tsx
-const copyToClipboard = (text: string) => {
-  navigator.clipboard.writeText(text);
-};
+## Before Submitting
 
-<Button onClick={() => copyToClipboard(output)} size="icon" variant="ghost">
-  <Copy className="h-4 w-4" />
-</Button>
-```
-
-## Testing
-
-Before submitting:
-
-1. Test your tool with various inputs
-2. Check responsive design (mobile and desktop)
-3. Verify it works in both light and dark mode
-4. Ensure error cases are handled
+1. Test with various inputs including edge cases
+2. Verify light and dark mode both look correct
+3. Run `npm run build` to catch TypeScript errors
