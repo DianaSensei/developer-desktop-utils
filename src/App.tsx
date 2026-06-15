@@ -178,7 +178,7 @@ function Sidebar({
       )}
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-screen bg-card/95 backdrop-blur border-r transition-all duration-300 ease-in-out flex flex-col',
+          'fixed lg:sticky top-0 left-0 z-50 h-screen bg-sidebar backdrop-blur border-r transition-all duration-300 ease-in-out flex flex-col',
           isCollapsed ? 'w-14' : 'w-56',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
@@ -286,7 +286,7 @@ function Sidebar({
                               : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                           )}
                         >
-                          <Icon className={cn('h-4 w-4 flex-shrink-0', isActive && 'text-primary')} />
+                          <Icon className="h-4 w-4 flex-shrink-0" />
                           {!isCollapsed && (
                             <span className={cn('flex-1 text-sm whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
                               {tool.label}
@@ -301,7 +301,7 @@ function Sidebar({
               {/* Fade + indicator when more items below */}
               {hasMore && (
                 <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 flex items-end justify-center pb-1"
-                  style={{ background: 'linear-gradient(to bottom, transparent, var(--card-bg, hsl(var(--card))) 85%)' }}>
+                  style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--sidebar)) 85%)' }}>
                   <span className={cn(
                     'flex items-center gap-0.5 text-[9px] text-muted-foreground/60',
                     isCollapsed ? 'flex-col' : 'flex-row'
@@ -371,7 +371,7 @@ function Sidebar({
             )}
           >
             <span className="relative shrink-0">
-              <SettingsIcon className={cn('h-4 w-4', isSettingsActive && 'text-primary')} />
+              <SettingsIcon className="h-4 w-4" />
               {updateAvailable && (
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-background" />
               )}

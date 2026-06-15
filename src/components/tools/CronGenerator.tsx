@@ -646,7 +646,7 @@ export function CronGenerator() {
             {analysis.errors.length > 0 ? (
               <AlertCircle className="h-4 w-4 text-destructive" />
             ) : (
-              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
             )}
             <span>{analysis.errors.length > 0 ? 'Invalid expression' : `Valid ${mode} cron`}</span>
           </div>
