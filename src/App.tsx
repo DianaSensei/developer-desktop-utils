@@ -54,7 +54,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'diff':           { path: '/diff',           component: TextDiff },
   'qrcode':         { path: '/qrcode',         component: QRCodeTool },
   'markdown':       { path: '/markdown',       component: MarkdownPreview },
-  'deduplicate':    { path: '/deduplicate',    component: ArrayDeduplicator },
+  'deduplicate':    { path: '/deduplicate',    component: ArrayDeduplicator, fullHeight: true },
   'checksum':       { path: '/checksum',       component: ChecksumTool },
   'image-base64':   { path: '/image-base64',   component: ImageBase64Tool },
   'generator':      { path: '/generator',      component: GeneratorTool },
