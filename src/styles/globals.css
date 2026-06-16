@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    /* SQL editor syntax colors */
+    /* SQL / JS editor syntax colors */
     --sql-keyword: hsl(207 100% 35%);
     --sql-string: hsl(130 50% 35%);
     --sql-comment: hsl(0 0% 50%);
@@ -13,6 +13,8 @@
     --sql-operator: hsl(0 0% 45%);
     --sql-function: hsl(185 75% 33%);
     --sql-type: hsl(270 55% 45%);
+    --js-property: hsl(32 90% 44%);
+    --js-method: hsl(270 60% 52%);
     --foreground: 0 0% 12%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 12%;
@@ -37,7 +39,7 @@
 
   .dark {
     --background: 0 0% 12%;
-    /* SQL editor syntax colors — dark */
+    /* SQL / JS editor syntax colors — dark */
     --sql-keyword: hsl(207 100% 68%);
     --sql-string: hsl(130 55% 60%);
     --sql-comment: hsl(0 0% 50%);
@@ -45,6 +47,8 @@
     --sql-operator: hsl(0 0% 60%);
     --sql-function: hsl(185 70% 60%);
     --sql-type: hsl(270 60% 72%);
+    --js-property: hsl(32 90% 66%);
+    --js-method: hsl(270 65% 75%);
     --foreground: 0 0% 80%;
     --card: 0 0% 15%;
     --card-foreground: 0 0% 80%;
@@ -71,10 +75,17 @@
   * {
     @apply border-border;
   }
+  html {
+    height: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans", sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    height: 100%;
+  }
+  #root {
+    height: 100%;
   }
 
   ::selection {

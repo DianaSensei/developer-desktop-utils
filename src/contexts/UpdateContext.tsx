@@ -29,16 +29,28 @@ const UpdateContext = createContext<UpdateContextValue | null>(null);
 
 const STORAGE_AUTO_CHECK = 'devtool-auto-update';
 const STORAGE_LAST_CHECK = 'devtool-last-update-check';
-const DAY_MS = 24 * 60 * 60 * 1000;
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+function todayMidnight(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function msUntilNextMidnight(): number {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return next.getTime() - now.getTime();
+}
 
 export function UpdateProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<UpdateStatus>('idle');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [autoCheckEnabled, setAutoCheckEnabled] = useState(
-    () => localStorage.getItem(STORAGE_AUTO_CHECK) === 'true'
-  );
+  const [autoCheckEnabled, setAutoCheckEnabled] = useState(() => {
+    const stored = localStorage.getItem(STORAGE_AUTO_CHECK);
+    return stored === null ? true : stored === 'true'; // default on for fresh installs
+  });
 
   const checkForUpdates = useCallback(async () => {
     if (!isTauri) return;
@@ -91,15 +103,25 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Run check on mount (if stale) and set up daily interval while enabled
+  // Check on app start if not yet checked today; re-check at each calendar midnight
   useEffect(() => {
     if (!isTauri || !autoCheckEnabled) return;
+
     const lastCheck = parseInt(localStorage.getItem(STORAGE_LAST_CHECK) ?? '0', 10);
-    if (Date.now() - lastCheck >= DAY_MS) {
+    if (lastCheck < todayMidnight()) {
       checkForUpdates();
     }
-    const id = setInterval(checkForUpdates, DAY_MS);
-    return () => clearInterval(id);
+
+    let id: ReturnType<typeof setTimeout>;
+    function scheduleNextMidnight() {
+      id = setTimeout(() => {
+        checkForUpdates();
+        scheduleNextMidnight();
+      }, msUntilNextMidnight());
+    }
+    scheduleNextMidnight();
+
+    return () => clearTimeout(id);
   }, [autoCheckEnabled, checkForUpdates]);
 
   return (

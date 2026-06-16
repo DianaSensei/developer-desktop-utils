@@ -5,8 +5,8 @@ import { javascript } from '@codemirror/lang-javascript';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { EditorState, Compartment } from '@codemirror/state';
 import { tags } from '@lezer/highlight';
-import { Database, Copy, Trash2, Wand2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
+import { Copy, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -137,13 +137,12 @@ function formatMongo(input: string, indentSize: number): string {
 
     const ch = text[i];
 
-    // Opening brace/bracket — expand unless empty
     if (ch === '{' || ch === '[') {
       let j = i + 1;
       while (j < text.length && text[j] === ' ') j++;
       const closer = ch === '{' ? '}' : ']';
       if (j < text.length && text[j] === closer) {
-        result += ch + closer; i = j + 1; continue;   // keep {} or [] inline
+        result += ch + closer; i = j + 1; continue;
       }
       result += ch + '\n';
       depth++;
@@ -153,7 +152,6 @@ function formatMongo(input: string, indentSize: number): string {
       continue;
     }
 
-    // Closing brace/bracket
     if (ch === '}' || ch === ']') {
       depth = Math.max(0, depth - 1);
       result = result.trimEnd() + '\n' + getInd() + ch;
@@ -161,7 +159,6 @@ function formatMongo(input: string, indentSize: number): string {
       continue;
     }
 
-    // Comma → newline at current depth
     if (ch === ',') {
       result += ',\n' + getInd();
       i++;
@@ -169,7 +166,6 @@ function formatMongo(input: string, indentSize: number): string {
       continue;
     }
 
-    // Colon → ensure space after
     if (ch === ':') {
       result = result.trimEnd() + ': ';
       i++;
@@ -184,11 +180,161 @@ function formatMongo(input: string, indentSize: number): string {
   return restore(result, store).trim();
 }
 
-// ─── CodeMirror setup ────────────────────────────────────────────────────────
+// ─── MongoDB completions ──────────────────────────────────────────────────────
 
-// Language instances (created once, reused via Compartment)
+const MONGO_COMPLETIONS: Completion[] = [
+  // Aggregation stages
+  { label: '$addFields',   type: 'keyword', detail: 'agg stage — add/overwrite fields' },
+  { label: '$bucket',      type: 'keyword', detail: 'agg stage — categorize into ranges' },
+  { label: '$count',       type: 'keyword', detail: 'agg stage — count documents' },
+  { label: '$facet',       type: 'keyword', detail: 'agg stage — multi-facet aggregation' },
+  { label: '$fill',        type: 'keyword', detail: 'agg stage — fill missing values' },
+  { label: '$geoNear',     type: 'keyword', detail: 'agg stage — geospatial proximity sort' },
+  { label: '$graphLookup', type: 'keyword', detail: 'agg stage — recursive graph lookup' },
+  { label: '$group',       type: 'keyword', detail: 'agg stage — group and accumulate' },
+  { label: '$limit',       type: 'keyword', detail: 'agg stage — limit document count' },
+  { label: '$lookup',      type: 'keyword', detail: 'agg stage — left outer join' },
+  { label: '$match',       type: 'keyword', detail: 'agg stage — filter documents' },
+  { label: '$merge',       type: 'keyword', detail: 'agg stage — merge into collection' },
+  { label: '$out',         type: 'keyword', detail: 'agg stage — write to collection' },
+  { label: '$project',     type: 'keyword', detail: 'agg stage — reshape documents' },
+  { label: '$redact',      type: 'keyword', detail: 'agg stage — restrict document content' },
+  { label: '$replaceRoot', type: 'keyword', detail: 'agg stage — promote subdocument to root' },
+  { label: '$replaceWith', type: 'keyword', detail: 'agg stage — replace root document' },
+  { label: '$sample',      type: 'keyword', detail: 'agg stage — random sample' },
+  { label: '$set',         type: 'keyword', detail: 'agg stage — alias for $addFields' },
+  { label: '$skip',        type: 'keyword', detail: 'agg stage — skip N documents' },
+  { label: '$sort',        type: 'keyword', detail: 'agg stage — sort documents' },
+  { label: '$sortByCount', type: 'keyword', detail: 'agg stage — group and sort by count' },
+  { label: '$unionWith',   type: 'keyword', detail: 'agg stage — union with another collection' },
+  { label: '$unset',       type: 'keyword', detail: 'agg stage — remove fields' },
+  { label: '$unwind',      type: 'keyword', detail: 'agg stage — deconstruct array field' },
+  // Comparison operators
+  { label: '$eq',  type: 'function', detail: 'comparison — equal' },
+  { label: '$ne',  type: 'function', detail: 'comparison — not equal' },
+  { label: '$gt',  type: 'function', detail: 'comparison — greater than' },
+  { label: '$gte', type: 'function', detail: 'comparison — greater than or equal' },
+  { label: '$lt',  type: 'function', detail: 'comparison — less than' },
+  { label: '$lte', type: 'function', detail: 'comparison — less than or equal' },
+  { label: '$in',  type: 'function', detail: 'comparison — value in array' },
+  { label: '$nin', type: 'function', detail: 'comparison — value not in array' },
+  // Logical operators
+  { label: '$and', type: 'function', detail: 'logical — all conditions true' },
+  { label: '$or',  type: 'function', detail: 'logical — any condition true' },
+  { label: '$not', type: 'function', detail: 'logical — negates condition' },
+  { label: '$nor', type: 'function', detail: 'logical — no conditions true' },
+  // Element operators
+  { label: '$exists', type: 'function', detail: 'element — field exists check' },
+  { label: '$type',   type: 'function', detail: 'element — match by BSON type' },
+  { label: '$expr',   type: 'function', detail: 'element — use aggregation expression' },
+  { label: '$regex',  type: 'function', detail: 'element — regex match' },
+  { label: '$text',   type: 'function', detail: 'element — full-text search' },
+  // Array operators
+  { label: '$all',       type: 'function', detail: 'array — matches all elements' },
+  { label: '$elemMatch', type: 'function', detail: 'array — element matches condition' },
+  { label: '$size',      type: 'function', detail: 'array — array length equals' },
+  // Update operators
+  { label: '$inc',         type: 'function', detail: 'update — increment numeric field' },
+  { label: '$mul',         type: 'function', detail: 'update — multiply numeric field' },
+  { label: '$rename',      type: 'function', detail: 'update — rename field' },
+  { label: '$currentDate', type: 'function', detail: 'update — set to current date/time' },
+  { label: '$push',        type: 'function', detail: 'update — append to array' },
+  { label: '$pull',        type: 'function', detail: 'update — remove matching from array' },
+  { label: '$pullAll',     type: 'function', detail: 'update — remove all listed values' },
+  { label: '$addToSet',    type: 'function', detail: 'update — add if not present in array' },
+  { label: '$pop',         type: 'function', detail: 'update — remove first (-1) or last (1)' },
+  { label: '$each',        type: 'function', detail: 'update modifier — apply to each value' },
+  { label: '$position',    type: 'function', detail: 'update modifier — insert at position' },
+  { label: '$slice',       type: 'function', detail: 'update modifier — truncate array' },
+  { label: '$bit',         type: 'function', detail: 'update — bitwise AND/OR/XOR' },
+  // Accumulator operators
+  { label: '$sum',          type: 'function', detail: 'accumulator — sum values' },
+  { label: '$avg',          type: 'function', detail: 'accumulator — average values' },
+  { label: '$min',          type: 'function', detail: 'accumulator — minimum value' },
+  { label: '$max',          type: 'function', detail: 'accumulator — maximum value' },
+  { label: '$first',        type: 'function', detail: 'accumulator — first value in group' },
+  { label: '$last',         type: 'function', detail: 'accumulator — last value in group' },
+  { label: '$mergeObjects', type: 'function', detail: 'accumulator — merge into one object' },
+  { label: '$stdDevPop',    type: 'function', detail: 'accumulator — std deviation (population)' },
+  { label: '$stdDevSamp',   type: 'function', detail: 'accumulator — std deviation (sample)' },
+  // Expression operators
+  { label: '$cond',          type: 'function', detail: 'expression — if/then/else' },
+  { label: '$ifNull',        type: 'function', detail: 'expression — null coalesce' },
+  { label: '$switch',        type: 'function', detail: 'expression — switch/case' },
+  { label: '$concat',        type: 'function', detail: 'expression — concatenate strings' },
+  { label: '$toLower',       type: 'function', detail: 'expression — lowercase string' },
+  { label: '$toUpper',       type: 'function', detail: 'expression — uppercase string' },
+  { label: '$trim',          type: 'function', detail: 'expression — trim whitespace' },
+  { label: '$ltrim',         type: 'function', detail: 'expression — left trim' },
+  { label: '$rtrim',         type: 'function', detail: 'expression — right trim' },
+  { label: '$substr',        type: 'function', detail: 'expression — substring (bytes)' },
+  { label: '$substrCP',      type: 'function', detail: 'expression — substring (code points)' },
+  { label: '$split',         type: 'function', detail: 'expression — split string into array' },
+  { label: '$strLenCP',      type: 'function', detail: 'expression — string length' },
+  { label: '$indexOfCP',     type: 'function', detail: 'expression — index of substring' },
+  { label: '$dateToString',  type: 'function', detail: 'expression — format date as string' },
+  { label: '$toDate',        type: 'function', detail: 'expression — convert to Date' },
+  { label: '$dateDiff',      type: 'function', detail: 'expression — difference between dates' },
+  { label: '$dateAdd',       type: 'function', detail: 'expression — add to date' },
+  { label: '$year',          type: 'function', detail: 'expression — extract year' },
+  { label: '$month',         type: 'function', detail: 'expression — extract month' },
+  { label: '$dayOfMonth',    type: 'function', detail: 'expression — extract day of month' },
+  { label: '$hour',          type: 'function', detail: 'expression — extract hour' },
+  { label: '$minute',        type: 'function', detail: 'expression — extract minute' },
+  { label: '$second',        type: 'function', detail: 'expression — extract second' },
+  { label: '$convert',       type: 'function', detail: 'expression — type conversion with onError' },
+  { label: '$toString',      type: 'function', detail: 'expression — convert to string' },
+  { label: '$toInt',         type: 'function', detail: 'expression — convert to integer' },
+  { label: '$toLong',        type: 'function', detail: 'expression — convert to long' },
+  { label: '$toDouble',      type: 'function', detail: 'expression — convert to double' },
+  { label: '$toDecimal',     type: 'function', detail: 'expression — convert to Decimal128' },
+  { label: '$toBool',        type: 'function', detail: 'expression — convert to boolean' },
+  { label: '$toObjectId',    type: 'function', detail: 'expression — convert to ObjectId' },
+  { label: '$literal',       type: 'function', detail: 'expression — return value as-is' },
+  { label: '$arrayElemAt',   type: 'function', detail: 'expression — element at index' },
+  { label: '$arrayToObject', type: 'function', detail: 'expression — array to object' },
+  { label: '$objectToArray', type: 'function', detail: 'expression — object to k/v array' },
+  { label: '$concatArrays',  type: 'function', detail: 'expression — concatenate arrays' },
+  { label: '$filter',        type: 'function', detail: 'expression — filter array elements' },
+  { label: '$map',           type: 'function', detail: 'expression — transform array elements' },
+  { label: '$reduce',        type: 'function', detail: 'expression — reduce array to value' },
+  { label: '$indexOfArray',  type: 'function', detail: 'expression — index in array' },
+  { label: '$isArray',       type: 'function', detail: 'expression — check if array' },
+  { label: '$reverseArray',  type: 'function', detail: 'expression — reverse array' },
+  { label: '$zip',           type: 'function', detail: 'expression — zip arrays together' },
+  { label: '$add',           type: 'function', detail: 'expression — add numbers or dates' },
+  { label: '$subtract',      type: 'function', detail: 'expression — subtract' },
+  { label: '$multiply',      type: 'function', detail: 'expression — multiply' },
+  { label: '$divide',        type: 'function', detail: 'expression — divide' },
+  { label: '$mod',           type: 'function', detail: 'expression — modulo' },
+  { label: '$abs',           type: 'function', detail: 'expression — absolute value' },
+  { label: '$ceil',          type: 'function', detail: 'expression — ceiling' },
+  { label: '$floor',         type: 'function', detail: 'expression — floor' },
+  { label: '$round',         type: 'function', detail: 'expression — round to N decimals' },
+  { label: '$sqrt',          type: 'function', detail: 'expression — square root' },
+  { label: '$pow',           type: 'function', detail: 'expression — power' },
+  { label: '$log',           type: 'function', detail: 'expression — logarithm' },
+  { label: '$log10',         type: 'function', detail: 'expression — base-10 logarithm' },
+  { label: '$exp',           type: 'function', detail: 'expression — e raised to power' },
+  { label: '$trunc',         type: 'function', detail: 'expression — truncate decimal' },
+];
+
+function mongoCompletionSource(context: CompletionContext): CompletionResult | null {
+  const word = context.matchBefore(/\$\w*/);
+  if (!word || (word.from === word.to && !context.explicit)) return null;
+  return { from: word.from, options: MONGO_COMPLETIONS, validFor: /^\$\w*/ };
+}
+
+// ─── CodeMirror setup (module-level — created once) ──────────────────────────
+
 const sqlLang = sql();
 const jsLang  = javascript();
+// Adds MongoDB $operator completions to the JS language via its data facet.
+// The data facet is scoped to this language, so completions only fire in mongo mode.
+const jsLangWithMongo = [
+  jsLang,
+  jsLang.language.data.of({ autocomplete: mongoCompletionSource }),
+];
 
 const editorTheme = EditorView.theme({
   '&': {
@@ -230,7 +376,7 @@ const editorTheme = EditorView.theme({
   '.cm-completionDetail': { color: 'hsl(var(--muted-foreground))' },
 });
 
-// Shared highlight style — CSS vars auto-switch with .dark
+// CSS vars auto-switch with .dark — no JS re-init needed for theme changes.
 const codeHighlight = HighlightStyle.define([
   { tag: tags.keyword,               color: 'var(--sql-keyword)', fontWeight: '600' },
   { tag: [tags.string, tags.regexp], color: 'var(--sql-string)' },
@@ -238,23 +384,23 @@ const codeHighlight = HighlightStyle.define([
   { tag: tags.number,                color: 'var(--sql-number)' },
   { tag: tags.operator,              color: 'var(--sql-operator)' },
   { tag: tags.punctuation,           color: 'var(--sql-operator)' },
-  { tag: tags.function(tags.name),   color: 'var(--sql-function)' },
+  // JS/MongoDB: method calls (.aggregate, .find) — purple
+  { tag: tags.function(tags.name),   color: 'var(--js-method)' },
   { tag: tags.typeName,              color: 'var(--sql-type)' },
   { tag: [tags.bool, tags.null],     color: 'var(--sql-keyword)', fontWeight: '600' },
-  { tag: tags.propertyName,          color: 'var(--sql-function)' },
+  // JS/MongoDB: object keys (field names, $operators) — amber
+  { tag: tags.propertyName,          color: 'var(--js-property)' },
+  // JS: variable names (db, collection) — plain foreground
   { tag: tags.variableName,          color: 'hsl(var(--foreground))' },
-  { tag: tags.definition(tags.variableName), color: 'var(--sql-type)' },
+  // JS: defined variables (const db = ...) — teal, distinct from plain vars
+  { tag: tags.definition(tags.variableName), color: 'var(--sql-function)' },
 ]);
 
 // ─── UI helpers ──────────────────────────────────────────────────────────────
 
 type Mode = 'sql' | 'mongo';
 
-function ModeTab({
-  active,
-  onClick,
-  children,
-}: {
+function ModeTab({ active, onClick, children }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
@@ -275,11 +421,7 @@ function ModeTab({
   );
 }
 
-function ToggleChip({
-  active,
-  onClick,
-  children,
-}: {
+function ToggleChip({ active, onClick, children }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
@@ -316,7 +458,7 @@ export function SqlFormatter() {
   const langConfRef       = useRef(new Compartment());
   const lastDispatchedRef = useRef<string | null>(null);
 
-  // Stable refs to avoid stale closures
+  // Stable refs to avoid stale closures inside editor callbacks
   const modeRef       = useRef(mode);       modeRef.current       = mode;
   const sqlInputRef   = useRef(sqlInput);   sqlInputRef.current   = sqlInput;
   const mongoInputRef = useRef(mongoInput); mongoInputRef.current = mongoInput;
@@ -332,7 +474,7 @@ export function SqlFormatter() {
         doc: modeRef.current === 'sql' ? sqlInputRef.current : mongoInputRef.current,
         extensions: [
           basicSetup,
-          langConfRef.current.of(modeRef.current === 'sql' ? sqlLang : jsLang),
+          langConfRef.current.of(modeRef.current === 'sql' ? sqlLang : jsLangWithMongo),
           syntaxHighlighting(codeHighlight),
           editorTheme,
           EditorView.lineWrapping,
@@ -353,11 +495,13 @@ export function SqlFormatter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Switch language + content when mode changes
+  // Reconfigure language + swap content when mode changes
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    view.dispatch({ effects: langConfRef.current.reconfigure(mode === 'sql' ? sqlLang : jsLang) });
+    view.dispatch({
+      effects: langConfRef.current.reconfigure(mode === 'sql' ? sqlLang : jsLangWithMongo),
+    });
     const newContent = mode === 'sql' ? sqlInputRef.current : mongoInputRef.current;
     const current = view.state.doc.toString();
     if (current === newContent) return;
@@ -404,29 +548,20 @@ export function SqlFormatter() {
   }, []);
 
   const handleModeChange = useCallback((next: Mode) => {
-    setMode(next);
     // Save current editor content before switching
     const view = viewRef.current;
-    if (!view) return;
-    const val = view.state.doc.toString();
-    if (modeRef.current === 'sql') setSqlRef.current(val);
-    else setMongoRef.current(val);
+    if (view) {
+      const val = view.state.doc.toString();
+      if (modeRef.current === 'sql') setSqlRef.current(val);
+      else setMongoRef.current(val);
+    }
+    setMode(next);
   }, [setMode]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
-          SQL Formatter
-        </CardTitle>
-        <CardDescription>
-          Format SQL queries and MongoDB pipelines with live syntax highlighting.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-
-        {/* Mode tabs + options in one row */}
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="shrink-0 border-b bg-background px-4 py-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* Mode switcher */}
           <div className="flex gap-0.5 rounded-md bg-muted p-0.5 shrink-0">
@@ -434,7 +569,6 @@ export function SqlFormatter() {
             <ModeTab active={mode === 'mongo'} onClick={() => handleModeChange('mongo')}>MongoDB</ModeTab>
           </div>
 
-          {/* Divider */}
           <div className="h-4 w-px bg-border shrink-0" />
 
           {/* Indent size */}
@@ -466,38 +600,38 @@ export function SqlFormatter() {
             </>
           )}
         </div>
+      </div>
 
-        {/* Editor */}
-        <div className="rounded-lg border overflow-hidden h-[380px]">
-          <div
-            ref={containerRef}
-            className="h-full [&_.cm-editor]:h-full [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
-          />
-        </div>
+      {/* Editor — fills remaining height */}
+      <div className="flex-1 min-h-0">
+        <div
+          ref={containerRef}
+          className="h-full [&_.cm-editor]:h-full [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
+        />
+      </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClear}
-            className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <Trash2 className="h-3 w-3" />
-            Clear
+      {/* Action bar */}
+      <div className="shrink-0 border-t bg-background px-4 py-2 flex items-center justify-between">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleClear}
+          className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <Trash2 className="h-3 w-3" />
+          Clear
+        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleCopy} className="h-7 gap-1.5 text-xs">
+            <Copy className="h-3 w-3" />
+            Copy
           </Button>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopy} className="h-7 gap-1.5 text-xs">
-              <Copy className="h-3 w-3" />
-              Copy
-            </Button>
-            <Button size="sm" onClick={handleFormat} className="h-7 gap-1.5 text-xs">
-              <Wand2 className="h-3 w-3" />
-              Format
-            </Button>
-          </div>
+          <Button size="sm" onClick={handleFormat} className="h-7 gap-1.5 text-xs">
+            <Wand2 className="h-3 w-3" />
+            Format
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

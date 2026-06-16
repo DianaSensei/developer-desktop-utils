@@ -21,16 +21,16 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'cron-generator': true,
   'text-transform': true,
   'text-counter': true,
-  'color-picker': true,
+  'color-picker': false,
   'base64': true,
-  'hash': true,
+  'hash': false,
   'unix-time': true,
   'json': true,
-  'jwt': true,
+  'jwt': false,
   'regex': true,
   'diff': true,
   'qrcode': true,
-  'markdown': true,
+  'markdown': false,
   'deduplicate': true,
   'checksum': true,
   'image-base64': true,
@@ -42,8 +42,14 @@ const DEFAULT_FEATURES: FeatureSettings = {
 
 export function FeatureProvider({ children }: { children: ReactNode }) {
   const [features, setFeatures] = useState<FeatureSettings>(() => {
-    const saved = localStorage.getItem('devtool-features');
-    return saved ? JSON.parse(saved) : DEFAULT_FEATURES;
+    try {
+      const saved = localStorage.getItem('devtool-features');
+      if (!saved) return DEFAULT_FEATURES;
+      // Merge: new tools get their DEFAULT value; existing user overrides are preserved
+      return { ...DEFAULT_FEATURES, ...JSON.parse(saved) };
+    } catch {
+      return DEFAULT_FEATURES;
+    }
   });
 
   const [toolOrder, setToolOrder] = useState<string[]>(() => {

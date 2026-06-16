@@ -14,7 +14,7 @@ import {
   Search,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { TOOL_DEFS, TOOL_DEF_MAP } from '@/lib/toolDefs';
+import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { Button } from '@/components/ui/button';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
 import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
@@ -60,7 +60,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'image-base64':   { path: '/image-base64',   component: ImageBase64Tool },
   'generator':      { path: '/generator',      component: GeneratorTool },
   'kafka-explorer':  { path: '/kafka-explorer',  component: KafkaExplorer,  fullHeight: true },
-  'sql-formatter':   { path: '/sql-formatter',   component: SqlFormatter },
+  'sql-formatter':   { path: '/sql-formatter',   component: SqlFormatter,  fullHeight: true },
 };
 
 const allTools = [
@@ -75,16 +75,17 @@ const allTools = [
 ];
 
 function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder: string[]): T[] {
-  if (!savedOrder.length) return tools;
+  const order = savedOrder.length ? savedOrder : DEFAULT_TOOL_ORDER;
+  if (!order.length) return tools;
   const map = new Map(tools.map((t) => [t.featureId, t]));
   const ordered: T[] = [];
-  for (const id of savedOrder) {
+  for (const id of order) {
     const t = map.get(id);
     if (t) ordered.push(t);
   }
   // append any new tools not in saved order
   for (const t of tools) {
-    if (!savedOrder.includes(t.featureId)) ordered.push(t);
+    if (!order.includes(t.featureId)) ordered.push(t);
   }
   return ordered;
 }
@@ -445,7 +446,7 @@ function AppContent() {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-full overflow-hidden bg-background text-foreground">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
