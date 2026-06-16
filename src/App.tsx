@@ -39,6 +39,7 @@ import { TextCounter } from '@/components/tools/TextCounter';
 import { ColorPicker } from '@/components/tools/ColorPicker';
 import { Settings } from '@/components/Settings';
 import { KafkaExplorer } from '@/components/tools/kafka/KafkaExplorer';
+import { SqlFormatter } from '@/components/tools/SqlFormatter';
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator },
@@ -58,7 +59,8 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'checksum':       { path: '/checksum',       component: ChecksumTool },
   'image-base64':   { path: '/image-base64',   component: ImageBase64Tool },
   'generator':      { path: '/generator',      component: GeneratorTool },
-  'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer, fullHeight: true },
+  'kafka-explorer':  { path: '/kafka-explorer',  component: KafkaExplorer,  fullHeight: true },
+  'sql-formatter':   { path: '/sql-formatter',   component: SqlFormatter },
 };
 
 const allTools = [

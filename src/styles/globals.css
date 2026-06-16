@@ -5,6 +5,14 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
+    /* SQL editor syntax colors */
+    --sql-keyword: hsl(207 100% 35%);
+    --sql-string: hsl(130 50% 35%);
+    --sql-comment: hsl(0 0% 50%);
+    --sql-number: hsl(25 90% 42%);
+    --sql-operator: hsl(0 0% 45%);
+    --sql-function: hsl(185 75% 33%);
+    --sql-type: hsl(270 55% 45%);
     --foreground: 0 0% 12%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 12%;
@@ -29,6 +37,14 @@
 
   .dark {
     --background: 0 0% 12%;
+    /* SQL editor syntax colors — dark */
+    --sql-keyword: hsl(207 100% 68%);
+    --sql-string: hsl(130 55% 60%);
+    --sql-comment: hsl(0 0% 50%);
+    --sql-number: hsl(25 90% 65%);
+    --sql-operator: hsl(0 0% 60%);
+    --sql-function: hsl(185 70% 60%);
+    --sql-type: hsl(270 60% 72%);
     --foreground: 0 0% 80%;
     --card: 0 0% 15%;
     --card-foreground: 0 0% 80%;
