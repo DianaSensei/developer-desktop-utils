@@ -43,18 +43,18 @@ import { SqlFormatter } from '@/components/tools/SqlFormatter';
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator },
-  'text-transform': { path: '/text-transform', component: TextTransformer },
+  'text-transform': { path: '/text-transform', component: TextTransformer, fullHeight: true },
   'text-counter':   { path: '/text-counter',   component: TextCounter },
   'color-picker':   { path: '/color-picker',   component: ColorPicker },
   'base64':         { path: '/base64',         component: Base64Tool },
   'hash':           { path: '/hash',           component: HashTool },
   'unix-time':      { path: '/unix-time',      component: UnixTimeConverter },
-  'json':           { path: '/json',           component: JsonFormatter },
+  'json':           { path: '/json',           component: JsonFormatter, fullHeight: true },
   'jwt':            { path: '/jwt',            component: JwtDebugger },
-  'regex':          { path: '/regex',          component: RegexTester },
-  'diff':           { path: '/diff',           component: TextDiff },
+  'regex':          { path: '/regex',          component: RegexTester, fullHeight: true },
+  'diff':           { path: '/diff',           component: TextDiff, fullHeight: true },
   'qrcode':         { path: '/qrcode',         component: QRCodeTool },
-  'markdown':       { path: '/markdown',       component: MarkdownPreview },
+  'markdown':       { path: '/markdown',       component: MarkdownPreview, fullHeight: true },
   'deduplicate':    { path: '/deduplicate',    component: ArrayDeduplicator, fullHeight: true },
   'checksum':       { path: '/checksum',       component: ChecksumTool },
   'image-base64':   { path: '/image-base64',   component: ImageBase64Tool },
@@ -455,8 +455,8 @@ function AppContent() {
         isCollapsed={isCollapsed}
         onToggleCollapse={toggleCollapse}
       />
-      <main className={cn('flex-1 flex flex-col min-h-0', isFullHeight ? 'overflow-hidden' : 'overflow-y-auto')}>
-        <div className={cn('z-30 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shrink-0', !isFullHeight && 'sticky top-0')}>
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="z-30 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shrink-0">
           <div className="flex items-center justify-between px-3 py-2.5 sm:px-4">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
@@ -482,8 +482,10 @@ function AppContent() {
             {routes}
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5">
-            {routes}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5">
+              {routes}
+            </div>
           </div>
         )}
       </main>

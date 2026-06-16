@@ -1,5 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import ReactMarkdown from 'react-markdown';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -38,30 +36,29 @@ export function MarkdownPreview() {
   useInputHistory(markdown, setMarkdown);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Markdown Preview</CardTitle>
-        <CardDescription>Write and preview Markdown in real-time</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Markdown Input</Label>
-            <Textarea
-              value={markdown}
-              onChange={(e) => setMarkdown(e.target.value)}
-              placeholder={`Enter markdown here — ${quickPasteHint}`}
-              className="min-h-[500px] font-mono text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Preview</Label>
-            <div className="border rounded-md p-4 min-h-[500px] overflow-auto prose dark:prose-invert prose-sm max-w-none">
-              <ReactMarkdown>{markdown}</ReactMarkdown>
-            </div>
-          </div>
+    <div className="grid grid-cols-2 h-full divide-x overflow-hidden">
+      {/* Editor */}
+      <div className="flex flex-col min-h-0">
+        <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
+          Markdown — {quickPasteHint}
         </div>
-      </CardContent>
-    </Card>
+        <Textarea
+          value={markdown}
+          onChange={(e) => setMarkdown(e.target.value)}
+          placeholder="Enter markdown here"
+          className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
+        />
+      </div>
+
+      {/* Preview */}
+      <div className="flex flex-col min-h-0">
+        <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
+          Preview
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 prose dark:prose-invert prose-sm max-w-none">
+          <ReactMarkdown>{markdown}</ReactMarkdown>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,12 +1,9 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Copy } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
@@ -22,16 +19,15 @@ type TransformMode =
   | 'snakecase';
 
 const MODE_OPTIONS: Array<{ value: TransformMode; label: string }> = [
-  { value: 'single-line', label: 'To Single Line' },
+  { value: 'single-line',    label: 'To Single Line' },
   { value: 'multiple-lines', label: 'To Multiple Lines' },
-  { value: 'array', label: 'To Array' },
-  { value: 'uppercase', label: 'To UPPERCASE' },
-  { value: 'lowercase', label: 'To lowercase' },
-  { value: 'camelcase', label: 'To camelCase' },
-  { value: 'snakecase', label: 'To snake_case' },
+  { value: 'array',          label: 'To Array' },
+  { value: 'uppercase',      label: 'To UPPERCASE' },
+  { value: 'lowercase',      label: 'To lowercase' },
+  { value: 'camelcase',      label: 'To camelCase' },
+  { value: 'snakecase',      label: 'To snake_case' },
 ];
 
-// Escape a single character for safe use inside a regex character class.
 function escapeForCharClass(char: string) {
   return char.replace(/[\\\]^-]/g, '\\$&');
 }
@@ -55,31 +51,20 @@ function toCamelCase(text: string) {
 }
 
 function toSnakeCase(text: string) {
-  return splitWords(text)
-    .map((word) => word.toLowerCase())
-    .join('_');
+  return splitWords(text).map((w) => w.toLowerCase()).join('_');
 }
 
 function toSingleLine(text: string, removeLineWhitespace: boolean, removeChars: string) {
   let result = text;
-
   if (removeChars) {
     const charClass = [...new Set(removeChars.split(''))].map(escapeForCharClass).join('');
-    if (charClass) {
-      result = result.replace(new RegExp(`[${charClass}]`, 'g'), '');
-    }
+    if (charClass) result = result.replace(new RegExp(`[${charClass}]`, 'g'), '');
   }
-
   if (removeLineWhitespace) {
-    // Trim each line and join directly, dropping the whitespace between lines.
-    result = result
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .join('');
+    result = result.split(/\r?\n/).map((line) => line.trim()).join('');
   } else {
     result = result.replace(/\r?\n/g, ' ');
   }
-
   return result.replace(/\s+/g, ' ').trim();
 }
 
@@ -87,7 +72,6 @@ function toMultipleLines(text: string, delimiters: string) {
   const source = delimiters || ',;';
   const charClass = [...new Set(source.split(''))].map(escapeForCharClass).join('');
   if (!charClass) return text;
-
   return text
     .split(new RegExp(`[${charClass}]`))
     .map((line) => line.trim())
@@ -106,128 +90,108 @@ function toArray(text: string) {
 export function TextTransformer() {
   const [input, setInput] = usePersistentState('devtool:textTransform:input', '');
   const [mode, setMode] = usePersistentState<TransformMode>('devtool:textTransform:mode', 'single-line');
-
-  // Single line options
   const [removeLineWhitespace, setRemoveLineWhitespace] = usePersistentState('devtool:textTransform:removeLineWs', false);
   const [removeChars, setRemoveChars] = usePersistentState('devtool:textTransform:removeChars', '');
-
-  // Multiple lines options
   const [delimiters, setDelimiters] = usePersistentState('devtool:textTransform:delimiters', ',;');
 
   const output = useMemo(() => {
     if (!input) return '';
-
     switch (mode) {
-      case 'single-line':
-        return toSingleLine(input, removeLineWhitespace, removeChars);
-      case 'multiple-lines':
-        return toMultipleLines(input, delimiters);
-      case 'array':
-        return toArray(input);
-      case 'uppercase':
-        return input.toUpperCase();
-      case 'lowercase':
-        return input.toLowerCase();
-      case 'camelcase':
-        return toCamelCase(input);
-      case 'snakecase':
-        return toSnakeCase(input);
-      default:
-        return input;
+      case 'single-line':    return toSingleLine(input, removeLineWhitespace, removeChars);
+      case 'multiple-lines': return toMultipleLines(input, delimiters);
+      case 'array':          return toArray(input);
+      case 'uppercase':      return input.toUpperCase();
+      case 'lowercase':      return input.toLowerCase();
+      case 'camelcase':      return toCamelCase(input);
+      case 'snakecase':      return toSnakeCase(input);
+      default:               return input;
     }
   }, [input, mode, removeLineWhitespace, removeChars, delimiters]);
 
   useQuickPaste((text) => setInput(text));
   useInputHistory(input, setInput);
 
-  const copyOutput = () => {
-    copyToClipboard(output);
-  };
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Text Transformer</CardTitle>
-        <CardDescription>
-          Convert text between single line, multiple lines, arrays, and letter cases — updates live as you type
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="space-y-2">
-            <Label>Mode</Label>
-            <Select value={mode} onValueChange={(value) => setMode(value as TransformMode)}>
-              <SelectTrigger className="w-full sm:w-56">
-                <SelectValue placeholder="Select a transform" />
-              </SelectTrigger>
-              <SelectContent>
-                {MODE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+    <div className="flex flex-col h-full">
+      {/* Options toolbar */}
+      <div className="shrink-0 border-b bg-background px-4 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
+            <SelectTrigger className="h-7 w-52 text-xs">
+              <SelectValue placeholder="Select transform" />
+            </SelectTrigger>
+            <SelectContent>
+              {MODE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {mode === 'single-line' && (
-            <div className="flex flex-1 flex-wrap items-end gap-2">
+            <>
               <Button
                 type="button"
+                size="sm"
                 variant={removeLineWhitespace ? 'default' : 'outline'}
-                onClick={() => setRemoveLineWhitespace((value) => !value)}
+                onClick={() => setRemoveLineWhitespace((v) => !v)}
+                className="h-7 text-xs"
               >
                 Remove whitespace between lines
               </Button>
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="remove-chars" className="text-xs text-muted-foreground">
-                  Characters to remove
-                </Label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Remove chars</span>
                 <Input
-                  id="remove-chars"
                   value={removeChars}
-                  onChange={(event) => setRemoveChars(event.target.value)}
-                  placeholder="e.g. ,.;!?-"
-                  className="font-mono"
+                  onChange={(e) => setRemoveChars(e.target.value)}
+                  placeholder="e.g. ,.;!?"
+                  className="h-7 w-32 font-mono text-xs"
                 />
               </div>
-            </div>
+            </>
           )}
 
           {mode === 'multiple-lines' && (
-            <div className="flex-1 space-y-1.5">
-              <Label htmlFor="delimiters" className="text-xs text-muted-foreground">
-                Split by delimiter characters (default: comma and semicolon)
-              </Label>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Split by</span>
               <Input
-                id="delimiters"
                 value={delimiters}
-                onChange={(event) => setDelimiters(event.target.value)}
+                onChange={(e) => setDelimiters(e.target.value)}
                 placeholder=",;"
-                className="font-mono"
+                className="h-7 w-24 font-mono text-xs"
               />
             </div>
           )}
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <Label>Input Text</Label>
-            <span className="text-xs text-muted-foreground">{quickPasteHint}</span>
+      {/* Input / Output — each half of remaining height */}
+      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y overflow-hidden">
+        {/* Input */}
+        <div className="flex flex-col min-h-0">
+          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-xs font-medium text-muted-foreground">
+            <span>Input</span>
+            <span>{quickPasteHint}</span>
           </div>
           <Textarea
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Enter text to transform"
-            className="min-h-[150px]"
+            className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
           />
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Output</Label>
-            <Button onClick={copyOutput} size="sm" variant="ghost" disabled={!output}>
-              <Copy className="h-4 w-4 mr-2" />
+        {/* Output */}
+        <div className="flex flex-col min-h-0">
+          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-xs font-medium text-muted-foreground">
+            <span>Output</span>
+            <Button
+              onClick={() => copyToClipboard(output)}
+              size="sm"
+              variant="ghost"
+              disabled={!output}
+              className="h-6 px-2 text-xs"
+            >
+              <Copy className="h-3 w-3 mr-1" />
               Copy
             </Button>
           </div>
@@ -235,10 +199,10 @@ export function TextTransformer() {
             value={output}
             readOnly
             placeholder="Result appears here"
-            className={cn('min-h-[150px] font-mono')}
+            className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -1,7 +1,5 @@
 import { useMemo, useState } from 'react';
 import { copyToClipboard } from '@/lib/clipboard';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +12,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FileJson,
   FoldVertical,
   Search,
   UnfoldVertical,
@@ -549,14 +548,11 @@ export function JsonFormatter() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>JSON Formatter</CardTitle>
-        <CardDescription>Beautify with a collapsible tree, convert to an escaped string, or minify</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="shrink-0 border-b bg-background px-4 py-2">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex h-9 rounded-md border bg-muted/45 p-0.5">
+          <div className="inline-flex h-7 rounded-md border bg-muted/45 p-0.5">
             {([
               { id: 'beautify', label: 'Beautify' },
               { id: 'string', label: 'To JSON String' },
@@ -567,7 +563,7 @@ export function JsonFormatter() {
                 type="button"
                 onClick={() => setMode(item.id)}
                 className={cn(
-                  'rounded px-3 text-sm font-medium transition-colors',
+                  'rounded px-3 text-xs font-medium transition-colors',
                   mode === item.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -579,9 +575,7 @@ export function JsonFormatter() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Indent</span>
             <Select value={indentKey} onValueChange={setIndentKey}>
-              <SelectTrigger className="h-9 w-[108px]">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-7 w-[108px] text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="2">2 spaces</SelectItem>
                 <SelectItem value="4">4 spaces</SelectItem>
@@ -593,155 +587,169 @@ export function JsonFormatter() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Quotes</span>
             <Select value={quote} onValueChange={setQuote}>
-              <SelectTrigger className="h-9 w-[112px]">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-7 w-[112px] text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={'"'}>Double "</SelectItem>
-                <SelectItem value={"'"}>Single '</SelectItem>
+                <SelectItem value={'"'}>Double &quot;</SelectItem>
+                <SelectItem value={"'"}>Single &apos;</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <Button variant="outline" size="sm" className="ml-auto" onClick={() => setShowInput((value) => !value)}>
-            {showInput ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+          <Button variant="outline" size="sm" className="ml-auto h-7 text-xs" onClick={() => setShowInput((v) => !v)}>
+            {showInput ? <EyeOff className="h-3 w-3 mr-1.5" /> : <Eye className="h-3 w-3 mr-1.5" />}
             {showInput ? 'Hide input' : 'Show input'}
           </Button>
         </div>
+      </div>
 
-        {showInput && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label>Input</Label>
-              <span className="text-xs text-muted-foreground">{quickPasteHint}</span>
+      {/* Input panel (collapsible, fixed height) */}
+      {showInput && (
+        <div className="shrink-0 border-b flex flex-col" style={{ height: '180px' }}>
+          <div className="shrink-0 px-4 py-1 border-b bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Input</span>
+            <span>{quickPasteHint}</span>
+          </div>
+          <Textarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
+            className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
+          />
+        </div>
+      )}
+
+      {/* Status bar */}
+      {(parsed.error || parsed.value !== undefined) && (
+        <div className="shrink-0 border-b px-4 py-2">
+          {parsed.error ? (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="font-mono">{parsed.error}</span>
             </div>
-            <Textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
-              className="min-h-[140px] font-mono text-sm"
-            />
-          </div>
-        )}
-
-        {parsed.error ? (
-          <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span className="font-mono">{parsed.error}</span>
-          </div>
-        ) : (
-          parsed.value !== undefined && (
+          ) : (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
               <span>Valid JSON</span>
             </div>
-          )
-        )}
+          )}
+        </div>
+      )}
 
-        {parsed.value !== undefined && mode === 'beautify' && (
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[180px]">
-                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Find by key, value, or path…"
-                  className="h-9 pl-8"
-                />
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set())} title="Expand all">
-                <UnfoldVertical className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCollapsed(new Set(containerPaths.filter((path) => path !== '$')))}
-                title="Collapse all"
-              >
-                <FoldVertical className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => copyText(beautified)}>
-                <Copy className="h-4 w-4 mr-2" />
-                Copy
-              </Button>
+      {/* Beautify: search + action bar */}
+      {parsed.value !== undefined && mode === 'beautify' && (
+        <div className="shrink-0 border-b px-4 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[160px]">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find by key, value, or path…"
+                className="h-7 pl-8 text-xs"
+              />
             </div>
-
-            <div
-              className="overflow-auto rounded-md border bg-muted/20 py-2 font-mono text-sm leading-relaxed min-h-[320px] max-h-[70vh]"
-              onMouseLeave={() => setHoveredContainer('')}
+            <Button variant="outline" size="sm" className="h-7" onClick={() => setCollapsed(new Set())} title="Expand all">
+              <UnfoldVertical className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="outline" size="sm" className="h-7"
+              onClick={() => setCollapsed(new Set(containerPaths.filter((path) => path !== '$')))}
+              title="Collapse all"
             >
-              {lines.map((line) => {
-                const bracketHighlighted = line.kind !== 'primitive' && line.path === hoveredContainer;
-                const bracketClass = cn('text-muted-foreground', bracketHighlighted && 'text-foreground font-semibold');
-                const isMatch = lineMatches(line, lowerQuery);
-                const isSelected = line.kind !== 'close' && selectedPath === line.path;
-                const isToggle = line.kind === 'open' || line.kind === 'collapsed';
+              <FoldVertical className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => copyText(beautified)}>
+              <Copy className="h-3.5 w-3.5 mr-1.5" />Copy
+            </Button>
+          </div>
+        </div>
+      )}
 
-                return (
-                  <div
-                    key={`${line.path}:${line.kind}`}
-                    className="flex items-start hover:bg-muted/30"
-                    onMouseEnter={() => setHoveredContainer(line.containerPath)}
-                    onClick={() => {
-                      setSelectedPath(line.path);
-                      if (isToggle && !forceExpand) toggle(line.path);
-                    }}
-                  >
-                    <span className="w-12 shrink-0 select-none pr-3 text-right text-xs leading-relaxed text-muted-foreground/45 tabular-nums">
-                      {line.no}
+      {/* Main content — flex-1 */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        {parsed.value !== undefined && mode === 'beautify' && (
+          <div
+            className="flex-1 min-h-0 overflow-auto py-2 font-mono text-sm leading-relaxed"
+            onMouseLeave={() => setHoveredContainer('')}
+          >
+            {lines.map((line) => {
+              const bracketHighlighted = line.kind !== 'primitive' && line.path === hoveredContainer;
+              const bracketClass = cn('text-muted-foreground', bracketHighlighted && 'text-foreground font-semibold');
+              const isMatch = lineMatches(line, lowerQuery);
+              const isSelected = line.kind !== 'close' && selectedPath === line.path;
+              const isToggle = line.kind === 'open' || line.kind === 'collapsed';
+              return (
+                <div
+                  key={`${line.path}:${line.kind}`}
+                  className="flex items-start hover:bg-muted/30"
+                  onMouseEnter={() => setHoveredContainer(line.containerPath)}
+                  onClick={() => { setSelectedPath(line.path); if (isToggle && !forceExpand) toggle(line.path); }}
+                >
+                  <span className="w-12 shrink-0 select-none pr-3 text-right text-xs leading-relaxed text-muted-foreground/45 tabular-nums">
+                    {line.no}
+                  </span>
+                  <div className="flex min-w-0 flex-1 items-start pr-3" style={{ paddingLeft: `${line.depth * indent.size}ch` }}>
+                    <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-muted-foreground">
+                      {isToggle && (line.kind === 'open' ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)}
                     </span>
-                    <div className="flex min-w-0 flex-1 items-start pr-3" style={{ paddingLeft: `${line.depth * indent.size}ch` }}>
-                      <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-muted-foreground">
-                        {isToggle &&
-                          (line.kind === 'open' ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)}
-                      </span>
-                      <span
-                        className={cn(
-                          'whitespace-pre rounded-sm px-0.5',
-                          isSelected && 'bg-foreground/10',
-                          isMatch && 'bg-yellow-200/70 dark:bg-yellow-500/25'
-                        )}
-                      >
-                        {line.name !== undefined && (
-                          <>
-                            <span className="text-sky-600 dark:text-sky-400">{quoteText(line.name, quote)}</span>
-                            <span className="text-muted-foreground">: </span>
-                          </>
-                        )}
-                        {renderValue(line, bracketClass)}
-                      </span>
-                    </div>
+                    <span className={cn('whitespace-pre rounded-sm px-0.5', isSelected && 'bg-foreground/10', isMatch && 'bg-yellow-200/70 dark:bg-yellow-500/25')}>
+                      {line.name !== undefined && (
+                        <>
+                          <span className="text-sky-600 dark:text-sky-400">{quoteText(line.name, quote)}</span>
+                          <span className="text-muted-foreground">: </span>
+                        </>
+                      )}
+                      {renderValue(line, bracketClass)}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center gap-2 rounded-md border bg-background/50 px-3 py-2 text-xs">
-              <span className="text-muted-foreground">Path</span>
-              <code className="flex-1 truncate font-mono text-foreground">{selectedPath || '$ (click a node)'}</code>
-              {selectedPath && (
-                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => copyText(selectedPath)}>
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
         {parsed.value !== undefined && mode !== 'beautify' && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>{mode === 'string' ? 'JSON String' : 'Minified'}</Label>
-              <Button onClick={() => copyText(outputText)} size="sm" variant="ghost">
-                <Copy className="h-4 w-4 mr-2" />
-                Copy
+          <>
+            <div className="shrink-0 border-b px-4 py-1.5 bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+              <span>{mode === 'string' ? 'JSON String' : 'Minified'}</span>
+              <Button onClick={() => copyText(outputText)} size="sm" variant="ghost" className="h-6 px-2 text-xs">
+                <Copy className="h-3 w-3 mr-1" />Copy
               </Button>
             </div>
-            <Textarea value={outputText} readOnly className="min-h-[200px] font-mono text-sm" />
+            <Textarea
+              value={outputText}
+              readOnly
+              className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
+            />
+          </>
+        )}
+
+        {/* Empty state */}
+        {parsed.value === undefined && !parsed.error && (
+          <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground px-8 gap-3">
+            <FileJson className="h-12 w-12 text-muted-foreground/30" />
+            <p className="text-sm">Paste JSON to get started</p>
+            {!showInput && (
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowInput(true)}>
+                <Eye className="h-3 w-3 mr-1.5" />Show input
+              </Button>
+            )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Beautify: path breadcrumb */}
+      {parsed.value !== undefined && mode === 'beautify' && (
+        <div className="shrink-0 border-t flex items-center gap-2 px-4 py-2 bg-background/50 text-xs">
+          <span className="text-muted-foreground">Path</span>
+          <code className="flex-1 truncate font-mono text-foreground">{selectedPath || '$ (click a node)'}</code>
+          {selectedPath && (
+            <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => copyText(selectedPath)}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
