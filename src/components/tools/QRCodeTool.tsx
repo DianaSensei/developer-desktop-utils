@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { QrCode, Copy, Download, Check, Upload, X } from 'lucide-react';
+import { Copy, Download, Check, Upload, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -371,22 +369,15 @@ export function QRCodeTool() {
         : 'border-border bg-background hover:border-primary/60 hover:bg-muted/50');
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <QrCode className="h-5 w-5" />
-          QR Code Generator
-        </CardTitle>
-        <CardDescription>Generate QR codes from text or URLs</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-4">
 
         <div className="space-y-1.5">
-          <Label>Text or URL</Label>
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={`Enter text or URL — ${quickPasteHint}`}
+            className="h-9"
           />
         </div>
 
@@ -479,7 +470,7 @@ export function QRCodeTool() {
           </div>
         )}
 
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

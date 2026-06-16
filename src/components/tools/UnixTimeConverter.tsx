@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Copy, Clock, RotateCcw, ChevronDown, ChevronUp,
+  Copy, RotateCcw, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight, Calendar, Info, Timer,
 } from 'lucide-react';
 import {
@@ -692,14 +691,8 @@ export function DateTimeTool() {
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Clock className="h-4 w-4" />
-          Date / Time Tool
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-4">
 
         {/* Input */}
         <div className="space-y-2">
@@ -969,8 +962,8 @@ export function DateTimeTool() {
           </div>
         </Section>
 
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

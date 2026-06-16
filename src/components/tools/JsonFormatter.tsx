@@ -613,7 +613,7 @@ export function JsonFormatter() {
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
-            className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
+            className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-xs p-4"
           />
         </div>
       )}
@@ -669,7 +669,7 @@ export function JsonFormatter() {
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {parsed.value !== undefined && mode === 'beautify' && (
           <div
-            className="flex-1 min-h-0 overflow-auto py-2 font-mono text-sm leading-relaxed"
+            className="flex-1 min-h-0 overflow-auto py-2 font-mono text-xs leading-relaxed"
             onMouseLeave={() => setHoveredContainer('')}
           >
             {lines.map((line) => {
@@ -719,7 +719,7 @@ export function JsonFormatter() {
             <Textarea
               value={outputText}
               readOnly
-              className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
+              className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-xs p-4"
             />
           </>
         )}

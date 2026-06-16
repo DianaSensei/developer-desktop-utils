@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -504,45 +503,38 @@ export function CronGenerator() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle>Cron Expression</CardTitle>
-            <CardDescription>Generate, validate, and explain Linux or Quartz cron schedules</CardDescription>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="inline-flex rounded-md border bg-muted/45 p-0.5">
-              {(['linux', 'quartz'] as CronMode[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => changeMode(item)}
-                  className={cn(
-                    'rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors',
-                    mode === item
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="shrink-0 border-b bg-background px-4 py-2 flex items-center gap-3">
+        <div className="inline-flex rounded-md border bg-muted/45 p-0.5">
+          {(['linux', 'quartz'] as CronMode[]).map((item) => (
             <button
+              key={item}
               type="button"
-              aria-label={`${mode} cron rule`}
-              className="group relative inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+              onClick={() => changeMode(item)}
+              className={cn(
+                'rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors',
+                mode === item ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
             >
-              <HelpCircle className="h-4 w-4" />
-              <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden w-72 rounded-md border bg-popover px-2.5 py-2 text-left text-xs font-normal leading-relaxed text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
-                {modeRuleTooltip(mode)}
-              </span>
+              {item}
             </button>
-          </div>
+          ))}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        <button
+          type="button"
+          aria-label={`${mode} cron rule`}
+          className="group relative inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+        >
+          <HelpCircle className="h-4 w-4" />
+          <span className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-72 rounded-md border bg-popover px-2.5 py-2 text-left text-xs font-normal leading-relaxed text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
+            {modeRuleTooltip(mode)}
+          </span>
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="p-4 space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="cron-expression">Expression</Label>
@@ -662,7 +654,8 @@ export function CronGenerator() {
             </p>
           ))}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      </div>
+    </div>
   );
 }

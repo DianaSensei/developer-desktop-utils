@@ -1,9 +1,7 @@
 import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Copy, Palette, Search } from 'lucide-react';
+import { Copy, Search } from 'lucide-react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { copyToClipboard } from '@/lib/clipboard';
 
@@ -105,116 +103,91 @@ export function ColorPicker() {
   );
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Color Picker
-          </CardTitle>
-          <CardDescription>Pick, convert, and search colors in multiple formats</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <Label>Color Preview</Label>
-            <div className="flex gap-4 items-center">
-              <div className="w-32 h-32 rounded-lg border-4 border-border shadow-lg" style={{ backgroundColor: color }} />
-              <div className="flex-1 space-y-2">
-                <div className="flex gap-2">
-                  <Input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-20 h-12 cursor-pointer" />
-                  <Input type="text" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#000000" className="font-mono" />
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-5">
+
+        {/* Color preview + picker */}
+        <div className="flex gap-4 items-center">
+          <div className="w-24 h-24 rounded-lg border-4 border-border shadow-lg shrink-0" style={{ backgroundColor: color }} />
+          <div className="flex-1 space-y-2">
+            <div className="flex gap-2">
+              <Input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-16 h-10 cursor-pointer p-1" />
+              <Input type="text" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#000000" className="font-mono h-10" />
+            </div>
+            <p className="text-xs text-muted-foreground">Click the color box or enter a hex value</p>
+          </div>
+        </div>
+
+        {/* Color formats */}
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground">HEX</div>
+            <div className="flex gap-2">
+              <Input value={formats.hex} onChange={(e) => handleHexChange(e.target.value)} placeholder="#000000" className="font-mono h-8 text-xs" />
+              <Button onClick={() => copyToClipboard(formats.hex)} size="icon" variant="outline" className="h-8 w-8 shrink-0"><Copy className="h-3.5 w-3.5" /></Button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground">RGB</div>
+            <div className="flex gap-2">
+              <Input type="number" min="0" max="255" value={formats.rgb.r} onChange={(e) => handleRgbChange(parseInt(e.target.value), formats.rgb.g, formats.rgb.b)} placeholder="R" className="font-mono h-8 text-xs" />
+              <Input type="number" min="0" max="255" value={formats.rgb.g} onChange={(e) => handleRgbChange(formats.rgb.r, parseInt(e.target.value), formats.rgb.b)} placeholder="G" className="font-mono h-8 text-xs" />
+              <Input type="number" min="0" max="255" value={formats.rgb.b} onChange={(e) => handleRgbChange(formats.rgb.r, formats.rgb.g, parseInt(e.target.value))} placeholder="B" className="font-mono h-8 text-xs" />
+              <Button onClick={() => copyToClipboard(`rgb(${formats.rgb.r}, ${formats.rgb.g}, ${formats.rgb.b})`)} size="icon" variant="outline" className="h-8 w-8 shrink-0"><Copy className="h-3.5 w-3.5" /></Button>
+            </div>
+            <p className="text-xs text-muted-foreground font-mono">rgb({formats.rgb.r}, {formats.rgb.g}, {formats.rgb.b})</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground">CMYK</div>
+            <div className="flex gap-2">
+              {(['c', 'm', 'y', 'k'] as const).map((ch) => (
+                <div key={ch} className="flex-1">
+                  <Input value={`${formats.cmyk[ch]}%`} readOnly className="font-mono text-center h-8 text-xs" />
+                  <p className="text-[10px] text-muted-foreground text-center mt-0.5">{ch.toUpperCase()}</p>
                 </div>
-                <p className="text-sm text-muted-foreground">Click the color box or enter a hex value</p>
-              </div>
+              ))}
+              <Button onClick={() => copyToClipboard(`cmyk(${formats.cmyk.c}%, ${formats.cmyk.m}%, ${formats.cmyk.y}%, ${formats.cmyk.k}%)`)} size="icon" variant="outline" className="h-8 w-8 shrink-0 self-start"><Copy className="h-3.5 w-3.5" /></Button>
             </div>
           </div>
 
-          <div className="grid gap-4">
-            <div className="space-y-2">
-              <Label>HEX</Label>
-              <div className="flex gap-2">
-                <Input value={formats.hex} onChange={(e) => handleHexChange(e.target.value)} placeholder="#000000" className="font-mono" />
-                <Button onClick={() => copyToClipboard(formats.hex)} size="icon" variant="outline"><Copy className="h-4 w-4" /></Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>RGB</Label>
-              <div className="flex gap-2">
-                <Input type="number" min="0" max="255" value={formats.rgb.r} onChange={(e) => handleRgbChange(parseInt(e.target.value), formats.rgb.g, formats.rgb.b)} placeholder="R" className="font-mono" />
-                <Input type="number" min="0" max="255" value={formats.rgb.g} onChange={(e) => handleRgbChange(formats.rgb.r, parseInt(e.target.value), formats.rgb.b)} placeholder="G" className="font-mono" />
-                <Input type="number" min="0" max="255" value={formats.rgb.b} onChange={(e) => handleRgbChange(formats.rgb.r, formats.rgb.g, parseInt(e.target.value))} placeholder="B" className="font-mono" />
-                <Button onClick={() => copyToClipboard(`rgb(${formats.rgb.r}, ${formats.rgb.g}, ${formats.rgb.b})`)} size="icon" variant="outline"><Copy className="h-4 w-4" /></Button>
-              </div>
-              <p className="text-xs text-muted-foreground font-mono">rgb({formats.rgb.r}, {formats.rgb.g}, {formats.rgb.b})</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>CMYK</Label>
-              <div className="grid grid-cols-4 gap-2">
-                {(['c', 'm', 'y', 'k'] as const).map((ch) => (
-                  <div key={ch}>
-                    <Input value={`${formats.cmyk[ch]}%`} readOnly className="font-mono text-center" />
-                    <p className="text-xs text-muted-foreground text-center mt-1">{ch.toUpperCase()}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input value={`cmyk(${formats.cmyk.c}%, ${formats.cmyk.m}%, ${formats.cmyk.y}%, ${formats.cmyk.k}%)`} readOnly className="font-mono text-sm" />
-                <Button onClick={() => copyToClipboard(`cmyk(${formats.cmyk.c}%, ${formats.cmyk.m}%, ${formats.cmyk.y}%, ${formats.cmyk.k}%)`)} size="icon" variant="outline"><Copy className="h-4 w-4" /></Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>HSL</Label>
-              <div className="grid grid-cols-3 gap-2">
-                <div><Input value={`${formats.hsl.h}°`} readOnly className="font-mono text-center" /><p className="text-xs text-muted-foreground text-center mt-1">Hue</p></div>
-                <div><Input value={`${formats.hsl.s}%`} readOnly className="font-mono text-center" /><p className="text-xs text-muted-foreground text-center mt-1">Saturation</p></div>
-                <div><Input value={`${formats.hsl.l}%`} readOnly className="font-mono text-center" /><p className="text-xs text-muted-foreground text-center mt-1">Lightness</p></div>
-              </div>
-              <div className="flex gap-2">
-                <Input value={`hsl(${formats.hsl.h}, ${formats.hsl.s}%, ${formats.hsl.l}%)`} readOnly className="font-mono text-sm" />
-                <Button onClick={() => copyToClipboard(`hsl(${formats.hsl.h}, ${formats.hsl.s}%, ${formats.hsl.l}%)`)} size="icon" variant="outline"><Copy className="h-4 w-4" /></Button>
-              </div>
+          <div className="space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground">HSL</div>
+            <div className="flex gap-2">
+              <div className="flex-1"><Input value={`${formats.hsl.h}°`} readOnly className="font-mono text-center h-8 text-xs" /><p className="text-[10px] text-muted-foreground text-center mt-0.5">Hue</p></div>
+              <div className="flex-1"><Input value={`${formats.hsl.s}%`} readOnly className="font-mono text-center h-8 text-xs" /><p className="text-[10px] text-muted-foreground text-center mt-0.5">Saturation</p></div>
+              <div className="flex-1"><Input value={`${formats.hsl.l}%`} readOnly className="font-mono text-center h-8 text-xs" /><p className="text-[10px] text-muted-foreground text-center mt-0.5">Lightness</p></div>
+              <Button onClick={() => copyToClipboard(`hsl(${formats.hsl.h}, ${formats.hsl.s}%, ${formats.hsl.l}%)`)} size="icon" variant="outline" className="h-8 w-8 shrink-0 self-start"><Copy className="h-3.5 w-3.5" /></Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Pantone Colors</CardTitle>
-          <CardDescription>Search and select from popular Pantone colors</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        {/* Pantone search */}
+        <div className="border-t pt-4 space-y-3">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pantone Colors</div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search Pantone colors..." className="pl-9" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search Pantone colors..." className="pl-9 h-8 text-xs" />
           </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[400px] overflow-y-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {filteredPantone.map((pantone) => (
-              <button
-                key={pantone.code}
-                onClick={() => setColor(pantone.hex)}
-                className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
-              >
-                <div className="w-10 h-10 rounded border-2 border-border flex-shrink-0" style={{ backgroundColor: pantone.hex }} />
+              <button key={pantone.code} onClick={() => setColor(pantone.hex)}
+                className="flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors text-left">
+                <div className="w-8 h-8 rounded border border-border shrink-0" style={{ backgroundColor: pantone.hex }} />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{pantone.code}</p>
-                  <p className="text-xs text-muted-foreground">{pantone.hex}</p>
+                  <p className="text-[10px] text-muted-foreground">{pantone.hex}</p>
                 </div>
               </button>
             ))}
+            {filteredPantone.length === 0 && (
+              <div className="col-span-3 text-center py-6 text-sm text-muted-foreground">No Pantone colors found</div>
+            )}
           </div>
+        </div>
 
-          {filteredPantone.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No Pantone colors found</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

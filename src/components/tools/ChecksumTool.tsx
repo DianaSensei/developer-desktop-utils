@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Copy, FileCheck, Upload, X, CheckCircle, XCircle } from 'lucide-react';
+import { Copy, Upload, X, CheckCircle, XCircle } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 
@@ -203,18 +201,12 @@ export function ChecksumTool() {
   const algoLabel  = ALGORITHMS.find((a) => a.id === algo)!.label;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <FileCheck className="h-4 w-4" />
-          Checksum
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-4">
 
-        {/* Step 1 — algorithm */}
+        {/* Algorithm */}
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Algorithm</Label>
+          <div className="text-xs text-muted-foreground font-medium">Algorithm</div>
           <div className="flex rounded-md border border-input overflow-hidden w-fit">
             {ALGORITHMS.map(({ label, id }) => (
               <button
@@ -316,9 +308,9 @@ export function ChecksumTool() {
 
             {/* Verify */}
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 Verify — paste an expected hash to compare
-              </Label>
+              </div>
               <div className="relative">
                 <Input
                   value={verify}
@@ -351,7 +343,7 @@ export function ChecksumTool() {
           </p>
         )}
 
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Copy, Hash } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import CryptoJS from 'crypto-js';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
@@ -47,94 +45,69 @@ export function HashTool() {
   }, [input, encryptKey, aesMode]);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Hash className="h-5 w-5" />
-            Hash Generator
-          </CardTitle>
-          <CardDescription>Generate MD5, SHA-1, SHA-256, SHA-512 hashes from text</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Input Text</Label>
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Enter text to hash — Press ⌘V to paste"
-              className="min-h-[100px]"
-            />
-          </div>
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-6">
+        {/* Input */}
+        <div className="space-y-1.5">
+          <div className="text-xs font-medium text-muted-foreground">Input Text — Press ⌘V to paste</div>
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Enter text to hash..."
+            className="min-h-[100px] font-mono text-sm"
+          />
+        </div>
 
-          <div className="space-y-3">
-            {([
-              { label: 'MD5', value: hashes.md5 },
-              { label: 'SHA-1', value: hashes.sha1 },
-              { label: 'SHA-256', value: hashes.sha256 },
-              { label: 'SHA-512', value: hashes.sha512 },
-            ] as const).map(({ label, value }) => (
-              <div key={label} className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{label}</Label>
-                <div className="flex gap-2">
-                  <Input value={value} readOnly className="font-mono text-xs" />
-                  <Button onClick={() => copyToClipboard(value)} size="icon" variant="outline" disabled={!value}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
+        {/* Hash results */}
+        <div className="space-y-2">
+          {([
+            { label: 'MD5', value: hashes.md5 },
+            { label: 'SHA-1', value: hashes.sha1 },
+            { label: 'SHA-256', value: hashes.sha256 },
+            { label: 'SHA-512', value: hashes.sha512 },
+          ] as const).map(({ label, value }) => (
+            <div key={label} className="space-y-0.5">
+              <div className="text-[10px] font-medium text-muted-foreground">{label}</div>
+              <div className="flex gap-2">
+                <Input value={value} readOnly className="font-mono text-xs h-8" />
+                <Button onClick={() => copyToClipboard(value)} size="icon" variant="outline" disabled={!value} className="h-8 w-8 shrink-0">
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          ))}
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>AES Encryption / Decryption</CardTitle>
-          <CardDescription>Encrypt or decrypt text using AES</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Encryption Key</Label>
+        {/* AES section */}
+        <div className="border-t pt-4 space-y-3">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">AES Encryption / Decryption</div>
+          <div className="space-y-1.5">
+            <div className="text-xs text-muted-foreground">Encryption Key</div>
             <Input
               type="password"
               value={encryptKey}
               onChange={(e) => setEncryptKey(e.target.value)}
               placeholder="Enter encryption key"
+              className="h-8 text-sm"
             />
           </div>
-
           <div className="flex gap-2">
-            <Button
-              variant={aesMode === 'encrypt' ? 'default' : 'outline'}
-              className="flex-1"
-              onClick={() => setAesMode('encrypt')}
-            >
-              Encrypt
-            </Button>
-            <Button
-              variant={aesMode === 'decrypt' ? 'default' : 'outline'}
-              className="flex-1"
-              onClick={() => setAesMode('decrypt')}
-            >
-              Decrypt
-            </Button>
+            <Button variant={aesMode === 'encrypt' ? 'default' : 'outline'} className="flex-1 h-8 text-xs" onClick={() => setAesMode('encrypt')}>Encrypt</Button>
+            <Button variant={aesMode === 'decrypt' ? 'default' : 'outline'} className="flex-1 h-8 text-xs" onClick={() => setAesMode('decrypt')}>Decrypt</Button>
           </div>
-
           {aesResult && (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label>{aesMode === 'encrypt' ? 'Encrypted' : 'Decrypted'}</Label>
-                <Button onClick={() => copyToClipboard(aesResult)} size="sm" variant="ghost">
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy
+                <div className="text-xs text-muted-foreground">{aesMode === 'encrypt' ? 'Encrypted' : 'Decrypted'}</div>
+                <Button onClick={() => copyToClipboard(aesResult)} size="sm" variant="ghost" className="h-6 px-2 text-xs">
+                  <Copy className="h-3 w-3 mr-1" />Copy
                 </Button>
               </div>
               <Textarea value={aesResult} readOnly className="min-h-[80px] font-mono text-xs" />
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

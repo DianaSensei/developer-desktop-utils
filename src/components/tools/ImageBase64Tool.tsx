@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Copy, ImageIcon, Upload, X, AlertCircle } from 'lucide-react';
+import { Copy, Upload, X, AlertCircle } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -67,14 +66,8 @@ export function ImageBase64Tool() {
   const decodeSrc = decodeInput.trim() ? normalizeBase64(decodeInput.trim()) : null;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ImageIcon className="h-4 w-4" />
-          Image ↔ Base64
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-4">
 
         {/* Mode tabs */}
         <div className="flex rounded-md border p-0.5 w-fit gap-0.5">
@@ -207,7 +200,7 @@ export function ImageBase64Tool() {
           </div>
         )}
 
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

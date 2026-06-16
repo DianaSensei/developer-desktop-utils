@@ -1,8 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Copy, RefreshCw, Shuffle } from 'lucide-react';
+import { Copy, RefreshCw } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
@@ -127,134 +125,86 @@ export function GeneratorTool() {
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Shuffle className="h-4 w-4" />
-          Generator
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-
-        {/* Mode tabs */}
-        <div className="flex rounded-md border p-0.5 w-fit gap-0.5">
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="shrink-0 border-b bg-background px-4 py-2 flex items-center gap-3">
+        <div className="flex rounded-md border p-0.5 gap-0.5">
           <ModeTab active={mode === 'uuid'}   onClick={() => setMode('uuid')}>UUID</ModeTab>
           <ModeTab active={mode === 'number'} onClick={() => setMode('number')}>Number</ModeTab>
           <ModeTab active={mode === 'text'}   onClick={() => setMode('text')}>Text</ModeTab>
         </div>
 
-        {/* Mode-specific options */}
         {mode === 'uuid' && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Count <span className="text-muted-foreground">(max 100)</span></Label>
-            <Input
-              type="number" min={1} max={100}
-              value={count}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Count</span>
+            <Input type="number" min={1} max={100} value={count}
               onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 100))}
-              className="h-8 text-xs w-32"
-            />
+              className="h-7 text-xs w-20" />
           </div>
         )}
 
         {mode === 'number' && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Min</Label>
-                <Input type="number" value={numMin} onChange={(e) => setNumMin(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Max</Label>
-                <Input type="number" value={numMax} onChange={(e) => setNumMax(parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Decimal places</Label>
-                <Input
-                  type="number" min={0} max={10}
-                  value={decimals}
-                  onChange={(e) => setDecimals(clamp(parseInt(e.target.value) || 0, 0, 10))}
-                  className="h-8 text-xs"
-                />
-              </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Min</span>
+              <Input type="number" value={numMin} onChange={(e) => setNumMin(parseFloat(e.target.value) || 0)} className="h-7 text-xs w-20" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Count <span className="text-muted-foreground">(max 1000)</span></Label>
-              <Input
-                type="number" min={1} max={1000}
-                value={count}
-                onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 1000))}
-                className="h-8 text-xs w-32"
-              />
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Max</span>
+              <Input type="number" value={numMax} onChange={(e) => setNumMax(parseFloat(e.target.value) || 0)} className="h-7 text-xs w-20" />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Decimals</span>
+              <Input type="number" min={0} max={10} value={decimals} onChange={(e) => setDecimals(clamp(parseInt(e.target.value) || 0, 0, 10))} className="h-7 text-xs w-16" />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Count</span>
+              <Input type="number" min={1} max={1000} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 1000))} className="h-7 text-xs w-20" />
             </div>
           </div>
         )}
 
         {mode === 'text' && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Length <span className="text-muted-foreground">(max 1024)</span></Label>
-                <Input
-                  type="number" min={1} max={1024}
-                  value={textLen}
-                  onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, 1024))}
-                  className="h-8 text-xs"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Count <span className="text-muted-foreground">(max 500)</span></Label>
-                <Input
-                  type="number" min={1} max={500}
-                  value={count}
-                  onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 500))}
-                  className="h-8 text-xs"
-                />
-              </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Length</span>
+              <Input type="number" min={1} max={1024} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, 1024))} className="h-7 text-xs w-20" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Character sets</Label>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
-                  <button
-                    key={k}
-                    onClick={() => toggleCharset(k)}
-                    className={cn(
-                      'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
-                      charsets[k]
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    {k === 'lower' ? 'a–z' : k === 'upper' ? 'A–Z' : k === 'digits' ? '0–9' : '!@#…'}
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">Count</span>
+              <Input type="number" min={1} max={500} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 500))} className="h-7 text-xs w-20" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Custom characters <span className="text-muted-foreground">(optional, appended to selection)</span></Label>
-              <Input
-                value={customChars}
-                onChange={(e) => setCustomChars(e.target.value)}
-                placeholder="e.g. àéü€¥"
-                className="h-8 text-xs font-mono"
-              />
+            <div className="flex gap-1.5">
+              {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
+                <button key={k} onClick={() => toggleCharset(k)}
+                  className={cn('rounded border px-2 py-0.5 text-xs font-medium transition-colors',
+                    charsets[k] ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground hover:text-foreground')}>
+                  {k === 'lower' ? 'a–z' : k === 'upper' ? 'A–Z' : k === 'digits' ? '0–9' : '!@#'}
+                </button>
+              ))}
             </div>
+            <Input value={customChars} onChange={(e) => setCustomChars(e.target.value)} placeholder="Custom chars" className="h-7 text-xs w-28 font-mono" />
           </div>
         )}
 
-        {/* Generate button */}
         <button
           onClick={handleGenerate}
-          className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="ml-auto flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
         >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Generate
+          <RefreshCw className="h-3 w-3" />Generate
         </button>
+      </div>
 
+      {/* Results */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <ResultList items={results} />
-
-      </CardContent>
-    </Card>
+        {!results.length && (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            Configure options above and click Generate
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

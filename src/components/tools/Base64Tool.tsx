@@ -1,6 +1,4 @@
 import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -651,76 +649,64 @@ export function Base64Tool() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Encoder / Decoder</CardTitle>
-        <CardDescription>{codec.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-2">
-            <Label>Algorithm</Label>
-            <Select value={algorithm} onValueChange={setAlgorithm}>
-              <SelectTrigger className="w-full sm:w-64">
-                <SelectValue placeholder="Select an algorithm" />
-              </SelectTrigger>
-              <SelectContent>
-                {CODECS.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="inline-flex h-9 rounded-md border bg-muted/45 p-0.5">
-            {(['encode', 'decode'] as Mode[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setMode(item)}
-                className={cn(
-                  'rounded px-4 text-sm font-medium capitalize transition-colors',
-                  mode === item
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {item}
-              </button>
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="shrink-0 border-b bg-background px-4 py-2 flex flex-wrap items-center gap-3">
+        <Select value={algorithm} onValueChange={setAlgorithm}>
+          <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {CODECS.map((item) => (
+              <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
             ))}
-          </div>
+          </SelectContent>
+        </Select>
+        <div className="inline-flex h-7 rounded-md border bg-muted/45 p-0.5">
+          {(['encode', 'decode'] as Mode[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setMode(item)}
+              className={cn(
+                'rounded px-3 text-xs font-medium capitalize transition-colors',
+                mode === item ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {item}
+            </button>
+          ))}
         </div>
+        <span className="text-xs text-muted-foreground truncate">{codec.description}</span>
+      </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <Label>Input</Label>
-            <span className="text-xs text-muted-foreground">{quickPasteHint}</span>
+      {/* Input / Output split */}
+      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y overflow-hidden">
+        <div className="flex flex-col min-h-0">
+          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Input</span>
+            <span>{quickPasteHint}</span>
           </div>
           <Textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder={mode === 'encode' ? 'Enter text to encode' : `Enter ${codec.label} to decode`}
-            className="min-h-[150px] font-mono"
+            className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
           />
         </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Output</Label>
-            <Button onClick={copyOutput} size="sm" variant="ghost" disabled={!output}>
-              <Copy className="h-4 w-4 mr-2" />
-              Copy
+        <div className="flex flex-col min-h-0">
+          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Output</span>
+            <Button onClick={copyOutput} size="sm" variant="ghost" disabled={!output} className="h-6 px-2 text-xs">
+              <Copy className="h-3 w-3 mr-1" />Copy
             </Button>
           </div>
           <Textarea
             value={error ? `Error: ${error}` : output}
             readOnly
             placeholder="Result appears here"
-            className={cn('min-h-[150px] font-mono', error && 'text-destructive')}
+            className={cn('flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4', error && 'text-destructive')}
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
