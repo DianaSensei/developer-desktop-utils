@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ColorPicker } from '@/components/ui/color-picker';
 import { Copy, Download, Check, Upload, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -436,19 +437,21 @@ export function QRCodeTool() {
           <div className="flex items-center gap-3 px-3 py-2.5">
             <span className="w-12 shrink-0 text-xs text-muted-foreground font-medium">Color</span>
             <div className="flex items-center gap-3 flex-wrap">
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="color" value={darkColor} onChange={(e) => setDarkColor(e.target.value)}
-                  className="w-6 h-6 rounded cursor-pointer border border-border bg-transparent p-0" />
+              <div className="flex items-center gap-1.5">
+                <ColorPicker value={darkColor} onChange={setDarkColor} title="QR color" />
                 <span className="text-xs text-muted-foreground font-mono">{darkColor.toUpperCase()} QR</span>
-              </label>
-              <label className={cn('flex items-center gap-1.5 cursor-pointer', transparent && 'opacity-40')}>
-                <input type="color" value={lightColor} disabled={transparent}
-                  onChange={(e) => { setLightColor(e.target.value); setTransparent(false); }}
-                  className="w-6 h-6 rounded cursor-pointer border border-border bg-transparent p-0 disabled:cursor-not-allowed" />
+              </div>
+              <div className={cn('flex items-center gap-1.5', transparent && 'opacity-40')}>
+                <ColorPicker
+                  value={lightColor}
+                  disabled={transparent}
+                  onChange={(c) => { setLightColor(c); setTransparent(false); }}
+                  title="Background color"
+                />
                 <span className="text-xs text-muted-foreground font-mono">
                   {transparent ? 'Transparent' : `${lightColor.toUpperCase()} BG`}
                 </span>
-              </label>
+              </div>
               <button onClick={() => setTransparent((v) => !v)} className={cn(chip(transparent), 'px-2 py-1')}>
                 Transparent BG
               </button>

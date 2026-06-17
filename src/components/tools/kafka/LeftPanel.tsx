@@ -46,6 +46,8 @@ export function LeftPanel({
   const [editConfig, setEditConfig] = useState<BrokerConfig | null>(null);
   const [connStatus, setConnStatus] = useState<Record<string, ConnStatus>>({});
   const [showBrokerDropdown, setShowBrokerDropdown] = useState(false);
+  const [brokerDeleteArmed, setBrokerDeleteArmed] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Topics
   const [topics, setTopics] = useState<TopicSummary[]>([]);
@@ -117,12 +119,23 @@ export function LeftPanel({
     setEditConfig(null);
   };
 
+  // Two-step delete: first click arms (button turns red), second confirms.
   const handleDeleteBroker = async () => {
-    if (!selectedBrokerId || !window.confirm(`Delete broker "${selectedConfig?.name}"?`)) return;
+    if (!selectedBrokerId) return;
+    if (!brokerDeleteArmed) { setBrokerDeleteArmed(true); return; }
+    setBrokerDeleteArmed(false);
     await kafkaApi.deleteConfig(selectedBrokerId);
     await loadConfigs();
     onSelectBroker('');
   };
+
+  // Reset the armed state after a few seconds, or when the selection changes.
+  useEffect(() => {
+    if (!brokerDeleteArmed) return;
+    const t = window.setTimeout(() => setBrokerDeleteArmed(false), 3000);
+    return () => window.clearTimeout(t);
+  }, [brokerDeleteArmed]);
+  useEffect(() => { setBrokerDeleteArmed(false); }, [selectedBrokerId]);
 
   const handleDisconnect = () => {
     setConnStatus((s) => ({ ...s, [selectedBrokerId]: 'disconnected' }));
@@ -183,7 +196,7 @@ export function LeftPanel({
       if (selectedTopic === deleteConfirm.name) onSelectTopic(null);
       setTopicsRefreshTick((k) => k + 1);
     } catch (err) {
-      alert(String(err));
+      setDeleteError(String(err));
     } finally {
       setDeletingTopic(null);
     }
@@ -291,11 +304,17 @@ export function LeftPanel({
                 </button>
               )}
               <button
-                className="px-2 py-1 text-xs rounded-md border hover:bg-destructive/10 text-destructive transition-colors"
-                title="Delete broker"
+                className={cn(
+                  'px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1',
+                  brokerDeleteArmed
+                    ? 'bg-destructive/10 border-destructive/40 text-destructive'
+                    : 'hover:bg-destructive/10 text-destructive',
+                )}
+                title={brokerDeleteArmed ? 'Click again to confirm' : 'Delete broker'}
                 onClick={handleDeleteBroker}
               >
                 <Trash2 className="w-3 h-3" />
+                {brokerDeleteArmed && <span>Confirm</span>}
               </button>
             </>
           )}
@@ -398,6 +417,21 @@ export function LeftPanel({
                 className="h-7 text-xs pl-6"
               />
             </div>
+          </div>
+        )}
+
+        {/* Delete error banner */}
+        {deleteError && (
+          <div className="mx-2 mb-1.5 flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 shrink-0">
+            <XCircle className="w-3 h-3 mt-0.5 shrink-0 text-destructive" />
+            <span className="flex-1 text-xs text-destructive break-words">{deleteError}</span>
+            <button
+              className="shrink-0 text-destructive/70 hover:text-destructive transition-colors"
+              title="Dismiss"
+              onClick={() => setDeleteError('')}
+            >
+              ✕
+            </button>
           </div>
         )}
 

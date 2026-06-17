@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Square, Trash2, Plus, ChevronRight, Coffee, Timer as TimerIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useClockify, type TimeEntry } from './store';
@@ -256,11 +257,10 @@ export function TimeTracker() {
         {/* Manual entry row */}
         {mode === 'manual' && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-            <Input
-              type="date"
+            <DatePicker
               value={manualDate}
-              onChange={(e) => setManualDate(e.target.value)}
-              className="h-9 w-[150px] text-xs [color-scheme:light] dark:[color-scheme:dark]"
+              onChange={setManualDate}
+              className="w-[150px] text-xs"
             />
             <div className="flex rounded-md border p-0.5">
               {(['range', 'duration'] as const).map((k) => (

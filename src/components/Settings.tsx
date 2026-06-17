@@ -201,37 +201,37 @@ export function Settings() {
 
       {/* Tools section */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
             <h2 className="text-sm font-semibold">Tools</h2>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              {enabledCount} of {TOOL_DEFS.length} enabled · drag to reorder · hidden tools are removed from the sidebar
+              {enabledCount} of {TOOL_DEFS.length} enabled
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {!allEnabled && (
               <button
                 onClick={enableAll}
-                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
-                <CheckCheck className="h-3 w-3" />
+                <CheckCheck className="h-3 w-3 shrink-0" />
                 Enable all
               </button>
             )}
             {!allDisabled && (
               <button
                 onClick={disableAll}
-                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
-                <Ban className="h-3 w-3" />
+                <Ban className="h-3 w-3 shrink-0" />
                 Disable all
               </button>
             )}
             <button
               onClick={resetToDefaults}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              <RotateCcw className="h-3 w-3" />
+              <RotateCcw className="h-3 w-3 shrink-0" />
               Reset
             </button>
           </div>
