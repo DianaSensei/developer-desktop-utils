@@ -13,6 +13,17 @@ async function readClipboard(): Promise<string> {
   return navigator.clipboard.readText();
 }
 
+/**
+ * True when focus is in a field where the user is actively typing/editing
+ * (input, textarea, or contenteditable). In that case ⌘V should paste at the
+ * cursor like a normal paste — not replace the whole field via quick-paste.
+ */
+function isEditableTarget(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+}
+
 export function useQuickPaste(onPaste: (text: string) => void, enabled = true) {
   const handlerRef = useRef(onPaste);
   handlerRef.current = onPaste;
@@ -24,6 +35,10 @@ export function useQuickPaste(onPaste: (text: string) => void, enabled = true) {
       const isPasteCombo =
         (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'v';
       if (!isPasteCombo) return;
+
+      // While editing a field, let the browser handle paste normally
+      // (insert at the cursor) instead of replacing the entire input.
+      if (isEditableTarget(event.target) || isEditableTarget(document.activeElement)) return;
 
       event.preventDefault();
       try {

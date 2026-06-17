@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { copyToClipboard } from '@/lib/clipboard';
 
 // ─── SQL formatter ───────────────────────────────────────────────────────────
@@ -522,6 +523,10 @@ export function SqlFormatter() {
     if (modeRef.current === 'sql') setSqlRef.current(text);
     else setMongoRef.current(text);
   }, []);
+
+  // ⌘V / Ctrl+V replaces the editor content when the editor isn't focused.
+  // (When it is focused, useQuickPaste defers to CodeMirror's native paste.)
+  useQuickPaste(setEditorContent);
 
   const handleFormat = useCallback(() => {
     const view = viewRef.current;

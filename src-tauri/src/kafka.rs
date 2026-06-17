@@ -228,8 +228,19 @@ async fn send_request(
 
     let mut size_buf = [0u8; 4];
     stream.read_exact(&mut size_buf).await.map_err(|e| e.to_string())?;
-    let rlen = i32::from_be_bytes(size_buf) as usize;
-    let mut resp = vec![0u8; rlen];
+    let rlen = i32::from_be_bytes(size_buf);
+    // The length comes straight off the socket. Validate it before allocating:
+    // a non-Kafka server (e.g. an HTTP/TLS port reached by a typo in
+    // bootstrap_servers) or a malicious peer could otherwise send a huge or
+    // negative size and trigger a multi-GB allocation → OOM crash. A response
+    // must also be at least 4 bytes to contain the correlation id we skip below.
+    const MAX_RESPONSE_BYTES: i32 = 64 * 1024 * 1024; // 64 MB — ample for metadata/offsets/groups/configs
+    if rlen < 4 || rlen > MAX_RESPONSE_BYTES {
+        return Err(format!(
+            "Invalid Kafka response size ({rlen} bytes) — is this a Kafka broker port?"
+        ));
+    }
+    let mut resp = vec![0u8; rlen as usize];
     stream.read_exact(&mut resp).await.map_err(|e| e.to_string())?;
     // skip correlation_id (4 bytes)
     Ok(resp[4..].to_vec())

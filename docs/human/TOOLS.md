@@ -251,9 +251,9 @@ This file is written by Rust (`fs::write`) whenever you save or delete a broker 
 
 ## What never happens in any tool
 
-- **No telemetry, analytics, or crash reporting.** The app makes no background network requests of any kind except Kafka connections you explicitly initiate.
-- **No auto-update network call unless you opt in.** The auto-update check (Settings → About → Auto-check for updates) is disabled by default. When enabled, it checks the GitHub Releases API once per day and only on your command or the daily interval.
-- **No data is sent to any server.** Every computation — hashing, encoding, diffing, JWT decoding, regex matching — runs locally in the WebView or in Rust. Your input data does not leave the machine.
+- **No telemetry, analytics, or crash reporting.** The only network activity is Kafka connections you explicitly initiate and the app update check described below.
+- **Daily auto-update check, on by default.** The auto-update check (Settings → About → Auto-check for updates) is **enabled by default** and contacts the GitHub Releases API at most once per day (plus whenever you click "Check"). It downloads or installs nothing without your action, and you can turn it off in Settings.
+- **No input data is sent to any server.** Every computation — hashing, encoding, diffing, JWT decoding, regex matching — runs locally in the WebView or in Rust. Your input data does not leave the machine; the update check sends only a version request, never your data.
 - **No background file access.** No tool reads files except when you explicitly click "Browse", drag a file, or use a file input.
 
 ---

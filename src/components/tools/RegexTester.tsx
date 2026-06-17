@@ -28,10 +28,20 @@ export function RegexTester() {
       const regex = new RegExp(pattern, flags);
       const matches: RegExpMatchArray[] = [];
       if (flags.includes('g')) {
-        let match;
+        // Cap results so a pattern that matches very often can't grow the
+        // array (and the render) without bound.
+        const MAX_MATCHES = 10_000;
         const globalRegex = new RegExp(pattern, flags);
+        let match: RegExpExecArray | null;
         while ((match = globalRegex.exec(testString)) !== null) {
           matches.push(match);
+          // A zero-width match (e.g. /a*/, /\b/, /\s*/) leaves lastIndex
+          // unchanged — without this nudge exec() would loop forever and
+          // freeze the UI. Advance past it manually.
+          if (match.index === globalRegex.lastIndex) {
+            globalRegex.lastIndex++;
+          }
+          if (matches.length >= MAX_MATCHES) break;
         }
       } else {
         const match = testString.match(regex);

@@ -17,6 +17,7 @@ import {
   intervalToDuration,
 } from 'date-fns';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { copyToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 
@@ -598,6 +599,10 @@ export function DateTimeTool() {
     setRawInput(val);
     setIsLive(!val.trim());
   };
+
+  // ⌘V / Ctrl+V fills the date/time input (and exits live mode) when no field
+  // is focused. While editing a field, ⌘V pastes normally at the cursor.
+  useQuickPaste(handleRawChange);
 
   const resetToNow = useCallback(() => {
     setIsLive(true);

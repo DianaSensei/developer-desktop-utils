@@ -1,14 +1,21 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import * as Diff from 'diff';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 
 export function TextDiff() {
   const [text1, setText1] = usePersistentState('devtool:diff:text1', '');
   const [text2, setText2] = usePersistentState('devtool:diff:text2', '');
 
   useInputHistory(text1, setText1);
+
+  // With two equal panes, quick-paste fills whichever side was focused last
+  // (defaulting to Original). It only fires when no field is focused — while
+  // editing a pane, ⌘V pastes normally at the cursor.
+  const activeSetter = useRef(setText1);
+  useQuickPaste((text) => activeSetter.current(text));
 
   const diffResult = useMemo(() => Diff.diffWords(text1, text2), [text1, text2]);
 
@@ -23,7 +30,8 @@ export function TextDiff() {
           <Textarea
             value={text1}
             onChange={(e) => setText1(e.target.value)}
-            placeholder="Enter original text"
+            onFocus={() => { activeSetter.current = setText1; }}
+            placeholder={`Enter original text — ${quickPasteHint}`}
             className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
           />
         </div>
@@ -34,7 +42,8 @@ export function TextDiff() {
           <Textarea
             value={text2}
             onChange={(e) => setText2(e.target.value)}
-            placeholder="Enter modified text"
+            onFocus={() => { activeSetter.current = setText2; }}
+            placeholder={`Enter modified text — ${quickPasteHint}`}
             className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
           />
         </div>

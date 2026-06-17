@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import {
   RotateCcw, GripVertical, X, Search, CheckCheck,
   RefreshCw, Download, CheckCircle2, AlertCircle, Loader2,
-  Clipboard, FolderOpen, FolderClosed, Shield,
+  Clipboard, FolderOpen, FolderClosed, Shield, Globe,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { TOOL_DEFS } from '@/lib/toolDefs';
@@ -64,6 +64,12 @@ const APP_PERMISSIONS = [
     name: 'File Dialogs',
     description: 'Open file picker and save dialogs so you can browse for files.',
     scope: 'Triggered by you only',
+  },
+  {
+    Icon: Globe,
+    name: 'Network',
+    description: 'Connect to Kafka brokers you configure (Kafka Explorer) and check GitHub for app updates. No telemetry or analytics.',
+    scope: 'Brokers you add + update check',
   },
 ];
 
@@ -224,7 +230,7 @@ export function Settings() {
           <Shield className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
         <p className="text-[11px] text-muted-foreground -mt-1">
-          DevTool cannot access your files outside the listed scope. No network requests are made.
+          DevTool cannot access your files outside the listed scope. Network access is limited to Kafka brokers you configure and the app update check — no telemetry or analytics.
         </p>
         {!isTauri && (
           <p className="text-[11px] text-amber-500 dark:text-amber-400">
@@ -330,7 +336,7 @@ export function Settings() {
           </div>
           <div className="px-4 py-3">
             <p className="text-muted-foreground leading-relaxed">
-              All tools run entirely on your device. No data is sent to any server.
+              Tools run entirely on your device. The only network activity is connecting to Kafka brokers you configure and the daily check for app updates — no telemetry, analytics, or other data leaves your machine.
             </p>
           </div>
         </div>

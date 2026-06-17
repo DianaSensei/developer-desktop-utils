@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X } from 'lucide-react';
+import { X, Info } from 'lucide-react';
 import type { BrokerConfig } from './types';
 
 interface BrokerFormProps {
@@ -38,7 +37,15 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
     setSaving(true);
     setError('');
     try {
-      await onSave(form);
+      // Only persist fields the app actually uses. TLS/SASL aren't supported yet,
+      // so we never collect or store credentials — and editing a config that was
+      // saved by an older build drops any previously stored password here.
+      await onSave({
+        id: form.id,
+        name: form.name,
+        bootstrapServers: form.bootstrapServers,
+        sslEnabled: false,
+      });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -82,58 +89,14 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
             <p className="text-xs text-muted-foreground mt-1">Kafka broker ports only — not ZooKeeper (2181)</p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              id="kf-ssl"
-              type="checkbox"
-              checked={form.sslEnabled}
-              onChange={(e) => set('sslEnabled', e.target.checked)}
-              className="rounded"
-            />
-            <Label htmlFor="kf-ssl">SSL / TLS</Label>
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+            <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+            <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+              Connections are <span className="font-medium">plaintext</span>. TLS/SSL and SASL
+              authentication are not yet supported — don't point this at a broker that requires
+              encryption or credentials.
+            </p>
           </div>
-
-          <div>
-            <Label htmlFor="kf-sasl">SASL Mechanism</Label>
-            <Select
-              value={form.saslMechanism || '__none__'}
-              onValueChange={(v) => set('saslMechanism', v === '__none__' ? '' : v)}
-            >
-              <SelectTrigger id="kf-sasl" className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                <SelectItem value="PLAIN">PLAIN</SelectItem>
-                <SelectItem value="SCRAM-SHA-256">SCRAM-SHA-256</SelectItem>
-                <SelectItem value="SCRAM-SHA-512">SCRAM-SHA-512</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {form.saslMechanism && (
-            <>
-              <div>
-                <Label htmlFor="kf-user">SASL Username</Label>
-                <Input
-                  id="kf-user"
-                  value={form.saslUsername ?? ''}
-                  onChange={(e) => set('saslUsername', e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="kf-pass">SASL Password</Label>
-                <Input
-                  id="kf-pass"
-                  type="password"
-                  value={form.saslPassword ?? ''}
-                  onChange={(e) => set('saslPassword', e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-            </>
-          )}
 
           {error && (
             <p className="text-sm text-destructive">{error}</p>
