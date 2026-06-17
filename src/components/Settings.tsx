@@ -108,6 +108,13 @@ export function Settings() {
   const enableAll = () => {
     TOOL_DEFS.forEach((t) => { if (features[t.id] === false) toggleFeature(t.id); });
   };
+
+  const openExternal = useCallback(async (e: React.MouseEvent, url: string) => {
+    if (!isTauri) return; // on web, let the anchor open a normal tab
+    e.preventDefault();
+    const { openUrl } = await import('@tauri-apps/plugin-opener');
+    await openUrl(url);
+  }, []);
   const visibleTools = toolQuery.trim()
     ? displayTools.filter((t) =>
         t.label.toLowerCase().includes(toolQuery.trim().toLowerCase()) ||
@@ -338,6 +345,7 @@ export function Settings() {
               rel="noopener noreferrer"
               title="Open GitHub issues"
               aria-label="Open GitHub issues"
+              onClick={(e) => openExternal(e, 'https://github.com/DianaSensei/developer-desktop-utils/issues')}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <GitHubIcon className="h-4 w-4" />
