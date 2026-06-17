@@ -35,6 +35,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Derive the app version from the pushed tag (e.g. v0.2.4 -> 0.2.4) and write
+      # it into the config files, so you only have to push a tag — no manual version
+      # bump in tauri.conf.json. tauri-action reads the version from tauri.conf.json.
+      - name: Sync version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Setting version to $VERSION"
+          node -e "const f='src-tauri/tauri.conf.json',j=require('./'+f);j.version='$VERSION';require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
+          node -e "const f='package.json',j=require('./'+f);j.version='$VERSION';require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
+          node -e "const fs=require('fs'),f='src-tauri/Cargo.toml';let c=fs.readFileSync(f,'utf8');c=c.replace(/^version = \".*\"/m,'version = \"$VERSION\"');fs.writeFileSync(f,c)"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -52,6 +64,10 @@ jobs:
           workspaces: src-tauri -> target
           cache-on-failure: true
           shared-key: ${{ matrix.platform }}-${{ matrix.rust-target }}
+          # Restore only. The cache is created/refreshed by warm-cache.yml on main;
+          # a tag run can read main's cache but would otherwise save a tag-scoped
+          # copy that no future tag can reuse, so we never save here.
+          save-if: false
 
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm'

@@ -1,10 +1,26 @@
-name: CI
+name: Build cache (deps)
 
+# Refreshes the Rust dependency cache on the default branch (main) so that tag
+# releases (release.yml) restore it and build fast.
+#
+# Why this exists: GitHub scopes Actions caches per ref. A tag run can read the
+# DEFAULT BRANCH's cache, but two different tags cannot read each other's. So the
+# cache has to be created on main. Swatinem/rust-cache keys the cache on the
+# Cargo.lock hash, so it only needs refreshing when dependencies change — which
+# is exactly when this runs. Ordinary pushes (frontend, Rust logic, docs) touch
+# neither file and trigger nothing. No cron.
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+    paths:
+      - 'src-tauri/Cargo.lock'
+      - 'src-tauri/Cargo.toml'
+  workflow_dispatch: {} # manual refresh if you ever need it
+
+# Cancel an in-progress run if a newer one starts.
+concurrency:
+  group: build-cache
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -35,6 +51,8 @@ jobs:
         with:
           targets: ${{ matrix.rust-target }}
 
+      # Same shared-key as release.yml so the cache this saves is the exact cache
+      # the tag release restores. Saves on this run (main scope).
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
         with:
