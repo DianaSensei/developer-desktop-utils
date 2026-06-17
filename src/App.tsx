@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ChevronDown,
   Search,
+  Plus,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
@@ -178,6 +179,14 @@ function Sidebar({
   const settingsTool = allTools.find((t) => t.featureId === 'settings')!;
   const isSettingsActive = location.pathname === settingsTool.path;
 
+  // Tools the user has hidden — surfaced as a hint so they know more exist.
+  const disabledTools = allTools.filter((t) => t.featureId !== 'settings' && !isFeatureEnabled(t.featureId));
+  const hiddenCount = disabledTools.length;
+  // When a search finds nothing enabled but matches a disabled tool, point the user to Settings.
+  const disabledMatches = query.trim()
+    ? disabledTools.filter((t) => t.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : [];
+
   return (
     <>
       {isOpen && (
@@ -273,7 +282,22 @@ function Sidebar({
             <div className="relative flex-1 min-h-0">
               <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
                 {navTools.length === 0 && query && (
-                  <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
+                  disabledMatches.length > 0 ? (
+                    <div className="px-2 py-4 text-center text-[11px] text-muted-foreground space-y-2">
+                      <p>
+                        <span className="font-medium text-foreground">{disabledMatches[0].label}</span> is turned off.
+                      </p>
+                      <Link
+                        to={settingsTool.path}
+                        onClick={onClose}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-primary hover:bg-muted transition-colors"
+                      >
+                        <Plus className="h-3 w-3" /> Enable in Settings
+                      </Link>
+                    </div>
+                  ) : (
+                    <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
+                  )
                 )}
                 <div className="space-y-0.5">
                   {navTools.map((tool) => {
@@ -304,6 +328,30 @@ function Sidebar({
                     );
                   })}
                 </div>
+
+                {/* Hint: more tools exist but are hidden — link to Settings to enable them.
+                    Deliberately low-emphasis (small, muted, no tab styling) so it reads as
+                    a hint, not a tool entry. */}
+                {!query && hiddenCount > 0 && (
+                  <NavTooltip
+                    label={`${hiddenCount} more tool${hiddenCount > 1 ? 's' : ''} available`}
+                    description="Turn on more tools from the Settings page."
+                  >
+                    <Link
+                      to={settingsTool.path}
+                      onClick={onClose}
+                      className={cn(
+                        'mt-1.5 flex items-center justify-center gap-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors',
+                        isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[10px]'
+                      )}
+                    >
+                      <Plus className={isCollapsed ? 'h-3 w-3' : 'h-2.5 w-2.5 flex-shrink-0'} />
+                      {!isCollapsed && (
+                        <span className="whitespace-nowrap">{hiddenCount} more in Settings</span>
+                      )}
+                    </Link>
+                  </NavTooltip>
+                )}
               </nav>
               {/* Fade + indicator when more items below */}
               {hasMore && (
