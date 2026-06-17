@@ -170,25 +170,21 @@ export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
 // Default tool display order for fresh installs (before any user drag-drop reordering).
 // Edit this array to change the out-of-box sort order before a build.
 export const DEFAULT_TOOL_ORDER: string[] = [
+  "task-tracker",
   "json",
   "deduplicate",
   "text-transform",
   "sql-formatter",
+  "unix-time",
+  "generator",
+  "text-counter",
   "base64",
   "regex",
   "diff",
-  "unix-time",
-
   "checksum",
-  "generator",
   "cron-generator",
-  "text-counter",
   "qrcode",
-
   "image-base64",
-  "task-tracker",
-
-  // Disabled by default — appear at bottom when enabled via Settings
   "color-picker",
   "hash",
   "jwt",
