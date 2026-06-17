@@ -67,6 +67,32 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Build the release notes from GitHub's auto-generated notes (commits/PRs since
+      # the previous tag). This becomes both the GitHub release body AND the updater
+      # manifest `notes` field, so the in-app update popup shows the real changes.
+      - name: Generate release notes
+        id: notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          body=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name="${{ github.ref_name }}" --jq '.body' || true)
+          if [ -z "$body" ]; then
+            body="See commit history for changes in this release."
+          fi
+          {
+            echo "RELEASE_NOTES<<__NOTES_EOF__"
+            echo "$body"
+            echo ""
+            echo "## Installation"
+            echo "Download the file for your platform below:"
+            echo "- **macOS (Apple Silicon)**: \`.dmg\` (aarch64)"
+            echo "- **Windows**: \`.msi\` or \`.exe\` (NSIS installer)"
+            echo "- **Linux**: \`.AppImage\` or \`.deb\`"
+            echo "__NOTES_EOF__"
+          } >> "$GITHUB_ENV"
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -76,16 +102,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: DevTool ${{ github.ref_name }}
-          releaseBody: |
-            ## What's new
-            See commit history for changes in this release.
-
-            ## Installation
-            Download the file for your platform below:
-            - **macOS (Apple Silicon)**: `.dmg` (aarch64)
-            - **macOS (Intel)**: `.dmg` (x86_64)
-            - **Windows**: `.msi` or `.exe` (NSIS installer)
-            - **Linux**: `.AppImage` or `.deb`
+          releaseBody: ${{ env.RELEASE_NOTES }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
