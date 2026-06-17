@@ -40,6 +40,7 @@ import { ColorPicker } from '@/components/tools/ColorPicker';
 import { Settings } from '@/components/Settings';
 import { KafkaExplorer } from '@/components/tools/kafka/KafkaExplorer';
 import { SqlFormatter } from '@/components/tools/SqlFormatter';
+import { TaskTracker } from '@/components/tools/TaskTracker';
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator,      fullHeight: true },
@@ -61,6 +62,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'generator':      { path: '/generator',      component: GeneratorTool,     fullHeight: true },
   'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer,     fullHeight: true },
   'sql-formatter':  { path: '/sql-formatter',  component: SqlFormatter,      fullHeight: true },
+  'task-tracker':   { path: '/task-tracker',   component: TaskTracker,       fullHeight: true },
 };
 
 const allTools = [

@@ -37,6 +37,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'generator': true,
   'kafka-explorer': false,
   'sql-formatter': true,
+  'task-tracker': true,
   'settings': true,
 };
 

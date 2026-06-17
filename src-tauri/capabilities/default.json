@@ -4,6 +4,7 @@
   "description": "Default capabilities for DevTool",
   "windows": ["main"],
   "permissions": [
+    "opener:allow-open-url",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
     "dialog:allow-open",

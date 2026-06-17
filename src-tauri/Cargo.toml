@@ -27,6 +27,7 @@ rskafka = { version = "0.6", features = ["transport-tls"] }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
+tauri-plugin-opener = "2.5.4"
 
 [features]
 default = ["custom-protocol"]

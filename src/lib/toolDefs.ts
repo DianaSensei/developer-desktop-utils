@@ -17,6 +17,7 @@ import {
   Shuffle,
   Server,
   Database,
+  Timer,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -155,6 +156,13 @@ export const TOOL_DEFS: ToolDef[] = [
     description:
       "Format and beautify SQL queries with keyword casing, space collapse, and clause line breaks.",
   },
+  {
+    id: "task-tracker",
+    label: "Time Tracker",
+    icon: Timer,
+    description:
+      "Clockify-style time suite: tracker, timesheet, calendar, schedule, expenses, and time off.",
+  },
 ];
 
 export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
@@ -178,6 +186,7 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "qrcode",
 
   "image-base64",
+  "task-tracker",
 
   // Disabled by default — appear at bottom when enabled via Settings
   "color-picker",
