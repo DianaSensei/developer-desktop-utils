@@ -3,13 +3,27 @@ import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
 import {
   RotateCcw, GripVertical, X, Search, CheckCheck,
-  RefreshCw, Download, CheckCircle2, AlertCircle, Loader2,
+  RefreshCw, Download, CheckCircle2, AlertCircle, Loader2, WifiOff,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from '@/components/ui/select';
 import { TOOL_DEFS } from '@/lib/toolDefs';
 import { useUpdate } from '@/contexts/UpdateContext';
 import { AppLogo } from '@/components/AppLogo';
+
+/** Format a time as a friendly 12-hour label, e.g. (6, 0) → "6:00 AM". */
+function formatTime(hour: number, minute = 0): string {
+  const period = hour < 12 ? 'AM' : 'PM';
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+// TEMP(testing): extra options that fire at a specific minute so the daily check can be
+// verified without waiting for an on-the-hour boundary. Remove before release.
+const TEST_TIMES: Array<{ hour: number; minute: number }> = [{ hour: 16, minute: 25 }];
 
 function applySavedOrder<T extends { id: string }>(tools: T[], savedOrder: string[]): T[] {
   if (!savedOrder.length) return tools;
@@ -83,7 +97,7 @@ const APP_PERMISSIONS = [
 
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools } = useFeatures();
-  const { status: updateStatus, updateInfo, error: updateError, autoCheckEnabled, toggleAutoCheck, checkForUpdates, installUpdate } = useUpdate();
+  const { status: updateStatus, updateInfo, updateAvailable, error: updateError, autoCheckEnabled, checkHour, checkMinute, setCheckTime, toggleAutoCheck, checkForUpdates, installUpdate } = useUpdate();
   const [currentVersion, setCurrentVersion] = useState('');
 
   useEffect(() => {
@@ -283,34 +297,79 @@ export function Settings() {
             <div className="flex items-center justify-between px-4 py-3 text-xs">
               <div>
                 <p className="font-medium">Auto-check for updates</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Check for new versions once a day</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Check on launch and daily at {formatTime(checkHour, checkMinute)}
+                </p>
               </div>
-              <Toggle checked={autoCheckEnabled} onChange={toggleAutoCheck} />
+              <div className="flex items-center gap-2">
+                {autoCheckEnabled && (
+                  <Select
+                    value={`${checkHour}:${checkMinute}`}
+                    onValueChange={(v) => {
+                      const [h, m] = v.split(':').map(Number);
+                      setCheckTime(h, m);
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-28 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, h) => (
+                        <SelectItem key={h} value={`${h}:0`} className="text-xs">
+                          {formatTime(h)}
+                        </SelectItem>
+                      ))}
+                      {/* TEMP(testing): remove TEST_TIMES before release */}
+                      {TEST_TIMES.map(({ hour, minute }) => (
+                        <SelectItem key={`${hour}:${minute}`} value={`${hour}:${minute}`} className="text-xs">
+                          {formatTime(hour, minute)} (test)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Toggle checked={autoCheckEnabled} onChange={toggleAutoCheck} />
+              </div>
             </div>
           )}
           <div className="flex items-center justify-between px-4 py-3 text-xs">
             <span className="text-muted-foreground">Version</span>
             <div className="flex items-center gap-2">
-              {updateStatus === 'not-available' && (
+              {updateStatus === 'not-available' && !updateAvailable && (
                 <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 className="h-3 w-3" />
                   Up to date
                 </span>
               )}
-              {updateStatus === 'available' && (
+              {updateAvailable && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 text-[10px] font-semibold">
                   v{updateInfo?.version} available
                 </span>
               )}
               {updateStatus === 'error' && (
-                <span className="flex items-center gap-1 text-destructive">
-                  <AlertCircle className="h-3 w-3 shrink-0" />
-                  {updateError ?? 'Update check failed'}
-                </span>
+                updateError?.startsWith('Offline') ? (
+                  <span
+                    className="flex items-center gap-1 text-amber-600 dark:text-amber-400"
+                    title={updateError}
+                  >
+                    <WifiOff className="h-3 w-3 shrink-0" />
+                    Offline
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-destructive">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    {updateError ?? 'Update check failed'}
+                  </span>
+                )
               )}
 
               {isTauri && (
-                updateStatus === 'available' ? (
+                (updateStatus === 'checking' || updateStatus === 'downloading') ? (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {updateStatus === 'checking' ? 'Checking…' : 'Downloading…'}
+                  </span>
+                ) : updateAvailable ? (
                   <button
                     onClick={installUpdate}
                     className="flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-2 py-1 text-[10px] font-medium hover:bg-primary/90 transition-colors"
@@ -318,11 +377,6 @@ export function Settings() {
                     <Download className="h-3 w-3" />
                     Install
                   </button>
-                ) : (updateStatus === 'checking' || updateStatus === 'downloading') ? (
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    {updateStatus === 'checking' ? 'Checking…' : 'Downloading…'}
-                  </span>
                 ) : (
                   <button
                     onClick={checkForUpdates}

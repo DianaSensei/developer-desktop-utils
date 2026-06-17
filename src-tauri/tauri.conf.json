@@ -1,6 +1,6 @@
 {
   "productName": "DevTool",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "identifier": "com.desktop-devtool-app",
   "build": {
     "beforeDevCommand": "npm run dev",
