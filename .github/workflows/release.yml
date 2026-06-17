@@ -125,6 +125,31 @@ jobs:
             echo "__NOTES_EOF__"
           } >> "$GITHUB_ENV"
 
+      # Windows bundling downloads WiX + NSIS (and nsis_tauri_utils.dll) into
+      # %LOCALAPPDATA%\tauri on every run. Cache that dir so later releases reuse it.
+      - name: Cache Tauri bundler tools (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/tauri
+          key: ${{ runner.os }}-tauri-bundler-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-tauri-bundler-
+
+      # Best-effort: cache Tauri's downloaded bundler tooling on Linux (AppImage
+      # linuxdeploy/AppRun + plugins). Depending on the Tauri version these may be
+      # fetched into the build dir instead, in which case this is a harmless no-op.
+      # - name: Cache Tauri bundler tools (Linux)
+      #   if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm'
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       ~/.cache/tauri
+      #       ~/.local/share/tauri
+      #     key: ${{ runner.os }}-tauri-bundler-${{ hashFiles('src-tauri/Cargo.lock') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-tauri-bundler-
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
         env:
