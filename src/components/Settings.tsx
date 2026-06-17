@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban,
   RefreshCw, Download, CheckCircle2, AlertCircle, Loader2, WifiOff, XCircle, ChevronDown,
-  Clipboard, FolderOpen, FolderClosed, Shield, Globe,
+  Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -95,7 +95,7 @@ const APP_PERMISSIONS = [
 
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools } = useFeatures();
-  const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall } = useUpdate();
+  const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall, openUpdateDialog } = useUpdate();
   const { config, setField, resetConfig } = useAppConfig();
   const [configOpen, setConfigOpen] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('');
@@ -448,13 +448,22 @@ export function Settings() {
                     Checking…
                   </span>
                 ) : updateAvailable ? (
-                  <button
-                    onClick={installUpdate}
-                    className="flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-2 py-1 text-[10px] font-medium hover:bg-primary/90 transition-colors"
-                  >
-                    <Download className="h-3 w-3" />
-                    Install
-                  </button>
+                  <>
+                    <button
+                      onClick={openUpdateDialog}
+                      className="flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      What's new
+                    </button>
+                    <button
+                      onClick={installUpdate}
+                      className="flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-2 py-1 text-[10px] font-medium hover:bg-primary/90 transition-colors"
+                    >
+                      <Download className="h-3 w-3" />
+                      Install
+                    </button>
+                  </>
                 ) : (
                   <button
                     onClick={checkForUpdates}

@@ -16,6 +16,8 @@ export interface AppConfig {
     defaultCheckHour: number;
     /** Abort a download if no progress arrives for this many seconds. */
     downloadTimeoutSeconds: number;
+    /** If the last check is older than this (minutes) when Install is clicked, re-check first. */
+    recheckStaleMinutes: number;
   };
   editor: {
     /** Debounce (ms) for grouping keystrokes into a single undo/redo step. */
@@ -41,6 +43,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   updates: {
     defaultCheckHour: 6,
     downloadTimeoutSeconds: 60,
+    recheckStaleMinutes: 60,
   },
   editor: {
     historyDebounceMs: 400,
@@ -85,6 +88,7 @@ export const SECTION_LABELS: Record<ConfigSection, string> = {
 export const CONFIG_FIELDS: ConfigField[] = [
   { section: 'updates', key: 'defaultCheckHour', label: 'Default check hour', description: 'Hour of day (0–23) used for the daily update check until you pick a time.', min: 0, max: 23, step: 1 },
   { section: 'updates', key: 'downloadTimeoutSeconds', label: 'Download timeout', description: 'Cancel an update download if it stalls for this long.', min: 10, max: 600, step: 5, unit: 's' },
+  { section: 'updates', key: 'recheckStaleMinutes', label: 'Re-check before install', description: 'When you click Install, re-check for updates first if the last check is older than this.', min: 1, max: 1440, step: 1, unit: 'min' },
   { section: 'editor', key: 'historyDebounceMs', label: 'Undo grouping delay', description: 'How long to wait before grouping edits into one undo step.', min: 100, max: 2000, step: 50, unit: 'ms' },
   { section: 'editor', key: 'copyFeedbackMs', label: 'Copied feedback', description: 'Duration the "Copied" confirmation stays visible.', min: 500, max: 5000, step: 100, unit: 'ms' },
   { section: 'generator', key: 'maxNumberCount', label: 'Max numbers', description: 'Largest batch of random numbers generated at once.', min: 10, max: 100000, step: 10 },

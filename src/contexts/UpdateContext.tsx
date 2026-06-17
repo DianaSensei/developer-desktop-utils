@@ -26,9 +26,11 @@ interface UpdateContextValue {
   /** Hour of day (0–23, local time) for the scheduled daily check. Defaults to 6am. */
   checkHour: number;
   setCheckHour: (hour: number) => void;
-  /** True while the "new version found" popup should be shown (set by automatic checks). */
+  /** True while the "new version found" popup should be shown. */
   showUpdateDialog: boolean;
   dismissUpdateDialog: () => void;
+  /** Re-open the changelog popup for a known-available update (no download). */
+  openUpdateDialog: () => void;
   toggleAutoCheck: () => void;
   checkForUpdates: () => Promise<void>;
   installUpdate: () => Promise<void>;
@@ -97,10 +99,14 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     setCheckHourState(h);
   }, []);
 
-  // `auto` distinguishes background checks (on launch / 6am) from the manual "Check" button.
-  // Automatic checks surface a popup whenever a new version is found.
-  const runCheck = useCallback(async (auto = false) => {
-    if (!isTauri) return;
+  // Checks the update manifest only — never downloads anything. Whenever a new
+  // version is found (whether triggered by the daily background check or the
+  // manual "Check" button), surface the changelog popup. Downloading + installing
+  // is a separate, explicitly user-triggered action (installUpdate).
+  // Returns the available UpdateInfo (or null). `popDialog` is suppressed for the
+  // silent pre-install refresh so it doesn't reopen the popup.
+  const runCheck = useCallback(async (popDialog = true): Promise<UpdateInfo | null> => {
+    if (!isTauri) return null;
     setStatus('checking');
     setError(null);
     try {
@@ -113,14 +119,15 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
         setUpdateAvailable(true);
         localStorage.setItem(STORAGE_PENDING_UPDATE, JSON.stringify(info));
         setStatus('available');
-        if (auto) setShowUpdateDialog(true);
-      } else {
-        // Confirmed up to date — clear the persisted badge.
-        setUpdateInfo(null);
-        setUpdateAvailable(false);
-        localStorage.removeItem(STORAGE_PENDING_UPDATE);
-        setStatus('not-available');
+        if (popDialog) setShowUpdateDialog(true);
+        return info;
       }
+      // Confirmed up to date — clear the persisted badge.
+      setUpdateInfo(null);
+      setUpdateAvailable(false);
+      localStorage.removeItem(STORAGE_PENDING_UPDATE);
+      setStatus('not-available');
+      return null;
     } catch (e) {
       // A failed check is non-fatal: the rest of the app keeps working offline.
       // A successful retry later will clear this. (lastCheck is intentionally NOT
@@ -135,16 +142,38 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
           : msg
       );
       setStatus('error');
+      return null;
     }
   }, []);
 
-  // Manual check (e.g. the "Check" button) — never auto-pops the dialog.
-  const checkForUpdates = useCallback(() => runCheck(false), [runCheck]);
+  const checkForUpdates = useCallback(() => runCheck().then(() => {}), [runCheck]);
 
   const dismissUpdateDialog = useCallback(() => setShowUpdateDialog(false), []);
+  // Re-open the changelog popup for an already-discovered update (no re-check, no download).
+  const openUpdateDialog = useCallback(() => setShowUpdateDialog(true), []);
 
   const installUpdate = useCallback(async () => {
     if (!isTauri) return;
+
+    // Freshness guard: if the last check is older than the configured window,
+    // silently re-check before downloading so the install reflects the current
+    // manifest. Three outcomes:
+    //   • no update now (already current / yanked / failed) → stop (status updated by runCheck)
+    //   • a *different* version than the user was about to install → show its changelog
+    //     and stop, so they review the new version before downloading
+    //   • same version → proceed to download
+    const staleMs = config.updates.recheckStaleMinutes * 60 * 1000;
+    const lastCheck = parseInt(localStorage.getItem(STORAGE_LAST_CHECK) ?? '0', 10);
+    if (Date.now() - lastCheck > staleMs) {
+      const prevVersion = updateInfo?.version;
+      const fresh = await runCheck(false);
+      if (!fresh) return;
+      if (fresh.version !== prevVersion) {
+        setShowUpdateDialog(true); // let the user see the new version's changes first
+        return;
+      }
+    }
+
     setStatus('downloading');
     setError(null);
     setDownloadProgress(null);
@@ -218,7 +247,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
         setStatus('error');
       }
     }
-  }, [updateAvailable, config.updates.downloadTimeoutSeconds]);
+  }, [updateAvailable, updateInfo, config.updates.downloadTimeoutSeconds, config.updates.recheckStaleMinutes, runCheck]);
 
   const cancelInstall = useCallback(() => cancelInstallRef.current?.('CANCELLED'), []);
 
@@ -236,13 +265,13 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
 
     const lastCheck = parseInt(localStorage.getItem(STORAGE_LAST_CHECK) ?? '0', 10);
     if (lastCheck < lastDailyBoundary(checkHour)) {
-      runCheck(true);
+      runCheck();
     }
 
     let id: ReturnType<typeof setTimeout>;
     function scheduleNextDailyCheck() {
       id = setTimeout(() => {
-        runCheck(true);
+        runCheck();
         scheduleNextDailyCheck();
       }, msUntilNextDailyCheck(checkHour));
     }
@@ -261,7 +290,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       if (statusRef.current === 'checking' || statusRef.current === 'downloading') return;
       const lastCheck = parseInt(localStorage.getItem(STORAGE_LAST_CHECK) ?? '0', 10);
       if (statusRef.current === 'error' || lastCheck < lastDailyBoundary(checkHour)) {
-        runCheck(true);
+        runCheck();
       }
     }
     window.addEventListener('online', handleOnline);
@@ -280,6 +309,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       setCheckHour,
       showUpdateDialog,
       dismissUpdateDialog,
+      openUpdateDialog,
       toggleAutoCheck,
       checkForUpdates,
       installUpdate,
