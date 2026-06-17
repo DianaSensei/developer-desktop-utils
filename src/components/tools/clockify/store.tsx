@@ -96,6 +96,12 @@ export interface Settings {
   dailyTargetHours: number;
   currencySymbol: string;
   expenseCategories: string[];
+  // Work schedule as time ranges (local "HH:MM"). Work happens before and after a
+  // lunch break, so the break itself is the lunchStart–lunchEnd range.
+  workStart: string;
+  lunchStart: string;
+  lunchEnd: string;
+  workEnd: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -107,6 +113,10 @@ export const DEFAULT_SETTINGS: Settings = {
   dailyTargetHours: 8,
   currencySymbol: '$',
   expenseCategories: ['General', 'Travel', 'Meals', 'Equipment', 'Software', 'Other'],
+  workStart: '09:00',
+  lunchStart: '12:00',
+  lunchEnd: '13:00',
+  workEnd: '18:00',
 };
 
 export const PROJECT_COLORS = [

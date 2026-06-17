@@ -16,8 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ClockifyProvider, PROJECT_COLORS, useClockify } from './store';
-import { ConfirmButton, Modal, Toggle } from './ui';
-import { fmtTimer } from './time';
+import { ConfirmButton, Modal, NumberStepper, TimeField, Toggle } from './ui';
+import { fmtTimer, workHoursForRanges } from './time';
 import { TimeTracker } from './TimeTracker';
 import { Timesheet } from './Timesheet';
 import { CalendarView } from './CalendarView';
@@ -174,6 +174,13 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
   const { settings, updateSettings } = useClockify();
   const [newCat, setNewCat] = useState('');
 
+  // Daily target is derived from the work-hours ranges so the rest of the suite stays consistent.
+  const dailyTarget = workHoursForRanges(settings.workStart, settings.lunchStart, settings.lunchEnd, settings.workEnd);
+  const setWorkHours = (patch: Partial<typeof settings>) => {
+    const next = { ...settings, ...patch };
+    updateSettings({ ...patch, dailyTargetHours: workHoursForRanges(next.workStart, next.lunchStart, next.lunchEnd, next.workEnd) });
+  };
+
   return (
     <Modal open onClose={onClose} title="Settings">
       <div className="space-y-4">
@@ -181,13 +188,42 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">General</h4>
           <Toggle label="Week starts Monday" checked={settings.weekStartsMon} onChange={(v) => updateSettings({ weekStartsMon: v })} />
           <label className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-muted-foreground">Daily target (hours)</span>
-            <Input type="number" min={0} value={settings.dailyTargetHours} onChange={(e) => updateSettings({ dailyTargetHours: Math.max(0, Number(e.target.value) || 0) })} className="h-7 w-16 text-center text-xs" />
-          </label>
-          <label className="flex items-center justify-between gap-3 text-xs">
             <span className="text-muted-foreground">Currency symbol</span>
             <Input value={settings.currencySymbol} onChange={(e) => updateSettings({ currencySymbol: e.target.value.slice(0, 3) })} className="h-7 w-16 text-center text-xs" />
           </label>
+        </section>
+
+        <section className="space-y-2.5 border-t pt-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Work hours</h4>
+            <span className="text-[11px] text-muted-foreground">
+              Target <span className="font-mono font-medium text-foreground">{dailyTarget}h</span>/day
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="text-muted-foreground">Work (before lunch)</span>
+            <div className="flex items-center gap-1.5">
+              <TimeField value={settings.workStart} onChange={(v) => setWorkHours({ workStart: v })} />
+              <span className="text-muted-foreground">–</span>
+              <TimeField value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="text-muted-foreground">Lunch break</span>
+            <div className="flex items-center gap-1.5">
+              <TimeField value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
+              <span className="text-muted-foreground">–</span>
+              <TimeField value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="text-muted-foreground">Work (after lunch)</span>
+            <div className="flex items-center gap-1.5">
+              <TimeField value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
+              <span className="text-muted-foreground">–</span>
+              <TimeField value={settings.workEnd} onChange={(v) => setWorkHours({ workEnd: v })} />
+            </div>
+          </div>
         </section>
 
         <section className="space-y-2.5 border-t pt-3">
@@ -195,11 +231,11 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <Toggle label="Enable Pomodoro indicator" checked={settings.pomodoro} onChange={(v) => updateSettings({ pomodoro: v })} />
           <label className="flex items-center justify-between gap-3 text-xs">
             <span className="text-muted-foreground">Work (min)</span>
-            <Input type="number" min={1} value={settings.workMinutes} onChange={(e) => updateSettings({ workMinutes: Math.max(1, Number(e.target.value) || 1) })} className="h-7 w-16 text-center text-xs" />
+            <NumberStepper value={settings.workMinutes} min={1} max={180} onChange={(v) => updateSettings({ workMinutes: v })} />
           </label>
           <label className="flex items-center justify-between gap-3 text-xs">
             <span className="text-muted-foreground">Break (min)</span>
-            <Input type="number" min={1} value={settings.breakMinutes} onChange={(e) => updateSettings({ breakMinutes: Math.max(1, Number(e.target.value) || 1) })} className="h-7 w-16 text-center text-xs" />
+            <NumberStepper value={settings.breakMinutes} min={1} max={120} onChange={(v) => updateSettings({ breakMinutes: v })} />
           </label>
           <Toggle label="Phase chime" checked={settings.sound} onChange={(v) => updateSettings({ sound: v })} />
         </section>

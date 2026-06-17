@@ -133,6 +133,36 @@ export function sameDay(a: number, b: number): boolean {
   return dayStart(a) === dayStart(b);
 }
 
+/** Minutes since midnight for an "HH:MM" string, or null when invalid. */
+export function hmToMinutes(hm: string): number | null {
+  const m = hm.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+/**
+ * Net working hours for a day given the work/lunch ranges (work before lunch +
+ * work after lunch). Returns 0 when the ranges are invalid/inconsistent.
+ */
+export function workHoursForRanges(
+  workStart: string,
+  lunchStart: string,
+  lunchEnd: string,
+  workEnd: string
+): number {
+  const ws = hmToMinutes(workStart);
+  const ls = hmToMinutes(lunchStart);
+  const le = hmToMinutes(lunchEnd);
+  const we = hmToMinutes(workEnd);
+  if (ws == null || ls == null || le == null || we == null) return 0;
+  const morning = Math.max(0, ls - ws);
+  const afternoon = Math.max(0, we - le);
+  return Math.round(((morning + afternoon) / 60) * 100) / 100;
+}
+
 export function dayLabel(ts: number): string {
   const diff = Math.round((dayStart(Date.now()) - dayStart(ts)) / MS_DAY);
   if (diff === 0) return 'Today';

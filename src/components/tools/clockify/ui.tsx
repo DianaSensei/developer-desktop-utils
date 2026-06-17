@@ -1,11 +1,104 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, DollarSign, Plus, Tag as TagIcon, X } from 'lucide-react';
+import { Check, ChevronDown, DollarSign, Minus, Plus, Tag as TagIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClockify } from './store';
 import { fmtHM, parseDuration } from './time';
+
+// ---------------------------------------------------------------------------
+// NumberStepper — themed −/＋ stepper (replaces native number-input arrows,
+// which render with poor contrast against the popover background).
+// ---------------------------------------------------------------------------
+
+export function NumberStepper({
+  value,
+  onChange,
+  min = 0,
+  max = Infinity,
+  step = 1,
+  className,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  className?: string;
+}) {
+  const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  const set = (v: number) => onChange(clamp(Number.isFinite(v) ? v : min));
+  return (
+    <div className={cn('flex h-7 items-stretch overflow-hidden rounded-md border bg-background', className)}>
+      <button
+        type="button"
+        onClick={() => set(value - step)}
+        disabled={value <= min}
+        className="flex w-6 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+      >
+        <Minus className="h-3 w-3" />
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={String(value)}
+        onChange={(e) => {
+          const n = parseInt(e.target.value.replace(/[^\d]/g, ''), 10);
+          if (!Number.isNaN(n)) set(n);
+          else if (e.target.value === '') onChange(min);
+        }}
+        className="w-10 border-x bg-transparent text-center text-xs tabular-nums focus:outline-none"
+      />
+      <button
+        type="button"
+        onClick={() => set(value + step)}
+        disabled={value >= max}
+        className="flex w-6 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+      >
+        <Plus className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TimeField — "HH:MM" text input (avoids native time-picker theming issues).
+// ---------------------------------------------------------------------------
+
+export function TimeField({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (hm: string) => void;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = (raw: string) => {
+    const m = raw.trim().match(/^(\d{1,2}):?(\d{0,2})$/);
+    if (m) {
+      const h = Math.min(23, Number(m[1]));
+      const min = Math.min(59, Number(m[2] || '0'));
+      onChange(`${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
+    }
+    setDraft(null);
+  };
+  return (
+    <Input
+      value={draft ?? value}
+      onFocus={() => setDraft(value)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') setDraft(null);
+      }}
+      className={cn('h-7 w-[68px] text-center font-mono text-xs tabular-nums', className)}
+    />
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Modal — lightweight portal dialog (no extra dependency)
@@ -148,10 +241,20 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   const btn = (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={cn('relative h-4 w-7 shrink-0 rounded-full transition-colors', checked ? 'bg-primary' : 'bg-muted-foreground/30')}
+      className={cn(
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        checked ? 'bg-primary' : 'bg-muted-foreground/25'
+      )}
     >
-      <span className={cn('absolute top-0.5 h-3 w-3 rounded-full bg-background transition-transform', checked ? 'translate-x-3.5' : 'translate-x-0.5')} />
+      <span
+        className={cn(
+          'inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform',
+          checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
+        )}
+      />
     </button>
   );
   if (!label) return btn;
