@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCheck, ChevronsDown, ChevronsUp, Copy, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { copyToClipboard } from '@/lib/clipboard';
 
@@ -99,6 +100,7 @@ const AREA_CLASS =
 const AREA_STYLE = { lineHeight: `${LINE_H}px`, paddingTop: `${AREA_PT}px` } as const;
 
 export function ArrayDeduplicator() {
+  const { config } = useAppConfig();
   const [mode, setMode] = usePersistentState<DedupeMode>('devtool:deduplicate:mode', 'preserve');
   const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -406,7 +408,7 @@ export function ArrayDeduplicator() {
     if (!result) return;
     await copyToClipboard(result.output);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
   };
 
   const stats = hasInput && !isProcessing ? result : null;

@@ -2,8 +2,8 @@ import { useRef, useCallback, useState, useEffect } from 'react';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
 import {
-  RotateCcw, GripVertical, X, Search, CheckCheck,
-  RefreshCw, Download, CheckCircle2, AlertCircle, Loader2, WifiOff,
+  RotateCcw, GripVertical, X, Search, CheckCheck, Ban,
+  RefreshCw, Download, CheckCircle2, AlertCircle, Loader2, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -11,19 +11,17 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select';
 import { TOOL_DEFS } from '@/lib/toolDefs';
+import { useAppConfig } from '@/contexts/AppConfigContext';
+import { CONFIG_FIELDS, SECTION_LABELS, type ConfigSection } from '@/config/appConfig';
 import { useUpdate } from '@/contexts/UpdateContext';
 import { AppLogo } from '@/components/AppLogo';
 
-/** Format a time as a friendly 12-hour label, e.g. (6, 0) → "6:00 AM". */
-function formatTime(hour: number, minute = 0): string {
+/** Format an hour (0–23) as a friendly 12-hour label, e.g. 6 → "6:00 AM". */
+function formatHour(hour: number): string {
   const period = hour < 12 ? 'AM' : 'PM';
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h12}:${String(minute).padStart(2, '0')} ${period}`;
+  return `${h12}:00 ${period}`;
 }
-
-// TEMP(testing): extra options that fire at a specific minute so the daily check can be
-// verified without waiting for an on-the-hour boundary. Remove before release.
-const TEST_TIMES: Array<{ hour: number; minute: number }> = [{ hour: 16, minute: 25 }];
 
 function applySavedOrder<T extends { id: string }>(tools: T[], savedOrder: string[]): T[] {
   if (!savedOrder.length) return tools;
@@ -97,7 +95,9 @@ const APP_PERMISSIONS = [
 
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools } = useFeatures();
-  const { status: updateStatus, updateInfo, updateAvailable, error: updateError, autoCheckEnabled, checkHour, checkMinute, setCheckTime, toggleAutoCheck, checkForUpdates, installUpdate } = useUpdate();
+  const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall } = useUpdate();
+  const { config, setField, resetConfig } = useAppConfig();
+  const [configOpen, setConfigOpen] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('');
 
   useEffect(() => {
@@ -118,9 +118,14 @@ export function Settings() {
   const [toolQuery, setToolQuery] = useState('');
   const enabledCount = displayTools.filter((t) => features[t.id] !== false).length;
   const allEnabled = TOOL_DEFS.every((t) => features[t.id] !== false);
+  const allDisabled = TOOL_DEFS.every((t) => features[t.id] === false);
 
   const enableAll = () => {
     TOOL_DEFS.forEach((t) => { if (features[t.id] === false) toggleFeature(t.id); });
+  };
+
+  const disableAll = () => {
+    TOOL_DEFS.forEach((t) => { if (features[t.id] !== false) toggleFeature(t.id); });
   };
 
   const openExternal = useCallback(async (e: React.MouseEvent, url: string) => {
@@ -137,30 +142,59 @@ export function Settings() {
     : displayTools;
   const isSearching = toolQuery.trim().length > 0;
 
-  const dragIndex = useRef<number | null>(null);
+  // --- Pointer-based drag reorder ---
+  // The list stays static during a drag (no churn/flicker). The grabbed row lifts
+  // and follows the cursor; an insertion line shows where it will land. The actual
+  // reorder is committed once, on drop.
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Live drag state: which row, how far it has moved vertically, and the target slot.
+  const [drag, setDrag] = useState<{ id: string; dy: number; dropIndex: number } | null>(null);
+  const dragMeta = useRef<{ id: string; startY: number; order: string[] } | null>(null);
 
-  const handleDragStart = useCallback((index: number) => {
-    dragIndex.current = index;
-  }, []);
+  const startDrag = useCallback((id: string, e: React.PointerEvent) => {
+    const order = displayTools.map((t) => t.id);
+    const fromIndex = order.indexOf(id);
+    dragMeta.current = { id, startY: e.clientY, order };
+    setDrag({ id, dy: 0, dropIndex: fromIndex });
 
-  const handleDragEnter = useCallback((index: number) => {
-    setDisplayTools((prev) => {
-      if (dragIndex.current === null || dragIndex.current === index) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(dragIndex.current, 1);
-      next.splice(index, 0, moved);
-      dragIndex.current = index;
-      return next;
-    });
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    setDisplayTools((prev) => {
-      reorderTools(prev.map((t) => t.id));
-      return prev;
-    });
-    dragIndex.current = null;
-  }, [reorderTools]);
+    const onMove = (ev: PointerEvent) => {
+      const meta = dragMeta.current;
+      if (!meta) return;
+      // Count non-dragged rows whose midpoint sits above the pointer → insertion index.
+      let dropIndex = 0;
+      for (const rid of meta.order) {
+        if (rid === meta.id) continue;
+        const el = rowRefs.current.get(rid);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (ev.clientY > r.top + r.height / 2) dropIndex++;
+      }
+      setDrag({ id: meta.id, dy: ev.clientY - meta.startY, dropIndex });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      const meta = dragMeta.current;
+      setDrag((d) => {
+        if (meta && d) {
+          setDisplayTools((prev) => {
+            const next = [...prev];
+            const from = next.findIndex((t) => t.id === meta.id);
+            if (from >= 0) {
+              const [moved] = next.splice(from, 1);
+              next.splice(d.dropIndex, 0, moved);
+            }
+            reorderTools(next.map((t) => t.id));
+            return next;
+          });
+        }
+        return null;
+      });
+      dragMeta.current = null;
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [displayTools, reorderTools]);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 py-2">
@@ -182,6 +216,15 @@ export function Settings() {
               >
                 <CheckCheck className="h-3 w-3" />
                 Enable all
+              </button>
+            )}
+            {!allDisabled && (
+              <button
+                onClick={disableAll}
+                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Ban className="h-3 w-3" />
+                Disable all
               </button>
             )}
             <button
@@ -213,41 +256,64 @@ export function Settings() {
           )}
         </div>
 
-        <div className="rounded-lg border divide-y">
+        <div className="relative rounded-lg border divide-y">
           {visibleTools.length === 0 && isSearching && (
             <p className="px-4 py-6 text-center text-[11px] text-muted-foreground">No tools match "{toolQuery}"</p>
           )}
-          {visibleTools.map((tool) => {
-            const index = displayTools.indexOf(tool);
-            const Icon = tool.icon;
-            const enabled = features[tool.id] !== false;
-            return (
-              <div
-                key={tool.id}
-                draggable={!isSearching}
-                onDragStart={!isSearching ? () => handleDragStart(index) : undefined}
-                onDragEnter={!isSearching ? () => handleDragEnter(index) : undefined}
-                onDragEnd={!isSearching ? handleDragEnd : undefined}
-                onDragOver={!isSearching ? (e) => e.preventDefault() : undefined}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-3 transition-colors cursor-default',
-                  !enabled && 'opacity-50'
-                )}
-              >
-                {/* Drag handle — hidden while searching */}
-                <GripVertical className={cn(
-                  'h-3.5 w-3.5 shrink-0 text-muted-foreground/40 transition-opacity',
-                  isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing'
-                )} />
-                <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'text-muted-foreground')} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium leading-none">{tool.label}</p>
-                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{tool.description}</p>
-                </div>
-                <Toggle checked={enabled} onChange={() => toggleFeature(tool.id)} />
-              </div>
+          {(() => {
+            const nodes: React.ReactNode[] = [];
+            let slot = 0; // running index among non-dragged rows
+            const line = (key: string) => (
+              <div key={key} className="pointer-events-none mx-3 h-0.5 rounded-full bg-primary" />
             );
-          })}
+            visibleTools.forEach((tool) => {
+              const Icon = tool.icon;
+              const enabled = features[tool.id] !== false;
+              const isDragging = drag?.id === tool.id;
+
+              if (!isDragging) {
+                if (drag && drag.dropIndex === slot) nodes.push(line(`line-${slot}`));
+                slot++;
+              }
+
+              nodes.push(
+                <div
+                  key={tool.id}
+                  ref={(el) => {
+                    if (el) rowRefs.current.set(tool.id, el);
+                    else rowRefs.current.delete(tool.id);
+                  }}
+                  style={isDragging ? { transform: `translateY(${drag!.dy}px)` } : undefined}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-3 cursor-default bg-background',
+                    !enabled && 'opacity-50',
+                    isDragging && 'relative z-20 rounded-md bg-muted opacity-100 shadow-lg ring-1 ring-primary/50'
+                  )}
+                >
+                  {/* Drag handle — hidden while searching */}
+                  <button
+                    type="button"
+                    aria-label="Drag to reorder"
+                    onPointerDown={!isSearching ? (e) => { e.preventDefault(); startDrag(tool.id, e); } : undefined}
+                    className={cn(
+                      'shrink-0 touch-none text-muted-foreground/40 transition-colors',
+                      isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing hover:text-muted-foreground'
+                    )}
+                  >
+                    <GripVertical className="h-3.5 w-3.5" />
+                  </button>
+                  <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'text-muted-foreground')} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium leading-none">{tool.label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{tool.description}</p>
+                  </div>
+                  <Toggle checked={enabled} onChange={() => toggleFeature(tool.id)} />
+                </div>
+              );
+            });
+            if (drag && drag.dropIndex === slot) nodes.push(line('line-end'));
+            return nodes;
+          })()}
         </div>
       </section>
 
@@ -298,31 +364,19 @@ export function Settings() {
               <div>
                 <p className="font-medium">Auto-check for updates</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Check on launch and daily at {formatTime(checkHour, checkMinute)}
+                  Check on launch and daily at {formatHour(checkHour)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 {autoCheckEnabled && (
-                  <Select
-                    value={`${checkHour}:${checkMinute}`}
-                    onValueChange={(v) => {
-                      const [h, m] = v.split(':').map(Number);
-                      setCheckTime(h, m);
-                    }}
-                  >
+                  <Select value={String(checkHour)} onValueChange={(v) => setCheckHour(Number(v))}>
                     <SelectTrigger className="h-7 w-28 text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {Array.from({ length: 24 }, (_, h) => (
-                        <SelectItem key={h} value={`${h}:0`} className="text-xs">
-                          {formatTime(h)}
-                        </SelectItem>
-                      ))}
-                      {/* TEMP(testing): remove TEST_TIMES before release */}
-                      {TEST_TIMES.map(({ hour, minute }) => (
-                        <SelectItem key={`${hour}:${minute}`} value={`${hour}:${minute}`} className="text-xs">
-                          {formatTime(hour, minute)} (test)
+                        <SelectItem key={h} value={String(h)} className="text-xs">
+                          {formatHour(h)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -364,10 +418,34 @@ export function Settings() {
               )}
 
               {isTauri && (
-                (updateStatus === 'checking' || updateStatus === 'downloading') ? (
+                updateStatus === 'downloading' ? (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Downloading…
+                    {downloadProgress != null && (
+                      <>
+                        <span className="relative h-1 w-16 overflow-hidden rounded-full bg-muted">
+                          <span
+                            className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all duration-150"
+                            style={{ width: `${downloadProgress}%` }}
+                          />
+                        </span>
+                        <span className="tabular-nums">{downloadProgress}%</span>
+                      </>
+                    )}
+                    <button
+                      onClick={cancelInstall}
+                      title="Cancel download"
+                      aria-label="Cancel download"
+                      className="ml-1 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  </span>
+                ) : updateStatus === 'checking' ? (
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    {updateStatus === 'checking' ? 'Checking…' : 'Downloading…'}
+                    Checking…
                   </span>
                 ) : updateAvailable ? (
                   <button
@@ -411,6 +489,70 @@ export function Settings() {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* Configuration section */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => setConfigOpen((o) => !o)}
+            className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-foreground/80"
+            aria-expanded={configOpen}
+          >
+            <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !configOpen && '-rotate-90')} />
+            Configuration
+          </button>
+          {configOpen && (
+            <button
+              onClick={resetConfig}
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset
+            </button>
+          )}
+        </div>
+        {configOpen && (
+        <>
+        <p className="text-[11px] text-muted-foreground -mt-1">
+          Tunable app behavior. Changes are saved locally and applied immediately.
+        </p>
+        {(Object.keys(SECTION_LABELS) as ConfigSection[]).map((sec) => {
+          const fields = CONFIG_FIELDS.filter((f) => f.section === sec);
+          if (!fields.length) return null;
+          return (
+            <div key={sec} className="rounded-lg border divide-y">
+              <div className="bg-muted/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {SECTION_LABELS[sec]}
+              </div>
+              {fields.map((f) => (
+                <div key={f.key} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">{f.label}</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{f.description}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min={f.min}
+                      max={f.max}
+                      step={f.step ?? 1}
+                      value={(config[f.section] as Record<string, number>)[f.key]}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v !== '') setField(f, Number(v));
+                      }}
+                      className="h-7 w-24 text-center text-xs"
+                    />
+                    {f.unit && <span className="w-5 text-[11px] text-muted-foreground">{f.unit}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        </>
+        )}
       </section>
 
     </div>

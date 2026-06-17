@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Copy, RefreshCw } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -81,6 +82,8 @@ function ResultList({ items }: { items: string[] }) {
 }
 
 export function GeneratorTool() {
+  const { config } = useAppConfig();
+  const { maxNumberCount, maxTextCount, maxTextLength } = config.generator;
   const [mode, setMode] = usePersistentState<Mode>('devtool:gen:mode', 'uuid');
   const [count, setCount] = usePersistentState('devtool:gen:count', 1);
   const [results, setResults] = useState<string[]>([]);
@@ -99,8 +102,8 @@ export function GeneratorTool() {
     const min = Math.min(numMin, numMax);
     const max = Math.max(numMin, numMax);
     const dec = clamp(decimals, 0, 10);
-    setResults(Array.from({ length: clamp(count, 1, 1000) }, () => randomNumber(min, max, dec)));
-  }, [count, numMin, numMax, decimals]);
+    setResults(Array.from({ length: clamp(count, 1, maxNumberCount) }, () => randomNumber(min, max, dec)));
+  }, [count, numMin, numMax, decimals, maxNumberCount]);
 
   // Text
   const [textLen, setTextLen] = usePersistentState('devtool:gen:textLen', 16);
@@ -115,8 +118,8 @@ export function GeneratorTool() {
     let charset = (Object.keys(CHARSETS) as CharsetKey[]).filter((k) => charsets[k]).map((k) => CHARSETS[k]).join('');
     if (customChars) charset += customChars;
     if (!charset) return;
-    setResults(Array.from({ length: clamp(count, 1, 500) }, () => randomText(clamp(textLen, 1, 1024), charset)));
-  }, [count, charsets, customChars, textLen]);
+    setResults(Array.from({ length: clamp(count, 1, maxTextCount) }, () => randomText(clamp(textLen, 1, maxTextLength), charset)));
+  }, [count, charsets, customChars, textLen, maxTextCount, maxTextLength]);
 
   const handleGenerate = () => {
     if (mode === 'uuid') generateUuids();
@@ -159,7 +162,7 @@ export function GeneratorTool() {
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Count</span>
-              <Input type="number" min={1} max={1000} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 1000))} className="h-7 text-xs w-20" />
+              <Input type="number" min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxNumberCount))} className="h-7 text-xs w-20" />
             </div>
           </div>
         )}
@@ -168,11 +171,11 @@ export function GeneratorTool() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Length</span>
-              <Input type="number" min={1} max={1024} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, 1024))} className="h-7 text-xs w-20" />
+              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, maxTextLength))} className="h-7 text-xs w-20" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Count</span>
-              <Input type="number" min={1} max={500} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 500))} className="h-7 text-xs w-20" />
+              <Input type="number" min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxTextCount))} className="h-7 text-xs w-20" />
             </div>
             <div className="flex gap-1.5">
               {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (

@@ -13,7 +13,7 @@ import { useUpdate } from '@/contexts/UpdateContext';
  * Popup shown when an automatic update check (on launch / daily at 6am) finds a new version.
  */
 export function UpdateDialog() {
-  const { showUpdateDialog, dismissUpdateDialog, updateInfo, status, installUpdate } = useUpdate();
+  const { showUpdateDialog, dismissUpdateDialog, updateInfo, status, downloadProgress, installUpdate, cancelInstall } = useUpdate();
   const isDownloading = status === 'downloading';
 
   return (
@@ -36,13 +36,21 @@ export function UpdateDialog() {
         )}
 
         <DialogFooter>
-          <button
-            onClick={dismissUpdateDialog}
-            disabled={isDownloading}
-            className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-          >
-            Later
-          </button>
+          {isDownloading ? (
+            <button
+              onClick={cancelInstall}
+              className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              onClick={dismissUpdateDialog}
+              className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Later
+            </button>
+          )}
           <button
             onClick={installUpdate}
             disabled={isDownloading}
@@ -51,7 +59,7 @@ export function UpdateDialog() {
             {isDownloading ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Installing…
+                {downloadProgress != null ? `Installing… ${downloadProgress}%` : 'Installing…'}
               </>
             ) : (
               <>

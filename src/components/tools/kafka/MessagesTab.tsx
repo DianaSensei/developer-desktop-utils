@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 import { kafkaApi, type KafkaMessage, type PartitionInfo } from './types';
 
 type FetchMode = 'tail' | 'from' | 'range';
@@ -66,6 +67,7 @@ function formatTs(ts: string): string {
 // ── Shared: Copy button ───────────────────────────────────────────────────────
 
 function CopyBtn({ text, className }: { text: string; className?: string }) {
+  const { config } = useAppConfig();
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -73,7 +75,7 @@ function CopyBtn({ text, className }: { text: string; className?: string }) {
     await copyToClipboard(text);
     setCopied(true);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), 1500);
+    timer.current = setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
   };
 
   return (
@@ -353,6 +355,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
+  const { config } = useAppConfig();
   const [defaultValueMode, setDefaultValueMode] = usePersistentState<ValueMode>(
     `devtool:kafka:${brokerId}:defaultValueMode`,
     'text',
@@ -461,7 +464,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         const from = parseInt(fromOffset, 10) || 0;
         const to = parseInt(toOffset, 10) || 0;
         startOffset = from;
-        fetchLimit = Math.min(Math.max(to - from, 1), 500);
+        fetchLimit = Math.min(Math.max(to - from, 1), config.kafka.maxFetchMessages);
       }
       const msgs = await kafkaApi.fetchMessages(brokerId, topic, partition, startOffset, fetchLimit);
       setMessages(msgs);

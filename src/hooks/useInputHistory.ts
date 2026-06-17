@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 
 /**
  * Adds undo/redo history to a tool's primary input. Pass the current value and
@@ -12,6 +13,7 @@ import { useEffect, useRef } from 'react';
  * lifetime of the mounted tool.
  */
 export function useInputHistory(value: string, applyValue: (next: string) => void, enabled = true) {
+  const { config } = useAppConfig();
   const history = useRef<string[]>([value]);
   const index = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -36,9 +38,9 @@ export function useInputHistory(value: string, applyValue: (next: string) => voi
       return;
     }
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => commit(valueRef.current), 400);
+    timer.current = setTimeout(() => commit(valueRef.current), config.editor.historyDebounceMs);
     return () => clearTimeout(timer.current);
-  }, [value]);
+  }, [value, config.editor.historyDebounceMs]);
 
   useEffect(() => {
     if (!enabled) return;

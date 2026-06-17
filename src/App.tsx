@@ -18,6 +18,7 @@ import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { Button } from '@/components/ui/button';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
 import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
+import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { AppLogo } from '@/components/AppLogo';
 
@@ -498,14 +499,16 @@ function AppContent() {
 
 function App() {
   return (
-    <FeatureProvider>
-      <UpdateProvider>
-        <Router>
-          <AppContent />
-          <UpdateDialog />
-        </Router>
-      </UpdateProvider>
-    </FeatureProvider>
+    <AppConfigProvider>
+      <FeatureProvider>
+        <UpdateProvider>
+          <Router>
+            <AppContent />
+            <UpdateDialog />
+          </Router>
+        </UpdateProvider>
+      </FeatureProvider>
+    </AppConfigProvider>
   );
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, DollarSign, Plus, Tag as TagIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -67,12 +67,43 @@ export function Popover({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Fixed-viewport coordinates so the panel escapes any scroll/overflow ancestor.
+  const [pos, setPos] = useState<{ top: number; left: number; right: number; width: number } | null>(null);
+
+  // Anchor the panel to the trigger; keep it in sync while open (scroll/resize).
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    const place = () => {
+      const el = triggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left, right: window.innerWidth - r.right, width: r.width });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true); // capture → catches inner scroll containers
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
+
+  // Clamp into the viewport so a long panel near the bottom stays visible.
+  useLayoutEffect(() => {
+    if (!open || !pos || !panelRef.current) return;
+    const h = panelRef.current.offsetHeight;
+    const maxTop = Math.max(8, window.innerHeight - h - 8);
+    if (pos.top > maxTop) setPos((p) => (p && p.top !== maxTop ? { ...p, top: maxTop } : p));
+  }, [open, pos]);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     window.addEventListener('mousedown', onDown);
@@ -84,18 +115,26 @@ export function Popover({
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={triggerRef} className="relative">
       {trigger({ open, toggle: () => setOpen((o) => !o) })}
-      {open && (
+      {open && pos && createPortal(
         <div
+          ref={panelRef}
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: align === 'right' ? undefined : pos.left,
+            right: align === 'right' ? pos.right : undefined,
+            minWidth: pos.width,
+          }}
           className={cn(
-            'absolute top-full z-50 mt-1 min-w-[200px] rounded-md border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
-            align === 'right' ? 'right-0' : 'left-0',
+            'z-[9999] min-w-[200px] rounded-md border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
             className
           )}
         >
           {children(() => setOpen(false))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

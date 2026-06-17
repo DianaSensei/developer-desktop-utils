@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Copy, Download, Check, Upload, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { cn } from '@/lib/utils';
@@ -107,9 +108,13 @@ async function renderToCanvas(opts: RenderOpts): Promise<HTMLCanvasElement | nul
   canvas.height = totalH;
   const ctx = canvas.getContext('2d')!;
 
+  // `bgColor` backs the logo zone so a logo stays legible even on a transparent QR.
+  // When transparent, leave the canvas unpainted so light modules are see-through.
   const bgColor = opts.transparent ? '#FFFFFF' : opts.lightColor;
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, totalW, totalH);
+  if (!opts.transparent) {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, totalW, totalH);
+  }
 
   // ── Step 3: measure logo zone ─────────────────────────────────────────────
   const qrOriginX = framePad;
@@ -300,6 +305,7 @@ const LOGO_PRESETS: Array<{ value: LogoPreset; display: string }> = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function QRCodeTool() {
+  const { config } = useAppConfig();
   const [text,        setText]        = usePersistentState('devtool:qrcode:text',        '');
   const [darkColor,   setDarkColor]   = usePersistentState('devtool:qrcode:dark',        '#000000');
   const [lightColor,  setLightColor]  = usePersistentState('devtool:qrcode:light',       '#FFFFFF');
@@ -358,7 +364,7 @@ export function QRCodeTool() {
       );
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
     } catch { setError('Image clipboard not supported — use Download instead'); }
   };
 
@@ -454,7 +460,7 @@ export function QRCodeTool() {
 
         {dataUrl && (
           <div className="space-y-3">
-            <div className="flex justify-center p-6 rounded-xl border bg-white shadow-sm">
+            <div className="flex justify-center p-6 rounded-xl border bg-background shadow-sm">
               <img src={dataUrl} alt="QR Code" className="max-w-full w-[280px]" />
             </div>
             <div className="flex gap-2">
