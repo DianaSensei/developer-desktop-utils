@@ -135,6 +135,9 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: DevTool ${{ github.ref_name }}
           releaseBody: ${{ env.RELEASE_NOTES }}
-          releaseDraft: true
+          # Must be published (not draft) for the updater: the endpoint
+          # releases/latest/download/latest.json only resolves to the latest
+          # PUBLISHED release, so drafts are invisible to the in-app updater.
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

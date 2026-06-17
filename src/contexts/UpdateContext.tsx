@@ -76,6 +76,19 @@ function loadPendingUpdate(): UpdateInfo | null {
   }
 }
 
+/** True if `remote` is a strictly newer semver than `current` (numeric x.y.z compare). */
+function isNewer(remote: string, current: string): boolean {
+  const parse = (v: string) => v.split('.').map((p) => parseInt(p, 10) || 0);
+  const a = parse(remote);
+  const b = parse(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
 export function UpdateProvider({ children }: { children: React.ReactNode }) {
   const { config } = useAppConfig();
   const [status, setStatus] = useState<UpdateStatus>('idle');
@@ -92,6 +105,18 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     return stored === null ? true : stored === 'true'; // default on for fresh installs
   });
   const [checkHour, setCheckHourState] = useState<number>(() => loadCheckHour(config.updates.defaultCheckHour));
+  // The installed app version, used to ignore stale/older "available" updates.
+  const [currentVersion, setCurrentVersion] = useState('');
+  const currentVersionRef = useRef('');
+
+  // Fetch the running app version once; keep a ref so runCheck can read it without re-creating.
+  useEffect(() => {
+    if (!isTauri) return;
+    import('@tauri-apps/api/app')
+      .then(({ getVersion }) => getVersion())
+      .then((v) => { setCurrentVersion(v); currentVersionRef.current = v; })
+      .catch(() => {});
+  }, []);
 
   const setCheckHour = useCallback((hour: number) => {
     const h = Math.min(23, Math.max(0, Math.trunc(hour)));
@@ -113,7 +138,10 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       const { check } = await import('@tauri-apps/plugin-updater');
       const update = await check();
       localStorage.setItem(STORAGE_LAST_CHECK, Date.now().toString());
-      if (update?.available) {
+      // Only treat it as available if it's strictly newer than what's installed.
+      // Guards against a stale/older manifest being offered as a "downgrade update".
+      const cur = currentVersionRef.current;
+      if (update?.available && (!cur || isNewer(update.version, cur))) {
         const info = { version: update.version, body: update.body ?? '', date: update.date ?? '' };
         setUpdateInfo(info);
         setUpdateAvailable(true);
@@ -151,6 +179,20 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   const dismissUpdateDialog = useCallback(() => setShowUpdateDialog(false), []);
   // Re-open the changelog popup for an already-discovered update (no re-check, no download).
   const openUpdateDialog = useCallback(() => setShowUpdateDialog(true), []);
+
+  // Once the installed version is known, discard any persisted "available" update
+  // that isn't actually newer (e.g. a stale badge left over after upgrading, or an
+  // older published manifest). Prevents offering a downgrade.
+  useEffect(() => {
+    if (!currentVersion || !updateInfo) return;
+    if (!isNewer(updateInfo.version, currentVersion)) {
+      setUpdateInfo(null);
+      setUpdateAvailable(false);
+      localStorage.removeItem(STORAGE_PENDING_UPDATE);
+      setShowUpdateDialog(false);
+      setStatus((s) => (s === 'available' ? 'not-available' : s));
+    }
+  }, [currentVersion, updateInfo]);
 
   const installUpdate = useCallback(async () => {
     if (!isTauri) return;
