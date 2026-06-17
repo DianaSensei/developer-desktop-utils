@@ -34,6 +34,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history + tags so the changelog can diff previous→new tag
 
       # Derive the app version from the pushed tag (e.g. v0.2.4 -> 0.2.4) and write
       # it into the config files, so you only have to push a tag — no manual version
@@ -83,23 +85,37 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # Build the release notes from GitHub's auto-generated notes (commits/PRs since
-      # the previous tag). This becomes both the GitHub release body AND the updater
+      # Build the release notes from the full commit log between the previous tag
+      # and this tag. This becomes both the GitHub release body AND the updater
       # manifest `notes` field, so the in-app update popup shows the real changes.
       - name: Generate release notes
         id: notes
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          body=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
-            -f tag_name="${{ github.ref_name }}" --jq '.body' || true)
-          if [ -z "$body" ]; then
-            body="See commit history for changes in this release."
+          NEW_TAG="${GITHUB_REF_NAME}"
+          # Nearest tag reachable from this tag's parent = the previous release.
+          PREV_TAG=$(git describe --tags --abbrev=0 "${NEW_TAG}^" 2>/dev/null || true)
+
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..${NEW_TAG}"
+            heading="## Changes since ${PREV_TAG}"
+          else
+            RANGE="${NEW_TAG}"           # first release — list the whole history
+            heading="## Changes"
           fi
+
+          # Every commit in the range (excluding merge commits), as "- subject (hash)".
+          commits=$(git log --no-merges --pretty=format:'- %s (%h)' "$RANGE")
+          [ -z "$commits" ] && commits="- No changes recorded."
+
           {
             echo "RELEASE_NOTES<<__NOTES_EOF__"
-            echo "$body"
+            echo "$heading"
+            echo "$commits"
+            if [ -n "$PREV_TAG" ]; then
+              echo ""
+              echo "**Full changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${NEW_TAG}"
+            fi
             echo ""
             echo "## Installation"
             echo "Download the file for your platform below:"
