@@ -98,10 +98,8 @@ jobs:
 
           if [ -n "$PREV_TAG" ]; then
             RANGE="${PREV_TAG}..${NEW_TAG}"
-            heading="## Changes since ${PREV_TAG}"
           else
             RANGE="${NEW_TAG}"           # first release — list the whole history
-            heading="## Changes"
           fi
 
           # Every commit in the range (excluding merge commits), as "- subject (hash)".
@@ -110,18 +108,8 @@ jobs:
 
           {
             echo "RELEASE_NOTES<<__NOTES_EOF__"
-            echo "$heading"
+            echo "## Changes:"
             echo "$commits"
-            if [ -n "$PREV_TAG" ]; then
-              echo ""
-              echo "**Full changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${NEW_TAG}"
-            fi
-            echo ""
-            echo "## Installation"
-            echo "Download the file for your platform below:"
-            echo "- **macOS (Apple Silicon)**: \`.dmg\` (aarch64)"
-            echo "- **Windows**: \`.msi\` or \`.exe\` (NSIS installer)"
-            echo "- **Linux**: \`.AppImage\` or \`.deb\`"
             echo "__NOTES_EOF__"
           } >> "$GITHUB_ENV"
 
