@@ -13,7 +13,7 @@
 - **State**: React Context API (`FeatureContext`, `UpdateContext`)
 - **Routing**: React Router v6
 
-**Version**: 0.0.3  
+**Version**: 0.2.3  
 **Platform Support**: macOS 11+ · Windows 10/11 · Ubuntu 22.04+
 
 ---
@@ -343,6 +343,11 @@ Common capability strings:
 "updater:allow-download-and-install"
 ```
 
+The HTTP plugin is **URL-scoped** — instead of a bare string, add an object with an `allow` list (see Network Tools in `capabilities/default.json`):
+```json
+{ "identifier": "http:default", "allow": [{ "url": "https://cloudflare-dns.com/*" }] }
+```
+
 ---
 
 ## Build & Deployment
@@ -430,11 +435,15 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 - `@tauri-apps/plugin-fs` — file system access
 - `@tauri-apps/plugin-process` — `relaunch()`
 - `@tauri-apps/plugin-updater` — `check()` → `update.downloadAndInstall()`
+- `@tauri-apps/plugin-http` — Rust-side `fetch` for Network Tools (bypasses WebView CORS/Origin)
 - `crypto-js` — hashing & AES encryption
 - `rskafka` (Rust, v0.6) — Kafka client (pulled via `rustls 0.23`)
+- `local-ip-address` + `hostname` (Rust) — back the `local_network_info` command (`src-tauri/src/netinfo.rs`) for the Network tool's Local Network view
 - `diff` — text diffing
 - `qrcode` — QR generation
 - `react-markdown` — markdown rendering
+
+> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, and local network info. It uses an **in-memory session store** (not `usePersistentState`) so results survive tab switches and leaving the tool but clear on app restart.
 
 ---
 
@@ -479,4 +488,4 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 
 ---
 
-*Last updated: 2026-06-15*
+*Last updated: 2026-06-18*

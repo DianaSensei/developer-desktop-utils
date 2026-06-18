@@ -70,26 +70,42 @@ const APP_PERMISSIONS = [
   {
     Icon: Clipboard,
     name: 'Clipboard',
-    description: 'Read text you\'ve copied; write tool output directly to your clipboard.',
     scope: 'System clipboard only',
+    reasons: [
+      { text: 'Read text you\'ve copied for quick paste', tool: 'All tools' },
+      { text: 'Write tool output to your clipboard', tool: 'All tools' },
+    ],
   },
   {
     Icon: FolderOpen,
     name: 'File System',
-    description: 'Read and write files for tools like Checksum and Image ↔ Base64.',
     scope: 'AppData folder + app resources only',
+    reasons: [
+      { text: 'Read files to hash them', tool: 'Checksum' },
+      { text: 'Read and convert image files', tool: 'Image ↔ Base64' },
+      { text: 'Save broker configs to app data', tool: 'Kafka Explorer' },
+    ],
   },
   {
     Icon: FolderClosed,
     name: 'File Dialogs',
-    description: 'Open file picker and save dialogs so you can browse for files.',
     scope: 'Triggered by you only',
+    reasons: [
+      { text: 'Open file picker to browse for files', tool: 'Checksum, Image ↔ Base64' },
+      { text: 'Save dialog to export generated files', tool: 'QR Code' },
+    ],
   },
   {
     Icon: Globe,
     name: 'Network',
-    description: 'Connect to Kafka brokers you configure (Kafka Explorer) and check GitHub for app updates. No telemetry or analytics.',
-    scope: 'Brokers you add + update check',
+    scope: 'Brokers you add + DNS/IP services you query + update check',
+    reasons: [
+      { text: 'Connect to Kafka brokers you configure', tool: 'Kafka Explorer' },
+      { text: 'Run DNS record, propagation & DNSSEC lookups', tool: 'Network Tools' },
+      { text: 'Look up public IP & geolocation', tool: 'Network Tools' },
+      { text: 'Read this machine\'s local network info', tool: 'Network Tools' },
+      { text: 'Check GitHub for app updates', tool: 'Auto-update' },
+    ],
   },
 ];
 
@@ -98,6 +114,7 @@ export function Settings() {
   const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall, openUpdateDialog } = useUpdate();
   const { config, setField, resetConfig } = useAppConfig();
   const [configOpen, setConfigOpen] = useState(false);
+  const [permsOpen, setPermsOpen] = useState(true);
   const [currentVersion, setCurrentVersion] = useState('');
 
   useEffect(() => {
@@ -320,12 +337,19 @@ export function Settings() {
 
       {/* Permissions section */}
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">App Permissions</h2>
+        <button
+          onClick={() => setPermsOpen((o) => !o)}
+          className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-foreground/80"
+          aria-expanded={permsOpen}
+        >
+          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !permsOpen && '-rotate-90')} />
+          App Permissions
           <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-        </div>
+        </button>
+        {permsOpen && (
+        <>
         <p className="text-[11px] text-muted-foreground -mt-1">
-          DevTool cannot access your files outside the listed scope. Network access is limited to Kafka brokers you configure and the app update check — no telemetry or analytics.
+          DevTool cannot access your files outside the listed scope. Network access is limited to Kafka brokers you configure, DNS/IP lookups you run in Network Tools, and the app update check — no telemetry or analytics.
         </p>
         {!isTauri && (
           <p className="text-[11px] text-amber-500 dark:text-amber-400">
@@ -333,19 +357,26 @@ export function Settings() {
           </p>
         )}
         <div className="rounded-lg border divide-y">
-          {APP_PERMISSIONS.map(({ Icon, name, description, scope }) => (
+          {APP_PERMISSIONS.map(({ Icon, name, reasons }) => (
             <div key={name} className="flex items-start gap-3 px-4 py-3">
               <Icon className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
-              <div className="flex-1 min-w-0 space-y-0.5">
+              <div className="flex-1 min-w-0 space-y-1.5">
                 <p className="text-xs font-medium">{name}</p>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">{description}</p>
+                <ul className="space-y-1">
+                  {reasons.map((r) => (
+                    <li key={r.text} className="flex items-baseline gap-2 text-[11px] text-muted-foreground leading-relaxed">
+                      <span className="mt-px text-muted-foreground/40">•</span>
+                      <span className="flex-1">{r.text}</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground/60">{r.tool}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {scope}
-              </span>
             </div>
           ))}
         </div>
+        </>
+        )}
       </section>
 
       {/* About section */}
@@ -494,7 +525,7 @@ export function Settings() {
           </div>
           <div className="px-4 py-3">
             <p className="text-muted-foreground leading-relaxed">
-              Tools run entirely on your device. The only network activity is connecting to Kafka brokers you configure and the daily check for app updates — no telemetry, analytics, or other data leaves your machine.
+              Everything runs on your device. Network access only happens when you ask for it, plus the daily check for app updates — no telemetry, analytics, or other data leaves your machine.
             </p>
           </div>
         </div>

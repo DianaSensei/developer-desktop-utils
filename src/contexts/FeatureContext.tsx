@@ -38,6 +38,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'kafka-explorer': false,
   'sql-formatter': true,
   'task-tracker': true,
+  'network': true,
   'settings': true,
 };
 

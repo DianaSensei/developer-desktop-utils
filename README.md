@@ -1,6 +1,6 @@
 # DevTool
 
-A cross-platform desktop app for developers — 17 offline utilities in a clean, fast interface. Built with Tauri 2 + React + TypeScript.
+A cross-platform desktop app for developers — 21 utilities in a clean, fast interface. Built with Tauri 2 + React + TypeScript.
 
 [![Release](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml/badge.svg)](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -15,7 +15,7 @@ A cross-platform desktop app for developers — 17 offline utilities in a clean,
 | Windows | 10 / 11 | `.msi`, `.exe` (NSIS) |
 | Linux | Ubuntu 22.04+ | `.AppImage`, `.deb` |
 
-All processing runs **locally**. No data leaves your machine.
+Most tools run **fully offline** — text, encoding, hashing, formatting, and file utilities never touch the network. The only outbound traffic is user-initiated: Kafka Explorer (brokers you configure), Network Tools (DNS/IP lookups you run), and the optional app-update check. No telemetry or analytics.
 
 > **macOS note:** The app is not yet notarized with an Apple Developer certificate. If macOS says _"DevTool is damaged and can't be opened"_, run this once in Terminal after moving the app to Applications:
 > ```bash
@@ -45,6 +45,10 @@ All processing runs **locally**. No data leaves your machine.
 | Checksum | Compute MD5/SHA checksums for any file |
 | Image ↔ Base64 | Encode images to Base64 or decode Base64 back to images |
 | Generator | Generate UUIDs, random numbers, and random text |
+| SQL Formatter | Format and beautify SQL with keyword casing and clause line breaks |
+| Time Tracker | Clockify-style time suite: tracker, timesheet, calendar, schedule, expenses, and time off |
+| Kafka Explorer | Browse topics/partitions/offsets, manage consumer groups, and produce messages |
+| Network Tools | DNS records, propagation & DNSSEC checks, what's-my-IP, IP geolocation, and local network info |
 
 ---
 
@@ -113,7 +117,7 @@ Review the draft on GitHub Releases, then publish it. Users already running the 
 |-------|-----------|
 | Desktop | [Tauri 2](https://tauri.app) — Rust-backed, lightweight native shell |
 | Frontend | [React 18](https://react.dev) + [TypeScript](https://typescriptlang.org) |
-| Build | [Vite 5](https://vitejs.dev) |
+| Build | [Vite 8](https://vitejs.dev) (Rolldown bundler) |
 | Styling | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
 | Routing | [React Router v6](https://reactrouter.com) |
 
@@ -131,9 +135,11 @@ npx tsc --noEmit      # Type check
 ### Adding a tool
 
 1. Create `src/components/tools/YourTool.tsx` — use `usePersistentState`, `useQuickPaste`, `useInputHistory` hooks
-2. Add entry to `allTools` in `src/App.tsx`
-3. Add `'your-tool': true` to `DEFAULT_FEATURES` in `src/contexts/FeatureContext.tsx`
-4. Add entry to `FEATURE_LIST` in `src/components/Settings.tsx`
+2. Add tool metadata (id, label, icon, description) to `TOOL_DEFS` in `src/lib/toolDefs.ts`
+3. Register the route in `TOOL_ROUTES` in `src/App.tsx`
+4. Add `'your-tool': true` to `DEFAULT_FEATURES` in `src/contexts/FeatureContext.tsx`
+
+`Settings.tsx` reads `TOOL_DEFS` automatically — no change needed there.
 
 See [docs/human/CONTRIBUTING.md](docs/human/CONTRIBUTING.md) for a full walkthrough and [docs/ai/CLAUDE.md](docs/ai/CLAUDE.md) for the AI agent guide.
 

@@ -16,16 +16,19 @@ This document describes every tool in the app: what computation it performs, wha
 | Hash & Encrypt | ✓ | — | — | — | Input (localStorage) |
 | Date / Time | ✓ | — | — | — | Input (localStorage) |
 | JSON Formatter | ✓ | — | — | — | Input (localStorage) |
+| SQL Formatter | ✓ | — | — | — | Input + options (localStorage) |
 | JWT Debugger | — | — | — | — | Input (localStorage) |
 | Regex Tester | — | — | — | — | Input (localStorage) |
 | Text Diff | — | — | — | — | Input (localStorage) |
 | Markdown Preview | — | — | — | — | Input (localStorage) |
 | Array Deduplicator | ✓ | — | — | — | Input (localStorage) |
 | Generator | ✓ | — | — | — | Mode pref (localStorage) |
+| Time Tracker | ✓ | — | — | — | Time entries, projects, expenses (localStorage) |
 | Checksum | ✓ | ✓ | — | — | — |
 | Image ↔ Base64 | ✓ | ✓ (browser) | — | — | — |
 | QR Code | ✓ (image) | ✓ | ✓ | — | — |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data) |
+| Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
 
 ---
 
@@ -99,6 +102,14 @@ Formats, minifies, and validates JSON. Renders an interactive tree explorer. All
 
 ---
 
+### SQL Formatter
+
+Formats and beautifies SQL queries — keyword casing, whitespace collapse, and clause line breaks — entirely in JS. No database connection is ever made; it only reshapes the text you paste.
+
+**OS / system impact:** clipboard write only.
+
+---
+
 ### JWT Debugger
 
 Decodes a JWT by splitting on `.` and base64-decoding each part. **No signature verification is performed.** No network call is made — this tool cannot tell you if a token is valid or expired (it only shows the claims).
@@ -150,6 +161,14 @@ Generates random values in three modes:
 | Random number | `Math.random()` | Not cryptographically random |
 
 **OS / system impact:** clipboard write only. Uses the browser's `crypto.getRandomValues` (built into every modern browser/WebView) — no external RNG service.
+
+---
+
+### Time Tracker
+
+A Clockify-style time-management suite: time tracker, timesheet, calendar, schedule, expenses, and time off. All entries, projects, clients, tags, and expenses are computed and stored **locally in `localStorage`** — there is no account, sync, or server. Closing and reopening the app preserves your data; clearing browser storage erases it.
+
+**OS / system impact:** clipboard write only. No network, no file access — everything persists in `localStorage`.
 
 ---
 
@@ -249,13 +268,34 @@ This file is written by Rust (`fs::write`) whenever you save or delete a broker 
 
 ---
 
+### Network Tools
+
+A suite of DNS and IP utilities. Every lookup is user-initiated (you type a domain/IP and click a button or press Enter) — there is no background polling or auto-query, except the **Local Network** tab, which reads your own machine's interfaces locally when first opened.
+
+| Sub-tool | What is sent | Service contacted |
+|----------|--------------|-------------------|
+| DNS Lookup (A, AAAA, CNAME, MX, NS, TXT, SOA, SRV, CAA, PTR, ALL) | The domain name you enter | DNS-over-HTTPS: Cloudflare, Google, Quad9, or AdGuard (your pick) |
+| Propagation | The domain name you enter | All four DoH resolvers above, in parallel |
+| DNSSEC | The domain name you enter | Selected DoH resolver (DS / DNSKEY / RRSIG + AD flag) |
+| What's My IP | Nothing (the request itself reveals your IP) | `ipapi.co`, falling back to `ipwho.is` / `freeipapi.com` |
+| IP Lookup | The IP address you enter | `ipapi.co`, falling back to `ipwho.is` / `freeipapi.com` (geolocation, ISP, ASN) |
+| Local Network | **Nothing — read locally** | None. Reads hostname, LAN addresses, and interfaces via the Rust `local_network_info` command. Desktop app only. |
+
+**What leaves the machine:** only the domain name or IP you explicitly look up over HTTPS. The Local Network tab is entirely local. No telemetry. Inputs, selections, and results are held in an **in-memory session store** (not `localStorage`) so they survive switching tabs and leaving/returning to the tool, but are cleared on a fresh app launch — none of it leaves the machine.
+
+**Accuracy note:** IP geolocation is approximate and provided by a third party; DoH answers reflect the chosen resolver's cache and may differ from your system resolver.
+
+**Permissions (Tauri):** `http:default`, scoped in `capabilities/default.json` to exactly the seven hosts above (Cloudflare/Google/Quad9/AdGuard DNS + ipapi.co/ipwho.is/freeipapi.com) — no other URLs are reachable. In the desktop app, HTTP requests are made from Rust via the HTTP plugin (so they aren't blocked by browser CORS/Origin rules); the web build uses the WebView's `fetch` (where some IP services may be unreachable due to CORS). Local network info uses the `local_network_info` Rust command (reads interfaces only, no file access).
+
+---
+
 ## What never happens in any tool
 
-- **No telemetry, analytics, or crash reporting.** The only network activity is Kafka connections you explicitly initiate and the app update check described below.
+- **No telemetry, analytics, or crash reporting.** The only outbound network activity is: Kafka connections you initiate, DNS/IP lookups you initiate in Network Tools, and the app update check described below.
 - **Daily auto-update check, on by default.** The auto-update check (Settings → About → Auto-check for updates) is **enabled by default** and contacts the GitHub Releases API at most once per day (plus whenever you click "Check"). It downloads or installs nothing without your action, and you can turn it off in Settings.
-- **No input data is sent to any server.** Every computation — hashing, encoding, diffing, JWT decoding, regex matching — runs locally in the WebView or in Rust. Your input data does not leave the machine; the update check sends only a version request, never your data.
+- **No input data is sent to any server, except where a tool's whole purpose is a network query.** Computation — hashing, encoding, diffing, JWT decoding, regex matching — runs locally in the WebView or in Rust and never leaves the machine. The exceptions are explicit, user-initiated network tools: Kafka Explorer (broker traffic) and Network Tools (the single domain/IP you look up).
 - **No background file access.** No tool reads files except when you explicitly click "Browse", drag a file, or use a file input.
 
 ---
 
-*Last updated: 2026-06-15*
+*Last updated: 2026-06-18*

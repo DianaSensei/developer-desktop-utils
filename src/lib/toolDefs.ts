@@ -18,6 +18,7 @@ import {
   Server,
   Database,
   Timer,
+  Network,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -163,6 +164,13 @@ export const TOOL_DEFS: ToolDef[] = [
     description:
       "Clockify-style time suite: tracker, timesheet, calendar, schedule, expenses, and time off.",
   },
+  {
+    id: "network",
+    label: "Network Tools",
+    icon: Network,
+    description:
+      "DNS records (A, AAAA, CNAME, NS, TXT, SOA, SRV, CAA…), propagation, DNSSEC, plus what's my IP and IP geolocation lookup.",
+  },
 ];
 
 export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
@@ -189,5 +197,6 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "hash",
   "jwt",
   "markdown",
+  "network",
   "kafka-explorer",
 ];

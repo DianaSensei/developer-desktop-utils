@@ -16,6 +16,18 @@
     "process:allow-restart",
     "updater:allow-check",
     "updater:allow-download-and-install",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://cloudflare-dns.com/*" },
+        { "url": "https://dns.google/*" },
+        { "url": "https://dns.quad9.net:5053/*" },
+        { "url": "https://dns.adguard-dns.com/*" },
+        { "url": "https://ipapi.co/*" },
+        { "url": "https://ipwho.is/*" },
+        { "url": "https://freeipapi.com/*" }
+      ]
+    },
     "core:default"
   ]
 }

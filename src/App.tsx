@@ -44,6 +44,7 @@ import { Settings } from '@/components/Settings';
 import { KafkaExplorer } from '@/components/tools/kafka/KafkaExplorer';
 import { SqlFormatter } from '@/components/tools/SqlFormatter';
 import { TaskTracker } from '@/components/tools/TaskTracker';
+import { NetworkTools } from '@/components/tools/NetworkTools';
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator,      fullHeight: true },
@@ -66,6 +67,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer,     fullHeight: true },
   'sql-formatter':  { path: '/sql-formatter',  component: SqlFormatter,      fullHeight: true },
   'task-tracker':   { path: '/task-tracker',   component: TaskTracker,       fullHeight: true },
+  'network':        { path: '/network',        component: NetworkTools,      fullHeight: true },
 };
 
 const allTools = [
@@ -517,11 +519,13 @@ function AppContent() {
               <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-card">
                 <ActiveIcon className="h-4 w-4 text-primary" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-sm font-semibold leading-none">{activeTool.label}</h2>
-                <p className="mt-1 hidden text-[11px] text-muted-foreground sm:block">
-                  Offline utility - {enabledTools.filter(t => t.featureId !== 'settings').length} enabled
-                </p>
+                {activeTool.description && (
+                  <p className="mt-1 hidden max-w-xl truncate text-[11px] text-muted-foreground sm:block">
+                    {activeTool.description}
+                  </p>
+                )}
               </div>
             </div>
             <Button variant="ghost" size="icon" className="lg:hidden" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>

@@ -103,7 +103,7 @@ jobs:
           fi
 
           # Every commit in the range (excluding merge commits), as "- subject (hash)".
-          commits=$(git log --no-merges --pretty=format:'- %s (%h)' "$RANGE")
+          commits=$(git log --no-merges --pretty=format:'- (%h) %s ' "$RANGE")
           [ -z "$commits" ] && commits="- No changes recorded."
 
           {
