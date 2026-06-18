@@ -51,6 +51,16 @@ export interface TimeEntry {
   start: number;
   end: number | null; // null = running
   source: EntrySource;
+  /** Subtask name within the task, or null/undefined when tracked on the task directly. */
+  subtask?: string | null;
+}
+
+/** A named subtask under a task. Persisted so a task can list subtasks with zero time yet. */
+export interface Subtask {
+  id: string;
+  task: string; // task group key = task name, lowercased
+  name: string;
+  createdAt: number;
 }
 
 export interface Expense {
@@ -138,6 +148,7 @@ interface ClockifyContextValue {
   tasks: Task[];
   tags: Tag[];
   entries: TimeEntry[];
+  subtasks: Subtask[];
   expenses: Expense[];
   policies: TimeOffPolicy[];
   timeOff: TimeOffRequest[];
@@ -173,6 +184,9 @@ interface ClockifyContextValue {
   // entries
   startEntry: (partial: Partial<Omit<TimeEntry, 'id' | 'start' | 'end'>>) => void;
   stopRunning: () => void;
+  // subtasks
+  addSubtask: (taskName: string, name: string) => void;
+  deleteSubtask: (taskName: string, name: string) => void;
   addEntry: (entry: Omit<TimeEntry, 'id'>) => TimeEntry;
   updateEntry: (id: string, patch: Partial<TimeEntry>) => void;
   deleteEntry: (id: string) => void;
@@ -208,6 +222,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = usePersistentState<Task[]>('devtool:tasks:items', []);
   const [tags, setTags] = usePersistentState<Tag[]>('devtool:clockify:tags', []);
   const [entries, setEntries] = usePersistentState<TimeEntry[]>('devtool:clockify:entries', []);
+  const [subtasks, setSubtasks] = usePersistentState<Subtask[]>('devtool:clockify:subtasks', []);
   const [expenses, setExpenses] = usePersistentState<Expense[]>('devtool:clockify:expenses', []);
   const [policies, setPolicies] = usePersistentState<TimeOffPolicy[]>('devtool:clockify:timeoff-policies', []);
   const [timeOff, setTimeOff] = usePersistentState<TimeOffRequest[]>('devtool:clockify:timeoff', []);
@@ -266,8 +281,8 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
         cur.length
           ? cur
           : [
-              { id: uid(), name: 'Vacation', color: '#3b82f6', balanceDays: 20 },
-              { id: uid(), name: 'Sick leave', color: '#f97316', balanceDays: 10 },
+              { id: uid(), name: 'Vacation', color: '#3b82f6', balanceDays: null },
+              { id: uid(), name: 'Sick leave', color: '#f97316', balanceDays: null },
             ]
       );
 
@@ -414,12 +429,45 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
             start: ts,
             end: null,
             source: partial.source ?? 'tracker',
+            subtask: partial.subtask ?? null,
           },
         ];
       });
     },
     [setEntries]
   );
+
+  // --- subtasks ---
+  const addSubtask = useCallback(
+    (taskName: string, name: string) => {
+      const task = taskName.trim().toLowerCase();
+      const n = name.trim();
+      if (!task || !n) return;
+      setSubtasks((prev) =>
+        prev.some((s) => s.task === task && s.name.toLowerCase() === n.toLowerCase())
+          ? prev
+          : [...prev, { id: uid(), task, name: n, createdAt: Date.now() }]
+      );
+    },
+    [setSubtasks]
+  );
+  // Remove a subtask: drop its definition and fold any of its time back onto the task directly.
+  const deleteSubtask = useCallback(
+    (taskName: string, name: string) => {
+      const task = taskName.trim().toLowerCase();
+      const lname = name.trim().toLowerCase();
+      setSubtasks((prev) => prev.filter((s) => !(s.task === task && s.name.toLowerCase() === lname)));
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.description.trim().toLowerCase() === task && (e.subtask ?? '').toLowerCase() === lname
+            ? { ...e, subtask: null }
+            : e
+        )
+      );
+    },
+    [setSubtasks, setEntries]
+  );
+
   const stopRunning = useCallback(() => {
     const ts = Date.now();
     setEntries((prev) => prev.map((e) => (e.end === null ? { ...e, end: ts } : e)));
@@ -546,7 +594,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
   );
 
   const value: ClockifyContextValue = {
-    projects, tasks, tags, entries, expenses, policies, timeOff, schedule, settings,
+    projects, tasks, tags, entries, subtasks, expenses, policies, timeOff, schedule, settings,
     running, now,
     projectById, taskById, tagById,
     updateSettings,
@@ -554,6 +602,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     addTask, updateTask, deleteTask,
     addTag,
     startEntry, stopRunning, addEntry, updateEntry, deleteEntry, setDayTotal,
+    addSubtask, deleteSubtask,
     addExpense, updateExpense, deleteExpense,
     addPolicy, updatePolicy, deletePolicy, addTimeOff, deleteTimeOff,
     addAssignment, updateAssignment, deleteAssignment,

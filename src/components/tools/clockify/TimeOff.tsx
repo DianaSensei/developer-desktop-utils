@@ -40,8 +40,6 @@ export function TimeOff() {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {policies.map((p) => {
             const used = usedDays(p.id);
-            const remaining = p.balanceDays !== null ? p.balanceDays - used : null;
-            const pct = p.balanceDays ? Math.min(100, (used / p.balanceDays) * 100) : 0;
             return (
               <div key={p.id} className="rounded-lg border p-3">
                 <div className="flex items-center gap-2">
@@ -49,16 +47,11 @@ export function TimeOff() {
                   <span className="text-sm font-medium">{p.name}</span>
                 </div>
                 <div className="mt-2 flex items-baseline gap-1.5">
-                  <span className="text-2xl font-semibold tabular-nums">{remaining !== null ? remaining : used}</span>
+                  <span className="text-2xl font-semibold tabular-nums">{used}</span>
                   <span className="text-xs text-muted-foreground">
-                    {remaining !== null ? `days left of ${p.balanceDays}` : 'days taken (unlimited)'}
+                    {used === 1 ? 'day taken' : 'days taken'} in {year}
                   </span>
                 </div>
-                {p.balanceDays !== null && (
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: p.color }} />
-                  </div>
-                )}
               </div>
             );
           })}
@@ -158,7 +151,7 @@ function RequestModal({
           <Label className="text-xs">Policy</Label>
           <Select value={policyId} onValueChange={setPolicyId}>
             <SelectTrigger><SelectValue placeholder="Select policy" /></SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[9999]">
               {policies.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -202,7 +195,6 @@ function PolicyModal({
 }) {
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROJECT_COLORS[9]);
-  const [balance, setBalance] = useState('20');
 
   return (
     <Modal open onClose={onClose} title="Time-off policies">
@@ -212,15 +204,6 @@ function PolicyModal({
             <div key={p.id} className="flex items-center gap-2 px-2.5 py-2">
               <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
               <Input value={p.name} onChange={(e) => onUpdate(p.id, { name: e.target.value })} className="h-7 flex-1 text-sm" />
-              <Input
-                type="number"
-                min={0}
-                value={p.balanceDays ?? ''}
-                placeholder="∞"
-                onChange={(e) => onUpdate(p.id, { balanceDays: e.target.value === '' ? null : Math.max(0, Number(e.target.value)) })}
-                className="h-7 w-16 text-center text-xs"
-                title="Annual balance in days (blank = unlimited)"
-              />
               <ConfirmButton onConfirm={() => onDelete(p.id)} title="Delete policy">
                 <Trash2 className="h-3.5 w-3.5" />
               </ConfirmButton>
@@ -231,10 +214,7 @@ function PolicyModal({
 
         <div className="space-y-2 rounded-md border p-2.5">
           <Label className="text-xs">New policy</Label>
-          <div className="flex items-center gap-2">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="h-8 flex-1 text-sm" />
-            <Input type="number" min={0} value={balance} onChange={(e) => setBalance(e.target.value)} className="h-8 w-16 text-center text-sm" title="Annual days (blank = unlimited)" />
-          </div>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="h-8 text-sm" />
           <div className="flex flex-wrap gap-1">
             {PROJECT_COLORS.map((c) => (
               <button key={c} onClick={() => setColor(c)} className={cn('h-5 w-5 rounded-full transition-transform', color === c && 'ring-2 ring-offset-1 ring-offset-popover')} style={{ backgroundColor: c }} />
@@ -245,7 +225,7 @@ function PolicyModal({
             className="w-full gap-1.5"
             onClick={() => {
               if (!name.trim()) return;
-              onAdd(name.trim(), color, balance === '' ? null : Math.max(0, Number(balance)));
+              onAdd(name.trim(), color, null);
               setName('');
             }}
           >
