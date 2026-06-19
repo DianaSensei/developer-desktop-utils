@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { cn } from '@/lib/utils';
 import { PROJECT_COLORS, useClockify, type TimeOffPolicy } from './store';
 import { ConfirmButton, Modal } from './ui';
@@ -159,11 +160,11 @@ function RequestModal({
         <div className="flex gap-3">
           <div className="flex-1 space-y-1.5">
             <Label className="text-xs">From</Label>
-            <Input value={startStr} onChange={(e) => setStartStr(e.target.value)} placeholder="YYYY-MM-DD" className="font-mono" />
+            <DatePicker value={startStr} onChange={setStartStr} className="w-full" />
           </div>
           <div className="flex-1 space-y-1.5">
             <Label className="text-xs">To</Label>
-            <Input value={endStr} onChange={(e) => setEndStr(e.target.value)} placeholder="YYYY-MM-DD" className="font-mono" />
+            <DatePicker value={endStr} onChange={setEndStr} className="w-full" />
           </div>
         </div>
         <div className="space-y-1.5">

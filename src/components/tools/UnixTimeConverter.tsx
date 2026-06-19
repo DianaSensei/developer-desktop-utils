@@ -2,15 +2,16 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DateTimePanel } from '@/components/ui/date-time-panel';
 import {
-  Copy, RotateCcw, ChevronDown, ChevronUp,
-  ChevronLeft, ChevronRight, Calendar, Info, Timer,
+  Copy, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
+  Calendar, Info, Timer,
 } from 'lucide-react';
 import {
   format, parseISO, fromUnixTime, getUnixTime,
   startOfDay, endOfDay, startOfWeek, endOfWeek,
   startOfMonth, endOfMonth, startOfYear, endOfYear,
-  getDaysInMonth, getDay, isSameDay, getWeekOfMonth,
+  getWeekOfMonth,
   differenceInMilliseconds, differenceInSeconds, differenceInMinutes,
   differenceInHours, differenceInDays, differenceInWeeks,
   differenceInMonths, differenceInYears,
@@ -33,10 +34,6 @@ const TIMEZONES = [
 ];
 
 const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const WEEKDAYS = ['Mo','Tu','We','Th','Fr','Sa','Su'];
-const THIS_YEAR = new Date().getFullYear();
-const YEAR_OPTIONS = Array.from({ length: 101 }, (_, i) => THIS_YEAR - 50 + i);
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
@@ -164,16 +161,6 @@ function DurationParts({ a, b }: { a: Date; b: Date }) {
       ))}
     </>
   );
-}
-
-function buildCalGrid(monthDate: Date): (number | null)[] {
-  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const startOffset = (getDay(firstDay) + 6) % 7; // Mon=0
-  const days = getDaysInMonth(firstDay);
-  const cells: (number | null)[] = Array(startOffset).fill(null);
-  for (let d = 1; d <= days; d++) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
 }
 
 // ─── format / boundary config ─────────────────────────────────────────────
@@ -339,167 +326,6 @@ function TzSelect({ label, value, onChange, availableTzs }: {
   );
 }
 
-// ─── Date/Time Picker (compact, confirm-on-apply) ─────────────────────────
-
-function NumField({ label, value, min, max, set }: {
-  label: string; value: number; min: number; max: number; set: (n: number) => void;
-}) {
-  const wrap = (n: number) => n < min ? max : n > max ? min : n;
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-      <div className="flex flex-col items-stretch border rounded bg-background overflow-hidden">
-        <button type="button" onClick={() => set(wrap(value + 1))}
-          className="flex justify-center py-0.5 hover:bg-muted text-muted-foreground transition-colors">
-          <ChevronUp className="h-3 w-3" />
-        </button>
-        <input
-          type="number" min={min} max={max}
-          value={String(value).padStart(2, '0')}
-          onChange={(e) => { const n = parseInt(e.target.value); if (!isNaN(n)) set(wrap(n)); }}
-          className="text-center font-mono text-xs bg-transparent py-0.5 border-y [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none outline-none"
-        />
-        <button type="button" onClick={() => set(wrap(value - 1))}
-          className="flex justify-center py-0.5 hover:bg-muted text-muted-foreground transition-colors">
-          <ChevronDown className="h-3 w-3" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function DateTimePicker({ initialValue, tz, onConfirm, onCancel }: {
-  initialValue: Date;
-  tz: string;
-  onConfirm: (d: Date) => void;
-  onCancel: () => void;
-}) {
-  const initWall = useMemo(() => {
-    const s = formatInTz(initialValue, tz, 'yyyy-MM-dd HH:mm:ss');
-    return new Date(s);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const [viewYear,  setViewYear]  = useState(initWall.getFullYear());
-  const [viewMonth, setViewMonth] = useState(initWall.getMonth());
-  const [selYear,   setSelYear]   = useState(initWall.getFullYear());
-  const [selMonth,  setSelMonth]  = useState(initWall.getMonth());
-  const [selDay,    setSelDay]    = useState(initWall.getDate());
-  const [hour,      setHour]      = useState(initWall.getHours());
-  const [minute,    setMinute]    = useState(initWall.getMinutes());
-  const [second,    setSecond]    = useState(initWall.getSeconds());
-
-  const grid = useMemo(() => buildCalGrid(new Date(viewYear, viewMonth, 1)), [viewYear, viewMonth]);
-  const todayWall = useMemo(() => new Date(formatInTz(new Date(), tz, 'yyyy-MM-dd HH:mm:ss')), [tz]);
-
-  const prevMonth = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
-    else setViewMonth(m => m - 1);
-  };
-  const nextMonth = () => {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
-    else setViewMonth(m => m + 1);
-  };
-
-  const pickDay = (day: number) => {
-    setSelDay(day); setSelMonth(viewMonth); setSelYear(viewYear);
-  };
-
-  const handleConfirm = () => {
-    const utcGuess = new Date(Date.UTC(selYear, selMonth, selDay, hour, minute, second));
-    const offset = tzOffsetMinutes(utcGuess, tz);
-    onConfirm(new Date(utcGuess.getTime() - offset * 60000));
-  };
-
-  return (
-    <div className="w-64 rounded-md border bg-card shadow-lg p-3 space-y-2">
-
-      {/* Month / Year nav */}
-      <div className="flex items-center gap-1">
-        <button type="button" onClick={prevMonth}
-          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0">
-          <ChevronLeft className="h-3.5 w-3.5" />
-        </button>
-        <div className="flex flex-1 gap-1">
-          <Select value={String(viewMonth)} onValueChange={(v) => { const m = parseInt(v); setViewMonth(m); setSelMonth(m); }}>
-            <SelectTrigger className="flex-1 h-7 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTH_NAMES.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={String(viewYear)} onValueChange={(v) => { const y = parseInt(v); setViewYear(y); setSelYear(y); }}>
-            <SelectTrigger className="w-16 h-7 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {YEAR_OPTIONS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <button type="button" onClick={nextMonth}
-          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0">
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      {/* Day grid */}
-      <div className="grid grid-cols-7 gap-px">
-        {WEEKDAYS.map((d) => (
-          <div key={d} className="text-center text-[10px] font-medium text-muted-foreground py-0.5">{d}</div>
-        ))}
-        {grid.map((day, i) => {
-          if (!day) return <div key={i} />;
-          const isSel = day === selDay && viewMonth === selMonth && viewYear === selYear;
-          const isToday = isSameDay(new Date(viewYear, viewMonth, day), todayWall);
-          return (
-            <button key={i} type="button" onClick={() => pickDay(day)}
-              className={cn(
-                'text-xs rounded py-1 transition-colors w-full',
-                isSel
-                  ? 'bg-primary text-primary-foreground font-semibold'
-                  : isToday
-                  ? 'border border-primary/50 text-primary hover:bg-muted'
-                  : 'hover:bg-muted text-foreground'
-              )}>
-              {day}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Time row */}
-      <div className="grid grid-cols-3 gap-1.5 border-t pt-2">
-        <NumField label="Hour"   value={hour}   min={0} max={23} set={setHour}   />
-        <NumField label="Minute" value={minute} min={0} max={59} set={setMinute} />
-        <NumField label="Second" value={second} min={0} max={59} set={setSecond} />
-      </div>
-
-      {/* Preview */}
-      <div className="border-t pt-1.5 text-center font-mono text-[10px] text-muted-foreground">
-        {selYear}-{String(selMonth+1).padStart(2,'0')}-{String(selDay).padStart(2,'0')}
-        {' '}
-        {String(hour).padStart(2,'0')}:{String(minute).padStart(2,'0')}:{String(second).padStart(2,'0')}
-        {' '}
-        <span className="text-sky-500 dark:text-sky-400">{getLocalTzLabel(tz) || tz}</span>
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-2 border-t pt-1.5">
-        <button type="button" onClick={onCancel}
-          className="flex-1 rounded-md border px-3 py-1.5 text-xs hover:bg-muted transition-colors">
-          Cancel
-        </button>
-        <button type="button" onClick={handleConfirm}
-          className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors">
-          Confirm
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Diff Date Input (picker-enabled, no live mode) ───────────────────────
 
 function DiffDateInput({ value, onChange, tz }: {
@@ -514,7 +340,10 @@ function DiffDateInput({ value, onChange, tz }: {
   useEffect(() => {
     if (!showPicker) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setShowPicker(false);
+      const t = e.target as Element;
+      // Ignore clicks inside a Radix popover/select portal (month/year dropdowns).
+      if (t.closest?.('[data-radix-popper-content-wrapper]')) return;
+      if (ref.current && !ref.current.contains(t)) setShowPicker(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -540,8 +369,8 @@ function DiffDateInput({ value, onChange, tz }: {
       </button>
       {showPicker && snapshot && (
         <div className="absolute top-full left-0 z-50 mt-1">
-          <DateTimePicker
-            initialValue={snapshot}
+          <DateTimePanel
+            value={snapshot}
             tz={tz}
             onConfirm={(d) => {
               onChange(formatInTz(d, tz, "yyyy-MM-dd'T'HH:mm:ss"));
@@ -673,7 +502,9 @@ export function DateTimeTool() {
   useEffect(() => {
     if (!showPicker) return;
     const handler = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node))
+      const t = e.target as Element;
+      if (t.closest?.('[data-radix-popper-content-wrapper]')) return;
+      if (pickerRef.current && !pickerRef.current.contains(t))
         setShowPicker(false);
     };
     document.addEventListener('mousedown', handler);
@@ -736,8 +567,8 @@ export function DateTimeTool() {
 
             {showPicker && pickerSnapshot && (
               <div className="absolute top-full left-0 z-50 mt-1">
-                <DateTimePicker
-                  initialValue={pickerSnapshot}
+                <DateTimePanel
+                  value={pickerSnapshot}
                   tz={inputTz}
                   onConfirm={confirmPicker}
                   onCancel={cancelPicker}

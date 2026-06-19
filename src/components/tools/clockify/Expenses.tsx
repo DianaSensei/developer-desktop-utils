@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useClockify, type Expense } from './store';
 import { BillableButton, ColorDot, ConfirmButton, Modal, ProjectPicker } from './ui';
 import { monthKey, monthLabel, parseDateInput, shortDate, toDateInput } from './time';
@@ -159,7 +160,7 @@ function ExpenseEditor({
         <div className="flex gap-3">
           <div className="flex-1 space-y-1.5">
             <Label className="text-xs">Date</Label>
-            <Input value={dateStr} onChange={(e) => setDateStr(e.target.value)} placeholder="YYYY-MM-DD" className="font-mono" />
+            <DatePicker value={dateStr} onChange={setDateStr} className="w-full" />
           </div>
           <div className="flex-1 space-y-1.5">
             <Label className="text-xs">Amount</Label>

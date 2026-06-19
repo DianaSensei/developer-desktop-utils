@@ -1,19 +1,34 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useClockify } from './store';
+import { useMeetings } from '@/lib/meetings';
+import { MeetingDialog } from '@/components/meetings/MeetingDialog';
 import { Modal, ProjectPicker } from './ui';
 import { MS_HOUR, addDays, dayStart, sameDay, weekDays, weekRangeLabel, weekdayShort } from './time';
 
+const MS_MIN = 60_000;
+
 export function Schedule() {
   const { schedule, entries, projectById, taskById, addAssignment, deleteAssignment, settings, now } = useClockify();
+  const { meetings, addMeeting } = useMeetings();
   const [anchor, setAnchor] = useState(() => now);
   const [addingDay, setAddingDay] = useState<number | null>(null);
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
 
   const days = useMemo(() => weekDays(anchor, settings.weekStartsMon), [anchor, settings.weekStartsMon]);
+
+  const meetingsFor = (dayTs: number) =>
+    meetings.filter((m) => sameDay(m.start, dayTs)).sort((a, b) => a.start - b.start);
+  const addMeetingOn = (dayTs: number) => {
+    const start = dayStart(dayTs) + 10 * MS_HOUR; // 10:00
+    const m = addMeeting({ start, end: start + 60 * MS_MIN });
+    setEditingMeetingId(m.id);
+  };
+  const timeLabel = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const plannedFor = (dayTs: number) => schedule.filter((a) => sameDay(a.date, dayTs));
   const plannedHours = (dayTs: number) => plannedFor(dayTs).reduce((s, a) => s + a.hours, 0);
@@ -77,12 +92,33 @@ export function Schedule() {
                     </div>
                   );
                 })}
-                <button
-                  onClick={() => setAddingDay(d)}
-                  className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  <Plus className="h-3 w-3" /> Plan
-                </button>
+                {meetingsFor(d).map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setEditingMeetingId(m.id)}
+                    className="block w-full rounded-md border border-dashed border-indigo-400/70 bg-indigo-500/10 px-1.5 py-1 text-left text-[11px] text-indigo-700 transition-colors hover:bg-indigo-500/20 dark:text-indigo-200"
+                  >
+                    <div className="flex items-center gap-1 font-medium">
+                      <Users className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{m.title || 'Meeting'}</span>
+                    </div>
+                    <div className="truncate opacity-80">{timeLabel(m.start)}–{timeLabel(m.end)}</div>
+                  </button>
+                ))}
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setAddingDay(d)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-md border border-dashed py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <Plus className="h-3 w-3" /> Plan
+                  </button>
+                  <button
+                    onClick={() => addMeetingOn(d)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-md border border-dashed border-indigo-400/60 py-1 text-[10px] text-indigo-600 hover:bg-indigo-500/10 dark:text-indigo-300"
+                  >
+                    <Users className="h-3 w-3" /> Meeting
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -98,6 +134,9 @@ export function Schedule() {
             setAddingDay(null);
           }}
         />
+      )}
+      {editingMeetingId && (
+        <MeetingDialog meetingId={editingMeetingId} onClose={() => setEditingMeetingId(null)} />
       )}
     </div>
   );

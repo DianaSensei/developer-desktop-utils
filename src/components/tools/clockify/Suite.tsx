@@ -16,7 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ClockifyProvider, PROJECT_COLORS, useClockify } from './store';
-import { ConfirmButton, Modal, NumberStepper, TimeField, Toggle } from './ui';
+import { ConfirmButton, Modal, NumberStepper, Toggle } from './ui';
+import { TimePicker } from '@/components/ui/time-picker';
 import { fmtTimer, workHoursForRanges } from './time';
 import { TimeTracker } from './TimeTracker';
 import { Timesheet } from './Timesheet';
@@ -203,25 +204,25 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="text-muted-foreground">Work (before lunch)</span>
             <div className="flex items-center gap-1.5">
-              <TimeField value={settings.workStart} onChange={(v) => setWorkHours({ workStart: v })} />
+              <TimePicker value={settings.workStart} onChange={(v) => setWorkHours({ workStart: v })} />
               <span className="text-muted-foreground">–</span>
-              <TimeField value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
+              <TimePicker value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="text-muted-foreground">Lunch break</span>
             <div className="flex items-center gap-1.5">
-              <TimeField value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
+              <TimePicker value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
               <span className="text-muted-foreground">–</span>
-              <TimeField value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
+              <TimePicker value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="text-muted-foreground">Work (after lunch)</span>
             <div className="flex items-center gap-1.5">
-              <TimeField value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
+              <TimePicker value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
               <span className="text-muted-foreground">–</span>
-              <TimeField value={settings.workEnd} onChange={(v) => setWorkHours({ workEnd: v })} />
+              <TimePicker value={settings.workEnd} onChange={(v) => setWorkHours({ workEnd: v })} />
             </div>
           </div>
         </section>

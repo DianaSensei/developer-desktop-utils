@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
 import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
+import { MeetingsProvider } from '@/lib/meetings';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { AppLogo } from '@/components/AppLogo';
 
@@ -45,6 +46,8 @@ import { KafkaExplorer } from '@/components/tools/kafka/KafkaExplorer';
 import { SqlFormatter } from '@/components/tools/SqlFormatter';
 import { TaskTracker } from '@/components/tools/TaskTracker';
 import { NetworkTools } from '@/components/tools/NetworkTools';
+import { MeetingNotes } from '@/components/tools/MeetingNotes';
+import { LuckyWheel } from '@/components/tools/LuckyWheel';
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator,      fullHeight: true },
@@ -68,6 +71,8 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'sql-formatter':  { path: '/sql-formatter',  component: SqlFormatter,      fullHeight: true },
   'task-tracker':   { path: '/task-tracker',   component: TaskTracker,       fullHeight: true },
   'network':        { path: '/network',        component: NetworkTools,      fullHeight: true },
+  'meeting-notes':  { path: '/meeting-notes',  component: MeetingNotes,      fullHeight: true },
+  'lucky-wheel':    { path: '/lucky-wheel',    component: LuckyWheel,        fullHeight: true },
 };
 
 const allTools = [
@@ -554,10 +559,12 @@ function App() {
     <AppConfigProvider>
       <FeatureProvider>
         <UpdateProvider>
-          <Router>
-            <AppContent />
-            <UpdateDialog />
-          </Router>
+          <MeetingsProvider>
+            <Router>
+              <AppContent />
+              <UpdateDialog />
+            </Router>
+          </MeetingsProvider>
         </UpdateProvider>
       </FeatureProvider>
     </AppConfigProvider>

@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { ColorPicker } from '@/components/ui/color-picker';
-import { Copy, Download, Check, Upload, X } from 'lucide-react';
+import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Loader2, ExternalLink } from 'lucide-react';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
+import { copyToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 
 type FrameStyle = 'none' | 'border' | 'scan-bottom' | 'scan-top';
@@ -305,7 +307,7 @@ const LOGO_PRESETS: Array<{ value: LogoPreset; display: string }> = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function QRCodeTool() {
+function QrGenerator() {
   const { config } = useAppConfig();
   const [text,        setText]        = usePersistentState('devtool:qrcode:text',        '');
   const [darkColor,   setDarkColor]   = usePersistentState('devtool:qrcode:dark',        '#000000');
@@ -376,9 +378,7 @@ export function QRCodeTool() {
         : 'border-border bg-background hover:border-primary/60 hover:bg-muted/50');
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="p-4 space-y-4">
-
+    <div className="space-y-4">
         <div className="space-y-1.5">
           <Input
             value={text}
@@ -478,7 +478,163 @@ export function QRCodeTool() {
             </div>
           </div>
         )}
+    </div>
+  );
+}
 
+// ── QR Reader (decode content from an image) ───────────────────────────────────
+
+async function decodeQrFromImage(img: HTMLImageElement): Promise<string | null> {
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0);
+  const { data, width, height } = ctx.getImageData(0, 0, w, h);
+  const jsQR = (await import('jsqr')).default;
+  const code = jsQR(data, width, height);
+  return code?.data ?? null;
+}
+
+function QrReader() {
+  const [imageUrl, setImageUrl] = useState('');
+  const [result, setResult] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const run = async (img: HTMLImageElement, dataUrl: string) => {
+    setLoading(true); setError(''); setResult(''); setImageUrl(dataUrl);
+    try {
+      const text = await decodeQrFromImage(img);
+      if (text) setResult(text);
+      else setError('No QR code found in this image.');
+    } catch {
+      setError('Could not read the image.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    try {
+      const r = await pickImageFile();
+      if (!r) return;
+      await run(r.img, r.dataUrl);
+    } catch {
+      setError('Failed to load image.');
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => run(img, dataUrl);
+      img.onerror = () => setError('Failed to load image.');
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const copy = async () => {
+    await copyToClipboard(result);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1400);
+  };
+
+  const isUrl = /^https?:\/\//i.test(result.trim());
+  const openLink = async () => {
+    const url = result.trim();
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+      await openUrl(url);
+    } else {
+      window.open(url, '_blank', 'noopener');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div
+        onClick={handleUpload}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDrop}
+        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors hover:border-primary/60 hover:bg-muted/40"
+      >
+        {loading
+          ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          : <Upload className="h-6 w-6 text-muted-foreground" />}
+        <p className="text-sm font-medium">Click to upload or drop a QR image</p>
+        <p className="text-xs text-muted-foreground">PNG, JPG, GIF, or WebP</p>
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {imageUrl && (
+        <div className="flex justify-center rounded-xl border bg-background p-6 shadow-sm">
+          <img src={imageUrl} alt="Uploaded QR" className="w-[200px] max-w-full object-contain" />
+        </div>
+      )}
+
+      {result && (
+        <div className="space-y-2">
+          <span className="text-xs font-medium text-muted-foreground">Decoded content</span>
+          <Textarea value={result} readOnly className="min-h-[80px] resize-y font-mono text-sm" />
+          <div className="flex gap-2">
+            <Button onClick={copy} className="flex-1">
+              {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+              {copied ? 'Copied!' : 'Copy content'}
+            </Button>
+            {isUrl && (
+              <Button onClick={openLink} variant="outline" className="flex-1">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open link
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Root: Generate / Read toggle ────────────────────────────────────────────────
+
+type QrMode = 'generate' | 'read';
+
+export function QRCodeTool() {
+  const [mode, setMode] = usePersistentState<QrMode>('devtool:qrcode:mode', 'generate');
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 space-y-4">
+        <div className="inline-flex h-8 rounded-md border bg-muted/45 p-0.5">
+          {([
+            { id: 'generate' as QrMode, label: 'Generate', Icon: QrCodeIcon },
+            { id: 'read' as QrMode, label: 'Read', Icon: ScanLine },
+          ]).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setMode(id)}
+              className={cn(
+                'flex items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors',
+                mode === id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+        {mode === 'generate' ? <QrGenerator /> : <QrReader />}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { Play, Square, Trash2, Plus, ChevronRight, Coffee, Timer as TimerIcon } 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
+import { TimePicker } from '@/components/ui/time-picker';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useClockify, type TimeEntry } from './store';
@@ -46,27 +47,14 @@ function periodStart(now: number, period: Period, mondayStart: boolean): number 
   return d.getTime();
 }
 
-// Editable HH:MM(:SS) cell bound to a single timestamp on a fixed day.
+// Time cell bound to a single timestamp on a fixed day. Uses the constrained
+// TimePicker so only valid times can be set.
 function EditableTime({ ts, dayTs, onCommit }: { ts: number; dayTs: number; onCommit: (v: number) => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const value = draft ?? timeOfDay(ts, false);
   return (
-    <Input
-      value={value}
-      onFocus={() => setDraft(timeOfDay(ts, false))}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        if (draft !== null) {
-          const parsed = parseTimeOfDay(draft, dayTs);
-          if (parsed !== null) onCommit(parsed);
-        }
-        setDraft(null);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-        if (e.key === 'Escape') setDraft(null);
-      }}
-      className="h-7 w-[64px] text-center font-mono text-xs tabular-nums"
+    <TimePicker
+      value={timeOfDay(ts, false)}
+      onChange={(hm) => { const v = parseTimeOfDay(hm, dayTs); if (v !== null) onCommit(v); }}
+      className="h-7"
     />
   );
 }
@@ -374,9 +362,9 @@ export function TimeTracker() {
             </div>
             {manualKind === 'range' ? (
               <>
-                <Input value={manualStart} onChange={(e) => setManualStart(e.target.value)} className="h-9 w-20 text-center font-mono text-sm" />
+                <TimePicker value={manualStart} onChange={setManualStart} className="h-9" />
                 <span className="text-muted-foreground">–</span>
-                <Input value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} className="h-9 w-20 text-center font-mono text-sm" />
+                <TimePicker value={manualEnd} onChange={setManualEnd} className="h-9" />
               </>
             ) : (
               <Input value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} placeholder="1:30 or 90m" className="h-9 w-28 text-center font-mono text-sm" />

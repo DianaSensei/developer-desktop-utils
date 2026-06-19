@@ -21,12 +21,14 @@ This document describes every tool in the app: what computation it performs, wha
 | Regex Tester | — | — | — | — | Input (localStorage) |
 | Text Diff | — | — | — | — | Input (localStorage) |
 | Markdown Preview | — | — | — | — | Input (localStorage) |
+| Meeting Notes | ✓ | — | — | — | Notes library, shared with Time Tracker (localStorage) |
+| Lucky Wheel | — | — | — | — | Choices + options (localStorage) |
 | Array Deduplicator | ✓ | — | — | — | Input (localStorage) |
 | Generator | ✓ | — | — | — | Mode pref (localStorage) |
 | Time Tracker | ✓ | — | — | — | Time entries, projects, expenses (localStorage) |
 | Checksum | ✓ | ✓ | — | — | — |
 | Image ↔ Base64 | ✓ | ✓ (browser) | — | — | — |
-| QR Code | ✓ (image) | ✓ | ✓ | — | — |
+| QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
 
@@ -139,6 +141,24 @@ Compares two text blocks and highlights line/character-level additions and remov
 Renders Markdown to HTML using `react-markdown`. Does not execute any embedded scripts. Supports standard CommonMark; no GitHub Flavored Markdown extensions that make external requests.
 
 **OS / system impact:** none.
+
+---
+
+### Meeting Notes
+
+A manager for meeting minutes: create, search, edit, and delete notes from a sidebar list. Each note has a title, date, start/end time (with derived duration), participants, agenda/discussion, decisions, and action items, assembled into clean Markdown in real time (action items become task checkboxes). The output renders with `react-markdown` in the preview pane; copy writes the Markdown to your clipboard. All composition is pure JS — no network, no file access.
+
+Notes are stored in a shared `devtool:meetings` record that the **Time Tracker** also reads: a meeting with a time range shows on the Time Tracker **Calendar** and **Schedule**, and you can create or edit a meeting from either tool — edits sync both ways because they share the same data.
+
+**OS / system impact:** clipboard write only. Notes persist in `localStorage` (`devtool:meetings`).
+
+---
+
+### Lucky Wheel
+
+Spins a wheel built from your own choices (one per line) and picks a random winner. Duplicate lines are kept by default — repeating a value gives it more slices and higher odds — and a "unique values only" toggle collapses duplicates to one slice each. The wheel is drawn on an HTML `<canvas>` with an animated spin and a winning-segment pulse; the landing position uses `Math.random()` over a uniform rotation offset, so every slice has equal odds. Optionally removes the winner from the list after each spin. The spin duration is configurable, and an auto-spin mode draws up to *N − 1* distinct winners in a row (where *N* is the number of slices) without altering the list. Every spin is recorded in a winner history table (choice + time) that can be sorted by spin time (newest first by default).
+
+**OS / system impact:** none. Choices, the "remove winner" preference, and the spin history persist in `localStorage`; nothing is sent anywhere.
 
 ---
 

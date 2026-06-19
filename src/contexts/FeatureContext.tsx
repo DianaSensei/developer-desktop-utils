@@ -39,6 +39,8 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'sql-formatter': true,
   'task-tracker': true,
   'network': true,
+  'meeting-notes': true,
+  'lucky-wheel': true,
   'settings': true,
 };
 

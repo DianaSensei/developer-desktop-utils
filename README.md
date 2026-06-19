@@ -1,6 +1,6 @@
 # DevTool
 
-A cross-platform desktop app for developers — 21 utilities in a clean, fast interface. Built with Tauri 2 + React + TypeScript.
+A cross-platform desktop app for developers — 23 utilities in a clean, fast interface. Built with Tauri 2 + React + TypeScript.
 
 [![Release](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml/badge.svg)](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -39,13 +39,15 @@ Most tools run **fully offline** — text, encoding, hashing, formatting, and fi
 | JWT Debugger | Decode and inspect JWT header, payload, and signature |
 | Regex Tester | Test regex patterns with live match highlighting |
 | Text Diff | Side-by-side text comparison |
-| QR Code | Generate QR codes with custom frames and logo overlays |
+| QR Code | Generate QR codes with custom frames and logo overlays, or read content from a QR image |
 | Markdown | Live markdown preview |
 | Deduplicate | Remove duplicate lines or array items |
 | Checksum | Compute MD5/SHA checksums for any file |
 | Image ↔ Base64 | Encode images to Base64 or decode Base64 back to images |
 | Generator | Generate UUIDs, random numbers, and random text |
 | SQL Formatter | Format and beautify SQL with keyword casing and clause line breaks |
+| Meeting Notes | Manage meeting minutes (search/create/edit) with times that sync to the Time Tracker calendar & schedule |
+| Lucky Wheel | Spin a wheel of your own choices to pick a random winner |
 | Time Tracker | Clockify-style time suite: tracker, timesheet, calendar, schedule, expenses, and time off |
 | Kafka Explorer | Browse topics/partitions/offsets, manage consumer groups, and produce messages |
 | Network Tools | DNS records, propagation & DNSSEC checks, what's-my-IP, IP geolocation, and local network info |

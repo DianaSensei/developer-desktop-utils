@@ -1,17 +1,19 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useClockify, type TimeEntry } from './store';
+import { useMeetings, type Meeting } from '@/lib/meetings';
+import { MeetingDialog } from '@/components/meetings/MeetingDialog';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { BillableButton, Modal, ProjectPicker, TagPicker } from './ui';
 import {
   MS_MIN,
   addDays,
   dayStart,
   fmtTimer,
-  parseTimeOfDay,
   pad,
   sameDay,
   shortDate,
@@ -28,9 +30,11 @@ const snap = (min: number) => Math.round(min / SNAP_MIN) * SNAP_MIN;
 
 export function CalendarView() {
   const { entries, timeOff, policies, projectById, now, addEntry, updateEntry, deleteEntry, settings } = useClockify();
+  const { meetings, addMeeting } = useMeetings();
   const [anchor, setAnchor] = useState(() => now);
   const [view, setView] = useState<'week' | 'day'>('week');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ dayTs: number; top: number; aMin: number; bMin: number } | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -54,6 +58,16 @@ export function CalendarView() {
     }
     return m;
   }, [entries, days]);
+
+  const meetingsByDay = useMemo(() => {
+    const m = new Map<number, Meeting[]>();
+    for (const d of days) m.set(d, []);
+    for (const mt of meetings) {
+      const d = dayStart(mt.start);
+      if (m.has(d)) m.get(d)!.push(mt);
+    }
+    return m;
+  }, [meetings, days]);
 
   // --- drag-to-create ---
   const onColMouseDown = (dayTs: number, e: React.MouseEvent<HTMLDivElement>) => {
@@ -115,7 +129,21 @@ export function CalendarView() {
         <span className="ml-2 text-sm font-medium">
           {view === 'day' ? shortDate(days[0]) : weekRangeLabel(anchor, settings.weekStartsMon)}
         </span>
-        <div className="ml-auto flex rounded-md border p-0.5">
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto h-8 gap-1.5"
+          onClick={() => {
+            const day = dayStart(view === 'day' ? days[0] : now);
+            const base = sameDay(day, now) ? now : day + 10 * 3600_000;
+            const start = Math.round(base / (30 * MS_MIN)) * (30 * MS_MIN);
+            const m = addMeeting({ start, end: start + 60 * MS_MIN });
+            setEditingMeetingId(m.id);
+          }}
+        >
+          <Users className="h-4 w-4" /> Meeting
+        </Button>
+        <div className="flex rounded-md border p-0.5">
           {(['week', 'day'] as const).map((v) => (
             <button
               key={v}
@@ -185,6 +213,32 @@ export function CalendarView() {
                   />
                 )}
 
+                {/* meeting blocks (shared with Meeting Notes) */}
+                {(meetingsByDay.get(d) ?? []).map((mt) => {
+                  const startMin = (mt.start - d) / MS_MIN;
+                  const endMin = (mt.end - d) / MS_MIN;
+                  const height = Math.max(16, ((endMin - startMin) / 60) * HOUR_PX);
+                  return (
+                    <button
+                      key={mt.id}
+                      data-block
+                      onClick={(ev) => { ev.stopPropagation(); setEditingMeetingId(mt.id); }}
+                      className="absolute left-1 right-1 z-30 overflow-hidden rounded border border-dashed border-indigo-400 bg-indigo-500/20 px-1.5 py-0.5 text-left text-[11px] leading-tight text-indigo-700 shadow-sm backdrop-blur-[1px] transition-shadow hover:shadow-md dark:text-indigo-200"
+                      style={{ top: (startMin / 60) * HOUR_PX, height }}
+                    >
+                      <div className="flex items-center gap-1 font-medium">
+                        <Users className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{mt.title || 'Meeting'}</span>
+                      </div>
+                      {height > 28 && (
+                        <div className="truncate opacity-80">
+                          {timeOfDay(mt.start, false)} · {fmtTimer(mt.end - mt.start)}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+
                 {/* entry blocks */}
                 {dayEntries.map((e) => {
                   const startMin = (e.start - d) / MS_MIN;
@@ -224,6 +278,9 @@ export function CalendarView() {
           onDelete={() => { deleteEntry(editing.id); setEditingId(null); }}
         />
       )}
+      {editingMeetingId && (
+        <MeetingDialog meetingId={editingMeetingId} onClose={() => setEditingMeetingId(null)} />
+      )}
     </div>
   );
 }
@@ -262,22 +319,6 @@ function EntryEditor({
   onChange: (patch: Partial<TimeEntry>) => void;
   onDelete: () => void;
 }) {
-  const day = dayStart(entry.start);
-  const [startStr, setStartStr] = useState(timeOfDay(entry.start, false));
-  const [endStr, setEndStr] = useState(entry.end !== null ? timeOfDay(entry.end, false) : '');
-
-  const commitStart = () => {
-    const v = parseTimeOfDay(startStr, day);
-    if (v !== null && (entry.end === null || v <= entry.end)) onChange({ start: v });
-    else setStartStr(timeOfDay(entry.start, false));
-  };
-  const commitEnd = () => {
-    if (entry.end === null) return;
-    const v = parseTimeOfDay(endStr, day);
-    if (v !== null && v >= entry.start) onChange({ end: v });
-    else setEndStr(timeOfDay(entry.end, false));
-  };
-
   return (
     <Modal open onClose={onClose} title="Edit entry">
       <div className="space-y-3">
@@ -289,14 +330,21 @@ function EntryEditor({
           <Label className="text-xs">Project</Label>
           <ProjectPicker value={entry.projectId} taskValue={entry.taskId} onChange={(p, t) => onChange({ projectId: p, taskId: t })} />
         </div>
-        <div className="flex gap-3">
-          <div className="flex-1 space-y-1.5">
+        <div className="flex flex-wrap gap-3">
+          <div className="space-y-1.5">
             <Label className="text-xs">Start</Label>
-            <Input value={startStr} onChange={(e) => setStartStr(e.target.value)} onBlur={commitStart} className="font-mono" />
+            <DateTimePicker
+              value={entry.start}
+              onChange={(ts) => onChange({ start: ts, ...(entry.end !== null && ts > entry.end ? { end: ts } : {}) })}
+            />
           </div>
-          <div className="flex-1 space-y-1.5">
+          <div className="space-y-1.5">
             <Label className="text-xs">End</Label>
-            <Input value={endStr} onChange={(e) => setEndStr(e.target.value)} onBlur={commitEnd} disabled={entry.end === null} className="font-mono" />
+            {entry.end !== null ? (
+              <DateTimePicker value={entry.end} onChange={(ts) => onChange({ end: Math.max(ts, entry.start) })} />
+            ) : (
+              <div className="flex h-9 items-center px-1 text-xs text-muted-foreground">Running…</div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">

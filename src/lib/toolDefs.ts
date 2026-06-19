@@ -19,6 +19,8 @@ import {
   Database,
   Timer,
   Network,
+  NotebookPen,
+  Disc3,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -171,6 +173,20 @@ export const TOOL_DEFS: ToolDef[] = [
     description:
       "DNS records (A, AAAA, CNAME, NS, TXT, SOA, SRV, CAA…), propagation, DNSSEC, plus what's my IP and IP geolocation lookup.",
   },
+  {
+    id: "meeting-notes",
+    label: "Meeting Notes",
+    icon: NotebookPen,
+    description:
+      "Manage meeting minutes — search, create, and edit timed notes that sync with the Time Tracker calendar and export to Markdown.",
+  },
+  {
+    id: "lucky-wheel",
+    label: "Lucky Wheel",
+    icon: Disc3,
+    description:
+      "Spin a wheel of your own choices (one per line) to pick a random winner.",
+  },
 ];
 
 export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
@@ -197,6 +213,8 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "hash",
   "jwt",
   "markdown",
+  "meeting-notes",
+  "lucky-wheel",
   "network",
   "kafka-explorer",
 ];
