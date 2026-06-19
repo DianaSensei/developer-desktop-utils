@@ -42,16 +42,17 @@ const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 function drawWheel(
   ctx: CanvasRenderingContext2D,
+  size: number,
   choices: string[],
   rotation: number,
   highlight: { index: number; intensity: number } | null,
 ) {
   const n = choices.length;
-  const cx = SIZE / 2;
-  const cy = SIZE / 2;
-  const radius = SIZE / 2 - 6;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = size / 2 - 6;
 
-  ctx.clearRect(0, 0, SIZE, SIZE);
+  ctx.clearRect(0, 0, size, size);
 
   if (n === 0) {
     ctx.fillStyle = 'rgba(120,120,120,0.12)';
@@ -98,18 +99,19 @@ function drawWheel(
     ctx.restore();
   }
 
-  // Hub
+  // Hub — proportional so it stays balanced at any rendered size
   ctx.beginPath();
-  ctx.arc(cx, cy, 26, 0, Math.PI * 2);
+  ctx.arc(cx, cy, size * 0.057, 0, Math.PI * 2);
   ctx.fillStyle = '#ffffff';
   ctx.fill();
   ctx.lineWidth = 3;
   ctx.strokeStyle = 'rgba(0,0,0,0.12)';
   ctx.stroke();
 
-  // Outer ring
+  // Outer ring — stroke sits just inside the radius so it never gets clipped
+  // at the bitmap edge (a clipped stroke is what made the rim look jagged).
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.arc(cx, cy, radius - 2, 0, Math.PI * 2);
   ctx.lineWidth = 4;
   ctx.strokeStyle = 'rgba(0,0,0,0.18)';
   ctx.stroke();
@@ -132,6 +134,7 @@ export function LuckyWheel() {
   const [winner, setWinner] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sizeRef = useRef(SIZE); // logical (CSS) size the canvas is currently rendered at
   const rotationRef = useRef(0);
   const highlightRef = useRef<{ index: number; intensity: number } | null>(null);
   const spinRaf = useRef<number | null>(null);
@@ -149,19 +152,33 @@ export function LuckyWheel() {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!ctx) return;
-    drawWheel(ctx, choices, rotationRef.current, highlightRef.current);
+    drawWheel(ctx, sizeRef.current, choices, rotationRef.current, highlightRef.current);
   }, [choices]);
 
-  // Size the backing store at device resolution, then draw.
+  // Match the backing store to the canvas's actual on-screen size × DPR so the
+  // circle is rasterized at native device resolution. Without this the fixed
+  // bitmap got bitmap-scaled to fit, which re-aliased the rim (jagged edge).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = SIZE * dpr;
-    canvas.height = SIZE * dpr;
-    const ctx = canvas.getContext('2d');
-    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    render();
+    const sync = () => {
+      const cssSize = Math.round(canvas.getBoundingClientRect().width);
+      if (cssSize <= 0) return;
+      const dpr = window.devicePixelRatio || 1;
+      const next = Math.round(cssSize * dpr);
+      if (canvas.width !== next || canvas.height !== next) {
+        canvas.width = next;
+        canvas.height = next;
+      }
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      sizeRef.current = cssSize;
+      render();
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(canvas);
+    return () => ro.disconnect();
   }, [render]);
 
   useEffect(() => {

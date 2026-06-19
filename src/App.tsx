@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Search,
   Plus,
+  Loader2,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
@@ -24,30 +25,36 @@ import { MeetingsProvider } from '@/lib/meetings';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { AppLogo } from '@/components/AppLogo';
 
-import { CronGenerator } from '@/components/tools/CronGenerator';
-import { TextTransformer } from '@/components/tools/TextTransformer';
-import { Base64Tool } from '@/components/tools/Base64Tool';
-import { HashTool } from '@/components/tools/HashTool';
-import { UnixTimeConverter } from '@/components/tools/UnixTimeConverter';
-import { JsonFormatter } from '@/components/tools/JsonFormatter';
-import { JwtDebugger } from '@/components/tools/JwtDebugger';
-import { RegexTester } from '@/components/tools/RegexTester';
-import { ChecksumTool } from '@/components/tools/ChecksumTool';
-import { ImageBase64Tool } from '@/components/tools/ImageBase64Tool';
-import { GeneratorTool } from '@/components/tools/GeneratorTool';
-import { TextDiff } from '@/components/tools/TextDiff';
-import { QRCodeTool } from '@/components/tools/QRCodeTool';
-import { MarkdownPreview } from '@/components/tools/MarkdownPreview';
-import { ArrayDeduplicator } from '@/components/tools/ArrayDeduplicator';
-import { TextCounter } from '@/components/tools/TextCounter';
-import { ColorPicker } from '@/components/tools/ColorPicker';
-import { Settings } from '@/components/Settings';
-import { KafkaExplorer } from '@/components/tools/kafka/KafkaExplorer';
-import { SqlFormatter } from '@/components/tools/SqlFormatter';
-import { TaskTracker } from '@/components/tools/TaskTracker';
-import { NetworkTools } from '@/components/tools/NetworkTools';
-import { MeetingNotes } from '@/components/tools/MeetingNotes';
-import { LuckyWheel } from '@/components/tools/LuckyWheel';
+// Tools are code-split: each loads its own chunk on first navigation instead of
+// being bundled into the initial payload. This keeps app startup fast and avoids
+// parsing heavy libs (CodeMirror, jsQR, qrcode, react-markdown) until needed.
+const named = <T,>(p: Promise<Record<string, T>>, key: string) =>
+  p.then((m) => ({ default: (m as Record<string, React.ComponentType>)[key] }));
+
+const CronGenerator = lazy(() => named(import('@/components/tools/CronGenerator'), 'CronGenerator'));
+const TextTransformer = lazy(() => named(import('@/components/tools/TextTransformer'), 'TextTransformer'));
+const Base64Tool = lazy(() => named(import('@/components/tools/Base64Tool'), 'Base64Tool'));
+const HashTool = lazy(() => named(import('@/components/tools/HashTool'), 'HashTool'));
+const UnixTimeConverter = lazy(() => named(import('@/components/tools/UnixTimeConverter'), 'UnixTimeConverter'));
+const JsonFormatter = lazy(() => named(import('@/components/tools/JsonFormatter'), 'JsonFormatter'));
+const JwtDebugger = lazy(() => named(import('@/components/tools/JwtDebugger'), 'JwtDebugger'));
+const RegexTester = lazy(() => named(import('@/components/tools/RegexTester'), 'RegexTester'));
+const ChecksumTool = lazy(() => named(import('@/components/tools/ChecksumTool'), 'ChecksumTool'));
+const ImageBase64Tool = lazy(() => named(import('@/components/tools/ImageBase64Tool'), 'ImageBase64Tool'));
+const GeneratorTool = lazy(() => named(import('@/components/tools/GeneratorTool'), 'GeneratorTool'));
+const TextDiff = lazy(() => named(import('@/components/tools/TextDiff'), 'TextDiff'));
+const QRCodeTool = lazy(() => named(import('@/components/tools/QRCodeTool'), 'QRCodeTool'));
+const MarkdownPreview = lazy(() => named(import('@/components/tools/MarkdownPreview'), 'MarkdownPreview'));
+const ArrayDeduplicator = lazy(() => named(import('@/components/tools/ArrayDeduplicator'), 'ArrayDeduplicator'));
+const TextCounter = lazy(() => named(import('@/components/tools/TextCounter'), 'TextCounter'));
+const ColorPicker = lazy(() => named(import('@/components/tools/ColorPicker'), 'ColorPicker'));
+const Settings = lazy(() => named(import('@/components/Settings'), 'Settings'));
+const KafkaExplorer = lazy(() => named(import('@/components/tools/kafka/KafkaExplorer'), 'KafkaExplorer'));
+const SqlFormatter = lazy(() => named(import('@/components/tools/SqlFormatter'), 'SqlFormatter'));
+const TaskTracker = lazy(() => named(import('@/components/tools/TaskTracker'), 'TaskTracker'));
+const NetworkTools = lazy(() => named(import('@/components/tools/NetworkTools'), 'NetworkTools'));
+const MeetingNotes = lazy(() => named(import('@/components/tools/MeetingNotes'), 'MeetingNotes'));
+const LuckyWheel = lazy(() => named(import('@/components/tools/LuckyWheel'), 'LuckyWheel'));
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator,      fullHeight: true },
@@ -100,6 +107,16 @@ function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder
     if (!order.includes(t.featureId)) ordered.push(t);
   }
   return ordered;
+}
+
+// Shown briefly while a tool's code-split chunk loads. Fills the content area so
+// the header/sidebar stay put — no layout shift.
+function ToolLoading() {
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+    </div>
+  );
 }
 
 function NavTooltip({ label, description, children }: {
@@ -496,12 +513,14 @@ function AppContent() {
   const isFullHeight = !!(activeTool as typeof allTools[0] & { fullHeight?: boolean }).fullHeight;
 
   const routes = (
-    <Routes>
-      {enabledTools.map((tool) => (
-        <Route key={tool.path} path={tool.path} element={<tool.component />} />
-      ))}
-      <Route path="/settings" element={<Settings />} />
-    </Routes>
+    <Suspense fallback={<ToolLoading />}>
+      <Routes>
+        {enabledTools.map((tool) => (
+          <Route key={tool.path} path={tool.path} element={<tool.component />} />
+        ))}
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </Suspense>
   );
 
   return (
@@ -515,7 +534,7 @@ function AppContent() {
         onToggleCollapse={toggleCollapse}
       />
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="z-30 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shrink-0">
+        <div className="z-30 border-b bg-background shrink-0">
           <div className="flex items-center justify-between px-3 py-2.5 sm:px-4">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>

@@ -5,6 +5,29 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DevTool - Developer Utilities</title>
+    <!-- Critical theme bootstrap: runs before first paint so the window opens in
+         the correct light/dark colour with no flash of unstyled / wrong-theme
+         content. Mirrors the logic in App.tsx (key: devtool-dark-mode). -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('devtool-dark-mode');
+          var dark = saved !== null
+            ? saved === 'true'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var root = document.documentElement;
+          if (dark) root.classList.add('dark');
+          root.style.colorScheme = dark ? 'dark' : 'light';
+          // Paint the right background immediately, before the CSS bundle loads.
+          root.style.backgroundColor = dark ? '#1f1f1f' : '#e5e5e5';
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      /* Hard guarantee against a white flash while the JS/CSS bundles load */
+      html { background-color: #e5e5e5; }
+      html.dark { background-color: #1f1f1f; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
