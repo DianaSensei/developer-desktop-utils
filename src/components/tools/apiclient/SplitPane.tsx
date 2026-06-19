@@ -1,0 +1,68 @@
+// Two-pane resizable split with a draggable divider. `direction` is the axis the
+// panes are laid out along: 'horizontal' = side by side, 'vertical' = stacked.
+// The first pane's size is a percentage, clamped to a sane range while dragging.
+
+import { useCallback, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
+
+interface Props {
+  direction: 'horizontal' | 'vertical';
+  first: React.ReactNode;
+  second: React.ReactNode;
+  initialPercent?: number;
+  minPercent?: number;
+  maxPercent?: number;
+}
+
+export function SplitPane({
+  direction, first, second, initialPercent = 50, minPercent = 20, maxPercent = 80,
+}: Props) {
+  const [percent, setPercent] = useState(initialPercent);
+  const [dragging, setDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const horizontal = direction === 'horizontal';
+
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const raw = horizontal
+      ? ((e.clientX - rect.left) / rect.width) * 100
+      : ((e.clientY - rect.top) / rect.height) * 100;
+    setPercent(Math.min(maxPercent, Math.max(minPercent, raw)));
+  }, [horizontal, minPercent, maxPercent]);
+
+  const stop = useCallback(() => {
+    setDragging(false);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', stop);
+  }, [onPointerMove]);
+
+  const start = useCallback(() => {
+    setDragging(true);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', stop);
+  }, [onPointerMove, stop]);
+
+  return (
+    <div ref={containerRef} className={cn('flex min-h-0 min-w-0 flex-1', horizontal ? 'flex-row' : 'flex-col')}>
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden" style={{ flexBasis: `${percent}%` }}>
+        {first}
+      </div>
+      <div
+        onPointerDown={start}
+        className={cn(
+          'group relative shrink-0 bg-border transition-colors hover:bg-primary/40',
+          horizontal ? 'w-px cursor-col-resize' : 'h-px cursor-row-resize',
+          dragging && 'bg-primary/60',
+        )}
+      >
+        {/* invisible wider hit area for easier grabbing */}
+        <span className={cn('absolute', horizontal ? '-inset-x-1 inset-y-0' : '-inset-y-1 inset-x-0')} />
+      </div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {second}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,307 @@
+// Persistent state for the API Client.
+//
+// Everything (collections, environments, history) is JSON-serializable and kept
+// in localStorage via usePersistentState, so the workspace survives app
+// restarts — consistent with the rest of DevTool. Tree edits are applied
+// immutably through small recursive helpers.
+
+import { useCallback, useMemo } from 'react';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import {
+  type ApiRequest,
+  type Collection,
+  type Environment,
+  type Folder,
+  type HistoryEntry,
+  type RequestScript,
+  type TreeItem,
+  newCollection,
+  newEnvironment,
+  newFolder,
+  newRequest,
+  normalizeRequest,
+  uid,
+} from './types';
+
+const MAX_HISTORY = 50;
+
+// First-run sample so the tool isn't an empty screen.
+function seedCollections(): Collection[] {
+  const sample = newRequest({
+    name: 'Get IP',
+    method: 'GET',
+    url: 'https://httpbin.org/get',
+  });
+  return [{ id: uid(), name: 'My Collection', items: [sample] }];
+}
+
+// ─── immutable tree helpers ─────────────────────────────────────────────────
+
+function mapTree(items: TreeItem[], fn: (item: TreeItem) => TreeItem): TreeItem[] {
+  return items.map((item) => {
+    const mapped = fn(item);
+    if (mapped.type === 'folder') {
+      return { ...mapped, items: mapTree(mapped.items, fn) };
+    }
+    return mapped;
+  });
+}
+
+function removeFromTree(items: TreeItem[], id: string): TreeItem[] {
+  return items
+    .filter((item) => item.id !== id)
+    .map((item) => (item.type === 'folder' ? { ...item, items: removeFromTree(item.items, id) } : item));
+}
+
+// Insert `child` into the folder/collection with `parentId`. When parentId is
+// null the child goes at the collection root (handled by the caller).
+function insertIntoTree(items: TreeItem[], parentId: string, child: TreeItem): TreeItem[] {
+  return items.map((item) => {
+    if (item.type !== 'folder') return item;
+    if (item.id === parentId) return { ...item, items: [...item.items, child], collapsed: false };
+    return { ...item, items: insertIntoTree(item.items, parentId, child) };
+  });
+}
+
+function findRequest(items: TreeItem[], id: string): ApiRequest | null {
+  for (const item of items) {
+    if (item.id === id && item.type === 'request') return item;
+    if (item.type === 'folder') {
+      const found = findRequest(item.items, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+// Find a request by id and return the folder chain leading to it (outer→inner).
+function findFolderPath(items: TreeItem[], id: string, acc: Folder[]): Folder[] | null {
+  for (const item of items) {
+    if (item.id === id && item.type === 'request') return acc;
+    if (item.type === 'folder') {
+      const found = findFolderPath(item.items, id, [...acc, item]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+export interface InheritedScripts { pre: string[]; post: string[] }
+
+// Ordered ancestor scripts for a request: pre runs collection→folders (outer to
+// inner); post runs the reverse (inner to outer) so cleanup unwinds naturally.
+function collectInherited(collections: Collection[], id: string): InheritedScripts {
+  for (const c of collections) {
+    const path = findFolderPath(c.items, id, []);
+    if (path) {
+      const nodes: { script?: { req: string; res: string } }[] = [c, ...path];
+      const pre = nodes.map((n) => n.script?.req ?? '').filter((s) => s.trim());
+      const post = nodes.map((n) => n.script?.res ?? '').filter((s) => s.trim()).reverse();
+      return { pre, post };
+    }
+  }
+  return { pre: [], post: [] };
+}
+
+// ─── store hook ─────────────────────────────────────────────────────────────
+
+export function useApiStore() {
+  const [collections, setCollections] = usePersistentState<Collection[]>(
+    'devtool:apiclient:collections', seedCollections,
+  );
+  const [environments, setEnvironments] = usePersistentState<Environment[]>(
+    'devtool:apiclient:environments', [],
+  );
+  const [activeEnvId, setActiveEnvId] = usePersistentState<string | null>(
+    'devtool:apiclient:activeEnv', null,
+  );
+  const [history, setHistory] = usePersistentState<HistoryEntry[]>(
+    'devtool:apiclient:history', [],
+  );
+  const [activeRequestId, setActiveRequestId] = usePersistentState<string | null>(
+    'devtool:apiclient:activeRequest', null,
+  );
+  // Requests open as tabs, in tab order. activeRequestId points at the focused one.
+  const [openTabIds, setOpenTabIds] = usePersistentState<string[]>(
+    'devtool:apiclient:openTabs', [],
+  );
+
+  const activeEnv = useMemo(
+    () => environments.find((e) => e.id === activeEnvId) ?? null,
+    [environments, activeEnvId],
+  );
+
+  // Normalizes on read so requests saved before scripting existed never crash
+  // the editor (missing script/vars/assertions/tests are backfilled).
+  const lookupRequest = useCallback((id: string): ApiRequest | null => {
+    for (const c of collections) {
+      const found = findRequest(c.items, id);
+      if (found) return normalizeRequest(found);
+    }
+    return null;
+  }, [collections]);
+
+  const activeRequest = useMemo(
+    () => (activeRequestId ? lookupRequest(activeRequestId) : null),
+    [activeRequestId, lookupRequest],
+  );
+
+  // Open tabs resolved to live requests, dropping any that were deleted.
+  const openRequests = useMemo(
+    () => openTabIds.map(lookupRequest).filter((r): r is ApiRequest => r !== null),
+    [openTabIds, lookupRequest],
+  );
+
+  // Open (or focus) a request in a tab.
+  const selectRequest = useCallback((id: string) => {
+    setOpenTabIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setActiveRequestId(id);
+  }, [setOpenTabIds, setActiveRequestId]);
+
+  // Close a tab; if it was active, focus the neighbour that takes its place.
+  const closeTab = useCallback((id: string) => {
+    setOpenTabIds((prev) => {
+      const idx = prev.indexOf(id);
+      const next = prev.filter((t) => t !== id);
+      setActiveRequestId((cur) => {
+        if (cur !== id) return cur;
+        return next[idx] ?? next[idx - 1] ?? null;
+      });
+      return next;
+    });
+  }, [setOpenTabIds, setActiveRequestId]);
+
+  // — collection / tree ops —
+
+  const addCollection = useCallback(() => {
+    const c = newCollection();
+    setCollections((prev) => [...prev, c]);
+    return c.id;
+  }, [setCollections]);
+
+  const importCollection = useCallback((collection: Collection) => {
+    setCollections((prev) => [...prev, collection]);
+  }, [setCollections]);
+
+  const deleteCollection = useCallback((id: string) => {
+    setCollections((prev) => prev.filter((c) => c.id !== id));
+  }, [setCollections]);
+
+  const renameCollection = useCallback((id: string, name: string) => {
+    setCollections((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
+  }, [setCollections]);
+
+  const toggleCollapse = useCallback((collectionId: string, itemId?: string) => {
+    setCollections((prev) => prev.map((c) => {
+      if (c.id !== collectionId) return c;
+      if (!itemId) return { ...c, collapsed: !c.collapsed };
+      return {
+        ...c,
+        items: mapTree(c.items, (item) =>
+          item.id === itemId && item.type === 'folder' ? { ...item, collapsed: !item.collapsed } : item,
+        ),
+      };
+    }));
+  }, [setCollections]);
+
+  // Add a request (or folder) to a collection root, or into a folder by parentId.
+  const addItem = useCallback((collectionId: string, kind: 'request' | 'folder', parentId?: string) => {
+    const child: TreeItem = kind === 'request' ? newRequest() : newFolder();
+    setCollections((prev) => prev.map((c) => {
+      if (c.id !== collectionId) return c;
+      if (!parentId) return { ...c, items: [...c.items, child], collapsed: false };
+      return { ...c, items: insertIntoTree(c.items, parentId, child) };
+    }));
+    if (child.type === 'request') selectRequest(child.id);
+    return child.id;
+  }, [setCollections, selectRequest]);
+
+  const deleteItem = useCallback((collectionId: string, itemId: string) => {
+    setCollections((prev) => prev.map((c) =>
+      c.id === collectionId ? { ...c, items: removeFromTree(c.items, itemId) } : c,
+    ));
+    closeTab(itemId);
+  }, [setCollections, closeTab]);
+
+  const renameItem = useCallback((itemId: string, name: string) => {
+    setCollections((prev) => prev.map((c) => ({
+      ...c,
+      items: mapTree(c.items, (item) => (item.id === itemId ? { ...item, name } : item)),
+    })));
+  }, [setCollections]);
+
+  // Set the inherited script on a collection (nodeId null) or a folder.
+  const setNodeScript = useCallback((collectionId: string, nodeId: string | null, script: RequestScript) => {
+    setCollections((prev) => prev.map((c) => {
+      if (c.id !== collectionId) return c;
+      if (!nodeId) return { ...c, script };
+      return {
+        ...c,
+        items: mapTree(c.items, (item) =>
+          item.id === nodeId && item.type === 'folder' ? { ...item, script } : item,
+        ),
+      };
+    }));
+  }, [setCollections]);
+
+  // Inherited (collection + folder) scripts for the request currently active.
+  const inheritedScripts = useMemo(
+    () => (activeRequestId ? collectInherited(collections, activeRequestId) : { pre: [], post: [] }),
+    [collections, activeRequestId],
+  );
+
+  const duplicateRequest = useCallback((collectionId: string, req: ApiRequest) => {
+    const copy = { ...newRequest({ ...req, name: `${req.name} copy` }) };
+    setCollections((prev) => prev.map((c) =>
+      c.id === collectionId ? { ...c, items: [...c.items, copy] } : c,
+    ));
+    selectRequest(copy.id);
+  }, [setCollections, selectRequest]);
+
+  // Apply a partial patch to whichever request matches `id`, anywhere in the tree.
+  const updateRequest = useCallback((id: string, patch: Partial<ApiRequest>) => {
+    setCollections((prev) => prev.map((c) => ({
+      ...c,
+      items: mapTree(c.items, (item) =>
+        item.id === id && item.type === 'request' ? { ...item, ...patch } : item,
+      ),
+    })));
+  }, [setCollections]);
+
+  // — environment ops —
+
+  const addEnvironment = useCallback(() => {
+    const e = newEnvironment();
+    setEnvironments((prev) => [...prev, e]);
+    return e.id;
+  }, [setEnvironments]);
+
+  const updateEnvironment = useCallback((id: string, patch: Partial<Environment>) => {
+    setEnvironments((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  }, [setEnvironments]);
+
+  const deleteEnvironment = useCallback((id: string) => {
+    setEnvironments((prev) => prev.filter((e) => e.id !== id));
+    setActiveEnvId((cur) => (cur === id ? null : cur));
+  }, [setEnvironments, setActiveEnvId]);
+
+  // — history —
+
+  const addHistory = useCallback((entry: Omit<HistoryEntry, 'id' | 'at'>) => {
+    setHistory((prev) => [{ ...entry, id: uid(), at: Date.now() }, ...prev].slice(0, MAX_HISTORY));
+  }, [setHistory]);
+
+  const clearHistory = useCallback(() => setHistory([]), [setHistory]);
+
+  return {
+    collections, environments, activeEnvId, activeEnv, history,
+    activeRequestId, activeRequest, openRequests, inheritedScripts,
+    setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
+    addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,
+    addItem, deleteItem, renameItem, duplicateRequest, updateRequest, setNodeScript,
+    addEnvironment, updateEnvironment, deleteEnvironment,
+    addHistory, clearHistory,
+  };
+}
+
+export type ApiStore = ReturnType<typeof useApiStore>;

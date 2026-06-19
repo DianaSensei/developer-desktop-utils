@@ -41,6 +41,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'network': true,
   'meeting-notes': true,
   'lucky-wheel': true,
+  'api-client': true,
   'settings': true,
 };
 
