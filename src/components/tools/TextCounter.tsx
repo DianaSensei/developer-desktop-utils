@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Check, X } from 'lucide-react';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -8,7 +8,12 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 export function TextCounter() {
   const [text, setText] = usePersistentState('devtool:textCounter:text', '');
 
+  // The stats below do several full-string scans (splits, TextEncoder, per-char
+  // counts). Defer so the textarea stays responsive on large input.
+  const deferredText = useDeferredValue(text);
+
   const stats = useMemo(() => {
+    const text = deferredText;
     const empty = {
       characters: 0,
       charactersNoSpaces: 0,
@@ -95,7 +100,7 @@ export function TextCounter() {
       fitsAscii,
       fitsLatin1,
     };
-  }, [text]);
+  }, [deferredText]);
 
   const smallestEncoding = !text
     ? '—'

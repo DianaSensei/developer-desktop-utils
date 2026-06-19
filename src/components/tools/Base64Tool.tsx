@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -631,15 +631,18 @@ export function Base64Tool() {
 
   const codec = useMemo(() => CODECS.find((item) => item.id === algorithm) ?? CODECS[0], [algorithm]);
 
+  // Some codecs (Huffman, Punycode, base62 BigInt) are heavy. Defer the input so
+  // the textarea stays responsive while converting large payloads.
+  const deferredInput = useDeferredValue(input);
   const { output, error } = useMemo(() => {
-    if (!input) return { output: '', error: '' };
+    if (!deferredInput) return { output: '', error: '' };
     try {
-      const result = mode === 'encode' ? codec.encode(input) : codec.decode(input);
+      const result = mode === 'encode' ? codec.encode(deferredInput) : codec.decode(deferredInput);
       return { output: result, error: '' };
     } catch (err) {
       return { output: '', error: err instanceof Error ? err.message : 'Conversion failed' };
     }
-  }, [input, codec, mode]);
+  }, [deferredInput, codec, mode]);
 
   useQuickPaste((text) => setInput(text));
   useInputHistory(input, setInput);

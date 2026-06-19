@@ -149,7 +149,7 @@ function NavTooltip({ label, description, children }: {
       {children}
       {visible && createPortal(
         <div
-          className="fixed z-[9999] pointer-events-none -translate-y-1/2 w-52 rounded-md border bg-popover px-3 py-2.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100"
+          className="fixed z-[9999] pointer-events-none -translate-y-1/2 w-52 rounded-md border bg-popover px-3 py-2.5 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-left-1 duration-150 ease-out"
           style={{ top: coords.top, left: coords.left }}
         >
           <p className="text-xs font-semibold text-popover-foreground leading-none">{label}</p>
@@ -218,7 +218,7 @@ function Sidebar({
       )}
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-screen bg-sidebar backdrop-blur border-r transition-all duration-300 ease-in-out flex flex-col',
+          'fixed lg:sticky top-0 left-0 z-50 h-screen bg-sidebar border-r transition-all duration-300 ease-in-out flex flex-col',
           isCollapsed ? 'w-14' : 'w-56',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
@@ -334,14 +334,14 @@ function Sidebar({
                           to={tool.path}
                           onClick={onClose}
                           className={cn(
-                            'flex items-center rounded-md transition-all duration-150',
+                            'group flex items-center rounded-md transition-all duration-150 motion-safe:active:scale-[0.98]',
                             isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
                             isActive
                               ? 'bg-accent text-accent-foreground'
                               : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                           )}
                         >
-                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-150 motion-safe:group-hover:scale-110" />
                           {!isCollapsed && (
                             <span className={cn('flex-1 text-sm whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
                               {tool.label}
@@ -540,10 +540,13 @@ function AppContent() {
               <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
                 <Menu className="h-4 w-4" />
               </Button>
-              <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-card">
+              <div
+                key={activeTool.path}
+                className="flex h-8 w-8 items-center justify-center rounded-md border bg-card motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+              >
                 <ActiveIcon className="h-4 w-4 text-primary" />
               </div>
-              <div className="min-w-0">
+              <div key={`${activeTool.path}-label`} className="min-w-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-left-1 motion-safe:duration-200">
                 <h2 className="text-sm font-semibold leading-none">{activeTool.label}</h2>
                 {activeTool.description && (
                   <p className="mt-1 hidden max-w-xl truncate text-[11px] text-muted-foreground sm:block">
@@ -559,11 +562,17 @@ function AppContent() {
         </div>
         {isFullHeight ? (
           <div className="flex-1 min-h-0 overflow-hidden">
-            {routes}
+            {/* key on pathname re-triggers the entrance animation on each tool switch */}
+            <div key={location.pathname} className="h-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200 motion-safe:ease-out">
+              {routes}
+            </div>
           </div>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5">
+            <div
+              key={location.pathname}
+              className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:ease-out"
+            >
               {routes}
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,10 @@ export function RegexTester() {
   useQuickPaste(setTestString);
   useInputHistory(testString, setTestString);
 
+  // Matching against a large test string runs on every keystroke. Defer the
+  // test string so typing/editing the pattern stays responsive; the match
+  // computation and results render happen at low priority.
+  const deferredTest = useDeferredValue(testString);
   const result = useMemo(() => {
     if (!pattern) return { matches: [], error: '' };
     try {
@@ -33,7 +37,7 @@ export function RegexTester() {
         const MAX_MATCHES = 10_000;
         const globalRegex = new RegExp(pattern, flags);
         let match: RegExpExecArray | null;
-        while ((match = globalRegex.exec(testString)) !== null) {
+        while ((match = globalRegex.exec(deferredTest)) !== null) {
           matches.push(match);
           // A zero-width match (e.g. /a*/, /\b/, /\s*/) leaves lastIndex
           // unchanged — without this nudge exec() would loop forever and
@@ -44,16 +48,16 @@ export function RegexTester() {
           if (matches.length >= MAX_MATCHES) break;
         }
       } else {
-        const match = testString.match(regex);
+        const match = deferredTest.match(regex);
         if (match) matches.push(match);
       }
       return { matches, error: '' };
     } catch (err) {
       return { matches: [], error: err instanceof Error ? err.message : 'Invalid regex pattern' };
     }
-  }, [pattern, flags, testString]);
+  }, [pattern, flags, deferredTest]);
 
-  const hasResult = result.error || result.matches.length > 0 || (!result.error && pattern && testString);
+  const hasResult = result.error || result.matches.length > 0 || (!result.error && pattern && deferredTest);
 
   return (
     <div className="flex flex-col h-full">

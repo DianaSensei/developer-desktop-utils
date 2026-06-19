@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useDeferredValue, useMemo, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import * as Diff from 'diff';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -17,7 +17,12 @@ export function TextDiff() {
   const activeSetter = useRef(setText1);
   useQuickPaste((text) => activeSetter.current(text));
 
-  const diffResult = useMemo(() => Diff.diffWords(text1, text2), [text1, text2]);
+  // Diffing is O(n·m) and runs on every keystroke. Defer it so typing in either
+  // pane stays responsive — the textareas update instantly while the (heavier)
+  // diff render happens at low priority and can be interrupted by further typing.
+  const dText1 = useDeferredValue(text1);
+  const dText2 = useDeferredValue(text2);
+  const diffResult = useMemo(() => Diff.diffWords(dText1, dText2), [dText1, dText2]);
 
   return (
     <div className="flex flex-col h-full">

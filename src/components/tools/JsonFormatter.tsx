@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -453,14 +453,18 @@ export function JsonFormatter() {
   const forceExpand = query.trim().length > 0;
   const lowerQuery = query.trim().toLowerCase();
 
+  // Parsing + flattening + serialization all key off the raw input and run on
+  // every keystroke. Defer the input so the textarea stays responsive while
+  // parsing a large document; the derived views update at low priority.
+  const deferredInput = useDeferredValue(input);
   const parsed = useMemo<{ value: JsonValue | undefined; error: string }>(() => {
-    if (!input.trim()) return { value: undefined, error: '' };
+    if (!deferredInput.trim()) return { value: undefined, error: '' };
     try {
-      return { value: parseInput(input), error: '' };
+      return { value: parseInput(deferredInput), error: '' };
     } catch (err) {
       return { value: undefined, error: err instanceof Error ? err.message : 'Invalid JSON' };
     }
-  }, [input]);
+  }, [deferredInput]);
 
   const containerPaths = useMemo(
     () => (parsed.value !== undefined ? collectContainerPaths(parsed.value) : []),

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useDeferredValue, useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,30 +19,33 @@ export function HashTool() {
   useQuickPaste(setInput);
   useInputHistory(input, setInput);
 
+  // Four synchronous digests on every keystroke. Defer the input so the textarea
+  // stays smooth while hashing a large payload; digests update at low priority.
+  const deferredInput = useDeferredValue(input);
   const hashes = useMemo(() => {
-    if (!input) return { md5: '', sha1: '', sha256: '', sha512: '' };
+    if (!deferredInput) return { md5: '', sha1: '', sha256: '', sha512: '' };
     return {
-      md5: CryptoJS.MD5(input).toString(),
-      sha1: CryptoJS.SHA1(input).toString(),
-      sha256: CryptoJS.SHA256(input).toString(),
-      sha512: CryptoJS.SHA512(input).toString(),
+      md5: CryptoJS.MD5(deferredInput).toString(),
+      sha1: CryptoJS.SHA1(deferredInput).toString(),
+      sha256: CryptoJS.SHA256(deferredInput).toString(),
+      sha512: CryptoJS.SHA512(deferredInput).toString(),
     };
-  }, [input]);
+  }, [deferredInput]);
 
   const aesResult = useMemo(() => {
-    if (!input || !encryptKey) return '';
+    if (!deferredInput || !encryptKey) return '';
     try {
       if (aesMode === 'encrypt') {
-        return CryptoJS.AES.encrypt(input, encryptKey).toString();
+        return CryptoJS.AES.encrypt(deferredInput, encryptKey).toString();
       } else {
-        const bytes = CryptoJS.AES.decrypt(input, encryptKey);
+        const bytes = CryptoJS.AES.decrypt(deferredInput, encryptKey);
         const result = bytes.toString(CryptoJS.enc.Utf8);
         return result || 'Error: Invalid key or encrypted text';
       }
     } catch {
       return 'Error: Decryption failed';
     }
-  }, [input, encryptKey, aesMode]);
+  }, [deferredInput, encryptKey, aesMode]);
 
   return (
     <div className="h-full overflow-y-auto">
