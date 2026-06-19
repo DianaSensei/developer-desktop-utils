@@ -33,7 +33,7 @@ export interface TimePickerProps {
 }
 
 function Column({
-  label, count, selected, onPick, onStep, selRef, listClass,
+  label, count, selected, onPick, onStep, selRef, listClass, fill,
 }: {
   label: string;
   count: number;
@@ -42,14 +42,15 @@ function Column({
   onStep: (d: number) => void;
   selRef: React.RefObject<HTMLButtonElement>;
   listClass: string;
+  fill?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center" onWheel={(e) => { e.preventDefault(); onStep(e.deltaY > 0 ? 1 : -1); }}>
+    <div className={cn('flex flex-col items-center', fill && 'min-h-0 flex-1')} onWheel={(e) => { e.preventDefault(); onStep(e.deltaY > 0 ? 1 : -1); }}>
       <span className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
       <button type="button" onClick={() => onStep(-1)} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Previous ${label}`}>
         <ChevronUp className="h-4 w-4" />
       </button>
-      <div className={cn('my-1 w-10 overflow-y-auto rounded-md border bg-muted/20 px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', listClass)}>
+      <div className={cn('my-1 w-10 overflow-y-auto rounded-md border bg-muted/20 px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', fill ? 'min-h-0 flex-1' : listClass)}>
         {Array.from({ length: count }, (_, n) => {
           const isSel = n === selected;
           return (
@@ -127,18 +128,18 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
   const stepMin = (d: number) => emit(h, (m + 60 + d * minuteStep) % 60, s);
   const stepSec = (d: number) => emit(h, m, (s + 60 + d) % 60);
 
-  const listClass = inline ? 'h-[168px]' : 'h-[132px]';
+  const listClass = 'h-[132px]';
   const sep = <span className="self-center font-mono text-lg text-muted-foreground">:</span>;
   const columns = (
     <>
-      <div className="flex items-start justify-center gap-1">
-        <Column label="Hr" count={24} selected={h} onPick={(n) => emit(n, m, s)} onStep={stepHour} selRef={hourRef} listClass={listClass} />
+      <div className={cn('flex justify-center gap-1', inline ? 'min-h-0 flex-1 items-stretch' : 'items-start')}>
+        <Column label="Hr" count={24} selected={h} onPick={(n) => emit(n, m, s)} onStep={stepHour} selRef={hourRef} listClass={listClass} fill={inline} />
         {sep}
-        <Column label="Min" count={60} selected={m} onPick={(n) => emit(h, n, s)} onStep={stepMin} selRef={minRef} listClass={listClass} />
+        <Column label="Min" count={60} selected={m} onPick={(n) => emit(h, n, s)} onStep={stepMin} selRef={minRef} listClass={listClass} fill={inline} />
         {showSeconds && (
           <>
             {sep}
-            <Column label="Sec" count={60} selected={s} onPick={(n) => emit(h, m, n)} onStep={stepSec} selRef={secRef} listClass={listClass} />
+            <Column label="Sec" count={60} selected={s} onPick={(n) => emit(h, m, n)} onStep={stepSec} selRef={secRef} listClass={listClass} fill={inline} />
           </>
         )}
       </div>
@@ -153,7 +154,7 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
   );
 
   if (inline) {
-    return <div ref={wrapRef} className={cn('rounded-lg border bg-popover p-3', className)}>{columns}</div>;
+    return <div ref={wrapRef} className={cn('flex h-full flex-col rounded-lg border bg-popover p-3', className)}>{columns}</div>;
   }
 
   return (

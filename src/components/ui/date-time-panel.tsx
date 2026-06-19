@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { DatePicker } from './date-picker';
 import { TimePicker } from './time-picker';
@@ -84,30 +84,48 @@ export function DateTimePanel({
     onConfirm(new Date(utcGuess.getTime() - offset * 60000));
   };
 
+  // Match the time column's height to the calendar exactly (the time list then
+  // fills + scrolls within that height rather than dictating its own).
+  const dateRef = useRef<HTMLDivElement>(null);
+  const [dateH, setDateH] = useState<number>();
+  useLayoutEffect(() => {
+    const el = dateRef.current;
+    if (!el) return;
+    const update = () => setDateH(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div className={cn('rounded-md border bg-card p-3 shadow-lg space-y-3', className)}>
       <div className="flex items-start gap-3">
-        {/* Date (left) */}
-        <DatePicker
-          inline
-          monthYearNav
-          value={dateISO}
-          onChange={(iso) => {
-            const [y, mo, da] = iso.split('-').map(Number);
-            if (y && mo && da) { setSelYear(y); setSelMonth(mo - 1); setSelDay(da); }
-          }}
-        />
+        {/* Date (left) — the height reference */}
+        <div ref={dateRef}>
+          <DatePicker
+            inline
+            monthYearNav
+            value={dateISO}
+            onChange={(iso) => {
+              const [y, mo, da] = iso.split('-').map(Number);
+              if (y && mo && da) { setSelYear(y); setSelMonth(mo - 1); setSelDay(da); }
+            }}
+          />
+        </div>
 
-        {/* Time (right) */}
-        <TimePicker
-          inline
-          showSeconds={showSeconds}
-          value={timeStr}
-          onChange={(t) => {
-            const [h, m, s] = t.split(':').map(Number);
-            setHour(h || 0); setMinute(m || 0); setSecond(s || 0);
-          }}
-        />
+        {/* Time (right) — constrained to the calendar's height */}
+        <div style={dateH ? { height: dateH } : undefined}>
+          <TimePicker
+            inline
+            showSeconds={showSeconds}
+            value={timeStr}
+            onChange={(t) => {
+              const [h, m, s] = t.split(':').map(Number);
+              setHour(h || 0); setMinute(m || 0); setSecond(s || 0);
+            }}
+          />
+        </div>
       </div>
 
       {/* Preview */}
