@@ -4,8 +4,10 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
+  Boxes,
   ChevronDown,
   ChevronRight,
+  CopyPlus,
   Download,
   FilePlus2,
   FolderPlus,
@@ -13,13 +15,11 @@ import {
   Layers,
   MoreVertical,
   Plus,
+  Search,
   Trash2,
   Upload,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import type { ApiStore } from './store';
 import type { ApiRequest, Collection, Folder, RequestScript, TreeItem } from './types';
 import { importPostman, exportPostman } from './postman';
@@ -29,17 +29,31 @@ import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialo
 
 const emptyScript = (s?: RequestScript): RequestScript => s ?? { req: '', res: '' };
 
-interface Props {
-  store: ApiStore;
-  onManageEnvironments: () => void;
+// Tree-filter predicates: a node is shown when its name (or any descendant's
+// name) matches the query.
+function itemMatches(item: TreeItem, q: string): boolean {
+  if (item.type === 'request') return item.name.toLowerCase().includes(q);
+  return item.name.toLowerCase().includes(q) || item.items.some((c) => itemMatches(c, q));
+}
+function collectionMatches(c: Collection, q: string): boolean {
+  return c.name.toLowerCase().includes(q) || c.items.some((i) => itemMatches(i, q));
 }
 
-export function Sidebar({ store, onManageEnvironments }: Props) {
+interface Props {
+  store: ApiStore;
+  searchInputRef?: React.Ref<HTMLInputElement>;
+}
+
+export function Sidebar({ store, searchInputRef }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<NodeSettingsTarget | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
 
   const handleImport = async () => {
     setError(null);
+    setMenu(false);
     try {
       const text = await pickJsonFile();
       if (!text) return;
@@ -49,18 +63,43 @@ export function Sidebar({ store, onManageEnvironments }: Props) {
     }
   };
 
+  const visible = store.collections.filter((c) => !q || collectionMatches(c, q));
+
   return (
-    <div className="flex h-full w-72 shrink-0 flex-col border-r">
+    <div className="flex h-full w-full flex-col">
       {/* header */}
       <div className="flex items-center justify-between gap-1 border-b px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Collections</span>
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <Boxes className="h-4 w-4" /> Collections
+        </div>
         <div className="flex items-center gap-0.5">
-          <button onClick={handleImport} title="Import Postman collection" className="rounded p-1.5 hover:bg-accent">
-            <Upload className="h-4 w-4" />
-          </button>
           <button onClick={() => store.addCollection()} title="New collection" className="rounded p-1.5 hover:bg-accent">
             <Plus className="h-4 w-4" />
           </button>
+          <div className="relative">
+            <button onClick={() => setMenu((m) => !m)} title="More" className="rounded p-1.5 hover:bg-accent">
+              <MoreVertical className="h-4 w-4" />
+            </button>
+            {menu && (
+              <Menu onClose={() => setMenu(false)}>
+                <MenuItem onClick={handleImport}><Upload className="h-3.5 w-3.5" /> Import collection</MenuItem>
+              </Menu>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* search */}
+      <div className="border-b px-2 py-1.5">
+        <div className="flex items-center gap-1.5 rounded-md border bg-background px-2">
+          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <Input
+            ref={searchInputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search"
+            className="h-7 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          />
         </div>
       </div>
 
@@ -74,33 +113,13 @@ export function Sidebar({ store, onManageEnvironments }: Props) {
           <p className="px-3 py-6 text-center text-xs text-muted-foreground">
             No collections yet. Create one or import a Postman file.
           </p>
+        ) : visible.length === 0 ? (
+          <p className="px-3 py-6 text-center text-xs text-muted-foreground">No matches.</p>
         ) : (
-          store.collections.map((c) => (
-            <CollectionNode key={c.id} collection={c} store={store} onError={setError} onSettings={setSettings} />
+          visible.map((c) => (
+            <CollectionNode key={c.id} collection={c} store={store} onError={setError} onSettings={setSettings} q={q} />
           ))
         )}
-      </div>
-
-      {/* environment selector */}
-      <div className="border-t p-2">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Environment</span>
-          <button onClick={onManageEnvironments} className="text-[11px] text-primary hover:underline">Manage</button>
-        </div>
-        <Select
-          value={store.activeEnvId ?? 'none'}
-          onValueChange={(v) => store.setActiveEnvId(v === 'none' ? null : v)}
-        >
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue placeholder="No environment" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No environment</SelectItem>
-            {store.environments.map((e) => (
-              <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {settings && (
@@ -117,10 +136,10 @@ export function Sidebar({ store, onManageEnvironments }: Props) {
 // ─── collection node ────────────────────────────────────────────────────────
 
 function CollectionNode({
-  collection, store, onError, onSettings,
-}: { collection: Collection; store: ApiStore; onError: (m: string | null) => void; onSettings: (t: NodeSettingsTarget) => void }) {
+  collection, store, onError, onSettings, q,
+}: { collection: Collection; store: ApiStore; onError: (m: string | null) => void; onSettings: (t: NodeSettingsTarget) => void; q: string }) {
   const [menu, setMenu] = useState(false);
-  const collapsed = !!collection.collapsed;
+  const collapsed = !!collection.collapsed && !q;
 
   const handleExport = async () => {
     onError(null);
@@ -164,8 +183,8 @@ function CollectionNode({
           </>
         }
       />
-      {!collapsed && collection.items.map((item) => (
-        <TreeNode key={item.id} item={item} depth={1} collectionId={collection.id} store={store} onSettings={onSettings} />
+      {!collapsed && collection.items.filter((it) => !q || itemMatches(it, q)).map((item) => (
+        <TreeNode key={item.id} item={item} depth={1} collectionId={collection.id} store={store} onSettings={onSettings} q={q} />
       ))}
     </div>
   );
@@ -174,16 +193,16 @@ function CollectionNode({
 // ─── folder / request node ──────────────────────────────────────────────────
 
 function TreeNode({
-  item, depth, collectionId, store, onSettings,
-}: { item: TreeItem; depth: number; collectionId: string; store: ApiStore; onSettings: (t: NodeSettingsTarget) => void }) {
-  if (item.type === 'folder') return <FolderNode folder={item} depth={depth} collectionId={collectionId} store={store} onSettings={onSettings} />;
+  item, depth, collectionId, store, onSettings, q,
+}: { item: TreeItem; depth: number; collectionId: string; store: ApiStore; onSettings: (t: NodeSettingsTarget) => void; q: string }) {
+  if (item.type === 'folder') return <FolderNode folder={item} depth={depth} collectionId={collectionId} store={store} onSettings={onSettings} q={q} />;
   return <RequestNode request={item} depth={depth} collectionId={collectionId} store={store} />;
 }
 
 function FolderNode({
-  folder, depth, collectionId, store, onSettings,
-}: { folder: Folder; depth: number; collectionId: string; store: ApiStore; onSettings: (t: NodeSettingsTarget) => void }) {
-  const collapsed = !!folder.collapsed;
+  folder, depth, collectionId, store, onSettings, q,
+}: { folder: Folder; depth: number; collectionId: string; store: ApiStore; onSettings: (t: NodeSettingsTarget) => void; q: string }) {
+  const collapsed = !!folder.collapsed && !q;
   return (
     <div>
       <Row
@@ -203,8 +222,8 @@ function FolderNode({
           </>
         }
       />
-      {!collapsed && folder.items.map((child) => (
-        <TreeNode key={child.id} item={child} depth={depth + 1} collectionId={collectionId} store={store} onSettings={onSettings} />
+      {!collapsed && folder.items.filter((it) => !q || itemMatches(it, q)).map((child) => (
+        <TreeNode key={child.id} item={child} depth={depth + 1} collectionId={collectionId} store={store} onSettings={onSettings} q={q} />
       ))}
     </div>
   );
@@ -223,7 +242,10 @@ function RequestNode({
       onClick={() => store.selectRequest(request.id)}
       onRename={(name) => store.renameItem(request.id, name)}
       actions={
-        <IconBtn title="Delete request" onClick={() => store.deleteItem(collectionId, request.id)}><Trash2 className="h-3.5 w-3.5" /></IconBtn>
+        <>
+          <IconBtn title="Duplicate request" onClick={() => store.duplicateRequest(collectionId, request)}><CopyPlus className="h-3.5 w-3.5" /></IconBtn>
+          <IconBtn title="Delete request" onClick={() => store.deleteItem(collectionId, request.id)}><Trash2 className="h-3.5 w-3.5" /></IconBtn>
+        </>
       }
     />
   );

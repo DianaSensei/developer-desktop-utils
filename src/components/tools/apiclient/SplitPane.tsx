@@ -12,10 +12,13 @@ interface Props {
   initialPercent?: number;
   minPercent?: number;
   maxPercent?: number;
+  // Hard minimum size (px) each pane keeps while dragging, so content never gets
+  // squeezed out of view.
+  minPanePx?: number;
 }
 
 export function SplitPane({
-  direction, first, second, initialPercent = 50, minPercent = 20, maxPercent = 80,
+  direction, first, second, initialPercent = 50, minPercent = 20, maxPercent = 80, minPanePx = 360,
 }: Props) {
   const [percent, setPercent] = useState(initialPercent);
   const [dragging, setDragging] = useState(false);
@@ -26,11 +29,16 @@ export function SplitPane({
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const size = horizontal ? rect.width : rect.height;
     const raw = horizontal
       ? ((e.clientX - rect.left) / rect.width) * 100
       : ((e.clientY - rect.top) / rect.height) * 100;
-    setPercent(Math.min(maxPercent, Math.max(minPercent, raw)));
-  }, [horizontal, minPercent, maxPercent]);
+    // Clamp by both the percent bounds and a hard pixel minimum per pane.
+    const pxFloor = size > 0 ? (minPanePx / size) * 100 : minPercent;
+    const lo = Math.max(minPercent, pxFloor);
+    const hi = Math.min(maxPercent, 100 - pxFloor);
+    setPercent(lo > hi ? 50 : Math.min(hi, Math.max(lo, raw)));
+  }, [horizontal, minPercent, maxPercent, minPanePx]);
 
   const stop = useCallback(() => {
     setDragging(false);

@@ -196,7 +196,7 @@ export function makeReq(draft: ApiRequest) {
     },
     setBody: (data: unknown) => {
       if (typeof data === 'object' && data !== null) draft.body = { mode: 'json', raw: JSON.stringify(data), form: [] };
-      else draft.body = { ...draft.body, mode: 'raw', raw: String(data) };
+      else draft.body = { ...draft.body, mode: 'text', raw: String(data) };
     },
   };
 }
@@ -364,6 +364,19 @@ function coerce(raw: string): unknown {
   return raw;
 }
 
+function isEmptyVal(v: unknown): boolean {
+  if (v == null) return true;
+  if (typeof v === 'string' || Array.isArray(v)) return v.length === 0;
+  if (typeof v === 'object') return Object.keys(v as object).length === 0;
+  return false;
+}
+
+function isJsonVal(v: unknown): boolean {
+  if (typeof v === 'object' && v !== null) return true;
+  if (typeof v !== 'string') return false;
+  try { JSON.parse(v); return true; } catch { return false; }
+}
+
 export function evalAssertions(
   assertions: Assertion[],
   scope: Record<string, unknown>,
@@ -380,19 +393,39 @@ export function evalAssertions(
       continue;
     }
     const expected = coerce(a.value);
+    const list = () => a.value.split(',').map((s) => coerce(s.trim()));
+    const str = String(actual);
     let passed = false;
     try {
       switch (a.operator) {
-        case 'eq': passed = typeof expected === 'object' ? deepEqual(actual, expected) : actual == expected; break;
-        case 'neq': passed = actual != expected; break;
+        case 'equals': passed = typeof expected === 'object' ? deepEqual(actual, expected) : actual == expected; break;
+        case 'notEquals': passed = actual != expected; break;
         case 'gt': passed = Number(actual) > Number(expected); break;
         case 'gte': passed = Number(actual) >= Number(expected); break;
         case 'lt': passed = Number(actual) < Number(expected); break;
         case 'lte': passed = Number(actual) <= Number(expected); break;
-        case 'contains': passed = Array.isArray(actual) ? actual.includes(expected) : String(actual).includes(String(expected)); break;
-        case 'notContains': passed = Array.isArray(actual) ? !actual.includes(expected) : !String(actual).includes(String(expected)); break;
-        case 'matches': passed = new RegExp(a.value).test(String(actual)); break;
+        case 'in': passed = list().some((x) => x == actual); break;
+        case 'notIn': passed = !list().some((x) => x == actual); break;
+        case 'contains': passed = Array.isArray(actual) ? actual.includes(expected) : str.includes(String(expected)); break;
+        case 'notContains': passed = Array.isArray(actual) ? !actual.includes(expected) : !str.includes(String(expected)); break;
         case 'length': passed = (actual as { length?: number })?.length === Number(expected); break;
+        case 'matches': passed = new RegExp(a.value).test(str); break;
+        case 'notMatches': passed = !new RegExp(a.value).test(str); break;
+        case 'startsWith': passed = str.startsWith(a.value); break;
+        case 'endsWith': passed = str.endsWith(a.value); break;
+        case 'between': { const [lo, hi] = list(); passed = Number(actual) >= Number(lo) && Number(actual) <= Number(hi); break; }
+        case 'isEmpty': passed = isEmptyVal(actual); break;
+        case 'isNotEmpty': passed = !isEmptyVal(actual); break;
+        case 'isNull': passed = actual === null; break;
+        case 'isUndefined': passed = actual === undefined; break;
+        case 'isDefined': passed = actual !== undefined; break;
+        case 'isTruthy': passed = !!actual; break;
+        case 'isFalsy': passed = !actual; break;
+        case 'isJson': passed = isJsonVal(actual); break;
+        case 'isNumber': passed = typeof actual === 'number' && !Number.isNaN(actual); break;
+        case 'isString': passed = typeof actual === 'string'; break;
+        case 'isBoolean': passed = typeof actual === 'boolean'; break;
+        case 'isArray': passed = Array.isArray(actual); break;
       }
     } catch (e) {
       out.push({ name, passed: false, error: (e as Error).message });

@@ -16,6 +16,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { Button } from '@/components/ui/button';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
@@ -477,6 +478,7 @@ function Sidebar({
 function AppContent() {
   const location = useLocation();
   const { isFeatureEnabled } = useFeatures();
+  useDesktopChrome();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('devtool-sidebar-collapsed');

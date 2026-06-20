@@ -24,6 +24,28 @@ import {
 } from './types';
 
 const MAX_HISTORY = 50;
+const MAX_HISTORY_BODY = 256 * 1024; // cap stored response bodies at 256 KB
+
+// Keep history entries lean in localStorage: truncate huge response bodies and
+// drop binary file payloads from the request snapshot (filenames are kept).
+function trimHistoryEntry(entry: Omit<HistoryEntry, 'id' | 'at'>): Omit<HistoryEntry, 'id' | 'at'> {
+  const out = { ...entry };
+  if (out.response && out.response.body.length > MAX_HISTORY_BODY) {
+    out.response = { ...out.response, body: out.response.body.slice(0, MAX_HISTORY_BODY) };
+  }
+  if (out.request) {
+    const r = out.request;
+    out.request = {
+      ...r,
+      body: {
+        ...r.body,
+        fileContent: undefined,
+        form: r.body.form.map((f) => (f.fileContent ? { ...f, fileContent: undefined } : f)),
+      },
+    };
+  }
+  return out;
+}
 
 // First-run sample so the tool isn't an empty screen.
 function seedCollections(): Collection[] {
@@ -106,17 +128,19 @@ function collectInherited(collections: Collection[], id: string): InheritedScrip
 // ─── store hook ─────────────────────────────────────────────────────────────
 
 export function useApiStore() {
+  // The collections tree is edited on every keystroke, so debounce its (large)
+  // serialization rather than writing the whole tree to localStorage each time.
   const [collections, setCollections] = usePersistentState<Collection[]>(
-    'devtool:apiclient:collections', seedCollections,
+    'devtool:apiclient:collections', seedCollections, { debounceMs: 400 },
   );
   const [environments, setEnvironments] = usePersistentState<Environment[]>(
-    'devtool:apiclient:environments', [],
+    'devtool:apiclient:environments', [], { debounceMs: 300 },
   );
   const [activeEnvId, setActiveEnvId] = usePersistentState<string | null>(
     'devtool:apiclient:activeEnv', null,
   );
   const [history, setHistory] = usePersistentState<HistoryEntry[]>(
-    'devtool:apiclient:history', [],
+    'devtool:apiclient:history', [], { debounceMs: 500 },
   );
   const [activeRequestId, setActiveRequestId] = usePersistentState<string | null>(
     'devtool:apiclient:activeRequest', null,
@@ -145,6 +169,16 @@ export function useApiStore() {
     () => (activeRequestId ? lookupRequest(activeRequestId) : null),
     [activeRequestId, lookupRequest],
   );
+
+  // The collection the user is currently working in — used to scope which
+  // collection environments are available alongside the global ones.
+  const activeCollectionId = useMemo(() => {
+    if (activeRequestId) {
+      const c = collections.find((col) => findRequest(col.items, activeRequestId));
+      if (c) return c.id;
+    }
+    return collections[0]?.id ?? null;
+  }, [collections, activeRequestId]);
 
   // Open tabs resolved to live requests, dropping any that were deleted.
   const openRequests = useMemo(
@@ -185,7 +219,9 @@ export function useApiStore() {
 
   const deleteCollection = useCallback((id: string) => {
     setCollections((prev) => prev.filter((c) => c.id !== id));
-  }, [setCollections]);
+    // Drop the collection's scoped environments too.
+    setEnvironments((prev) => prev.filter((e) => e.collectionId !== id));
+  }, [setCollections, setEnvironments]);
 
   const renameCollection = useCallback((id: string, name: string) => {
     setCollections((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
@@ -270,8 +306,8 @@ export function useApiStore() {
 
   // — environment ops —
 
-  const addEnvironment = useCallback(() => {
-    const e = newEnvironment();
+  const addEnvironment = useCallback((collectionId: string | null = null) => {
+    const e = newEnvironment('New Environment', collectionId);
     setEnvironments((prev) => [...prev, e]);
     return e.id;
   }, [setEnvironments]);
@@ -288,13 +324,14 @@ export function useApiStore() {
   // — history —
 
   const addHistory = useCallback((entry: Omit<HistoryEntry, 'id' | 'at'>) => {
-    setHistory((prev) => [{ ...entry, id: uid(), at: Date.now() }, ...prev].slice(0, MAX_HISTORY));
+    const lean = trimHistoryEntry(entry);
+    setHistory((prev) => [{ ...lean, id: uid(), at: Date.now() }, ...prev].slice(0, MAX_HISTORY));
   }, [setHistory]);
 
   const clearHistory = useCallback(() => setHistory([]), [setHistory]);
 
   return {
-    collections, environments, activeEnvId, activeEnv, history,
+    collections, environments, activeEnvId, activeEnv, history, activeCollectionId,
     activeRequestId, activeRequest, openRequests, inheritedScripts,
     setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,

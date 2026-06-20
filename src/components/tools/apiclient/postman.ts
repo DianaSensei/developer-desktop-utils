@@ -17,6 +17,7 @@ import {
   type RequestBody,
   type TreeItem,
   HTTP_METHODS,
+  newSettings,
   uid,
 } from './types';
 
@@ -88,11 +89,12 @@ function importAuth(auth?: PmAuth): Auth {
 function importBody(body?: PmBody): RequestBody {
   if (!body?.mode) return { mode: 'none', raw: '', form: [] };
   if (body.mode === 'raw') {
-    const isJson = body.options?.raw?.language === 'json';
-    return { mode: isJson ? 'json' : 'raw', raw: body.raw ?? '', form: [] };
+    const lang = body.options?.raw?.language;
+    const mode = lang === 'json' ? 'json' : lang === 'xml' ? 'xml' : 'text';
+    return { mode, raw: body.raw ?? '', form: [] };
   }
   if (body.mode === 'urlencoded') return { mode: 'urlencoded', raw: '', form: mapKv(body.urlencoded) };
-  if (body.mode === 'formdata') return { mode: 'form-data', raw: '', form: mapKv(body.formdata) };
+  if (body.mode === 'formdata') return { mode: 'multipart', raw: '', form: mapKv(body.formdata) };
   return { mode: 'none', raw: '', form: [] };
 }
 
@@ -130,6 +132,7 @@ function importRequest(item: PmItem): ApiRequest {
     vars: { req: [], res: [] },
     assertions: [],
     tests: test,
+    settings: newSettings(),
   };
 }
 
@@ -190,11 +193,14 @@ function exportBody(body: RequestBody): PmBody | undefined {
   switch (body.mode) {
     case 'json':
       return { mode: 'raw', raw: body.raw, options: { raw: { language: 'json' } } };
-    case 'raw':
+    case 'xml':
+      return { mode: 'raw', raw: body.raw, options: { raw: { language: 'xml' } } };
+    case 'text':
+    case 'sparql':
       return { mode: 'raw', raw: body.raw };
     case 'urlencoded':
       return { mode: 'urlencoded', urlencoded: exportKv(body.form) };
-    case 'form-data':
+    case 'multipart':
       return { mode: 'formdata', formdata: exportKv(body.form) };
     default:
       return undefined;

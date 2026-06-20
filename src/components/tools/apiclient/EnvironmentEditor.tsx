@@ -28,6 +28,9 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   }, [environments, selectedId]);
 
   const selected = environments.find((e) => e.id === selectedId) ?? null;
+  const activeCollection = store.collections.find((c) => c.id === store.activeCollectionId) ?? null;
+  const collectionEnvs = environments.filter((e) => e.collectionId === store.activeCollectionId);
+  const globalEnvs = environments.filter((e) => !e.collectionId);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -37,35 +40,22 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
         </DialogHeader>
 
         <div className="flex h-[26rem]">
-          {/* list */}
-          <div className="flex w-52 shrink-0 flex-col border-r">
-            <div className="min-h-0 flex-1 overflow-y-auto py-1">
-              {environments.map((e) => (
-                <button
-                  key={e.id}
-                  onClick={() => setSelectedId(e.id)}
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent/60',
-                    selectedId === e.id && 'bg-accent',
-                  )}
-                >
-                  {store.activeEnvId === e.id && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-                  <span className="truncate">{e.name}</span>
-                </button>
+          {/* list — grouped by scope */}
+          <div className="flex w-56 shrink-0 flex-col overflow-y-auto border-r py-1">
+            <Section
+              title={activeCollection?.name ?? 'Collection'}
+              disabled={!store.activeCollectionId}
+              onAdd={() => setSelectedId(store.addEnvironment(store.activeCollectionId))}
+            >
+              {collectionEnvs.map((e) => (
+                <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selectedId === e.id} onClick={() => setSelectedId(e.id)} />
               ))}
-              {environments.length === 0 && (
-                <p className="px-3 py-4 text-center text-[11px] text-muted-foreground">No environments yet.</p>
-              )}
-            </div>
-            <div className="border-t p-2">
-              <Button
-                variant="outline"
-                className="h-8 w-full gap-1.5 text-xs"
-                onClick={() => setSelectedId(store.addEnvironment())}
-              >
-                <Plus className="h-3.5 w-3.5" /> New environment
-              </Button>
-            </div>
+            </Section>
+            <Section title="Global" onAdd={() => setSelectedId(store.addEnvironment(null))}>
+              {globalEnvs.map((e) => (
+                <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selectedId === e.id} onClick={() => setSelectedId(e.id)} />
+              ))}
+            </Section>
           </div>
 
           {/* editor */}
@@ -73,6 +63,9 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             {selected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
+                  </span>
                   <Input
                     value={selected.name}
                     onChange={(e) => store.updateEnvironment(selected.id, { name: e.target.value })}
@@ -114,5 +107,43 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Section({ title, onAdd, disabled, children }: {
+  title: string; onAdd: () => void; disabled?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between px-3 py-1">
+        <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</span>
+        <button
+          onClick={onAdd}
+          disabled={disabled}
+          title={`New ${title} environment`}
+          className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EnvRow({ env, active, selected, onClick }: {
+  env: { id: string; name: string }; active: boolean; selected: boolean; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent/60',
+        selected && 'bg-accent',
+      )}
+    >
+      {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />}
+      <span className="truncate">{env.name}</span>
+    </button>
   );
 }

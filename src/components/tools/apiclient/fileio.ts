@@ -55,3 +55,24 @@ export async function saveJsonFile(suggestedName: string, text: string): Promise
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// Save arbitrary text to a file the user picks (no extension lock-in). Used to
+// export a raw response body.
+export async function saveTextFile(suggestedName: string, text: string): Promise<void> {
+  if (isTauri) {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const path = await save({ defaultPath: suggestedName });
+    if (!path) return;
+    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+    await writeTextFile(path, text);
+    return;
+  }
+
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = suggestedName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
