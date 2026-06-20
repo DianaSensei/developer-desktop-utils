@@ -3,10 +3,15 @@
 // status affordances.
 
 import { Cookie, Search, Wrench } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const VERSION = 'v0.1.0';
 
-export function StatusBar({ onSearch }: { onSearch: () => void }) {
+export function StatusBar({ onSearch, onCookies, cookieCount }: {
+  onSearch: () => void;
+  onCookies: () => void;
+  cookieCount: number;
+}) {
   return (
     <div className="flex shrink-0 items-center justify-between border-t px-3 py-1 text-[11px] text-muted-foreground">
       <span className="font-medium">API Client</span>
@@ -14,10 +19,13 @@ export function StatusBar({ onSearch }: { onSearch: () => void }) {
         <button onClick={onSearch} className="flex items-center gap-1 transition-colors hover:text-foreground">
           <Search className="h-3.5 w-3.5" /> Search
         </button>
-        <span className="flex items-center gap-1 opacity-50" title="Not available yet">
+        <button onClick={onCookies} className="flex items-center gap-1 transition-colors hover:text-foreground" title="Manage cookies">
           <Cookie className="h-3.5 w-3.5" /> Cookies
-        </span>
-        <span className="flex items-center gap-1 opacity-50" title="Not available yet">
+          {cookieCount > 0 && (
+            <span className="rounded-full bg-muted px-1.5 text-[9px] font-semibold text-foreground">{cookieCount}</span>
+          )}
+        </button>
+        <span className={cn('flex items-center gap-1 opacity-50')} title="Not available yet">
           <Wrench className="h-3.5 w-3.5" /> Dev Tools
         </span>
         <span>{VERSION}</span>

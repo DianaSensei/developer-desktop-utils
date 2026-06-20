@@ -12,7 +12,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Check, Trash2 } from 'lucide-react';
 import { CodeEditor } from './CodeEditor';
-import { type KeyValue, newKeyValue } from './types';
+import { VarInput } from './VarInput';
+import { type KeyValue, type VarMap, newKeyValue } from './types';
 
 interface Props {
   rows: KeyValue[];
@@ -22,6 +23,9 @@ interface Props {
   nameLabel?: string;
   valueLabel?: string;
   bulkEdit?: boolean;
+  // When provided, name/value cells become {{variable}}-aware (highlight +
+  // autocomplete + hover). Omitted where vars don't apply (e.g. env editor).
+  vars?: VarMap;
 }
 
 const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
@@ -34,6 +38,7 @@ export function KeyValueEditor({
   nameLabel = 'Name',
   valueLabel = 'Value',
   bulkEdit = true,
+  vars,
 }: Props) {
   const [bulk, setBulk] = useState(false);
   // Bulk mode keeps its own text so newlines/spacing survive while typing; rows
@@ -134,13 +139,24 @@ export function KeyValueEditor({
               </div>
               {/* value cell */}
               <div className="border-r px-2">
-                <Input
-                  value={row.value}
-                  onChange={(e) => editRow(row.id, { value: e.target.value })}
-                  placeholder={valuePlaceholder}
-                  className={cn('h-8 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', !isGhost && !row.enabled && 'opacity-50')}
-                  spellCheck={false}
-                />
+                {vars ? (
+                  <div className={cn('flex h-8 items-center', !isGhost && !row.enabled && 'opacity-50')}>
+                    <VarInput
+                      value={row.value}
+                      onChange={(v) => editRow(row.id, { value: v })}
+                      vars={vars}
+                      placeholder={valuePlaceholder}
+                    />
+                  </div>
+                ) : (
+                  <Input
+                    value={row.value}
+                    onChange={(e) => editRow(row.id, { value: e.target.value })}
+                    placeholder={valuePlaceholder}
+                    className={cn('h-8 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', !isGhost && !row.enabled && 'opacity-50')}
+                    spellCheck={false}
+                  />
+                )}
               </div>
               {/* action cell */}
               <div className="flex items-center justify-center">

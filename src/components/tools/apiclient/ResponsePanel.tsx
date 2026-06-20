@@ -178,6 +178,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
     const shortcuts: [string, string][] = [
       ['Send Request', `${mod} + Enter`],
       ['New Request', `${mod} + B`],
+      ['Close Tab', `${mod} + W`],
       ['Edit Environments', `${mod} + E`],
     ];
     return (

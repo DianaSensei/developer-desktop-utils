@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { methodColor } from './method-color';
 import { VarInput } from './VarInput';
+import { paramsFromUrl } from './request';
 import { type ApiRequest, HTTP_METHODS } from './types';
 
 interface Props {
@@ -20,6 +21,13 @@ interface Props {
 }
 
 export function AddressBar({ request, onChange, onSend, onCancel, sending, onGenerateCode, vars }: Props) {
+  // Typing in the URL keeps the Params table in sync. Ignore echoes where the
+  // value is unchanged (e.g. when a params edit rewrote the URL).
+  const handleUrl = (url: string) => {
+    if (url === request.url) return;
+    onChange({ url, params: paramsFromUrl(url, request.params) });
+  };
+
   return (
     <div className="p-3">
       <div className="flex items-center rounded-md border bg-background shadow-sm transition-colors focus-within:ring-2 focus-within:ring-ring/40">
@@ -37,7 +45,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         <div className="flex h-9 min-w-0 flex-1 items-center px-2.5">
           <VarInput
             value={request.url}
-            onChange={(url) => onChange({ url })}
+            onChange={handleUrl}
             vars={vars}
             onEnter={onSend}
             placeholder="https://api.example.com/endpoint  ·  {{var}} for environment values"

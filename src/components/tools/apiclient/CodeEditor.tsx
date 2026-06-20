@@ -9,6 +9,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { tags } from '@lezer/highlight';
 import { cn } from '@/lib/utils';
+import { varExtensions, varTheme } from './varSupport';
 
 const jsLang = javascript();
 
@@ -51,14 +52,20 @@ interface Props {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  // When provided, {{variables}} are highlighted/autocompleted in the editor
+  // (used for the request body; omitted for scripts/tests).
+  vars?: Record<string, string>;
 }
 
-export function CodeEditor({ value, onChange, placeholder, className }: Props) {
+export function CodeEditor({ value, onChange, placeholder, className, vars }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const lastValueRef = useRef(value);
+  const varsRef = useRef(vars);
+  varsRef.current = vars;
+  const hasVars = useRef(!!vars).current;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -71,6 +78,7 @@ export function CodeEditor({ value, onChange, placeholder, className }: Props) {
           syntaxHighlighting(codeHighlight),
           editorTheme,
           EditorView.lineWrapping,
+          ...(hasVars ? [...varExtensions(() => varsRef.current ?? {}), varTheme] : []),
           EditorView.updateListener.of((upd) => {
             if (!upd.docChanged) return;
             const val = upd.state.doc.toString();
@@ -85,6 +93,11 @@ export function CodeEditor({ value, onChange, placeholder, className }: Props) {
     return () => { view.destroy(); viewRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Refresh {{var}} highlighting when the known variable set changes.
+  useEffect(() => {
+    if (hasVars) viewRef.current?.dispatch({});
+  }, [vars, hasVars]);
 
   // Reflect external value changes (e.g. switching tabs) into the editor.
   useEffect(() => {

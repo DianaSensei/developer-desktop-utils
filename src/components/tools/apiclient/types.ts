@@ -201,6 +201,8 @@ export interface ApiResponse {
   contentType: string;
   timeMs: number;
   sizeBytes: number;
+  url?: string;            // final URL actually fetched (after redirects)
+  setCookies?: string[];   // raw Set-Cookie header values from the response
 }
 
 // A single past send (most-recent first), kept for the History tab.

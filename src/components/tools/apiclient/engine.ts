@@ -10,6 +10,7 @@
 import type { ApiRequest, ApiResponse, Auth, Environment, LogEntry, TestResult, VarMap } from './types';
 import { newRequest } from './types';
 import { sendRequest } from './request';
+import type { Cookie } from './cookies';
 import {
   type VarStores,
   applyVars, evalAssertions, makeBru, makeReq, makeRes, runScript, type ScriptRun,
@@ -39,6 +40,8 @@ export async function executeRequest(
   runtimeVarsIn: VarMap,
   signal?: AbortSignal,
   inherited: InheritedScripts = { pre: [], post: [] },
+  cookieJar: Cookie[] = [],
+  dataVars: VarMap = {},
 ): Promise<ExecResult> {
   // Work on copies so a failed run never mutates stored state.
   const draft = newRequest({ ...request });
@@ -48,13 +51,16 @@ export async function executeRequest(
     runtime: { ...runtimeVarsIn },
     env: envToMap(env),
     envName: env?.name ?? null,
+    data: dataVars,
   };
   const out: ScriptRun = { logs: [], tests: [], error: null };
 
   const envBefore = JSON.stringify(stores.env);
 
-  // Combined substitution map — runtime overrides environment.
-  const varMap = (): VarMap => ({ ...stores.env, ...stores.runtime });
+  // Combined substitution map. Precedence: env < data-file row < runtime
+  // (bru.setVar / local), so a data file overrides the environment but explicit
+  // runtime sets still win — matching Postman's variable resolution order.
+  const varMap = (): VarMap => ({ ...stores.env, ...dataVars, ...stores.runtime });
 
   // 1. inherited pre-request scripts (collection → folders), then request's own
   for (const code of inherited.pre) {
@@ -72,7 +78,7 @@ export async function executeRequest(
   // 3. build & send
   let response: ApiResponse;
   try {
-    response = await sendRequest(draft, varMap(), signal);
+    response = await sendRequest(draft, varMap(), signal, cookieJar);
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
     return finish(null, out, stores, envBefore, (e as Error).message || 'Request failed');

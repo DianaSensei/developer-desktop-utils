@@ -22,6 +22,7 @@ import { SplitPane } from './SplitPane';
 import { EnvironmentEditor } from './EnvironmentEditor';
 import { GenerateCodeDialog } from './GenerateCodeDialog';
 import { RunnerDialog } from './RunnerDialog';
+import { CookieManager } from './CookieManager';
 import { useApiStore } from './store';
 import { executeRequest } from './engine';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
@@ -47,6 +48,7 @@ export function ApiClient() {
   const abortRefs = useRef<Map<string, AbortController>>(new Map());
   const [envOpen, setEnvOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [cookiesOpen, setCookiesOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [runTarget, setRunTarget] = useState<{ title: string; requests: ApiRequest[] } | null>(null);
   const [direction, setDirection] = usePersistentState<SplitDirection>(
@@ -91,6 +93,10 @@ export function ApiClient() {
   // After a run, persist runtime/env-var changes and record a history entry.
   const persistResult = useCallback((req: ApiRequest, result: Awaited<ReturnType<typeof executeRequest>>) => {
     runtimeVarsRef.current = result.runtimeVars;
+    // Capture any Set-Cookie into the jar (scoped to the URL that returned them).
+    if (store.cookiesEnabled && result.response?.setCookies?.length) {
+      store.captureCookies(result.response.url ?? req.url, result.response.setCookies);
+    }
     if (result.envChanged && store.activeEnv) {
       const env = store.activeEnv;
       const variables = env.variables.map((v) => (v.key in result.envVars ? { ...v, value: result.envVars[v.key] } : v));
@@ -114,8 +120,9 @@ export function ApiClient() {
   }, [store]);
 
   // Run one request (used by the Runner); resolves inherited scripts/auth per id.
-  const runRequest = useCallback(async (req: ApiRequest) => {
-    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, undefined, store.getInherited(req.id));
+  const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap) => {
+    const jar = store.cookiesEnabled ? store.cookies : [];
+    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, undefined, store.getInherited(req.id), jar, dataVars);
     persistResult(req, result);
     return result;
   }, [store, persistResult]);
@@ -127,7 +134,8 @@ export function ApiClient() {
     abortRefs.current.set(id, controller);
     patchRun(id, { sending: true, error: null });
     try {
-      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts);
+      const jar = store.cookiesEnabled ? store.cookies : [];
+      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar);
       persistResult(activeRequest, result);
       patchRun(id, {
         response: result.response,
@@ -163,6 +171,9 @@ export function ApiClient() {
         if (first) { e.preventDefault(); store.addItem(first.id, 'request'); }
       } else if (e.key.toLowerCase() === 'e') {
         e.preventDefault(); setEnvOpen(true);
+      } else if (e.key.toLowerCase() === 'w') {
+        // Close the focused request tab (don't close the desktop window).
+        if (activeRequest) { e.preventDefault(); store.closeTab(activeRequest.id); }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -250,6 +261,7 @@ export function ApiClient() {
                         key={activeRequest.id}
                         request={activeRequest}
                         onChange={(patch) => store.updateRequest(activeRequest.id, patch)}
+                        vars={varMap}
                       />
                     }
                     second={
@@ -275,9 +287,14 @@ export function ApiClient() {
         </div>
       </div>
 
-      <StatusBar onSearch={() => searchInputRef.current?.focus()} />
+      <StatusBar
+        onSearch={() => searchInputRef.current?.focus()}
+        onCookies={() => setCookiesOpen(true)}
+        cookieCount={store.cookies.length}
+      />
 
       <EnvironmentEditor store={store} open={envOpen} onClose={() => setEnvOpen(false)} />
+      <CookieManager store={store} open={cookiesOpen} onClose={() => setCookiesOpen(false)} />
       <GenerateCodeDialog
         open={codeOpen}
         onClose={() => setCodeOpen(false)}

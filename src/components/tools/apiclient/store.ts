@@ -7,6 +7,8 @@
 
 import { useCallback, useMemo } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { type Cookie, applySetCookies } from './cookies';
+import { paramsFromUrl } from './request';
 import {
   type ApiRequest,
   type Auth,
@@ -147,6 +149,16 @@ function insertRelative(items: TreeItem[], targetId: string, node: TreeItem, whe
   return { items: out, done };
 }
 
+// Backfill the params table from the URL's query for requests saved before the
+// URL⇄params sync (or imported), so the Params tab reflects the URL on open.
+function syncParams(req: ApiRequest): ApiRequest {
+  if (req.params.length === 0 && req.url.includes('?')) {
+    const params = paramsFromUrl(req.url, []);
+    if (params.length) return { ...req, params };
+  }
+  return req;
+}
+
 function findRequest(items: TreeItem[], id: string): ApiRequest | null {
   for (const item of items) {
     if (item.id === id && item.type === 'request') return item;
@@ -217,6 +229,13 @@ export function useApiStore() {
   const [openTabIds, setOpenTabIds] = usePersistentState<string[]>(
     'devtool:apiclient:openTabs', [],
   );
+  // Cookie jar: captured from responses, auto-sent to matching requests.
+  const [cookies, setCookies] = usePersistentState<Cookie[]>(
+    'devtool:apiclient:cookies', [], { debounceMs: 300 },
+  );
+  const [cookiesEnabled, setCookiesEnabled] = usePersistentState<boolean>(
+    'devtool:apiclient:cookiesEnabled', true,
+  );
 
   const activeEnv = useMemo(
     () => environments.find((e) => e.id === activeEnvId) ?? null,
@@ -228,7 +247,7 @@ export function useApiStore() {
   const lookupRequest = useCallback((id: string): ApiRequest | null => {
     for (const c of collections) {
       const found = findRequest(c.items, id);
-      if (found) return normalizeRequest(found);
+      if (found) return syncParams(normalizeRequest(found));
     }
     return null;
   }, [collections]);
@@ -478,6 +497,35 @@ export function useApiStore() {
 
   const clearHistory = useCallback(() => setHistory([]), [setHistory]);
 
+  // — cookies —
+
+  // Capture Set-Cookie from a response at `url` into the jar (no-op if disabled).
+  const captureCookies = useCallback((url: string, raws: string[]) => {
+    if (!raws.length) return;
+    setCookies((prev) => applySetCookies(prev, raws, url));
+  }, [setCookies]);
+
+  // Upsert a single cookie (manual add/edit from the cookie manager).
+  const upsertCookie = useCallback((cookie: Cookie, replaces?: Cookie) => {
+    setCookies((prev) => {
+      const same = (a: Cookie, b: Cookie) => a.domain === b.domain && a.path === b.path && a.name === b.name;
+      const target = replaces ?? cookie;
+      const next = prev.filter((c) => !same(c, target));
+      next.push(cookie);
+      return next;
+    });
+  }, [setCookies]);
+
+  const deleteCookie = useCallback((cookie: Cookie) => {
+    setCookies((prev) => prev.filter((c) => !(c.domain === cookie.domain && c.path === cookie.path && c.name === cookie.name)));
+  }, [setCookies]);
+
+  const clearDomainCookies = useCallback((domain: string) => {
+    setCookies((prev) => prev.filter((c) => c.domain !== domain));
+  }, [setCookies]);
+
+  const clearCookies = useCallback(() => setCookies([]), [setCookies]);
+
   return {
     collections, environments, activeEnvId, activeEnv, history, activeCollectionId,
     activeRequestId, activeRequest, openRequests, inheritedScripts,
@@ -486,6 +534,8 @@ export function useApiStore() {
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, updateRequest, setNodeScript, setNodeAuth,
     addEnvironment, updateEnvironment, deleteEnvironment,
     addHistory, clearHistory, getInherited,
+    cookies, cookiesEnabled, setCookiesEnabled,
+    captureCookies, upsertCookie, deleteCookie, clearDomainCookies, clearCookies,
   };
 }
 

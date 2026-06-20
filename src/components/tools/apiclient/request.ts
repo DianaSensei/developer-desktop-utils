@@ -7,7 +7,9 @@
 // fire when the user clicks Send.
 
 import type { ApiRequest, ApiResponse, KeyValue, OAuth2Auth, VarMap } from './types';
+import { newKeyValue } from './types';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
+import { type Cookie, cookieHeader } from './cookies';
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -54,20 +56,19 @@ function buildUrl(req: ApiRequest, sub: Sub): string {
   if (req.auth.type === 'apikey' && req.auth.apiKey.placement === 'query' && req.auth.apiKey.key.trim()) {
     params.push([sub(req.auth.apiKey.key), sub(req.auth.apiKey.value)]);
   }
+  // No managed params → leave the URL (and its own query) untouched.
   if (!params.length) return base;
 
-  const [head, existingQuery = ''] = base.split('#')[0].split('?');
+  // The params table mirrors the query string, so build the query *only* from
+  // the params (dropping the URL's own query) to avoid duplicating them.
+  const head = base.split('#')[0].split('?')[0];
 
   if (req.settings?.encodeUrl === false) {
-    const raw = params.map(([k, v]) => `${k}=${v}`).join('&');
-    const query = [existingQuery, raw].filter(Boolean).join('&');
-    return query ? `${head}?${query}` : head;
+    return `${head}?${params.map(([k, v]) => `${k}=${v}`).join('&')}`;
   }
-
-  const search = new URLSearchParams(existingQuery);
+  const search = new URLSearchParams();
   for (const [k, v] of params) search.append(k, v);
-  const query = search.toString();
-  return query ? `${head}?${query}` : head;
+  return `${head}?${search.toString()}`;
 }
 
 // Assemble headers from the headers list, auth, and the body content-type.
@@ -189,6 +190,7 @@ export async function sendRequest(
   req: ApiRequest,
   vars: VarMap,
   signal?: AbortSignal,
+  cookieJar: Cookie[] = [],
 ): Promise<ApiResponse> {
   const sub: Sub = (s) => substituteVars(s, vars);
   const url = buildUrl(req, sub);
@@ -209,6 +211,12 @@ export async function sendRequest(
   // OAuth2: fetch an access token first, then send the request as Bearer.
   if (req.auth.type === 'oauth2') {
     reqHeaders['Authorization'] = `Bearer ${await fetchOAuthToken(req.auth.oauth2, sub, timeoutCtl ? timeoutCtl.signal : signal)}`;
+  }
+
+  // Auto-attach jar cookies unless the request sets its own Cookie header.
+  if (cookieJar.length && !Object.keys(reqHeaders).some((h) => h.toLowerCase() === 'cookie')) {
+    const header = cookieHeader(cookieJar, finalUrl);
+    if (header) reqHeaders['Cookie'] = header;
   }
 
   const init: RequestInit & { maxRedirections?: number } = {
@@ -260,6 +268,18 @@ export async function sendRequest(
   const headers: [string, string][] = [];
   res.headers.forEach((value, key) => headers.push([key, value]));
 
+  // Capture Set-Cookie. getSetCookie() returns them un-collapsed (preferred);
+  // fall back to the single combined header otherwise.
+  const hdrs = res.headers as Headers & { getSetCookie?: () => string[] };
+  let setCookies: string[] | undefined;
+  if (typeof hdrs.getSetCookie === 'function') {
+    const list = hdrs.getSetCookie();
+    if (list.length) setCookies = list;
+  } else {
+    const sc = res.headers.get('set-cookie');
+    if (sc) setCookies = [sc];
+  }
+
   const contentType = res.headers.get('content-type') ?? '';
   const lengthHeader = res.headers.get('content-length');
   const sizeBytes = lengthHeader ? Number(lengthHeader) : byteLength(text);
@@ -273,6 +293,8 @@ export async function sendRequest(
     contentType,
     timeMs,
     sizeBytes,
+    url: res.url || finalUrl,
+    setCookies,
   };
 }
 
@@ -343,6 +365,52 @@ export function resolveRequest(req: ApiRequest, vars: VarMap, interpolate: boole
 }
 
 export const shellQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
+
+// ─── URL ⇄ query-params sync (Postman/Bruno) ──────────────────────────────────
+// Kept as raw string ops (no URL/URLSearchParams) so {{var}} tokens survive
+// verbatim — encoding only happens at send time, per the request's settings.
+
+function splitUrl(url: string): { base: string; query: string; hash: string } {
+  const hashIdx = url.indexOf('#');
+  const hash = hashIdx >= 0 ? url.slice(hashIdx) : '';
+  const noHash = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+  const qIdx = noHash.indexOf('?');
+  return {
+    base: qIdx >= 0 ? noHash.slice(0, qIdx) : noHash,
+    query: qIdx >= 0 ? noHash.slice(qIdx + 1) : '',
+    hash,
+  };
+}
+
+// Derive the query-params table from a URL. Enabled rows are taken from the URL's
+// query (reusing existing rows by position to keep ids/focus stable); disabled
+// rows aren't represented in the URL, so they're preserved as-is at the end.
+export function paramsFromUrl(url: string, existing: KeyValue[]): KeyValue[] {
+  const { query } = splitUrl(url);
+  const pairs = query
+    ? query.split('&').filter((s) => s !== '').map((seg) => {
+        const eq = seg.indexOf('=');
+        return { key: eq === -1 ? seg : seg.slice(0, eq), value: eq === -1 ? '' : seg.slice(eq + 1) };
+      })
+    : [];
+  const enabledPrev = existing.filter((p) => p.enabled);
+  const disabledPrev = existing.filter((p) => !p.enabled);
+  const next = pairs.map((p, i) => {
+    const reuse = enabledPrev[i];
+    return reuse ? { ...reuse, key: p.key, value: p.value, enabled: true } : newKeyValue(p.key, p.value);
+  });
+  return [...next, ...disabledPrev];
+}
+
+// Rebuild a URL's query string from the enabled params (raw — {{var}} preserved).
+export function urlWithParams(url: string, params: KeyValue[]): string {
+  const { base, hash } = splitUrl(url);
+  const query = params
+    .filter((p) => p.enabled && p.key.trim() !== '')
+    .map((p) => `${p.key}=${p.value}`)
+    .join('&');
+  return base + (query ? `?${query}` : '') + hash;
+}
 
 // ─── formatting helpers ─────────────────────────────────────────────────────
 

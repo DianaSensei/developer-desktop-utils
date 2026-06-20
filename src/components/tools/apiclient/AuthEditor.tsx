@@ -5,7 +5,8 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { ApiKeyAuth, Auth, AuthType, OAuth2Auth } from './types';
+import { VarInput } from './VarInput';
+import type { ApiKeyAuth, Auth, AuthType, OAuth2Auth, VarMap } from './types';
 
 const AUTH_TYPES: { id: AuthType; label: string }[] = [
   { id: 'none', label: 'No Auth' },
@@ -17,20 +18,29 @@ const AUTH_TYPES: { id: AuthType; label: string }[] = [
   { id: 'oauth2', label: 'OAuth 2.0' },
 ];
 
-function Field({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
-      <Input className="h-8 font-mono text-xs" spellCheck={false} {...props} />
-    </div>
-  );
-}
-
-export function AuthEditor({ auth, onChange, allowInherit = true }: { auth: Auth; onChange: (a: Auth) => void; allowInherit?: boolean }) {
+export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
+  auth: Auth; onChange: (a: Auth) => void; allowInherit?: boolean; vars?: VarMap;
+}) {
   const set = (patch: Partial<Auth>) => onChange({ ...auth, ...patch });
   const setApiKey = (patch: Partial<ApiKeyAuth>) => set({ apiKey: { ...auth.apiKey, ...patch } });
   const setOAuth = (patch: Partial<OAuth2Auth>) => set({ oauth2: { ...auth.oauth2, ...patch } });
   const types = allowInherit ? AUTH_TYPES : AUTH_TYPES.filter((t) => t.id !== 'inherit');
+
+  // A labelled text field that becomes {{variable}}-aware when `vars` is given.
+  const Field = ({ label, value, onValue, placeholder }: {
+    label: string; value: string; onValue: (v: string) => void; placeholder?: string;
+  }) => (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      {vars ? (
+        <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40">
+          <VarInput value={value} onChange={onValue} vars={vars} placeholder={placeholder} />
+        </div>
+      ) : (
+        <Input className="h-8 font-mono text-xs" spellCheck={false} value={value} onChange={(e) => onValue(e.target.value)} placeholder={placeholder} />
+      )}
+    </div>
+  );
 
   return (
     <div className="max-w-lg space-y-3">
@@ -45,15 +55,15 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth: Auth
       {auth.type === 'inherit' && <p className="py-4 text-center text-xs text-muted-foreground">Inherits auth from the parent folder or collection.</p>}
 
       {auth.type === 'bearer' && (
-        <Field label="Token" value={auth.token} onChange={(e) => set({ token: e.target.value })} placeholder="Token or {{var}}" />
+        <Field label="Token" value={auth.token} onValue={(v) => set({ token: v })} placeholder="Token or {{var}}" />
       )}
 
       {(auth.type === 'basic' || auth.type === 'digest') && (
         <div className="space-y-2">
-          <Field label="Username" value={auth.username} onChange={(e) => set({ username: e.target.value })} />
+          <Field label="Username" value={auth.username} onValue={(v) => set({ username: v })} placeholder="Username or {{var}}" />
           <div className="space-y-1.5">
             <Label className="text-xs">Password</Label>
-            <Input type="password" value={auth.password} onChange={(e) => set({ password: e.target.value })} className="h-8 text-xs" />
+            <Input type="password" value={auth.password} onChange={(e) => set({ password: e.target.value })} className="h-8 text-xs" placeholder="Password or {{var}}" />
           </div>
           {auth.type === 'digest' && (
             <p className="text-[11px] text-muted-foreground">The server's 401 challenge is answered automatically with an MD5 Digest response.</p>
@@ -63,8 +73,8 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth: Auth
 
       {auth.type === 'apikey' && (
         <div className="space-y-2">
-          <Field label="Key" value={auth.apiKey.key} onChange={(e) => setApiKey({ key: e.target.value })} placeholder="X-API-Key" />
-          <Field label="Value" value={auth.apiKey.value} onChange={(e) => setApiKey({ value: e.target.value })} placeholder="Value or {{var}}" />
+          <Field label="Key" value={auth.apiKey.key} onValue={(v) => setApiKey({ key: v })} placeholder="X-API-Key" />
+          <Field label="Value" value={auth.apiKey.value} onValue={(v) => setApiKey({ value: v })} placeholder="Value or {{var}}" />
           <div className="space-y-1.5">
             <Label className="text-xs">Add to</Label>
             <Select value={auth.apiKey.placement} onValueChange={(v) => setApiKey({ placement: v as ApiKeyAuth['placement'] })}>
@@ -90,14 +100,14 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth: Auth
               </SelectContent>
             </Select>
           </div>
-          <Field label="Access Token URL" value={auth.oauth2.tokenUrl} onChange={(e) => setOAuth({ tokenUrl: e.target.value })} placeholder="https://auth.example.com/oauth/token" />
-          <Field label="Client ID" value={auth.oauth2.clientId} onChange={(e) => setOAuth({ clientId: e.target.value })} />
-          <Field label="Client Secret" value={auth.oauth2.clientSecret} onChange={(e) => setOAuth({ clientSecret: e.target.value })} />
-          <Field label="Scope" value={auth.oauth2.scope} onChange={(e) => setOAuth({ scope: e.target.value })} placeholder="read write" />
+          <Field label="Access Token URL" value={auth.oauth2.tokenUrl} onValue={(v) => setOAuth({ tokenUrl: v })} placeholder="https://auth.example.com/oauth/token" />
+          <Field label="Client ID" value={auth.oauth2.clientId} onValue={(v) => setOAuth({ clientId: v })} />
+          <Field label="Client Secret" value={auth.oauth2.clientSecret} onValue={(v) => setOAuth({ clientSecret: v })} />
+          <Field label="Scope" value={auth.oauth2.scope} onValue={(v) => setOAuth({ scope: v })} placeholder="read write" />
           {auth.oauth2.grantType === 'password' && (
             <>
-              <Field label="Username" value={auth.oauth2.username} onChange={(e) => setOAuth({ username: e.target.value })} />
-              <Field label="Password" value={auth.oauth2.password} onChange={(e) => setOAuth({ password: e.target.value })} />
+              <Field label="Username" value={auth.oauth2.username} onValue={(v) => setOAuth({ username: v })} />
+              <Field label="Password" value={auth.oauth2.password} onValue={(v) => setOAuth({ password: v })} />
             </>
           )}
           <p className="text-[11px] text-muted-foreground">The token is fetched fresh on each send and sent as a Bearer header.</p>

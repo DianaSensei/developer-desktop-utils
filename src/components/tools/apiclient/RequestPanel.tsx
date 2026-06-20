@@ -18,11 +18,13 @@ import {
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
 import { CodeEditor } from './CodeEditor';
+import { VarInput } from './VarInput';
 import { ResponsiveTabBar } from './ResponsiveTabBar';
 import { AuthEditor } from './AuthEditor';
+import { urlWithParams } from './request';
 import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
-  type KeyValue, type VarDef, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
+  type KeyValue, type VarDef, type VarMap, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
 } from './types';
 
 type Tab = 'params' | 'headers' | 'body' | 'auth' | 'script' | 'vars' | 'assert' | 'tests' | 'settings';
@@ -30,11 +32,12 @@ type Tab = 'params' | 'headers' | 'body' | 'auth' | 'script' | 'vars' | 'assert'
 interface Props {
   request: ApiRequest;
   onChange: (patch: Partial<ApiRequest>) => void;
+  vars: VarMap;
 }
 
 const count = (n: number) => (n ? ` (${n})` : '');
 
-export function RequestPanel({ request, onChange }: Props) {
+export function RequestPanel({ request, onChange, vars }: Props) {
   const [tab, setTab] = useState<Tab>('params');
 
   const enabledParams = request.params.filter((p) => p.enabled && p.key).length;
@@ -72,16 +75,17 @@ export function RequestPanel({ request, onChange }: Props) {
           <div className="space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Query</Label>
-              <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params })} />
+              {/* Editing params rewrites the URL's query string (kept in sync). */}
+              <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params, url: urlWithParams(request.url, params) })} vars={vars} />
             </div>
-            <PathParamsEditor request={request} onChange={onChange} />
+            <PathParamsEditor request={request} onChange={onChange} vars={vars} />
           </div>
         )}
         {tab === 'headers' && (
-          <div className="overflow-y-auto p-3"><KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" /></div>
+          <div className="overflow-y-auto p-3"><KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} /></div>
         )}
-        {tab === 'body' && <div className="flex min-h-0 flex-1 flex-col p-3"><BodyEditor request={request} onChange={onChange} /></div>}
-        {tab === 'auth' && <div className="overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} /></div>}
+        {tab === 'body' && <div className="flex min-h-0 flex-1 flex-col p-3"><BodyEditor request={request} onChange={onChange} vars={vars} /></div>}
+        {tab === 'auth' && <div className="overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} vars={vars} /></div>}
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
         {tab === 'vars' && <div className="overflow-y-auto p-3"><VarsEditor request={request} onChange={onChange} /></div>}
         {tab === 'assert' && <div className="overflow-y-auto p-3"><AssertEditor request={request} onChange={onChange} /></div>}
@@ -265,7 +269,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
 
 // ─── path params ──────────────────────────────────────────────────────────────
 
-function PathParamsEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void; vars: VarMap }) {
   // Path params are the :placeholders that follow a '/' in the URL.
   const names = useMemo(() => {
     const found: string[] = [];
@@ -297,13 +301,12 @@ function PathParamsEditor({ request, onChange }: { request: ApiRequest; onChange
         {names.map((name) => (
           <div key={name} className="grid grid-cols-[1fr_1fr] border-b last:border-b-0">
             <div className="flex items-center border-r px-3 py-1 font-mono text-muted-foreground">:{name}</div>
-            <div className="px-2">
-              <Input
+            <div className="flex h-8 items-center px-2">
+              <VarInput
                 value={valueOf(name)}
-                onChange={(e) => setValue(name, e.target.value)}
+                onChange={(v) => setValue(name, v)}
+                vars={vars}
                 placeholder="Value"
-                className="h-8 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                spellCheck={false}
               />
             </div>
           </div>
@@ -498,7 +501,7 @@ function BodyModeDropdown({ body, onChange }: { body: ApiRequest['body']; onChan
   );
 }
 
-function BodyEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void; vars: VarMap }) {
   const { body } = request;
   const setBody = (patch: Partial<typeof body>) => onChange({ body: { ...body, ...patch } });
 
@@ -515,7 +518,7 @@ function BodyEditor({ request, onChange }: { request: ApiRequest; onChange: (p: 
   if (body.mode === 'urlencoded') {
     return (
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <KeyValueEditor rows={body.form} onChange={(form) => setBody({ form })} keyPlaceholder="Key" valueLabel="Value" />
+        <KeyValueEditor rows={body.form} onChange={(form) => setBody({ form })} keyPlaceholder="Key" valueLabel="Value" vars={vars} />
       </div>
     );
   }
@@ -529,11 +532,11 @@ function BodyEditor({ request, onChange }: { request: ApiRequest; onChange: (p: 
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex min-h-0 flex-[2] flex-col gap-1.5">
           <Label className="text-xs text-muted-foreground">Query</Label>
-          <CodeEditor value={g.query} onChange={(query) => setG({ query })} placeholder={'query {\n  field\n}'} />
+          <CodeEditor value={g.query} onChange={(query) => setG({ query })} placeholder={'query {\n  field\n}'} vars={vars} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-1.5">
           <Label className="text-xs text-muted-foreground">Variables</Label>
-          <CodeEditor value={g.variables} onChange={(variables) => setG({ variables })} placeholder={'{\n  "id": 1\n}'} />
+          <CodeEditor value={g.variables} onChange={(variables) => setG({ variables })} placeholder={'{\n  "id": 1\n}'} vars={vars} />
         </div>
       </div>
     );
@@ -545,6 +548,7 @@ function BodyEditor({ request, onChange }: { request: ApiRequest; onChange: (p: 
         value={body.raw}
         onChange={(raw) => setBody({ raw })}
         placeholder={RAW_PLACEHOLDER[body.mode]}
+        vars={vars}
       />
     </div>
   );

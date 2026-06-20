@@ -33,6 +33,31 @@ export async function pickJsonFile(): Promise<string | null> {
   });
 }
 
+// Pick a CSV or JSON data file (for data-driven runs); returns its name + text.
+// Reads through the webview's FileReader in both web and Tauri — unlike the fs
+// plugin, this needs no path-scope permission, so any file the user picks works.
+export function pickDataFile(): Promise<{ name: string; text: string } | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.json,text/csv,application/json';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    const cleanup = () => { input.remove(); };
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) { cleanup(); return resolve(null); }
+      const reader = new FileReader();
+      reader.onload = () => { cleanup(); resolve({ name: file.name, text: String(reader.result ?? '') }); };
+      reader.onerror = () => { cleanup(); reject(new Error(`Could not read ${file.name}`)); };
+      reader.readAsText(file);
+    };
+    // If the user cancels the dialog, there's no reliable event; the picker is
+    // simply abandoned (the element is cleaned up on the next successful pick).
+    input.click();
+  });
+}
+
 // Save `text` to a .json file chosen by the user.
 export async function saveJsonFile(suggestedName: string, text: string): Promise<void> {
   if (isTauri) {

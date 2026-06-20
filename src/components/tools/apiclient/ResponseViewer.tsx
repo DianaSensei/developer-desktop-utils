@@ -41,21 +41,32 @@ const highlight = HighlightStyle.define([
 interface Props {
   value: string;
   language: 'json' | 'text';
+  // Large bodies: skip line-wrapping, folding and highlighting (the parts that
+  // bog down on multi-MB docs) for a plain, fast, scrollable view.
+  plain?: boolean;
 }
 
-export function ResponseViewer({ value, language }: Props) {
+export function ResponseViewer({ value, language, plain }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
-  const extensions = useMemo(() => [
-    basicSetup,
-    ...(language === 'json' ? [json()] : []),
-    syntaxHighlighting(highlight),
-    editorTheme,
-    EditorView.lineWrapping,
-    EditorState.readOnly.of(true),
-    EditorView.editable.of(false),
-  ], [language]);
+  const extensions = useMemo(() => (plain
+    ? [
+        minimalSetup,
+        lineNumbers(),
+        editorTheme,
+        EditorState.readOnly.of(true),
+        EditorView.editable.of(false),
+      ]
+    : [
+        basicSetup,
+        ...(language === 'json' ? [json()] : []),
+        syntaxHighlighting(highlight),
+        editorTheme,
+        EditorView.lineWrapping,
+        EditorState.readOnly.of(true),
+        EditorView.editable.of(false),
+      ]), [language, plain]);
 
   // Recreate the view when the language changes so the parser swaps cleanly.
   useEffect(() => {

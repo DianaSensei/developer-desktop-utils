@@ -205,17 +205,20 @@ export interface VarStores {
   runtime: VarMap;   // bru.setVar / getVar  (mutated in place)
   env: VarMap;       // bru.setEnvVar / getEnvVar (mutated in place)
   envName: string | null;
+  data?: VarMap;     // current data-file row (read-only; data-driven runs)
 }
 
 export function makeBru(stores: VarStores) {
   return {
-    getVar: (k: string) => stores.runtime[k],
+    getVar: (k: string) => (k in stores.runtime ? stores.runtime[k] : stores.data?.[k]),
     setVar: (k: string, v: unknown) => { stores.runtime[k] = v == null ? '' : String(v); },
     deleteVar: (k: string) => { delete stores.runtime[k]; },
-    hasVar: (k: string) => k in stores.runtime,
+    hasVar: (k: string) => k in stores.runtime || (!!stores.data && k in stores.data),
     getEnvVar: (k: string) => stores.env[k],
     setEnvVar: (k: string, v: unknown) => { stores.env[k] = v == null ? '' : String(v); },
     getEnvName: () => stores.envName,
+    // Postman parity: bru.getIterationData('x') reads the current data row.
+    getIterationData: (k: string) => stores.data?.[k],
   };
 }
 

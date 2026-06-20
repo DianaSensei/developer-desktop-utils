@@ -56,12 +56,24 @@ export function usePersistentState<T>(key: string, initial: T | (() => T), optio
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [state, debounceMs, write]);
 
-  // Flush any pending debounced write on unmount / page unload.
+  // Flush any pending debounced write on unmount / app close / backgrounding.
+  // `beforeunload` is unreliable in desktop webviews (Tauri/WebKit), so we also
+  // listen for `pagehide` and `visibilitychange→hidden`, which fire when the
+  // window is closed, hidden, or the OS suspends the app — ensuring the latest
+  // edits reach localStorage before the process goes away.
   useEffect(() => {
     if (debounceMs <= 0) return;
     const flush = () => write();
+    const onVisibility = () => { if (document.visibilityState === 'hidden') write(); };
     window.addEventListener('beforeunload', flush);
-    return () => { window.removeEventListener('beforeunload', flush); write(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+      write();
+    };
   }, [debounceMs, write]);
 
   return [state, setState] as [T, Dispatch<SetStateAction<T>>];
