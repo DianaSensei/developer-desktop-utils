@@ -6,7 +6,7 @@
 // the standard `fetch` (subject to the target's CORS policy). Requests only ever
 // fire when the user clicks Send.
 
-import type { ApiRequest, ApiResponse, KeyValue, VarMap } from './types';
+import type { ApiRequest, ApiResponse, KeyValue, OAuth2Auth, VarMap } from './types';
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -38,10 +38,21 @@ type Sub = (s: string) => string;
 // When the request's URL-encoding setting is off, params are appended raw so the
 // user keeps full control of the query string (Bruno's "URL Encoding" toggle).
 function buildUrl(req: ApiRequest, sub: Sub): string {
-  const base = sub(req.url).trim();
+  let base = sub(req.url).trim();
+
+  // Substitute :placeholders in the path (only after a '/', so ports like :8080
+  // are untouched). Encoding follows the URL-encoding setting.
+  const pathMap: Record<string, string> = {};
+  for (const p of req.pathParams ?? []) if (p.enabled && p.key) pathMap[p.key] = sub(p.value);
+  const enc = (v: string) => (req.settings?.encodeUrl === false ? v : encodeURIComponent(v));
+  base = base.replace(/(\/):([A-Za-z_]\w*)/g, (m, slash, name) => (name in pathMap ? slash + enc(pathMap[name]) : m));
+
   const params = enabledPairs(req.params).map(
     ([k, v]) => [sub(k), sub(v)] as [string, string],
   );
+  if (req.auth.type === 'apikey' && req.auth.apiKey.placement === 'query' && req.auth.apiKey.key.trim()) {
+    params.push([sub(req.auth.apiKey.key), sub(req.auth.apiKey.value)]);
+  }
   if (!params.length) return base;
 
   const [head, existingQuery = ''] = base.split('#')[0].split('?');
@@ -71,6 +82,8 @@ function buildHeaders(req: ApiRequest, sub: Sub): Record<string, string> {
     const user = sub(req.auth.username);
     const pass = sub(req.auth.password);
     headers['Authorization'] = `Basic ${btoa(`${user}:${pass}`)}`;
+  } else if (req.auth.type === 'apikey' && req.auth.apiKey.placement === 'header' && req.auth.apiKey.key.trim()) {
+    headers[sub(req.auth.apiKey.key)] = sub(req.auth.apiKey.value);
   }
 
   const hasContentType = Object.keys(headers).some((h) => h.toLowerCase() === 'content-type');
@@ -89,6 +102,7 @@ const BODY_CONTENT_TYPE: Record<string, string | null> = {
   xml: 'application/xml',
   text: 'text/plain',
   sparql: 'application/sparql-query',
+  graphql: 'application/json',
   urlencoded: 'application/x-www-form-urlencoded',
   multipart: null,
   file: 'file',
@@ -112,6 +126,12 @@ function buildBody(req: ApiRequest, sub: Sub): BodyInit | undefined {
     case 'text':
     case 'sparql':
       return req.body.raw ? sub(req.body.raw) : undefined;
+    case 'graphql': {
+      const gql = req.body.graphql ?? { query: '', variables: '' };
+      let variables: unknown = {};
+      try { variables = gql.variables.trim() ? JSON.parse(sub(gql.variables)) : {}; } catch { variables = {}; }
+      return JSON.stringify({ query: sub(gql.query), variables });
+    }
     case 'urlencoded': {
       const p = new URLSearchParams();
       for (const [k, v] of enabledPairs(req.body.form)) p.append(sub(k), sub(v));
@@ -140,6 +160,28 @@ function buildBody(req: ApiRequest, sub: Sub): BodyInit | undefined {
   }
 }
 
+// Fetch an OAuth2 access token (client-credentials or password grant).
+async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal): Promise<string> {
+  const url = sub(o.tokenUrl).trim();
+  if (!url) throw new Error('OAuth2: token URL is required');
+  const form = new URLSearchParams();
+  form.set('grant_type', o.grantType);
+  if (o.clientId) form.set('client_id', sub(o.clientId));
+  if (o.clientSecret) form.set('client_secret', sub(o.clientSecret));
+  if (o.scope) form.set('scope', sub(o.scope));
+  if (o.grantType === 'password') { form.set('username', sub(o.username)); form.set('password', sub(o.password)); }
+
+  const res = await netFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: form.toString(),
+    signal,
+  });
+  const json = (await res.json()) as { access_token?: string; error?: string; error_description?: string };
+  if (!json.access_token) throw new Error(`OAuth2 token request failed: ${json.error_description || json.error || res.status}`);
+  return json.access_token;
+}
+
 const byteLength = (s: string): number => new TextEncoder().encode(s).length;
 
 export async function sendRequest(
@@ -162,9 +204,15 @@ export async function sendRequest(
     signal?.addEventListener('abort', () => timeoutCtl.abort(), { once: true });
   }
 
+  const reqHeaders = buildHeaders(req, sub);
+  // OAuth2: fetch an access token first, then send the request as Bearer.
+  if (req.auth.type === 'oauth2') {
+    reqHeaders['Authorization'] = `Bearer ${await fetchOAuthToken(req.auth.oauth2, sub, timeoutCtl ? timeoutCtl.signal : signal)}`;
+  }
+
   const init: RequestInit & { maxRedirections?: number } = {
     method: req.method,
-    headers: buildHeaders(req, sub),
+    headers: reqHeaders,
     signal: timeoutCtl ? timeoutCtl.signal : signal,
     redirect: req.settings?.followRedirects === false ? 'manual' : 'follow',
   };
@@ -227,7 +275,7 @@ export interface ResolvedRequest {
 // send path this also labels multipart, matching how Bruno renders code snippets.
 const DISPLAY_CONTENT_TYPE: Record<string, string | null> = {
   json: 'application/json', xml: 'application/xml', text: 'text/plain',
-  sparql: 'application/sparql-query', urlencoded: 'application/x-www-form-urlencoded',
+  sparql: 'application/sparql-query', graphql: 'application/json', urlencoded: 'application/x-www-form-urlencoded',
   multipart: 'multipart/form-data', none: null, file: null,
 };
 
@@ -236,6 +284,12 @@ function resolveBody(req: ApiRequest, sub: Sub): ResolvedBody {
   switch (b.mode) {
     case 'json': case 'xml': case 'text': case 'sparql':
       return b.raw ? { type: 'raw', text: sub(b.raw), contentType: DISPLAY_CONTENT_TYPE[b.mode] ?? 'text/plain' } : { type: 'none' };
+    case 'graphql': {
+      const gql = b.graphql ?? { query: '', variables: '' };
+      let variables: unknown = {};
+      try { variables = gql.variables.trim() ? JSON.parse(sub(gql.variables)) : {}; } catch { variables = {}; }
+      return { type: 'raw', text: JSON.stringify({ query: sub(gql.query), variables }, null, 2), contentType: 'application/json' };
+    }
     case 'urlencoded':
       return { type: 'urlencoded', fields: enabledPairs(b.form).map(([k, v]) => [sub(k), sub(v)]) };
     case 'multipart':

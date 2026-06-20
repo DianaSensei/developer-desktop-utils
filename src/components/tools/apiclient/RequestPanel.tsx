@@ -2,10 +2,10 @@
 // URL + Send bar lives above the split (see AddressBar). Edits are written
 // straight back to the store so the request is always saved (Postman autosave).
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Braces, Check, ChevronDown, Code2, Database, File, FileText, FormInput,
-  type LucideIcon, Tag, Trash2, X,
+  Hexagon, type LucideIcon, Tag, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,10 @@ import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
 import { CodeEditor } from './CodeEditor';
 import { ResponsiveTabBar } from './ResponsiveTabBar';
+import { AuthEditor } from './AuthEditor';
 import {
-  type ApiRequest, type Assertion, type AssertOperator, type BodyMode, type AuthType,
-  type KeyValue, type VarDef, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion,
+  type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
+  type KeyValue, type VarDef, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
 } from './types';
 
 type Tab = 'params' | 'headers' | 'body' | 'auth' | 'script' | 'vars' | 'assert' | 'tests' | 'settings';
@@ -68,16 +69,19 @@ export function RequestPanel({ request, onChange }: Props) {
       {/* tab body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {tab === 'params' && (
-          <div className="space-y-2 overflow-y-auto p-3">
-            <Label className="text-xs text-muted-foreground">Query</Label>
-            <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params })} />
+          <div className="space-y-4 overflow-y-auto p-3">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Query</Label>
+              <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params })} />
+            </div>
+            <PathParamsEditor request={request} onChange={onChange} />
           </div>
         )}
         {tab === 'headers' && (
           <div className="overflow-y-auto p-3"><KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" /></div>
         )}
         {tab === 'body' && <div className="flex min-h-0 flex-1 flex-col p-3"><BodyEditor request={request} onChange={onChange} /></div>}
-        {tab === 'auth' && <div className="overflow-y-auto p-3"><AuthEditor request={request} onChange={onChange} /></div>}
+        {tab === 'auth' && <div className="overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} /></div>}
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
         {tab === 'vars' && <div className="overflow-y-auto p-3"><VarsEditor request={request} onChange={onChange} /></div>}
         {tab === 'assert' && <div className="overflow-y-auto p-3"><AssertEditor request={request} onChange={onChange} /></div>}
@@ -259,6 +263,56 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
   );
 }
 
+// ─── path params ──────────────────────────────────────────────────────────────
+
+function PathParamsEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+  // Path params are the :placeholders that follow a '/' in the URL.
+  const names = useMemo(() => {
+    const found: string[] = [];
+    const re = /\/:([A-Za-z_]\w*)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(request.url))) if (!found.includes(m[1])) found.push(m[1]);
+    return found;
+  }, [request.url]);
+
+  if (names.length === 0) return null;
+
+  const valueOf = (name: string) => request.pathParams.find((p) => p.key === name)?.value ?? '';
+  const setValue = (name: string, value: string) => {
+    const exists = request.pathParams.some((p) => p.key === name);
+    const next = exists
+      ? request.pathParams.map((p) => (p.key === name ? { ...p, value } : p))
+      : [...request.pathParams, newKeyValue(name, value)];
+    onChange({ pathParams: next });
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-muted-foreground">Path</Label>
+      <div className="overflow-hidden rounded-md border text-xs">
+        <div className="grid grid-cols-[1fr_1fr] border-b bg-muted/30 font-semibold">
+          <div className="border-r px-3 py-1.5">Name</div>
+          <div className="px-3 py-1.5">Value</div>
+        </div>
+        {names.map((name) => (
+          <div key={name} className="grid grid-cols-[1fr_1fr] border-b last:border-b-0">
+            <div className="flex items-center border-r px-3 py-1 font-mono text-muted-foreground">:{name}</div>
+            <div className="px-2">
+              <Input
+                value={valueOf(name)}
+                onChange={(e) => setValue(name, e.target.value)}
+                placeholder="Value"
+                className="h-8 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── settings ─────────────────────────────────────────────────────────────────
 
 function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
@@ -381,6 +435,7 @@ function NumberRow({ title, hint, value, onChange, disabled, clearable }: {
 const BODY_LABEL: Record<BodyMode, string> = {
   none: 'No Body',
   json: 'JSON', xml: 'XML', text: 'TEXT', sparql: 'SPARQL',
+  graphql: 'GraphQL',
   multipart: 'Multipart Form', urlencoded: 'Form URL Encoded',
   file: 'File / Binary',
 };
@@ -395,6 +450,7 @@ const RAW_PLACEHOLDER: Partial<Record<BodyMode, string>> = {
 const BODY_GROUPS: { label: string; items: { id: BodyMode; icon: LucideIcon }[] }[] = [
   { label: 'Form', items: [{ id: 'multipart', icon: FormInput }, { id: 'urlencoded', icon: FormInput }] },
   { label: 'Raw', items: [{ id: 'json', icon: Braces }, { id: 'xml', icon: Code2 }, { id: 'text', icon: FileText }, { id: 'sparql', icon: Database }] },
+  { label: 'GraphQL', items: [{ id: 'graphql', icon: Hexagon }] },
   { label: 'Other', items: [{ id: 'file', icon: File }, { id: 'none', icon: X }] },
 ];
 
@@ -466,6 +522,22 @@ function BodyEditor({ request, onChange }: { request: ApiRequest; onChange: (p: 
   if (body.mode === 'file') {
     return <FileBody body={body} setBody={setBody} />;
   }
+  if (body.mode === 'graphql') {
+    const g = body.graphql ?? { query: '', variables: '' };
+    const setG = (patch: Partial<typeof g>) => setBody({ graphql: { ...g, ...patch } });
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex min-h-0 flex-[2] flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Query</Label>
+          <CodeEditor value={g.query} onChange={(query) => setG({ query })} placeholder={'query {\n  field\n}'} />
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Variables</Label>
+          <CodeEditor value={g.variables} onChange={(variables) => setG({ variables })} placeholder={'{\n  "id": 1\n}'} />
+        </div>
+      </div>
+    );
+  }
   // raw text modes (json / xml / text / sparql)
   return (
     <div className="min-h-0 flex-1">
@@ -520,54 +592,3 @@ function FileBody({ body, setBody }: { body: ApiRequest['body']; setBody: (p: Pa
   );
 }
 
-// ─── auth ───────────────────────────────────────────────────────────────────
-
-const AUTH_TYPES: { id: AuthType; label: string }[] = [
-  { id: 'none', label: 'No Auth' },
-  { id: 'bearer', label: 'Bearer Token' },
-  { id: 'basic', label: 'Basic Auth' },
-];
-
-function AuthEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
-  const { auth } = request;
-  const setAuth = (patch: Partial<typeof auth>) => onChange({ auth: { ...auth, ...patch } });
-
-  return (
-    <div className="max-w-md space-y-3">
-      <Select value={auth.type} onValueChange={(v) => setAuth({ type: v as AuthType })}>
-        <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          {AUTH_TYPES.map((a) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
-        </SelectContent>
-      </Select>
-
-      {auth.type === 'bearer' && (
-        <div className="space-y-1.5">
-          <Label className="text-xs">Token</Label>
-          <Input
-            value={auth.token}
-            onChange={(e) => setAuth({ token: e.target.value })}
-            placeholder="Token or {{var}}"
-            className="h-8 font-mono text-xs"
-            spellCheck={false}
-          />
-        </div>
-      )}
-      {auth.type === 'basic' && (
-        <div className="space-y-2">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Username</Label>
-            <Input value={auth.username} onChange={(e) => setAuth({ username: e.target.value })} className="h-8 text-xs" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Password</Label>
-            <Input type="password" value={auth.password} onChange={(e) => setAuth({ password: e.target.value })} className="h-8 text-xs" />
-          </div>
-        </div>
-      )}
-      {auth.type === 'none' && (
-        <p className="py-6 text-center text-xs text-muted-foreground">This request uses no authorization.</p>
-      )}
-    </div>
-  );
-}

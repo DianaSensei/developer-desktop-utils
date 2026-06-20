@@ -9,6 +9,7 @@ import { useCallback, useMemo } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import {
   type ApiRequest,
+  type Auth,
   type Collection,
   type Environment,
   type Folder,
@@ -85,6 +86,58 @@ function insertIntoTree(items: TreeItem[], parentId: string, child: TreeItem): T
   });
 }
 
+// Deep-clone a tree item with fresh ids throughout.
+function cloneTreeItem(item: TreeItem): TreeItem {
+  if (item.type === 'folder') return { ...item, id: uid(), items: item.items.map(cloneTreeItem) };
+  return newRequest({ ...item });
+}
+
+// Append a fresh clone of `itemId` next to it (same parent list).
+function insertSiblingClone(items: TreeItem[], itemId: string): TreeItem[] {
+  const orig = items.find((i) => i.id === itemId);
+  if (orig) return [...items, cloneTreeItem(orig)];
+  return items.map((i) => (i.type === 'folder' ? { ...i, items: insertSiblingClone(i.items, itemId) } : i));
+}
+
+function containsId(item: TreeItem, id: string): boolean {
+  if (item.id === id) return true;
+  return item.type === 'folder' && item.items.some((c) => containsId(c, id));
+}
+
+// Remove `id` from the tree, capturing the removed item.
+function extractItem(items: TreeItem[], id: string): { items: TreeItem[]; found: TreeItem | null } {
+  let found: TreeItem | null = null;
+  const next: TreeItem[] = [];
+  for (const it of items) {
+    if (it.id === id) { found = it; continue; }
+    if (it.type === 'folder') {
+      const r = extractItem(it.items, id);
+      if (r.found) found = r.found;
+      next.push({ ...it, items: r.items });
+    } else next.push(it);
+  }
+  return { items: next, found };
+}
+
+// Insert `node` relative to `targetId` (before/after sibling, or inside a folder).
+function insertRelative(items: TreeItem[], targetId: string, node: TreeItem, where: 'before' | 'after' | 'inside'): { items: TreeItem[]; done: boolean } {
+  const out: TreeItem[] = [];
+  let done = false;
+  for (const it of items) {
+    if (!done && it.id === targetId) {
+      if (where === 'before') { out.push(node, it); done = true; continue; }
+      if (where === 'after') { out.push(it, node); done = true; continue; }
+      if (where === 'inside' && it.type === 'folder') { out.push({ ...it, items: [...it.items, node], collapsed: false }); done = true; continue; }
+    }
+    if (!done && it.type === 'folder') {
+      const r = insertRelative(it.items, targetId, node, where);
+      if (r.done) { out.push({ ...it, items: r.items }); done = true; continue; }
+    }
+    out.push(it);
+  }
+  return { items: out, done };
+}
+
 function findRequest(items: TreeItem[], id: string): ApiRequest | null {
   for (const item of items) {
     if (item.id === id && item.type === 'request') return item;
@@ -108,21 +161,27 @@ function findFolderPath(items: TreeItem[], id: string, acc: Folder[]): Folder[] 
   return null;
 }
 
-export interface InheritedScripts { pre: string[]; post: string[] }
+export interface InheritedScripts { pre: string[]; post: string[]; auth: Auth | null }
 
 // Ordered ancestor scripts for a request: pre runs collection→folders (outer to
 // inner); post runs the reverse (inner to outer) so cleanup unwinds naturally.
+// `auth` is the nearest ancestor (folder before collection) with concrete auth.
 function collectInherited(collections: Collection[], id: string): InheritedScripts {
   for (const c of collections) {
     const path = findFolderPath(c.items, id, []);
     if (path) {
-      const nodes: { script?: { req: string; res: string } }[] = [c, ...path];
+      const nodes: { script?: { req: string; res: string }; auth?: Auth }[] = [c, ...path];
       const pre = nodes.map((n) => n.script?.req ?? '').filter((s) => s.trim());
       const post = nodes.map((n) => n.script?.res ?? '').filter((s) => s.trim()).reverse();
-      return { pre, post };
+      let auth: Auth | null = null;
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const a = nodes[i].auth;
+        if (a && a.type !== 'none' && a.type !== 'inherit') { auth = a; break; }
+      }
+      return { pre, post, auth };
     }
   }
-  return { pre: [], post: [] };
+  return { pre: [], post: [], auth: null };
 }
 
 // ─── store hook ─────────────────────────────────────────────────────────────
@@ -280,9 +339,25 @@ export function useApiStore() {
     }));
   }, [setCollections]);
 
+  const setNodeAuth = useCallback((collectionId: string, nodeId: string | null, auth: Auth) => {
+    setCollections((prev) => prev.map((c) => {
+      if (c.id !== collectionId) return c;
+      if (!nodeId) return { ...c, auth };
+      return {
+        ...c,
+        items: mapTree(c.items, (item) =>
+          item.id === nodeId && item.type === 'folder' ? { ...item, auth } : item,
+        ),
+      };
+    }));
+  }, [setCollections]);
+
+  // Inherited scripts/auth for any request id (used by the Runner).
+  const getInherited = useCallback((id: string) => collectInherited(collections, id), [collections]);
+
   // Inherited (collection + folder) scripts for the request currently active.
   const inheritedScripts = useMemo(
-    () => (activeRequestId ? collectInherited(collections, activeRequestId) : { pre: [], post: [] }),
+    () => (activeRequestId ? collectInherited(collections, activeRequestId) : { pre: [], post: [], auth: null }),
     [collections, activeRequestId],
   );
 
@@ -293,6 +368,62 @@ export function useApiStore() {
     ));
     selectRequest(copy.id);
   }, [setCollections, selectRequest]);
+
+  // Insert an already-built request (e.g. a cURL import) and focus it.
+  const addRequest = useCallback((collectionId: string, request: ApiRequest, parentId?: string) => {
+    setCollections((prev) => prev.map((c) => {
+      if (c.id !== collectionId) return c;
+      if (!parentId) return { ...c, items: [...c.items, request], collapsed: false };
+      return { ...c, items: insertIntoTree(c.items, parentId, request) };
+    }));
+    selectRequest(request.id);
+  }, [setCollections, selectRequest]);
+
+  // Move a request/folder to a new spot (drag & drop). `targetId` may be a
+  // collection, folder, or request; `where` is before/after a sibling or inside
+  // a folder/collection.
+  const moveItem = useCallback((sourceId: string, targetId: string, where: 'before' | 'after' | 'inside') => {
+    if (sourceId === targetId) return;
+    setCollections((prev) => {
+      let captured: TreeItem | null = null;
+      const stripped = prev.map((c) => { const r = extractItem(c.items, sourceId); if (r.found) captured = r.found; return { ...c, items: r.items }; });
+      if (!captured) return prev;
+      // Don't drop a folder into itself/its descendants.
+      if (containsId(captured, targetId)) return prev;
+      // Drop directly onto a collection → append at its root.
+      if (stripped.some((c) => c.id === targetId)) {
+        return stripped.map((c) => (c.id === targetId ? { ...c, items: [...c.items, captured!], collapsed: false } : c));
+      }
+      let inserted = false;
+      const next = stripped.map((c) => {
+        if (inserted) return c;
+        const r = insertRelative(c.items, targetId, captured!, where);
+        if (r.done) { inserted = true; return { ...c, items: r.items }; }
+        return c;
+      });
+      return inserted ? next : prev;
+    });
+  }, [setCollections]);
+
+  // Clone a folder or request (deep, new ids) next to itself.
+  const cloneItem = useCallback((collectionId: string, itemId: string) => {
+    setCollections((prev) => prev.map((c) =>
+      c.id === collectionId ? { ...c, items: insertSiblingClone(c.items, itemId) } : c,
+    ));
+  }, [setCollections]);
+
+  // Clone a whole collection (deep, new ids) right after it.
+  const cloneCollection = useCallback((id: string) => {
+    setCollections((prev) => {
+      const idx = prev.findIndex((c) => c.id === id);
+      if (idx === -1) return prev;
+      const src = prev[idx];
+      const copy: Collection = { ...src, id: uid(), name: `${src.name} copy`, items: src.items.map(cloneTreeItem) };
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+  }, [setCollections]);
 
   // Apply a partial patch to whichever request matches `id`, anywhere in the tree.
   const updateRequest = useCallback((id: string, patch: Partial<ApiRequest>) => {
@@ -335,9 +466,9 @@ export function useApiStore() {
     activeRequestId, activeRequest, openRequests, inheritedScripts,
     setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,
-    addItem, deleteItem, renameItem, duplicateRequest, updateRequest, setNodeScript,
+    addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, updateRequest, setNodeScript, setNodeAuth,
     addEnvironment, updateEnvironment, deleteEnvironment,
-    addHistory, clearHistory,
+    addHistory, clearHistory, getInherited,
   };
 }
 

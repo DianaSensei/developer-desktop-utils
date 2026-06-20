@@ -6,14 +6,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, Binary, Braces, Check, ChevronDown, ChevronsRight, Code2, Copy, Download, Eraser,
-  FileCode, FileText, Hash, Loader2, MoreHorizontal, Send, X,
+  FileCode, FileText, Filter, Hash, Loader2, MoreHorizontal, Send, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import type { ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
 import { saveTextFile } from './fileio';
+import { queryJson } from './jsonpath';
 import { ResponseViewer } from './ResponseViewer';
 
 type Kind = 'json' | 'html' | 'xml' | 'image' | 'text';
@@ -59,6 +61,8 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   const [copied, setCopied] = useState(false);
   const [format, setFormat] = useState<Format>('raw');
   const [preview, setPreview] = useState(false);
+  const [filter, setFilter] = useState('');
+  const [showFilter, setShowFilter] = useState(false);
 
   // Track header width so the tab strip can collapse into a » overflow menu when
   // the right-side controls leave too little room (Bruno-style responsiveness).
@@ -109,15 +113,27 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
     if (response) { setFormat(KIND_FORMAT[detectKind(response)]); setPreview(false); }
   }, [response]);
 
+  // Apply the JSONPath filter to JSON bodies (the funnel box), if active/valid.
+  const filterResult = useMemo(() => {
+    if (!response || kind !== 'json' || !filter.trim()) return null;
+    try {
+      const out = queryJson(JSON.parse(response.body), filter);
+      return { ok: true as const, text: JSON.stringify(out, null, 2) };
+    } catch {
+      return { ok: false as const, text: '' };
+    }
+  }, [response, kind, filter]);
+
   const bodyText = useMemo(() => {
     if (!response) return '';
+    if (filterResult?.ok) return filterResult.text;
     switch (format) {
       case 'json': return pretty;
       case 'hex': return hexDump(response.body);
       case 'base64': return toBase64(response.body);
       default: return response.body;
     }
-  }, [response, format, pretty]);
+  }, [response, format, pretty, filterResult]);
 
   const failed = tests.filter((t) => !t.passed).length;
 
@@ -261,6 +277,15 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
           ) : (
             <span className="font-semibold text-destructive">No response</span>
           )}
+          {response && tab === 'body' && kind === 'json' && (
+            <button
+              onClick={() => setShowFilter((s) => !s)}
+              title="Filter (JSONPath)"
+              className={cn('rounded p-1 transition-colors hover:bg-accent hover:text-foreground', showFilter || filter ? 'text-amber-500' : 'text-muted-foreground')}
+            >
+              <Filter className="h-4 w-4" />
+            </button>
+          )}
           {response && (
             <ActionsMenu copied={copied} onCopy={copy} onSave={saveResponse} onClear={onClear} />
           )}
@@ -277,9 +302,26 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
       {/* tab content */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {tab === 'body' && response && (
-          response.body
-            ? <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} />
-            : <p className="p-3 text-xs text-muted-foreground">Empty response body.</p>
+          response.body ? (
+            <>
+              <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} />
+              {showFilter && kind === 'json' && (
+                <div className="flex shrink-0 items-center gap-2 border-t px-3 py-1.5">
+                  <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <Input
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    placeholder="$.store.book[*].title"
+                    className="h-7 border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    spellCheck={false}
+                    autoFocus
+                  />
+                  {filter && filterResult && !filterResult.ok && <span className="shrink-0 text-[10px] text-destructive">invalid</span>}
+                  {filter && <button onClick={() => setFilter('')} title="Clear" className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
+                </div>
+              )}
+            </>
+          ) : <p className="p-3 text-xs text-muted-foreground">Empty response body.</p>
         )}
         {tab === 'headers' && response && (
           <div className="min-h-0 flex-1 divide-y overflow-auto text-xs">

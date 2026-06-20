@@ -27,6 +27,7 @@ export interface KeyValue {
 export type BodyMode =
   | 'none'
   | 'json' | 'xml' | 'text' | 'sparql'   // raw text bodies (differ only by content-type)
+  | 'graphql'                            // GraphQL query + variables
   | 'multipart' | 'urlencoded'           // form bodies
   | 'file';                              // raw file / binary upload
 
@@ -34,19 +35,39 @@ export interface RequestBody {
   mode: BodyMode;
   raw: string;          // used for the raw text modes (json/xml/text/sparql)
   form: KeyValue[];     // used for multipart / urlencoded
+  graphql?: { query: string; variables: string }; // graphql mode
   fileName?: string;    // file mode: original name
   fileType?: string;    // file mode: MIME type
   fileContent?: string; // file mode: base64-encoded bytes
 }
 
-export type AuthType = 'none' | 'bearer' | 'basic';
+export type AuthType = 'none' | 'inherit' | 'bearer' | 'basic' | 'apikey' | 'oauth2';
+
+export interface ApiKeyAuth { key: string; value: string; placement: 'header' | 'query' }
+export interface OAuth2Auth {
+  grantType: 'client_credentials' | 'password';
+  tokenUrl: string;
+  clientId: string;
+  clientSecret: string;
+  scope: string;
+  username: string;     // password grant
+  password: string;     // password grant
+}
 
 export interface Auth {
   type: AuthType;
   token: string;        // bearer
   username: string;     // basic
   password: string;     // basic
+  apiKey: ApiKeyAuth;
+  oauth2: OAuth2Auth;
 }
+
+export const newAuth = (): Auth => ({
+  type: 'none', token: '', username: '', password: '',
+  apiKey: { key: '', value: '', placement: 'header' },
+  oauth2: { grantType: 'client_credentials', tokenUrl: '', clientId: '', clientSecret: '', scope: '', username: '', password: '' },
+});
 
 // Pre-request and post-response JavaScript, Bruno-style.
 export interface RequestScript {
@@ -113,6 +134,7 @@ export interface ApiRequest {
   method: HttpMethod;
   url: string;
   params: KeyValue[];
+  pathParams: KeyValue[];   // values for :placeholders in the URL path
   headers: KeyValue[];
   body: RequestBody;
   auth: Auth;
@@ -146,6 +168,7 @@ export interface Folder {
   items: TreeItem[];
   collapsed?: boolean;
   script?: RequestScript;   // inherited by requests inside
+  auth?: Auth;              // inherited by requests with 'inherit' auth
 }
 
 export type TreeItem = ApiRequest | Folder;
@@ -156,6 +179,7 @@ export interface Collection {
   items: TreeItem[];
   collapsed?: boolean;
   script?: RequestScript;   // inherited by all requests
+  auth?: Auth;              // inherited by requests with 'inherit' auth
 }
 
 export interface Environment {
@@ -222,9 +246,10 @@ export function newRequest(partial: Partial<ApiRequest> = {}): ApiRequest {
     method: partial.method ?? 'GET',
     url: partial.url ?? '',
     params: partial.params ?? [],
+    pathParams: partial.pathParams ?? [],
     headers: partial.headers ?? [],
     body: partial.body ?? { mode: 'none', raw: '', form: [] },
-    auth: partial.auth ?? { type: 'none', token: '', username: '', password: '' },
+    auth: partial.auth ?? newAuth(),
     script: partial.script ?? { req: '', res: '' },
     vars: partial.vars ?? { req: [], res: [] },
     assertions: partial.assertions ?? [],
@@ -241,9 +266,12 @@ const LEGACY_BODY_MODE: Record<string, BodyMode> = { raw: 'text', 'form-data': '
 export function normalizeRequest(req: ApiRequest): ApiRequest {
   const mode = LEGACY_BODY_MODE[req.body?.mode as string];
   const legacyOp = (req.assertions ?? []).some((a) => a.operator in { eq: 1, neq: 1 });
-  if (req.script && req.vars && req.assertions && typeof req.tests === 'string' && req.settings && !mode && !legacyOp) return req;
+  const authOk = req.auth && req.auth.apiKey && req.auth.oauth2;
+  if (req.script && req.vars && req.assertions && typeof req.tests === 'string' && req.settings && req.pathParams && authOk && !mode && !legacyOp) return req;
   return {
     ...req,
+    pathParams: req.pathParams ?? [],
+    auth: { ...newAuth(), ...req.auth, apiKey: { ...newAuth().apiKey, ...req.auth?.apiKey }, oauth2: { ...newAuth().oauth2, ...req.auth?.oauth2 } },
     body: mode ? { ...req.body, mode } : req.body,
     script: req.script ?? { req: '', res: '' },
     vars: req.vars ?? { req: [], res: [] },

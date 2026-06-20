@@ -21,9 +21,10 @@ import { HistoryView } from './HistoryView';
 import { SplitPane } from './SplitPane';
 import { EnvironmentEditor } from './EnvironmentEditor';
 import { GenerateCodeDialog } from './GenerateCodeDialog';
+import { RunnerDialog } from './RunnerDialog';
 import { useApiStore } from './store';
 import { executeRequest } from './engine';
-import type { ApiResponse, LogEntry, TestResult, VarMap } from './types';
+import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 
 export type SplitDirection = 'horizontal' | 'vertical';
 
@@ -47,6 +48,7 @@ export function ApiClient() {
   const [envOpen, setEnvOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [runTarget, setRunTarget] = useState<{ title: string; requests: ApiRequest[] } | null>(null);
   const [direction, setDirection] = usePersistentState<SplitDirection>(
     'devtool:apiclient:layout:v2', 'horizontal',
   );
@@ -86,6 +88,38 @@ export function ApiClient() {
     setRuns((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY_RUN), ...patch } }));
   }, []);
 
+  // After a run, persist runtime/env-var changes and record a history entry.
+  const persistResult = useCallback((req: ApiRequest, result: Awaited<ReturnType<typeof executeRequest>>) => {
+    runtimeVarsRef.current = result.runtimeVars;
+    if (result.envChanged && store.activeEnv) {
+      const env = store.activeEnv;
+      const variables = env.variables.map((v) => (v.key in result.envVars ? { ...v, value: result.envVars[v.key] } : v));
+      const existing = new Set(env.variables.map((v) => v.key));
+      for (const [k, val] of Object.entries(result.envVars)) {
+        if (!existing.has(k)) variables.push({ id: `s-${Date.now()}-${k}`, key: k, value: val, enabled: true });
+      }
+      store.updateEnvironment(env.id, { variables });
+    }
+    store.addHistory({
+      method: req.method, url: req.url,
+      status: result.response?.status ?? 0,
+      ok: result.response?.ok ?? false,
+      timeMs: result.response?.timeMs ?? 0,
+      error: result.error ?? undefined,
+      request: JSON.parse(JSON.stringify(req)) as ApiRequest,
+      response: result.response,
+      tests: result.tests,
+      logs: result.logs,
+    });
+  }, [store]);
+
+  // Run one request (used by the Runner); resolves inherited scripts/auth per id.
+  const runRequest = useCallback(async (req: ApiRequest) => {
+    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, undefined, store.getInherited(req.id));
+    persistResult(req, result);
+    return result;
+  }, [store, persistResult]);
+
   const send = useCallback(async () => {
     if (!activeRequest) return;
     const id = activeRequest.id;
@@ -94,33 +128,10 @@ export function ApiClient() {
     patchRun(id, { sending: true, error: null });
     try {
       const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts);
-      runtimeVarsRef.current = result.runtimeVars;
-      // Persist any environment vars a script changed (bru.setEnvVar).
-      if (result.envChanged && store.activeEnv) {
-        const env = store.activeEnv;
-        const variables = env.variables.map((v) =>
-          v.key in result.envVars ? { ...v, value: result.envVars[v.key] } : v,
-        );
-        const existing = new Set(env.variables.map((v) => v.key));
-        for (const [k, val] of Object.entries(result.envVars)) {
-          if (!existing.has(k)) variables.push({ id: `s-${Date.now()}-${k}`, key: k, value: val, enabled: true });
-        }
-        store.updateEnvironment(env.id, { variables });
-      }
+      persistResult(activeRequest, result);
       patchRun(id, {
         response: result.response,
         error: result.error,
-        tests: result.tests,
-        logs: result.logs,
-      });
-      store.addHistory({
-        method: activeRequest.method, url: activeRequest.url,
-        status: result.response?.status ?? 0,
-        ok: result.response?.ok ?? false,
-        timeMs: result.response?.timeMs ?? 0,
-        error: result.error ?? undefined,
-        request: JSON.parse(JSON.stringify(activeRequest)) as typeof activeRequest,
-        response: result.response,
         tests: result.tests,
         logs: result.logs,
       });
@@ -134,7 +145,7 @@ export function ApiClient() {
       patchRun(id, { sending: false });
       abortRefs.current.delete(id);
     }
-  }, [activeRequest, store, patchRun]);
+  }, [activeRequest, store, patchRun, persistResult]);
 
   const cancel = useCallback(() => {
     if (activeRequest) abortRefs.current.get(activeRequest.id)?.abort();
@@ -171,12 +182,13 @@ export function ApiClient() {
     return vars;
   }, [store.activeEnv]);
 
-  // Known variable names for {{ }} highlighting + autocomplete in inputs.
-  const varNames = useMemo(() => {
-    const set = new Set<string>(Object.keys(runtimeVarsRef.current));
-    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) set.add(v.key);
-    if (activeRequest) for (const v of activeRequest.vars.req) if (v.name) set.add(v.name);
-    return [...set];
+  // Known variables (name → current value) for {{ }} highlighting, autocomplete,
+  // and hover-value tooltips in inputs.
+  const varMap = useMemo(() => {
+    const map: VarMap = { ...runtimeVarsRef.current };
+    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) map[v.key] = v.value;
+    if (activeRequest) for (const v of activeRequest.vars.req) if (v.name) map[v.name] = v.value;
+    return map;
   }, [store.activeEnv, activeRequest]);
 
   const run = activeRequest ? (runs[activeRequest.id] ?? EMPTY_RUN) : EMPTY_RUN;
@@ -185,7 +197,7 @@ export function ApiClient() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="shrink-0 overflow-hidden" style={{ width: sidebarWidth }}>
-          <Sidebar store={store} searchInputRef={searchInputRef} />
+          <Sidebar store={store} searchInputRef={searchInputRef} onRun={(title, requests) => setRunTarget({ title, requests })} />
         </div>
         <div
           onPointerDown={startSidebarResize}
@@ -223,7 +235,7 @@ export function ApiClient() {
                     onCancel={cancel}
                     sending={run.sending}
                     onGenerateCode={() => setCodeOpen(true)}
-                    vars={varNames}
+                    vars={varMap}
                   />
                   <SplitPane
                     direction={direction}
@@ -267,6 +279,15 @@ export function ApiClient() {
         request={activeRequest}
         vars={codeOpen ? codeVars() : {}}
       />
+      {runTarget && (
+        <RunnerDialog
+          open
+          title={runTarget.title}
+          requests={runTarget.requests}
+          runRequest={runRequest}
+          onClose={() => setRunTarget(null)}
+        />
+      )}
     </div>
   );
 }

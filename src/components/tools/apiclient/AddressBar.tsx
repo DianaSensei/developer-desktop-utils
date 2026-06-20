@@ -16,7 +16,7 @@ interface Props {
   onCancel: () => void;
   sending: boolean;
   onGenerateCode: () => void;
-  vars: string[];
+  vars: Record<string, string>;
 }
 
 export function AddressBar({ request, onChange, onSend, onCancel, sending, onGenerateCode, vars }: Props) {

@@ -17,6 +17,7 @@ import {
   type RequestBody,
   type TreeItem,
   HTTP_METHODS,
+  newAuth,
   newSettings,
   uid,
 } from './types';
@@ -76,7 +77,7 @@ function findKv(list: PmKeyValue[] | undefined, key: string): string {
 }
 
 function importAuth(auth?: PmAuth): Auth {
-  const base: Auth = { type: 'none', token: '', username: '', password: '' };
+  const base = newAuth();
   if (!auth?.type) return base;
   const type = auth.type as AuthType;
   if (type === 'bearer') return { ...base, type, token: findKv(auth.bearer, 'token') };
@@ -125,6 +126,7 @@ function importRequest(item: PmItem): ApiRequest {
     method: (HTTP_METHODS as readonly string[]).includes(method) ? (method as HttpMethod) : 'GET',
     url: rawUrl(r.url),
     params: mapKv(url?.query),
+    pathParams: [],
     headers: mapKv(r.header),
     body: importBody(r.body),
     auth: importAuth(r.auth ?? item.auth),

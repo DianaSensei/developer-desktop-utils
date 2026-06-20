@@ -7,7 +7,7 @@
 // vars (bru.setVar) override them. Scripts may mutate the request draft and both
 // variable stores; the caller persists the resulting env/runtime changes.
 
-import type { ApiRequest, ApiResponse, Environment, LogEntry, TestResult, VarMap } from './types';
+import type { ApiRequest, ApiResponse, Auth, Environment, LogEntry, TestResult, VarMap } from './types';
 import { newRequest } from './types';
 import { sendRequest } from './request';
 import {
@@ -31,7 +31,7 @@ function envToMap(env: Environment | null): VarMap {
   return map;
 }
 
-export interface InheritedScripts { pre: string[]; post: string[] }
+export interface InheritedScripts { pre: string[]; post: string[]; auth?: Auth | null }
 
 export async function executeRequest(
   request: ApiRequest,
@@ -42,6 +42,8 @@ export async function executeRequest(
 ): Promise<ExecResult> {
   // Work on copies so a failed run never mutates stored state.
   const draft = newRequest({ ...request });
+  // Resolve 'inherit' auth from the collection/folder chain.
+  if (draft.auth.type === 'inherit') draft.auth = inherited.auth ?? { ...draft.auth, type: 'none' };
   const stores: VarStores = {
     runtime: { ...runtimeVarsIn },
     env: envToMap(env),

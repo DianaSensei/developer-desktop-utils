@@ -5,7 +5,7 @@
 
 import { useEffect, useRef } from 'react';
 import {
-  Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, keymap, placeholder as cmPlaceholder,
+  Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, hoverTooltip, keymap, placeholder as cmPlaceholder,
 } from '@codemirror/view';
 import { EditorState, RangeSetBuilder } from '@codemirror/state';
 import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
@@ -16,7 +16,7 @@ const TOKEN = /\{\{\s*([\w.-]+)\s*\}\}/g;
 interface Props {
   value: string;
   onChange: (v: string) => void;
-  vars: string[];
+  vars: Record<string, string>;   // known variable name → current value
   placeholder?: string;
   onEnter?: () => void;
   className?: string;
@@ -30,22 +30,30 @@ const theme = EditorView.theme({
   '.cm-line': { padding: '0' },
   '.cm-cursor': { borderLeftColor: 'hsl(var(--foreground))' },
   '.cm-placeholder': { color: 'hsl(var(--muted-foreground) / 0.6)' },
-  '.cm-var': { color: 'hsl(150 55% 45%)', fontWeight: '500' },
-  '.cm-var-unknown': { color: 'hsl(0 72% 60%)', fontWeight: '500' },
+  '.cm-var': { color: 'hsl(150 55% 45%)', fontStyle: 'italic', fontSize: '11px' },
+  '.cm-var-unknown': { color: 'hsl(0 72% 60%)', fontStyle: 'italic', fontSize: '11px' },
   '.cm-tooltip.cm-tooltip-autocomplete': {
     border: '1px solid hsl(var(--border))', borderRadius: '6px', backgroundColor: 'hsl(var(--popover))',
     boxShadow: '0 4px 12px rgb(0 0 0 / 0.2)', overflow: 'hidden',
   },
   '.cm-tooltip-autocomplete ul li': { padding: '3px 8px', fontFamily: 'ui-monospace, monospace', fontSize: '12px', color: 'hsl(var(--foreground))' },
   '.cm-tooltip-autocomplete ul li[aria-selected]': { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' },
+  '.cm-tooltip.cm-tooltip-hover': {
+    border: '1px solid hsl(var(--border))', borderRadius: '6px', backgroundColor: 'hsl(var(--popover))',
+    boxShadow: '0 4px 12px rgb(0 0 0 / 0.2)',
+  },
+  '.cm-vartip': { display: 'flex', flexDirection: 'column', gap: '2px', padding: '6px 8px', maxWidth: '340px' },
+  '.cm-vartip-name': { fontSize: '10px', color: 'hsl(var(--muted-foreground))', fontFamily: 'ui-monospace, monospace' },
+  '.cm-vartip-val': { fontSize: '12px', color: 'hsl(var(--foreground))', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-all', whiteSpace: 'pre-wrap' },
+  '.cm-vartip-missing': { fontSize: '12px', color: 'hsl(0 72% 60%)' },
 });
 
 export function VarInput({ value, onChange, vars, placeholder, onEnter, className }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   // Live refs so the editor (created once) always sees fresh callbacks/vars.
-  const varsRef = useRef(new Set(vars));
-  varsRef.current = new Set(vars);
+  const varsRef = useRef(vars);
+  varsRef.current = vars;
   const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   const onEnterRef = useRef(onEnter); onEnterRef.current = onEnter;
   const lastValue = useRef(value);
@@ -64,7 +72,7 @@ export function VarInput({ value, onChange, vars, placeholder, onEnter, classNam
           TOKEN.lastIndex = 0;
           let m: RegExpExecArray | null;
           while ((m = TOKEN.exec(text))) {
-            const cls = varsRef.current.has(m[1]) ? 'cm-var' : 'cm-var-unknown';
+            const cls = m[1] in varsRef.current ? 'cm-var' : 'cm-var-unknown';
             b.add(m.index, m.index + m[0].length, Decoration.mark({ class: cls }));
           }
           return b.finish();
@@ -80,7 +88,7 @@ export function VarInput({ value, onChange, vars, placeholder, onEnter, classNam
       const word = /([\w.-]*)$/.exec(before.slice(open + 2))?.[1] ?? '';
       const from = ctx.pos - word.length;
       if (!ctx.explicit && word === '' && before.slice(-2) !== '{{') return null;
-      const options = [...varsRef.current].sort().map((name) => ({
+      const options = Object.keys(varsRef.current).sort().map((name) => ({
         label: name,
         type: 'variable',
         apply: (view: EditorView, _c: unknown, f: number, t: number) => {
@@ -93,6 +101,44 @@ export function VarInput({ value, onChange, vars, placeholder, onEnter, classNam
       }));
       return { from, options, validFor: /[\w.-]*/ };
     };
+
+    // Hovering a {{token}} shows the variable's current value (or "not defined").
+    const tooltip = hoverTooltip((view, pos) => {
+      const text = view.state.doc.toString();
+      TOKEN.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = TOKEN.exec(text))) {
+        const start = m.index;
+        const end = start + m[0].length;
+        if (pos < start || pos > end) continue;
+        const name = m[1];
+        const known = name in varsRef.current;
+        return {
+          pos: start,
+          end,
+          above: true,
+          create() {
+            const dom = document.createElement('div');
+            dom.className = 'cm-vartip';
+            const nameEl = document.createElement('span');
+            nameEl.className = 'cm-vartip-name';
+            nameEl.textContent = name;
+            dom.appendChild(nameEl);
+            const valEl = document.createElement('span');
+            if (known) {
+              valEl.className = 'cm-vartip-val';
+              valEl.textContent = varsRef.current[name] !== '' ? varsRef.current[name] : '(empty)';
+            } else {
+              valEl.className = 'cm-vartip-missing';
+              valEl.textContent = 'not defined';
+            }
+            dom.appendChild(valEl);
+            return { dom };
+          },
+        };
+      }
+      return null;
+    }, { hoverTime: 150 });
 
     // Keep it to one line: flatten any inserted newlines.
     const singleLine = EditorState.transactionFilter.of((tr) => {
@@ -114,6 +160,7 @@ export function VarInput({ value, onChange, vars, placeholder, onEnter, classNam
         extensions: [
           highlighter,
           autocompletion({ override: [complete], icons: false }),
+          tooltip,
           singleLine,
           cmPlaceholder(placeholder ?? ''),
           theme,
