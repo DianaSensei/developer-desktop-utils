@@ -45,6 +45,11 @@ const FORMAT_META: Record<Format, { label: string; icon: typeof Braces }> = {
 const SYNTAX_FORMATS: Format[] = ['json', 'html', 'xml', 'javascript'];
 const ENCODING_FORMATS: Format[] = ['raw', 'hex', 'base64'];
 
+// Above this size, skip pretty-printing / JSON syntax highlighting and show the
+// raw text by default — parsing and folding multi-MB bodies otherwise freezes
+// the UI. The user can still switch formats manually.
+const LARGE_BODY = 2_000_000;
+
 interface Props {
   response: ApiResponse | null;
   sending: boolean;
@@ -102,20 +107,26 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
     return () => ro.disconnect();
   }, []);
 
+  const big = !!response && response.body.length > LARGE_BODY;
+
   const pretty = useMemo(
-    () => (response ? prettyBody(response.body, response.contentType) : ''),
-    [response],
+    () => (response && !big ? prettyBody(response.body, response.contentType) : response?.body ?? ''),
+    [response, big],
   );
   const kind = useMemo(() => (response ? detectKind(response) : 'text'), [response]);
 
   // Reset the view to the detected default whenever a new response arrives.
+  // Oversized bodies default to raw text to stay responsive.
   useEffect(() => {
-    if (response) { setFormat(KIND_FORMAT[detectKind(response)]); setPreview(false); }
+    if (response) {
+      setFormat(response.body.length > LARGE_BODY ? 'raw' : KIND_FORMAT[detectKind(response)]);
+      setPreview(false);
+    }
   }, [response]);
 
   // Apply the JSONPath filter to JSON bodies (the funnel box), if active/valid.
   const filterResult = useMemo(() => {
-    if (!response || kind !== 'json' || !filter.trim()) return null;
+    if (!response || big || kind !== 'json' || !filter.trim()) return null;
     try {
       const out = queryJson(JSON.parse(response.body), filter);
       return { ok: true as const, text: JSON.stringify(out, null, 2) };
@@ -127,6 +138,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   const bodyText = useMemo(() => {
     if (!response) return '';
     if (filterResult?.ok) return filterResult.text;
+    if (big && format === 'json') return response.body;
     switch (format) {
       case 'json': return pretty;
       case 'hex': return hexDump(response.body);
@@ -277,7 +289,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
           ) : (
             <span className="font-semibold text-destructive">No response</span>
           )}
-          {response && tab === 'body' && kind === 'json' && (
+          {response && tab === 'body' && kind === 'json' && !big && (
             <button
               onClick={() => setShowFilter((s) => !s)}
               title="Filter (JSONPath)"
@@ -304,7 +316,13 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
         {tab === 'body' && response && (
           response.body ? (
             <>
-              <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} />
+              {big && (
+                <div className="flex shrink-0 items-center gap-2 border-b bg-amber-400/10 px-3 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  Large response ({formatBytes(response.sizeBytes)}) shown as raw text for performance.
+                </div>
+              )}
+              <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} />
               {showFilter && kind === 'json' && (
                 <div className="flex shrink-0 items-center gap-2 border-t px-3 py-1.5">
                   <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -452,8 +470,8 @@ function TabOverflow({ tabs, onSelect }: { tabs: { id: Tab; label: string; badge
 
 // ─── response body ────────────────────────────────────────────────────────────
 
-function ResponseBody({ response, kind, format, preview, text }: {
-  response: ApiResponse; kind: Kind; format: Format; preview: boolean; text: string;
+function ResponseBody({ response, kind, format, preview, text, plain }: {
+  response: ApiResponse; kind: Kind; format: Format; preview: boolean; text: string; plain?: boolean;
 }) {
   if (preview) {
     if (kind === 'html' || format === 'html') {
@@ -470,7 +488,7 @@ function ResponseBody({ response, kind, format, preview, text }: {
   }
   return (
     <div className="min-h-0 flex-1">
-      <ResponseViewer value={text} language={format === 'json' ? 'json' : 'text'} />
+      <ResponseViewer value={text} language={!plain && format === 'json' ? 'json' : 'text'} plain={plain} />
     </div>
   );
 }

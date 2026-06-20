@@ -41,7 +41,7 @@ export interface RequestBody {
   fileContent?: string; // file mode: base64-encoded bytes
 }
 
-export type AuthType = 'none' | 'inherit' | 'bearer' | 'basic' | 'apikey' | 'oauth2';
+export type AuthType = 'none' | 'inherit' | 'bearer' | 'basic' | 'digest' | 'apikey' | 'oauth2';
 
 export interface ApiKeyAuth { key: string; value: string; placement: 'header' | 'query' }
 export interface OAuth2Auth {
@@ -57,8 +57,8 @@ export interface OAuth2Auth {
 export interface Auth {
   type: AuthType;
   token: string;        // bearer
-  username: string;     // basic
-  password: string;     // basic
+  username: string;     // basic / digest
+  password: string;     // basic / digest
   apiKey: ApiKeyAuth;
   oauth2: OAuth2Auth;
 }

@@ -1,7 +1,7 @@
 // Collections sidebar: the tree of collections → folders → requests, with a
 // search filter, hover actions, and a Bruno-style right-click context menu.
 
-import { useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Boxes,
@@ -63,9 +63,14 @@ interface MenuEntry {
   sep?: boolean;
 }
 
-// Shared bits threaded to every tree node so prop lists stay small.
+// Shared bits threaded to every tree node so prop lists stay small. Kept stable
+// across renders (see useMemo below) so React.memo'd nodes only re-render when
+// their own item changes. `storeRef` holds the latest store without forcing a
+// new ctx identity each render; `activeRequestId` is the one reactive field
+// nodes read, so it lives directly on ctx.
 interface NodeCtx {
-  store: ApiStore;
+  storeRef: React.MutableRefObject<ApiStore>;
+  activeRequestId: string | null;
   q: string;
   onError: (m: string | null) => void;
   onSettings: (t: NodeSettingsTarget) => void;
@@ -100,11 +105,17 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const q = query.trim().toLowerCase();
 
-  const onDrop = () => {
-    if (dragId && dropTarget) store.moveItem(dragId, dropTarget.id, dropTarget.where);
+  // Latest store kept in a ref so the node context's identity doesn't change on
+  // every render (store is a fresh object each render). Nodes read the current
+  // store via storeRef.current when they actually render.
+  const storeRef = useRef(store);
+  storeRef.current = store;
+
+  const onDrop = useCallback(() => {
+    if (dragId && dropTarget) storeRef.current.moveItem(dragId, dropTarget.id, dropTarget.where);
     setDragId(null);
     setDropTarget(null);
-  };
+  }, [dragId, dropTarget]);
 
   const handleImport = async () => {
     setError(null);
@@ -118,13 +129,16 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     }
   };
 
-  const openMenu = (e: React.MouseEvent, entries: MenuEntry[]) => {
+  const openMenu = useCallback((e: React.MouseEvent, entries: MenuEntry[]) => {
     e.preventDefault();
     e.stopPropagation();
     setCtx({ x: e.clientX, y: e.clientY, entries });
-  };
+  }, []);
 
-  const nodeCtx: NodeCtx = { store, q, onError: setError, onSettings: setSettings, openMenu, editingId, setEditingId, onRun, dragId, dropTarget, setDragId, setDropTarget, onDrop };
+  const nodeCtx: NodeCtx = useMemo(() => ({
+    storeRef, activeRequestId: store.activeRequestId, q, onError: setError, onSettings: setSettings,
+    openMenu, editingId, setEditingId, onRun, dragId, dropTarget, setDragId, setDropTarget, onDrop,
+  }), [store.activeRequestId, q, openMenu, editingId, onRun, dragId, dropTarget, onDrop]);
   const visible = store.collections.filter((c) => !q || collectionMatches(c, q));
 
   return (
@@ -194,8 +208,8 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
 
 // ─── collection node ────────────────────────────────────────────────────────
 
-function CollectionNode({ collection, ctx }: { collection: Collection; ctx: NodeCtx }) {
-  const { store } = ctx;
+const CollectionNode = memo(function CollectionNode({ collection, ctx }: { collection: Collection; ctx: NodeCtx }) {
+  const store = ctx.storeRef.current;
   const collapsed = !!collection.collapsed && !ctx.q;
 
   const handleExport = async () => {
@@ -247,7 +261,7 @@ function CollectionNode({ collection, ctx }: { collection: Collection; ctx: Node
       ))}
     </div>
   );
-}
+});
 
 // ─── folder / request node ──────────────────────────────────────────────────
 
@@ -256,8 +270,8 @@ function TreeNode({ item, depth, collectionId, ctx }: { item: TreeItem; depth: n
   return <RequestNode request={item} depth={depth} collectionId={collectionId} ctx={ctx} />;
 }
 
-function FolderNode({ folder, depth, collectionId, ctx }: { folder: Folder; depth: number; collectionId: string; ctx: NodeCtx }) {
-  const { store } = ctx;
+const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }: { folder: Folder; depth: number; collectionId: string; ctx: NodeCtx }) {
+  const store = ctx.storeRef.current;
   const collapsed = !!folder.collapsed && !ctx.q;
 
   const entries: MenuEntry[] = [
@@ -297,11 +311,11 @@ function FolderNode({ folder, depth, collectionId, ctx }: { folder: Folder; dept
       ))}
     </div>
   );
-}
+});
 
-function RequestNode({ request, depth, collectionId, ctx }: { request: ApiRequest; depth: number; collectionId: string; ctx: NodeCtx }) {
-  const { store } = ctx;
-  const active = store.activeRequestId === request.id;
+const RequestNode = memo(function RequestNode({ request, depth, collectionId, ctx }: { request: ApiRequest; depth: number; collectionId: string; ctx: NodeCtx }) {
+  const store = ctx.storeRef.current;
+  const active = ctx.activeRequestId === request.id;
 
   const entries: MenuEntry[] = [
     { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', onClick: () => store.cloneItem(collectionId, request.id) },
@@ -328,7 +342,7 @@ function RequestNode({ request, depth, collectionId, ctx }: { request: ApiReques
       }
     />
   );
-}
+});
 
 // ─── generic row (selectable + inline-renamable) ────────────────────────────
 

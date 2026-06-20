@@ -60,14 +60,23 @@ function seedCollections(): Collection[] {
 
 // ─── immutable tree helpers ─────────────────────────────────────────────────
 
+// Identity-preserving map: returns the SAME array/objects when nothing changed,
+// so React.memo'd sidebar nodes can skip re-rendering subtrees that an edit
+// didn't touch. Only the path to a changed item gets fresh references.
 function mapTree(items: TreeItem[], fn: (item: TreeItem) => TreeItem): TreeItem[] {
-  return items.map((item) => {
+  let changed = false;
+  const next = items.map((item) => {
     const mapped = fn(item);
     if (mapped.type === 'folder') {
-      return { ...mapped, items: mapTree(mapped.items, fn) };
+      const kids = mapTree(mapped.items, fn);
+      const folder = kids === mapped.items ? mapped : { ...mapped, items: kids };
+      if (folder !== item) changed = true;
+      return folder;
     }
+    if (mapped !== item) changed = true;
     return mapped;
   });
+  return changed ? next : items;
 }
 
 function removeFromTree(items: TreeItem[], id: string): TreeItem[] {
@@ -426,13 +435,21 @@ export function useApiStore() {
   }, [setCollections]);
 
   // Apply a partial patch to whichever request matches `id`, anywhere in the tree.
+  // Collections that don't contain the request keep their identity untouched, so
+  // editing a request only re-renders that request's node path in the sidebar.
   const updateRequest = useCallback((id: string, patch: Partial<ApiRequest>) => {
-    setCollections((prev) => prev.map((c) => ({
-      ...c,
-      items: mapTree(c.items, (item) =>
-        item.id === id && item.type === 'request' ? { ...item, ...patch } : item,
-      ),
-    })));
+    setCollections((prev) => {
+      let changed = false;
+      const next = prev.map((c) => {
+        const items = mapTree(c.items, (item) =>
+          item.id === id && item.type === 'request' ? { ...item, ...patch } : item,
+        );
+        if (items === c.items) return c;
+        changed = true;
+        return { ...c, items };
+      });
+      return changed ? next : prev;
+    });
   }, [setCollections]);
 
   // — environment ops —

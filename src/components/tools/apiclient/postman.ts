@@ -31,12 +31,16 @@ interface PmBody {
   raw?: string;
   urlencoded?: PmKeyValue[];
   formdata?: PmKeyValue[];
+  graphql?: { query?: string; variables?: string };
   options?: { raw?: { language?: string } };
 }
 interface PmAuth {
   type?: string;
   bearer?: PmKeyValue[];
   basic?: PmKeyValue[];
+  digest?: PmKeyValue[];
+  apikey?: PmKeyValue[];
+  oauth2?: PmKeyValue[];
 }
 interface PmRequest {
   method?: string;
@@ -84,6 +88,34 @@ function importAuth(auth?: PmAuth): Auth {
   if (type === 'basic') {
     return { ...base, type, username: findKv(auth.basic, 'username'), password: findKv(auth.basic, 'password') };
   }
+  if (type === 'digest') {
+    return { ...base, type, username: findKv(auth.digest, 'username'), password: findKv(auth.digest, 'password') };
+  }
+  if (type === 'apikey') {
+    return {
+      ...base, type,
+      apiKey: {
+        key: findKv(auth.apikey, 'key'),
+        value: findKv(auth.apikey, 'value'),
+        placement: findKv(auth.apikey, 'in') === 'query' ? 'query' : 'header',
+      },
+    };
+  }
+  if (type === 'oauth2') {
+    return {
+      ...base, type,
+      oauth2: {
+        ...base.oauth2,
+        grantType: findKv(auth.oauth2, 'grant_type') === 'password_credentials' ? 'password' : 'client_credentials',
+        tokenUrl: findKv(auth.oauth2, 'accessTokenUrl'),
+        clientId: findKv(auth.oauth2, 'clientId'),
+        clientSecret: findKv(auth.oauth2, 'clientSecret'),
+        scope: findKv(auth.oauth2, 'scope'),
+        username: findKv(auth.oauth2, 'username'),
+        password: findKv(auth.oauth2, 'password'),
+      },
+    };
+  }
   return base;
 }
 
@@ -96,6 +128,9 @@ function importBody(body?: PmBody): RequestBody {
   }
   if (body.mode === 'urlencoded') return { mode: 'urlencoded', raw: '', form: mapKv(body.urlencoded) };
   if (body.mode === 'formdata') return { mode: 'multipart', raw: '', form: mapKv(body.formdata) };
+  if (body.mode === 'graphql') {
+    return { mode: 'graphql', raw: '', form: [], graphql: { query: body.graphql?.query ?? '', variables: body.graphql?.variables ?? '' } };
+  }
   return { mode: 'none', raw: '', form: [] };
 }
 
@@ -188,6 +223,39 @@ function exportAuth(auth: Auth): PmAuth | undefined {
       ],
     };
   }
+  if (auth.type === 'digest') {
+    return {
+      type: 'digest',
+      digest: [
+        { key: 'username', value: auth.username },
+        { key: 'password', value: auth.password },
+      ],
+    };
+  }
+  if (auth.type === 'apikey') {
+    return {
+      type: 'apikey',
+      apikey: [
+        { key: 'key', value: auth.apiKey.key },
+        { key: 'value', value: auth.apiKey.value },
+        { key: 'in', value: auth.apiKey.placement },
+      ],
+    };
+  }
+  if (auth.type === 'oauth2') {
+    return {
+      type: 'oauth2',
+      oauth2: [
+        { key: 'grant_type', value: auth.oauth2.grantType === 'password' ? 'password_credentials' : 'client_credentials' },
+        { key: 'accessTokenUrl', value: auth.oauth2.tokenUrl },
+        { key: 'clientId', value: auth.oauth2.clientId },
+        { key: 'clientSecret', value: auth.oauth2.clientSecret },
+        { key: 'scope', value: auth.oauth2.scope },
+        { key: 'username', value: auth.oauth2.username },
+        { key: 'password', value: auth.oauth2.password },
+      ],
+    };
+  }
   return undefined;
 }
 
@@ -204,6 +272,8 @@ function exportBody(body: RequestBody): PmBody | undefined {
       return { mode: 'urlencoded', urlencoded: exportKv(body.form) };
     case 'multipart':
       return { mode: 'formdata', formdata: exportKv(body.form) };
+    case 'graphql':
+      return { mode: 'graphql', graphql: { query: body.graphql?.query ?? '', variables: body.graphql?.variables ?? '' } };
     default:
       return undefined;
   }

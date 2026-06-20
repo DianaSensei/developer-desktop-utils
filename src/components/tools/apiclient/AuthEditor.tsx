@@ -11,6 +11,7 @@ const AUTH_TYPES: { id: AuthType; label: string }[] = [
   { id: 'none', label: 'No Auth' },
   { id: 'inherit', label: 'Inherit' },
   { id: 'basic', label: 'Basic Auth' },
+  { id: 'digest', label: 'Digest Auth' },
   { id: 'bearer', label: 'Bearer Token' },
   { id: 'apikey', label: 'API Key' },
   { id: 'oauth2', label: 'OAuth 2.0' },
@@ -47,13 +48,16 @@ export function AuthEditor({ auth, onChange, allowInherit = true }: { auth: Auth
         <Field label="Token" value={auth.token} onChange={(e) => set({ token: e.target.value })} placeholder="Token or {{var}}" />
       )}
 
-      {auth.type === 'basic' && (
+      {(auth.type === 'basic' || auth.type === 'digest') && (
         <div className="space-y-2">
           <Field label="Username" value={auth.username} onChange={(e) => set({ username: e.target.value })} />
           <div className="space-y-1.5">
             <Label className="text-xs">Password</Label>
             <Input type="password" value={auth.password} onChange={(e) => set({ password: e.target.value })} className="h-8 text-xs" />
           </div>
+          {auth.type === 'digest' && (
+            <p className="text-[11px] text-muted-foreground">The server's 401 challenge is answered automatically with an MD5 Digest response.</p>
+          )}
         </div>
       )}
 

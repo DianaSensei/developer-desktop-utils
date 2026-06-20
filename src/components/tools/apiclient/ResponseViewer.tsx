@@ -3,7 +3,8 @@
 // response pane. Themed via the same CSS variables as the rest of the app.
 
 import { useEffect, useMemo, useRef } from 'react';
-import { EditorView, basicSetup } from 'codemirror';
+import { EditorView, basicSetup, minimalSetup } from 'codemirror';
+import { lineNumbers } from '@codemirror/view';
 import { json } from '@codemirror/lang-json';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';

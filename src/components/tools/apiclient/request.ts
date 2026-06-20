@@ -7,6 +7,7 @@
 // fire when the user clicks Send.
 
 import type { ApiRequest, ApiResponse, KeyValue, OAuth2Auth, VarMap } from './types';
+import { buildDigestHeader, parseDigestChallenge } from './digest';
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -225,6 +226,26 @@ export async function sendRequest(
   let res: Response;
   try {
     res = await netFetch(finalUrl, init);
+    // Digest auth: the first send is unauthenticated; on a 401 challenge,
+    // compute the Authorization header and resend once.
+    if (req.auth.type === 'digest' && res.status === 401) {
+      const challenge = parseDigestChallenge(res.headers.get('www-authenticate') ?? '');
+      const user = sub(req.auth.username);
+      if (challenge && user) {
+        const u = new URL(finalUrl);
+        const header = buildDigestHeader({
+          username: user,
+          password: sub(req.auth.password),
+          method: req.method,
+          uri: u.pathname + u.search,
+          challenge,
+        });
+        const retryInit: typeof init = { ...init, headers: { ...reqHeaders, Authorization: header } };
+        const retryBody = buildBody(req, sub);
+        if (retryBody !== undefined) retryInit.body = retryBody;
+        res = await netFetch(finalUrl, retryInit);
+      }
+    }
   } catch (e) {
     if ((e as Error).name === 'TimeoutError' || (timeoutCtl?.signal.aborted && !signal?.aborted)) {
       throw new Error(`Request timed out after ${timeout} ms`);

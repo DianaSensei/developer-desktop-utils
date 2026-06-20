@@ -174,6 +174,11 @@ export function ApiClient() {
     if (first) { setShowHistory(false); store.addItem(first.id, 'request'); }
   }, [store]);
 
+  // Stable so the Sidebar's memoized tree nodes aren't invalidated each render.
+  const handleRun = useCallback((title: string, requests: ApiRequest[]) => {
+    setRunTarget({ title, requests });
+  }, []);
+
   // Merged variable map (environment + session runtime vars) for code generation.
   const codeVars = useCallback((): VarMap => {
     const env = store.activeEnv;
@@ -197,7 +202,7 @@ export function ApiClient() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="shrink-0 overflow-hidden" style={{ width: sidebarWidth }}>
-          <Sidebar store={store} searchInputRef={searchInputRef} onRun={(title, requests) => setRunTarget({ title, requests })} />
+          <Sidebar store={store} searchInputRef={searchInputRef} onRun={handleRun} />
         </div>
         <div
           onPointerDown={startSidebarResize}
