@@ -90,6 +90,9 @@
   html {
     height: 100%;
     overflow: hidden;
+    /* Prevent rubber-band elastic overscroll on macOS WKWebView and Windows WebView2.
+       overflow:hidden on html/body stops CSS scroll but not the native bounce layer. */
+    overscroll-behavior: none;
     /* Stop mobile/webview auto-inflating text; keep sizes identical per-OS */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;

@@ -199,8 +199,10 @@ export function ApiClient() {
       } else if (e.key.toLowerCase() === 'e') {
         e.preventDefault(); setEnvOpen(true);
       } else if (e.key.toLowerCase() === 'w') {
-        // Close the focused request tab (don't close the desktop window).
-        if (req) { e.preventDefault(); s.closeTab(req.id); }
+        // Always prevent the OS window-close shortcut (⌘W on macOS closes the window
+        // when not intercepted). Close the active tab if one is open.
+        e.preventDefault();
+        if (req) s.closeTab(req.id);
       }
     };
     window.addEventListener('keydown', onKey);

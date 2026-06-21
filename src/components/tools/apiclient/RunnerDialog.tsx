@@ -108,21 +108,24 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
   const iters = dataFile ? dataFile.rows.length : Math.max(1, Number(iterations) || 1);
   const delayMs = Math.max(0, Number(delay) || 0);
 
+  const cancelledRef = useRef(false);
+  useEffect(() => () => { cancelledRef.current = true; }, []);
+
   const runOne = async (req: ApiRequest, iter: number, dataVars?: VarMap) => {
     const key = keyOf(iter, req.id);
     try {
       const r = await runRequest(req, dataVars);
+      if (cancelledRef.current) return;
       const passed = r.tests.filter((t) => t.passed).length;
       const row: RowResult = { status: r.response?.status ?? 0, ms: r.response?.timeMs ?? 0, passed, total: r.tests.length, error: r.error };
       setResults((m) => ({ ...m, [key]: row }));
       setDetails((m) => ({ ...m, [key]: { request: req, result: r, dataVars } }));
     } catch (e) {
-      setResults((m) => ({ ...m, [key]: { status: 0, ms: 0, passed: 0, total: 0, error: (e as Error).message } }));
+      if (!cancelledRef.current) {
+        setResults((m) => ({ ...m, [key]: { status: 0, ms: 0, passed: 0, total: 0, error: (e as Error).message } }));
+      }
     }
   };
-
-  const cancelledRef = useRef(false);
-  useEffect(() => () => { cancelledRef.current = true; }, []);
 
   const run = async () => {
     cancelledRef.current = false;

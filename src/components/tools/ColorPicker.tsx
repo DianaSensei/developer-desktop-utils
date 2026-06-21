@@ -143,7 +143,7 @@ export function ColorPicker() {
 
   useQuickPaste((text) => {
     const trimmed = text.trim();
-    if (/^#?[0-9a-f]{3,8}$/i.test(trimmed)) {
+    if (/^#?([0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{4}|[0-9a-f]{3})$/i.test(trimmed)) {
       setColor(trimmed.startsWith('#') ? trimmed : `#${trimmed}`);
     }
   });

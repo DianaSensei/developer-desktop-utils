@@ -27,6 +27,18 @@ export function useDesktopChrome() {
         e.preventDefault();
         return;
       }
+      // ⌘R / Ctrl+R reloads the webview (WKWebView on macOS, WebView2 on Windows),
+      // wiping all React state. Block unconditionally.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        return;
+      }
+      // ⌘F / Ctrl+F opens the native browser find bar — not useful in a desktop app
+      // and overlays the UI. Block unconditionally.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        return;
+      }
       // ⌘←/→ and Alt+←/→ navigate history, but the same keys move the caret in
       // text fields — only block them when not editing.
       if ((e.metaKey || e.altKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isEditable(e.target)) {

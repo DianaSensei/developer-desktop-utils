@@ -52,6 +52,30 @@ export function SplitPane({
     window.removeEventListener('pointerup', stop);
   }, [onPointerMove, stop]);
 
+  // Reclamp percent when the container is resized (e.g. window resize) so the
+  // second pane is never squeezed to zero by the flexShrink:0 first pane.
+  // rAF-throttled so macOS ProMotion (120Hz) continuous resize doesn't cause
+  // ~120 state updates/second and layout thrashing.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let rafId = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const rect = el.getBoundingClientRect();
+        const size = horizontal ? rect.width : rect.height;
+        if (size <= 0) return;
+        const pxFloor = (minPanePx / size) * 100;
+        const lo = Math.max(minPercent, pxFloor);
+        const hi = Math.min(maxPercent, 100 - pxFloor);
+        setPercent((p) => (lo > hi ? 50 : Math.min(hi, Math.max(lo, p))));
+      });
+    });
+    ro.observe(el);
+    return () => { ro.disconnect(); cancelAnimationFrame(rafId); };
+  }, [horizontal, minPercent, maxPercent, minPanePx]);
+
   const start = useCallback(() => {
     setDragging(true);
     window.addEventListener('pointermove', onPointerMove);

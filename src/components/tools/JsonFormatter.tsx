@@ -441,7 +441,7 @@ export function JsonFormatter() {
   const [quote, setQuote] = usePersistentState('devtool:json:quote', '"');
   const [showInput, setShowInput] = usePersistentState('devtool:json:showInput', true);
 
-  const [query, setQuery] = usePersistentState('devtool:json:query', '');
+  const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selectedPath, setSelectedPath] = useState('');
   const [hoveredContainer, setHoveredContainer] = useState('');

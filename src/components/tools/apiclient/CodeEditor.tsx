@@ -14,11 +14,7 @@ import { varExtensions, varTheme } from './varSupport';
 const jsLang = javascript();
 
 const editorTheme = EditorView.theme({
-  // Use flex instead of height:100% so the editor fills its parent in any flex
-  // context. height:100% only works when the parent has an explicit pixel height
-  // which is not the case in flex chains (flex:1 parents). On Windows WebView2
-  // (Chromium) this caused the gutter and content to stack vertically instead of
-  // sitting side-by-side inside .cm-scroller.
+  // flex:1 (not height:100%) fills the parent in flex chains without an explicit pixel height.
   '&': {
     flex: '1 1 0',
     minHeight: '0',
@@ -26,8 +22,7 @@ const editorTheme = EditorView.theme({
     fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
   },
   '&.cm-focused': { outline: 'none' },
-  // min-height:0 is required on the scroller (a flex item itself) so it can
-  // shrink below its content height inside a constrained flex container.
+  // minHeight:0 lets the scroller shrink inside a constrained flex container.
   '.cm-scroller': { overflow: 'auto', minHeight: '0' },
   '.cm-content': { caretColor: 'hsl(var(--foreground))', padding: '8px 0' },
   '.cm-gutters': {
