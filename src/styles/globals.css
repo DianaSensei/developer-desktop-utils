@@ -89,12 +89,14 @@
   }
   html {
     height: 100%;
+    overflow: hidden;
     /* Stop mobile/webview auto-inflating text; keep sizes identical per-OS */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
+    overflow: hidden;
     /* Font stack ordered per-OS: macOS (SF) → Windows (Segoe UI Variable/Segoe UI)
        → Linux (Ubuntu/Cantarell/Noto). system-ui first lets each OS pick its native UI face. */
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
