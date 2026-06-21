@@ -496,7 +496,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
     }
   }
   return (
-    <div className="min-h-0 flex-1">
+    <div className="flex flex-col min-h-0 flex-1">
       <ResponseViewer value={text} language={!plain && format === 'json' ? 'json' : 'text'} plain={plain} />
     </div>
   );

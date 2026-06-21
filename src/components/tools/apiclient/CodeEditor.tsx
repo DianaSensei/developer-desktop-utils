@@ -14,13 +14,21 @@ import { varExtensions, varTheme } from './varSupport';
 const jsLang = javascript();
 
 const editorTheme = EditorView.theme({
+  // Use flex instead of height:100% so the editor fills its parent in any flex
+  // context. height:100% only works when the parent has an explicit pixel height
+  // which is not the case in flex chains (flex:1 parents). On Windows WebView2
+  // (Chromium) this caused the gutter and content to stack vertically instead of
+  // sitting side-by-side inside .cm-scroller.
   '&': {
-    height: '100%',
+    flex: '1 1 0',
+    minHeight: '0',
     fontSize: '12px',
     fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
   },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { overflow: 'auto' },
+  // min-height:0 is required on the scroller (a flex item itself) so it can
+  // shrink below its content height inside a constrained flex container.
+  '.cm-scroller': { overflow: 'auto', minHeight: '0' },
   '.cm-content': { caretColor: 'hsl(var(--foreground))', padding: '8px 0' },
   '.cm-gutters': {
     backgroundColor: 'hsl(var(--muted) / 0.4)',
@@ -108,8 +116,8 @@ export function CodeEditor({ value, onChange, placeholder, className, vars }: Pr
   }, [value]);
 
   return (
-    <div className={cn('relative h-full min-h-[180px] overflow-hidden rounded-md border', className)}>
-      <div ref={containerRef} className="h-full" />
+    <div className={cn('relative flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border', className)}>
+      <div ref={containerRef} className="flex flex-col flex-1 min-h-0" />
       {!value && placeholder && (
         <div className="pointer-events-none absolute left-9 top-2 font-mono text-[11px] text-muted-foreground/50">
           {placeholder}

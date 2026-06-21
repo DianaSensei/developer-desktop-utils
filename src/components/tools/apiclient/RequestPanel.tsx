@@ -543,7 +543,7 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
   }
   // raw text modes (json / xml / text / sparql)
   return (
-    <div className="min-h-0 flex-1">
+    <div className="flex flex-col min-h-0 flex-1">
       <CodeEditor
         value={body.raw}
         onChange={(raw) => setBody({ raw })}

@@ -11,14 +11,18 @@ import { EditorState } from '@codemirror/state';
 import { tags } from '@lezer/highlight';
 
 const editorTheme = EditorView.theme({
+  // Use flex: 1 instead of height: 100% — percentage heights don't resolve
+  // correctly through flex:1 parents on Windows WebView2 (Chromium), causing
+  // the gutter and content columns inside .cm-scroller to stack vertically.
   '&': {
-    height: '100%',
+    flex: '1 1 0',
+    minHeight: '0',
     fontSize: '12.5px',
     fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
     backgroundColor: 'transparent',
   },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { overflow: 'auto' },
+  '.cm-scroller': { overflow: 'auto', minHeight: '0' },
   '.cm-content': { padding: '6px 0' },
   '.cm-gutters': {
     backgroundColor: 'transparent',
@@ -87,5 +91,5 @@ export function ResponseViewer({ value, language, plain }: Props) {
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
   }, [value]);
 
-  return <div ref={containerRef} className="h-full" />;
+  return <div ref={containerRef} className="flex flex-col flex-1 min-h-0 overflow-hidden" />;
 }
