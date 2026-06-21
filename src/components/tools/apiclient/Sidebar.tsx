@@ -135,6 +135,13 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     setCtx({ x: e.clientX, y: e.clientY, entries });
   }, []);
 
+  // Environment variables, for {{var}} highlighting in collection/folder auth.
+  const envVars = useMemo(() => {
+    const m: Record<string, string> = {};
+    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) m[v.key] = v.value;
+    return m;
+  }, [store.activeEnv]);
+
   const nodeCtx: NodeCtx = useMemo(() => ({
     storeRef, activeRequestId: store.activeRequestId, q, onError: setError, onSettings: setSettings,
     openMenu, editingId, setEditingId, onRun, dragId, dropTarget, setDragId, setDropTarget, onDrop,
@@ -198,7 +205,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       </div>
 
       {settings && (
-        <NodeSettingsDialog target={settings} onSave={store.setNodeScript} onSaveAuth={store.setNodeAuth} onClose={() => setSettings(null)} />
+        <NodeSettingsDialog target={settings} onSave={store.setNodeScript} onSaveAuth={store.setNodeAuth} onClose={() => setSettings(null)} vars={envVars} />
       )}
       {ctx && <ContextMenu x={ctx.x} y={ctx.y} entries={ctx.entries} onClose={() => setCtx(null)} />}
       <ImportCurlDialog store={store} open={curlOpen} onClose={() => setCurlOpen(false)} />

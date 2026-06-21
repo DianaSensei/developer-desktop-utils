@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CodeEditor } from './CodeEditor';
 import { AuthEditor } from './AuthEditor';
-import { type Auth, type RequestScript, newAuth } from './types';
+import { type Auth, type RequestScript, type VarMap, newAuth } from './types';
 
 export interface NodeSettingsTarget {
   collectionId: string;
@@ -25,9 +25,10 @@ interface Props {
   onSave: (collectionId: string, nodeId: string | null, script: RequestScript) => void;
   onSaveAuth: (collectionId: string, nodeId: string | null, auth: Auth) => void;
   onClose: () => void;
+  vars?: VarMap;
 }
 
-export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose }: Props) {
+export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }: Props) {
   const [tab, setTab] = useState<'scripts' | 'auth'>('scripts');
   const [script, setScript] = useState<RequestScript>(target.script);
   const [auth, setAuth] = useState<Auth>(target.auth ?? newAuth());
@@ -80,7 +81,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose }: Prop
             <p className="text-[11px] text-muted-foreground">
               Requests with “Inherit” auth use this {target.kind.toLowerCase()}’s authorization.
             </p>
-            <AuthEditor auth={auth} onChange={setAuth} allowInherit={false} />
+            <AuthEditor auth={auth} onChange={setAuth} allowInherit={false} vars={vars} />
           </div>
         )}
 

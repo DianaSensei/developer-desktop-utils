@@ -1,31 +1,55 @@
 // Open-request tab strip, à la Bruno — every request you open gets a tab with a
-// method-colored label and a close button. Includes the request/response layout
-// toggle on the right.
+// method-colored label and a close button. The right cluster holds the
+// environment selector, history, and the request/response layout toggle.
 
-import { Clock, Columns2, Plus, Rows2, X } from 'lucide-react';
+import { Clock, Columns2, Plus, Rows2, Settings2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { methodColor } from './method-color';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
+import type { Collection, TreeItem } from './types';
 
 interface Props {
   store: ApiStore;
   direction: SplitDirection;
   onToggleDirection: () => void;
   onNewRequest: () => void;
+  onManageEnvironments: () => void;
   historyActive: boolean;
   onSelectRequest: (id: string) => void;
   onOpenHistory: () => void;
   onCloseHistory: () => void;
 }
 
+function containsRequest(items: TreeItem[], id: string): boolean {
+  return items.some((it) => (it.type === 'request' ? it.id === id : containsRequest(it.items, id)));
+}
+
+function activeCollection(store: ApiStore): Collection | null {
+  if (store.activeRequestId) {
+    const found = store.collections.find((c) => containsRequest(c.items, store.activeRequestId!));
+    if (found) return found;
+  }
+  return store.collections[0] ?? null;
+}
+
 export function RequestTabs({
-  store, direction, onToggleDirection, onNewRequest, historyActive, onSelectRequest, onOpenHistory, onCloseHistory,
+  store, direction, onToggleDirection, onNewRequest, onManageEnvironments,
+  historyActive, onSelectRequest, onOpenHistory, onCloseHistory,
 }: Props) {
   const { openRequests, activeRequestId } = store;
+  const collection = activeCollection(store);
+  const globalEnvs = store.environments.filter((e) => !e.collectionId);
+  const collectionEnvs = store.environments.filter((e) => e.collectionId === store.activeCollectionId);
+
+  const iconBtn = 'flex shrink-0 items-center px-2.5 transition-colors hover:bg-background hover:text-foreground';
 
   return (
     <div className="flex items-stretch border-b bg-muted/20">
+      {/* tabs (scrollable) + new */}
       <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">
         {openRequests.map((req) => {
           const active = !historyActive && req.id === activeRequestId;
@@ -64,31 +88,53 @@ export function RequestTabs({
             </button>
           </div>
         )}
-        <button
-          onClick={onNewRequest}
-          title="New request"
-          className="flex shrink-0 items-center px-2.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-        >
+        <button onClick={onNewRequest} title="New request" className={cn(iconBtn, 'text-muted-foreground')}>
           <Plus className="h-4 w-4" />
         </button>
       </div>
-      <button
-        onClick={onOpenHistory}
-        title="History"
-        className={cn(
-          'flex shrink-0 items-center border-l px-2.5 hover:bg-background hover:text-foreground',
-          historyActive ? 'text-amber-500' : 'text-muted-foreground',
-        )}
-      >
-        <Clock className="h-4 w-4" />
-      </button>
-      <button
-        onClick={onToggleDirection}
-        title={direction === 'horizontal' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
-        className="flex shrink-0 items-center border-l px-2.5 text-muted-foreground hover:bg-background hover:text-foreground"
-      >
-        {direction === 'horizontal' ? <Rows2 className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}
-      </button>
+
+      {/* right cluster: environment · history · layout */}
+      <div className="flex shrink-0 items-center gap-1 border-l pl-2 pr-1.5 text-muted-foreground">
+        <Select
+          value={store.activeEnvId ?? 'none'}
+          onValueChange={(v) => store.setActiveEnvId(v === 'none' ? null : v)}
+        >
+          <SelectTrigger className="h-7 w-40 text-xs"><SelectValue placeholder="No Environment" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No Environment</SelectItem>
+            {collectionEnvs.length > 0 && (
+              <SelectGroup>
+                <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">{collection?.name ?? 'Collection'}</SelectLabel>
+                {collectionEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+              </SelectGroup>
+            )}
+            {globalEnvs.length > 0 && (
+              <SelectGroup>
+                <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground">Global</SelectLabel>
+                {globalEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+              </SelectGroup>
+            )}
+          </SelectContent>
+        </Select>
+        <button onClick={onManageEnvironments} title="Configure environments" className="rounded p-1.5 transition-colors hover:bg-background hover:text-foreground">
+          <Settings2 className="h-4 w-4" />
+        </button>
+        <span className="mx-0.5 h-5 w-px bg-border" />
+        <button
+          onClick={onOpenHistory}
+          title="History"
+          className={cn('rounded p-1.5 transition-colors hover:bg-background hover:text-foreground', historyActive && 'text-amber-500')}
+        >
+          <Clock className="h-4 w-4" />
+        </button>
+        <button
+          onClick={onToggleDirection}
+          title={direction === 'horizontal' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
+          className="rounded p-1.5 transition-colors hover:bg-background hover:text-foreground"
+        >
+          {direction === 'horizontal' ? <Rows2 className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}
+        </button>
+      </div>
     </div>
   );
 }

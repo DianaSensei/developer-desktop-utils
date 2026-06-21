@@ -11,7 +11,6 @@ import { Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { Sidebar } from './Sidebar';
-import { TopBar } from './TopBar';
 import { StatusBar } from './StatusBar';
 import { AddressBar } from './AddressBar';
 import { RequestPanel } from './RequestPanel';
@@ -227,61 +226,60 @@ export function ApiClient() {
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <TopBar store={store} onManageEnvironments={() => setEnvOpen(true)} />
-          {activeRequest || showHistory ? (
+          <RequestTabs
+            store={store}
+            direction={direction}
+            onToggleDirection={() => setDirection((d) => (d === 'horizontal' ? 'vertical' : 'horizontal'))}
+            onNewRequest={newRequest}
+            onManageEnvironments={() => setEnvOpen(true)}
+            historyActive={showHistory}
+            onSelectRequest={(id) => { setShowHistory(false); store.setActiveRequestId(id); }}
+            onOpenHistory={() => setShowHistory(true)}
+            onCloseHistory={() => setShowHistory(false)}
+          />
+          {showHistory ? (
+            <HistoryView store={store} />
+          ) : activeRequest ? (
             <>
-              <RequestTabs
-                store={store}
-                direction={direction}
-                onToggleDirection={() => setDirection((d) => (d === 'horizontal' ? 'vertical' : 'horizontal'))}
-                onNewRequest={newRequest}
-                historyActive={showHistory}
-                onSelectRequest={(id) => { setShowHistory(false); store.setActiveRequestId(id); }}
-                onOpenHistory={() => setShowHistory(true)}
-                onCloseHistory={() => setShowHistory(false)}
+              <AddressBar
+                request={activeRequest}
+                onChange={(patch) => store.updateRequest(activeRequest.id, patch)}
+                onSend={send}
+                onCancel={cancel}
+                sending={run.sending}
+                onGenerateCode={() => setCodeOpen(true)}
+                vars={varMap}
               />
-              {showHistory ? (
-                <HistoryView store={store} />
-              ) : activeRequest ? (
-                <>
-                  <AddressBar
+              <SplitPane
+                direction={direction}
+                minPanePx={direction === 'horizontal' ? 380 : 220}
+                first={
+                  <RequestPanel
+                    key={activeRequest.id}
                     request={activeRequest}
                     onChange={(patch) => store.updateRequest(activeRequest.id, patch)}
-                    onSend={send}
-                    onCancel={cancel}
-                    sending={run.sending}
-                    onGenerateCode={() => setCodeOpen(true)}
                     vars={varMap}
                   />
-                  <SplitPane
-                    direction={direction}
-                    minPanePx={direction === 'horizontal' ? 380 : 220}
-                    first={
-                      <RequestPanel
-                        key={activeRequest.id}
-                        request={activeRequest}
-                        onChange={(patch) => store.updateRequest(activeRequest.id, patch)}
-                        vars={varMap}
-                      />
-                    }
-                    second={
-                      <ResponsePanel
-                        response={run.response}
-                        sending={run.sending}
-                        error={run.error}
-                        tests={run.tests}
-                        logs={run.logs}
-                        onClear={() => setRuns((prev) => ({ ...prev, [activeRequest.id]: EMPTY_RUN }))}
-                      />
-                    }
+                }
+                second={
+                  <ResponsePanel
+                    response={run.response}
+                    sending={run.sending}
+                    error={run.error}
+                    tests={run.tests}
+                    logs={run.logs}
+                    onClear={() => setRuns((prev) => ({ ...prev, [activeRequest.id]: EMPTY_RUN }))}
                   />
-                </>
-              ) : null}
+                }
+              />
             </>
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-              <Send className="h-8 w-8 opacity-30" />
-              <p className="text-sm">Select a request, or create one with the + button.</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
+              <Send className="h-10 w-10 opacity-20" />
+              <div className="text-center">
+                <p className="text-sm font-medium text-foreground/70">No request open</p>
+                <p className="mt-1 text-xs">Select a request from the sidebar, or press <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘B</kbd> to create one.</p>
+              </div>
             </div>
           )}
         </div>
