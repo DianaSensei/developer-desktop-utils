@@ -416,13 +416,10 @@ export function ArrayDeduplicator() {
 
   const stats = hasInput && !isProcessing ? result : null;
   // Hide native scrollbars in preserve mode — the center scrollbar takes over.
-  const areaClass = cn(AREA_CLASS, mode === 'preserve' && 'dedup-noscroll');
+  const areaClass = cn(AREA_CLASS, mode === 'preserve' && 'no-scrollbar');
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
-      {/* Inject once: hides native scrollbars for elements with .dedup-noscroll */}
-      <style>{`.dedup-noscroll::-webkit-scrollbar{display:none}.dedup-noscroll{scrollbar-width:none;-ms-overflow-style:none}`}</style>
-
       {/* ── Toolbar ── */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border">
         <div className="flex items-center p-0.5 rounded-md bg-muted gap-0.5">

@@ -39,6 +39,18 @@ export function useDesktopChrome() {
         e.preventDefault();
         return;
       }
+      // ⌘W / Ctrl+W — macOS WKWebView and Windows WebView2 both close the window when
+      // this key is not intercepted. ApiClient overrides it per-tab for its own tab-close
+      // UX, but this global guard protects every other tool from accidental window closure.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        return;
+      }
+      // ⌘P / Ctrl+P opens the browser print dialog — not useful in a developer tool.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        return;
+      }
       // ⌘←/→ and Alt+←/→ navigate history, but the same keys move the caret in
       // text fields — only block them when not editing.
       if ((e.metaKey || e.altKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isEditable(e.target)) {

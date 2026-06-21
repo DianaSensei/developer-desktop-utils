@@ -223,7 +223,7 @@ export function CalendarView() {
                       key={mt.id}
                       data-block
                       onClick={(ev) => { ev.stopPropagation(); setEditingMeetingId(mt.id); }}
-                      className="absolute left-1 right-1 z-30 overflow-hidden rounded border border-dashed border-indigo-400 bg-indigo-500/20 px-1.5 py-0.5 text-left text-[11px] leading-tight text-indigo-700 shadow-sm backdrop-blur-[1px] transition-shadow hover:shadow-md dark:text-indigo-200"
+                      className="absolute left-1 right-1 z-30 overflow-hidden rounded border border-dashed border-indigo-400 bg-indigo-500/60 px-1.5 py-0.5 text-left text-[11px] leading-tight text-indigo-700 shadow-sm backdrop-blur-[1px] transition-shadow hover:shadow-md dark:bg-indigo-500/40 dark:text-indigo-200"
                       style={{ top: (startMin / 60) * HOUR_PX, height }}
                     >
                       <div className="flex items-center gap-1 font-medium">

@@ -120,6 +120,16 @@
     isolation: isolate;
   }
 
+  /* Override optimizeLegibility on large monospace outputs and code editors.
+     WebKitGTK/FreeType applies full OpenType shaping per text node reflow under
+     optimizeLegibility, which is measurably expensive on long JSON/diff/code bodies
+     where there are no useful ligatures anyway. */
+  pre,
+  code,
+  .cm-editor {
+    text-rendering: auto;
+  }
+
   /* Inputs and buttons don't inherit the font by default in some webviews */
   button,
   input,
@@ -171,8 +181,9 @@
 
      Architecture:
        • Firefox uses the standard `scrollbar-width` / `scrollbar-color` API.
-       • All three Tauri webviews are WebKit-based and support ::-webkit-scrollbar
-         pseudo-elements, which fully override the native rendering pipeline.
+       • All three Tauri webviews support ::-webkit-scrollbar pseudo-elements:
+         WKWebView (macOS), WebView2/Chromium (Windows — not WebKit but Chromium,
+         which inherited this pseudo-element), WebKitGTK (Linux).
        • We use a 8px hit-area with a 2px transparent border inset on each side,
          giving a 4px-wide visual pill that feels lightweight but remains grabbable.
        • `min-height` / `min-width` prevent the thumb from shrinking below 36px
@@ -186,7 +197,7 @@
     scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
 
-  /* WebKit — all three Tauri platforms */
+  /* WebKit (macOS/Linux) and Chromium (Windows WebView2) — all three Tauri platforms */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

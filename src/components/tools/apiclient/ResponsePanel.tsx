@@ -102,6 +102,10 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
       next[id] = el.offsetWidth;
       if (prev[id] !== next[id]) changed = true;
     }
+    // On WebKitGTK the layout pass may not have completed when useLayoutEffect
+    // fires, so offsetWidth reads can return 0. Skip zero reads to keep the
+    // previous measurement (or the ?? 80 fallback) rather than collapsing all tabs.
+    if (Object.values(next).some((w) => w === 0)) return;
     if (changed) {
       tabWRef.current = next;
       setTabW(next);
