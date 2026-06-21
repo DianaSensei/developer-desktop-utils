@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
 import CryptoJS from 'crypto-js';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useQuickPaste } from '@/hooks/useQuickPaste';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { copyToClipboard } from '@/lib/clipboard';
 
@@ -52,7 +52,7 @@ export function HashTool() {
       <div className="p-4 space-y-6">
         {/* Input */}
         <div className="space-y-1.5">
-          <div className="text-xs font-medium text-muted-foreground">Input Text — Press ⌘V to paste</div>
+          <div className="text-xs font-medium text-muted-foreground">Input Text — {quickPasteHint}</div>
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}

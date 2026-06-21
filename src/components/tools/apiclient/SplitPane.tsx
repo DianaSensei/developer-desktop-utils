@@ -2,7 +2,7 @@
 // panes are laid out along: 'horizontal' = side by side, 'vertical' = stacked.
 // The first pane's size is a percentage, clamped to a sane range while dragging.
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -46,6 +46,12 @@ export function SplitPane({
     window.removeEventListener('pointerup', stop);
   }, [onPointerMove]);
 
+  // Remove any dangling listeners if the component unmounts while dragging.
+  useEffect(() => () => {
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', stop);
+  }, [onPointerMove, stop]);
+
   const start = useCallback(() => {
     setDragging(true);
     window.addEventListener('pointermove', onPointerMove);
@@ -54,7 +60,7 @@ export function SplitPane({
 
   return (
     <div ref={containerRef} className={cn('flex min-h-0 min-w-0 flex-1', horizontal ? 'flex-row' : 'flex-col')}>
-      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden" style={{ flexBasis: `${percent}%` }}>
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden" style={{ flexBasis: `${percent}%`, flexShrink: 0 }}>
         {first}
       </div>
       <div

@@ -3,7 +3,7 @@
 // JSON/HTML/XML/JavaScript and Raw/Hex/Base64), and copy / download / clear
 // actions. JSON bodies are pretty-printed; every view is copyable.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   AlertCircle, Binary, Braces, Check, ChevronDown, ChevronsRight, Code2, Copy, Download, Eraser,
   FileCode, FileText, Filter, Hash, Loader2, MoreHorizontal, Send, X,
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { isMac } from '@/hooks/useQuickPaste';
 import type { ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
 import { saveTextFile } from './fileio';
@@ -64,6 +65,8 @@ type Tab = 'body' | 'headers' | 'timeline' | 'tests' | 'console';
 export function ResponsePanel({ response, sending, error, tests, logs, onClear }: Props) {
   const [tab, setTab] = useState<Tab>('body');
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
   const [format, setFormat] = useState<Format>('raw');
   const [preview, setPreview] = useState(false);
   const [filter, setFilter] = useState('');
@@ -157,14 +160,15 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
 
   const failed = tests.filter((t) => !t.passed).length;
 
-  const copy = async () => {
+  const copy = useCallback(async () => {
     const text = tab === 'headers'
       ? (response?.headers ?? []).map(([k, v]) => `${k}: ${v}`).join('\n')
       : bodyText;
     await copyToClipboard(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
-  };
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 1200);
+  }, [tab, response, bodyText]);
 
   const saveResponse = async () => {
     if (!response) return;
@@ -182,7 +186,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   }
 
   if (!response && !error && tests.length === 0 && logs.length === 0) {
-    const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
+    const mod = isMac ? '⌘' : 'Ctrl';
     const shortcuts: [string, string][] = [
       ['Send Request', `${mod} + Enter`],
       ['New Request', `${mod} + B`],
@@ -270,9 +274,9 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* header: tabs left, format/status/actions pinned right */}
-      <div ref={headerRef} className="flex items-center border-b px-3">
+      <div ref={headerRef} className="relative flex items-center border-b px-3">
         {/* hidden row used only to measure intrinsic tab widths */}
-        <div aria-hidden className="pointer-events-none invisible fixed left-0 top-0 flex items-center gap-4">
+        <div aria-hidden className="pointer-events-none invisible absolute left-0 top-0 flex items-center gap-4">
           {tabDefs.map((t) => (
             <button key={t.id} ref={(el) => { measureRefs.current[t.id] = el; }} className="flex shrink-0 items-center gap-1 py-2 text-xs font-medium">
               {t.label}{t.badge}
@@ -408,7 +412,7 @@ const LOG_COLOR: Record<LogEntry['level'], string> = {
 };
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="flex h-full flex-col items-center justify-center gap-2">{children}</div>;
+  return <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2">{children}</div>;
 }
 
 // The … menu holding the copy / save / clear actions, so the status readout

@@ -114,6 +114,8 @@ export function ArrayDeduplicator() {
   const [result, setResult] = useState<DedupeResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   useEffect(() => {
     if (outputRef.current) outputRef.current.value = result?.output ?? '';
@@ -408,7 +410,8 @@ export function ArrayDeduplicator() {
     if (!result) return;
     await copyToClipboard(result.output);
     setCopied(true);
-    setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
   };
 
   const stats = hasInput && !isProcessing ? result : null;

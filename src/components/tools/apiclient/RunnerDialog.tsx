@@ -6,7 +6,7 @@
 //    a per-request pass/fail list, and a drill-in showing the exact request and
 //    response for any run.
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, GripVertical,
   ListChecks, Loader2, Play, RotateCcw, Settings2, X,
@@ -121,21 +121,27 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
     }
   };
 
+  const cancelledRef = useRef(false);
+  useEffect(() => () => { cancelledRef.current = true; }, []);
+
   const run = async () => {
+    cancelledRef.current = false;
     setRunning(true); resetRun(); setPhase('results');
     for (let i = 0; i < iters; i++) {
+      if (cancelledRef.current) break;
       const dataVars = dataFile ? dataFile.rows[i] : undefined;
       if (parallel) {
         await Promise.all(effective.map((req) => runOne(req, i, dataVars)));
       } else {
         for (const req of effective) {
+          if (cancelledRef.current) break;
           setCurrentKey(keyOf(i, req.id));
           await runOne(req, i, dataVars);
           if (delayMs > 0) await sleep(delayMs);
         }
       }
     }
-    setRanIters(iters); setCurrentKey(null); setRunning(false);
+    if (!cancelledRef.current) { setRanIters(iters); setCurrentKey(null); setRunning(false); }
   };
 
   const loadData = async () => {

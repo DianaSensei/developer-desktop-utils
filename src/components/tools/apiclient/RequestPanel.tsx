@@ -72,7 +72,7 @@ export function RequestPanel({ request, onChange, vars }: Props) {
       {/* tab body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {tab === 'params' && (
-          <div className="space-y-4 overflow-y-auto p-3">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Query</Label>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
@@ -82,14 +82,14 @@ export function RequestPanel({ request, onChange, vars }: Props) {
           </div>
         )}
         {tab === 'headers' && (
-          <div className="overflow-y-auto p-3"><KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} /></div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3"><KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} /></div>
         )}
         {tab === 'body' && <div className="flex min-h-0 flex-1 flex-col p-3"><BodyEditor request={request} onChange={onChange} vars={vars} /></div>}
-        {tab === 'auth' && <div className="overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} vars={vars} /></div>}
+        {tab === 'auth' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} vars={vars} /></div>}
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
-        {tab === 'vars' && <div className="overflow-y-auto p-3"><VarsEditor request={request} onChange={onChange} /></div>}
-        {tab === 'assert' && <div className="overflow-y-auto p-3"><AssertEditor request={request} onChange={onChange} /></div>}
-        {tab === 'settings' && <div className="overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}
+        {tab === 'vars' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><VarsEditor request={request} onChange={onChange} /></div>}
+        {tab === 'assert' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><AssertEditor request={request} onChange={onChange} /></div>}
+        {tab === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}
         {tab === 'tests' && (
           <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
             <p className="text-[11px] text-muted-foreground">
