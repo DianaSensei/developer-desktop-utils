@@ -50,7 +50,7 @@ export function RequestTabs({
   return (
     <div className="flex items-stretch border-b bg-muted/20">
       {/* tabs (scrollable) + new */}
-      <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">
+      <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar">
         {openRequests.map((req) => {
           const active = !historyActive && req.id === activeRequestId;
           return (

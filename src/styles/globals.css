@@ -130,11 +130,13 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Crisp 1px borders / hairlines regardless of fractional device-pixel ratios */
+  /* Crisp pixel art / raster images at fractional DPRs. SVGs are vector and need
+     no hint; canvas DPR is handled in JS. -webkit-optimize-contrast is WebKit-only
+     (ignored on Windows/Chromium WebView2), so pair it with the standard value. */
   img,
-  svg,
   canvas {
     image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
   }
 
   ::selection {
@@ -155,43 +157,73 @@
     }
   }
 
-  /* Cross-platform scrollbar — overrides native OS scrollbars so the app
-     looks identical on macOS, Windows, and Linux. */
+  /* ── Cross-platform custom scrollbar ─────────────────────────────────────
+     Replaces every native OS scrollbar with a single consistent design that
+     looks identical on macOS (WKWebView), Windows (WebView2/Chromium), and
+     Linux (WebKitGTK). Never rely on the OS to render scrollbars — each OS
+     has different defaults: macOS hides them by default, Windows shows thick
+     classic bars, Linux varies by GTK theme.
+
+     Architecture:
+       • Firefox uses the standard `scrollbar-width` / `scrollbar-color` API.
+       • All three Tauri webviews are WebKit-based and support ::-webkit-scrollbar
+         pseudo-elements, which fully override the native rendering pipeline.
+       • We use a 8px hit-area with a 2px transparent border inset on each side,
+         giving a 4px-wide visual pill that feels lightweight but remains grabbable.
+       • `min-height` / `min-width` prevent the thumb from shrinking below 36px
+         on very tall pages (ungrabbably small on touch/precision trackpad).
+       • Arrow buttons are hidden — they appear by default on Windows and look
+         out of place in a modern UI.                                          */
 
   /* Firefox */
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
 
-  /* WebKit (Chrome / Safari / the Tauri webview on every OS) */
+  /* WebKit — all three Tauri platforms */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.3);
+    background-color: hsl(var(--muted-foreground) / 0.25);
     border-radius: 9999px;
-    /* transparent border creates inset padding so the thumb looks slim */
+    /* 2px transparent border on each side = 4px visual pill within 8px hit-area */
     border: 2px solid transparent;
     background-clip: padding-box;
+    min-height: 36px;
+    min-width: 36px;
     transition: background-color 0.15s ease;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.55);
+    background-color: hsl(var(--muted-foreground) / 0.5);
   }
   ::-webkit-scrollbar-thumb:active {
     background-color: hsl(var(--muted-foreground) / 0.7);
   }
-  /* hide the up/down arrow buttons (Windows shows them natively) */
+  /* Remove OS-native arrow buttons — Windows renders them by default */
   ::-webkit-scrollbar-button {
     display: none;
   }
-  /* don't paint a solid square where the two scrollbars meet */
+  /* Transparent corner where horizontal and vertical bars meet */
   ::-webkit-scrollbar-corner {
     background: transparent;
+  }
+}
+
+@layer utilities {
+  /* Apply to any container that should scroll without showing a scrollbar —
+     e.g. horizontal tab strips and scroll-wheel pickers where the scrollbar
+     would look wrong but scrolling still needs to work (pointer/touch/wheel). */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }

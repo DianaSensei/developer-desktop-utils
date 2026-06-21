@@ -484,7 +484,7 @@ export function ColorPicker() {
                 </button>
               </div>
             </div>
-            <div ref={paletteRef} className="flex h-10 w-full overflow-x-auto overflow-y-hidden rounded-lg border">
+            <div ref={paletteRef} className="flex h-10 w-full overflow-x-auto overflow-y-hidden no-scrollbar rounded-lg border">
               {palette.length > 0 ? palette.map((hex, i) => swatch(hex, i))
                 : <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">No colors</div>}
             </div>

@@ -158,26 +158,40 @@ export function ApiClient() {
     if (activeRequest) abortRefs.current.get(activeRequest.id)?.abort();
   }, [activeRequest]);
 
+  // Stable refs so the keyboard listener can read current values without being
+  // re-registered on every response update (runs changes on every API call, store
+  // reference changes on every collection edit — both would cause constant churn).
+  const activeRequestRef = useRef(activeRequest);
+  activeRequestRef.current = activeRequest;
+  const runsRef = useRef(runs);
+  runsRef.current = runs;
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const storeRef = useRef(store);
+  storeRef.current = store;
+
   // Global keyboard shortcuts (Bruno parity): ⌘/Ctrl + Enter sends, + B creates a
   // request in the first collection, + E opens the environment manager.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
+      const req = activeRequestRef.current;
+      const s = storeRef.current;
       if (e.key === 'Enter') {
-        if (activeRequest && !runs[activeRequest.id]?.sending) { e.preventDefault(); send(); }
+        if (req && !runsRef.current[req.id]?.sending) { e.preventDefault(); sendRef.current(); }
       } else if (e.key.toLowerCase() === 'b') {
-        const first = store.collections[0];
-        if (first) { e.preventDefault(); store.addItem(first.id, 'request'); }
+        const first = s.collections[0];
+        if (first) { e.preventDefault(); s.addItem(first.id, 'request'); }
       } else if (e.key.toLowerCase() === 'e') {
         e.preventDefault(); setEnvOpen(true);
       } else if (e.key.toLowerCase() === 'w') {
         // Close the focused request tab (don't close the desktop window).
-        if (activeRequest) { e.preventDefault(); store.closeTab(activeRequest.id); }
+        if (req) { e.preventDefault(); s.closeTab(req.id); }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeRequest, runs, send, store]);
+  }, []);
 
   const newRequest = useCallback(() => {
     const first = store.collections[0];

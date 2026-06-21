@@ -50,7 +50,7 @@ function Column({
       <button type="button" onClick={() => onStep(-1)} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Previous ${label}`}>
         <ChevronUp className="h-4 w-4" />
       </button>
-      <div className={cn('my-1 w-10 overflow-y-auto rounded-md border bg-muted/20 px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', fill ? 'min-h-0 flex-1' : listClass)}>
+      <div className={cn('my-1 w-10 overflow-y-auto rounded-md border bg-muted/20 px-1 py-1 no-scrollbar', fill ? 'min-h-0 flex-1' : listClass)}>
         {Array.from({ length: count }, (_, n) => {
           const isSel = n === selected;
           return (

@@ -78,7 +78,7 @@ export function TopicView({
       )}
 
       {/* Tab bar */}
-      <div className="flex border-b shrink-0 px-2 gap-0 overflow-x-auto">
+      <div className="flex border-b shrink-0 px-2 gap-0 overflow-x-auto no-scrollbar">
         {TABS.map((tab) => (
           <button
             key={tab.id}

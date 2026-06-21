@@ -132,6 +132,10 @@ function NavTooltip({ label, description, children }: {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, []);
+
   const handleEnter = () => {
     timer.current = setTimeout(() => {
       if (wrapRef.current) {
@@ -161,6 +165,139 @@ function NavTooltip({ label, description, children }: {
           )}
         </div>,
         document.body
+      )}
+    </div>
+  );
+}
+
+// Scrollable nav list with an overflow fade indicator. Extracted into its own
+// component so hooks (useRef, useState, useLayoutEffect) follow React rules —
+// calling hooks inside an IIFE inside another component's render is invalid.
+type SidebarTool = (typeof allTools)[0];
+function NavScrollArea({
+  navTools,
+  query,
+  disabledMatches,
+  settingsTool,
+  onClose,
+  isCollapsed,
+  hiddenCount,
+}: {
+  navTools: SidebarTool[];
+  query: string;
+  disabledMatches: SidebarTool[];
+  settingsTool: SidebarTool;
+  onClose: () => void;
+  isCollapsed: boolean;
+  hiddenCount: number;
+}) {
+  const location = useLocation();
+  const navRef = useRef<HTMLElement>(null);
+  const [hasMore, setHasMore] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = navRef.current;
+    if (!el) return;
+    setHasMore(el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  }, []);
+
+  useLayoutEffect(() => {
+    checkScroll();
+    const el = navRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkScroll);
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
+  }, [checkScroll, navTools.length, query]);
+
+  return (
+    <div className="relative flex-1 min-h-0">
+      <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
+        {navTools.length === 0 && query && (
+          disabledMatches.length > 0 ? (
+            <div className="px-2 py-4 text-center text-[11px] text-muted-foreground space-y-2">
+              <p>
+                <span className="font-medium text-foreground">{disabledMatches[0].label}</span> is turned off.
+              </p>
+              <Link
+                to={settingsTool.path}
+                onClick={onClose}
+                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-primary hover:bg-muted transition-colors"
+              >
+                <Plus className="h-3 w-3" /> Enable in Settings
+              </Link>
+            </div>
+          ) : (
+            <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
+          )
+        )}
+        <div className="space-y-0.5">
+          {navTools.map((tool) => {
+            const Icon = tool.icon;
+            const isActive = location.pathname === tool.path;
+            const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
+            return (
+              <NavTooltip key={tool.path} label={tool.label} description={desc}>
+                <Link
+                  to={tool.path}
+                  onClick={onClose}
+                  className={cn(
+                    'group flex items-center rounded-md transition-all duration-150 motion-safe:active:scale-[0.98]',
+                    isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
+                    isActive
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  )}
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-150 motion-safe:group-hover:scale-110" />
+                  {!isCollapsed && (
+                    <span className={cn('flex-1 text-sm whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
+                      {tool.label}
+                    </span>
+                  )}
+                </Link>
+              </NavTooltip>
+            );
+          })}
+        </div>
+
+        {/* Hint: more tools exist but are hidden — link to Settings to enable them.
+            Deliberately low-emphasis (small, muted, no tab styling) so it reads as
+            a hint, not a tool entry. */}
+        {!query && hiddenCount > 0 && (
+          <NavTooltip
+            label={`${hiddenCount} more tool${hiddenCount > 1 ? 's' : ''} available`}
+            description="Turn on more tools from the Settings page."
+          >
+            <Link
+              to={settingsTool.path}
+              onClick={onClose}
+              className={cn(
+                'mt-1.5 flex items-center justify-center gap-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors',
+                isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[10px]'
+              )}
+            >
+              <Plus className={isCollapsed ? 'h-3 w-3' : 'h-2.5 w-2.5 flex-shrink-0'} />
+              {!isCollapsed && (
+                <span className="whitespace-nowrap">{hiddenCount} more in Settings</span>
+              )}
+            </Link>
+          </NavTooltip>
+        )}
+      </nav>
+      {/* Fade + indicator when more items below */}
+      {hasMore && (
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 flex items-end justify-center pb-1"
+          style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--sidebar)) 85%)' }}>
+          <span className={cn(
+            'flex items-center gap-0.5 text-[9px] text-muted-foreground/60',
+            isCollapsed ? 'flex-col' : 'flex-row'
+          )}>
+            <ChevronDown className="h-2.5 w-2.5" />
+            {!isCollapsed && 'more'}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -272,6 +409,8 @@ function Sidebar({
               {query && (
                 <button
                   onClick={() => setQuery('')}
+                  aria-label="Clear search"
+                  title="Clear search"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
                 >
                   <X className="h-3 w-3" />
@@ -282,120 +421,15 @@ function Sidebar({
         )}
 
         {/* Scrollable tool list with overflow fade */}
-        {(() => {
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          const navRef = useRef<HTMLElement>(null);
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          const [hasMore, setHasMore] = useState(false);
-
-          const checkScroll = useCallback(() => {
-            const el = navRef.current;
-            if (!el) return;
-            setHasMore(el.scrollTop + el.clientHeight < el.scrollHeight - 4);
-          }, []);
-
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          useLayoutEffect(() => {
-            checkScroll();
-            const el = navRef.current;
-            if (!el) return;
-            el.addEventListener('scroll', checkScroll);
-            const ro = new ResizeObserver(checkScroll);
-            ro.observe(el);
-            return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
-          }, [checkScroll, navTools.length, query]);
-
-          return (
-            <div className="relative flex-1 min-h-0">
-              <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
-                {navTools.length === 0 && query && (
-                  disabledMatches.length > 0 ? (
-                    <div className="px-2 py-4 text-center text-[11px] text-muted-foreground space-y-2">
-                      <p>
-                        <span className="font-medium text-foreground">{disabledMatches[0].label}</span> is turned off.
-                      </p>
-                      <Link
-                        to={settingsTool.path}
-                        onClick={onClose}
-                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-primary hover:bg-muted transition-colors"
-                      >
-                        <Plus className="h-3 w-3" /> Enable in Settings
-                      </Link>
-                    </div>
-                  ) : (
-                    <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
-                  )
-                )}
-                <div className="space-y-0.5">
-                  {navTools.map((tool) => {
-                    const Icon = tool.icon;
-                    const isActive = location.pathname === tool.path;
-                    const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
-                    return (
-                      <NavTooltip key={tool.path} label={tool.label} description={desc}>
-                        <Link
-                          to={tool.path}
-                          onClick={onClose}
-                          className={cn(
-                            'group flex items-center rounded-md transition-all duration-150 motion-safe:active:scale-[0.98]',
-                            isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
-                            isActive
-                              ? 'bg-accent text-accent-foreground'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                          )}
-                        >
-                          <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-150 motion-safe:group-hover:scale-110" />
-                          {!isCollapsed && (
-                            <span className={cn('flex-1 text-sm whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
-                              {tool.label}
-                            </span>
-                          )}
-                        </Link>
-                      </NavTooltip>
-                    );
-                  })}
-                </div>
-
-                {/* Hint: more tools exist but are hidden — link to Settings to enable them.
-                    Deliberately low-emphasis (small, muted, no tab styling) so it reads as
-                    a hint, not a tool entry. */}
-                {!query && hiddenCount > 0 && (
-                  <NavTooltip
-                    label={`${hiddenCount} more tool${hiddenCount > 1 ? 's' : ''} available`}
-                    description="Turn on more tools from the Settings page."
-                  >
-                    <Link
-                      to={settingsTool.path}
-                      onClick={onClose}
-                      className={cn(
-                        'mt-1.5 flex items-center justify-center gap-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors',
-                        isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[10px]'
-                      )}
-                    >
-                      <Plus className={isCollapsed ? 'h-3 w-3' : 'h-2.5 w-2.5 flex-shrink-0'} />
-                      {!isCollapsed && (
-                        <span className="whitespace-nowrap">{hiddenCount} more in Settings</span>
-                      )}
-                    </Link>
-                  </NavTooltip>
-                )}
-              </nav>
-              {/* Fade + indicator when more items below */}
-              {hasMore && (
-                <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 flex items-end justify-center pb-1"
-                  style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--sidebar)) 85%)' }}>
-                  <span className={cn(
-                    'flex items-center gap-0.5 text-[9px] text-muted-foreground/60',
-                    isCollapsed ? 'flex-col' : 'flex-row'
-                  )}>
-                    <ChevronDown className="h-2.5 w-2.5" />
-                    {!isCollapsed && 'more'}
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        <NavScrollArea
+          navTools={navTools}
+          query={query}
+          disabledMatches={disabledMatches}
+          settingsTool={settingsTool}
+          onClose={onClose}
+          isCollapsed={isCollapsed}
+          hiddenCount={hiddenCount}
+        />
 
         {/* Pinned bottom bar — always visible, order: Collapse → Dark mode → Settings */}
         <div className="shrink-0 border-t px-1.5 py-2 space-y-0.5">

@@ -3,7 +3,7 @@
 // is never clipped. An optional `right` node is pinned to the right edge and the
 // tabs yield space to it (used by the response panel's status readout).
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronsRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -33,23 +33,42 @@ export function ResponsiveTabBar({ tabs, active, onSelect, right, className }: P
   }, []);
 
   // Measure each tab's intrinsic width (hidden row) and the right group's width.
+  // Use refs for previous values so the effect is only registered once and doesn't
+  // re-run on every render — same pattern as ResponsePanel's tab measurement fix.
   const measureRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const tabWRef = useRef<Record<string, number>>({});
   const [tabW, setTabW] = useState<Record<string, number>>({});
   const rightRef = useRef<HTMLDivElement>(null);
+  const rightWRef = useRef(0);
   const [rightW, setRightW] = useState(0);
+
+  // A stable string that changes whenever any tab label changes — used as a dep
+  // to re-measure without including the full tabs array (which is a new reference
+  // every render from the parent).
+  const tabsKey = useMemo(() => tabs.map((t) => `${t.id}:${t.label}`).join('\0'), [tabs]);
+  const hasRight = right != null;
+
   useLayoutEffect(() => {
+    const prevTabW = tabWRef.current;
     let changed = false;
     const next: Record<string, number> = {};
     for (const id of Object.keys(measureRefs.current)) {
       const el = measureRefs.current[id];
       if (!el) continue;
       next[id] = el.offsetWidth;
-      if (tabW[id] !== next[id]) changed = true;
+      if (prevTabW[id] !== next[id]) changed = true;
     }
-    if (changed) setTabW(next);
+    if (changed) {
+      tabWRef.current = next;
+      setTabW(next);
+    }
     const rw = rightRef.current?.offsetWidth ?? 0;
-    if (rw !== rightW) setRightW(rw);
-  });
+    if (rw !== rightWRef.current) {
+      rightWRef.current = rw;
+      setRightW(rw);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabsKey, hasRight]);
 
   const GAP = 16;   // gap-4 between tabs
   const CHEV = 42;  // » button + margin
@@ -113,8 +132,10 @@ function TabBtn({ def, active, onClick }: { def: TabDef; active: boolean; onClic
     <button
       onClick={onClick}
       className={cn(
-        'relative -mb-px flex shrink-0 items-center gap-1 border-b-2 py-2 text-xs font-medium transition-colors',
-        active ? 'border-amber-400 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+        'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-medium transition-colors',
+        active
+          ? 'border-amber-400 text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
       )}
     >
       {def.label}{def.badge}

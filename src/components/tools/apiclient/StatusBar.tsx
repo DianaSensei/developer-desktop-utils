@@ -1,11 +1,7 @@
-// Bruno-style bottom status bar: app label on the left, quick actions + version
-// on the right. "Search" focuses the collections filter; the rest are passive
-// status affordances.
+// Bottom status bar — app label left, quick actions right.
+// Keeps chrome minimal; only includes actions the user can actually trigger.
 
-import { Cookie, Search, Wrench } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-const VERSION = 'v0.1.0';
+import { Cookie, Search } from 'lucide-react';
 
 export function StatusBar({ onSearch, onCookies, cookieCount }: {
   onSearch: () => void;
@@ -13,22 +9,29 @@ export function StatusBar({ onSearch, onCookies, cookieCount }: {
   cookieCount: number;
 }) {
   return (
-    <div className="flex shrink-0 items-center justify-between border-t px-3 py-1 text-[11px] text-muted-foreground">
-      <span className="font-medium">API Client</span>
-      <div className="flex items-center gap-4">
-        <button onClick={onSearch} className="flex items-center gap-1 transition-colors hover:text-foreground">
-          <Search className="h-3.5 w-3.5" /> Search
+    <div className="flex shrink-0 items-center justify-between border-t bg-muted/20 px-3 py-1 text-[11px] text-muted-foreground">
+      <span className="font-medium tracking-wide">API Client</span>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onSearch}
+          title="Focus collection search (⌘F)"
+          className="flex items-center gap-1 transition-colors hover:text-foreground"
+        >
+          <Search className="h-3 w-3" /> Search
         </button>
-        <button onClick={onCookies} className="flex items-center gap-1 transition-colors hover:text-foreground" title="Manage cookies">
-          <Cookie className="h-3.5 w-3.5" /> Cookies
+        <span className="h-3 w-px bg-border" />
+        <button
+          onClick={onCookies}
+          title="Manage cookies"
+          className="flex items-center gap-1 transition-colors hover:text-foreground"
+        >
+          <Cookie className="h-3 w-3" /> Cookies
           {cookieCount > 0 && (
-            <span className="rounded-full bg-muted px-1.5 text-[9px] font-semibold text-foreground">{cookieCount}</span>
+            <span className="ml-0.5 rounded-full bg-amber-400/20 px-1.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
+              {cookieCount}
+            </span>
           )}
         </button>
-        <span className={cn('flex items-center gap-1 opacity-50')} title="Not available yet">
-          <Wrench className="h-3.5 w-3.5" /> Dev Tools
-        </span>
-        <span>{VERSION}</span>
       </div>
     </div>
   );

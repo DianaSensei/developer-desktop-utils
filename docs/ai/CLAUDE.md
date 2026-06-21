@@ -239,6 +239,73 @@ useInputHistory(input, setInput);
 
 ---
 
+## Cross-Platform Rules (macOS · Windows · Linux)
+
+The app runs on three different WebView engines: WKWebView (macOS), WebView2/Chromium (Windows), WebKitGTK (Linux). Write defensively for all three.
+
+### CSS
+- **Never use `-webkit-*` properties alone** — always pair with the standard value or test that the fallback is acceptable. Example: `-webkit-optimize-contrast` is silently ignored on Windows/Chromium, so also add `crisp-edges` (the standard `image-rendering` value).
+- **Never apply `image-rendering` to SVG elements** — SVGs are vector; DPR scaling is handled by the browser. Apply only to raster `<img>` and `<canvas>`.
+- **Use `color-scheme` CSS property** in `:root` / `.dark` to tell the OS to theme native controls (scrollbars, form widgets) for the active mode — prevents flash of wrong-theme chrome on Windows/Linux.
+
+### Scrollbars — never use native OS rendering
+`globals.css` defines a single custom scrollbar that looks identical on all three platforms. **Never add inline scrollbar CSS or use `[scrollbar-width:none]` / `[&::-webkit-scrollbar]:hidden` Tailwind arbitrary values** — use the provided utilities instead:
+
+| Situation | Class to use |
+|---|---|
+| Content area that scrolls vertically | `overflow-y-auto` (picks up global scrollbar automatically) |
+| Nav/tab strip that scrolls horizontally | `overflow-x-auto no-scrollbar` |
+| Scroll-wheel picker / drum roll (no visible bar desired) | `overflow-y-auto no-scrollbar` |
+| Horizontal data table (scrollbar should be visible) | `overflow-x-auto` (global style applies) |
+
+The `no-scrollbar` utility class is defined in `@layer utilities` in `globals.css`. It sets `scrollbar-width: none` (Firefox) and `::-webkit-scrollbar { display: none }` (WebKit). Do not re-implement this inline.
+
+### JavaScript / Browser APIs
+- **Do not use `navigator.platform`** — deprecated and unreliable on Windows/Chromium. Use `navigator.userAgent` instead:
+  ```ts
+  const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  ```
+- **Do not use `window.alert`, `window.confirm`, `window.prompt`** — these spawn native OS dialogs that look wrong on every platform. Use shadcn/ui `Dialog` or `AlertDialog`.
+- **Do not use native `<select>`** — rendering differs dramatically between macOS, Windows, and Linux. Always use shadcn/ui `Select` (Radix UI `SelectPrimitive`).
+- **Tauri detection**: `'__TAURI_INTERNALS__' in window` (not `window.__TAURI__` or any other symbol).
+
+### React Hooks
+- **Never call hooks inside IIFEs, callbacks, or conditionals** inside a component's render. This violates the Rules of Hooks and causes unpredictable behavior (bugs that appear/disappear depending on render order). If you need hooks in a logically-grouped sub-section of JSX, extract that section into its own named component.
+  ```tsx
+  // ❌ Wrong — hooks inside IIFE in JSX
+  {(() => {
+    const ref = useRef(null);   // ESLint rule violation
+    useEffect(() => { ... });
+    return <div ref={ref} />;
+  })()}
+
+  // ✅ Correct — extract to a proper component
+  function MySection() {
+    const ref = useRef(null);
+    useEffect(() => { ... });
+    return <div ref={ref} />;
+  }
+  // then use <MySection /> in the parent's JSX
+  ```
+- **`useLayoutEffect` must always have a dependency array.** Without one it runs after *every* render — the most expensive possible schedule. Only omit the array if you have a measured, documented reason. Reading `offsetWidth` / `getBoundingClientRect()` in an unconstrained `useLayoutEffect` causes layout thrashing.
+- **Stable refs for long-lived event listeners.** When a `useEffect` adds a `window` event listener and its handler reads React state, keep the handler registered once (empty `[]` deps) by storing the latest state in a `useRef` and reading from the ref inside the handler:
+  ```ts
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  useEffect(() => {
+    const handler = () => { /* read valueRef.current, not value */ };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []); // stable — no re-registration on every state change
+  ```
+- **Always clean up timers on unmount.** Any `setTimeout` or `setInterval` stored in a `useRef` must be cleared in a `useEffect` cleanup:
+  ```ts
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  ```
+
+---
+
 ## Code Conventions
 
 ### Naming
@@ -488,4 +555,4 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 
 ---
 
-*Last updated: 2026-06-18*
+*Last updated: 2026-06-21*

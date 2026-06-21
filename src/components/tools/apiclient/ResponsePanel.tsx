@@ -84,18 +84,26 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   // Measure each tab's intrinsic width (from a hidden row) and the right-group
   // width so the strip collapses precisely — no clipping, status stays pinned.
   const measureRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const tabWRef = useRef<Record<string, number>>({});
   const [tabW, setTabW] = useState<Record<string, number>>({});
+  // Only re-measure when tab structure changes (new response, or test/log counts change
+  // which updates badge text). Using a ref for the previous widths avoids a stale closure
+  // while keeping the effect out of the render-on-every-update path.
   useLayoutEffect(() => {
+    const prev = tabWRef.current;
     let changed = false;
     const next: Record<string, number> = {};
     for (const id of Object.keys(measureRefs.current)) {
       const el = measureRefs.current[id];
       if (!el) continue;
       next[id] = el.offsetWidth;
-      if (tabW[id] !== next[id]) changed = true;
+      if (prev[id] !== next[id]) changed = true;
     }
-    if (changed) setTabW(next);
-  });
+    if (changed) {
+      tabWRef.current = next;
+      setTabW(next);
+    }
+  }, [response, tests.length, logs.length]);
 
   const rightRef = useRef<HTMLDivElement>(null);
   const [rightW, setRightW] = useState(0);
@@ -174,7 +182,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   }
 
   if (!response && !error && tests.length === 0 && logs.length === 0) {
-    const mod = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform) ? '⌘' : 'Ctrl';
+    const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent) ? '⌘' : 'Ctrl';
     const shortcuts: [string, string][] = [
       ['Send Request', `${mod} + Enter`],
       ['New Request', `${mod} + B`],
@@ -476,7 +484,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
 }) {
   if (preview) {
     if (kind === 'html' || format === 'html') {
-      return <iframe title="Response preview" sandbox="" srcDoc={response.body} className="min-h-0 flex-1 border-0 bg-white" />;
+      return <iframe title="Response preview" sandbox="" srcDoc={response.body} className="min-h-0 flex-1 border-0 bg-white dark:bg-neutral-900" />;
     }
     if (kind === 'image') {
       const src = `data:${response.contentType};base64,${toBase64(response.body)}`;

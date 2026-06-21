@@ -28,7 +28,7 @@ import type { ApiStore } from './store';
 import { type ApiRequest, type Auth, type Collection, type Folder, type RequestScript, type TreeItem, newAuth, normalizeRequest } from './types';
 import { importPostman, exportPostman } from './postman';
 import { pickJsonFile, saveJsonFile } from './fileio';
-import { methodColor } from './method-color';
+import { methodBadgeStyle } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
 import { ImportCurlDialog } from './ImportCurlDialog';
 
@@ -152,8 +152,8 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     <div className="flex h-full w-full flex-col">
       {/* header */}
       <div className="flex items-center justify-between gap-1 border-b px-3 py-2">
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <Boxes className="h-4 w-4" /> Collections
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+          <Boxes className="h-3.5 w-3.5" /> Collections
         </div>
         <div className="flex items-center gap-0.5">
           <button onClick={() => store.addCollection()} title="New collection" className="rounded p-1.5 hover:bg-accent">
@@ -336,7 +336,11 @@ const RequestNode = memo(function RequestNode({ request, depth, collectionId, ct
       id={request.id}
       depth={depth}
       active={active}
-      badge={<span className={cn('w-10 shrink-0 text-[9px] font-bold uppercase', methodColor(request.method))}>{request.method}</span>}
+      badge={
+        <span className={cn('shrink-0 rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide', methodBadgeStyle(request.method))}>
+          {request.method}
+        </span>
+      }
       name={request.name}
       onClick={() => store.selectRequest(request.id)}
       onRename={(name) => store.renameItem(request.id, name)}
@@ -403,8 +407,8 @@ function Row({
       }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onDrop(); }}
       className={cn(
-        'group relative flex items-center gap-1 py-1 pr-1 text-xs cursor-pointer hover:bg-accent/60',
-        active && 'bg-accent',
+        'group relative flex items-center gap-1.5 py-[5px] pr-1 text-xs cursor-pointer transition-colors hover:bg-accent/60',
+        active && 'bg-accent/80 text-foreground',
         dragging && 'opacity-40',
         dt?.where === 'inside' && 'bg-primary/10 ring-1 ring-inset ring-primary/40',
       )}
@@ -412,6 +416,8 @@ function Row({
       onClick={hasChildren ? onToggle : onClick}
       onContextMenu={(e) => ctx.openMenu(e, entries)}
     >
+      {/* Bruno-style left accent stripe on the active request */}
+      {active && <span className="pointer-events-none absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-amber-400" />}
       {dt?.where === 'before' && <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-primary" />}
       {dt?.where === 'after' && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
       {hasChildren ? (

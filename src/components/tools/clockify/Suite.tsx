@@ -49,7 +49,7 @@ function SuiteInner() {
     <div className="flex h-full flex-col">
       {/* Header: tabs + actions */}
       <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
-        <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+        <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto no-scrollbar">
           {TABS.map((t) => {
             const Icon = t.icon;
             return (
