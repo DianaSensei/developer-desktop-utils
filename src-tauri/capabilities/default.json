@@ -25,7 +25,9 @@
         { "url": "https://dns.adguard-dns.com/*" },
         { "url": "https://ipapi.co/*" },
         { "url": "https://ipwho.is/*" },
-        { "url": "https://freeipapi.com/*" }
+        { "url": "https://freeipapi.com/*" },
+        { "url": "http://**" },
+        { "url": "https://**" }
       ]
     },
     "core:default"

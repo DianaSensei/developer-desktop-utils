@@ -31,6 +31,7 @@ This document describes every tool in the app: what computation it performs, wha
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
+| API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
 
 ---
 
@@ -307,11 +308,34 @@ A suite of DNS and IP utilities. Every lookup is user-initiated (you type a doma
 
 **Permissions (Tauri):** `http:default`, scoped in `capabilities/default.json` to exactly the seven hosts above (Cloudflare/Google/Quad9/AdGuard DNS + ipapi.co/ipwho.is/freeipapi.com) — no other URLs are reachable. In the desktop app, HTTP requests are made from Rust via the HTTP plugin (so they aren't blocked by browser CORS/Origin rules); the web build uses the WebView's `fetch` (where some IP services may be unreachable due to CORS). Local network info uses the `local_network_info` Rust command (reads interfaces only, no file access).
 
+### API Client
+
+A Postman/Bruno-style HTTP request workbench: organize requests into collections and folders, set query params, headers, body (JSON, raw, form-data, x-www-form-urlencoded), and auth (Bearer/Basic), then send and inspect the status, timing, size, headers, and pretty-printed body.
+
+**What leaves the machine:** exactly the HTTP request you build and click **Send** on — to whatever URL you type. Nothing is sent in the background; there is no polling and no telemetry. Variables in the active environment (`{{var}}`) are substituted into the outgoing request locally before it is sent.
+
+**Storage:** collections, environments (including any tokens/passwords you store as variables or auth values), and the last 50 sends of history persist in `localStorage` under `devtool:apiclient:*`. This is local to your machine and not encrypted — treat it like any local config file.
+
+**Scripting (Bruno-style):** each request can have a pre-request script, a post-response script, a test script, declarative variable extractions, and declarative assertions. Collections and folders can also carry pre/post scripts that are **inherited** by every request inside them (edit via the collection ⋮ menu → Scripts, or a folder's `</>` action) — pre-request runs collection → folder → request, post-response unwinds in reverse. Scripts are JavaScript with a curated API in scope:
+
+- `bru` — get/set runtime & environment variables (`getVar`/`setVar`, `getEnvVar`/`setEnvVar`)
+- `req` — read/modify the outgoing request (`getUrl`/`setUrl`, `setHeader`, `setBody`, …)
+- `res` — read the response (`getStatus`, `getBody`, `getHeader`, `responseTime`, …)
+- `expect` / `test` / `assert` / `console`
+- `require(...)` — a small set of bundled libraries: `lodash`, `crypto-js`, `uuid`
+- `pm` — a Postman compatibility shim (`pm.environment`, `pm.variables`, `pm.response`, `pm.test`, `pm.expect`, …) so many imported Postman scripts run without rewriting
+
+**Scripts execute locally in the app's own JavaScript context** (the same trust model as Postman/Bruno: they are your own scripts, run on your machine). They can read/modify only the request being sent and the variable stores; they never run on their own — only as part of a Send you initiate. `console.log` output and test results appear in the response panel. Runtime variables set via `bru.setVar` are session-only and cleared on app restart; `bru.setEnvVar` writes persist to the active environment in `localStorage`.
+
+**Postman compatibility:** import reads Postman Collection **v2.1** JSON (folders, requests, headers, query, body, bearer/basic auth, and pre-request/test scripts); export writes the same format. Postman scripts use the `pm.*` API — the script text is preserved on import so you can adapt it to Bruno's `bru`/`req`/`res` API. Import/export use the native file picker (desktop) or browser file input/download (web).
+
+**Permissions (Tauri):** `http:default` is widened in `capabilities/default.json` to allow `http://**` and `https://**` so the client can reach any API — the same access Postman/Bruno need. Requests still only fire on **Send**. In the desktop app requests are made from Rust via the HTTP plugin (no browser CORS/Origin restriction); the web build uses the WebView's `fetch` (subject to the target's CORS policy). Import/export use the `dialog` + `fs` plugins (user-triggered pickers only).
+
 ---
 
 ## What never happens in any tool
 
-- **No telemetry, analytics, or crash reporting.** The only outbound network activity is: Kafka connections you initiate, DNS/IP lookups you initiate in Network Tools, and the app update check described below.
+- **No telemetry, analytics, or crash reporting.** The only outbound network activity is: Kafka connections you initiate, DNS/IP lookups you initiate in Network Tools, HTTP requests you send from the API Client, and the app update check described below.
 - **Daily auto-update check, on by default.** The auto-update check (Settings → About → Auto-check for updates) is **enabled by default** and contacts the GitHub Releases API at most once per day (plus whenever you click "Check"). It downloads or installs nothing without your action, and you can turn it off in Settings.
 - **No input data is sent to any server, except where a tool's whole purpose is a network query.** Computation — hashing, encoding, diffing, JWT decoding, regex matching — runs locally in the WebView or in Rust and never leaves the machine. The exceptions are explicit, user-initiated network tools: Kafka Explorer (broker traffic) and Network Tools (the single domain/IP you look up).
 - **No background file access.** No tool reads files except when you explicitly click "Browse", drag a file, or use a file input.

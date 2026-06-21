@@ -21,6 +21,7 @@ import {
   Network,
   NotebookPen,
   Disc3,
+  Send,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -187,6 +188,13 @@ export const TOOL_DEFS: ToolDef[] = [
     description:
       "Spin a wheel of your own choices (one per line) to pick a random winner.",
   },
+  {
+    id: "api-client",
+    label: "API Client",
+    icon: Send,
+    description:
+      "Postman/Bruno-style HTTP workbench: collections, environments with {{vars}}, auth, pre/post-request scripts, tests & assertions, and Postman collection import/export.",
+  },
 ];
 
 export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
@@ -195,6 +203,7 @@ export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
 // Edit this array to change the out-of-box sort order before a build.
 export const DEFAULT_TOOL_ORDER: string[] = [
   "task-tracker",
+  "api-client",
   "json",
   "deduplicate",
   "text-transform",

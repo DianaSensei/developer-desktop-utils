@@ -93,14 +93,16 @@ const APP_PERMISSIONS = [
     reasons: [
       { text: 'Open file picker to browse for files', tool: 'Checksum, Image ↔ Base64' },
       { text: 'Save dialog to export generated files', tool: 'QR Code' },
+      { text: 'Import / export Postman collections', tool: 'API Client' },
     ],
   },
   {
     Icon: Globe,
     name: 'Network',
-    scope: 'Brokers you add + DNS/IP services you query + update check',
+    scope: 'Brokers you add + URLs you send to + DNS/IP services you query + update check',
     reasons: [
       { text: 'Connect to Kafka brokers you configure', tool: 'Kafka Explorer' },
+      { text: 'Send HTTP requests to URLs you enter', tool: 'API Client' },
       { text: 'Run DNS record, propagation & DNSSEC lookups', tool: 'Network Tools' },
       { text: 'Look up public IP & geolocation', tool: 'Network Tools' },
       { text: 'Read this machine\'s local network info', tool: 'Network Tools' },

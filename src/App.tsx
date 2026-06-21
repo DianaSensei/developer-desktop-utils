@@ -16,6 +16,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { Button } from '@/components/ui/button';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
@@ -55,6 +56,7 @@ const TaskTracker = lazy(() => named(import('@/components/tools/TaskTracker'), '
 const NetworkTools = lazy(() => named(import('@/components/tools/NetworkTools'), 'NetworkTools'));
 const MeetingNotes = lazy(() => named(import('@/components/tools/MeetingNotes'), 'MeetingNotes'));
 const LuckyWheel = lazy(() => named(import('@/components/tools/LuckyWheel'), 'LuckyWheel'));
+const ApiClient = lazy(() => named(import('@/components/tools/apiclient/ApiClient'), 'ApiClient'));
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator,      fullHeight: true },
@@ -80,6 +82,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'network':        { path: '/network',        component: NetworkTools,      fullHeight: true },
   'meeting-notes':  { path: '/meeting-notes',  component: MeetingNotes,      fullHeight: true },
   'lucky-wheel':    { path: '/lucky-wheel',    component: LuckyWheel,        fullHeight: true },
+  'api-client':     { path: '/api-client',     component: ApiClient,         fullHeight: true },
 };
 
 const allTools = [
@@ -475,6 +478,7 @@ function Sidebar({
 function AppContent() {
   const location = useLocation();
   const { isFeatureEnabled } = useFeatures();
+  useDesktopChrome();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('devtool-sidebar-collapsed');
