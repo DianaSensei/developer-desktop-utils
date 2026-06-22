@@ -1,15 +1,11 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { copyToClipboard } from '@/lib/clipboard';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  AlertCircle,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Copy,
   Eye,
   EyeOff,
   FileJson,
@@ -21,6 +17,9 @@ import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
+import { CopyButton } from '@/components/CopyButton';
+import { StatusMessage } from '@/components/StatusMessage';
+import { EmptyState } from '@/components/EmptyState';
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type Mode = 'beautify' | 'string' | 'minify';
@@ -498,7 +497,6 @@ export function JsonFormatter() {
     });
   };
 
-  const copyText = (text: string) => copyToClipboard(text);
   const outputText = mode === 'minify' ? minified : mode === 'string' ? jsonString : beautified;
 
   const renderValue = (line: FlatLine, bracketClass: string) => {
@@ -556,7 +554,7 @@ export function JsonFormatter() {
       {/* Toolbar */}
       <div className="shrink-0 border-b bg-background px-4 py-2">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex h-7 rounded-md border bg-muted/45 p-0.5">
+          <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
             {([
               { id: 'beautify', label: 'Beautify' },
               { id: 'string', label: 'To JSON String' },
@@ -567,8 +565,10 @@ export function JsonFormatter() {
                 type="button"
                 onClick={() => setMode(item.id)}
                 className={cn(
-                  'rounded px-3 text-xs font-medium transition-colors',
-                  mode === item.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  'rounded-md px-3 text-xs font-medium transition-smooth',
+                  mode === item.id
+                    ? 'bg-card text-foreground shadow-sm-premium'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 {item.label}
@@ -576,10 +576,10 @@ export function JsonFormatter() {
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Indent</span>
             <Select value={indentKey} onValueChange={setIndentKey}>
-              <SelectTrigger className="h-7 w-[108px] text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[110px] text-xs rounded-lg border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="2">2 spaces</SelectItem>
                 <SelectItem value="4">4 spaces</SelectItem>
@@ -588,10 +588,10 @@ export function JsonFormatter() {
             </Select>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Quotes</span>
             <Select value={quote} onValueChange={setQuote}>
-              <SelectTrigger className="h-7 w-[112px] text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[114px] text-xs rounded-lg border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={'"'}>Double &quot;</SelectItem>
                 <SelectItem value={"'"}>Single &apos;</SelectItem>
@@ -599,8 +599,13 @@ export function JsonFormatter() {
             </Select>
           </div>
 
-          <Button variant="outline" size="sm" className="ml-auto h-7 text-xs" onClick={() => setShowInput((v) => !v)}>
-            {showInput ? <EyeOff className="h-3 w-3 mr-1.5" /> : <Eye className="h-3 w-3 mr-1.5" />}
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto h-8 text-xs transition-smooth"
+            onClick={() => setShowInput((v) => !v)}
+          >
+            {showInput ? <EyeOff className="h-4 w-4 mr-1.5" /> : <Eye className="h-4 w-4 mr-1.5" />}
             {showInput ? 'Hide input' : 'Show input'}
           </Button>
         </div>
@@ -626,15 +631,9 @@ export function JsonFormatter() {
       {(parsed.error || parsed.value !== undefined) && (
         <div className="shrink-0 border-b px-4 py-2">
           {parsed.error ? (
-            <div className="flex items-center gap-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span className="font-mono">{parsed.error}</span>
-            </div>
+            <StatusMessage status="error" message={parsed.error} dismissible={false} />
           ) : (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
-              <span>Valid JSON</span>
-            </div>
+            <StatusMessage status="success" message="Valid JSON" dismissible={false} />
           )}
         </div>
       )}
@@ -644,27 +643,37 @@ export function JsonFormatter() {
         <div className="shrink-0 border-b px-4 py-2">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[160px]">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Find by key, value, or path…"
-                className="h-7 pl-8 text-xs"
+                className="h-8 pl-9 text-xs rounded-lg border-border transition-smooth focus:ring-1 focus:ring-primary"
               />
             </div>
-            <Button variant="outline" size="sm" className="h-7" onClick={() => setCollapsed(new Set())} title="Expand all">
-              <UnfoldVertical className="h-3.5 w-3.5" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 transition-smooth hover-press"
+              onClick={() => setCollapsed(new Set())}
+              title="Expand all"
+            >
+              <UnfoldVertical className="h-4 w-4" />
             </Button>
             <Button
-              variant="outline" size="sm" className="h-7"
+              variant="outline" size="sm" className="h-8 transition-smooth hover-press"
               onClick={() => setCollapsed(new Set(containerPaths.filter((path) => path !== '$')))}
               title="Collapse all"
             >
-              <FoldVertical className="h-3.5 w-3.5" />
+              <FoldVertical className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => copyText(beautified)}>
-              <Copy className="h-3.5 w-3.5 mr-1.5" />Copy
-            </Button>
+            <CopyButton
+              text={beautified}
+              label="Copy"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs transition-smooth"
+            />
           </div>
         </div>
       )}
@@ -714,11 +723,15 @@ export function JsonFormatter() {
 
         {parsed.value !== undefined && mode !== 'beautify' && (
           <>
-            <div className="shrink-0 border-b px-4 py-1.5 bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+            <div className="shrink-0 border-b px-4 py-1.5 bg-muted/10 border-b border-border flex items-center justify-between text-[11px] text-muted-foreground font-medium">
               <span>{mode === 'string' ? 'JSON String' : 'Minified'}</span>
-              <Button onClick={() => copyText(outputText)} size="sm" variant="ghost" className="h-6 px-2 text-xs">
-                <Copy className="h-3 w-3 mr-1" />Copy
-              </Button>
+              <CopyButton
+                text={outputText}
+                label="Copy"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+              />
             </div>
             <Textarea
               value={outputText}
@@ -730,27 +743,28 @@ export function JsonFormatter() {
 
         {/* Empty state */}
         {parsed.value === undefined && !parsed.error && (
-          <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground px-8 gap-3">
-            <FileJson className="h-12 w-12 text-muted-foreground/30" />
-            <p className="text-sm">Paste JSON to get started</p>
-            {!showInput && (
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowInput(true)}>
-                <Eye className="h-3 w-3 mr-1.5" />Show input
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            icon={FileJson}
+            title="No JSON loaded"
+            description="Paste or drag JSON to beautify, minify, or convert to a string"
+            action={!showInput ? { label: 'Show input', onClick: () => setShowInput(true), variant: 'outline' } : undefined}
+          />
         )}
       </div>
 
       {/* Beautify: path breadcrumb */}
       {parsed.value !== undefined && mode === 'beautify' && (
-        <div className="shrink-0 border-t flex items-center gap-2 px-4 py-2 bg-background/50 text-xs">
+        <div className="shrink-0 border-t border-border flex items-center gap-2 px-4 py-2 bg-muted/5 text-xs">
           <span className="text-muted-foreground">Path</span>
           <code className="flex-1 truncate font-mono text-foreground">{selectedPath || '$ (click a node)'}</code>
           {selectedPath && (
-            <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => copyText(selectedPath)}>
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
+            <CopyButton
+              text={selectedPath}
+              label=""
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2"
+            />
           )}
         </div>
       )}

@@ -285,4 +285,179 @@
   .tool-scrollable {
     @apply flex-1 min-h-0 overflow-y-auto;
   }
+
+  /* ── Interactive & Animation Utilities ─────────────────────────────────
+     Enhance user feedback and micro-interactions */
+
+  /* Smooth transitions for interactive elements */
+  .transition-smooth {
+    @apply transition-all duration-150 ease-out;
+  }
+
+  /* Button-like interactive elements */
+  .interactive {
+    @apply transition-colors duration-150;
+    cursor: pointer;
+  }
+
+  /* Hover lift effect — subtle shadow and slight scale */
+  .hover-lift {
+    @apply transition-all duration-150 hover:shadow-md hover:scale-105;
+  }
+
+  /* Hover press effect — inset shadow on press */
+  .hover-press {
+    @apply transition-all duration-150 active:scale-95 active:shadow-inner;
+  }
+
+  /* Focus ring — visible focus state for keyboard nav */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Loading spinner text */
+  .loading-text {
+    @apply text-xs text-muted-foreground/70;
+  }
+
+  /* Success state styling */
+  .success-state {
+    @apply border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300;
+  }
+
+  /* Error state styling */
+  .error-state {
+    @apply border-destructive/20 bg-destructive/8 text-destructive;
+  }
+
+  /* Warning state styling */
+  .warning-state {
+    @apply border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-600;
+  }
+
+  /* Highlight effect — for search results, highlights */
+  .highlight-match {
+    @apply bg-yellow-200/70 dark:bg-yellow-500/25 transition-colors duration-200;
+  }
+
+  /* Selected/active item styling */
+  .selected-item {
+    @apply bg-primary/10 border-primary/30 dark:bg-primary/20 dark:border-primary/40;
+  }
+
+  /* Fade in animation entry */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* Slide up animation entry */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  /* Scale in animation */
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  /* Pulse animation for attention */
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-pulse-gentle {
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Shake animation for errors */
+  @keyframes shake {
+    0%, 100% {
+      transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+      transform: translateX(-2px);
+    }
+    20%, 40%, 60%, 80% {
+      transform: translateX(2px);
+    }
+  }
+
+  .animate-shake {
+    animation: shake 0.4s ease-in-out;
+  }
+
+  /* Bounce animation for tooltips/popovers */
+  @keyframes bounce-in {
+    0% {
+      opacity: 0;
+      transform: scale(0.9) translateY(-4px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .animate-bounce-in {
+    animation: bounce-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* ── Responsive State Styling ──────────────────────────────────────────
+     Visual feedback for different interaction states */
+
+  /* Disabled/inactive elements */
+  .disabled-state {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  /* Hover state for list items */
+  .list-item-hover {
+    @apply hover:bg-muted/50 dark:hover:bg-muted/30 transition-colors duration-100;
+  }
+
+  /* Variant: subtle background highlight */
+  .bg-subtle-highlight {
+    @apply bg-muted/5 dark:bg-muted/10;
+  }
+
+  /* Variant: active background highlight */
+  .bg-active-highlight {
+    @apply bg-primary/5 dark:bg-primary/10;
+  }
 }
