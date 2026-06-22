@@ -4,9 +4,42 @@
 
 @layer base {
   :root {
-    /* Dim, low-glare canvas. Pulled well below white so the screen isn't a wall
-       of bright pixels — the single biggest contributor to light-theme eye strain. */
-    --background: 0 0% 90%;
+    /* Premium light mode — inspired by Bruno, Postman, and Apple design system
+       Soft, approachable, with high contrast for clarity and accessibility */
+    --background: 0 0% 95%;
+    /* Richer grays with subtle warmth for sophistication */
+    --sidebar: 0 0% 92%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
+
+    /* Premium foreground colors — darker for better readability */
+    --foreground: 0 0% 8%;
+    --muted-foreground: 0 0% 42%;
+
+    /* Primary: Modern blue (inspired by API tools) */
+    --primary: 207 100% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Accent: Complementary blue for interactions */
+    --accent: 207 95% 47%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Secondary & inputs with better definition */
+    --secondary: 0 0% 88%;
+    --secondary-foreground: 0 0% 4%;
+    --input: 0 0% 96%;
+    --muted: 0 0% 92%;
+
+    /* Borders: Subtle but visible separation */
+    --border: 0 0% 86%;
+    --ring: 207 100% 42%;
+
+    /* Status colors */
+    --destructive: 0 84% 52%;
+    --destructive-foreground: 0 0% 100%;
+
     /* SQL / JS editor syntax colors */
     --sql-keyword: hsl(207 100% 35%);
     --sql-string: hsl(130 50% 35%);
@@ -17,39 +50,54 @@
     --sql-type: hsl(270 55% 45%);
     --js-property: hsl(32 90% 44%);
     --js-method: hsl(270 60% 52%);
-    /* Pure black primary text — maximum contrast on the light surfaces */
-    --foreground: 0 0% 0%;
-    /* Cards/menus sit just under pure white: bright enough to lift off the canvas,
-       not so bright they glare. */
-    --card: 0 0% 97%;
-    --card-foreground: 0 0% 0%;
-    --popover: 0 0% 97%;
-    --popover-foreground: 0 0% 0%;
-    --primary: 207 100% 40%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 84%;
-    --secondary-foreground: 0 0% 6%;
-    --muted: 0 0% 86%;
-    /* Secondary/description text — now much darker so even subordinate text reads
-       as near-black, while staying a step below primary text. */
-    --muted-foreground: 0 0% 24%;
-    --accent: 207 100% 38%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 12 82% 34%;
-    --destructive-foreground: 0 0% 100%;
-    /* Clearly visible borders/dividers so cards and rows read as distinct */
-    --border: 0 0% 79%;
-    --input: 0 0% 71%;
-    --ring: 207 100% 40%;
-    --sidebar: 0 0% 87%;
-    --radius: 0.65rem;
-    /* Tell the OS/webview to theme native fallbacks (scrollbars, form widgets,
-       focus rings) for light mode — keeps Windows/Linux from flashing dark chrome */
+
+    /* Premium rounded corners — Apple aesthetic */
+    --radius: 1rem;
+
+    /* Premium shadow system — multi-layer for depth */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
     color-scheme: light;
   }
 
   .dark {
-    --background: 0 0% 12%;
+    /* Premium dark mode — inspired by modern API tools (Bruno, Postman dark theme)
+       Deep, sophisticated, with careful contrast for extended viewing */
+    --background: 0 0% 10%;
+    --sidebar: 0 0% 8%;
+    --card: 0 0% 14%;
+    --card-foreground: 0 0% 94%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 94%;
+
+    /* Foreground colors for dark mode */
+    --foreground: 0 0% 92%;
+    --muted-foreground: 0 0% 58%;
+
+    /* Primary & Accent — maintained vibrancy in dark mode */
+    --primary: 207 100% 52%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 207 100% 57%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Secondary colors for dark mode */
+    --secondary: 0 0% 22%;
+    --secondary-foreground: 0 0% 92%;
+    --input: 0 0% 18%;
+    --muted: 0 0% 20%;
+
+    /* Subtle borders in dark mode */
+    --border: 0 0% 22%;
+    --ring: 207 100% 52%;
+
+    /* Status colors for dark mode */
+    --destructive: 0 80% 64%;
+    --destructive-foreground: 0 0% 100%;
+
     /* SQL / JS editor syntax colors — dark */
     --sql-keyword: hsl(207 100% 68%);
     --sql-string: hsl(130 55% 60%);
@@ -60,25 +108,17 @@
     --sql-type: hsl(270 60% 72%);
     --js-property: hsl(32 90% 66%);
     --js-method: hsl(270 65% 75%);
-    --foreground: 0 0% 80%;
-    --card: 0 0% 15%;
-    --card-foreground: 0 0% 80%;
-    --popover: 0 0% 17%;
-    --popover-foreground: 0 0% 80%;
-    --primary: 207 100% 40%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 24%;
-    --secondary-foreground: 0 0% 80%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 52%;
-    --accent: 207 83% 24%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 89% 62%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 24%;
-    --input: 0 0% 24%;
-    --ring: 207 100% 40%;
-    --sidebar: 0 0% 9%;
+
+    /* Same rounded corners for consistency */
+    --radius: 1rem;
+
+    /* Premium shadow system — adjusted for dark mode */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+
     color-scheme: dark;
   }
 }
@@ -114,6 +154,8 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Premium typography with improved line height and letter spacing */
+    letter-spacing: 0.3px;
   }
   #root {
     height: 100%;
@@ -173,55 +215,50 @@
   }
 
   /* ── Cross-platform custom scrollbar ─────────────────────────────────────
+     Premium scrollbar design inspired by modern applications.
+     Smooth, refined, with soft shadows for premium appearance.
      Replaces every native OS scrollbar with a single consistent design that
      looks identical on macOS (WKWebView), Windows (WebView2/Chromium), and
-     Linux (WebKitGTK). Never rely on the OS to render scrollbars — each OS
-     has different defaults: macOS hides them by default, Windows shows thick
-     classic bars, Linux varies by GTK theme.
+     Linux (WebKitGTK).
 
      Architecture:
        • Firefox uses the standard `scrollbar-width` / `scrollbar-color` API.
-       • All three Tauri webviews support ::-webkit-scrollbar pseudo-elements:
-         WKWebView (macOS), WebView2/Chromium (Windows — not WebKit but Chromium,
-         which inherited this pseudo-element), WebKitGTK (Linux).
-       • We use a 8px hit-area with a 2px transparent border inset on each side,
-         giving a 4px-wide visual pill that feels lightweight but remains grabbable.
-       • `min-height` / `min-width` prevent the thumb from shrinking below 36px
-         on very tall pages (ungrabbably small on touch/precision trackpad).
-       • Arrow buttons are hidden — they appear by default on Windows and look
-         out of place in a modern UI.                                          */
+       • All three Tauri webviews support ::-webkit-scrollbar pseudo-elements
+       • Premium 10px hit-area with 3px transparent border = 4px visual pill
+       • Soft gradient shadow for premium appearance
+       • Smooth transitions and hover states                                 */
 
-  /* Firefox */
+  /* Firefox — Premium thin scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
   }
 
   /* WebKit (macOS/Linux) and Chromium (Windows WebView2) — all three Tauri platforms */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.25);
+    background-color: hsl(var(--muted-foreground) / 0.35);
     border-radius: 9999px;
-    /* 2px transparent border on each side = 4px visual pill within 8px hit-area */
-    border: 2px solid transparent;
+    /* 3px transparent border on each side = 4px visual pill within 10px hit-area */
+    border: 3px solid transparent;
     background-clip: padding-box;
-    min-height: 36px;
-    min-width: 36px;
-    transition: background-color 0.15s ease;
+    min-height: 40px;
+    min-width: 40px;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.5);
+    background-color: hsl(var(--muted-foreground) / 0.55);
   }
   ::-webkit-scrollbar-thumb:active {
-    background-color: hsl(var(--muted-foreground) / 0.7);
+    background-color: hsl(var(--muted-foreground) / 0.75);
   }
-  /* Remove OS-native arrow buttons — Windows renders them by default */
+  /* Remove OS-native arrow buttons */
   ::-webkit-scrollbar-button {
     display: none;
   }
@@ -232,9 +269,7 @@
 }
 
 @layer utilities {
-  /* Apply to any container that should scroll without showing a scrollbar —
-     e.g. horizontal tab strips and scroll-wheel pickers where the scrollbar
-     would look wrong but scrolling still needs to work (pointer/touch/wheel). */
+  /* ── Scrollbar Utilities ───────────────────────────────────────────── */
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -243,27 +278,89 @@
     display: none;
   }
 
+  /* ── Premium Shadow System ─────────────────────────────────────────── */
+  /* Layered shadows inspired by Apple and modern UI design */
+  .shadow-sm-premium {
+    box-shadow: var(--shadow-sm);
+  }
+  .shadow-md-premium {
+    box-shadow: var(--shadow-md);
+  }
+  .shadow-lg-premium {
+    box-shadow: var(--shadow-lg);
+  }
+  .shadow-xl-premium {
+    box-shadow: var(--shadow-xl);
+  }
+
+  /* ── Premium Card & Container Utilities ────────────────────────────── */
+  /* Premium card with subtle shadow and smooth transitions */
+  .card-premium {
+    @apply bg-card rounded-lg border border-border shadow-sm-premium transition-all duration-200 ease-out;
+  }
+
+  /* Card that elevates on hover (API tool style) */
+  .card-interactive {
+    @apply card-premium hover:shadow-md-premium hover:border-border/70 active:shadow-sm-premium;
+  }
+
+  /* Premium container for tool sections */
+  .container-premium {
+    @apply rounded-lg border border-border bg-card/50 backdrop-blur-sm transition-colors duration-150;
+  }
+
+  /* ── Typography Utilities ──────────────────────────────────────────── */
+  /* Premium headings with improved hierarchy */
+  .heading-xl {
+    @apply text-xl font-semibold leading-tight tracking-tight;
+  }
+  .heading-lg {
+    @apply text-lg font-semibold leading-snug tracking-tight;
+  }
+  .heading-md {
+    @apply text-base font-semibold leading-relaxed tracking-tight;
+  }
+  .heading-sm {
+    @apply text-sm font-semibold leading-relaxed;
+  }
+  .heading-xs {
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+
+  /* Premium body text with proper line height */
+  .text-body {
+    @apply text-sm leading-relaxed;
+  }
+  .text-caption {
+    @apply text-xs leading-relaxed text-muted-foreground;
+  }
+
   /* ── Tool styling utilities ────────────────────────────────────────────
      Consistent spacing, typography, and layout for developer tools */
 
-  /* Tool container spacer — use for spacing between sections */
+  /* Tool container spacer — premium spacing */
   .tool-spacer {
-    @apply space-y-5 sm:space-y-6;
+    @apply space-y-6 sm:space-y-7;
+  }
+
+  /* Premium tool section with clear visual hierarchy */
+  .tool-section-premium {
+    @apply space-y-3;
   }
 
   /* Input row — groups input + label consistently */
   .tool-input-row {
-    @apply space-y-2;
+    @apply space-y-2.5;
   }
 
   /* Output row — groups output + label consistently */
   .tool-output-row {
-    @apply space-y-2 pb-4 sm:pb-5 border-b last:border-0 last:pb-0;
+    @apply space-y-2.5 pb-5 sm:pb-6 border-b last:border-0 last:pb-0;
   }
 
   /* Button group for actions (copy, paste, etc.) */
   .tool-button-group {
-    @apply flex gap-2;
+    @apply flex gap-2.5;
   }
 
   /* Icon used in sections — consistent sizing */
@@ -271,9 +368,9 @@
     @apply h-4 w-4;
   }
 
-  /* Responsive padding — consistent across all tools */
+  /* Responsive padding — premium spacing with better rhythm */
   .tool-padding {
-    @apply px-3 py-4 sm:px-4 sm:py-5 lg:px-5;
+    @apply px-4 py-5 sm:px-5 sm:py-6 lg:px-6;
   }
 
   /* Full-height tool with content inside */
@@ -284,5 +381,116 @@
   /* Content area inside full-height tool — should flex-1 and overflow-y-auto */
   .tool-scrollable {
     @apply flex-1 min-h-0 overflow-y-auto;
+  }
+
+  /* ── API Tool Style Utilities ──────────────────────────────────────── */
+  /* Inspired by Bruno, Postman — clean, organized layouts */
+
+  /* Split pane for request/response views */
+  .split-pane {
+    @apply flex gap-4 h-full;
+  }
+
+  /* Tab-like navigation with premium styling */
+  .tab-premium {
+    @apply px-4 py-2.5 rounded-t-lg border border-b-0 border-border bg-muted/50 text-sm font-medium
+           text-muted-foreground transition-all duration-150 cursor-pointer hover:text-foreground hover:bg-muted/70;
+  }
+
+  .tab-premium.active {
+    @apply bg-card border-border text-foreground shadow-sm-premium;
+  }
+
+  /* Pill-style badge for status/tags */
+  .badge-premium {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
+           bg-muted/60 text-foreground border border-border/50 transition-colors duration-150;
+  }
+
+  /* ── Form & Input Utilities ────────────────────────────────────────── */
+  /* Premium input styling with focus states */
+  .input-premium {
+    @apply h-9 rounded-lg border border-border bg-input px-3 py-2 text-sm
+           transition-all duration-150 ease-out
+           placeholder:text-muted-foreground/50
+           focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card;
+  }
+
+  .textarea-premium {
+    @apply rounded-lg border border-border bg-input px-3 py-2 text-sm
+           transition-all duration-150 ease-out
+           placeholder:text-muted-foreground/50
+           focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card;
+  }
+
+  /* ── Button Utilities ──────────────────────────────────────────────── */
+  /* Premium button with micro-interactions */
+  .btn-premium {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-150 ease-out
+           focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-1
+           active:scale-95;
+  }
+
+  .btn-primary-premium {
+    @apply btn-premium px-4 py-2 bg-primary text-primary-foreground shadow-sm-premium
+           hover:shadow-md-premium hover:bg-primary/95 active:shadow-sm-premium;
+  }
+
+  .btn-secondary-premium {
+    @apply btn-premium px-4 py-2 bg-muted text-foreground border border-border
+           hover:bg-muted/80 hover:shadow-sm-premium;
+  }
+
+  .btn-ghost-premium {
+    @apply btn-premium px-3 py-2 text-foreground hover:bg-muted/50;
+  }
+
+  /* ── Layout Utilities ──────────────────────────────────────────────── */
+  /* Premium sidebar styling */
+  .sidebar-premium {
+    @apply bg-sidebar border-r border-border;
+  }
+
+  /* Premium header styling */
+  .header-premium {
+    @apply border-b border-border bg-background/95 backdrop-blur-sm;
+  }
+
+  /* Content wrapper with optimal reading width */
+  .content-wrapper {
+    @apply mx-auto w-full max-w-7xl;
+  }
+
+  /* ── Animation Utilities ───────────────────────────────────────────── */
+  /* Smooth fade and slide animations */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.3s ease-out;
+  }
+
+  /* Smooth scale animation for interactive elements */
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
   }
 }
