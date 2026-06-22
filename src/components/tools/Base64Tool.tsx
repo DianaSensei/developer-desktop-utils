@@ -3,7 +3,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Copy, Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle } from 'lucide-react';
+import { Copy, Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, Workflow } from 'lucide-react';
+import { PipelineTab } from './PipelineTab';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import CryptoJS from 'crypto-js';
 import { cn } from '@/lib/utils';
@@ -14,7 +15,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'encode' | 'hash' | 'encrypt';
+type Tab = 'encode' | 'hash' | 'encrypt' | 'pipeline';
 type EncodeMode = 'encode' | 'decode';
 type CryptoMode = 'encrypt' | 'decrypt';
 
@@ -517,6 +518,7 @@ export function Base64Tool() {
   useQuickPaste(setInput,         tab === 'encode');
   useQuickPaste(setHashInput,     tab === 'hash');
   useQuickPaste(setEncryptInput,  tab === 'encrypt');
+  // Pipeline tab manages its own quick-paste internally
   useInputHistory(input,         setInput,         tab === 'encode');
   useInputHistory(hashInput,     setHashInput,     tab === 'hash');
   useInputHistory(encryptInput,  setEncryptInput,  tab === 'encrypt');
@@ -605,9 +607,10 @@ export function Base64Tool() {
       <div className="shrink-0 header-premium px-4 py-2.5 flex items-center gap-3">
         <div className="inline-flex h-9 rounded-lg border border-border bg-muted/50 p-0.5">
           {([
-            { id: 'encode',  icon: Code,           label: 'Encode'  },
-            { id: 'hash',    icon: Lock,           label: 'Hash'    },
-            { id: 'encrypt', icon: ArrowLeftRight, label: 'Encrypt' },
+            { id: 'encode',   icon: Code,           label: 'Encode'   },
+            { id: 'hash',     icon: Lock,           label: 'Hash'     },
+            { id: 'encrypt',  icon: ArrowLeftRight, label: 'Encrypt'  },
+            { id: 'pipeline', icon: Workflow,        label: 'Pipeline' },
           ] as const).map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -838,6 +841,9 @@ export function Base64Tool() {
           </ToolSection>
         </div>
       )}
+
+      {/* ── Pipeline tab ─────────────────────────────────────────────────────── */}
+      {tab === 'pipeline' && <PipelineTab active={tab === 'pipeline'} />}
 
       {/* ── Encrypt tab ──────────────────────────────────────────────────────── */}
       {tab === 'encrypt' && (

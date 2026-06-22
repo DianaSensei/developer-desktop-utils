@@ -59,7 +59,7 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     id: "base64",
-    label: "Encode · Hash · Encrypt",
+    label: "Encode·Hash·Encrypt",
     icon: Shield,
     description:
       "Encode/decode (Base64, URL, Hex, Morse…), hash (MD5, SHA-256, HMAC), and AES-256 encrypt/decrypt.",
@@ -202,8 +202,8 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "sql-formatter",
   "unix-time",
   "generator",
-  "text-counter",
   "base64",
+  "text-counter",
   "regex",
   "diff",
   "checksum",
