@@ -80,14 +80,49 @@ devtool/
 - **Never** use browser- or OS-native elements (`<select>`, `window.alert`, `window.confirm`, native context menus, etc.). They break visual consistency across macOS / Windows / Linux.
 - If a needed component doesn't exist in `src/components/ui/`, create a new shadcn/ui-style component using Radix UI primitives and Tailwind.
 
+### Tool Layout — use the standard container pattern
+
+Use the standardized tool layout components for consistency across all tools:
+
+```tsx
+import { ToolSection, ToolLabel, ToolHint, ToolContent } from '@/components/ui/tool-section';
+
+<div className="tool-full-height">
+  <div className="tool-scrollable tool-padding tool-spacer">
+    {/* Section 1 */}
+    <ToolSection>
+      <ToolLabel>Label</ToolLabel>
+      <ToolHint>Helper text</ToolHint>
+      <Input />
+    </ToolSection>
+
+    {/* Section 2 */}
+    <ToolSection>
+      <ToolLabel>Output</ToolLabel>
+      <Textarea readOnly />
+    </ToolSection>
+  </div>
+</div>
+```
+
+**Key utilities:**
+- `tool-full-height` — container that fills viewport height
+- `tool-scrollable` — content area that scrolls with custom scrollbar
+- `tool-padding` — responsive padding (3px on mobile, 4-5px on desktop)
+- `tool-spacer` — consistent section spacing (`space-y-5 sm:space-y-6`)
+- `ToolSection` — wrapper for input/output groups
+- `ToolLabel` — consistent label styling (bold, foreground color)
+- `ToolHint` — helper text under labels (muted, smaller)
+
 ### UI / UX — minimalist, smooth, and user-first
 
 - **Minimalist**: Remove every element that isn't directly serving the user's task. No decorative chrome, no nested cards inside cards.
 - **Tool space first**: The content area is the hero. Inputs and outputs fill available width. Sidebars and controls shrink to the minimum.
-- **Rounded-corner design**: Use `rounded-lg` or `rounded-md` consistently. Never `rounded-none` for containers or interactive elements.
+- **Rounded-corner design**: Use `rounded-md` or `rounded-lg` consistently. Never `rounded-none` for containers or interactive elements.
 - **Smooth and seamless**: All state transitions use CSS transitions or Tailwind's `transition-*` utilities. No jarring instant swaps.
 - **Follow user behavior**: Primary actions where eyes land first — top-left for input, inline or right for output, icon-only for secondary actions.
 - **Keyboard-first**: Respect `useQuickPaste` (⌘V) and `useInputHistory` (⌘Z/⌘⇧Z) on every text tool.
+- **Consistent typography**: Labels `text-xs font-medium`, hints `text-[11px] text-muted-foreground`, body `text-sm`, mono `font-mono text-sm`.
 
 ### Stability and Resource Usage — the app must never be the problem
 

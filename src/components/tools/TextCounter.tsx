@@ -124,9 +124,9 @@ export function TextCounter() {
   useInputHistory(text, setText);
 
   const Stat = ({ label, value, color = 'text-foreground' }: { label: string; value: number | string; color?: string }) => (
-    <div className="flex flex-col items-center justify-center p-3 rounded-lg border bg-card">
-      <div className={`text-xl font-bold ${color}`}>{value}</div>
-      <div className="text-[10px] text-muted-foreground mt-0.5 text-center">{label}</div>
+    <div className="flex flex-col items-center justify-center p-3 rounded-md border bg-card/50 hover:bg-card/80 transition-colors">
+      <div className={`text-lg font-bold ${color}`}>{value}</div>
+      <div className="text-xs text-muted-foreground mt-1 text-center leading-tight">{label}</div>
     </div>
   );
 

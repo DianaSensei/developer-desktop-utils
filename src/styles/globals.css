@@ -242,4 +242,47 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  /* ── Tool styling utilities ────────────────────────────────────────────
+     Consistent spacing, typography, and layout for developer tools */
+
+  /* Tool container spacer — use for spacing between sections */
+  .tool-spacer {
+    @apply space-y-5 sm:space-y-6;
+  }
+
+  /* Input row — groups input + label consistently */
+  .tool-input-row {
+    @apply space-y-2;
+  }
+
+  /* Output row — groups output + label consistently */
+  .tool-output-row {
+    @apply space-y-2 pb-4 sm:pb-5 border-b last:border-0 last:pb-0;
+  }
+
+  /* Button group for actions (copy, paste, etc.) */
+  .tool-button-group {
+    @apply flex gap-2;
+  }
+
+  /* Icon used in sections — consistent sizing */
+  .tool-icon {
+    @apply h-4 w-4;
+  }
+
+  /* Responsive padding — consistent across all tools */
+  .tool-padding {
+    @apply px-3 py-4 sm:px-4 sm:py-5 lg:px-5;
+  }
+
+  /* Full-height tool with content inside */
+  .tool-full-height {
+    @apply h-full overflow-hidden flex flex-col;
+  }
+
+  /* Content area inside full-height tool — should flex-1 and overflow-y-auto */
+  .tool-scrollable {
+    @apply flex-1 min-h-0 overflow-y-auto;
+  }
 }
