@@ -35,7 +35,6 @@ const named = <T,>(p: Promise<Record<string, T>>, key: string) =>
 const CronGenerator = lazy(() => named(import('@/components/tools/CronGenerator'), 'CronGenerator'));
 const TextTransformer = lazy(() => named(import('@/components/tools/TextTransformer'), 'TextTransformer'));
 const Base64Tool = lazy(() => named(import('@/components/tools/Base64Tool'), 'Base64Tool'));
-const HashTool = lazy(() => named(import('@/components/tools/HashTool'), 'HashTool'));
 const UnixTimeConverter = lazy(() => named(import('@/components/tools/UnixTimeConverter'), 'UnixTimeConverter'));
 const JsonFormatter = lazy(() => named(import('@/components/tools/JsonFormatter'), 'JsonFormatter'));
 const JwtDebugger = lazy(() => named(import('@/components/tools/JwtDebugger'), 'JwtDebugger'));
@@ -64,7 +63,6 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'text-counter':   { path: '/text-counter',   component: TextCounter,       fullHeight: true },
   'color-picker':   { path: '/color-picker',   component: ColorPicker,       fullHeight: true },
   'base64':         { path: '/base64',         component: Base64Tool,        fullHeight: true },
-  'hash':           { path: '/hash',           component: HashTool,          fullHeight: true },
   'unix-time':      { path: '/unix-time',      component: UnixTimeConverter, fullHeight: true },
   'json':           { path: '/json',           component: JsonFormatter,     fullHeight: true },
   'jwt':            { path: '/jwt',            component: JwtDebugger,       fullHeight: true },
