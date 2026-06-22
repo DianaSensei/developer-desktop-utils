@@ -193,7 +193,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
   const removeRow = (id: string) => onChange({ assertions: realRows.filter((a) => a.id !== id) });
 
   return (
-    <div className="overflow-hidden rounded-md border text-xs">
+    <div className="overflow-hidden rounded-lg border text-xs">
       {/* header */}
       <div className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b bg-muted/30 font-semibold">
         <div className="border-r px-3 py-1.5">Expr</div>
@@ -293,7 +293,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
   return (
     <div className="space-y-2">
       <Label className="text-xs text-muted-foreground">Path</Label>
-      <div className="overflow-hidden rounded-md border text-xs">
+      <div className="overflow-hidden rounded-lg border text-xs">
         <div className="grid grid-cols-[1fr_1fr] border-b bg-muted/30 font-semibold">
           <div className="border-r px-3 py-1.5">Name</div>
           <div className="px-3 py-1.5">Value</div>
@@ -336,7 +336,7 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
       {/* Tags */}
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/40">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/40">
           {settings.tags.map((t) => (
             <span key={t} className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px]">
               {t}
@@ -471,7 +471,7 @@ function BodyModeDropdown({ body, onChange }: { body: ApiRequest['body']; onChan
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 w-56 rounded-md border bg-popover p-1.5 shadow-md">
+          <div className="absolute right-0 z-50 mt-1 w-56 rounded-lg border bg-popover p-1.5 shadow-md">
             {BODY_GROUPS.map((group) => (
               <div key={group.label} className="py-1">
                 <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
@@ -574,12 +574,12 @@ function FileBody({ body, setBody }: { body: ApiRequest['body']; setBody: (p: Pa
   return (
     <div className="space-y-3 text-xs">
       {body.fileName ? (
-        <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+        <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
           <File className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="truncate font-medium">{body.fileName}</span>
           {body.fileType && <span className="text-muted-foreground">{body.fileType}</span>}
           <div className="ml-auto flex items-center gap-1">
-            <Button variant="outline" size="sm" className="h-7" onClick={pick}>Change</Button>
+            <Button variant="outline" size="sm" className="h-8" onClick={pick}>Change</Button>
             <button
               onClick={() => setBody({ fileName: undefined, fileType: undefined, fileContent: undefined })}
               className="rounded p-1 text-muted-foreground/60 hover:text-destructive"

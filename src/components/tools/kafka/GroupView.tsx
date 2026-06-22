@@ -49,7 +49,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
             </>
           )}
         </div>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={onRefresh}>
+        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={onRefresh}>
           <RefreshCw className="w-3 h-3" /> Refresh
         </Button>
       </div>
@@ -78,7 +78,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
             ) : (
               <>
                 {/* Column headers */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-1.5 text-xs font-medium text-muted-foreground border-b bg-muted/20 sticky top-0">
+                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-1.5 text-xs font-medium text-muted-foreground border-b bg-muted/10 sticky top-0">
                   <span>Topic</span>
                   <span className="text-right">Part</span>
                   <span className="text-right">Committed</span>

@@ -138,14 +138,14 @@ function AddCookie({ store }: { store: ApiStore }) {
     setName(''); setValue('');
   };
 
-  const cls = 'h-7 text-xs font-mono';
+  const cls = 'h-8 text-xs font-mono';
   return (
     <div className="flex items-end gap-2 border-t px-4 py-3">
       <Field label="Domain" className="flex-1"><Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="api.example.com" className={cls} /></Field>
       <Field label="Name" className="w-32"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="session" className={cls} /></Field>
       <Field label="Value" className="flex-1"><Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="…" className={cls} /></Field>
       <Field label="Path" className="w-20"><Input value={path} onChange={(e) => setPath(e.target.value)} className={cls} /></Field>
-      <Button size="sm" onClick={add} disabled={!domain.trim() || !name.trim()} className="h-7 gap-1.5">
+      <Button size="sm" onClick={add} disabled={!domain.trim() || !name.trim()} className="h-8 gap-1.5">
         <Plus className="h-3.5 w-3.5" /> Add
       </Button>
     </div>

@@ -86,7 +86,7 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
 
           {/* Operations table */}
           <div className="rounded-lg border border-border/50 overflow-hidden mb-4">
-            <div className="px-3 py-2 bg-muted/20 border-b border-border/40">
+            <div className="px-3 py-2 bg-muted/10 border-b border-border/40">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Operations</span>
             </div>
             <div className="px-3 divide-y divide-border/20">
@@ -172,7 +172,7 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
           </button>
           <button
             onClick={onClose}
-            className="text-xs font-medium bg-primary text-primary-foreground px-4 py-1.5 rounded-md hover:bg-primary/90 transition-colors"
+            className="text-xs font-medium bg-primary text-primary-foreground px-4 py-1.5 rounded-lg hover:bg-primary/90 transition-colors"
           >
             Got it
           </button>

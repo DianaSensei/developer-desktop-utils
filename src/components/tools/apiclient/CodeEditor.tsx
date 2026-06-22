@@ -111,7 +111,7 @@ export function CodeEditor({ value, onChange, placeholder, className, vars }: Pr
   }, [value]);
 
   return (
-    <div className={cn('relative flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border', className)}>
+    <div className={cn('relative flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-lg border', className)}>
       <div ref={containerRef} className="flex flex-col flex-1 min-h-0" />
       {!value && placeholder && (
         <div className="pointer-events-none absolute left-9 top-2 font-mono text-[11px] text-muted-foreground/50">

@@ -62,21 +62,21 @@ export function RegexTester() {
   return (
     <div className="flex flex-col h-full">
       {/* Pattern + flags + preset chips */}
-      <div className="shrink-0 border-b bg-background px-4 py-2 space-y-2">
+      <div className="shrink-0 border-b border-border bg-background px-4 py-2 space-y-2">
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm text-muted-foreground">/</span>
           <Input
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
             placeholder="[a-z]+"
-            className="flex-1 h-7 font-mono text-sm"
+            className="flex-1 h-8 font-mono text-sm"
           />
           <span className="font-mono text-sm text-muted-foreground">/</span>
           <Input
             value={flags}
             onChange={(e) => setFlags(e.target.value)}
             placeholder="g"
-            className="w-16 h-7 font-mono text-sm"
+            className="w-16 h-8 font-mono text-sm"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -94,7 +94,7 @@ export function RegexTester() {
 
       {/* Test string — fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col min-h-0">
-        <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
+        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 text-xs font-medium text-muted-foreground">
           Test String — {quickPasteHint}
         </div>
         <Textarea
@@ -107,8 +107,8 @@ export function RegexTester() {
 
       {/* Results panel */}
       {hasResult && (
-        <div className="shrink-0 border-t flex flex-col overflow-hidden" style={{ maxHeight: '40%' }}>
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium">
+        <div className="shrink-0 border-t border-border flex flex-col overflow-hidden" style={{ maxHeight: '40%' }}>
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 text-xs font-medium">
             {result.error ? (
               <span className="text-destructive">Error</span>
             ) : result.matches.length > 0 ? (
@@ -121,7 +121,7 @@ export function RegexTester() {
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
             {result.error && (
-              <div className="px-3 py-2 bg-destructive/10 rounded-md">
+              <div className="px-3 py-2 bg-destructive/10 rounded-lg">
                 <p className="font-mono text-sm text-destructive">{result.error}</p>
               </div>
             )}
@@ -142,7 +142,7 @@ export function RegexTester() {
               </div>
             ))}
             {!result.error && result.matches.length === 0 && (
-              <div className="px-3 py-2 bg-muted rounded-md">
+              <div className="px-3 py-2 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">No matches found</p>
               </div>
             )}

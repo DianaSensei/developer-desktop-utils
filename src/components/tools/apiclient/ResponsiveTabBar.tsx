@@ -153,7 +153,7 @@ function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-md border bg-popover p-1 shadow-md">
+          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border bg-popover p-1 shadow-md">
             {tabs.map((t) => (
               <button
                 key={t.id}

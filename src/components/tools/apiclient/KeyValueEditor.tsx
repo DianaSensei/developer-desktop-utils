@@ -102,7 +102,7 @@ export function KeyValueEditor({
 
   return (
     <div className="space-y-1.5">
-      <div className="overflow-hidden rounded-md border text-xs">
+      <div className="overflow-hidden rounded-lg border text-xs">
         {/* Header row */}
         <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
           <div />
@@ -115,7 +115,7 @@ export function KeyValueEditor({
           const isGhost = row.id === ghost.id;
           const disabled = !isGhost && !row.enabled;
           return (
-            <div key={row.id} className="group grid grid-cols-[1rem_1fr_1fr_2rem] border-b last:border-b-0 hover:bg-muted/20 transition-colors">
+            <div key={row.id} className="group grid grid-cols-[1rem_1fr_1fr_2rem] border-b last:border-b-0 hover:bg-muted/10 transition-colors">
               {/* Enable/disable toggle dot */}
               <div className="flex items-center justify-center">
                 <button

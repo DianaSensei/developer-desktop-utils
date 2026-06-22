@@ -651,21 +651,21 @@ export function Base64Tool() {
       {/* Toolbar */}
       <div className="shrink-0 border-b border-border bg-muted/10 px-4 py-2 flex flex-wrap items-center gap-3">
         <Select value={algorithm} onValueChange={setAlgorithm}>
-          <SelectTrigger className="h-8 w-44 text-xs rounded-lg border-border"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 w-44 text-xs rounded-lg border-b border-border"><SelectValue /></SelectTrigger>
           <SelectContent>
             {CODECS.map((item) => (
               <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
+        <div className="inline-flex h-8 rounded-lg border border-b border-border bg-muted/50 p-0.5">
           {(['encode', 'decode'] as Mode[]).map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setMode(item)}
               className={cn(
-                'rounded-md px-3 text-xs font-medium capitalize transition-smooth',
+                'rounded-lg px-3 text-xs font-medium capitalize transition-smooth',
                 mode === item ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground'
               )}
             >

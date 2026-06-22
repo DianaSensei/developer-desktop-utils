@@ -552,9 +552,9 @@ export function JsonFormatter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 border-b bg-background px-4 py-2">
+      <div className="shrink-0 border-b border-border bg-background px-4 py-2">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
+          <div className="inline-flex h-8 rounded-lg border border-b border-border bg-muted/50 p-0.5">
             {([
               { id: 'beautify', label: 'Beautify' },
               { id: 'string', label: 'To JSON String' },
@@ -565,7 +565,7 @@ export function JsonFormatter() {
                 type="button"
                 onClick={() => setMode(item.id)}
                 className={cn(
-                  'rounded-md px-3 text-xs font-medium transition-smooth',
+                  'rounded-lg px-3 text-xs font-medium transition-smooth',
                   mode === item.id
                     ? 'bg-card text-foreground shadow-sm-premium'
                     : 'text-muted-foreground hover:text-foreground'
@@ -579,7 +579,7 @@ export function JsonFormatter() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Indent</span>
             <Select value={indentKey} onValueChange={setIndentKey}>
-              <SelectTrigger className="h-8 w-[110px] text-xs rounded-lg border-border"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[110px] text-xs rounded-lg border-b border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="2">2 spaces</SelectItem>
                 <SelectItem value="4">4 spaces</SelectItem>
@@ -591,7 +591,7 @@ export function JsonFormatter() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Quotes</span>
             <Select value={quote} onValueChange={setQuote}>
-              <SelectTrigger className="h-8 w-[114px] text-xs rounded-lg border-border"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[114px] text-xs rounded-lg border-b border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={'"'}>Double &quot;</SelectItem>
                 <SelectItem value={"'"}>Single &apos;</SelectItem>
@@ -613,8 +613,8 @@ export function JsonFormatter() {
 
       {/* Input panel (collapsible, fixed height) */}
       {showInput && (
-        <div className="shrink-0 border-b flex flex-col" style={{ height: '180px' }}>
-          <div className="shrink-0 px-4 py-1 border-b bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="shrink-0 border-b border-border flex flex-col" style={{ height: '180px' }}>
+          <div className="shrink-0 px-4 py-1 border-b border-border bg-muted/10 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Input</span>
             <span>{quickPasteHint}</span>
           </div>
@@ -629,7 +629,7 @@ export function JsonFormatter() {
 
       {/* Status bar */}
       {(parsed.error || parsed.value !== undefined) && (
-        <div className="shrink-0 border-b px-4 py-2">
+        <div className="shrink-0 border-b border-border px-4 py-2">
           {parsed.error ? (
             <StatusMessage status="error" message={parsed.error} dismissible={false} />
           ) : (
@@ -640,7 +640,7 @@ export function JsonFormatter() {
 
       {/* Beautify: search + action bar */}
       {parsed.value !== undefined && mode === 'beautify' && (
-        <div className="shrink-0 border-b px-4 py-2">
+        <div className="shrink-0 border-b border-border px-4 py-2">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[160px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -648,7 +648,7 @@ export function JsonFormatter() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Find by key, value, or path…"
-                className="h-8 pl-9 text-xs rounded-lg border-border transition-smooth focus:ring-1 focus:ring-primary"
+                className="h-8 pl-9 text-xs rounded-lg border-b border-border transition-smooth focus:ring-1 focus:ring-primary"
               />
             </div>
             <Button
@@ -723,7 +723,7 @@ export function JsonFormatter() {
 
         {parsed.value !== undefined && mode !== 'beautify' && (
           <>
-            <div className="shrink-0 border-b px-4 py-1.5 bg-muted/10 border-b border-border flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+            <div className="shrink-0 border-b border-border px-4 py-1.5 bg-muted/10 border-b border-border flex items-center justify-between text-[11px] text-muted-foreground font-medium">
               <span>{mode === 'string' ? 'JSON String' : 'Minified'}</span>
               <CopyButton
                 text={outputText}
@@ -754,7 +754,7 @@ export function JsonFormatter() {
 
       {/* Beautify: path breadcrumb */}
       {parsed.value !== undefined && mode === 'beautify' && (
-        <div className="shrink-0 border-t border-border flex items-center gap-2 px-4 py-2 bg-muted/5 text-xs">
+        <div className="shrink-0 border-t border-border border-b border-border flex items-center gap-2 px-4 py-2 bg-muted/5 text-xs">
           <span className="text-muted-foreground">Path</span>
           <code className="flex-1 truncate font-mono text-foreground">{selectedPath || '$ (click a node)'}</code>
           {selectedPath && (

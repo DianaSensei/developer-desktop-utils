@@ -30,7 +30,7 @@ export function NumberStepper({
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const set = (v: number) => onChange(clamp(Number.isFinite(v) ? v : min));
   return (
-    <div className={cn('flex h-7 items-stretch overflow-hidden rounded-md border bg-background', className)}>
+    <div className={cn('flex h-8 items-stretch overflow-hidden rounded-lg border bg-background', className)}>
       <button
         type="button"
         onClick={() => set(value - step)}
@@ -95,7 +95,7 @@ export function TimeField({
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
         if (e.key === 'Escape') setDraft(null);
       }}
-      className={cn('h-7 w-[68px] text-center font-mono text-xs tabular-nums', className)}
+      className={cn('h-8 w-[68px] text-center font-mono text-xs tabular-nums', className)}
     />
   );
 }
@@ -221,7 +221,7 @@ export function Popover({
             minWidth: pos.width,
           }}
           className={cn(
-            'z-[9999] min-w-[200px] rounded-md border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
+            'z-[9999] min-w-[200px] rounded-lg border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
             className
           )}
         >
@@ -350,8 +350,8 @@ export function ProjectPicker({
         <button
           onClick={toggle}
           className={cn(
-            'flex items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors hover:bg-muted',
-            compact ? 'h-7' : 'h-9'
+            'flex items-center gap-1.5 rounded-lg border px-2.5 text-sm transition-colors hover:bg-muted',
+            compact ? 'h-8' : 'h-9'
           )}
         >
           <ColorDot color={project?.color} />
@@ -407,12 +407,12 @@ export function ProjectPicker({
                 }
               }}
               placeholder="New project…"
-              className="h-7 text-xs"
+              className="h-8 text-xs"
             />
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 shrink-0"
+              className="h-8 w-7 shrink-0"
               onClick={() => {
                 if (!creating.trim()) return;
                 const p = addProject(creating.trim());
@@ -453,7 +453,7 @@ function CreateTaskRow({ onCreate }: { onCreate: (name: string) => void }) {
           }
         }}
         placeholder="New task in project…"
-        className="h-7 pl-7 text-xs"
+        className="h-8 pl-7 text-xs"
       />
     </div>
   );
@@ -476,7 +476,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
       trigger={({ toggle: t }) => (
         <button
           onClick={t}
-          className={cn('flex items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors hover:bg-muted', compact ? 'h-7' : 'h-9')}
+          className={cn('flex items-center gap-1.5 rounded-lg border px-2.5 text-sm transition-colors hover:bg-muted', compact ? 'h-8' : 'h-9')}
         >
           <TagIcon className="h-3.5 w-3.5 opacity-60" />
           <span className={cn('truncate', !selected.length && 'text-muted-foreground')}>
@@ -508,7 +508,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
                 }
               }}
               placeholder="New tag…"
-              className="h-7 text-xs"
+              className="h-8 text-xs"
             />
           </div>
         </div>
@@ -528,8 +528,8 @@ export function BillableButton({ value, onChange, compact }: { value: boolean; o
       onClick={() => onChange(!value)}
       title={value ? 'Billable' : 'Non-billable'}
       className={cn(
-        'flex items-center justify-center rounded-md border transition-colors',
-        compact ? 'h-7 w-7' : 'h-9 w-9',
+        'flex items-center justify-center rounded-lg border transition-colors',
+        compact ? 'h-8 w-7' : 'h-9 w-9',
         value ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground hover:bg-muted'
       )}
     >

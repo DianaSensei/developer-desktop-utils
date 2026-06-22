@@ -378,7 +378,7 @@ function QrGenerator() {
     cn('rounded border text-xs font-medium transition-colors cursor-pointer select-none',
       active
         ? 'border-primary bg-primary text-primary-foreground'
-        : 'border-border bg-background hover:border-primary/60 hover:bg-muted/50');
+        : 'border-b border-border bg-background hover:border-primary/60 hover:bg-muted/50');
 
   return (
     <div className="space-y-4">
@@ -621,7 +621,7 @@ export function QRCodeTool() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-4 space-y-4">
-        <div className="inline-flex h-8 rounded-md border bg-muted/45 p-0.5">
+        <div className="inline-flex h-8 rounded-lg border bg-muted/45 p-0.5">
           {([
             { id: 'generate' as QrMode, label: 'Generate', Icon: QrCodeIcon },
             { id: 'read' as QrMode, label: 'Read', Icon: ScanLine },

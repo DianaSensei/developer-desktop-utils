@@ -235,7 +235,7 @@ export function LeftPanel({
         {/* Dropdown trigger */}
         <div className="relative">
           <button
-            className="w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-md border hover:bg-muted/50 transition-colors text-left"
+            className="w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg border hover:bg-muted/50 transition-colors text-left"
             onClick={() => setShowBrokerDropdown((v) => !v)}
           >
             <span className="flex items-center gap-1.5 min-w-0">
@@ -248,7 +248,7 @@ export function LeftPanel({
           </button>
 
           {showBrokerDropdown && (
-            <div className="absolute top-full left-0 right-0 z-20 mt-0.5 bg-popover border rounded-md shadow-lg py-1">
+            <div className="absolute top-full left-0 right-0 z-20 mt-0.5 bg-popover border rounded-lg shadow-lg py-1">
               {configs.length === 0 && (
                 <div className="px-3 py-2 text-xs text-muted-foreground">No brokers saved</div>
               )}
@@ -272,7 +272,7 @@ export function LeftPanel({
         {/* Broker action buttons */}
         <div className="flex gap-1">
           <button
-            className="flex-1 flex items-center justify-center gap-1 py-1 text-xs rounded-md border hover:bg-muted/50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1 py-1 text-xs rounded-lg border hover:bg-muted/50 transition-colors"
             onClick={() => { setEditConfig(null); setShowForm(true); setShowBrokerDropdown(false); }}
           >
             <Plus className="w-3 h-3" /> Add
@@ -280,7 +280,7 @@ export function LeftPanel({
           {selectedConfig && (
             <>
               <button
-                className="px-2 py-1 text-xs rounded-md border hover:bg-muted/50 transition-colors"
+                className="px-2 py-1 text-xs rounded-lg border hover:bg-muted/50 transition-colors"
                 title="Edit broker"
                 onClick={() => { setEditConfig(selectedConfig); setShowForm(true); setShowBrokerDropdown(false); }}
               >
@@ -288,7 +288,7 @@ export function LeftPanel({
               </button>
               {isDisconnected ? (
                 <button
-                  className="px-2 py-1 text-xs rounded-md border hover:bg-green-500/10 text-green-600 transition-colors flex items-center gap-1"
+                  className="px-2 py-1 text-xs rounded-lg border hover:bg-green-500/10 text-green-600 transition-colors flex items-center gap-1"
                   title="Reconnect"
                   onClick={handleReconnect}
                 >
@@ -296,7 +296,7 @@ export function LeftPanel({
                 </button>
               ) : (
                 <button
-                  className="px-2 py-1 text-xs rounded-md border hover:bg-muted/50 text-muted-foreground transition-colors"
+                  className="px-2 py-1 text-xs rounded-lg border hover:bg-muted/50 text-muted-foreground transition-colors"
                   title="Disconnect"
                   onClick={handleDisconnect}
                 >
@@ -305,7 +305,7 @@ export function LeftPanel({
               )}
               <button
                 className={cn(
-                  'px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1',
+                  'px-2 py-1 text-xs rounded-lg border transition-colors flex items-center gap-1',
                   brokerDeleteArmed
                     ? 'bg-destructive/10 border-destructive/40 text-destructive'
                     : 'hover:bg-destructive/10 text-destructive',
@@ -356,14 +356,14 @@ export function LeftPanel({
 
         {/* Inline create form */}
         {showCreateTopic && (
-          <div className="mx-2 mb-1.5 p-2 border rounded-md bg-muted/20 shrink-0 space-y-2">
+          <div className="mx-2 mb-1.5 p-2 border rounded-lg bg-muted/10 shrink-0 space-y-2">
             <div>
               <Label className="text-xs text-muted-foreground">Topic name</Label>
               <Input
                 value={newTopicName}
                 onChange={(e) => setNewTopicName(e.target.value)}
                 placeholder="my-topic"
-                className="h-7 text-xs font-mono mt-0.5"
+                className="h-8 text-xs font-mono mt-0.5"
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateTopic()}
                 autoFocus
               />
@@ -376,7 +376,7 @@ export function LeftPanel({
                   min="1"
                   value={newTopicPartitions}
                   onChange={(e) => setNewTopicPartitions(e.target.value)}
-                  className="h-7 text-xs mt-0.5"
+                  className="h-8 text-xs mt-0.5"
                   title="Number of partitions"
                 />
               </div>
@@ -387,13 +387,13 @@ export function LeftPanel({
                   min="1"
                   value={newTopicRf}
                   onChange={(e) => setNewTopicRf(e.target.value)}
-                  className="h-7 text-xs mt-0.5"
+                  className="h-8 text-xs mt-0.5"
                   title="Replication factor (must be ≤ number of brokers)"
                 />
               </div>
             </div>
             <div className="flex gap-1">
-              <Button size="sm" className="h-7 text-xs flex-1" onClick={handleCreateTopic} disabled={creating}>
+              <Button size="sm" className="h-8 text-xs flex-1" onClick={handleCreateTopic} disabled={creating}>
                 {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Create'}
               </Button>
               <button
@@ -414,7 +414,7 @@ export function LeftPanel({
                 value={topicSearch}
                 onChange={(e) => setTopicSearch(e.target.value)}
                 placeholder="Search topics…"
-                className="h-7 text-xs pl-6"
+                className="h-8 text-xs pl-6"
               />
             </div>
           </div>
@@ -422,7 +422,7 @@ export function LeftPanel({
 
         {/* Delete error banner */}
         {deleteError && (
-          <div className="mx-2 mb-1.5 flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 shrink-0">
+          <div className="mx-2 mb-1.5 flex items-start gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-2 py-1.5 shrink-0">
             <XCircle className="w-3 h-3 mt-0.5 shrink-0 text-destructive" />
             <span className="flex-1 text-xs text-destructive break-words">{deleteError}</span>
             <button
@@ -547,7 +547,7 @@ export function LeftPanel({
                 </p>
               </div>
 
-              <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2">
+              <div className="rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2">
                 <span className="font-mono text-sm text-destructive break-all">{deleteConfirm.name}</span>
               </div>
 

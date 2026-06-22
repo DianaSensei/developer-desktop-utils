@@ -200,11 +200,11 @@ function PolicyModal({
   return (
     <Modal open onClose={onClose} title="Time-off policies">
       <div className="space-y-3">
-        <div className="divide-y rounded-md border">
+        <div className="divide-y rounded-lg border">
           {policies.map((p) => (
             <div key={p.id} className="flex items-center gap-2 px-2.5 py-2">
               <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
-              <Input value={p.name} onChange={(e) => onUpdate(p.id, { name: e.target.value })} className="h-7 flex-1 text-sm" />
+              <Input value={p.name} onChange={(e) => onUpdate(p.id, { name: e.target.value })} className="h-8 flex-1 text-sm" />
               <ConfirmButton onConfirm={() => onDelete(p.id)} title="Delete policy">
                 <Trash2 className="h-3.5 w-3.5" />
               </ConfirmButton>
@@ -213,7 +213,7 @@ function PolicyModal({
           {policies.length === 0 && <p className="px-2.5 py-3 text-xs text-muted-foreground">No policies yet.</p>}
         </div>
 
-        <div className="space-y-2 rounded-md border p-2.5">
+        <div className="space-y-2 rounded-lg border p-2.5">
           <Label className="text-xs">New policy</Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="h-8 text-sm" />
           <div className="flex flex-wrap gap-1">

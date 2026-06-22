@@ -505,8 +505,8 @@ export function CronGenerator() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 border-b bg-background px-4 py-2 flex items-center gap-3">
-        <div className="inline-flex rounded-md border bg-muted/45 p-0.5">
+      <div className="shrink-0 border-b border-border bg-background px-4 py-2 flex items-center gap-3">
+        <div className="inline-flex rounded-lg border bg-muted/45 p-0.5">
           {(['linux', 'quartz'] as CronMode[]).map((item) => (
             <button
               key={item}
@@ -524,10 +524,10 @@ export function CronGenerator() {
         <button
           type="button"
           aria-label={`${mode} cron rule`}
-          className="group relative inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+          className="group relative inline-flex h-8 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
         >
           <HelpCircle className="h-4 w-4" />
-          <span className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-72 rounded-md border bg-popover px-2.5 py-2 text-left text-xs font-normal leading-relaxed text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
+          <span className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-72 rounded-lg border bg-popover px-2.5 py-2 text-left text-xs font-normal leading-relaxed text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
             {modeRuleTooltip(mode)}
           </span>
         </button>
@@ -567,7 +567,7 @@ export function CronGenerator() {
             const fieldErrors = validateField(fields[rule.key], rule);
 
             return (
-              <div key={rule.key} className="space-y-2 rounded-md border bg-background/50 px-3 py-2.5">
+              <div key={rule.key} className="space-y-2 rounded-lg border bg-background/50 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor={`cron-${rule.key}`}>{rule.label}</Label>
                   <span className="text-xs text-muted-foreground">{rule.range}</span>
@@ -628,7 +628,7 @@ export function CronGenerator() {
 
         <div
           className={cn(
-            'space-y-2 rounded-md border px-3 py-3',
+            'space-y-2 rounded-lg border px-3 py-3',
             analysis.errors.length > 0
               ? 'border-destructive/25 bg-destructive/10'
               : 'border-primary/25 bg-accent/45'

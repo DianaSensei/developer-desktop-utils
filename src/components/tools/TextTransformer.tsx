@@ -116,7 +116,7 @@ export function TextTransformer() {
       <div className="shrink-0 border-b border-border bg-muted/10 px-4 py-2">
         <div className="flex flex-wrap items-center gap-3">
           <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
-            <SelectTrigger className="h-8 w-52 text-xs rounded-lg border-border">
+            <SelectTrigger className="h-8 w-52 text-xs rounded-lg border-b border-border">
               <SelectValue placeholder="Select transform" />
             </SelectTrigger>
             <SelectContent>
@@ -143,7 +143,7 @@ export function TextTransformer() {
                   value={removeChars}
                   onChange={(e) => setRemoveChars(e.target.value)}
                   placeholder="e.g. ,.;!?"
-                  className="h-8 w-32 font-mono text-xs rounded-lg border-border"
+                  className="h-8 w-32 font-mono text-xs rounded-lg border-b border-border"
                 />
               </div>
             </>
@@ -156,7 +156,7 @@ export function TextTransformer() {
                 value={delimiters}
                 onChange={(e) => setDelimiters(e.target.value)}
                 placeholder=",;"
-                className="h-8 w-24 font-mono text-xs rounded-lg border-border"
+                className="h-8 w-24 font-mono text-xs rounded-lg border-b border-border"
               />
             </div>
           )}

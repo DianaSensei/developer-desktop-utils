@@ -70,7 +70,7 @@ export function ImageBase64Tool() {
       <div className="p-4 space-y-4">
 
         {/* Mode tabs */}
-        <div className="flex rounded-md border p-0.5 w-fit gap-0.5">
+        <div className="flex rounded-lg border p-0.5 w-fit gap-0.5">
           {([['encode', 'Image → Base64'], ['decode', 'Base64 → Image']] as [Mode, string][]).map(([m, label]) => (
             <button
               key={m}
@@ -115,11 +115,11 @@ export function ImageBase64Tool() {
             ) : (
               <div className="space-y-3">
                 {/* Preview */}
-                <div className="relative rounded-lg border bg-muted/20 p-3 flex items-center justify-center min-h-[160px]">
+                <div className="relative rounded-lg border bg-muted/10 p-3 flex items-center justify-center min-h-[160px]">
                   <img src={encodeDataUrl} alt="preview" className="max-h-48 max-w-full rounded object-contain" />
                   <button
                     onClick={clearEncode}
-                    className="absolute top-2 right-2 p-1 rounded-md bg-background/80 border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute top-2 right-2 p-1 rounded-lg bg-background/80 border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -151,7 +151,7 @@ export function ImageBase64Tool() {
                       </button>
                     </div>
                   </div>
-                  <div className="rounded-md border bg-muted/30 px-3 py-2 max-h-36 overflow-y-auto">
+                  <div className="rounded-lg border bg-muted/30 px-3 py-2 max-h-36 overflow-y-auto">
                     <p className="font-mono text-[10px] break-all text-foreground/80 leading-relaxed">{base64Only}</p>
                   </div>
                   <p className="text-[10px] text-muted-foreground">
@@ -170,13 +170,13 @@ export function ImageBase64Tool() {
                 value={decodeInput}
                 onChange={(e) => { setDecodeInput(e.target.value); setDecodeError(false); }}
                 placeholder="data:image/png;base64,iVBORw0KGgo… or raw base64"
-                className="w-full rounded-md border bg-background px-3 py-2 font-mono text-[10px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
+                className="w-full rounded-lg border bg-background px-3 py-2 font-mono text-[10px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
               />
             </div>
 
             {/* Rendered image */}
             {decodeSrc && (
-              <div className="rounded-lg border bg-muted/20 p-3 flex items-center justify-center min-h-[160px]">
+              <div className="rounded-lg border bg-muted/10 p-3 flex items-center justify-center min-h-[160px]">
                 <img
                   src={decodeSrc}
                   alt="decoded"
@@ -188,7 +188,7 @@ export function ImageBase64Tool() {
             )}
 
             {decodeError && (
-              <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2">
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2">
                 <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
                 <p className="text-xs text-destructive">Could not render image — invalid or unsupported base64.</p>
               </div>

@@ -263,10 +263,10 @@ function InfoTip({ text }: { text: string }) {
     <span className="relative group/tip inline-flex items-center">
       <Info className="h-2.5 w-2.5 text-muted-foreground/40 hover:text-muted-foreground cursor-help transition-colors" />
       <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50
-        hidden group-hover/tip:block w-52 rounded-md border bg-popover px-2.5 py-2
+        hidden group-hover/tip:block w-52 rounded-lg border bg-popover px-2.5 py-2
         text-[10px] leading-relaxed text-popover-foreground shadow-md">
         {text}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-border" />
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-t border-borderransparent border-t-border" />
       </span>
     </span>
   );
@@ -292,7 +292,7 @@ function Section({ title, icon, open, onToggle, children }: {
   title: string; icon?: React.ReactNode; open: boolean; onToggle: () => void; children: React.ReactNode;
 }) {
   return (
-    <div className="border rounded-md px-3">
+    <div className="border rounded-lg px-3">
       <button
         onClick={onToggle}
         className="flex w-full items-center justify-between py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
@@ -312,7 +312,7 @@ function TzSelect({ label, value, onChange, availableTzs }: {
     <div className="flex items-center gap-2 flex-1">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="flex-1 h-7 text-xs">
+        <SelectTrigger className="flex-1 h-8 text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -619,7 +619,7 @@ export function DateTimeTool() {
               const outVal = parsedDate ? row.value(parsedDate, outputTz) : '—';
 
               return (
-                <div key={row.label} className="py-1.5 space-y-0.5 border-b last:border-b-0 [&:nth-last-child(2)]:border-b-0">
+                <div key={row.label} className="py-1.5 space-y-0.5 border-b border-border last:border-b-0 [&:nth-last-child(2)]:border-b-0">
                   <div className="flex items-center gap-1">
                     <span className="text-[10px] text-muted-foreground">{row.label}</span>
                     <InfoTip text={row.description} />
@@ -643,7 +643,7 @@ export function DateTimeTool() {
             })}
           </div>
           {/* Custom format */}
-          <div className="border-t mt-0.5 pt-2 space-y-0.5">
+          <div className="border-t border-border mt-0.5 pt-2 space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-muted-foreground shrink-0 w-10">Custom</span>
               <Input
@@ -721,7 +721,7 @@ export function DateTimeTool() {
               };
 
               return (
-                <div key={label} className="grid grid-cols-[4rem_1fr_1fr] gap-2 py-1.5 border-t">
+                <div key={label} className="grid grid-cols-[4rem_1fr_1fr] gap-2 py-1.5 border-t border-border">
                   <span className="text-xs text-muted-foreground self-start pt-0.5">{label}</span>
                   {renderCell(s)}
                   {renderCell(e)}
@@ -757,7 +757,7 @@ export function DateTimeTool() {
               const duration = humanReadableDuration(aDate, bDate);
               return (
                 <div className="space-y-2">
-                  <div className="rounded-md border px-3 py-2.5 space-y-2.5">
+                  <div className="rounded-lg border px-3 py-2.5 space-y-2.5">
                     {/* Timeline visual */}
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold text-foreground shrink-0">From</span>
@@ -780,11 +780,11 @@ export function DateTimeTool() {
                       )}
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 border rounded-md px-3 py-1">
+                  <div className="grid grid-cols-2 gap-x-4 border rounded-lg px-3 py-1">
                     {(Object.entries(diffResult) as [string, number][])
                       .filter(([, val]) => val !== 0)
                       .map(([label, val]) => (
-                        <div key={label} className="flex flex-col py-1.5 border-b [&:nth-last-child(-n+2)]:border-b-0">
+                        <div key={label} className="flex flex-col py-1.5 border-b border-border [&:nth-last-child(-n+2)]:border-b-0">
                           <span className="text-[10px] text-muted-foreground">{label}</span>
                           <CopyValue value={val.toLocaleString()} />
                         </div>

@@ -78,7 +78,7 @@ function LineNumbers({
   return (
     <div
       ref={containerRef}
-      className="shrink-0 overflow-hidden select-none font-mono text-xs text-muted-foreground bg-muted/40 border-r border-border"
+      className="shrink-0 overflow-hidden select-none font-mono text-xs text-muted-foreground bg-muted/40 border-r border-b border-border"
       style={{ width }}
     />
   );
@@ -422,11 +422,11 @@ export function ArrayDeduplicator() {
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* ── Toolbar ── */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border">
-        <div className="flex items-center p-0.5 rounded-md bg-muted gap-0.5">
+        <div className="flex items-center p-0.5 rounded-lg bg-muted gap-0.5">
           <Button
             variant={mode === 'preserve' ? 'default' : 'ghost'}
             size="sm"
-            className="h-7 px-3 text-xs"
+            className="h-8 px-3 text-xs"
             onClick={() => setMode('preserve')}
           >
             Preserve Order
@@ -434,7 +434,7 @@ export function ArrayDeduplicator() {
           <Button
             variant={mode === 'sort' ? 'default' : 'ghost'}
             size="sm"
-            className="h-7 px-3 text-xs"
+            className="h-8 px-3 text-xs"
             onClick={() => setMode('sort')}
           >
             Sort
@@ -455,7 +455,7 @@ export function ArrayDeduplicator() {
       <div className="flex-1 min-h-0 flex">
 
         {/* Input pane */}
-        <div className={cn('flex-1 min-w-0 flex flex-col', mode === 'sort' && 'border-r border-border')}>
+        <div className={cn('flex-1 min-w-0 flex flex-col', mode === 'sort' && 'border-r border-b border-border')}>
           <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30">
             <span className="text-xs font-medium text-muted-foreground">Input · one item per line</span>
             <div className="flex items-center gap-0.5">
@@ -488,7 +488,7 @@ export function ArrayDeduplicator() {
         {mode === 'preserve' && (
           <div
             ref={trackRef}
-            className="w-3 shrink-0 relative bg-muted/20 border-x border-border cursor-pointer select-none"
+            className="w-3 shrink-0 relative bg-muted/10 border-x border-b border-border cursor-pointer select-none"
             onClick={handleTrackClick}
           >
             <div

@@ -225,7 +225,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
               <Button
                 variant="ghost" size="sm"
                 onClick={() => setPhase('setup')}
-                className="ml-auto h-7 shrink-0 gap-1.5 text-xs"
+                className="ml-auto h-8 shrink-0 gap-1.5 text-xs"
               >
                 <Settings2 className="h-3.5 w-3.5" /> Configure
               </Button>
@@ -254,7 +254,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                   </Field>
                 </div>
 
-                <label className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2">
+                <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
                   <span className="text-xs font-medium">Run in parallel</span>
                   <Switch checked={parallel} onCheckedChange={setParallel} aria-label="Run in parallel" />
                 </label>
@@ -262,7 +262,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Data file</p>
                   {dataFile ? (
-                    <div className="space-y-2 rounded-md border p-2">
+                    <div className="space-y-2 rounded-lg border p-2">
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                         <span className="min-w-0 flex-1 truncate text-xs font-medium" title={dataFile.name}>{dataFile.name}</span>
@@ -278,7 +278,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                   ) : (
                     <button
                       onClick={loadData}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2.5 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2.5 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
                     >
                       <FileSpreadsheet className="h-3.5 w-3.5" /> Select CSV or JSON file
                     </button>
@@ -404,7 +404,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                 ) : (
                   <>
                     {dataRow && Object.keys(dataRow).length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 border-b bg-muted/20 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-1.5 border-b bg-muted/10 px-3 py-2">
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Data</span>
                         {Object.entries(dataRow).map(([k, v]) => (
                           <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"><span className="text-muted-foreground">{k}=</span>{v}</span>
@@ -465,7 +465,7 @@ function Stat({ label, value, tone = 'default', icon }: {
     : tone === 'bad' ? 'text-destructive'
     : tone === 'muted' ? 'text-muted-foreground' : 'text-foreground';
   return (
-    <div className="min-w-[5.5rem] rounded-md border bg-muted/20 px-3 py-1.5">
+    <div className="min-w-[5.5rem] rounded-lg border bg-muted/10 px-3 py-1.5">
       <p className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">{icon}{label}</p>
       <p className={cn('text-base font-semibold tabular-nums', toneCls)}>{value}</p>
     </div>
@@ -488,7 +488,7 @@ function DataPreview({ rows }: { rows: DataRow[] }) {
         </thead>
         <tbody>
           {shown.map((row, i) => (
-            <tr key={i} className="odd:bg-muted/20">
+            <tr key={i} className="odd:bg-muted/10">
               <td className="px-1.5 py-0.5 text-muted-foreground">{i + 1}</td>
               {cols.map((c) => <td key={c} className="max-w-[8rem] truncate px-1.5 py-0.5 font-mono" title={row[c]}>{row[c]}</td>)}
             </tr>

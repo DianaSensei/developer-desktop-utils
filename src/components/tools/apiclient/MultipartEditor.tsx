@@ -57,7 +57,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
     editRow(id, { kind: 'text', fileName: undefined, fileType: undefined, fileContent: undefined });
 
   return (
-    <div className="overflow-hidden rounded-md border text-xs">
+    <div className="overflow-hidden rounded-lg border text-xs">
       {/* header */}
       <div className="grid grid-cols-[1fr_1fr_10rem_2rem] border-b bg-muted/30 font-semibold">
         <div className="border-r px-3 py-1.5">Key</div>

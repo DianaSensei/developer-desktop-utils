@@ -31,8 +31,8 @@ export function JwtDebugger() {
   return (
     <div className="flex flex-col h-full">
       {/* Token input — fixed height */}
-      <div className="shrink-0 border-b flex flex-col" style={{ height: '160px' }}>
-        <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground">
+      <div className="shrink-0 border-b border-border flex flex-col" style={{ height: '160px' }}>
+        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between text-[11px] text-muted-foreground">
           <span>JWT Token</span>
           <span>{quickPasteHint}</span>
         </div>

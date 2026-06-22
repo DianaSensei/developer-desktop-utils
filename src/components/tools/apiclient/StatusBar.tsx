@@ -9,7 +9,7 @@ export function StatusBar({ onSearch, onCookies, cookieCount }: {
   cookieCount: number;
 }) {
   return (
-    <div className="flex shrink-0 items-center justify-between border-t bg-muted/20 px-3 py-1 text-[11px] text-muted-foreground">
+    <div className="flex shrink-0 items-center justify-between border-t bg-muted/10 px-3 py-1 text-[11px] text-muted-foreground">
       <span className="font-medium tracking-wide">API Client</span>
       <div className="flex items-center gap-3">
         <button

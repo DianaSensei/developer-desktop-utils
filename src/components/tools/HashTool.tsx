@@ -75,7 +75,7 @@ export function HashTool() {
               <div key={label} className="space-y-1">
                 <ToolLabel className="text-xs">{label}</ToolLabel>
                 <div className="flex gap-2">
-                  <Input value={value} readOnly className="font-mono text-xs h-8 rounded-lg border-border" />
+                  <Input value={value} readOnly className="font-mono text-xs h-8 rounded-lg border-b border-border" />
                   <CopyButton text={value} label="" size="icon" variant="outline" disabled={!value} className="h-8 w-8 shrink-0" />
                 </div>
               </div>
@@ -84,7 +84,7 @@ export function HashTool() {
         </div>
 
         {/* AES section */}
-        <div className="border-t border-border pt-5 space-y-3">
+        <div className="border-t border-border border-b border-border pt-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">AES Encryption</h3>
           <ToolSection>
             <ToolLabel>Encryption Key</ToolLabel>
@@ -93,7 +93,7 @@ export function HashTool() {
               value={encryptKey}
               onChange={(e) => setEncryptKey(e.target.value)}
               placeholder="Enter encryption key"
-              className="h-8 text-sm rounded-lg border-border transition-smooth"
+              className="h-8 text-sm rounded-lg border-b border-border transition-smooth"
             />
           </ToolSection>
           <div className="flex gap-2">
@@ -106,7 +106,7 @@ export function HashTool() {
                 <ToolLabel className="text-xs">{aesMode === 'encrypt' ? 'Encrypted' : 'Decrypted'}</ToolLabel>
                 <CopyButton text={aesResult} label="Copy" size="sm" variant="ghost" className="h-6 px-2 text-xs" />
               </div>
-              <Textarea value={aesResult} readOnly className="min-h-[80px] font-mono text-xs rounded-lg border-border" />
+              <Textarea value={aesResult} readOnly className="min-h-[80px] font-mono text-xs rounded-lg border-b border-border" />
             </ToolSection>
           )}
         </div>

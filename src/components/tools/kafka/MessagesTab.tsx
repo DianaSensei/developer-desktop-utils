@@ -249,7 +249,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Panel title bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/20 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/10 shrink-0">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           Message Detail
         </span>
@@ -565,7 +565,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Start from</Label>
-          <div className="flex rounded-md border border-input overflow-hidden text-xs h-8">
+          <div className="flex rounded-lg border border-input overflow-hidden text-xs h-8">
             {(['tail', 'from', 'range'] as FetchMode[]).map((m) => (
               <button
                 key={m}
@@ -638,7 +638,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Default view</Label>
-          <div className="flex rounded-md border border-input overflow-hidden text-xs h-8">
+          <div className="flex rounded-lg border border-input overflow-hidden text-xs h-8">
             {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
               <button
                 key={m}
@@ -675,7 +675,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           placeholder="Filter by key, value, or headers…"
-          className="h-7 text-xs border-0 shadow-none focus-visible:ring-0 px-0 flex-1"
+          className="h-8 text-xs border-0 shadow-none focus-visible:ring-0 px-0 flex-1"
           disabled={!fetched}
         />
         {keyword && (
@@ -722,7 +722,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           {/* Column headers */}
           {!loading && !error && sorted.length > 0 && (
             <div
-              className="grid px-3 py-2 border-b bg-muted/20 shrink-0"
+              className="grid px-3 py-2 border-b bg-muted/10 shrink-0"
               style={{ gridTemplateColumns: gridCols, gap: '0.5rem' }}
             >
               <ColHeader label="P" col="partition" align="right" {...sortProps}

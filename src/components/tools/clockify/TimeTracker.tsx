@@ -54,7 +54,7 @@ function EditableTime({ ts, dayTs, onCommit }: { ts: number; dayTs: number; onCo
     <TimePicker
       value={timeOfDay(ts, false)}
       onChange={(hm) => { const v = parseTimeOfDay(hm, dayTs); if (v !== null) onCommit(v); }}
-      className="h-7"
+      className="h-8"
     />
   );
 }
@@ -97,9 +97,9 @@ function AddSubtaskInput({ onAdd }: { onAdd: (name: string) => void }) {
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
         placeholder="Add subtask…"
-        className="h-7 flex-1 text-xs"
+        className="h-8 flex-1 text-xs"
       />
-      <Button size="sm" variant="outline" className="h-7" onClick={submit} disabled={!v.trim()}>Add</Button>
+      <Button size="sm" variant="outline" className="h-8" onClick={submit} disabled={!v.trim()}>Add</Button>
     </div>
   );
 }
@@ -303,7 +303,7 @@ export function TimeTracker() {
           <TagPicker value={tagIds} onChange={setTagIds} />
           <BillableButton value={billable} onChange={setBillable} />
 
-          <div className="flex rounded-md border p-0.5">
+          <div className="flex rounded-lg border p-0.5">
             {(['timer', 'manual'] as const).map((m) => (
               <button
                 key={m}
@@ -349,7 +349,7 @@ export function TimeTracker() {
               onChange={setManualDate}
               className="w-[150px] text-xs"
             />
-            <div className="flex rounded-md border p-0.5">
+            <div className="flex rounded-lg border p-0.5">
               {(['range', 'duration'] as const).map((k) => (
                 <button
                   key={k}
@@ -396,7 +396,7 @@ export function TimeTracker() {
       {/* Period selector + total */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2 text-xs">
         <div className="flex items-center gap-2">
-          <div className="flex rounded-md border p-0.5">
+          <div className="flex rounded-lg border p-0.5">
             {PERIODS.map((p) => (
               <button
                 key={p.id}
@@ -409,9 +409,9 @@ export function TimeTracker() {
           </div>
           {period === 'range' && (
             <div className="flex items-center gap-1.5">
-              <DatePicker value={rangeStart} onChange={setRangeStart} className="h-7 text-xs" />
+              <DatePicker value={rangeStart} onChange={setRangeStart} className="h-8 text-xs" />
               <span className="text-muted-foreground">→</span>
-              <DatePicker value={rangeEnd} onChange={setRangeEnd} className="h-7 text-xs" />
+              <DatePicker value={rangeEnd} onChange={setRangeEnd} className="h-8 text-xs" />
             </div>
           )}
         </div>
@@ -481,7 +481,7 @@ export function TimeTracker() {
 
                 {/* Expanded: subtasks (if any) or plain history, plus an add-subtask input */}
                 {isOpen && (
-                  <div className="border-t bg-muted/20">
+                  <div className="border-t bg-muted/10">
                     {g.hasSub ? (
                       <>
                         {g.subgroups.map((sg) => {
@@ -499,15 +499,15 @@ export function TimeTracker() {
                                 </button>
                                 <span className={cn('shrink-0 font-mono text-xs tabular-nums', sg.running && 'text-red-500')}>{fmtTotal(subTotal)}</span>
                                 {sg.running ? (
-                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:bg-red-500/10" onClick={stopRunning} title="Stop">
+                                  <Button size="icon" variant="ghost" className="h-8 w-7 text-red-500 hover:bg-red-500/10" onClick={stopRunning} title="Stop">
                                     <Square className="h-3.5 w-3.5 fill-current" />
                                   </Button>
                                 ) : (
-                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Start this subtask" onClick={() => resumeTask(g.name, g.projectId, g.tagIds, g.billable, sg.name)}>
+                                  <Button size="icon" variant="ghost" className="h-8 w-7 text-muted-foreground hover:text-foreground" title="Start this subtask" onClick={() => resumeTask(g.name, g.projectId, g.tagIds, g.billable, sg.name)}>
                                     <Play className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
-                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted">
+                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-8 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </ConfirmButton>
                               </div>

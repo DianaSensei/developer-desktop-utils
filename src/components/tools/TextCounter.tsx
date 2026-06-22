@@ -124,7 +124,7 @@ export function TextCounter() {
   useInputHistory(text, setText);
 
   const Stat = ({ label, value, color = 'text-foreground' }: { label: string; value: number | string; color?: string }) => (
-    <div className="flex flex-col items-center justify-center p-3 rounded-lg border border-border bg-card/30 hover:bg-card/50 transition-smooth hover-press">
+    <div className="flex flex-col items-center justify-center p-3 rounded-lg border border-b border-border bg-card/30 hover:bg-card/50 transition-smooth hover-press">
       <div className={`text-lg font-bold ${color}`}>{value}</div>
       <div className="text-xs text-muted-foreground mt-1 text-center leading-tight">{label}</div>
     </div>
@@ -133,7 +133,7 @@ export function TextCounter() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left: textarea input */}
-      <div className="flex flex-col min-h-0 border-r border-border" style={{ width: '40%' }}>
+      <div className="flex flex-col min-h-0 border-r border-b border-border" style={{ width: '40%' }}>
         <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between text-xs font-medium text-muted-foreground">
           <span>Text Input</span>
           <span>{quickPasteHint}</span>
@@ -159,7 +159,7 @@ export function TextCounter() {
           <Stat label="Avg word length" value={stats.words > 0 ? (stats.charactersNoSpaces / stats.words).toFixed(1) : '0'} color="text-teal-600 dark:text-teal-400" />
         </div>
 
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-border border-b border-border pt-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Byte Size</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
             <Stat label="UTF-8 bytes" value={stats.utf8Bytes} color="text-blue-600 dark:text-blue-400" />
@@ -185,7 +185,7 @@ export function TextCounter() {
           </ul>
         </div>
 
-        <div className="border-t border-border pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div className="border-t border-border border-b border-border pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div>
             <p className="font-semibold text-sm mb-2">Text Details</p>
             <ul className="space-y-1 text-muted-foreground">

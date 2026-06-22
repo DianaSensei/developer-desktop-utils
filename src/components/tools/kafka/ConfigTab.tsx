@@ -58,7 +58,7 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter name or value…"
-          className="h-7 text-xs border-0 shadow-none focus-visible:ring-0 px-0"
+          className="h-8 text-xs border-0 shadow-none focus-visible:ring-0 px-0"
         />
         {filter && (
           <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
@@ -71,7 +71,7 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
       <div className="flex-1 overflow-y-auto min-h-0">
         {/* Sticky header */}
         <div
-          className="grid gap-4 px-4 py-2 text-xs font-semibold text-muted-foreground border-b bg-muted/20 sticky top-0"
+          className="grid gap-4 px-4 py-2 text-xs font-semibold text-muted-foreground border-b bg-muted/10 sticky top-0"
           style={{ gridTemplateColumns: '1fr 1fr' }}
         >
           <span>Name</span>
@@ -85,7 +85,7 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
             <div
               key={c.name}
               className={cn(
-                'grid gap-4 px-4 py-1.5 text-xs border-b border-border/30 hover:bg-muted/20',
+                'grid gap-4 px-4 py-1.5 text-xs border-b border-border/30 hover:bg-muted/10',
                 i % 2 === 1 && 'bg-muted/5',
               )}
               style={{ gridTemplateColumns: '1fr 1fr' }}

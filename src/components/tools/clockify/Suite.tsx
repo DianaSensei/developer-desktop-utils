@@ -57,7 +57,7 @@ function SuiteInner() {
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  'flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
                   tab === t.id ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
               >
@@ -72,7 +72,7 @@ function SuiteInner() {
         {running && tab !== 'tracker' && (
           <button
             onClick={() => setTab('tracker')}
-            className="flex shrink-0 items-center gap-1.5 rounded-md bg-red-500/10 px-2 py-1 text-xs font-medium text-red-500"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-red-500/10 px-2 py-1 text-xs font-medium text-red-500"
           >
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
             <span className="font-mono tabular-nums">{fmtTimer(now - running.start)}</span>
@@ -121,12 +121,12 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
           </Button>
         </div>
 
-        <div className="max-h-[50vh] divide-y overflow-y-auto rounded-md border">
+        <div className="max-h-[50vh] divide-y overflow-y-auto rounded-lg border">
           {projects.length === 0 && <p className="px-3 py-4 text-center text-xs text-muted-foreground">No projects yet.</p>}
           {projects.map((p) => (
             <div key={p.id} className={cn('flex items-center gap-2 px-2.5 py-2', p.archived && 'opacity-50')}>
               <ColorMenu color={p.color} onPick={(c) => updateProject(p.id, { color: c })} />
-              <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-7 flex-1 text-sm" />
+              <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-8 flex-1 text-sm" />
               <button
                 onClick={() => updateProject(p.id, { billable: !p.billable })}
                 title="Billable by default"
@@ -160,7 +160,7 @@ function ColorMenu({ color, onPick }: { color: string; onPick: (c: string) => vo
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-50 mt-1 grid w-40 grid-cols-8 gap-1 rounded-md border bg-popover p-2 shadow-lg">
+          <div className="absolute left-0 top-full z-50 mt-1 grid w-40 grid-cols-8 gap-1 rounded-lg border bg-popover p-2 shadow-lg">
             {PROJECT_COLORS.map((c) => (
               <button key={c} onClick={() => { onPick(c); setOpen(false); }} className="h-4 w-4 rounded-full" style={{ backgroundColor: c }} />
             ))}
@@ -190,7 +190,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <Toggle label="Week starts Monday" checked={settings.weekStartsMon} onChange={(v) => updateSettings({ weekStartsMon: v })} />
           <label className="flex items-center justify-between gap-3 text-xs">
             <span className="text-muted-foreground">Currency symbol</span>
-            <Input value={settings.currencySymbol} onChange={(e) => updateSettings({ currencySymbol: e.target.value.slice(0, 3) })} className="h-7 w-16 text-center text-xs" />
+            <Input value={settings.currencySymbol} onChange={(e) => updateSettings({ currencySymbol: e.target.value.slice(0, 3) })} className="h-8 w-16 text-center text-xs" />
           </label>
         </section>
 
@@ -267,7 +267,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
                 }
               }}
               placeholder="Add category…"
-              className="h-7 text-xs"
+              className="h-8 text-xs"
             />
           </div>
         </section>

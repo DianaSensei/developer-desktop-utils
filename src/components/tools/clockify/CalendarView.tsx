@@ -143,7 +143,7 @@ export function CalendarView() {
         >
           <Users className="h-4 w-4" /> Meeting
         </Button>
-        <div className="flex rounded-md border p-0.5">
+        <div className="flex rounded-lg border p-0.5">
           {(['week', 'day'] as const).map((v) => (
             <button
               key={v}

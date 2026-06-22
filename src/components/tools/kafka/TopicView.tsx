@@ -64,7 +64,7 @@ export function TopicView({
           )}
           {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
         </div>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={onRefresh}>
+        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={onRefresh}>
           <RefreshCw className="w-3 h-3" /> Refresh
         </Button>
       </div>

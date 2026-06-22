@@ -74,7 +74,7 @@ export function Schedule() {
                   return (
                     <div
                       key={a.id}
-                      className="group rounded-md border-l-2 bg-card px-1.5 py-1 text-[11px]"
+                      className="group rounded-lg border-l-2 bg-card px-1.5 py-1 text-[11px]"
                       style={{ borderLeftColor: project?.color ?? '#64748b' }}
                     >
                       <div className="flex items-center justify-between gap-1">
@@ -96,7 +96,7 @@ export function Schedule() {
                   <button
                     key={m.id}
                     onClick={() => setEditingMeetingId(m.id)}
-                    className="block w-full rounded-md border border-dashed border-indigo-400/70 bg-indigo-500/10 px-1.5 py-1 text-left text-[11px] text-indigo-700 transition-colors hover:bg-indigo-500/20 dark:text-indigo-200"
+                    className="block w-full rounded-lg border border-dashed border-indigo-400/70 bg-indigo-500/10 px-1.5 py-1 text-left text-[11px] text-indigo-700 transition-colors hover:bg-indigo-500/20 dark:text-indigo-200"
                   >
                     <div className="flex items-center gap-1 font-medium">
                       <Users className="h-3 w-3 shrink-0" />
@@ -108,13 +108,13 @@ export function Schedule() {
                 <div className="flex gap-1">
                   <button
                     onClick={() => setAddingDay(d)}
-                    className="flex flex-1 items-center justify-center gap-1 rounded-md border border-dashed py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-dashed py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     <Plus className="h-3 w-3" /> Plan
                   </button>
                   <button
                     onClick={() => addMeetingOn(d)}
-                    className="flex flex-1 items-center justify-center gap-1 rounded-md border border-dashed border-indigo-400/60 py-1 text-[10px] text-indigo-600 hover:bg-indigo-500/10 dark:text-indigo-300"
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-dashed border-indigo-400/60 py-1 text-[10px] text-indigo-600 hover:bg-indigo-500/10 dark:text-indigo-300"
                   >
                     <Users className="h-3 w-3" /> Meeting
                   </button>

@@ -29,7 +29,7 @@ export function TextDiff() {
       {/* Two input columns */}
       <div className="flex-1 min-h-0 grid grid-cols-2 divide-x overflow-hidden">
         <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 text-xs font-medium text-muted-foreground">
             Original
           </div>
           <Textarea
@@ -41,7 +41,7 @@ export function TextDiff() {
           />
         </div>
         <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 text-xs font-medium text-muted-foreground">
             Modified
           </div>
           <Textarea
@@ -56,8 +56,8 @@ export function TextDiff() {
 
       {/* Diff result panel */}
       {(text1 || text2) && (
-        <div className="shrink-0 border-t flex flex-col" style={{ maxHeight: '35%' }}>
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-xs font-medium">
+        <div className="shrink-0 border-t border-border flex flex-col" style={{ maxHeight: '35%' }}>
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between text-xs font-medium">
             <span>Diff Result</span>
             <div className="flex items-center gap-3 text-muted-foreground">
               <span className="flex items-center gap-1.5">

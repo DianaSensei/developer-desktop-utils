@@ -56,9 +56,9 @@ export function UuidGenerator() {
               </Button>
             )}
           </div>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-md p-4">
+          <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-4">
             {uuids.map((uuid, idx) => (
-              <div key={idx} className="flex items-center gap-2 p-2 hover:bg-accent rounded-md">
+              <div key={idx} className="flex items-center gap-2 p-2 hover:bg-accent rounded-lg">
                 <span className="flex-1 font-mono text-sm">{uuid}</span>
                 <Button onClick={() => copyToClipboard(uuid)} size="sm" variant="ghost">
                   <Copy className="h-4 w-4" />

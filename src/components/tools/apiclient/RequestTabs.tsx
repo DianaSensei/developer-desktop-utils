@@ -48,7 +48,7 @@ export function RequestTabs({
   const iconBtn = 'flex shrink-0 items-center px-2.5 transition-colors hover:bg-background hover:text-foreground';
 
   return (
-    <div className="flex items-stretch border-b bg-muted/20">
+    <div className="flex items-stretch border-b bg-muted/10">
       {/* tabs (scrollable) + new */}
       <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar">
         {openRequests.map((req) => {
@@ -99,7 +99,7 @@ export function RequestTabs({
           value={store.activeEnvId ?? 'none'}
           onValueChange={(v) => store.setActiveEnvId(v === 'none' ? null : v)}
         >
-          <SelectTrigger className="h-7 w-40 text-xs"><SelectValue placeholder="No Environment" /></SelectTrigger>
+          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="No Environment" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No Environment</SelectItem>
             {collectionEnvs.length > 0 && (

@@ -129,7 +129,7 @@ function Help({ text }: { text: string }) {
   return (
     <span className="group relative inline-flex align-middle">
       <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground/50 transition-colors hover:text-foreground" />
-      <span className="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden w-56 rounded-md border bg-popover p-2 text-[11px] font-normal leading-relaxed text-muted-foreground shadow-lg group-hover:block">
+      <span className="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden w-56 rounded-lg border bg-popover p-2 text-[11px] font-normal leading-relaxed text-muted-foreground shadow-lg group-hover:block">
         {text}
       </span>
     </span>
@@ -451,9 +451,9 @@ export function ColorPicker() {
 
               {/* Swatch row */}
               <span />
-              <div className="h-11 rounded-md border shadow-sm" style={{ backgroundColor: color }} title={`Selected ${color}`} />
+              <div className="h-11 rounded-lg border shadow-sm" style={{ backgroundColor: color }} title={`Selected ${color}`} />
               <div
-                className="h-11 rounded-md border shadow-sm"
+                className="h-11 rounded-lg border shadow-sm"
                 style={hoverColor ? { backgroundColor: hoverColor } : undefined}
                 title={hoverColor ? `Hovering ${hoverColor}` : 'Move over the image'}
               />
@@ -481,12 +481,12 @@ export function ColorPicker() {
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={downloadPalette}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-8 w-7 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-muted"
                   title="Download palette as PNG">
                   <Download className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={savePalette}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-8 w-7 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-muted"
                   title="Copy all hex codes">
                   {copied === 'palette' ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>

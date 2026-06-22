@@ -89,7 +89,7 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
             <p className="text-xs text-muted-foreground mt-1">Kafka broker ports only — not ZooKeeper (2181)</p>
           </div>
 
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
             <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
               Connections are <span className="font-medium">plaintext</span>. TLS/SSL and SASL

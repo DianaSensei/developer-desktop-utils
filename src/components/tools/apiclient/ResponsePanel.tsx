@@ -347,7 +347,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                     placeholder="$.store.book[*].title"
-                    className="h-7 border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-8 border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                     spellCheck={false}
                     autoFocus
                   />
@@ -434,7 +434,7 @@ function ActionsMenu({ copied, onCopy, onSave, onClear }: {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-md border bg-popover p-1 shadow-md">
+          <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-lg border bg-popover p-1 shadow-md">
             <button className={item} onClick={() => { onCopy(); setOpen(false); }}>
               {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />} Copy
             </button>
@@ -468,7 +468,7 @@ function TabOverflow({ tabs, onSelect }: { tabs: { id: Tab; label: string; badge
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-md border bg-popover p-1 shadow-md">
+          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border bg-popover p-1 shadow-md">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -565,7 +565,7 @@ function FormatDropdown({ format, onChange, preview, onPreview }: {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 w-48 rounded-md border bg-popover p-1.5 shadow-md">
+          <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border bg-popover p-1.5 shadow-md">
             <div className="flex items-center justify-between px-2 py-1.5 text-xs">
               <span>Preview</span>
               <Switch checked={preview} onCheckedChange={onPreview} aria-label="Preview" />

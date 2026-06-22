@@ -16,7 +16,7 @@ export function ConsumersTab({ consumerGroups, onSelectGroup }: ConsumersTabProp
 
   return (
     <div className="overflow-x-auto">
-      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/20 sticky top-0">
+      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/10 sticky top-0">
         <span>Group</span>
         <span className="text-right">Part</span>
         <span className="text-right">Committed</span>

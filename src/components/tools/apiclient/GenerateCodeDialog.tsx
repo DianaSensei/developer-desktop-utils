@@ -68,7 +68,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
                 key={v.id}
                 onClick={() => setVariant(v.id)}
                 className={cn(
-                  'rounded-md border px-3 py-1 text-xs font-medium transition-colors',
+                  'rounded-lg border px-3 py-1 text-xs font-medium transition-colors',
                   variant === v.id ? 'border-transparent bg-blue-500 text-white' : 'hover:bg-accent',
                 )}
               >

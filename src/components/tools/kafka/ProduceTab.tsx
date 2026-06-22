@@ -75,7 +75,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         <div className="flex items-center gap-3">
           <div>
             <Label className="text-xs">Partition</Label>
-            <div className="flex rounded-md border border-input overflow-hidden text-xs h-8 mt-1">
+            <div className="flex rounded-lg border border-input overflow-hidden text-xs h-8 mt-1">
               <button
                 className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
                 onClick={() => setPartitionMode('auto')}
@@ -138,13 +138,13 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
                 value={h.key}
                 onChange={(e) => updateHeader(i, 'key', e.target.value)}
                 placeholder="key"
-                className="h-7 text-xs font-mono flex-1"
+                className="h-8 text-xs font-mono flex-1"
               />
               <Input
                 value={h.value}
                 onChange={(e) => updateHeader(i, 'value', e.target.value)}
                 placeholder="value"
-                className="h-7 text-xs font-mono flex-[2]"
+                className="h-8 text-xs font-mono flex-[2]"
               />
               <button
                 className="text-muted-foreground hover:text-destructive px-1"
@@ -168,7 +168,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono shadow-sm resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-xs font-mono shadow-sm resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
 

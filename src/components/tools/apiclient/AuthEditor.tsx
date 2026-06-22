@@ -33,7 +33,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
     <div className="space-y-1.5">
       <Label className="text-xs">{label}</Label>
       {vars ? (
-        <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40">
+        <div className="flex h-8 items-center rounded-lg border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40">
           <VarInput value={value} onChange={onValue} vars={vars} placeholder={placeholder} />
         </div>
       ) : (
