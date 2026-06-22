@@ -48,7 +48,7 @@ function SuiteInner() {
   return (
     <div className="flex h-full flex-col">
       {/* Header: tabs + actions */}
-      <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
+      <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1.5">
         <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto no-scrollbar">
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -121,12 +121,12 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
           </Button>
         </div>
 
-        <div className="max-h-[50vh] divide-y overflow-y-auto rounded-md border">
+        <div className="max-h-[50vh] divide-y overflow-y-auto rounded-lg border border-border">
           {projects.length === 0 && <p className="px-3 py-4 text-center text-xs text-muted-foreground">No projects yet.</p>}
           {projects.map((p) => (
             <div key={p.id} className={cn('flex items-center gap-2 px-2.5 py-2', p.archived && 'opacity-50')}>
               <ColorMenu color={p.color} onPick={(c) => updateProject(p.id, { color: c })} />
-              <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-7 flex-1 text-sm" />
+              <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-8 flex-1 text-sm rounded-lg" />
               <button
                 onClick={() => updateProject(p.id, { billable: !p.billable })}
                 title="Billable by default"
@@ -160,7 +160,7 @@ function ColorMenu({ color, onPick }: { color: string; onPick: (c: string) => vo
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-50 mt-1 grid w-40 grid-cols-8 gap-1 rounded-md border bg-popover p-2 shadow-lg">
+          <div className="absolute left-0 top-full z-50 mt-1 grid w-40 grid-cols-8 gap-1 rounded-lg border border-border bg-popover p-2 shadow-lg">
             {PROJECT_COLORS.map((c) => (
               <button key={c} onClick={() => { onPick(c); setOpen(false); }} className="h-4 w-4 rounded-full" style={{ backgroundColor: c }} />
             ))}
@@ -194,7 +194,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           </label>
         </section>
 
-        <section className="space-y-2.5 border-t pt-3">
+        <section className="space-y-2.5 border-t border-border pt-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Work hours</h4>
             <span className="text-[11px] text-muted-foreground">
@@ -227,7 +227,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           </div>
         </section>
 
-        <section className="space-y-2.5 border-t pt-3">
+        <section className="space-y-2.5 border-t border-border pt-3">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pomodoro</h4>
           <Toggle label="Enable Pomodoro indicator" checked={settings.pomodoro} onChange={(v) => updateSettings({ pomodoro: v })} />
           <label className="flex items-center justify-between gap-3 text-xs">
@@ -272,7 +272,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           </div>
         </section>
 
-        <div className="flex justify-end border-t pt-3">
+        <div className="flex justify-end border-t border-border pt-3">
           <Button size="sm" onClick={onClose}>Done</Button>
         </div>
       </div>

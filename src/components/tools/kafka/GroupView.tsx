@@ -37,7 +37,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-mono font-semibold text-sm truncate">{groupId}</span>
           {data && (
@@ -49,7 +49,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
             </>
           )}
         </div>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={onRefresh}>
+        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs rounded-lg" onClick={onRefresh}>
           <RefreshCw className="w-3 h-3" /> Refresh
         </Button>
       </div>

@@ -331,7 +331,7 @@ export function LuckyWheel() {
               title="Collapse duplicate lines so each value gets one slice"
               aria-pressed={uniqueOnly}
               className={cn(
-                'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                 uniqueOnly
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -346,7 +346,7 @@ export function LuckyWheel() {
               title="Remove the winning choice from the list after each spin"
               aria-pressed={removeOnWin}
               className={cn(
-                'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                 removeOnWin
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -361,7 +361,7 @@ export function LuckyWheel() {
             <Timer className="h-3.5 w-3.5" />
             <span>Spin time</span>
             <Select value={String(spinSec)} onValueChange={(v) => setSpinSec(Number(v))}>
-              <SelectTrigger className="h-7 w-[4.5rem] text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[4.5rem] text-xs rounded-lg"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {SPIN_DURATIONS.map((s) => <SelectItem key={s} value={String(s)}>{s}s</SelectItem>)}
               </SelectContent>
@@ -386,7 +386,7 @@ export function LuckyWheel() {
             )}
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border">
-            <div className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b bg-muted/30 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+            <div className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
               <span>#</span>
               <span>Winner</span>
               <button
@@ -459,7 +459,7 @@ export function LuckyWheel() {
             {spinning && !autoLeft ? 'Spinning…' : 'Spin'}
           </Button>
 
-          <div className="flex items-center gap-1.5 rounded-md border bg-card p-1">
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1">
             <Input
               type="number"
               min={1}

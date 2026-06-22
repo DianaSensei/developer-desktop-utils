@@ -54,8 +54,8 @@ export function PropertiesTab({ details }: PropertiesTabProps) {
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 border-b pb-1">
           Partition Offsets
         </h3>
-        <div className="rounded-md border overflow-hidden">
-          <div className="grid text-xs font-medium text-muted-foreground bg-muted/30 px-3 py-2 border-b"
+        <div className="rounded-lg border border-border overflow-hidden">
+          <div className="grid text-xs font-medium text-muted-foreground bg-muted/10 px-3 py-2 border-b border-border"
             style={{ gridTemplateColumns: '3rem 1fr 1fr 1fr' }}>
             <span>ID</span>
             <span>Earliest</span>

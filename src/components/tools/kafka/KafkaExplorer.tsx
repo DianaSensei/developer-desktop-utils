@@ -27,7 +27,7 @@ export function KafkaExplorer() {
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       {/* Left panel */}
-      <div className="w-64 shrink-0 border-r flex flex-col h-full overflow-hidden">
+      <div className="w-64 shrink-0 border-r border-border flex flex-col h-full overflow-hidden">
         <LeftPanel
           selectedBrokerId={selectedBrokerId}
           onSelectBroker={setSelectedBrokerId}

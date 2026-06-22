@@ -665,16 +665,16 @@ export function NetworkTools() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* View switcher */}
-      <div className="shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar border-b px-3 py-2.5 sm:px-4">
-        <div className="inline-flex h-8 rounded-md border bg-muted/45 p-0.5">
+      <div className="shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-border px-3 py-2.5 sm:px-4">
+        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
           {VIEWS.map((v) => (
             <button
               key={v.id}
               type="button"
               onClick={() => setView(v.id)}
               className={cn(
-                'rounded px-3 text-xs font-medium transition-colors whitespace-nowrap',
-                view === v.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                'rounded-md px-3 text-xs font-medium transition-all duration-150 whitespace-nowrap',
+                view === v.id ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               {v.label}

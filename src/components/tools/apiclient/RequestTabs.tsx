@@ -48,7 +48,7 @@ export function RequestTabs({
   const iconBtn = 'flex shrink-0 items-center px-2.5 transition-colors hover:bg-background hover:text-foreground';
 
   return (
-    <div className="flex items-stretch border-b bg-muted/20">
+    <div className="flex items-stretch border-b border-border bg-muted/10">
       {/* tabs (scrollable) + new */}
       <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar">
         {openRequests.map((req) => {
@@ -68,7 +68,7 @@ export function RequestTabs({
               <button
                 onClick={(e) => { e.stopPropagation(); store.closeTab(req.id); }}
                 className={cn(
-                  'ml-1 rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground',
+                  'ml-1 rounded-md p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground',
                   active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
                 )}
                 title="Close tab"
@@ -99,7 +99,7 @@ export function RequestTabs({
           value={store.activeEnvId ?? 'none'}
           onValueChange={(v) => store.setActiveEnvId(v === 'none' ? null : v)}
         >
-          <SelectTrigger className="h-7 w-40 text-xs"><SelectValue placeholder="No Environment" /></SelectTrigger>
+          <SelectTrigger className="h-8 w-40 text-xs rounded-lg"><SelectValue placeholder="No Environment" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No Environment</SelectItem>
             {collectionEnvs.length > 0 && (
@@ -130,7 +130,7 @@ export function RequestTabs({
         <button
           onClick={onToggleDirection}
           title={direction === 'horizontal' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
-          className="rounded p-1.5 transition-colors hover:bg-background hover:text-foreground"
+          className="rounded-lg p-1.5 transition-colors hover:bg-background hover:text-foreground"
         >
           {direction === 'horizontal' ? <Rows2 className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}
         </button>
