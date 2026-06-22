@@ -37,11 +37,25 @@ const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
+/** Extract wall-clock components in `tz` via Intl — reliable across all system timezones. */
+function intlParts(date: Date, tz: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? '0');
+  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour') % 24, minute: get('minute'), second: get('second') };
+}
+
 // Minutes by which tz local time is AHEAD of UTC (positive = east of UTC)
 function tzOffsetMinutes(date: Date, tz: string): number {
-  const utcStr = date.toLocaleString('en-US', { timeZone: 'UTC' });
-  const tzStr  = date.toLocaleString('en-US', { timeZone: tz });
-  return (new Date(tzStr).getTime() - new Date(utcStr).getTime()) / 60000;
+  try {
+    const p = intlParts(date, tz);
+    const wallMs = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+    return (wallMs - date.getTime()) / 60000;
+  } catch { return 0; }
 }
 
 function getLocalTzLabel(tz: string): string {
@@ -53,11 +67,14 @@ function getLocalTzLabel(tz: string): string {
   } catch { return ''; }
 }
 
-// Format a UTC Date into wall-clock display for the given timezone
+// Format a UTC Date into wall-clock display for the given timezone.
+// Uses Intl to get correct wall-clock components, then builds a local Date
+// so date-fns format reads the right values regardless of system timezone.
 function formatInTz(date: Date, tz: string, fmt: string): string {
   try {
-    const offset = tzOffsetMinutes(date, tz);
-    return format(new Date(date.getTime() + offset * 60000), fmt);
+    const p = intlParts(date, tz);
+    // new Date(y, m, d, h, min, s) — local constructor, date-fns format reads local getters correctly
+    return format(new Date(p.year, p.month - 1, p.day, p.hour, p.minute, p.second), fmt);
   } catch { return format(date, fmt); }
 }
 
