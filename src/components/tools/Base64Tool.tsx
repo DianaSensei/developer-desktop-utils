@@ -3,7 +3,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Copy, Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code } from 'lucide-react';
+import { Copy, Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle } from 'lucide-react';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import CryptoJS from 'crypto-js';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 
 type Tab = 'encode' | 'hash' | 'encrypt';
 type EncodeMode = 'encode' | 'decode';
-type AesMode = 'encrypt' | 'decrypt';
+type CryptoMode = 'encrypt' | 'decrypt';
 
 // ─── Encoding codecs ──────────────────────────────────────────────────────────
 
@@ -350,47 +350,140 @@ const punycode = (() => {
 })();
 
 const CODECS: Codec[] = [
-  { id: 'base64', label: 'Base64', description: 'Binary-to-text encoding using 64 ASCII characters (UTF-8 safe).', encode: base64Encode, decode: base64Decode },
-  { id: 'base62', label: 'Base62', description: 'Big-integer encoding with 0-9, A-Z, a-z (no padding characters).', encode: base62Encode, decode: base62Decode },
-  { id: 'rot13',  label: 'ROT13',  description: 'Letter substitution cipher rotating by 13 places (symmetric).', encode: rot13, decode: rot13 },
-  { id: 'url',    label: 'URL Encode', description: 'Percent-encoding for use in URLs (encodeURIComponent).', encode: urlEncode, decode: urlDecode },
-  { id: 'html',   label: 'HTML Entities', description: "Escapes &, <, >, \", ' and decodes named/numeric entities.", encode: htmlEncode, decode: htmlDecode },
+  { id: 'base64',   label: 'Base64',            description: 'Binary-to-text encoding using 64 ASCII characters (UTF-8 safe).', encode: base64Encode, decode: base64Decode },
+  { id: 'base62',   label: 'Base62',            description: 'Big-integer encoding with 0-9, A-Z, a-z (no padding characters).', encode: base62Encode, decode: base62Decode },
+  { id: 'rot13',    label: 'ROT13',             description: 'Letter substitution cipher rotating by 13 places (symmetric).', encode: rot13, decode: rot13 },
+  { id: 'url',      label: 'URL Encode',        description: 'Percent-encoding for use in URLs (encodeURIComponent).', encode: urlEncode, decode: urlDecode },
+  { id: 'html',     label: 'HTML Entities',     description: "Escapes &, <, >, \", ' and decodes named/numeric entities.", encode: htmlEncode, decode: htmlDecode },
   { id: 'quoted-printable', label: 'Quoted-Printable', description: 'MIME encoding for mostly-ASCII text with =XX escapes.', encode: quotedPrintableEncode, decode: quotedPrintableDecode },
-  { id: 'huffman', label: 'Huffman Coding', description: 'Prefix-code compression; output is self-describing JSON ({ codes, bits }).', encode: huffmanEncode, decode: huffmanDecode },
-  { id: 'rle',    label: 'Run-Length Encoding', description: 'Compresses repeated runs; reversible with ~ escaping.', encode: rleEncode, decode: rleDecode },
-  { id: 'morse',  label: 'Morse Code', description: 'Dots and dashes; letters split by space, words by " / ".', encode: morseEncode, decode: morseDecode },
-  { id: 'punycode', label: 'Punycode', description: 'RFC 3492 bootstring encoding used for internationalized domains.', encode: punycode.encode, decode: punycode.decode },
-  { id: 'hex',    label: 'Hex',    description: 'Each UTF-8 byte as two hex digits, space separated.', encode: (i) => radixEncode(i, 16, 2), decode: (i) => radixDecode(i, 16) },
-  { id: 'octal',  label: 'Octal',  description: 'Each UTF-8 byte as octal, space separated.', encode: (i) => radixEncode(i, 8, 3), decode: (i) => radixDecode(i, 8) },
-  { id: 'binary', label: 'Binary', description: 'Each UTF-8 byte as 8 bits, space separated.', encode: (i) => radixEncode(i, 2, 8), decode: (i) => radixDecode(i, 2) },
-  { id: 'decimal', label: 'Decimal', description: 'Each UTF-8 byte as a decimal number, space separated.', encode: (i) => radixEncode(i, 10, 0), decode: (i) => radixDecode(i, 10) },
+  { id: 'huffman',  label: 'Huffman Coding',    description: 'Prefix-code compression; output is self-describing JSON ({ codes, bits }).', encode: huffmanEncode, decode: huffmanDecode },
+  { id: 'rle',      label: 'Run-Length Encoding', description: 'Compresses repeated runs; reversible with ~ escaping.', encode: rleEncode, decode: rleDecode },
+  { id: 'morse',    label: 'Morse Code',        description: 'Dots and dashes; letters split by space, words by " / ".', encode: morseEncode, decode: morseDecode },
+  { id: 'punycode', label: 'Punycode',          description: 'RFC 3492 bootstring encoding used for internationalized domains.', encode: punycode.encode, decode: punycode.decode },
+  { id: 'hex',      label: 'Hex',               description: 'Each UTF-8 byte as two hex digits, space separated.', encode: (i) => radixEncode(i, 16, 2), decode: (i) => radixDecode(i, 16) },
+  { id: 'octal',    label: 'Octal',             description: 'Each UTF-8 byte as octal, space separated.', encode: (i) => radixEncode(i, 8, 3), decode: (i) => radixDecode(i, 8) },
+  { id: 'binary',   label: 'Binary',            description: 'Each UTF-8 byte as 8 bits, space separated.', encode: (i) => radixEncode(i, 2, 8), decode: (i) => radixDecode(i, 2) },
+  { id: 'decimal',  label: 'Decimal',           description: 'Each UTF-8 byte as a decimal number, space separated.', encode: (i) => radixEncode(i, 10, 0), decode: (i) => radixDecode(i, 10) },
 ];
 
 // ─── Hash algorithms ──────────────────────────────────────────────────────────
 
 const ALGORITHMS = [
-  { id: 'md5',    label: 'MD5',     bits: 128, chars: 32,  desc: 'Fast · avoid for passwords, OK for checksums' },
-  { id: 'sha1',   label: 'SHA-1',   bits: 160, chars: 40,  desc: 'Legacy · not recommended for new projects' },
-  { id: 'sha256', label: 'SHA-256', bits: 256, chars: 64,  desc: 'Recommended · file integrity, tokens, APIs' },
-  { id: 'sha512', label: 'SHA-512', bits: 512, chars: 128, desc: 'Maximum strength · best security, slower' },
+  { id: 'md5',      label: 'MD5',        bits: 128, chars: 32,  desc: 'Fast · avoid for passwords, OK for checksums' },
+  { id: 'ripemd160',label: 'RIPEMD-160', bits: 160, chars: 40,  desc: 'Legacy Bitcoin hash · alternative to SHA-1' },
+  { id: 'sha1',     label: 'SHA-1',      bits: 160, chars: 40,  desc: 'Legacy · not recommended for new projects' },
+  { id: 'sha224',   label: 'SHA-224',    bits: 224, chars: 56,  desc: 'SHA-2 · compact variant, 28-byte digest' },
+  { id: 'sha256',   label: 'SHA-256',    bits: 256, chars: 64,  desc: 'Recommended · file integrity, tokens, APIs' },
+  { id: 'sha384',   label: 'SHA-384',    bits: 384, chars: 96,  desc: 'SHA-2 · truncated SHA-512, 48-byte digest' },
+  { id: 'sha512',   label: 'SHA-512',    bits: 512, chars: 128, desc: 'Maximum strength · best security, slower' },
+  { id: 'sha3-256', label: 'SHA-3/256',  bits: 256, chars: 64,  desc: 'Modern Keccak · used in Ethereum/web3' },
+  { id: 'sha3-512', label: 'SHA-3/512',  bits: 512, chars: 128, desc: 'Modern Keccak · maximum SHA-3 strength' },
 ] as const;
 
 type AlgoId = (typeof ALGORITHMS)[number]['id'];
 
+// SHA-3 uses a single-length HmacSHA3 (512-bit), which would be misleading for sha3-256.
+// Show HMAC only for algorithms with a dedicated per-length HmacXXX function.
+const HMAC_ALGORITHMS = ALGORITHMS.filter(
+  (a) => !['sha3-256', 'sha3-512'].includes(a.id)
+);
+
 function computeHash(id: AlgoId, input: string): string {
   switch (id) {
-    case 'md5':    return CryptoJS.MD5(input).toString();
-    case 'sha1':   return CryptoJS.SHA1(input).toString();
-    case 'sha256': return CryptoJS.SHA256(input).toString();
-    case 'sha512': return CryptoJS.SHA512(input).toString();
+    case 'md5':       return CryptoJS.MD5(input).toString();
+    case 'ripemd160': return CryptoJS.RIPEMD160(input).toString();
+    case 'sha1':      return CryptoJS.SHA1(input).toString();
+    case 'sha224':    return CryptoJS.SHA224(input).toString();
+    case 'sha256':    return CryptoJS.SHA256(input).toString();
+    case 'sha384':    return CryptoJS.SHA384(input).toString();
+    case 'sha512':    return CryptoJS.SHA512(input).toString();
+    case 'sha3-256':  return CryptoJS.SHA3(input, { outputLength: 256 }).toString();
+    case 'sha3-512':  return CryptoJS.SHA3(input, { outputLength: 512 }).toString();
   }
 }
+
 function computeHmac(id: AlgoId, input: string, key: string): string {
   switch (id) {
-    case 'md5':    return CryptoJS.HmacMD5(input, key).toString();
-    case 'sha1':   return CryptoJS.HmacSHA1(input, key).toString();
-    case 'sha256': return CryptoJS.HmacSHA256(input, key).toString();
-    case 'sha512': return CryptoJS.HmacSHA512(input, key).toString();
+    case 'md5':       return CryptoJS.HmacMD5(input, key).toString();
+    case 'ripemd160': return CryptoJS.HmacRIPEMD160(input, key).toString();
+    case 'sha1':      return CryptoJS.HmacSHA1(input, key).toString();
+    case 'sha224':    return CryptoJS.HmacSHA224(input, key).toString();
+    case 'sha256':    return CryptoJS.HmacSHA256(input, key).toString();
+    case 'sha384':    return CryptoJS.HmacSHA384(input, key).toString();
+    case 'sha512':    return CryptoJS.HmacSHA512(input, key).toString();
+    default:          return ''; // sha3-256, sha3-512 not rendered in HMAC section
+  }
+}
+
+// ─── Encryption algorithms ────────────────────────────────────────────────────
+
+const ENCRYPT_ALGOS = [
+  { id: 'aes-cbc',   label: 'AES-256 CBC',  desc: 'Recommended · strong symmetric encryption with random IV per message', safe: true  },
+  { id: 'aes-ctr',   label: 'AES-256 CTR',  desc: 'Stream mode · no padding needed, efficient for large data',            safe: true  },
+  { id: 'aes-ecb',   label: 'AES-256 ECB',  desc: 'Weak · identical blocks produce identical ciphertext, avoid',          safe: false },
+  { id: 'aes-cfb',   label: 'AES-256 CFB',  desc: 'Cipher feedback · stream-like, propagates errors',                    safe: true  },
+  { id: 'aes-ofb',   label: 'AES-256 OFB',  desc: 'Output feedback · stream cipher, errors do not propagate',            safe: true  },
+  { id: 'tripledes', label: 'Triple DES',   desc: 'Legacy 3DES · 112-bit effective security, widely supported',           safe: true  },
+  { id: 'rabbit',    label: 'Rabbit',       desc: 'Fast stream cipher · compact key setup, 128-bit key',                  safe: true  },
+] as const;
+
+type EncryptAlgo = (typeof ENCRYPT_ALGOS)[number]['id'];
+
+function doEncrypt(algo: EncryptAlgo, plaintext: string, key: string): string {
+  switch (algo) {
+    case 'aes-cbc':
+      return CryptoJS.AES.encrypt(plaintext, key).toString();
+    case 'aes-ctr':
+      return CryptoJS.AES.encrypt(plaintext, key, {
+        mode: CryptoJS.mode.CTR,
+        padding: CryptoJS.pad.NoPadding,
+      }).toString();
+    case 'aes-ecb':
+      return CryptoJS.AES.encrypt(plaintext, key, { mode: CryptoJS.mode.ECB }).toString();
+    case 'aes-cfb':
+      return CryptoJS.AES.encrypt(plaintext, key, { mode: CryptoJS.mode.CFB }).toString();
+    case 'aes-ofb':
+      return CryptoJS.AES.encrypt(plaintext, key, { mode: CryptoJS.mode.OFB }).toString();
+    case 'tripledes':
+      return CryptoJS.TripleDES.encrypt(plaintext, key).toString();
+    case 'rabbit':
+      return CryptoJS.Rabbit.encrypt(plaintext, key).toString();
+  }
+}
+
+function doDecrypt(algo: EncryptAlgo, ciphertext: string, key: string): string {
+  switch (algo) {
+    case 'aes-cbc': {
+      const b = CryptoJS.AES.decrypt(ciphertext, key);
+      return b.toString(CryptoJS.enc.Utf8);
+    }
+    case 'aes-ctr': {
+      const b = CryptoJS.AES.decrypt(ciphertext, key, {
+        mode: CryptoJS.mode.CTR,
+        padding: CryptoJS.pad.NoPadding,
+      });
+      return b.toString(CryptoJS.enc.Utf8);
+    }
+    case 'aes-ecb': {
+      const b = CryptoJS.AES.decrypt(ciphertext, key, { mode: CryptoJS.mode.ECB });
+      return b.toString(CryptoJS.enc.Utf8);
+    }
+    case 'aes-cfb': {
+      const b = CryptoJS.AES.decrypt(ciphertext, key, { mode: CryptoJS.mode.CFB });
+      return b.toString(CryptoJS.enc.Utf8);
+    }
+    case 'aes-ofb': {
+      const b = CryptoJS.AES.decrypt(ciphertext, key, { mode: CryptoJS.mode.OFB });
+      return b.toString(CryptoJS.enc.Utf8);
+    }
+    case 'tripledes': {
+      const b = CryptoJS.TripleDES.decrypt(ciphertext, key);
+      return b.toString(CryptoJS.enc.Utf8);
+    }
+    case 'rabbit': {
+      const b = CryptoJS.Rabbit.decrypt(ciphertext, key);
+      return b.toString(CryptoJS.enc.Utf8);
+    }
   }
 }
 
@@ -406,20 +499,21 @@ export function Base64Tool() {
   const [encodeMode, setEncodeMode] = usePersistentState<EncodeMode>('devtool:codec:mode', 'encode');
 
   // Hash tab
-  const [hashInput, setHashInput]   = usePersistentState('devtool:hash:hashInput', '');
-  const [upperHex, setUpperHex]     = usePersistentState('devtool:hash:upperHex', false);
-  const [hmacKey, setHmacKey]       = usePersistentState('devtool:hash:hmacKey', '');
+  const [hashInput, setHashInput]     = usePersistentState('devtool:hash:hashInput', '');
+  const [upperHex, setUpperHex]       = usePersistentState('devtool:hash:upperHex', false);
+  const [hmacKey, setHmacKey]         = usePersistentState('devtool:hash:hmacKey', '');
   const [showHmacKey, setShowHmacKey] = useState(false);
-  const [verifyAlgo, setVerifyAlgo] = useState<AlgoId | null>(null);
+  const [verifyAlgo, setVerifyAlgo]   = useState<AlgoId | null>(null);
   const [verifyValue, setVerifyValue] = useState('');
 
   // Encrypt tab
   const [encryptInput, setEncryptInput] = usePersistentState('devtool:hash:encryptInput', '');
   const [encryptKey, setEncryptKey]     = usePersistentState('devtool:hash:key', '');
-  const [aesMode, setAesMode]           = usePersistentState<AesMode>('devtool:hash:aesMode', 'encrypt');
+  const [cryptoMode, setCryptoMode]     = usePersistentState<CryptoMode>('devtool:hash:aesMode', 'encrypt');
+  const [encryptAlgo, setEncryptAlgo]   = usePersistentState<EncryptAlgo>('devtool:hash:encryptAlgo', 'aes-cbc');
   const [showKey, setShowKey]           = useState(false);
 
-  // Hooks (always called, enabled param controls activity)
+  // Hooks (always called; enabled param gates the listener)
   useQuickPaste(setInput,         tab === 'encode');
   useQuickPaste(setHashInput,     tab === 'hash');
   useQuickPaste(setEncryptInput,  tab === 'encrypt');
@@ -431,60 +525,67 @@ export function Base64Tool() {
   const deferredHash    = useDeferredValue(hashInput);
   const deferredEncrypt = useDeferredValue(encryptInput);
 
-  // Encode tab computation
+  // Encode computation
   const codec = useMemo(() => CODECS.find((c) => c.id === algorithm) ?? CODECS[0], [algorithm]);
   const { output: encodeOutput, error: encodeError } = useMemo(() => {
     if (!deferredInput) return { output: '', error: '' };
     try {
-      return { output: encodeMode === 'encode' ? codec.encode(deferredInput) : codec.decode(deferredInput), error: '' };
+      const result = encodeMode === 'encode' ? codec.encode(deferredInput) : codec.decode(deferredInput);
+      return { output: result, error: '' };
     } catch (err) {
       return { output: '', error: err instanceof Error ? err.message : 'Conversion failed' };
     }
   }, [deferredInput, codec, encodeMode]);
 
-  // Hash tab computation
+  // Hash computation — all 9 algorithms
   const hashes = useMemo((): Record<AlgoId, string> => {
-    if (!deferredHash) return { md5: '', sha1: '', sha256: '', sha512: '' };
-    const raw = {
-      md5:    computeHash('md5',    deferredHash),
-      sha1:   computeHash('sha1',   deferredHash),
-      sha256: computeHash('sha256', deferredHash),
-      sha512: computeHash('sha512', deferredHash),
-    };
-    return upperHex
-      ? { md5: raw.md5.toUpperCase(), sha1: raw.sha1.toUpperCase(), sha256: raw.sha256.toUpperCase(), sha512: raw.sha512.toUpperCase() }
-      : raw;
+    if (!deferredHash) {
+      return Object.fromEntries(ALGORITHMS.map((a) => [a.id, ''])) as Record<AlgoId, string>;
+    }
+    return Object.fromEntries(
+      ALGORITHMS.map(({ id }) => {
+        const v = computeHash(id, deferredHash);
+        return [id, upperHex ? v.toUpperCase() : v];
+      })
+    ) as Record<AlgoId, string>;
   }, [deferredHash, upperHex]);
 
+  // HMAC computation — only algorithms with a dedicated HmacXXX function
   const hmacs = useMemo((): Record<AlgoId, string> => {
-    if (!deferredHash || !hmacKey) return { md5: '', sha1: '', sha256: '', sha512: '' };
-    const raw = {
-      md5:    computeHmac('md5',    deferredHash, hmacKey),
-      sha1:   computeHmac('sha1',   deferredHash, hmacKey),
-      sha256: computeHmac('sha256', deferredHash, hmacKey),
-      sha512: computeHmac('sha512', deferredHash, hmacKey),
-    };
-    return upperHex
-      ? { md5: raw.md5.toUpperCase(), sha1: raw.sha1.toUpperCase(), sha256: raw.sha256.toUpperCase(), sha512: raw.sha512.toUpperCase() }
-      : raw;
+    if (!deferredHash || !hmacKey) {
+      return Object.fromEntries(ALGORITHMS.map((a) => [a.id, ''])) as Record<AlgoId, string>;
+    }
+    const computed = Object.fromEntries(
+      HMAC_ALGORITHMS.map(({ id }) => {
+        const v = computeHmac(id, deferredHash, hmacKey);
+        return [id, upperHex ? v.toUpperCase() : v];
+      })
+    );
+    return Object.fromEntries(
+      ALGORITHMS.map((a) => [a.id, computed[a.id] ?? ''])
+    ) as Record<AlgoId, string>;
   }, [deferredHash, hmacKey, upperHex]);
 
-  // Encrypt tab computation
-  const aesResult = useMemo(() => {
+  // Encrypt/decrypt computation
+  const selectedEncryptAlgo = useMemo(
+    () => ENCRYPT_ALGOS.find((a) => a.id === encryptAlgo) ?? ENCRYPT_ALGOS[0],
+    [encryptAlgo]
+  );
+
+  const cryptoResult = useMemo(() => {
     if (!deferredEncrypt || !encryptKey) return { output: '', error: '' };
     try {
-      if (aesMode === 'encrypt') {
-        return { output: CryptoJS.AES.encrypt(deferredEncrypt, encryptKey).toString(), error: '' };
+      if (cryptoMode === 'encrypt') {
+        return { output: doEncrypt(encryptAlgo, deferredEncrypt, encryptKey), error: '' };
       }
-      const bytes = CryptoJS.AES.decrypt(deferredEncrypt, encryptKey);
-      const text = bytes.toString(CryptoJS.enc.Utf8);
+      const text = doDecrypt(encryptAlgo, deferredEncrypt, encryptKey);
       return text ? { output: text, error: '' } : { output: '', error: 'Invalid key or ciphertext' };
     } catch {
       return { output: '', error: 'Decryption failed — check your key and ciphertext' };
     }
-  }, [deferredEncrypt, encryptKey, aesMode]);
+  }, [deferredEncrypt, encryptKey, cryptoMode, encryptAlgo]);
 
-  // Verify hash comparison
+  // Inline hash verification
   const verifyMatch = useMemo(() => {
     if (!verifyAlgo || !verifyValue.trim() || !hashes[verifyAlgo]) return null;
     return verifyValue.trim().toLowerCase() === hashes[verifyAlgo].toLowerCase();
@@ -503,46 +604,30 @@ export function Base64Tool() {
       {/* Top-level tab navigation */}
       <div className="shrink-0 header-premium px-4 py-2.5 flex items-center gap-3">
         <div className="inline-flex h-9 rounded-lg border border-border bg-muted/50 p-0.5">
-          <button
-            type="button"
-            onClick={() => setTab('encode')}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-md px-4 text-sm font-medium transition-all duration-150',
-              tab === 'encode' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <Code className="h-3.5 w-3.5" />
-            Encode
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('hash')}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-md px-4 text-sm font-medium transition-all duration-150',
-              tab === 'hash' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <Lock className="h-3.5 w-3.5" />
-            Hash
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('encrypt')}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-md px-4 text-sm font-medium transition-all duration-150',
-              tab === 'encrypt' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            Encrypt
-          </button>
+          {([
+            { id: 'encode',  icon: Code,           label: 'Encode'  },
+            { id: 'hash',    icon: Lock,           label: 'Hash'    },
+            { id: 'encrypt', icon: ArrowLeftRight, label: 'Encrypt' },
+          ] as const).map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-md px-4 text-sm font-medium transition-all duration-150',
+                tab === id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* ── Encode tab ───────────────────────────────────────────────────────── */}
       {tab === 'encode' && (
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* Codec toolbar */}
           <div className="shrink-0 px-4 py-2 border-b border-border bg-muted/5 flex flex-wrap items-center gap-3">
             <Select value={algorithm} onValueChange={setAlgorithm}>
               <SelectTrigger className="h-8 w-44 text-xs rounded-lg"><SelectValue /></SelectTrigger>
@@ -558,9 +643,7 @@ export function Base64Tool() {
                   onClick={() => setEncodeMode(m)}
                   className={cn(
                     'rounded-md px-3.5 text-xs font-medium capitalize transition-all duration-150',
-                    encodeMode === m
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                    encodeMode === m ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
                   {m}
@@ -570,7 +653,6 @@ export function Base64Tool() {
             <span className="text-xs text-muted-foreground truncate hidden sm:block">{codec.description}</span>
           </div>
 
-          {/* Split pane */}
           <div className="flex-1 min-h-0 grid grid-rows-2 divide-y divide-border overflow-hidden">
             <div className="flex flex-col min-h-0">
               <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
@@ -624,7 +706,7 @@ export function Base64Tool() {
             />
           </ToolSection>
 
-          {/* Results header with case toggle */}
+          {/* Results header with uppercase toggle */}
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Hash Results</p>
             <button
@@ -649,7 +731,7 @@ export function Base64Tool() {
               return (
                 <div key={id} className="rounded-lg border border-border bg-muted/20 overflow-hidden">
                   <div className="flex items-center gap-3 px-3 pt-2.5 pb-1 group">
-                    <div className="shrink-0 w-20">
+                    <div className="shrink-0 w-24">
                       <p className="text-xs font-semibold text-foreground leading-none mb-0.5">{label}</p>
                       <p className="text-[10px] text-muted-foreground">{bits}-bit</p>
                     </div>
@@ -702,7 +784,7 @@ export function Base64Tool() {
             })}
           </div>
 
-          {/* HMAC section */}
+          {/* HMAC section (7 algorithms — SHA-3 excluded, no per-length HmacSHA3) */}
           <ToolSection>
             <div className="flex items-center gap-1.5">
               <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
@@ -727,11 +809,11 @@ export function Base64Tool() {
             </div>
             {hmacKey ? (
               <div className="space-y-2">
-                {ALGORITHMS.map(({ id, label, bits, chars }) => {
+                {HMAC_ALGORITHMS.map(({ id, label, bits, chars }) => {
                   const value = hmacs[id];
                   return (
                     <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-muted/20 group">
-                      <div className="shrink-0 w-24">
+                      <div className="shrink-0 w-28">
                         <p className="text-xs font-semibold text-foreground leading-none mb-0.5">HMAC-{label}</p>
                         <p className="text-[10px] text-muted-foreground">{bits}-bit</p>
                       </div>
@@ -761,33 +843,55 @@ export function Base64Tool() {
       {tab === 'encrypt' && (
         <div className="tool-scrollable tool-padding tool-spacer">
 
-          <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30">
-            <ArrowLeftRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
-            <p className="text-xs text-blue-700 dark:text-blue-400">
-              Reversible · AES-256 ciphertext can be fully recovered with the correct key.
-            </p>
-          </div>
-
+          {/* Algorithm + mode row */}
           <div className="flex items-center gap-3 flex-wrap">
+            <Select value={encryptAlgo} onValueChange={(v) => setEncryptAlgo(v as EncryptAlgo)}>
+              <SelectTrigger className="h-8 w-44 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ENCRYPT_ALGOS.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    <span className="flex items-center gap-2">
+                      {!a.safe && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                      {a.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-              {(['encrypt', 'decrypt'] as AesMode[]).map((m) => (
+              {(['encrypt', 'decrypt'] as CryptoMode[]).map((m) => (
                 <button
                   key={m}
                   type="button"
-                  onClick={() => setAesMode(m)}
+                  onClick={() => setCryptoMode(m)}
                   className={cn(
                     'rounded-md px-3.5 text-xs font-medium capitalize transition-all duration-150',
-                    aesMode === m
-                      ? 'bg-card text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                    cryptoMode === m ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
                   {m}
                 </button>
               ))}
             </div>
-            <span className="text-xs text-muted-foreground">AES-256 · CBC</span>
           </div>
+
+          {/* Algorithm description banner */}
+          {selectedEncryptAlgo.safe ? (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30">
+              <ArrowLeftRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+              <p className="text-xs text-blue-700 dark:text-blue-400">
+                Reversible · {selectedEncryptAlgo.desc}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Insecure · ECB mode encrypts identical 16-byte blocks to the same ciphertext, leaking data patterns. Use AES-256 CBC or CTR instead.
+              </p>
+            </div>
+          )}
 
           <ToolSection>
             <ToolLabel>Encryption Key</ToolLabel>
@@ -811,32 +915,32 @@ export function Base64Tool() {
           </ToolSection>
 
           <ToolSection>
-            <ToolLabel>{aesMode === 'encrypt' ? 'Plaintext' : 'Ciphertext'}</ToolLabel>
+            <ToolLabel>{cryptoMode === 'encrypt' ? 'Plaintext' : 'Ciphertext'}</ToolLabel>
             <ToolHint>{quickPasteHint}</ToolHint>
             <Textarea
               value={encryptInput}
               onChange={(e) => setEncryptInput(e.target.value)}
-              placeholder={aesMode === 'encrypt' ? 'Enter text to encrypt…' : 'Paste base64 ciphertext to decrypt…'}
+              placeholder={cryptoMode === 'encrypt' ? 'Enter text to encrypt…' : 'Paste base64 ciphertext to decrypt…'}
               className="min-h-[100px] font-mono text-sm"
             />
           </ToolSection>
 
-          {(aesResult.output || aesResult.error) && (
+          {(cryptoResult.output || cryptoResult.error) && (
             <ToolSection>
               <div className="flex items-center justify-between">
-                <ToolLabel>{aesMode === 'encrypt' ? 'Ciphertext' : 'Plaintext'}</ToolLabel>
-                {aesResult.output && (
-                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => copyToClipboard(aesResult.output)}>
+                <ToolLabel>{cryptoMode === 'encrypt' ? 'Ciphertext' : 'Plaintext'}</ToolLabel>
+                {cryptoResult.output && (
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => copyToClipboard(cryptoResult.output)}>
                     <Copy className="h-3 w-3 mr-1" />Copy
                   </Button>
                 )}
               </div>
-              {aesResult.error ? (
+              {cryptoResult.error ? (
                 <div className="px-3 py-2.5 bg-destructive/8 border border-destructive/20 rounded-lg">
-                  <p className="text-sm text-destructive">{aesResult.error}</p>
+                  <p className="text-sm text-destructive">{cryptoResult.error}</p>
                 </div>
               ) : (
-                <Textarea value={aesResult.output} readOnly className="min-h-[80px] font-mono text-xs" />
+                <Textarea value={cryptoResult.output} readOnly className="min-h-[80px] font-mono text-xs" />
               )}
             </ToolSection>
           )}
