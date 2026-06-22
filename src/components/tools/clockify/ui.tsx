@@ -30,7 +30,7 @@ export function NumberStepper({
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const set = (v: number) => onChange(clamp(Number.isFinite(v) ? v : min));
   return (
-    <div className={cn('flex h-7 items-stretch overflow-hidden rounded-md border bg-background', className)}>
+    <div className={cn('flex h-8 items-stretch overflow-hidden rounded-lg border border-border bg-background', className)}>
       <button
         type="button"
         onClick={() => set(value - step)}
@@ -131,7 +131,7 @@ export function Modal({
         className={cn('w-full rounded-lg border bg-popover shadow-xl animate-in fade-in-0 zoom-in-95 duration-100', width)}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 className="text-sm font-semibold">{title}</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
@@ -221,7 +221,7 @@ export function Popover({
             minWidth: pos.width,
           }}
           className={cn(
-            'z-[9999] min-w-[200px] rounded-md border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
+            'z-[9999] min-w-[200px] rounded-lg border border-border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
             className
           )}
         >
@@ -350,7 +350,7 @@ export function ProjectPicker({
         <button
           onClick={toggle}
           className={cn(
-            'flex items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors hover:bg-muted',
+            'flex items-center gap-1.5 rounded-lg border border-border px-2.5 text-sm transition-colors hover:bg-muted',
             compact ? 'h-7' : 'h-9'
           )}
         >
@@ -394,7 +394,7 @@ export function ProjectPicker({
               </div>
             );
           })}
-          <div className="mt-1 flex items-center gap-1 border-t pt-1.5">
+          <div className="mt-1 flex items-center gap-1 border-t border-border pt-1.5">
             <Input
               value={creating}
               onChange={(e) => setCreating(e.target.value)}
@@ -496,7 +496,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
               <span className="truncate">{t.name}</span>
             </button>
           ))}
-          <div className="mt-1 flex items-center gap-1 border-t pt-1.5">
+          <div className="mt-1 flex items-center gap-1 border-t border-border pt-1.5">
             <Input
               value={creating}
               onChange={(e) => setCreating(e.target.value)}
@@ -528,7 +528,7 @@ export function BillableButton({ value, onChange, compact }: { value: boolean; o
       onClick={() => onChange(!value)}
       title={value ? 'Billable' : 'Non-billable'}
       className={cn(
-        'flex items-center justify-center rounded-md border transition-colors',
+        'flex items-center justify-center rounded-lg border border-border transition-colors',
         compact ? 'h-7 w-7' : 'h-9 w-9',
         value ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground hover:bg-muted'
       )}

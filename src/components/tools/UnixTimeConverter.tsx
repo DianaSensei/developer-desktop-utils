@@ -292,7 +292,7 @@ function Section({ title, icon, open, onToggle, children }: {
   title: string; icon?: React.ReactNode; open: boolean; onToggle: () => void; children: React.ReactNode;
 }) {
   return (
-    <div className="border rounded-md px-3">
+    <div className="border border-border rounded-lg px-3">
       <button
         onClick={onToggle}
         className="flex w-full items-center justify-between py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
@@ -312,7 +312,7 @@ function TzSelect({ label, value, onChange, availableTzs }: {
     <div className="flex items-center gap-2 flex-1">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="flex-1 h-7 text-xs">
+        <SelectTrigger className="flex-1 h-8 text-xs rounded-lg">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -757,7 +757,7 @@ export function DateTimeTool() {
               const duration = humanReadableDuration(aDate, bDate);
               return (
                 <div className="space-y-2">
-                  <div className="rounded-md border px-3 py-2.5 space-y-2.5">
+                  <div className="rounded-lg border border-border px-3 py-2.5 space-y-2.5">
                     {/* Timeline visual */}
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-semibold text-foreground shrink-0">From</span>
@@ -780,7 +780,7 @@ export function DateTimeTool() {
                       )}
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 border rounded-md px-3 py-1">
+                  <div className="grid grid-cols-2 gap-x-4 border border-border rounded-lg px-3 py-1">
                     {(Object.entries(diffResult) as [string, number][])
                       .filter(([, val]) => val !== 0)
                       .map(([label, val]) => (

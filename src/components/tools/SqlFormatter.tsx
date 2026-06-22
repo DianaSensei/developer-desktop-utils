@@ -412,9 +412,9 @@ function ModeTab({ active, onClick, children }: {
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded px-3 py-1 text-xs font-medium transition-colors',
+        'rounded-md px-3 text-xs font-medium transition-all duration-150',
         active
-          ? 'bg-background text-foreground shadow-sm'
+          ? 'bg-card text-foreground shadow-sm-premium'
           : 'text-muted-foreground hover:text-foreground'
       )}
     >
@@ -433,7 +433,7 @@ function ToggleChip({ active, onClick, children }: {
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors select-none',
+        'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none',
         active
           ? 'border-primary/50 bg-primary/10 text-primary'
           : 'border-input bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -567,10 +567,10 @@ export function SqlFormatter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 border-b bg-background px-4 py-2">
+      <div className="shrink-0 header-premium px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* Mode switcher */}
-          <div className="flex gap-0.5 rounded-md bg-muted p-0.5 shrink-0">
+          <div className="inline-flex h-8 gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5 shrink-0">
             <ModeTab active={mode === 'sql'}   onClick={() => handleModeChange('sql')}>SQL</ModeTab>
             <ModeTab active={mode === 'mongo'} onClick={() => handleModeChange('mongo')}>MongoDB</ModeTab>
           </div>
@@ -581,7 +581,7 @@ export function SqlFormatter() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Indent</span>
             <Select value={indentSize} onValueChange={(v) => setIndentSize(v as '2' | '4')}>
-              <SelectTrigger className="h-7 w-[88px] text-xs">
+              <SelectTrigger className="h-8 w-[88px] text-xs rounded-lg">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -617,22 +617,22 @@ export function SqlFormatter() {
       </div>
 
       {/* Action bar */}
-      <div className="shrink-0 border-t bg-background px-4 py-2 flex items-center justify-between">
+      <div className="shrink-0 border-t border-border bg-muted/10 px-4 py-2.5 flex items-center justify-between">
         <Button
           variant="ghost"
           size="sm"
           onClick={handleClear}
-          className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+          className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground rounded-lg"
         >
           <Trash2 className="h-3 w-3" />
           Clear
         </Button>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleCopy} className="h-7 gap-1.5 text-xs">
+          <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 gap-1.5 text-xs rounded-lg">
             <Copy className="h-3 w-3" />
             Copy
           </Button>
-          <Button size="sm" onClick={handleFormat} className="h-7 gap-1.5 text-xs">
+          <Button size="sm" onClick={handleFormat} className="h-8 gap-1.5 text-xs rounded-lg">
             <Wand2 className="h-3 w-3" />
             Format
           </Button>

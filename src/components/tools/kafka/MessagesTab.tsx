@@ -249,7 +249,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Panel title bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/20 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/10 shrink-0">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           Message Detail
         </span>
@@ -546,7 +546,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
     <div className="flex-1 flex flex-col min-h-0">
 
       {/* ── Toolbar ── */}
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-4 py-2.5 border-b shrink-0 bg-muted/10">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-4 py-2.5 border-b border-border shrink-0 bg-muted/10">
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Partition</Label>
           <Select value={String(partition)} onValueChange={(v) => setPartition(Number(v))}>
@@ -669,7 +669,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
       </div>
 
       {/* ── Filter bar ── */}
-      <div className="px-4 py-1.5 border-b shrink-0 flex items-center gap-2 bg-muted/5">
+      <div className="px-4 py-1.5 border-b border-border shrink-0 flex items-center gap-2 bg-muted/5">
         <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <Input
           value={keyword}
@@ -722,7 +722,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           {/* Column headers */}
           {!loading && !error && sorted.length > 0 && (
             <div
-              className="grid px-3 py-2 border-b bg-muted/20 shrink-0"
+              className="grid px-3 py-2 border-b border-border bg-muted/10 shrink-0"
               style={{ gridTemplateColumns: gridCols, gap: '0.5rem' }}
             >
               <ColHeader label="P" col="partition" align="right" {...sortProps}

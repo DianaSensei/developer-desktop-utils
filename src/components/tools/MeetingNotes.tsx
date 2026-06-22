@@ -69,7 +69,7 @@ export function MeetingNotes() {
     <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[260px_1fr]">
       {/* List pane */}
       <div className="flex min-h-0 flex-col border-r">
-        <div className="shrink-0 space-y-2 border-b p-2.5">
+        <div className="shrink-0 space-y-2 border-b border-border p-2.5">
           <Button onClick={createNew} size="sm" className="w-full gap-1.5">
             <Plus className="h-4 w-4" /> New note
           </Button>
@@ -95,7 +95,7 @@ export function MeetingNotes() {
                   key={m.id}
                   onClick={() => setSelectedId(m.id)}
                   className={cn(
-                    'group flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                    'group flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
                     selectedId === m.id ? 'bg-foreground/10' : 'hover:bg-muted',
                   )}
                 >
@@ -125,16 +125,16 @@ export function MeetingNotes() {
       {/* Detail pane — full-width editor with Edit / Markdown / Preview tabs */}
       {selected ? (
         <div className="flex min-h-0 flex-col">
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b bg-muted/10 px-4 py-2">
-            <div className="inline-flex h-8 rounded-md border bg-muted/45 p-0.5">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/10 px-4 py-2">
+            <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
               {(['edit', 'markdown', 'preview'] as ViewMode[]).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setMode(m)}
                   className={cn(
-                    'rounded px-3 text-xs font-medium capitalize transition-colors',
-                    mode === m ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                    'rounded-md px-3 text-xs font-medium capitalize transition-all duration-150',
+                    mode === m ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {m}
@@ -145,7 +145,7 @@ export function MeetingNotes() {
               <button
                 type="button"
                 onClick={copy}
-                className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? 'Copied' : 'Copy markdown'}
@@ -153,7 +153,7 @@ export function MeetingNotes() {
               <button
                 type="button"
                 onClick={() => remove(selected.id)}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
                 title="Delete note"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -177,7 +177,7 @@ export function MeetingNotes() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-col items-center justify-center gap-3 p-4 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl border bg-card">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-card">
             <NotebookPen className="h-6 w-6 text-muted-foreground/40" />
           </div>
           <p className="max-w-xs text-sm text-muted-foreground">

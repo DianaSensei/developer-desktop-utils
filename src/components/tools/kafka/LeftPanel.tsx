@@ -219,7 +219,7 @@ export function LeftPanel({
     <div className="flex flex-col h-full overflow-hidden text-sm">
 
       {/* ── Panel header ── */}
-      <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Kafka</span>
         <button
           onClick={onShowInfo}
@@ -231,11 +231,11 @@ export function LeftPanel({
       </div>
 
       {/* ── Broker section ── */}
-      <div className="px-2 pt-2 pb-2 border-b shrink-0 space-y-1.5">
+      <div className="px-2 pt-2 pb-2 border-b border-border shrink-0 space-y-1.5">
         {/* Dropdown trigger */}
         <div className="relative">
           <button
-            className="w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-md border hover:bg-muted/50 transition-colors text-left"
+            className="w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left"
             onClick={() => setShowBrokerDropdown((v) => !v)}
           >
             <span className="flex items-center gap-1.5 min-w-0">
@@ -248,7 +248,7 @@ export function LeftPanel({
           </button>
 
           {showBrokerDropdown && (
-            <div className="absolute top-full left-0 right-0 z-20 mt-0.5 bg-popover border rounded-md shadow-lg py-1">
+            <div className="absolute top-full left-0 right-0 z-20 mt-0.5 bg-popover border border-border rounded-lg shadow-lg py-1">
               {configs.length === 0 && (
                 <div className="px-3 py-2 text-xs text-muted-foreground">No brokers saved</div>
               )}
@@ -272,7 +272,7 @@ export function LeftPanel({
         {/* Broker action buttons */}
         <div className="flex gap-1">
           <button
-            className="flex-1 flex items-center justify-center gap-1 py-1 text-xs rounded-md border hover:bg-muted/50 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1 py-1 text-xs rounded-lg border border-border hover:bg-muted/50 transition-colors"
             onClick={() => { setEditConfig(null); setShowForm(true); setShowBrokerDropdown(false); }}
           >
             <Plus className="w-3 h-3" /> Add
@@ -280,7 +280,7 @@ export function LeftPanel({
           {selectedConfig && (
             <>
               <button
-                className="px-2 py-1 text-xs rounded-md border hover:bg-muted/50 transition-colors"
+                className="px-2 py-1 text-xs rounded-lg border border-border hover:bg-muted/50 transition-colors"
                 title="Edit broker"
                 onClick={() => { setEditConfig(selectedConfig); setShowForm(true); setShowBrokerDropdown(false); }}
               >
@@ -288,7 +288,7 @@ export function LeftPanel({
               </button>
               {isDisconnected ? (
                 <button
-                  className="px-2 py-1 text-xs rounded-md border hover:bg-green-500/10 text-green-600 transition-colors flex items-center gap-1"
+                  className="px-2 py-1 text-xs rounded-lg border border-border hover:bg-green-500/10 text-green-600 transition-colors flex items-center gap-1"
                   title="Reconnect"
                   onClick={handleReconnect}
                 >
@@ -296,7 +296,7 @@ export function LeftPanel({
                 </button>
               ) : (
                 <button
-                  className="px-2 py-1 text-xs rounded-md border hover:bg-muted/50 text-muted-foreground transition-colors"
+                  className="px-2 py-1 text-xs rounded-lg border border-border hover:bg-muted/50 text-muted-foreground transition-colors"
                   title="Disconnect"
                   onClick={handleDisconnect}
                 >
@@ -305,7 +305,7 @@ export function LeftPanel({
               )}
               <button
                 className={cn(
-                  'px-2 py-1 text-xs rounded-md border transition-colors flex items-center gap-1',
+                  'px-2 py-1 text-xs rounded-lg border border-border transition-colors flex items-center gap-1',
                   brokerDeleteArmed
                     ? 'bg-destructive/10 border-destructive/40 text-destructive'
                     : 'hover:bg-destructive/10 text-destructive',
@@ -327,7 +327,7 @@ export function LeftPanel({
       </div>
 
       {/* ── Topics section ── */}
-      <div className="flex flex-col border-b flex-1 min-h-0">
+      <div className="flex flex-col border-b border-border flex-1 min-h-0">
         {/* Header row */}
         <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
           <span className="text-xs font-medium text-muted-foreground">
@@ -356,7 +356,7 @@ export function LeftPanel({
 
         {/* Inline create form */}
         {showCreateTopic && (
-          <div className="mx-2 mb-1.5 p-2 border rounded-md bg-muted/20 shrink-0 space-y-2">
+          <div className="mx-2 mb-1.5 p-2 border border-border rounded-lg bg-muted/10 shrink-0 space-y-2">
             <div>
               <Label className="text-xs text-muted-foreground">Topic name</Label>
               <Input

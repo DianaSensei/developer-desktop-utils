@@ -654,39 +654,41 @@ export function Base64Tool() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 border-b bg-background px-4 py-2 flex flex-wrap items-center gap-3">
+      <div className="shrink-0 header-premium px-4 py-2.5 flex flex-wrap items-center gap-3">
         <Select value={algorithm} onValueChange={setAlgorithm}>
-          <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 w-44 text-xs rounded-lg"><SelectValue /></SelectTrigger>
           <SelectContent>
             {CODECS.map((item) => (
               <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <div className="inline-flex h-7 rounded-md border bg-muted/45 p-0.5">
+        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
           {(['encode', 'decode'] as Mode[]).map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setMode(item)}
               className={cn(
-                'rounded px-3 text-xs font-medium capitalize transition-colors',
-                mode === item ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                'rounded-md px-3.5 text-xs font-medium capitalize transition-all duration-150',
+                mode === item
+                  ? 'bg-card text-foreground shadow-sm-premium'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
               {item}
             </button>
           ))}
         </div>
-        <span className="text-xs text-muted-foreground truncate">{codec.description}</span>
+        <span className="text-xs text-muted-foreground truncate hidden sm:block">{codec.description}</span>
       </div>
 
       {/* Input / Output split */}
-      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y divide-border overflow-hidden">
         <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Input</span>
-            <span>{quickPasteHint}</span>
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Input</span>
+            <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
           </div>
           <Textarea
             value={input}
@@ -696,9 +698,9 @@ export function Base64Tool() {
           />
         </div>
         <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Output</span>
-            <Button onClick={copyOutput} size="sm" variant="ghost" disabled={!output} className="h-6 px-2 text-xs">
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Output</span>
+            <Button onClick={copyOutput} size="sm" variant="ghost" disabled={!output} className="h-6 px-2 text-xs rounded-lg">
               <Copy className="h-3 w-3 mr-1" />Copy
             </Button>
           </div>

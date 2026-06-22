@@ -243,11 +243,11 @@ function NavScrollArea({
                   to={tool.path}
                   onClick={onClose}
                   className={cn(
-                    'group flex items-center rounded-md transition-all duration-150 motion-safe:active:scale-[0.98]',
-                    isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
+                    'group flex items-center rounded-lg transition-all duration-150 motion-safe:active:scale-[0.98]',
+                    isCollapsed ? 'justify-center px-2.5 py-2.5' : 'gap-2.5 px-2.5 py-2.5',
                     isActive
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      ? 'bg-primary text-primary-foreground shadow-sm-premium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 hover:shadow-sm-premium'
                   )}
                 >
                   <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-150 motion-safe:group-hover:scale-110" />
@@ -358,14 +358,14 @@ function Sidebar({
       )}
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-full bg-sidebar border-r transition-all duration-300 ease-in-out flex flex-col',
+          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-premium transition-all duration-300 ease-in-out flex flex-col',
           isCollapsed ? 'w-14' : 'w-56',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
         {/* Header */}
         <div className={cn(
-          'flex shrink-0 items-center border-b',
+          'flex shrink-0 items-center border-b border-border',
           isCollapsed ? 'justify-center py-3 px-2' : 'justify-between px-3 py-3'
         )}>
           {isCollapsed ? (
@@ -438,8 +438,8 @@ function Sidebar({
             onClick={onToggleCollapse}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
-              'group relative hidden lg:flex w-full items-center rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted',
-              isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2'
+              'group relative hidden lg:flex w-full items-center rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+              isCollapsed ? 'justify-center px-2.5 py-2.5' : 'gap-2.5 px-2.5 py-2.5'
             )}
           >
             {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronLeft className="h-4 w-4 shrink-0" />}
@@ -456,8 +456,8 @@ function Sidebar({
             onClick={onToggleDark}
             title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             className={cn(
-              'group relative flex w-full items-center rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted',
-              isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2'
+              'group relative flex w-full items-center rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+              isCollapsed ? 'justify-center px-2.5 py-2.5' : 'gap-2.5 px-2.5 py-2.5'
             )}
           >
             {isDark ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
@@ -479,11 +479,11 @@ function Sidebar({
             onClick={onClose}
             title="Settings"
             className={cn(
-              'group relative flex items-center rounded-md transition-colors',
-              isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
+              'group relative flex items-center rounded-lg transition-colors',
+              isCollapsed ? 'justify-center px-2.5 py-2.5' : 'gap-2.5 px-2.5 py-2.5',
               isSettingsActive
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                ? 'bg-primary text-primary-foreground shadow-sm-premium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 hover:shadow-sm-premium'
             )}
           >
             <span className="relative shrink-0">
@@ -572,28 +572,28 @@ function AppContent() {
         onToggleCollapse={toggleCollapse}
       />
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="z-30 border-b bg-background shrink-0">
-          <div className="flex items-center justify-between px-3 py-2.5 sm:px-4">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
+        <div className="z-30 header-premium shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-2.5">
+              <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setSidebarOpen(true)}>
                 <Menu className="h-4 w-4" />
               </Button>
               <div
                 key={activeTool.path}
-                className="flex h-8 w-8 items-center justify-center rounded-md border bg-card motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card shadow-sm-premium motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
               >
                 <ActiveIcon className="h-4 w-4 text-primary" />
               </div>
               <div key={`${activeTool.path}-label`} className="min-w-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-left-1 motion-safe:duration-200">
-                <h2 className="text-sm font-semibold leading-none">{activeTool.label}</h2>
+                <h2 className="text-sm font-semibold leading-none text-foreground">{activeTool.label}</h2>
                 {activeTool.description && (
-                  <p className="mt-1 hidden max-w-xl truncate text-[11px] text-muted-foreground sm:block">
+                  <p className="mt-1 hidden max-w-xl truncate text-xs text-muted-foreground sm:block">
                     {activeTool.description}
                   </p>
                 )}
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="lg:hidden" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
+            <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
           </div>

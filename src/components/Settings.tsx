@@ -231,7 +231,7 @@ export function Settings() {
             {!allEnabled && (
               <button
                 onClick={enableAll}
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 <CheckCheck className="h-3 w-3 shrink-0" />
                 Enable all
@@ -240,7 +240,7 @@ export function Settings() {
             {!allDisabled && (
               <button
                 onClick={disableAll}
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 <Ban className="h-3 w-3 shrink-0" />
                 Disable all
@@ -248,7 +248,7 @@ export function Settings() {
             )}
             <button
               onClick={resetToDefaults}
-              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <RotateCcw className="h-3 w-3 shrink-0" />
               Reset
@@ -306,7 +306,7 @@ export function Settings() {
                   className={cn(
                     'flex items-center gap-3 px-3 py-3 cursor-default bg-background',
                     !enabled && 'opacity-50',
-                    isDragging && 'relative z-20 rounded-md bg-muted opacity-100 shadow-lg ring-1 ring-primary/50'
+                    isDragging && 'relative z-20 rounded-lg bg-muted opacity-100 shadow-lg ring-1 ring-primary/50'
                   )}
                 >
                   {/* Drag handle — hidden while searching */}
@@ -403,7 +403,7 @@ export function Settings() {
               <div className="flex items-center gap-2">
                 {autoCheckEnabled && (
                   <Select value={String(checkHour)} onValueChange={(v) => setCheckHour(Number(v))}>
-                    <SelectTrigger className="h-7 w-28 text-xs">
+                    <SelectTrigger className="h-8 w-28 text-xs rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -484,14 +484,14 @@ export function Settings() {
                   <>
                     <button
                       onClick={openUpdateDialog}
-                      className="flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
                       <Sparkles className="h-3 w-3" />
                       What's new
                     </button>
                     <button
                       onClick={installUpdate}
-                      className="flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-2 py-1 text-[10px] font-medium hover:bg-primary/90 transition-colors"
+                      className="flex items-center gap-1 rounded-lg bg-primary text-primary-foreground px-2 py-1 text-[10px] font-medium hover:bg-primary/90 transition-colors"
                     >
                       <Download className="h-3 w-3" />
                       Install
@@ -564,7 +564,7 @@ export function Settings() {
           if (!fields.length) return null;
           return (
             <div key={sec} className="rounded-lg border divide-y">
-              <div className="bg-muted/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="bg-muted/10 border-b border-border px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {SECTION_LABELS[sec]}
               </div>
               {fields.map((f) => (
@@ -584,7 +584,7 @@ export function Settings() {
                         const v = e.target.value;
                         if (v !== '') setField(f, Number(v));
                       }}
-                      className="h-7 w-24 text-center text-xs"
+                      className="h-8 w-24 text-center text-xs rounded-lg"
                     />
                     {f.unit && <span className="w-5 text-[11px] text-muted-foreground">{f.unit}</span>}
                   </div>

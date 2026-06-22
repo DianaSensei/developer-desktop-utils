@@ -30,7 +30,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
 
   return (
     <div className="px-3 py-2.5">
-      <div className="flex items-center overflow-hidden rounded-md border bg-background shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-2 focus-within:ring-ring/40">
+      <div className="flex items-center overflow-hidden rounded-lg border border-border bg-background shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-2 focus-within:ring-ring/40">
         {/* Method selector — tinted to match the active HTTP method (Bruno-style) */}
         <Select value={request.method} onValueChange={(v) => onChange({ method: v as ApiRequest['method'] })}>
           <SelectTrigger
@@ -68,14 +68,14 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         <button
           onClick={onGenerateCode}
           title="Generate Code"
-          className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Code2 className="h-4 w-4" />
         </button>
 
         {/* Send / Cancel */}
         {sending ? (
-          <Button variant="destructive" size="sm" onClick={onCancel} className="m-1 h-7 gap-1.5">
+          <Button variant="destructive" size="sm" onClick={onCancel} className="m-1 h-8 gap-1.5 rounded-lg">
             <X className="h-3.5 w-3.5" /> Cancel
           </Button>
         ) : (
@@ -83,7 +83,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
             size="sm"
             onClick={onSend}
             disabled={!request.url.trim()}
-            className="m-1 h-7 gap-1.5 bg-amber-400 text-neutral-900 shadow-sm hover:bg-amber-500 active:scale-[0.97] transition-transform"
+            className="m-1 h-8 gap-1.5 rounded-lg bg-amber-400 text-neutral-900 shadow-sm hover:bg-amber-500 active:scale-[0.97] transition-transform"
           >
             <Send className="h-3.5 w-3.5" /> Send
           </Button>

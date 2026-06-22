@@ -278,7 +278,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* header: tabs left, format/status/actions pinned right */}
-      <div ref={headerRef} className="relative flex items-center border-b px-3">
+      <div ref={headerRef} className="relative flex items-center border-b border-border px-3">
         {/* hidden row used only to measure intrinsic tab widths */}
         <div aria-hidden className="pointer-events-none invisible absolute left-0 top-0 flex items-center gap-4">
           {tabDefs.map((t) => (
@@ -322,7 +322,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 border-b bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div className="flex items-start gap-2 border-b border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span className="break-words">{error}</span>
         </div>
@@ -341,7 +341,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
               )}
               <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} />
               {showFilter && kind === 'json' && (
-                <div className="flex shrink-0 items-center gap-2 border-t px-3 py-1.5">
+                <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5">
                   <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <Input
                     value={filter}
@@ -434,7 +434,7 @@ function ActionsMenu({ copied, onCopy, onSave, onClear }: {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-md border bg-popover p-1 shadow-md">
+          <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-lg border border-border bg-popover p-1 shadow-md">
             <button className={item} onClick={() => { onCopy(); setOpen(false); }}>
               {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />} Copy
             </button>
@@ -468,7 +468,7 @@ function TabOverflow({ tabs, onSelect }: { tabs: { id: Tab; label: string; badge
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-md border bg-popover p-1 shadow-md">
+          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-popover p-1 shadow-md">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -557,7 +557,7 @@ function FormatDropdown({ format, onChange, preview, onPreview }: {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+        className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
       >
         <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
@@ -565,14 +565,14 @@ function FormatDropdown({ format, onChange, preview, onPreview }: {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 w-48 rounded-md border bg-popover p-1.5 shadow-md">
+          <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-border bg-popover p-1.5 shadow-md">
             <div className="flex items-center justify-between px-2 py-1.5 text-xs">
               <span>Preview</span>
               <Switch checked={preview} onCheckedChange={onPreview} aria-label="Preview" />
             </div>
-            <div className="my-1 border-t" />
+            <div className="my-1 border-t border-border" />
             {SYNTAX_FORMATS.map((f) => <Row key={f} id={f} />)}
-            <div className="my-1 border-t" />
+            <div className="my-1 border-t border-border" />
             {ENCODING_FORMATS.map((f) => <Row key={f} id={f} />)}
           </div>
         </>

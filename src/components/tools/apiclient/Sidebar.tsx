@@ -151,7 +151,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   return (
     <div className="flex h-full w-full flex-col">
       {/* header */}
-      <div className="flex items-center justify-between gap-1 border-b px-3 py-2">
+      <div className="flex items-center justify-between gap-1 border-b border-border px-3 py-2">
         <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
           <Boxes className="h-3.5 w-3.5" /> Collections
         </div>
@@ -174,8 +174,8 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       </div>
 
       {/* search */}
-      <div className="border-b px-2 py-1.5">
-        <div className="flex items-center gap-1.5 rounded-md border bg-background px-2">
+      <div className="border-b border-border px-2 py-1.5">
+        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2">
           <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <Input
             ref={searchInputRef}
@@ -188,7 +188,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       </div>
 
       {error && (
-        <div className="border-b bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">{error}</div>
+        <div className="border-b border-destructive/20 bg-destructive/8 px-3 py-1.5 text-[11px] text-destructive">{error}</div>
       )}
 
       {/* tree */}
@@ -471,7 +471,7 @@ function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries
   return (
     <>
       <div className="fixed inset-0 z-[60]" onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }} />
-      <div className="fixed z-[61] rounded-md border bg-popover p-1 shadow-lg" style={{ left, top, width }}>
+      <div className="fixed z-[61] rounded-lg border border-border bg-popover p-1 shadow-lg" style={{ left, top, width }}>
         {entries.map((en, i) => (
           <div key={i}>
             {en.sep && i > 0 && <div className="my-1 border-t" />}
@@ -497,7 +497,7 @@ function Menu({ children, onClose }: { children: React.ReactNode; onClose: () =>
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-0 z-50 mt-1 w-44 rounded-md border bg-popover p-1 shadow-md">{children}</div>
+      <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-border bg-popover p-1 shadow-md">{children}</div>
     </>
   );
 }
