@@ -21,6 +21,7 @@ import {
   NotebookPen,
   Disc3,
   Send,
+  ShieldCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -187,6 +188,13 @@ export const TOOL_DEFS: ToolDef[] = [
     description:
       "Postman/Bruno-style HTTP workbench: collections, environments with {{vars}}, auth, pre/post-request scripts, tests & assertions, and Postman collection import/export.",
   },
+  {
+    id: "2fa",
+    label: "2FA Authenticator",
+    icon: ShieldCheck,
+    description:
+      "Generate TOTP and HOTP one-time passwords supporting SHA-1/256/512, 6/8 digits, and 30/60-second periods.",
+  },
 ];
 
 export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
@@ -217,4 +225,5 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "lucky-wheel",
   "network",
   "kafka-explorer",
+  "2fa",
 ];

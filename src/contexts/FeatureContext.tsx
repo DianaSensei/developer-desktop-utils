@@ -41,6 +41,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'network': false,
   'meeting-notes': false,
   'lucky-wheel': false,
+  '2fa': true,
   'settings': true,
 };
 
