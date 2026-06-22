@@ -40,8 +40,8 @@ function ModeTab({ active, onClick, children }: { active: boolean; onClick: () =
     <button
       onClick={onClick}
       className={cn(
-        'rounded px-3 py-1 text-xs font-medium transition-colors',
-        active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+        'rounded-md px-3 text-xs font-medium transition-all duration-150',
+        active ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground'
       )}
     >
       {children}
@@ -64,7 +64,7 @@ function ResultList({ items }: { items: string[] }) {
           </button>
         )}
       </div>
-      <div className="max-h-72 overflow-y-auto rounded-md border divide-y">
+      <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y">
         {items.map((v, i) => (
           <div key={i} className="flex items-center gap-2 px-3 py-1.5 group hover:bg-muted/40 transition-colors">
             <span className="flex-1 font-mono text-xs break-all">{v}</span>
@@ -130,8 +130,8 @@ export function GeneratorTool() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 border-b bg-background px-4 py-2 flex items-center gap-3">
-        <div className="flex rounded-md border p-0.5 gap-0.5">
+      <div className="shrink-0 header-premium px-4 py-2.5 flex items-center gap-3">
+        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5 gap-0.5">
           <ModeTab active={mode === 'uuid'}   onClick={() => setMode('uuid')}>UUID</ModeTab>
           <ModeTab active={mode === 'number'} onClick={() => setMode('number')}>Number</ModeTab>
           <ModeTab active={mode === 'text'}   onClick={() => setMode('text')}>Text</ModeTab>
@@ -142,7 +142,7 @@ export function GeneratorTool() {
             <span className="text-xs text-muted-foreground">Count</span>
             <Input type="number" min={1} max={100} value={count}
               onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 100))}
-              className="h-7 text-xs w-20" />
+              className="h-8 text-xs w-20 rounded-lg" />
           </div>
         )}
 
@@ -150,19 +150,19 @@ export function GeneratorTool() {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Min</span>
-              <Input type="number" value={numMin} onChange={(e) => setNumMin(parseFloat(e.target.value) || 0)} className="h-7 text-xs w-20" />
+              <Input type="number" value={numMin} onChange={(e) => setNumMin(parseFloat(e.target.value) || 0)} className="h-8 text-xs w-20 rounded-lg" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Max</span>
-              <Input type="number" value={numMax} onChange={(e) => setNumMax(parseFloat(e.target.value) || 0)} className="h-7 text-xs w-20" />
+              <Input type="number" value={numMax} onChange={(e) => setNumMax(parseFloat(e.target.value) || 0)} className="h-8 text-xs w-20 rounded-lg" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Decimals</span>
-              <Input type="number" min={0} max={10} value={decimals} onChange={(e) => setDecimals(clamp(parseInt(e.target.value) || 0, 0, 10))} className="h-7 text-xs w-16" />
+              <Input type="number" min={0} max={10} value={decimals} onChange={(e) => setDecimals(clamp(parseInt(e.target.value) || 0, 0, 10))} className="h-8 text-xs w-16 rounded-lg" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Count</span>
-              <Input type="number" min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxNumberCount))} className="h-7 text-xs w-20" />
+              <Input type="number" min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxNumberCount))} className="h-8 text-xs w-20 rounded-lg" />
             </div>
           </div>
         )}
@@ -171,28 +171,28 @@ export function GeneratorTool() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Length</span>
-              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, maxTextLength))} className="h-7 text-xs w-20" />
+              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, maxTextLength))} className="h-8 text-xs w-20 rounded-lg" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Count</span>
-              <Input type="number" min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxTextCount))} className="h-7 text-xs w-20" />
+              <Input type="number" min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxTextCount))} className="h-8 text-xs w-20 rounded-lg" />
             </div>
             <div className="flex gap-1.5">
               {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
                 <button key={k} onClick={() => toggleCharset(k)}
-                  className={cn('rounded border px-2 py-0.5 text-xs font-medium transition-colors',
+                  className={cn('rounded-lg border px-2 py-0.5 text-xs font-medium transition-colors',
                     charsets[k] ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground hover:text-foreground')}>
                   {k === 'lower' ? 'a–z' : k === 'upper' ? 'A–Z' : k === 'digits' ? '0–9' : '!@#'}
                 </button>
               ))}
             </div>
-            <Input value={customChars} onChange={(e) => setCustomChars(e.target.value)} placeholder="Custom chars" className="h-7 text-xs w-28 font-mono" />
+            <Input value={customChars} onChange={(e) => setCustomChars(e.target.value)} placeholder="Custom chars" className="h-8 text-xs w-28 font-mono rounded-lg" />
           </div>
         )}
 
         <button
           onClick={handleGenerate}
-          className="ml-auto flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+          className="ml-auto flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
         >
           <RefreshCw className="h-3 w-3" />Generate
         </button>

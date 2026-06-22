@@ -375,7 +375,7 @@ function QrGenerator() {
   };
 
   const chip = (active: boolean) =>
-    cn('rounded border text-xs font-medium transition-colors cursor-pointer select-none',
+    cn('rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none',
       active
         ? 'border-primary bg-primary text-primary-foreground'
         : 'border-border bg-background hover:border-primary/60 hover:bg-muted/50');
@@ -621,7 +621,7 @@ export function QRCodeTool() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-4 space-y-4">
-        <div className="inline-flex h-8 rounded-md border bg-muted/45 p-0.5">
+        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
           {([
             { id: 'generate' as QrMode, label: 'Generate', Icon: QrCodeIcon },
             { id: 'read' as QrMode, label: 'Read', Icon: ScanLine },
@@ -631,8 +631,8 @@ export function QRCodeTool() {
               type="button"
               onClick={() => setMode(id)}
               className={cn(
-                'flex items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors',
-                mode === id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                'flex items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-all duration-150',
+                mode === id ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               <Icon className="h-3.5 w-3.5" />

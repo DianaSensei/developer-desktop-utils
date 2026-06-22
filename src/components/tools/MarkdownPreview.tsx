@@ -39,7 +39,7 @@ export function MarkdownPreview() {
     <div className="grid grid-cols-2 h-full divide-x overflow-hidden">
       {/* Editor */}
       <div className="flex flex-col min-h-0">
-        <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
+        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 text-xs font-medium text-muted-foreground">
           Markdown — {quickPasteHint}
         </div>
         <Textarea
@@ -52,7 +52,7 @@ export function MarkdownPreview() {
 
       {/* Preview */}
       <div className="flex flex-col min-h-0">
-        <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
+        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 text-xs font-medium text-muted-foreground">
           Preview
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-4 prose dark:prose-invert prose-sm max-w-none">

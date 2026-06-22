@@ -422,11 +422,11 @@ export function ArrayDeduplicator() {
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* ── Toolbar ── */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border">
-        <div className="flex items-center p-0.5 rounded-md bg-muted gap-0.5">
+        <div className="inline-flex h-8 items-center p-0.5 rounded-lg border border-border bg-muted/50 gap-0.5">
           <Button
             variant={mode === 'preserve' ? 'default' : 'ghost'}
             size="sm"
-            className="h-7 px-3 text-xs"
+            className="h-7 px-3 text-xs rounded-md"
             onClick={() => setMode('preserve')}
           >
             Preserve Order
@@ -434,7 +434,7 @@ export function ArrayDeduplicator() {
           <Button
             variant={mode === 'sort' ? 'default' : 'ghost'}
             size="sm"
-            className="h-7 px-3 text-xs"
+            className="h-7 px-3 text-xs rounded-md"
             onClick={() => setMode('sort')}
           >
             Sort

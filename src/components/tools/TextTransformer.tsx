@@ -114,10 +114,10 @@ export function TextTransformer() {
   return (
     <div className="flex flex-col h-full">
       {/* Options toolbar */}
-      <div className="shrink-0 border-b bg-background px-4 py-2">
+      <div className="shrink-0 header-premium px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-3">
           <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
-            <SelectTrigger className="h-7 w-52 text-xs">
+            <SelectTrigger className="h-8 w-52 text-xs rounded-lg">
               <SelectValue placeholder="Select transform" />
             </SelectTrigger>
             <SelectContent>
@@ -134,7 +134,7 @@ export function TextTransformer() {
                 size="sm"
                 variant={removeLineWhitespace ? 'default' : 'outline'}
                 onClick={() => setRemoveLineWhitespace((v) => !v)}
-                className="h-7 text-xs"
+                className="h-8 text-xs rounded-lg"
               >
                 Remove whitespace between lines
               </Button>
@@ -144,7 +144,7 @@ export function TextTransformer() {
                   value={removeChars}
                   onChange={(e) => setRemoveChars(e.target.value)}
                   placeholder="e.g. ,.;!?"
-                  className="h-7 w-32 font-mono text-xs"
+                  className="h-8 w-32 font-mono text-xs rounded-lg"
                 />
               </div>
             </>
@@ -157,7 +157,7 @@ export function TextTransformer() {
                 value={delimiters}
                 onChange={(e) => setDelimiters(e.target.value)}
                 placeholder=",;"
-                className="h-7 w-24 font-mono text-xs"
+                className="h-8 w-24 font-mono text-xs rounded-lg"
               />
             </div>
           )}
@@ -165,12 +165,12 @@ export function TextTransformer() {
       </div>
 
       {/* Input / Output — each half of remaining height */}
-      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y divide-border overflow-hidden">
         {/* Input */}
         <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-xs font-medium text-muted-foreground">
-            <span>Input</span>
-            <span>{quickPasteHint}</span>
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Input</span>
+            <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
           </div>
           <Textarea
             value={input}
@@ -182,14 +182,14 @@ export function TextTransformer() {
 
         {/* Output */}
         <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-xs font-medium text-muted-foreground">
-            <span>Output</span>
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Output</span>
             <Button
               onClick={() => copyToClipboard(output)}
               size="sm"
               variant="ghost"
               disabled={!output}
-              className="h-6 px-2 text-xs"
+              className="h-6 px-2 text-xs rounded-lg"
             >
               <Copy className="h-3 w-3 mr-1" />
               Copy

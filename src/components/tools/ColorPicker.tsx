@@ -362,7 +362,7 @@ export function ColorPicker() {
       <button
         onClick={() => copy(id, value.c)}
         title={`Click to copy ${value.c}`}
-        className="group flex w-full min-w-0 items-center gap-1 rounded px-1.5 py-1 text-left font-mono text-xs transition-colors hover:bg-muted"
+        className="group flex w-full min-w-0 items-center gap-1 rounded-lg px-1.5 py-1 text-left font-mono text-xs transition-colors hover:bg-muted"
       >
         <span className="min-w-0 flex-1 truncate">{value.d}</span>
         {copied === id
@@ -451,7 +451,7 @@ export function ColorPicker() {
 
               {/* Swatch row */}
               <span />
-              <div className="h-11 rounded-md border shadow-sm" style={{ backgroundColor: color }} title={`Selected ${color}`} />
+              <div className="h-11 rounded-lg border border-border shadow-sm" style={{ backgroundColor: color }} title={`Selected ${color}`} />
               <div
                 className="h-11 rounded-md border shadow-sm"
                 style={hoverColor ? { backgroundColor: hoverColor } : undefined}
@@ -481,12 +481,12 @@ export function ColorPicker() {
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={downloadPalette}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted"
                   title="Download palette as PNG">
                   <Download className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={savePalette}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted"
                   title="Copy all hex codes">
                   {copied === 'palette' ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>

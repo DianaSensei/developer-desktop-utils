@@ -31,10 +31,10 @@ export function JwtDebugger() {
   return (
     <div className="flex flex-col h-full">
       {/* Token input — fixed height */}
-      <div className="shrink-0 border-b flex flex-col" style={{ height: '160px' }}>
-        <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>JWT Token</span>
-          <span>{quickPasteHint}</span>
+      <div className="shrink-0 border-b border-border flex flex-col" style={{ height: '160px' }}>
+        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">JWT Token</span>
+          <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
         </div>
         <Textarea
           value={token}
@@ -45,31 +45,40 @@ export function JwtDebugger() {
       </div>
 
       {/* Decoded output — scrollable */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
         {decoded.error ? (
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-            <p className="text-sm text-red-900 dark:text-red-300">{decoded.error}</p>
+          <div className="p-3.5 bg-destructive/8 border border-destructive/20 rounded-lg">
+            <p className="text-sm text-destructive">{decoded.error}</p>
           </div>
         ) : decoded.header ? (
           <>
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-blue-600 dark:text-blue-400">Header</div>
-              <Textarea value={decoded.header} readOnly className="min-h-[100px] font-mono text-sm bg-blue-50 dark:bg-blue-950/20" />
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Header</div>
+              <Textarea
+                value={decoded.header}
+                readOnly
+                className="min-h-[100px] font-mono text-sm bg-blue-50/70 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-900/40 rounded-lg focus-visible:ring-blue-500/20"
+              />
             </div>
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-purple-600 dark:text-purple-400">Payload</div>
-              <Textarea value={decoded.payload} readOnly className="min-h-[180px] font-mono text-sm bg-purple-50 dark:bg-purple-950/20" />
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Payload</div>
+              <Textarea
+                value={decoded.payload}
+                readOnly
+                className="min-h-[180px] font-mono text-sm bg-purple-50/70 dark:bg-purple-950/20 border-purple-200/50 dark:border-purple-900/40 rounded-lg focus-visible:ring-purple-500/20"
+              />
             </div>
-            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <p className="text-xs text-yellow-900 dark:text-yellow-300">
-                This tool only decodes the token — it does not verify the signature.
+            <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/40 rounded-lg">
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                <span className="font-semibold">Note:</span> This tool only decodes the token — it does not verify the signature.
               </p>
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground gap-3 pt-12">
-            <Shield className="h-12 w-12 text-muted-foreground/30" />
-            <p className="text-sm">Paste a JWT token to decode it</p>
+            <Shield className="h-12 w-12 text-muted-foreground/25" />
+            <p className="text-sm font-medium">Paste a JWT token to decode it</p>
+            <p className="text-xs text-muted-foreground/70">Supports HS256, RS256, ES256 and more</p>
           </div>
         )}
       </div>

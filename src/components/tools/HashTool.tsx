@@ -87,7 +87,7 @@ export function HashTool() {
         </div>
 
         {/* AES section */}
-        <div className="border-t pt-5 space-y-3">
+        <div className="border-t border-border pt-5 space-y-3">
           <h3 className="text-sm font-semibold text-foreground">AES Encryption</h3>
           <ToolSection>
             <ToolLabel>Encryption Key</ToolLabel>
@@ -100,8 +100,8 @@ export function HashTool() {
             />
           </ToolSection>
           <div className="flex gap-2">
-            <Button variant={aesMode === 'encrypt' ? 'default' : 'outline'} className="flex-1 h-8 text-xs" onClick={() => setAesMode('encrypt')}>Encrypt</Button>
-            <Button variant={aesMode === 'decrypt' ? 'default' : 'outline'} className="flex-1 h-8 text-xs" onClick={() => setAesMode('decrypt')}>Decrypt</Button>
+            <Button variant={aesMode === 'encrypt' ? 'default' : 'outline'} className="flex-1 h-8 text-xs rounded-lg" onClick={() => setAesMode('encrypt')}>Encrypt</Button>
+            <Button variant={aesMode === 'decrypt' ? 'default' : 'outline'} className="flex-1 h-8 text-xs rounded-lg" onClick={() => setAesMode('decrypt')}>Decrypt</Button>
           </div>
           {aesResult && (
             <ToolSection>
