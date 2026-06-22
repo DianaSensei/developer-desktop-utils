@@ -339,12 +339,13 @@ const jsLangWithMongo = [
 
 const editorTheme = EditorView.theme({
   '&': {
-    height: '100%',
+    flex: '1 1 0',
+    minHeight: '0',
     fontSize: '13px',
     fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
   },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { overflow: 'auto' },
+  '.cm-scroller': { overflow: 'auto', minHeight: '0' },
   '.cm-content': { caretColor: 'hsl(var(--foreground))', padding: '10px 0' },
   '.cm-gutters': {
     backgroundColor: 'hsl(var(--muted) / 0.4)',
@@ -608,10 +609,10 @@ export function SqlFormatter() {
       </div>
 
       {/* Editor — fills remaining height */}
-      <div className="flex-1 min-h-0">
+      <div className="flex flex-col flex-1 min-h-0">
         <div
           ref={containerRef}
-          className="h-full [&_.cm-editor]:h-full [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
+          className="flex flex-col flex-1 min-h-0 [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
         />
       </div>
 

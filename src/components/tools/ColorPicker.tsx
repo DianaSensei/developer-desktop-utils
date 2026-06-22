@@ -5,6 +5,7 @@ import {
   Copy, Check, Pipette, Image as ImageIcon, Download, SlidersHorizontal, HelpCircle, ArrowLeftRight,
 } from 'lucide-react';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { copyToClipboard } from '@/lib/clipboard';
 
 // ---------------------------------------------------------------------------
@@ -139,6 +140,13 @@ export function ColorPicker() {
   const [color, setColor] = usePersistentState('devtool:colorPicker:color', '#2596be');
   const [imageSrc, setImageSrc] = useState<string>('');
   const [palette, setPalette] = useState<string[]>([]);
+
+  useQuickPaste((text) => {
+    const trimmed = text.trim();
+    if (/^#?([0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{4}|[0-9a-f]{3})$/i.test(trimmed)) {
+      setColor(trimmed.startsWith('#') ? trimmed : `#${trimmed}`);
+    }
+  });
   const [hoverColor, setHoverColor] = useState<string | null>(null);
   const [loupe, setLoupe] = useState<{ x: number; y: number } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);

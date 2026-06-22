@@ -5,7 +5,9 @@
       "Skill(claude-api)",
       "Skill(claude-api:*)",
       "Bash(npx tsc *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Skill(code-review)",
+      "Skill(code-review:*)"
     ]
   }
 }

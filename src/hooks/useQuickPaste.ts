@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-const isMac =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+export const isMac =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 export const quickPasteHint = isMac ? 'Press ⌘V to paste' : 'Press Ctrl+V to paste';
 

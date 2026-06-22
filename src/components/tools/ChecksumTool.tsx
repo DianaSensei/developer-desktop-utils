@@ -43,6 +43,9 @@ export function ChecksumTool() {
 
   useEffect(() => { algoRef.current = algo; }, [algo]);
 
+  // Terminate any in-progress web worker when the component unmounts.
+  useEffect(() => () => { workerRef.current?.terminate(); }, []);
+
   // ─── Tauri: listen for window-level file drop events ────────────────────────
   useEffect(() => {
     if (!isTauri) return;

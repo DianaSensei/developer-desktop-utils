@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useQuickPaste } from '@/hooks/useQuickPaste';
+import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 
 const COMMON_PATTERNS = [
@@ -95,7 +95,7 @@ export function RegexTester() {
       {/* Test string — fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col min-h-0">
         <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 text-xs font-medium text-muted-foreground">
-          Test String — Press ⌘V to paste
+          Test String — {quickPasteHint}
         </div>
         <Textarea
           value={testString}

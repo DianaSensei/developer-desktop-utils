@@ -6,7 +6,7 @@
 //    a per-request pass/fail list, and a drill-in showing the exact request and
 //    response for any run.
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, GripVertical,
   ListChecks, Loader2, Play, RotateCcw, Settings2, X,
@@ -108,34 +108,43 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
   const iters = dataFile ? dataFile.rows.length : Math.max(1, Number(iterations) || 1);
   const delayMs = Math.max(0, Number(delay) || 0);
 
+  const cancelledRef = useRef(false);
+  useEffect(() => () => { cancelledRef.current = true; }, []);
+
   const runOne = async (req: ApiRequest, iter: number, dataVars?: VarMap) => {
     const key = keyOf(iter, req.id);
     try {
       const r = await runRequest(req, dataVars);
+      if (cancelledRef.current) return;
       const passed = r.tests.filter((t) => t.passed).length;
       const row: RowResult = { status: r.response?.status ?? 0, ms: r.response?.timeMs ?? 0, passed, total: r.tests.length, error: r.error };
       setResults((m) => ({ ...m, [key]: row }));
       setDetails((m) => ({ ...m, [key]: { request: req, result: r, dataVars } }));
     } catch (e) {
-      setResults((m) => ({ ...m, [key]: { status: 0, ms: 0, passed: 0, total: 0, error: (e as Error).message } }));
+      if (!cancelledRef.current) {
+        setResults((m) => ({ ...m, [key]: { status: 0, ms: 0, passed: 0, total: 0, error: (e as Error).message } }));
+      }
     }
   };
 
   const run = async () => {
+    cancelledRef.current = false;
     setRunning(true); resetRun(); setPhase('results');
     for (let i = 0; i < iters; i++) {
+      if (cancelledRef.current) break;
       const dataVars = dataFile ? dataFile.rows[i] : undefined;
       if (parallel) {
         await Promise.all(effective.map((req) => runOne(req, i, dataVars)));
       } else {
         for (const req of effective) {
+          if (cancelledRef.current) break;
           setCurrentKey(keyOf(i, req.id));
           await runOne(req, i, dataVars);
           if (delayMs > 0) await sleep(delayMs);
         }
       }
     }
-    setRanIters(iters); setCurrentKey(null); setRunning(false);
+    if (!cancelledRef.current) { setRanIters(iters); setCurrentKey(null); setRunning(false); }
   };
 
   const loadData = async () => {

@@ -60,6 +60,9 @@ export function ApiClient() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Drag the divider between the collections sidebar and the workbench.
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => { resizeCleanupRef.current?.(); }, []);
+
   const startSidebarResize = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -71,12 +74,23 @@ export function ApiClient() {
       setResizing(false);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      resizeCleanupRef.current = null;
+    };
+    resizeCleanupRef.current = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
   }, [sidebarWidth, setSidebarWidth]);
   // Session-scoped runtime variables (bru.setVar), cleared on app restart.
   const runtimeVarsRef = useRef<VarMap>({});
+
+  // Abort all in-flight requests when the component unmounts.
+  useEffect(() => () => {
+    abortRefs.current.forEach((ctrl) => ctrl.abort());
+    abortRefs.current.clear();
+  }, []);
 
   // Migrate the previously-persisted active request into a tab on first load.
   useEffect(() => {
@@ -185,8 +199,10 @@ export function ApiClient() {
       } else if (e.key.toLowerCase() === 'e') {
         e.preventDefault(); setEnvOpen(true);
       } else if (e.key.toLowerCase() === 'w') {
-        // Close the focused request tab (don't close the desktop window).
-        if (req) { e.preventDefault(); s.closeTab(req.id); }
+        // Always prevent the OS window-close shortcut (⌘W on macOS closes the window
+        // when not intercepted). Close the active tab if one is open.
+        e.preventDefault();
+        if (req) s.closeTab(req.id);
       }
     };
     window.addEventListener('keydown', onKey);

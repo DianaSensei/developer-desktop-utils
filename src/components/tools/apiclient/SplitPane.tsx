@@ -2,7 +2,7 @@
 // panes are laid out along: 'horizontal' = side by side, 'vertical' = stacked.
 // The first pane's size is a percentage, clamped to a sane range while dragging.
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -46,6 +46,36 @@ export function SplitPane({
     window.removeEventListener('pointerup', stop);
   }, [onPointerMove]);
 
+  // Remove any dangling listeners if the component unmounts while dragging.
+  useEffect(() => () => {
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', stop);
+  }, [onPointerMove, stop]);
+
+  // Reclamp percent when the container is resized (e.g. window resize) so the
+  // second pane is never squeezed to zero by the flexShrink:0 first pane.
+  // rAF-throttled so macOS ProMotion (120Hz) continuous resize doesn't cause
+  // ~120 state updates/second and layout thrashing.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let rafId = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const rect = el.getBoundingClientRect();
+        const size = horizontal ? rect.width : rect.height;
+        if (size <= 0) return;
+        const pxFloor = (minPanePx / size) * 100;
+        const lo = Math.max(minPercent, pxFloor);
+        const hi = Math.min(maxPercent, 100 - pxFloor);
+        setPercent((p) => (lo > hi ? 50 : Math.min(hi, Math.max(lo, p))));
+      });
+    });
+    ro.observe(el);
+    return () => { ro.disconnect(); cancelAnimationFrame(rafId); };
+  }, [horizontal, minPercent, maxPercent, minPanePx]);
+
   const start = useCallback(() => {
     setDragging(true);
     window.addEventListener('pointermove', onPointerMove);
@@ -54,7 +84,7 @@ export function SplitPane({
 
   return (
     <div ref={containerRef} className={cn('flex min-h-0 min-w-0 flex-1', horizontal ? 'flex-row' : 'flex-col')}>
-      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden" style={{ flexBasis: `${percent}%` }}>
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden" style={{ flexBasis: `${percent}%`, flexShrink: 0 }}>
         {first}
       </div>
       <div

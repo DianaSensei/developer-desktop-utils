@@ -260,6 +260,36 @@ The app runs on three different WebView engines: WKWebView (macOS), WebView2/Chr
 
 The `no-scrollbar` utility class is defined in `@layer utilities` in `globals.css`. It sets `scrollbar-width: none` (Firefox) and `::-webkit-scrollbar { display: none }` (WebKit). Do not re-implement this inline.
 
+### CodeMirror 6 in flex layouts
+CodeMirror 6's internal structure is:
+```
+.cm-editor   (display: flex; flex-direction: column)
+  .cm-scroller (display: flex; flex-direction: row — gutter left, content right)
+    .cm-gutters
+    .cm-content
+```
+`height: 100%` on `.cm-editor` only works when the parent has an **explicit pixel height**. In flex chains where the parent uses `flex: 1` (no explicit height), `height: 100%` resolves to `0` on Windows WebView2/Chromium — this causes the gutter and content to stack vertically instead of side-by-side.
+
+**Always use the flex approach instead:**
+```ts
+// In EditorView.theme()
+'&': { flex: '1 1 0', minHeight: '0', ... },  // NOT height: '100%'
+'.cm-scroller': { overflow: 'auto', minHeight: '0' },  // min-height:0 required
+```
+
+**Container divs** that hold CodeMirror must also be flex:
+```tsx
+// The div that CodeMirror mounts into
+<div ref={containerRef} className="flex flex-col flex-1 min-h-0 overflow-hidden" />
+
+// Any intermediate wrapper between a flex parent and the CodeMirror container
+<div className="flex flex-col flex-1 min-h-0">
+  <CodeEditor ... />
+</div>
+```
+
+CodeMirror components in this repo that implement this pattern: `CodeEditor.tsx`, `ResponseViewer.tsx`, `SqlFormatter.tsx`.
+
 ### JavaScript / Browser APIs
 - **Do not use `navigator.platform`** — deprecated and unreliable on Windows/Chromium. Use `navigator.userAgent` instead:
   ```ts

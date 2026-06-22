@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,8 @@ export function MeetingNotes() {
   const [query, setQuery] = useState('');
   const [mode, setMode] = usePersistentState<ViewMode>('devtool:meeting:mode', 'edit');
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   const sorted = useMemo(
     () => [...meetings].sort((a, b) => b.start - a.start),
@@ -54,7 +56,8 @@ export function MeetingNotes() {
   const copy = async () => {
     await copyToClipboard(markdown);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 1400);
   };
 
   const remove = (id: string) => {

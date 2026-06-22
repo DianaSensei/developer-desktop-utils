@@ -1,7 +1,7 @@
 // "Generate Code" modal (Bruno-style): pick a language + variant, optionally
 // interpolate {{vars}}, preview the snippet, and copy it.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -23,6 +23,8 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
   const [variant, setVariant] = useState('curl');
   const [interpolate, setInterpolate] = useState(true);
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   const target = CODE_TARGETS.find((t) => t.lang === lang) ?? CODE_TARGETS[0];
 
@@ -40,7 +42,8 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
   const copy = async () => {
     await copyToClipboard(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 1200);
   };
 
   return (

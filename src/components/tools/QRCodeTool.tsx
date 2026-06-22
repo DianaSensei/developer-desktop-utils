@@ -323,6 +323,8 @@ function QrGenerator() {
   const [error,   setError]   = useState('');
   const [copied,  setCopied]  = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   useQuickPaste(setText);
   useInputHistory(text, setText);
@@ -367,7 +369,8 @@ function QrGenerator() {
       );
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       setCopied(true);
-      setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
     } catch { setError('Image clipboard not supported — use Download instead'); }
   };
 
@@ -504,6 +507,8 @@ function QrReader() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   const run = async (img: HTMLImageElement, dataUrl: string) => {
     setLoading(true); setError(''); setResult(''); setImageUrl(dataUrl);
@@ -546,7 +551,8 @@ function QrReader() {
   const copy = async () => {
     await copyToClipboard(result);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 1400);
   };
 
   const isUrl = /^https?:\/\//i.test(result.trim());
