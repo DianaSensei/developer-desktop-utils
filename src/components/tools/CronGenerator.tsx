@@ -10,7 +10,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { copyToClipboard } from '@/lib/clipboard';
 
-type CronMode = 'linux' | 'quartz';
+type CronMode = 'linux' | 'quartz' | 'spring';
 type FieldKey = 'seconds' | 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek' | 'year';
 
 interface CronFields {
@@ -119,6 +119,44 @@ const QUARTZ_RULES: FieldRule[] = [
   { key: 'year', label: 'Year', range: 'optional', min: 1970, max: 2099, optional: true },
 ];
 
+const SPRING_DAY_ALIASES = {
+  SUN: 0,
+  MON: 1,
+  TUE: 2,
+  WED: 3,
+  THU: 4,
+  FRI: 5,
+  SAT: 6,
+};
+
+const SPRING_RULES: FieldRule[] = [
+  { key: 'seconds', label: 'Seconds', range: '0-59', min: 0, max: 59 },
+  { key: 'minute', label: 'Minute', range: '0-59', min: 0, max: 59 },
+  { key: 'hour', label: 'Hour', range: '0-23', min: 0, max: 23 },
+  {
+    key: 'dayOfMonth',
+    label: 'Day of Month',
+    range: '1-31, ?, L, W',
+    min: 1,
+    max: 31,
+    allowQuestion: true,
+    allowLast: true,
+    allowWeekday: true,
+  },
+  { key: 'month', label: 'Month', range: '1-12 or JAN-DEC', min: 1, max: 12, aliases: MONTH_ALIASES },
+  {
+    key: 'dayOfWeek',
+    label: 'Day of Week',
+    range: '0-7, SUN-SAT, ?, L, #',
+    min: 0,
+    max: 7,
+    aliases: SPRING_DAY_ALIASES,
+    allowQuestion: true,
+    allowLast: true,
+    allowNth: true,
+  },
+];
+
 const SUGGESTIONS: Record<CronMode, Partial<Record<FieldKey, Array<{ label: string; value: string }>>>> = {
   linux: {
     minute: [
@@ -191,6 +229,44 @@ const SUGGESTIONS: Record<CronMode, Partial<Record<FieldKey, Array<{ label: stri
       { label: 'This year', value: new Date().getFullYear().toString() },
     ],
   },
+  spring: {
+    seconds: [
+      { label: 'At second 0', value: '0' },
+      { label: 'Every second', value: '*' },
+      { label: 'Every 30 seconds', value: '*/30' },
+    ],
+    minute: [
+      { label: 'Every minute', value: '*' },
+      { label: 'Every 5 minutes', value: '*/5' },
+      { label: 'At minute 0', value: '0' },
+      { label: 'At minute 30', value: '30' },
+    ],
+    hour: [
+      { label: 'Every hour', value: '*' },
+      { label: 'Midnight', value: '0' },
+      { label: '9 AM', value: '9' },
+      { label: 'Business hours', value: '9-17' },
+    ],
+    dayOfMonth: [
+      { label: 'No specific day', value: '?' },
+      { label: 'Every day', value: '*' },
+      { label: 'Last day', value: 'L' },
+      { label: 'Nearest weekday to 15th', value: '15W' },
+    ],
+    month: [
+      { label: 'Every month', value: '*' },
+      { label: 'January', value: 'JAN' },
+      { label: 'First quarter', value: 'JAN-MAR' },
+    ],
+    dayOfWeek: [
+      { label: 'No specific day', value: '?' },
+      { label: 'Sunday', value: 'SUN' },
+      { label: 'Monday', value: 'MON' },
+      { label: 'Weekdays', value: 'MON-FRI' },
+      { label: 'Second Monday', value: 'MON#2' },
+      { label: 'Last Friday', value: 'FRIL' },
+    ],
+  },
 };
 
 const PRESETS = {
@@ -208,6 +284,13 @@ const PRESETS = {
     { label: 'Daily midnight', value: '0 0 0 ? * *' },
     { label: 'Monday 9 AM', value: '0 0 9 ? * MON' },
   ],
+  spring: [
+    { label: 'Every minute', value: '0 * * ? * *' },
+    { label: 'Every 5 minutes', value: '0 */5 * ? * *' },
+    { label: 'Hourly', value: '0 0 * ? * *' },
+    { label: 'Daily midnight', value: '0 0 0 ? * *' },
+    { label: 'Monday 9 AM', value: '0 0 9 ? * MON' },
+  ],
 };
 
 function normalizeExpression(value: string) {
@@ -215,7 +298,9 @@ function normalizeExpression(value: string) {
 }
 
 function getRules(mode: CronMode) {
-  return mode === 'linux' ? LINUX_RULES : QUARTZ_RULES;
+  if (mode === 'linux') return LINUX_RULES;
+  if (mode === 'spring') return SPRING_RULES;
+  return QUARTZ_RULES;
 }
 
 function expressionFromFields(mode: CronMode, fields: CronFields) {
@@ -248,7 +333,12 @@ function fieldsFromExpression(mode: CronMode, expression: string) {
 function inferMode(expression: string, fallback: CronMode): CronMode {
   const count = normalizeExpression(expression).split(' ').filter(Boolean).length;
   if (count === 5) return 'linux';
-  if (count === 6 || count === 7) return 'quartz';
+  if (count === 6) {
+    // Spring uses 0-7 for day of week, Quartz uses 1-7
+    // If it looks like it uses 0-6 range or SUN-SAT aliases, it's likely Spring
+    return 'spring';
+  }
+  if (count === 7) return 'quartz';
   return fallback;
 }
 
@@ -319,6 +409,9 @@ function modeRuleTooltip(mode: CronMode) {
   if (mode === 'linux') {
     return 'Linux cron uses 5 fields: minute, hour, day of month, month, day of week. Use *, values, ranges, lists, and steps like */5.';
   }
+  if (mode === 'spring') {
+    return 'Spring @Scheduled uses 6 fields: second, minute, hour, day of month, month, day of week. Use ? in either day field, plus L, W, and # where supported. Day of week: 0-7 (0 and 7 = Sunday).';
+  }
 
   return 'Quartz cron uses 6 fields plus optional year: second, minute, hour, day of month, month, day of week, year. Use ? in either day field, plus L, W, and # where supported.';
 }
@@ -335,11 +428,12 @@ function validateExpression(mode: CronMode, expression: string) {
   }
 
   if (parts.length !== rules.length) {
-    errors.push(
-      mode === 'linux'
-        ? 'Linux cron must have 5 fields: minute hour day-of-month month day-of-week.'
-        : 'Quartz cron must have 6 fields, or 7 fields when year is included.'
-    );
+    const fieldCountMsg = mode === 'linux'
+      ? 'Linux cron must have 5 fields: minute hour day-of-month month day-of-week.'
+      : mode === 'spring'
+        ? 'Spring @Scheduled must have 6 fields: second minute hour day-of-month month day-of-week.'
+        : 'Quartz cron must have 6 fields, or 7 fields when year is included.';
+    errors.push(fieldCountMsg);
     return { normalized, fields: null, errors, warnings };
   }
 
@@ -354,11 +448,12 @@ function validateExpression(mode: CronMode, expression: string) {
     errors.push(...validateField(fields[rule.key], rule));
   });
 
-  if (mode === 'quartz') {
+  if (mode === 'quartz' || mode === 'spring') {
     const dom = fields.dayOfMonth;
     const dow = fields.dayOfWeek;
     if (dom !== '?' && dow !== '?') {
-      warnings.push('Quartz usually uses ? in either day-of-month or day-of-week to avoid conflicting schedules.');
+      const prefix = mode === 'spring' ? 'Spring' : 'Quartz';
+      warnings.push(`${prefix} usually uses ? in either day-of-month or day-of-week to avoid conflicting schedules.`);
     }
   }
 
@@ -397,7 +492,7 @@ function explainExpression(mode: CronMode, fields: CronFields | null, errors: st
     }
   }
 
-  if (mode === 'quartz') {
+  if (mode === 'quartz' || mode === 'spring') {
     if (secondStep && fields.minute === '*' && fields.hour === '*' && fields.dayOfMonth === '?' && fields.month === '*' && fields.dayOfWeek === '*') {
       return `Every ${secondStep[1]} seconds.`;
     }
@@ -456,11 +551,18 @@ export function CronGenerator() {
             dayOfWeek: fields.dayOfWeek.replace(/\?/g, '*') || '*',
             year: '',
           }
-        : {
-            ...fields,
-            seconds: fields.seconds || '0',
-            dayOfMonth: fields.dayOfMonth === '*' && fields.dayOfWeek === '*' ? '?' : fields.dayOfMonth,
-          };
+        : nextMode === 'spring'
+          ? {
+              ...fields,
+              seconds: fields.seconds || '0',
+              dayOfMonth: fields.dayOfMonth === '*' && fields.dayOfWeek === '*' ? '?' : fields.dayOfMonth,
+              year: '',
+            }
+          : {
+              ...fields,
+              seconds: fields.seconds || '0',
+              dayOfMonth: fields.dayOfMonth === '*' && fields.dayOfWeek === '*' ? '?' : fields.dayOfMonth,
+            };
 
     setMode(nextMode);
     setFields(nextFields);
@@ -507,7 +609,7 @@ export function CronGenerator() {
       {/* Toolbar */}
       <div className="shrink-0 border-b border-border bg-background px-4 py-2 flex items-center gap-3">
         <div className="inline-flex rounded-lg border bg-muted/45 p-0.5">
-          {(['linux', 'quartz'] as CronMode[]).map((item) => (
+          {(['linux', 'quartz', 'spring'] as CronMode[]).map((item) => (
             <button
               key={item}
               type="button"
@@ -550,12 +652,12 @@ export function CronGenerator() {
               value={expression}
               onChange={(event) => updateExpression(event.target.value)}
               placeholder={mode === 'linux' ? '*/5 * * * *' : '0 */5 * ? * *'}
-              className="font-mono"
+              className="font-mono h-8 rounded-lg border-b border-border"
             />
-            <Button onClick={copyCronToClipboard} size="icon" variant="outline" title="Copy expression">
+            <Button onClick={copyCronToClipboard} size="sm" variant="outline" title="Copy expression" className="h-8 px-2">
               <Copy className="h-4 w-4" />
             </Button>
-            <Button onClick={reset} size="icon" variant="ghost" title="Reset">
+            <Button onClick={reset} size="sm" variant="ghost" title="Reset" className="h-8 px-2">
               <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
@@ -619,7 +721,7 @@ export function CronGenerator() {
           <Label>Presets</Label>
           <div className="flex flex-wrap gap-1.5">
             {PRESETS[mode].map((preset) => (
-              <Button key={preset.value} variant="outline" size="sm" onClick={() => applyPreset(preset.value)}>
+              <Button key={preset.value} variant="outline" size="sm" onClick={() => applyPreset(preset.value)} className="h-8 text-xs">
                 {preset.label}
               </Button>
             ))}
@@ -640,7 +742,13 @@ export function CronGenerator() {
             ) : (
               <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
             )}
-            <span>{analysis.errors.length > 0 ? 'Invalid expression' : `Valid ${mode} cron`}</span>
+            <span>
+              {analysis.errors.length > 0
+                ? 'Invalid expression'
+                : mode === 'spring'
+                  ? 'Valid Spring @Scheduled'
+                  : `Valid ${mode} cron`}
+            </span>
           </div>
           <p className="text-sm text-foreground">{explanation}</p>
           {analysis.errors.map((error) => (
