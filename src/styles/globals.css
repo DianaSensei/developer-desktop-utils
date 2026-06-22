@@ -322,17 +322,35 @@
 
   /* Success state styling */
   .success-state {
-    @apply border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300;
+    border-color: rgb(134 239 172 / 0.5);
+    background-color: rgb(240 253 244 / 1);
+    color: rgb(22 163 74);
+  }
+
+  .dark .success-state {
+    border-color: rgb(20 83 56 / 1);
+    background-color: rgb(6 78 59 / 0.3);
+    color: rgb(134 239 172);
   }
 
   /* Error state styling */
   .error-state {
-    @apply border-destructive/20 bg-destructive/8 text-destructive;
+    border-color: hsl(var(--destructive) / 0.2);
+    background-color: hsl(var(--destructive) / 0.08);
+    color: hsl(var(--destructive));
   }
 
   /* Warning state styling */
   .warning-state {
-    @apply border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-600;
+    border-color: rgb(253 224 71 / 0.5);
+    background-color: rgb(254 252 232 / 1);
+    color: rgb(180 83 9);
+  }
+
+  .dark .warning-state {
+    border-color: rgb(113 63 18 / 1);
+    background-color: rgb(120 53 15 / 0.3);
+    color: rgb(202 138 4);
   }
 
   /* Highlight effect — for search results, highlights */
@@ -459,5 +477,24 @@
   /* Variant: active background highlight */
   .bg-active-highlight {
     @apply bg-primary/5 dark:bg-primary/10;
+  }
+
+  /* ── Premium Shadow System ─────────────────────────────────────────
+     Elevated shadows for active states and lifted controls */
+
+  .shadow-xs-premium {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .shadow-sm-premium {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+
+  .shadow-md-premium {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .shadow-lg-premium {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   }
 }

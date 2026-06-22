@@ -1,6 +1,5 @@
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { ReactNode } from 'react';
 
 interface EmptyStateProps {
   icon: React.ComponentType<any>;
