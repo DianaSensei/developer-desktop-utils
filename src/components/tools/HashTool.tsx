@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Copy, Eye, EyeOff, Lock, ArrowLeftRight } from 'lucide-react';
+import { Copy, Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound } from 'lucide-react';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import CryptoJS from 'crypto-js';
 import { cn } from '@/lib/utils';
@@ -15,10 +15,10 @@ type Tab = 'hash' | 'encrypt';
 type AesMode = 'encrypt' | 'decrypt';
 
 const ALGORITHMS = [
-  { id: 'md5',    label: 'MD5',     bits: 128, chars: 32 },
-  { id: 'sha1',   label: 'SHA-1',   bits: 160, chars: 40 },
-  { id: 'sha256', label: 'SHA-256', bits: 256, chars: 64 },
-  { id: 'sha512', label: 'SHA-512', bits: 512, chars: 128 },
+  { id: 'md5',    label: 'MD5',     bits: 128, chars: 32,  desc: 'Fast · avoid for passwords, OK for checksums' },
+  { id: 'sha1',   label: 'SHA-1',   bits: 160, chars: 40,  desc: 'Legacy · not recommended for new projects' },
+  { id: 'sha256', label: 'SHA-256', bits: 256, chars: 64,  desc: 'Recommended · file integrity, tokens, APIs' },
+  { id: 'sha512', label: 'SHA-512', bits: 512, chars: 128, desc: 'Maximum strength · best security, slower' },
 ] as const;
 
 type AlgoId = (typeof ALGORITHMS)[number]['id'];
@@ -32,13 +32,27 @@ function computeHash(id: AlgoId, input: string): string {
   }
 }
 
+function computeHmac(id: AlgoId, input: string, key: string): string {
+  switch (id) {
+    case 'md5':    return CryptoJS.HmacMD5(input, key).toString();
+    case 'sha1':   return CryptoJS.HmacSHA1(input, key).toString();
+    case 'sha256': return CryptoJS.HmacSHA256(input, key).toString();
+    case 'sha512': return CryptoJS.HmacSHA512(input, key).toString();
+  }
+}
+
 export function HashTool() {
   const [tab, setTab] = usePersistentState<Tab>('devtool:hash:tab', 'hash');
   const [hashInput, setHashInput] = usePersistentState('devtool:hash:hashInput', '');
   const [encryptInput, setEncryptInput] = usePersistentState('devtool:hash:encryptInput', '');
   const [encryptKey, setEncryptKey] = usePersistentState('devtool:hash:key', '');
   const [aesMode, setAesMode] = usePersistentState<AesMode>('devtool:hash:aesMode', 'encrypt');
+  const [upperHex, setUpperHex] = usePersistentState('devtool:hash:upperHex', false);
+  const [hmacKey, setHmacKey] = usePersistentState('devtool:hash:hmacKey', '');
   const [showKey, setShowKey] = useState(false);
+  const [showHmacKey, setShowHmacKey] = useState(false);
+  const [verifyAlgo, setVerifyAlgo] = useState<AlgoId | null>(null);
+  const [verifyValue, setVerifyValue] = useState('');
 
   useQuickPaste(setHashInput, tab === 'hash');
   useQuickPaste(setEncryptInput, tab === 'encrypt');
@@ -50,13 +64,29 @@ export function HashTool() {
 
   const hashes = useMemo((): Record<AlgoId, string> => {
     if (!deferredHash) return { md5: '', sha1: '', sha256: '', sha512: '' };
-    return {
+    const raw = {
       md5:    computeHash('md5',    deferredHash),
       sha1:   computeHash('sha1',   deferredHash),
       sha256: computeHash('sha256', deferredHash),
       sha512: computeHash('sha512', deferredHash),
     };
-  }, [deferredHash]);
+    return upperHex
+      ? { md5: raw.md5.toUpperCase(), sha1: raw.sha1.toUpperCase(), sha256: raw.sha256.toUpperCase(), sha512: raw.sha512.toUpperCase() }
+      : raw;
+  }, [deferredHash, upperHex]);
+
+  const hmacs = useMemo((): Record<AlgoId, string> => {
+    if (!deferredHash || !hmacKey) return { md5: '', sha1: '', sha256: '', sha512: '' };
+    const raw = {
+      md5:    computeHmac('md5',    deferredHash, hmacKey),
+      sha1:   computeHmac('sha1',   deferredHash, hmacKey),
+      sha256: computeHmac('sha256', deferredHash, hmacKey),
+      sha512: computeHmac('sha512', deferredHash, hmacKey),
+    };
+    return upperHex
+      ? { md5: raw.md5.toUpperCase(), sha1: raw.sha1.toUpperCase(), sha256: raw.sha256.toUpperCase(), sha512: raw.sha512.toUpperCase() }
+      : raw;
+  }, [deferredHash, hmacKey, upperHex]);
 
   const aesResult = useMemo(() => {
     if (!deferredEncrypt || !encryptKey) return { output: '', error: '' };
@@ -71,6 +101,21 @@ export function HashTool() {
       return { output: '', error: 'Decryption failed — check your key and ciphertext' };
     }
   }, [deferredEncrypt, encryptKey, aesMode]);
+
+  const verifyMatch = useMemo(() => {
+    if (!verifyAlgo || !verifyValue.trim() || !hashes[verifyAlgo]) return null;
+    return verifyValue.trim().toLowerCase() === hashes[verifyAlgo].toLowerCase();
+  }, [verifyAlgo, verifyValue, hashes]);
+
+  const toggleVerify = (id: AlgoId) => {
+    if (verifyAlgo === id) {
+      setVerifyAlgo(null);
+      setVerifyValue('');
+    } else {
+      setVerifyAlgo(id);
+      setVerifyValue('');
+    }
+  };
 
   return (
     <div className="tool-full-height">
@@ -123,34 +168,163 @@ export function HashTool() {
               />
             </ToolSection>
 
+            {/* Results header with case toggle */}
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Hash Results</p>
+              <button
+                type="button"
+                onClick={() => setUpperHex((v) => !v)}
+                title={upperHex ? 'Switch to lowercase' : 'Switch to uppercase'}
+                className={cn(
+                  'text-[11px] font-mono px-2 py-0.5 rounded border transition-colors',
+                  upperHex
+                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:border-border/80'
+                )}
+              >
+                {upperHex ? 'ABC' : 'abc'}
+              </button>
+            </div>
+
             <div className="space-y-2">
-              {ALGORITHMS.map(({ id, label, bits, chars }) => {
+              {ALGORITHMS.map(({ id, label, bits, chars, desc }) => {
                 const value = hashes[id];
+                const isVerifying = verifyAlgo === id;
                 return (
-                  <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-muted/20 group">
-                    <div className="shrink-0 w-16">
-                      <p className="text-xs font-semibold text-foreground leading-none mb-0.5">{label}</p>
-                      <p className="text-[10px] text-muted-foreground">{bits}-bit</p>
+                  <div key={id} className="rounded-lg border border-border bg-muted/20 overflow-hidden">
+                    {/* Main row */}
+                    <div className="flex items-center gap-3 px-3 pt-2.5 pb-1 group">
+                      <div className="shrink-0 w-20">
+                        <p className="text-xs font-semibold text-foreground leading-none mb-0.5">{label}</p>
+                        <p className="text-[10px] text-muted-foreground">{bits}-bit</p>
+                      </div>
+                      <Input
+                        value={value}
+                        readOnly
+                        className="flex-1 h-7 font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
+                        placeholder={`${chars} hex chars`}
+                      />
+                      <div className={cn(
+                        'shrink-0 flex items-center gap-1 transition-opacity',
+                        isVerifying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      )}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          disabled={!value}
+                          onClick={() => copyToClipboard(value)}
+                          className="h-7 w-7"
+                          title="Copy"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant={isVerifying ? 'secondary' : 'ghost'}
+                          disabled={!value}
+                          onClick={() => toggleVerify(id)}
+                          className="h-7 w-7"
+                          title="Verify hash"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                    <Input
-                      value={value}
-                      readOnly
-                      className="flex-1 h-7 font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
-                      placeholder={`${chars} hex chars`}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={!value}
-                      onClick={() => copyToClipboard(value)}
-                      className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
+
+                    {/* Algorithm description */}
+                    <p className="text-[10px] text-muted-foreground/60 px-3 pb-2">{desc}</p>
+
+                    {/* Inline verify panel */}
+                    {isVerifying && (
+                      <div className="px-3 pb-3 border-t border-border/50 pt-2.5 space-y-2">
+                        <p className="text-[11px] text-muted-foreground font-medium">Verify {label} hash</p>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={verifyValue}
+                            onChange={(e) => setVerifyValue(e.target.value)}
+                            placeholder="Paste a hash to compare…"
+                            className="h-7 font-mono text-xs flex-1"
+                            autoFocus
+                          />
+                          {verifyValue.trim() && verifyMatch !== null && (
+                            <div className={cn(
+                              'flex items-center gap-1 text-xs font-medium shrink-0',
+                              verifyMatch ? 'text-green-600 dark:text-green-400' : 'text-destructive'
+                            )}>
+                              {verifyMatch
+                                ? <><Check className="h-3.5 w-3.5" /> Match</>
+                                : <><X className="h-3.5 w-3.5" /> No match</>
+                              }
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+
+            {/* ── HMAC section ─────────────────────────────────────────── */}
+            <ToolSection>
+              <div className="flex items-center gap-1.5">
+                <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
+                <ToolLabel>HMAC — Keyed Hash</ToolLabel>
+              </div>
+              <ToolHint>Combines your text with a secret key · used for API authentication and message signing</ToolHint>
+              <div className="relative">
+                <Input
+                  type={showHmacKey ? 'text' : 'password'}
+                  value={hmacKey}
+                  onChange={(e) => setHmacKey(e.target.value)}
+                  placeholder="Enter HMAC secret key…"
+                  className="h-8 text-sm pr-9 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowHmacKey((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showHmacKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              {hmacKey ? (
+                <div className="space-y-2">
+                  {ALGORITHMS.map(({ id, label, bits, chars }) => {
+                    const value = hmacs[id];
+                    return (
+                      <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-muted/20 group">
+                        <div className="shrink-0 w-24">
+                          <p className="text-xs font-semibold text-foreground leading-none mb-0.5">HMAC-{label}</p>
+                          <p className="text-[10px] text-muted-foreground">{bits}-bit</p>
+                        </div>
+                        <Input
+                          value={value}
+                          readOnly
+                          className="flex-1 h-7 font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
+                          placeholder={`${chars} hex chars`}
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          disabled={!value}
+                          onClick={() => copyToClipboard(value)}
+                          className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Copy"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground/50 text-center py-2">
+                  Enter a key above to generate HMAC signatures
+                </p>
+              )}
+            </ToolSection>
           </>
         )}
 
