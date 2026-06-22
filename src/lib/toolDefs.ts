@@ -1,7 +1,6 @@
 import {
   Calendar,
   Code,
-  Hash,
   Clock,
   FileJson,
   Shield,
@@ -60,17 +59,10 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     id: "base64",
-    label: "Encoder / Decoder",
-    icon: Code,
+    label: "Encode · Hash · Encrypt",
+    icon: Shield,
     description:
-      "Encode and decode Base64, URL, HTML entities, Hex, Morse, and more.",
-  },
-  {
-    id: "hash",
-    label: "Hash & Encrypt",
-    icon: Hash,
-    description:
-      "Compute MD5, SHA-1, SHA-256, SHA-512 hashes and AES encrypt/decrypt.",
+      "Encode/decode (Base64, URL, Hex, Morse…), hash (MD5, SHA-256, HMAC), and AES-256 encrypt/decrypt.",
   },
   {
     id: "unix-time",
@@ -219,7 +211,6 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "qrcode",
   "image-base64",
   "color-picker",
-  "hash",
   "jwt",
   "markdown",
   "meeting-notes",
