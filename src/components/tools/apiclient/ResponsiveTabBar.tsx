@@ -102,7 +102,7 @@ export function ResponsiveTabBar({ tabs, active, onSelect, right, className }: P
   }
 
   return (
-    <div ref={headerRef} className={cn('flex items-center border-b px-3', className)}>
+    <div ref={headerRef} className={cn('flex items-center border-b border-border px-3', className)}>
       {/* hidden row used only to measure intrinsic tab widths */}
       <div aria-hidden className="pointer-events-none invisible fixed left-0 top-0 flex items-center gap-4">
         {tabs.map((t) => (
@@ -153,7 +153,7 @@ function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-md border bg-popover p-1 shadow-md">
+          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-popover p-1 shadow-md">
             {tabs.map((t) => (
               <button
                 key={t.id}
