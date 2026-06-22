@@ -3,11 +3,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Copy } from 'lucide-react';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { copyToClipboard } from '@/lib/clipboard';
+import { CopyButton } from '@/components/CopyButton';
 
 type TransformMode =
   | 'single-line'
@@ -114,10 +113,10 @@ export function TextTransformer() {
   return (
     <div className="flex flex-col h-full">
       {/* Options toolbar */}
-      <div className="shrink-0 border-b bg-background px-4 py-2">
+      <div className="shrink-0 border-b border-border bg-muted/10 px-4 py-2">
         <div className="flex flex-wrap items-center gap-3">
           <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
-            <SelectTrigger className="h-7 w-52 text-xs">
+            <SelectTrigger className="h-8 w-52 text-xs rounded-lg border-border">
               <SelectValue placeholder="Select transform" />
             </SelectTrigger>
             <SelectContent>
@@ -134,30 +133,30 @@ export function TextTransformer() {
                 size="sm"
                 variant={removeLineWhitespace ? 'default' : 'outline'}
                 onClick={() => setRemoveLineWhitespace((v) => !v)}
-                className="h-7 text-xs"
+                className="h-8 text-xs transition-smooth"
               >
                 Remove whitespace between lines
               </Button>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Remove chars</span>
                 <Input
                   value={removeChars}
                   onChange={(e) => setRemoveChars(e.target.value)}
                   placeholder="e.g. ,.;!?"
-                  className="h-7 w-32 font-mono text-xs"
+                  className="h-8 w-32 font-mono text-xs rounded-lg border-border"
                 />
               </div>
             </>
           )}
 
           {mode === 'multiple-lines' && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Split by</span>
               <Input
                 value={delimiters}
                 onChange={(e) => setDelimiters(e.target.value)}
                 placeholder=",;"
-                className="h-7 w-24 font-mono text-xs"
+                className="h-8 w-24 font-mono text-xs rounded-lg border-border"
               />
             </div>
           )}
@@ -165,10 +164,10 @@ export function TextTransformer() {
       </div>
 
       {/* Input / Output — each half of remaining height */}
-      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y overflow-hidden">
+      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y divide-border overflow-hidden">
         {/* Input */}
         <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-xs font-medium text-muted-foreground">
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between text-xs font-medium text-muted-foreground">
             <span>Input</span>
             <span>{quickPasteHint}</span>
           </div>
@@ -182,18 +181,16 @@ export function TextTransformer() {
 
         {/* Output */}
         <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b bg-muted/20 flex items-center justify-between text-xs font-medium text-muted-foreground">
+          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between text-xs font-medium text-muted-foreground">
             <span>Output</span>
-            <Button
-              onClick={() => copyToClipboard(output)}
-              size="sm"
+            <CopyButton
+              text={output}
+              label="Copy"
               variant="ghost"
-              disabled={!output}
+              size="sm"
               className="h-6 px-2 text-xs"
-            >
-              <Copy className="h-3 w-3 mr-1" />
-              Copy
-            </Button>
+              disabled={!output}
+            />
           </div>
           <Textarea
             value={output}

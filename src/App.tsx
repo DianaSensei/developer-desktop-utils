@@ -116,8 +116,9 @@ function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder
 // the header/sidebar stay put — no layout shift.
 function ToolLoading() {
   return (
-    <div className="flex h-full w-full items-center justify-center">
-      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+    <div className="flex h-full w-full items-center justify-center gap-3 bg-background/50 animate-fade-in">
+      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <span className="text-sm text-muted-foreground">Loading tool...</span>
     </div>
   );
 }
@@ -156,7 +157,7 @@ function NavTooltip({ label, description, children }: {
       {children}
       {visible && createPortal(
         <div
-          className="fixed z-[9999] pointer-events-none -translate-y-1/2 w-52 rounded-md border bg-popover px-3 py-2.5 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-left-1 duration-150 ease-out"
+          className="fixed z-[9999] pointer-events-none -translate-y-1/2 w-52 rounded-lg border border-border bg-popover px-3 py-2.5 shadow-md animate-bounce-in"
           style={{ top: coords.top, left: coords.left }}
         >
           <p className="text-xs font-semibold text-popover-foreground leading-none">{label}</p>
@@ -243,11 +244,11 @@ function NavScrollArea({
                   to={tool.path}
                   onClick={onClose}
                   className={cn(
-                    'group flex items-center rounded-md transition-all duration-150 motion-safe:active:scale-[0.98]',
+                    'group flex items-center rounded-lg transition-smooth hover-press',
                     isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
                     isActive
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      ? 'bg-primary/10 text-primary border border-primary/30'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                   )}
                 >
                   <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-150 motion-safe:group-hover:scale-110" />
@@ -404,7 +405,7 @@ function Sidebar({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search tools…"
-                className="h-7 pl-7 pr-7 text-xs rounded-md bg-muted/40 border-muted focus-visible:ring-1"
+                className="h-8 pl-8 pr-7 text-xs rounded-lg border-border bg-muted/20 transition-smooth focus-visible:ring-1 focus-visible:ring-primary"
               />
               {query && (
                 <button
@@ -432,13 +433,13 @@ function Sidebar({
         />
 
         {/* Pinned bottom bar — always visible, order: Collapse → Dark mode → Settings */}
-        <div className="shrink-0 border-t px-1.5 py-2 space-y-0.5">
+        <div className="shrink-0 border-t border-border px-1.5 py-2 space-y-0.5">
           {/* Collapse/expand — desktop only */}
           <button
             onClick={onToggleCollapse}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
-              'group relative hidden lg:flex w-full items-center rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted',
+              'group relative hidden lg:flex w-full items-center rounded-lg transition-smooth hover-press text-muted-foreground hover:text-foreground hover:bg-muted/50',
               isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2'
             )}
           >
@@ -456,7 +457,7 @@ function Sidebar({
             onClick={onToggleDark}
             title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             className={cn(
-              'group relative flex w-full items-center rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted',
+              'group relative flex w-full items-center rounded-lg transition-smooth hover-press text-muted-foreground hover:text-foreground hover:bg-muted/50',
               isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2'
             )}
           >
@@ -479,11 +480,11 @@ function Sidebar({
             onClick={onClose}
             title="Settings"
             className={cn(
-              'group relative flex items-center rounded-md transition-colors',
+              'group relative flex items-center rounded-lg transition-smooth hover-press',
               isCollapsed ? 'justify-center px-2 py-2.5' : 'gap-2.5 px-2.5 py-2',
               isSettingsActive
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                ? 'bg-primary/10 text-primary border border-primary/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             )}
           >
             <span className="relative shrink-0">
