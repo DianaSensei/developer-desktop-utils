@@ -56,6 +56,7 @@ const NetworkTools = lazy(() => named(import('@/components/tools/NetworkTools'),
 const MeetingNotes = lazy(() => named(import('@/components/tools/MeetingNotes'), 'MeetingNotes'));
 const LuckyWheel = lazy(() => named(import('@/components/tools/LuckyWheel'), 'LuckyWheel'));
 const ApiClient = lazy(() => named(import('@/components/tools/apiclient/ApiClient'), 'ApiClient'));
+const TwoFactorAuth = lazy(() => named(import('@/components/tools/TwoFactorAuth'), 'TwoFactorAuth'));
 
 const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   'cron-generator': { path: '/',              component: CronGenerator,      fullHeight: true },
@@ -81,6 +82,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'meeting-notes':  { path: '/meeting-notes',  component: MeetingNotes,      fullHeight: true },
   'lucky-wheel':    { path: '/lucky-wheel',    component: LuckyWheel,        fullHeight: true },
   'api-client':     { path: '/api-client',     component: ApiClient,         fullHeight: true },
+  '2fa':            { path: '/2fa',            component: TwoFactorAuth,     fullHeight: true },
 };
 
 const allTools = [
