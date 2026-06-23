@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, lazy, Suspense } from 'react';
-import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import {
   Menu,
@@ -19,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
 import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
@@ -122,54 +122,6 @@ function ToolLoading() {
   );
 }
 
-function NavTooltip({ label, description, children }: {
-  label: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  const [visible, setVisible] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    return () => { if (timer.current) clearTimeout(timer.current); };
-  }, []);
-
-  const handleEnter = () => {
-    timer.current = setTimeout(() => {
-      if (wrapRef.current) {
-        const r = wrapRef.current.getBoundingClientRect();
-        setCoords({ top: r.top + r.height / 2, left: r.right + 10 });
-        setVisible(true);
-      }
-    }, 500);
-  };
-
-  const handleLeave = () => {
-    if (timer.current) clearTimeout(timer.current);
-    setVisible(false);
-  };
-
-  return (
-    <div ref={wrapRef} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
-      {children}
-      {visible && createPortal(
-        <div
-          className="fixed z-[9999] pointer-events-none -translate-y-1/2 w-52 rounded-md border bg-popover px-3 py-2.5 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-left-1 duration-150 ease-out"
-          style={{ top: coords.top, left: coords.left }}
-        >
-          <p className="text-xs font-semibold text-popover-foreground leading-none">{label}</p>
-          {description && (
-            <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">{description}</p>
-          )}
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
-
 // Scrollable nav list with an overflow fade indicator. Extracted into its own
 // component so hooks (useRef, useState, useLayoutEffect) follow React rules —
 // calling hooks inside an IIFE inside another component's render is invalid.
@@ -238,19 +190,19 @@ function NavScrollArea({
             const isActive = location.pathname === tool.path;
             const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
             return (
-              <NavTooltip key={tool.path} label={tool.label} description={desc}>
+              <Tooltip key={tool.path} side="right" triggerClassName="block" label={tool.label} description={desc}>
                 <Link
                   to={tool.path}
                   onClick={onClose}
                   className={cn(
-                    'group flex items-center rounded-lg px-2.5 py-2.5 transition-all duration-150 motion-safe:active:scale-[0.98]',
+                    'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.98]',
                     isCollapsed ? 'justify-center' : 'gap-2.5',
                     isActive
-                      ? 'bg-primary text-primary-foreground shadow-sm-premium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 hover:shadow-sm-premium'
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
                   )}
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-150 motion-safe:group-hover:scale-110" />
+                  <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
                   {/* Label is always mounted and fades/collapses with the sidebar
                       (300ms, matching the aside width animation) so it glides
                       rather than popping in/out on collapse-expand. */}
@@ -264,7 +216,7 @@ function NavScrollArea({
                     {tool.label}
                   </span>
                 </Link>
-              </NavTooltip>
+              </Tooltip>
             );
           })}
         </div>
@@ -273,7 +225,9 @@ function NavScrollArea({
             Deliberately low-emphasis (small, muted, no tab styling) so it reads as
             a hint, not a tool entry. */}
         {!query && hiddenCount > 0 && (
-          <NavTooltip
+          <Tooltip
+            side="right"
+            triggerClassName="block"
             label={`${hiddenCount} more tool${hiddenCount > 1 ? 's' : ''} available`}
             description="Turn on more tools from the Settings page."
           >
@@ -281,7 +235,7 @@ function NavScrollArea({
               to={settingsTool.path}
               onClick={onClose}
               className={cn(
-                'mt-1.5 flex items-center justify-center gap-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors',
+                'mt-1.5 flex w-full items-center justify-center gap-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors',
                 isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[10px]'
               )}
             >
@@ -290,7 +244,7 @@ function NavScrollArea({
                 <span className="whitespace-nowrap">{hiddenCount} more in Settings</span>
               )}
             </Link>
-          </NavTooltip>
+          </Tooltip>
         )}
       </nav>
       {/* Fade + indicator when more items below */}
@@ -503,15 +457,15 @@ function Sidebar({
             onClick={onClose}
             title="Settings"
             className={cn(
-              'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-colors',
+              'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-200 ease-out',
               isCollapsed ? 'justify-center' : 'gap-2.5',
               isSettingsActive
-                ? 'bg-primary text-primary-foreground shadow-sm-premium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 hover:shadow-sm-premium'
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
             )}
           >
             <span className="relative shrink-0">
-              <SettingsIcon className="h-4 w-4" />
+              <SettingsIcon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
               {updateAvailable && (
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-background" />
               )}
@@ -626,7 +580,7 @@ function AppContent() {
               </Button>
               <div
                 key={activeTool.path}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card shadow-sm-premium motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
               >
                 <ActiveIcon className="h-4 w-4 text-primary" />
               </div>

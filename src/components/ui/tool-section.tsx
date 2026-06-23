@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 // Consistent container for tool input/output sections
 const ToolSection = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('space-y-2', className)} {...props} />
+    <div ref={ref} className={cn('space-y-2.5', className)} {...props} />
   )
 );
 ToolSection.displayName = 'ToolSection';

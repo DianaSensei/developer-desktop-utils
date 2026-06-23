@@ -1,12 +1,10 @@
 import { useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Copy } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { CopyButton } from '@/components/ui/copy-button';
+import { Segmented } from '@/components/ui/segmented';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { copyToClipboard } from '@/lib/clipboard';
 
 type UrlMode = 'encode' | 'decode';
 
@@ -30,20 +28,15 @@ export function UrlTool() {
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="shrink-0 header-premium px-4 py-2.5">
-        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-          {([['encode', 'Encode'], ['decode', 'Decode']] as [UrlMode, string][]).map(([m, label]) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={cn(
-                'rounded-md px-4 text-xs font-medium transition-all duration-150',
-                mode === m ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          value={mode}
+          onValueChange={(v) => setMode(v)}
+          options={[
+            { value: 'encode', label: 'Encode' },
+            { value: 'decode', label: 'Decode' },
+          ]}
+          aria-label="URL mode"
+        />
       </div>
 
       {/* Input / Output — each half of remaining height */}
@@ -66,16 +59,15 @@ export function UrlTool() {
         <div className="flex flex-col min-h-0">
           <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Output</span>
-            <Button
-              onClick={() => copyToClipboard(output)}
+            <CopyButton
+              value={output}
+              label="Copy"
               size="sm"
               variant="ghost"
               disabled={!output}
               className="h-6 px-2 text-xs rounded-lg"
-            >
-              <Copy className="h-3 w-3 mr-1" />
-              Copy
-            </Button>
+              iconClassName="h-3 w-3"
+            />
           </div>
           <Textarea
             value={output}

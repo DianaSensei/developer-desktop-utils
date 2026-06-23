@@ -77,13 +77,13 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
             <Label className="text-xs">Partition</Label>
             <div className="flex rounded-md border border-input overflow-hidden text-xs h-8 mt-1">
               <button
-                className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted'}`}
                 onClick={() => setPartitionMode('auto')}
               >
                 Auto
               </button>
               <button
-                className={`px-3 py-1 transition-colors ${partitionMode === 'manual' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                className={`px-3 py-1 transition-colors ${partitionMode === 'manual' ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted'}`}
                 onClick={() => setPartitionMode('manual')}
               >
                 Manual

@@ -297,7 +297,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
                       key={m}
                       className={cn(
                         'px-2 py-0.5 font-mono transition-colors',
-                        valueMode === m ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/60',
+                        valueMode === m ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted/60',
                       )}
                       onClick={() => setValueMode(m)}
                     >
@@ -571,7 +571,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 key={m}
                 className={cn(
                   'px-2.5 transition-colors whitespace-nowrap',
-                  mode === m ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                  mode === m ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted',
                 )}
                 onClick={() => setMode(m)}
               >
@@ -644,7 +644,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 key={m}
                 className={cn(
                   'px-2.5 transition-colors font-mono',
-                  defaultValueMode === m ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                  defaultValueMode === m ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted',
                 )}
                 onClick={() => setDefaultValueMode(m)}
               >

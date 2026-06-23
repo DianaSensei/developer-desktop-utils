@@ -7,7 +7,13 @@ import { cn } from '@/lib/utils';
 
 export interface CopyButtonProps extends Omit<ButtonProps, 'onClick' | 'children' | 'value'> {
   /** Text to copy, or a (possibly async) getter resolved at click time. */
-  value: string | (() => string | null | undefined | Promise<string | null | undefined>);
+  value?: string | (() => string | null | undefined | Promise<string | null | undefined>);
+  /**
+   * Custom copy action (e.g. copying an image). When provided it replaces the
+   * default text copy and `value` is ignored. Return `false` to signal "nothing
+   * copied" and suppress the success animation.
+   */
+  copyAction?: () => boolean | void | Promise<boolean | void>;
   /** Optional label shown next to the icon (e.g. "Copy"). */
   label?: React.ReactNode;
   /** Label shown while in the copied state. Defaults to "Copied". */
@@ -33,6 +39,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
   (
     {
       value,
+      copyAction,
       label,
       copiedLabel = 'Copied',
       iconClassName = 'h-3.5 w-3.5',
@@ -55,9 +62,13 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
 
     const handleCopy = React.useCallback(async () => {
       try {
-        const text = typeof value === 'function' ? await value() : value;
-        if (text == null || text === '') return;
-        await copyToClipboard(String(text));
+        if (copyAction) {
+          if ((await copyAction()) === false) return;
+        } else {
+          const text = typeof value === 'function' ? await value() : value;
+          if (text == null || text === '') return;
+          await copyToClipboard(String(text));
+        }
         setCopied(true);
         onCopied?.();
         if (timer.current) clearTimeout(timer.current);
@@ -65,7 +76,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
       } catch {
         /* clipboard write can reject (denied permission) — fail silently */
       }
-    }, [value, onCopied, config.editor.copyFeedbackMs]);
+    }, [value, copyAction, onCopied, config.editor.copyFeedbackMs]);
 
     return (
       <Button

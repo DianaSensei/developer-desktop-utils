@@ -53,11 +53,11 @@ export function JwtDebugger() {
         ) : decoded.header ? (
           <>
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Header</div>
+              <div className="text-xs font-semibold text-primary uppercase tracking-wider">Header</div>
               <Textarea
                 value={decoded.header}
                 readOnly
-                className="min-h-[100px] font-mono text-sm bg-blue-50/70 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-900/40 rounded-lg focus-visible:ring-blue-500/20"
+                className="min-h-[100px] font-mono text-sm bg-primary/[0.06] dark:bg-primary/[0.10] border-primary/20 rounded-lg focus-visible:ring-primary/20"
               />
             </div>
             <div className="space-y-2">

@@ -8,6 +8,8 @@
     "opener:allow-default-urls",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-image",
+    "clipboard-manager:allow-write-image",
     "dialog:allow-open",
     "dialog:allow-save",
     "fs:allow-read-file",

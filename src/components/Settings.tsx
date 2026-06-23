@@ -74,6 +74,7 @@ const APP_PERMISSIONS = [
     reasons: [
       { text: 'Read text you\'ve copied for quick paste', tool: 'All tools' },
       { text: 'Write tool output to your clipboard', tool: 'All tools' },
+      { text: 'Read and write images for paste/copy', tool: 'Image ↔ Base64 · QR Code' },
     ],
   },
   {

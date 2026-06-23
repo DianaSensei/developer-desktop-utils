@@ -6,13 +6,13 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { EditorState, Compartment } from '@codemirror/state';
 import { tags } from '@lezer/highlight';
 import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
-import { Copy, Trash2, Wand2 } from 'lucide-react';
+import { Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
-import { copyToClipboard } from '@/lib/clipboard';
 
 // ─── SQL formatter ───────────────────────────────────────────────────────────
 
@@ -548,11 +548,6 @@ export function SqlFormatter() {
 
   const handleClear = useCallback(() => setEditorContent(''), [setEditorContent]);
 
-  const handleCopy = useCallback(() => {
-    const view = viewRef.current;
-    if (view) copyToClipboard(view.state.doc.toString());
-  }, []);
-
   const handleModeChange = useCallback((next: Mode) => {
     // Save current editor content before switching
     const view = viewRef.current;
@@ -628,10 +623,14 @@ export function SqlFormatter() {
           Clear
         </Button>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 gap-1.5 text-xs rounded-lg">
-            <Copy className="h-3 w-3" />
-            Copy
-          </Button>
+          <CopyButton
+            value={() => viewRef.current?.state.doc.toString() ?? ''}
+            label="Copy"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs rounded-lg"
+            iconClassName="h-3 w-3"
+          />
           <Button size="sm" onClick={handleFormat} className="h-8 gap-1.5 text-xs rounded-lg">
             <Wand2 className="h-3 w-3" />
             Format
