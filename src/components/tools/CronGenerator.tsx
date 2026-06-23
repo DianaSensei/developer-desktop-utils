@@ -3,12 +3,12 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, CheckCircle2, Copy, HelpCircle, Lightbulb, RotateCcw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, HelpCircle, Lightbulb, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { copyToClipboard } from '@/lib/clipboard';
+import { CopyButton } from '@/components/ui/copy-button';
 
 type CronMode = 'linux' | 'quartz' | 'spring';
 type FieldKey = 'seconds' | 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek' | 'year';
@@ -600,10 +600,6 @@ export function CronGenerator() {
     setExpression(expressionFromFields('linux', DEFAULT_FIELDS));
   };
 
-  const copyCronToClipboard = () => {
-    copyToClipboard(normalizeExpression(expression));
-  };
-
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
@@ -654,9 +650,14 @@ export function CronGenerator() {
               placeholder={mode === 'linux' ? '*/5 * * * *' : '0 */5 * ? * *'}
               className="font-mono h-8 rounded-lg border-b border-border"
             />
-            <Button onClick={copyCronToClipboard} size="sm" variant="outline" title="Copy expression" className="h-8 px-2">
-              <Copy className="h-4 w-4" />
-            </Button>
+            <CopyButton
+              value={() => normalizeExpression(expression)}
+              variant="outline"
+              size="sm"
+              title="Copy expression"
+              className="h-8 px-2"
+              iconClassName="h-4 w-4"
+            />
             <Button onClick={reset} size="sm" variant="ghost" title="Reset" className="h-8 px-2">
               <RotateCcw className="h-4 w-4" />
             </Button>

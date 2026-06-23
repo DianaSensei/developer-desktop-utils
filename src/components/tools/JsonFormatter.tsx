@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { copyToClipboard } from '@/lib/clipboard';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Copy,
   Eye,
   EyeOff,
   FileJson,
@@ -498,7 +497,6 @@ export function JsonFormatter() {
     });
   };
 
-  const copyText = (text: string) => copyToClipboard(text);
   const outputText = mode === 'minify' ? minified : mode === 'string' ? jsonString : beautified;
 
   const renderValue = (line: FlatLine, bracketClass: string) => {
@@ -662,9 +660,7 @@ export function JsonFormatter() {
             >
               <FoldVertical className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="sm" className="h-8 text-xs rounded-lg" onClick={() => copyText(beautified)}>
-              <Copy className="h-3.5 w-3.5 mr-1.5" />Copy
-            </Button>
+            <CopyButton value={() => beautified} label="Copy" variant="outline" size="sm" className="h-8 text-xs rounded-lg" iconClassName="h-3.5 w-3.5" />
           </div>
         </div>
       )}
@@ -716,9 +712,7 @@ export function JsonFormatter() {
           <>
             <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">{mode === 'string' ? 'JSON String' : 'Minified'}</span>
-              <Button onClick={() => copyText(outputText)} size="sm" variant="ghost" className="h-6 px-2 text-xs rounded-lg">
-                <Copy className="h-3 w-3 mr-1" />Copy
-              </Button>
+              <CopyButton value={() => outputText} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />
             </div>
             <Textarea
               value={outputText}
@@ -748,9 +742,7 @@ export function JsonFormatter() {
           <span className="text-muted-foreground">Path</span>
           <code className="flex-1 truncate font-mono text-foreground">{selectedPath || '$ (click a node)'}</code>
           {selectedPath && (
-            <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => copyText(selectedPath)}>
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
+            <CopyButton value={selectedPath} variant="ghost" size="sm" className="h-6 px-2" iconClassName="h-3.5 w-3.5" />
           )}
         </div>
       )}
