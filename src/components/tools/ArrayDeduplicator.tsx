@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Segmented } from '@/components/ui/segmented';
 
 type DedupeMode = 'preserve' | 'sort';
 
@@ -409,24 +410,16 @@ export function ArrayDeduplicator() {
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* ── Toolbar ── */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border">
-        <div className="inline-flex h-8 items-center p-0.5 rounded-lg border border-border bg-muted/50 gap-0.5">
-          <Button
-            variant={mode === 'preserve' ? 'default' : 'ghost'}
-            size="sm"
-            className="h-7 px-3 text-xs rounded-md"
-            onClick={() => setMode('preserve')}
-          >
-            Preserve Order
-          </Button>
-          <Button
-            variant={mode === 'sort' ? 'default' : 'ghost'}
-            size="sm"
-            className="h-7 px-3 text-xs rounded-md"
-            onClick={() => setMode('sort')}
-          >
-            Sort
-          </Button>
-        </div>
+        <Segmented
+          value={mode}
+          onValueChange={(v) => setMode(v)}
+          size="sm"
+          options={[
+            { value: 'preserve', label: 'Preserve Order' },
+            { value: 'sort', label: 'Sort' },
+          ]}
+          aria-label="Dedupe mode"
+        />
 
         <div className="ml-auto flex items-center gap-5">
           {isProcessing && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}

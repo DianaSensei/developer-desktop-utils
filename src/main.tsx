@@ -1,5 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+// Inter — self-hosted variable font (bundled by Vite, works offline, identical
+// on macOS / Windows / Linux). One UI typeface for the whole app.
+import '@fontsource-variable/inter';
 import App from './App';
 import './styles/globals.css';
 

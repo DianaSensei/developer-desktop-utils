@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
-import { Copy, RefreshCw } from 'lucide-react';
-import { copyToClipboard } from '@/lib/clipboard';
+import { CopyButton } from '@/components/ui/copy-button';
+import { RefreshCw } from 'lucide-react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { cn } from '@/lib/utils';
@@ -56,24 +56,26 @@ function ResultList({ items }: { items: string[] }) {
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{items.length} result{items.length !== 1 ? 's' : ''}</span>
         {items.length > 1 && (
-          <button
-            onClick={() => copyToClipboard(items.join('\n'))}
-            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Copy className="h-3 w-3" /> Copy all
-          </button>
+          <CopyButton
+            value={() => items.join('\n')}
+            label="Copy all"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+            iconClassName="h-3 w-3"
+          />
         )}
       </div>
       <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y">
         {items.map((v, i) => (
           <div key={i} className="flex items-center gap-2 px-3 py-1.5 group hover:bg-muted/40 transition-colors">
             <span className="flex-1 font-mono text-xs break-all">{v}</span>
-            <button
-              onClick={() => copyToClipboard(v)}
-              className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
-            >
-              <Copy className="h-3 w-3" />
-            </button>
+            <CopyButton
+              value={v}
+              variant="ghost"
+              className="shrink-0 h-6 w-6 p-0 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground"
+              iconClassName="h-3 w-3"
+            />
           </div>
         ))}
       </div>

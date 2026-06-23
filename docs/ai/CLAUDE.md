@@ -262,6 +262,17 @@ const [input, setInput] = usePersistentState('devtool:json:input', '');
 useQuickPaste(setInput);
 ```
 
+### `useImagePaste(onImage, enabled?)` — `src/hooks/useImagePaste.ts`
+
+Image counterpart to `useQuickPaste`: ⌘V / Ctrl+V (and the native `paste`
+event) captures an image from the clipboard and calls `onImage(dataUrl)` with a
+PNG data URL. Tauri-aware (clipboard plugin in the desktop app, async Clipboard
+API on the web). Use for tools that take image input (e.g. `ImageBase64Tool`).
+
+```tsx
+useImagePaste(loadFromDataUrl, mode === 'encode');
+```
+
 ### `useInputHistory(value, applyValue, enabled?)` — `src/hooks/useInputHistory.ts`
 
 Adds undo (⌘Z) / redo (⌘⇧Z / Ctrl+Y) to a tool's primary input. Debounces user edits ~400ms into history entries.
@@ -407,6 +418,24 @@ const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 import { copyToClipboard } from '@/lib/clipboard';
 await copyToClipboard(text);
 ```
+
+### Image clipboard (Tauri-aware)
+The WebView clipboard only handles plain text reliably across platforms, so
+images route through the Tauri clipboard plugin in the desktop app and fall back
+to the async Clipboard API (`ClipboardItem`) on the web. Both helpers live in
+`src/lib/clipboard.ts`:
+```tsx
+import { copyImageToClipboard, readImageFromClipboard } from '@/lib/clipboard';
+await copyImageToClipboard(blobOrDataUrl);            // copy an image out
+const dataUrl = await readImageFromClipboard();       // null when no image
+```
+For "copy image" buttons, reuse `CopyButton` with its `copyAction` prop so the
+animated Copy→Check affordance is identical to text copies:
+```tsx
+<CopyButton copyAction={async () => { try { await copyImageToClipboard(src); return true; } catch { return false; } }} label="Copy image" />
+```
+Requires the `clipboard-manager:allow-read-image` / `allow-write-image`
+capabilities (already granted in `capabilities/default.json`).
 
 ### Copy button — always use the shared `CopyButton`
 For any user-facing "copy" control, use `CopyButton` instead of wiring a raw

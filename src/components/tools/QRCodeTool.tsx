@@ -9,7 +9,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { copyToClipboard } from '@/lib/clipboard';
+import { copyToClipboard, copyImageToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 
 type FrameStyle = 'none' | 'border' | 'scan-bottom' | 'scan-top';
@@ -367,7 +367,7 @@ function QrGenerator() {
       const blob = await new Promise<Blob>((res, rej) =>
         canvas.toBlob((b) => (b ? res(b) : rej()), 'image/png')
       );
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      await copyImageToClipboard(blob);
       setCopied(true);
       if (copyTimer.current) clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);

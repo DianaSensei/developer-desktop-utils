@@ -4,9 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateTimePanel } from '@/components/ui/date-time-panel';
 import {
-  Copy, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
+  RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   Calendar, Info, Timer,
 } from 'lucide-react';
+import { CopyButton } from '@/components/ui/copy-button';
 import {
   format, parseISO, fromUnixTime, getUnixTime,
   startOfDay, endOfDay, startOfWeek, endOfWeek,
@@ -19,7 +20,6 @@ import {
 } from 'date-fns';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
-import { copyToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 
 // ─── constants ────────────────────────────────────────────────────────────
@@ -294,12 +294,12 @@ function CopyValue({ value, dim = false }: { value: string; dim?: boolean }) {
     <div className="flex items-center gap-1 group min-w-0">
       <span className={cn('font-mono text-xs truncate flex-1', dim && 'text-muted-foreground')}>{value}</span>
       {!dim && (
-        <button
-          onClick={() => copyToClipboard(value)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted shrink-0"
-        >
-          <Copy className="h-3 w-3" />
-        </button>
+        <CopyButton
+          value={value}
+          variant="ghost"
+          className="h-6 w-6 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+          iconClassName="h-3 w-3"
+        />
       )}
     </div>
   );
@@ -718,9 +718,7 @@ export function DateTimeTool() {
                   <div className="flex flex-col gap-0.5 group">
                     <div className="flex items-center gap-1">
                       <span className="font-mono text-xs">{inStr}</span>
-                      <button onClick={() => copyToClipboard(inStr)} className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted">
-                        <Copy className="h-2.5 w-2.5" />
-                      </button>
+                      <CopyButton value={inStr} variant="ghost" className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" iconClassName="h-2.5 w-2.5" />
                     </div>
                     {tzsDiffer && inStr !== outStr && (
                       <span className="font-mono text-[10px] text-muted-foreground">
@@ -729,9 +727,7 @@ export function DateTimeTool() {
                     )}
                     <div className="flex items-center gap-1">
                       <span className="font-mono text-[10px] text-muted-foreground">{ts}</span>
-                      <button onClick={() => copyToClipboard(String(ts))} className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted">
-                        <Copy className="h-2.5 w-2.5" />
-                      </button>
+                      <CopyButton value={String(ts)} variant="ghost" className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" iconClassName="h-2.5 w-2.5" />
                     </div>
                   </div>
                 );

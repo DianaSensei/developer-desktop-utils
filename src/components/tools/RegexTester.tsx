@@ -270,12 +270,14 @@ export function RegexTester() {
           {PRESETS.map((p) => (
             <Button
               key={p.label}
-              variant={activePreset?.label === p.label ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
+              aria-pressed={activePreset?.label === p.label}
               onClick={() => loadPreset(p)}
               className={cn(
                 'h-6 text-xs rounded-lg transition-all',
-                activePreset?.label === p.label && 'ring-1 ring-primary/30'
+                activePreset?.label === p.label &&
+                  'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
               )}
             >
               {p.label}

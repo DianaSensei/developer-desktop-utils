@@ -11,6 +11,23 @@ module.exports = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: [
+          'Inter Variable',
+          'Inter',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI Variable Text',
+          'Segoe UI',
+          'Ubuntu',
+          'Cantarell',
+          'Noto Sans',
+          'Helvetica Neue',
+          'Arial',
+          'sans-serif',
+        ],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -65,6 +82,10 @@ module.exports = {
         '2xl': '0 12px 28px -6px rgb(0 0 0 / 0.12), 0 24px 48px -12px rgb(0 0 0 / 0.08)',
         inner: 'inset 0 1px 2px 0 rgb(0 0 0 / 0.06)',
         none: 'none',
+      },
+      transitionTimingFunction: {
+        'out-soft': 'cubic-bezier(0.22, 1, 0.36, 1)',
+        spring: 'cubic-bezier(0.34, 1.45, 0.64, 1)',
       },
       keyframes: {
         'accordion-down': {

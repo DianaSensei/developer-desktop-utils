@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Copy } from 'lucide-react';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { copyToClipboard } from '@/lib/clipboard';
+import { cn } from '@/lib/utils';
 
 type TransformMode =
   | 'single-line'
@@ -16,7 +16,9 @@ type TransformMode =
   | 'uppercase'
   | 'lowercase'
   | 'camelcase'
-  | 'snakecase';
+  | 'snakecase'
+  | 'vn-phone-new'
+  | 'vn-phone-old';
 
 const MODE_OPTIONS: Array<{ value: TransformMode; label: string }> = [
   { value: 'single-line',    label: 'To Single Line' },
@@ -26,7 +28,72 @@ const MODE_OPTIONS: Array<{ value: TransformMode; label: string }> = [
   { value: 'lowercase',      label: 'To lowercase' },
   { value: 'camelcase',      label: 'To camelCase' },
   { value: 'snakecase',      label: 'To snake_case' },
+  { value: 'vn-phone-new',   label: 'VN Phone → New (10-digit)' },
+  { value: 'vn-phone-old',   label: 'VN Phone → Old (11-digit)' },
 ];
+
+// Vietnamese mobile prefix migration (effective Sept 2018): 11-digit numbers
+// became 10-digit. Keyed by the 3-digit "old" subscriber prefix (after the
+// trunk 0) → the 2-digit "new" prefix. Covers Viettel, MobiFone, VinaPhone,
+// Vietnamobile and Gmobile.
+const VN_OLD_TO_NEW: Record<string, string> = {
+  // Viettel
+  '162': '32', '163': '33', '164': '34', '165': '35',
+  '166': '36', '167': '37', '168': '38', '169': '39',
+  // MobiFone
+  '120': '70', '121': '79', '122': '77', '126': '76', '128': '78',
+  // VinaPhone
+  '123': '83', '124': '84', '125': '85', '127': '81', '129': '82',
+  // Vietnamobile
+  '186': '56', '188': '58',
+  // Gmobile
+  '199': '59',
+};
+
+const VN_NEW_TO_OLD: Record<string, string> = Object.fromEntries(
+  Object.entries(VN_OLD_TO_NEW).map(([oldPrefix, newPrefix]) => [newPrefix, oldPrefix])
+);
+
+// Matches phone-like runs within a line: a leading digit (optionally +), then
+// digits with common separators, ending in a digit. Bounded so it can't span
+// unrelated numbers. Direction-specific conversion leaves non-matches untouched.
+const VN_PHONE_TOKEN = /\+?\d[\d.\-\s]{6,16}\d/g;
+
+/**
+ * Convert a single phone token between Vietnamese old/new mobile formats.
+ * Returns the converted token, or null when it isn't a recognized number for
+ * the requested direction (so the caller can leave it unchanged).
+ */
+function convertVnPhone(token: string, dir: 'toNew' | 'toOld'): string | null {
+  const hasPlus = token.trimStart().startsWith('+');
+  let body = token.replace(/\D/g, '');
+  let prefix: string;
+  if (body.startsWith('84')) {
+    prefix = hasPlus ? '+84' : '84';
+    body = body.slice(2);
+  } else if (body.startsWith('0')) {
+    prefix = '0';
+    body = body.slice(1);
+  } else {
+    return null;
+  }
+
+  if (dir === 'toNew' && body.length === 10) {
+    const mapped = VN_OLD_TO_NEW[body.slice(0, 3)];
+    if (mapped) return prefix + mapped + body.slice(3);
+  } else if (dir === 'toOld' && body.length === 9) {
+    const mapped = VN_NEW_TO_OLD[body.slice(0, 2)];
+    if (mapped) return prefix + mapped + body.slice(2);
+  }
+  return null;
+}
+
+function convertVnPhones(text: string, dir: 'toNew' | 'toOld') {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(VN_PHONE_TOKEN, (m) => convertVnPhone(m, dir) ?? m))
+    .join('\n');
+}
 
 function escapeForCharClass(char: string) {
   return char.replace(/[\\\]^-]/g, '\\$&');
@@ -104,6 +171,8 @@ export function TextTransformer() {
       case 'lowercase':      return input.toLowerCase();
       case 'camelcase':      return toCamelCase(input);
       case 'snakecase':      return toSnakeCase(input);
+      case 'vn-phone-new':   return convertVnPhones(input, 'toNew');
+      case 'vn-phone-old':   return convertVnPhones(input, 'toOld');
       default:               return input;
     }
   }, [input, mode, removeLineWhitespace, removeChars, delimiters]);
@@ -132,9 +201,14 @@ export function TextTransformer() {
               <Button
                 type="button"
                 size="sm"
-                variant={removeLineWhitespace ? 'default' : 'outline'}
+                variant="outline"
+                aria-pressed={removeLineWhitespace}
                 onClick={() => setRemoveLineWhitespace((v) => !v)}
-                className="h-8 text-xs rounded-lg"
+                className={cn(
+                  'h-8 text-xs rounded-lg',
+                  removeLineWhitespace &&
+                    'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
+                )}
               >
                 Remove whitespace between lines
               </Button>
@@ -184,16 +258,15 @@ export function TextTransformer() {
         <div className="flex flex-col min-h-0">
           <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Output</span>
-            <Button
-              onClick={() => copyToClipboard(output)}
+            <CopyButton
+              value={output}
+              label="Copy"
               size="sm"
               variant="ghost"
               disabled={!output}
               className="h-6 px-2 text-xs rounded-lg"
-            >
-              <Copy className="h-3 w-3 mr-1" />
-              Copy
-            </Button>
+              iconClassName="h-3 w-3"
+            />
           </div>
           <Textarea
             value={output}
