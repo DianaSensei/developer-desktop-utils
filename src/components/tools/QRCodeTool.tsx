@@ -3,11 +3,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { ColorPicker } from '@/components/ui/color-picker';
-import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Loader2, ExternalLink } from 'lucide-react';
+import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Loader2, ExternalLink, ClipboardPaste } from 'lucide-react';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useImagePaste } from '@/hooks/useImagePaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { copyToClipboard, copyImageToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
@@ -533,6 +534,22 @@ function QrReader() {
     }
   };
 
+  // Decode a QR from an image pasted via clipboard (⌘V or the Paste button).
+  const loadFromDataUrl = (dataUrl: string) => {
+    const img = new Image();
+    img.onload = () => run(img, dataUrl);
+    img.onerror = () => setError('Failed to load image.');
+    img.src = dataUrl;
+  };
+  useImagePaste(loadFromDataUrl);
+
+  const pasteFromClipboard = async () => {
+    const { readImageFromClipboard } = await import('@/lib/clipboard');
+    const dataUrl = await readImageFromClipboard();
+    if (dataUrl) loadFromDataUrl(dataUrl);
+    else setError('No image on the clipboard to read.');
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
@@ -579,6 +596,14 @@ function QrReader() {
           : <Upload className="h-6 w-6 text-muted-foreground" />}
         <p className="text-sm font-medium">Click to upload or drop a QR image</p>
         <p className="text-xs text-muted-foreground">PNG, JPG, GIF, or WebP</p>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); void pasteFromClipboard(); }}
+          className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          <ClipboardPaste className="h-3.5 w-3.5" />
+          Paste from clipboard · {quickPasteHint}
+        </button>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
