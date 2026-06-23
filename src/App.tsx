@@ -243,19 +243,26 @@ function NavScrollArea({
                   to={tool.path}
                   onClick={onClose}
                   className={cn(
-                    'group flex items-center rounded-lg transition-all duration-150 motion-safe:active:scale-[0.98]',
-                    isCollapsed ? 'justify-center px-2.5 py-2.5' : 'gap-2.5 px-2.5 py-2.5',
+                    'group flex items-center rounded-lg px-2.5 py-2.5 transition-all duration-150 motion-safe:active:scale-[0.98]',
+                    isCollapsed ? 'justify-center' : 'gap-2.5',
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm-premium'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 hover:shadow-sm-premium'
                   )}
                 >
                   <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-150 motion-safe:group-hover:scale-110" />
-                  {!isCollapsed && (
-                    <span className={cn('flex-1 text-sm whitespace-nowrap overflow-hidden', isActive && 'font-medium')}>
-                      {tool.label}
-                    </span>
-                  )}
+                  {/* Label is always mounted and fades/collapses with the sidebar
+                      (300ms, matching the aside width animation) so it glides
+                      rather than popping in/out on collapse-expand. */}
+                  <span
+                    className={cn(
+                      'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                      isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
+                      isActive && 'font-medium'
+                    )}
+                  >
+                    {tool.label}
+                  </span>
                 </Link>
               </NavTooltip>
             );
@@ -353,9 +360,16 @@ function Sidebar({
 
   return (
     <>
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 lg:hidden" onClick={onClose} />
-      )}
+      {/* Backdrop fades in/out in sync with the drawer slide (mobile only).
+          Always rendered so the fade plays on close too, not just open. */}
+      <div
+        className={cn(
+          'fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 lg:hidden transition-opacity duration-300 ease-in-out',
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        )}
+        onClick={onClose}
+        aria-hidden
+      />
       <aside
         className={cn(
           'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-premium transition-all duration-300 ease-in-out flex flex-col',
@@ -438,8 +452,8 @@ function Sidebar({
             onClick={onToggleCollapse}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
-              'group relative hidden lg:flex w-full items-center rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
-              isCollapsed ? 'justify-center px-2.5 py-2.5' : 'gap-2.5 px-2.5 py-2.5'
+              'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+              isCollapsed ? 'justify-center' : 'gap-2.5'
             )}
           >
             {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronLeft className="h-4 w-4 shrink-0" />}
@@ -448,7 +462,14 @@ function Sidebar({
                 {isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               </span>
             )}
-            {!isCollapsed && <span className="text-sm whitespace-nowrap overflow-hidden">Collapse</span>}
+            <span
+              className={cn(
+                'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
+              )}
+            >
+              Collapse
+            </span>
           </button>
 
           {/* Dark / Light mode — icon reflects current mode */}
@@ -456,8 +477,8 @@ function Sidebar({
             onClick={onToggleDark}
             title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             className={cn(
-              'group relative flex w-full items-center rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
-              isCollapsed ? 'justify-center px-2.5 py-2.5' : 'gap-2.5 px-2.5 py-2.5'
+              'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+              isCollapsed ? 'justify-center' : 'gap-2.5'
             )}
           >
             {isDark ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
@@ -466,11 +487,14 @@ function Sidebar({
                 {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               </span>
             )}
-            {!isCollapsed && (
-              <span className="text-sm whitespace-nowrap overflow-hidden">
-                {isDark ? 'Light mode' : 'Dark mode'}
-              </span>
-            )}
+            <span
+              className={cn(
+                'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
+              )}
+            >
+              {isDark ? 'Light mode' : 'Dark mode'}
+            </span>
           </button>
 
           {/* Settings — always last */}
@@ -479,8 +503,8 @@ function Sidebar({
             onClick={onClose}
             title="Settings"
             className={cn(
-              'group relative flex items-center rounded-lg transition-colors',
-              isCollapsed ? 'justify-center px-2.5 py-2.5' : 'gap-2.5 px-2.5 py-2.5',
+              'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-colors',
+              isCollapsed ? 'justify-center' : 'gap-2.5',
               isSettingsActive
                 ? 'bg-primary text-primary-foreground shadow-sm-premium'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/60 hover:shadow-sm-premium'
@@ -497,11 +521,15 @@ function Sidebar({
                 Settings
               </span>
             )}
-            {!isCollapsed && (
-              <span className={cn('text-sm whitespace-nowrap overflow-hidden', isSettingsActive && 'font-medium')}>
-                Settings
-              </span>
-            )}
+            <span
+              className={cn(
+                'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
+                isSettingsActive && 'font-medium'
+              )}
+            >
+              Settings
+            </span>
           </Link>
         </div>
       </aside>
