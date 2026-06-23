@@ -1,15 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 import {
   ShieldCheck, Copy, Check, Plus, Trash2, Eye, EyeOff,
   RefreshCw, KeyRound, ChevronDown, ChevronUp, ArrowRight,
+  Upload, Download, QrCode, FileText, Search, X, Loader2, ClipboardPaste,
 } from 'lucide-react';
 import { copyToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { base32Decode, parseOtpImport, type ParsedOtp } from '@/lib/otpauth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,8 +28,8 @@ interface Account {
   issuer: string;
   secret: string;
   algorithm: Algorithm;
-  digits: 6 | 8;
-  period: 30 | 60;
+  digits: number;
+  period: number;
   type: OTPType;
   counter: number;
 }
@@ -47,24 +53,6 @@ function initials(name: string): string {
   if (!words[0]) return '?';
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-}
-
-// ─── Base32 decode ────────────────────────────────────────────────────────────
-
-const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-
-function base32Decode(input: string): Uint8Array {
-  const clean = input.toUpperCase().replace(/=+$/, '').replace(/\s/g, '');
-  let bits = 0, value = 0, out = 0;
-  const result = new Uint8Array(Math.floor((clean.length * 5) / 8));
-  for (let i = 0; i < clean.length; i++) {
-    const idx = B32.indexOf(clean[i]);
-    if (idx === -1) throw new Error(`Invalid character: "${clean[i]}"`);
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) { result[out++] = (value >>> (bits - 8)) & 0xff; bits -= 8; }
-  }
-  return result;
 }
 
 // ─── HOTP / TOTP ─────────────────────────────────────────────────────────────
@@ -604,13 +592,284 @@ function InfoPanel() {
   );
 }
 
+// ─── QR decode (for Google Authenticator / app export screenshots) ─────────────
+
+async function decodeQrFile(file: File): Promise<string | null> {
+  const dataUrl = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as string);
+    r.onerror = () => rej(new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error('image failed'));
+    i.src = dataUrl;
+  });
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0);
+  const { data, width, height } = ctx.getImageData(0, 0, w, h);
+  const jsQR = (await import('jsqr')).default;
+  return jsQR(data, width, height)?.data ?? null;
+}
+
+// ─── Export ────────────────────────────────────────────────────────────────────
+
+function buildOtpauthUri(a: Account): string {
+  const label = encodeURIComponent(a.issuer ? `${a.issuer}:${a.name}` : a.name);
+  const params = new URLSearchParams();
+  params.set('secret', a.secret);
+  if (a.issuer) params.set('issuer', a.issuer);
+  params.set('algorithm', a.algorithm.replace('-', ''));
+  params.set('digits', String(a.digits));
+  if (a.type === 'totp') params.set('period', String(a.period));
+  else params.set('counter', String(a.counter));
+  return `otpauth://${a.type}/${label}?${params.toString()}`;
+}
+
+function exportAccounts(accounts: Account[]) {
+  const body = accounts.map(buildOtpauthUri).join('\n') + '\n';
+  const blob = new Blob([body], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `2fa-export-${new Date().toISOString().slice(0, 10)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Import dialog ──────────────────────────────────────────────────────────────
+
+interface ImportDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onImport: (entries: ParsedOtp[]) => void;
+}
+
+function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
+  const [rawText, setRawText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [fileError, setFileError] = useState('');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const parsed = useMemo(() => parseOtpImport(rawText), [rawText]);
+
+  useEffect(() => { setSelected(new Set(parsed.map((_, i) => i))); }, [parsed]);
+  useEffect(() => {
+    if (!open) { setRawText(''); setFileError(''); setBusy(false); setDragOver(false); }
+  }, [open]);
+
+  const ingestFiles = async (files: FileList | File[]) => {
+    setBusy(true); setFileError('');
+    const collected: string[] = [];
+    let imageWithoutQr = false;
+    try {
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith('image/')) {
+          const txt = await decodeQrFile(file);
+          if (txt) collected.push(txt); else imageWithoutQr = true;
+        } else {
+          collected.push(await file.text());
+        }
+      }
+      const joined = collected.join('\n');
+      if (joined.trim()) {
+        setRawText((prev) => (prev.trim() ? prev + '\n' : '') + joined);
+      } else if (imageWithoutQr) {
+        setFileError('No QR code found in the selected image.');
+      } else {
+        setFileError('No OTP data found in the selected file(s).');
+      }
+    } catch {
+      setFileError('Could not read one or more files.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) setRawText((prev) => (prev.trim() ? prev + '\n' : '') + text);
+    } catch {
+      setFileError('Clipboard access was blocked. Paste into the box instead.');
+    }
+  };
+
+  const toggle = (i: number) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(i)) next.delete(i); else next.add(i);
+    return next;
+  });
+
+  const allSelected = parsed.length > 0 && selected.size === parsed.length;
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(parsed.map((_, i) => i)));
+
+  const confirm = () => {
+    onImport(parsed.filter((_, i) => selected.has(i)));
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-4 w-4" /> Import Accounts
+          </DialogTitle>
+          <DialogDescription>
+            Import a Google Authenticator export QR, or <code className="font-mono text-[11px]">otpauth://</code> URIs
+            from any app (2FAS, Aegis, Authy, Raivo…). Everything is parsed locally.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Drop zone */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); }}
+          className={cn(
+            'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-colors',
+            dragOver ? 'border-primary bg-primary/5' : 'border-input hover:border-muted-foreground/40 hover:bg-muted/30',
+          )}
+        >
+          {busy ? (
+            <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+          ) : (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <QrCode className="h-6 w-6" />
+              <FileText className="h-6 w-6" />
+            </div>
+          )}
+          <p className="text-xs font-medium">
+            {busy ? 'Reading…' : 'Drop QR image or export file here'}
+          </p>
+          <p className="text-[11px] text-muted-foreground">PNG · JPG · .txt · .json — or click to browse</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.txt,.json,text/plain,application/json"
+            multiple
+            className="hidden"
+            onChange={(e) => { if (e.target.files?.length) ingestFiles(e.target.files); e.target.value = ''; }}
+          />
+        </div>
+
+        {/* Paste box */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Or paste URIs</Label>
+            <Button variant="ghost" size="sm" className="h-6 text-[11px] gap-1 px-2" onClick={handlePasteClipboard}>
+              <ClipboardPaste className="h-3 w-3" /> Paste
+            </Button>
+          </div>
+          <Textarea
+            value={rawText}
+            onChange={(e) => { setRawText(e.target.value); setFileError(''); }}
+            placeholder="otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP&issuer=Example
+otpauth-migration://offline?data=…"
+            className="h-20 text-[11px] font-mono resize-none"
+            spellCheck={false}
+          />
+          {fileError && <p className="text-[11px] text-destructive">{fileError}</p>}
+        </div>
+
+        {/* Parsed preview */}
+        {parsed.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">
+                Found {parsed.length} account{parsed.length === 1 ? '' : 's'}
+              </span>
+              <button onClick={toggleAll} className="text-[11px] text-primary hover:underline">
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            </div>
+            <div className="max-h-44 overflow-y-auto rounded-md border divide-y">
+              {parsed.map((entry, i) => {
+                const checked = selected.has(i);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => toggle(i)}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-left hover:bg-muted/40 transition-colors"
+                  >
+                    <span className={cn(
+                      'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
+                      checked ? 'bg-primary border-primary' : 'border-input',
+                    )}>
+                      {checked && <Check className="h-3 w-3 text-primary-foreground" />}
+                    </span>
+                    <div className={cn(
+                      'w-7 h-7 rounded-md flex items-center justify-center text-white text-[10px] font-bold shrink-0',
+                      avatarColor(entry.name),
+                    )}>
+                      {initials(entry.name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{entry.name}</p>
+                      {entry.issuer && <p className="text-[10px] text-muted-foreground truncate">{entry.issuer}</p>}
+                    </div>
+                    <span className={cn(
+                      'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0',
+                      entry.type === 'totp'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+                    )}>
+                      {entry.type}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button size="sm" onClick={confirm} disabled={selected.size === 0} className="gap-1.5">
+            <Download className="h-3.5 w-3.5" />
+            Import {selected.size > 0 ? selected.size : ''}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function TwoFactorAuth() {
   const [accounts, setAccounts] = usePersistentState<Account[]>('devtool:2fa:accounts', []);
   const [showForm, setShowForm] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [filter, setFilter] = useState<'all' | OTPType>('all');
+  const [search, setSearch] = useState('');
+  const [notice, setNotice] = useState('');
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
+
+  const flashNotice = (msg: string) => {
+    setNotice(msg);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(''), 4000);
+  };
 
   const handleAdd = (account: Account) => {
     setAccounts((prev) => [...prev, account]);
@@ -625,9 +884,48 @@ export function TwoFactorAuth() {
     setAccounts((prev) => prev.map((a) => a.id === id ? { ...a, counter: a.counter + 1 } : a));
   };
 
-  const filtered = filter === 'all' ? accounts : accounts.filter((a) => a.type === filter);
+  const handleImport = (entries: ParsedOtp[]) => {
+    setAccounts((prev) => {
+      const existing = new Set(prev.map((a) => `${a.type}:${a.secret}:${a.name}`));
+      let added = 0, skipped = 0;
+      const next = [...prev];
+      for (const e of entries) {
+        const key = `${e.type}:${e.secret}:${e.name}`;
+        if (existing.has(key)) { skipped++; continue; }
+        existing.add(key);
+        next.push({
+          id: crypto.randomUUID(),
+          name: e.name,
+          issuer: e.issuer,
+          secret: e.secret,
+          algorithm: e.algorithm,
+          digits: e.digits,
+          period: e.period,
+          type: e.type,
+          counter: e.counter,
+        });
+        added++;
+      }
+      flashNotice(
+        added > 0
+          ? `Imported ${added} account${added === 1 ? '' : 's'}${skipped ? ` · ${skipped} duplicate${skipped === 1 ? '' : 's'} skipped` : ''}.`
+          : `No new accounts — ${skipped} already exist${skipped === 1 ? 's' : ''}.`,
+      );
+      return next;
+    });
+  };
+
   const totpCount = accounts.filter((a) => a.type === 'totp').length;
   const hotpCount = accounts.filter((a) => a.type === 'hotp').length;
+
+  const filtered = accounts.filter((a) => {
+    if (filter !== 'all' && a.type !== filter) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      if (!a.name.toLowerCase().includes(q) && !a.issuer.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="tool-full-height">
@@ -643,7 +941,7 @@ export function TwoFactorAuth() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button
               variant="ghost" size="sm"
               className="h-7 text-xs gap-1 text-muted-foreground"
@@ -652,46 +950,98 @@ export function TwoFactorAuth() {
               {showInfo ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               About
             </Button>
+            {accounts.length > 0 && (
+              <Button
+                variant="ghost" size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={() => exportAccounts(accounts)}
+                title="Export all accounts (otpauth URIs)"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <Button
+              variant="outline" size="sm"
+              className="h-7 text-xs gap-1.5"
+              onClick={() => setShowImport(true)}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Import
+            </Button>
             <Button
               size="sm"
               className="h-7 text-xs gap-1.5"
               onClick={() => { setShowForm((s) => !s); }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Add Account
+              Add
             </Button>
           </div>
         </div>
 
+        {/* ── Notice ── */}
+        {notice && (
+          <div className="flex items-center gap-2 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-3 py-2 text-xs ring-1 ring-emerald-500/20">
+            <Check className="h-3.5 w-3.5 shrink-0" />
+            <span>{notice}</span>
+          </div>
+        )}
+
         {/* ── Info ── */}
         {showInfo && <InfoPanel />}
+
+        {/* ── Import dialog ── */}
+        <ImportDialog open={showImport} onOpenChange={setShowImport} onImport={handleImport} />
 
         {/* ── Add form ── */}
         {showForm && (
           <AddAccountForm onAdd={handleAdd} onCancel={() => setShowForm(false)} />
         )}
 
-        {/* ── Filter tabs (only when there are mixed types) ── */}
-        {accounts.length > 0 && totpCount > 0 && hotpCount > 0 && (
-          <div className="flex items-center gap-1">
-            {([
-              { key: 'all', label: `All (${accounts.length})` },
-              { key: 'totp', label: `TOTP (${totpCount})` },
-              { key: 'hotp', label: `HOTP (${hotpCount})` },
-            ] as { key: typeof filter; label: string }[]).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setFilter(key)}
-                className={cn(
-                  'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
-                  filter === key
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+        {/* ── Filter row: tabs + search ── */}
+        {accounts.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {totpCount > 0 && hotpCount > 0 && (
+              <div className="flex items-center gap-1">
+                {([
+                  { key: 'all', label: `All (${accounts.length})` },
+                  { key: 'totp', label: `TOTP (${totpCount})` },
+                  { key: 'hotp', label: `HOTP (${hotpCount})` },
+                ] as { key: typeof filter; label: string }[]).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                      filter === key
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {accounts.length > 3 && (
+              <div className="relative ml-auto w-full sm:w-56">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search accounts…"
+                  className="h-7 pl-8 pr-7 text-xs"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 )}
-              >
-                {label}
-              </button>
-            ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -711,8 +1061,13 @@ export function TwoFactorAuth() {
           <EmptyState onAdd={() => setShowForm(true)} />
         ) : filtered.length === 0 && accounts.length > 0 ? (
           <div className="text-center py-8 text-xs text-muted-foreground">
-            No {filter.toUpperCase()} accounts.{' '}
-            <button className="underline hover:text-foreground" onClick={() => setFilter('all')}>Show all</button>
+            {search.trim() ? (
+              <>No accounts match "{search}".{' '}
+                <button className="underline hover:text-foreground" onClick={() => setSearch('')}>Clear search</button></>
+            ) : (
+              <>No {filter.toUpperCase()} accounts.{' '}
+                <button className="underline hover:text-foreground" onClick={() => setFilter('all')}>Show all</button></>
+            )}
           </div>
         ) : null}
 
