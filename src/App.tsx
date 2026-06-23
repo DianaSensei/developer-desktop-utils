@@ -537,8 +537,26 @@ function AppContent() {
     localStorage.setItem('devtool-sidebar-collapsed', isCollapsed.toString());
   }, [isCollapsed]);
 
+  // Timer that clears the temporary `.theme-transition` class after a toggle.
+  const themeTransitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (themeTransitionTimer.current) clearTimeout(themeTransitionTimer.current);
+  }, []);
+
   const toggleDark = () => {
-    setIsDark(!isDark);
+    // Animate the color swap, but only on an explicit user toggle and only when
+    // the user hasn't asked for reduced motion. The class is removed once the
+    // transition completes so it can never affect first paint or later interactions.
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduceMotion) {
+      const root = document.documentElement;
+      root.classList.add('theme-transition');
+      if (themeTransitionTimer.current) clearTimeout(themeTransitionTimer.current);
+      themeTransitionTimer.current = setTimeout(() => {
+        root.classList.remove('theme-transition');
+      }, 260);
+    }
+    setIsDark((prev) => !prev);
   };
 
   const toggleCollapse = () => {

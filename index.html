@@ -19,14 +19,18 @@
           if (dark) root.classList.add('dark');
           root.style.colorScheme = dark ? 'dark' : 'light';
           // Paint the right background immediately, before the CSS bundle loads.
-          root.style.backgroundColor = dark ? '#1f1f1f' : '#e5e5e5';
+          // Colors must match the resolved --background CSS variable exactly
+          // (light: hsl(0 0% 95%) = #f2f2f2, dark: hsl(0 0% 10%) = #1a1a1a) so
+          // there is no background shift when the stylesheet takes over.
+          root.style.backgroundColor = dark ? '#1a1a1a' : '#f2f2f2';
         } catch (e) {}
       })();
     </script>
     <style>
-      /* Hard guarantee against a white flash while the JS/CSS bundles load */
-      html { background-color: #e5e5e5; }
-      html.dark { background-color: #1f1f1f; }
+      /* Hard guarantee against a white flash while the JS/CSS bundles load.
+         Matches the resolved --background variable to avoid a paint shift. */
+      html { background-color: #f2f2f2; }
+      html.dark { background-color: #1a1a1a; }
     </style>
   </head>
   <body>

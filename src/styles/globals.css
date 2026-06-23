@@ -200,6 +200,21 @@
     @apply bg-primary/20;
   }
 
+  /* Smooth, controlled light/dark transition. This class is added to <html> by
+     the theme toggle handler only for the duration of the swap, then removed —
+     so it is never present on first paint (no load flash) and never fires on
+     anything other than an explicit user toggle. Only the color-bearing
+     properties transition; layout properties are intentionally excluded so
+     nothing reflows. Guarded out under reduce-motion via the block below. */
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition: background-color 220ms ease, border-color 220ms ease,
+      color 220ms ease, fill 220ms ease, stroke 220ms ease,
+      box-shadow 220ms ease !important;
+  }
+
   /* Respect the OS "reduce motion" setting — neutralize all animation/transition
      so the app stays instant and jank-free for users who opt out (and on the
      lowest-end Linux/Windows GPUs where compositing animation is expensive). */
