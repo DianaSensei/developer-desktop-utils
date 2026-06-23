@@ -408,6 +408,28 @@ import { copyToClipboard } from '@/lib/clipboard';
 await copyToClipboard(text);
 ```
 
+### Copy button — always use the shared `CopyButton`
+For any user-facing "copy" control, use `CopyButton` instead of wiring a raw
+`Button` to `copyToClipboard`. It gives every copy the same affordance: an
+animated Copy→Check cross-fade held for the user-configurable
+`editor.copyFeedbackMs` duration, with its own timer cleanup. Do **not**
+re-implement a local `copied` state / `setTimeout` swap.
+
+```tsx
+import { CopyButton } from '@/components/ui/copy-button';
+
+// Icon-only (size defaults to "icon" when there is no label)
+<CopyButton value={output} iconClassName="h-3.5 w-3.5" />
+
+// With a label and a lazily-computed value (resolved at click time)
+<CopyButton value={() => buildExport()} label="Copy" variant="outline" size="sm" />
+
+// Custom idle glyph (Check still shows on success)
+<CopyButton value={all} icon={Layers} label="Copy all" />
+```
+Props mirror `Button` (`variant`, `size`, `className`, `disabled`). `value`
+may be a string or a sync/async getter; empty/nullish values are ignored.
+
 ### Persist a setting
 ```tsx
 localStorage.setItem('devtool-my-setting', value);

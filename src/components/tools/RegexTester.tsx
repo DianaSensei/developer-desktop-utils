@@ -2,12 +2,12 @@ import { useDeferredValue, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Copy, Layers } from 'lucide-react';
+import { CopyButton } from '@/components/ui/copy-button';
+import { Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { copyToClipboard } from '@/lib/clipboard';
 
 type ResultView = 'matches' | 'highlight' | 'extract' | 'replace';
 
@@ -344,15 +344,15 @@ export function RegexTester() {
                 </div>
                 {/* Copy all matches */}
                 {result.matches.length > 0 && resultView === 'matches' && (
-                  <Button
-                    size="sm"
+                  <CopyButton
+                    value={() => result.matches.map((m) => m[0]).join('\n')}
+                    icon={Layers}
+                    label="Copy all"
                     variant="ghost"
-                    className="shrink-0 h-6 px-2 mr-1 text-xs gap-1"
-                    onClick={() => copyToClipboard(result.matches.map((m) => m[0]).join('\n'))}
-                  >
-                    <Layers className="h-3 w-3" />
-                    Copy all
-                  </Button>
+                    size="sm"
+                    className="shrink-0 h-6 px-2 mr-1 text-xs"
+                    iconClassName="h-3 w-3"
+                  />
                 )}
               </>
             )}
@@ -388,9 +388,7 @@ export function RegexTester() {
                           </div>
                           <p className="font-mono text-sm text-foreground break-all">&quot;{m[0]}&quot;</p>
                         </div>
-                        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => copyToClipboard(m[0])}>
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                        <CopyButton value={m[0]} className="h-6 w-6 shrink-0" iconClassName="h-3 w-3" />
                       </div>
                       {m.length > 1 && (
                         <div className="mt-2 space-y-1 pl-2 border-l-2 border-green-300/60 dark:border-green-700/60">
@@ -405,9 +403,7 @@ export function RegexTester() {
                                   {g !== undefined ? `"${g}"` : <span className="opacity-40">undefined</span>}
                                 </span>
                                 {g !== undefined && (
-                                  <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0 ml-auto" onClick={() => copyToClipboard(g)}>
-                                    <Copy className="h-2.5 w-2.5" />
-                                  </Button>
+                                  <CopyButton value={g} className="h-5 w-5 shrink-0 ml-auto" iconClassName="h-2.5 w-2.5" />
                                 )}
                               </div>
                             );
@@ -497,19 +493,18 @@ export function RegexTester() {
                     <p className="text-[11px] text-muted-foreground">
                       {result.matches[0].length - 1} group{result.matches[0].length - 1 !== 1 ? 's' : ''} captured per match
                     </p>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-2 text-[11px] gap-1"
-                      onClick={() => {
+                    <CopyButton
+                      value={() => {
                         const header = ['#', 'Pos', 'Match', ...result.matches[0].slice(1).map((_, i) => groupNames[i] ? `<${groupNames[i]}>` : `Group ${i + 1}`)].join('\t');
                         const rows = result.matches.map((m, i) => [i + 1, m.index, m[0], ...m.slice(1).map(g => g ?? '')].join('\t'));
-                        copyToClipboard([header, ...rows].join('\n'));
+                        return [header, ...rows].join('\n');
                       }}
-                    >
-                      <Copy className="h-2.5 w-2.5" />
-                      Copy table
-                    </Button>
+                      label="Copy table"
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 px-2 text-[11px]"
+                      iconClassName="h-2.5 w-2.5"
+                    />
                   </div>
                   <div className="overflow-x-auto rounded-lg border border-border">
                     <table className="w-full text-xs font-mono border-collapse">
@@ -575,9 +570,15 @@ export function RegexTester() {
                           </span>
                         )}
                       </label>
-                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={!replaceResult.output} onClick={() => copyToClipboard(replaceResult.output)}>
-                        <Copy className="h-3 w-3 mr-1" />Copy
-                      </Button>
+                      <CopyButton
+                        value={replaceResult.output}
+                        label="Copy"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        iconClassName="h-3 w-3"
+                        disabled={!replaceResult.output}
+                      />
                     </div>
                     <Textarea
                       value={replaceResult.output}

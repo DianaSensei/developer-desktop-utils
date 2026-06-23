@@ -3,7 +3,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Copy, Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, Workflow } from 'lucide-react';
+import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, Workflow } from 'lucide-react';
 import { PipelineTab } from './PipelineTab';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import CryptoJS from 'crypto-js';
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { copyToClipboard } from '@/lib/clipboard';
+import { CopyButton } from '@/components/ui/copy-button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -672,9 +672,7 @@ export function Base64Tool() {
             <div className="flex flex-col min-h-0">
               <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">Output</span>
-                <Button onClick={() => copyToClipboard(encodeOutput)} size="sm" variant="ghost" disabled={!encodeOutput} className="h-6 px-2 text-xs rounded-lg">
-                  <Copy className="h-3 w-3 mr-1" />Copy
-                </Button>
+                <CopyButton value={encodeOutput} label="Copy" variant="ghost" size="sm" disabled={!encodeOutput} className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />
               </div>
               <Textarea
                 value={encodeError ? `Error: ${encodeError}` : encodeOutput}
@@ -748,9 +746,7 @@ export function Base64Tool() {
                       'shrink-0 flex items-center gap-1 transition-opacity',
                       isVerifying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     )}>
-                      <Button size="icon" variant="ghost" disabled={!value} onClick={() => copyToClipboard(value)} className="h-7 w-7" title="Copy">
-                        <Copy className="h-3 w-3" />
-                      </Button>
+                      <CopyButton value={value} disabled={!value} className="h-7 w-7" iconClassName="h-3 w-3" />
                       <Button size="icon" variant={isVerifying ? 'secondary' : 'ghost'} disabled={!value} onClick={() => toggleVerify(id)} className="h-7 w-7" title="Verify hash">
                         <Check className="h-3 w-3" />
                       </Button>
@@ -826,9 +822,7 @@ export function Base64Tool() {
                         className="flex-1 h-7 font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
                         placeholder={`${chars} hex chars`}
                       />
-                      <Button size="icon" variant="ghost" disabled={!value} onClick={() => copyToClipboard(value)} className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" title="Copy">
-                        <Copy className="h-3 w-3" />
-                      </Button>
+                      <CopyButton value={value} disabled={!value} className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" iconClassName="h-3 w-3" />
                     </div>
                   );
                 })}
@@ -936,9 +930,7 @@ export function Base64Tool() {
               <div className="flex items-center justify-between">
                 <ToolLabel>{cryptoMode === 'encrypt' ? 'Ciphertext' : 'Plaintext'}</ToolLabel>
                 {cryptoResult.output && (
-                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => copyToClipboard(cryptoResult.output)}>
-                    <Copy className="h-3 w-3 mr-1" />Copy
-                  </Button>
+                  <CopyButton value={cryptoResult.output} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
                 )}
               </div>
               {cryptoResult.error ? (

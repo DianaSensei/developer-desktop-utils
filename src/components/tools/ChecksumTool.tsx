@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
-import { Copy, Upload, X, CheckCircle, XCircle } from 'lucide-react';
-import { copyToClipboard } from '@/lib/clipboard';
+import { Upload, X, CheckCircle, XCircle } from 'lucide-react';
+import { CopyButton } from '@/components/ui/copy-button';
 import { cn } from '@/lib/utils';
 
 const ALGORITHMS = [
@@ -300,12 +300,12 @@ export function ChecksumTool() {
               </div>
               <div className="flex items-center gap-3 px-3 py-2.5">
                 <span className="flex-1 font-mono text-xs break-all">{hash}</span>
-                <button
-                  onClick={() => copyToClipboard(hash)}
-                  className="shrink-0 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Copy className="h-3 w-3" />
-                </button>
+                <CopyButton
+                  value={hash}
+                  title="Copy hash"
+                  className="h-6 w-6 shrink-0 rounded text-muted-foreground"
+                  iconClassName="h-3 w-3"
+                />
               </div>
             </div>
 

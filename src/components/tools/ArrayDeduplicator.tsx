@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCheck, ChevronsDown, ChevronsUp, Copy, Loader2, X } from 'lucide-react';
+import { ChevronsDown, ChevronsUp, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { copyToClipboard } from '@/lib/clipboard';
+import { CopyButton } from '@/components/ui/copy-button';
 
 type DedupeMode = 'preserve' | 'sort';
 
@@ -100,7 +99,6 @@ const AREA_CLASS =
 const AREA_STYLE = { lineHeight: `${LINE_H}px`, paddingTop: `${AREA_PT}px` } as const;
 
 export function ArrayDeduplicator() {
-  const { config } = useAppConfig();
   const [mode, setMode] = usePersistentState<DedupeMode>('devtool:deduplicate:mode', 'preserve');
   const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -113,9 +111,6 @@ export function ArrayDeduplicator() {
   const [hasInput, setHasInput] = useState(false);
   const [result, setResult] = useState<DedupeResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   useEffect(() => {
     if (outputRef.current) outputRef.current.value = result?.output ?? '';
@@ -406,14 +401,6 @@ export function ArrayDeduplicator() {
     else if (inputRef.current) inputRef.current.scrollTop = inputRef.current.scrollHeight;
   };
 
-  const handleCopy = async () => {
-    if (!result) return;
-    await copyToClipboard(result.output);
-    setCopied(true);
-    if (copyTimer.current) clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
-  };
-
   const stats = hasInput && !isProcessing ? result : null;
   // Hide native scrollbars in preserve mode — the center scrollbar takes over.
   const areaClass = cn(AREA_CLASS, mode === 'preserve' && 'no-scrollbar');
@@ -507,17 +494,15 @@ export function ArrayDeduplicator() {
         >
           <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30">
             <span className="text-xs font-medium text-muted-foreground">Output</span>
-            <Button
-              onClick={handleCopy}
-              size="sm"
+            <CopyButton
+              value={() => result?.output ?? ''}
+              label="Copy"
               variant="ghost"
+              size="sm"
               disabled={isProcessing || !result?.output}
-              className="h-6 px-2 text-xs gap-1.5 -mr-1"
-            >
-              {copied
-                ? <><CheckCheck className="h-3.5 w-3.5 text-green-500" />Copied</>
-                : <><Copy className="h-3.5 w-3.5" />Copy</>}
-            </Button>
+              className="h-6 px-2 text-xs -mr-1"
+              iconClassName="h-3.5 w-3.5"
+            />
           </div>
           <div className="flex-1 min-h-0 flex">
             <LineNumbers textareaRef={outputRef} lineCount={result?.unique ?? 0} />
