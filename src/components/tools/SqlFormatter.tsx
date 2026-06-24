@@ -473,7 +473,14 @@ export function SqlFormatter() {
     });
 
     viewRef.current = view;
-    return () => { view.destroy(); viewRef.current = null; };
+
+    // Force a layout re-measure on the next frame. In the production build the
+    // editor can mount before its (lazy-loaded) flex container has a resolved
+    // height; without this CodeMirror caches a 0-height viewport and renders its
+    // gutter/content collapsed. In dev StrictMode's double-mount hides this.
+    const raf = requestAnimationFrame(() => view.requestMeasure());
+
+    return () => { cancelAnimationFrame(raf); view.destroy(); viewRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -589,14 +596,17 @@ export function SqlFormatter() {
         </div>
       </div>
 
-      {/* Editor — fills remaining height. overflow-hidden on the mount container
-          is required for CodeMirror's flex layout to resolve on WebKitGTK (Linux)
-          and WebView2 (Windows); without it the editor collapses / the input
-          becomes unusable. See docs/ai/CLAUDE.md "CodeMirror 6 in flex layouts". */}
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {/* Editor — fills remaining height. The mount node is absolutely positioned
+          (inset-0) inside a `relative` parent so it always has a *definite*
+          resolved height. A pure flex/`h-full` chain resolves to 0 height on the
+          production WebKitGTK (Linux) / WebView2 (Windows) builds — it only
+          appears to work in dev because React StrictMode double-mounts the editor
+          after layout settles. Absolute positioning removes that dependency.
+          See docs/ai/CLAUDE.md "CodeMirror 6 in flex layouts". */}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
         <div
           ref={containerRef}
-          className="flex flex-col flex-1 min-h-0 overflow-hidden [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
+          className="absolute inset-0 flex flex-col overflow-hidden [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
         />
       </div>
 
