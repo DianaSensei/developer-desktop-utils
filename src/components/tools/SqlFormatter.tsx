@@ -589,11 +589,14 @@ export function SqlFormatter() {
         </div>
       </div>
 
-      {/* Editor — fills remaining height */}
-      <div className="flex flex-col flex-1 min-h-0">
+      {/* Editor — fills remaining height. overflow-hidden on the mount container
+          is required for CodeMirror's flex layout to resolve on WebKitGTK (Linux)
+          and WebView2 (Windows); without it the editor collapses / the input
+          becomes unusable. See docs/ai/CLAUDE.md "CodeMirror 6 in flex layouts". */}
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
           ref={containerRef}
-          className="flex flex-col flex-1 min-h-0 [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
+          className="flex flex-col flex-1 min-h-0 overflow-hidden [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
         />
       </div>
 
