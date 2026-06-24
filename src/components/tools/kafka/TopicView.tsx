@@ -112,9 +112,6 @@ export function TopicView({
             onClick={() => onSelectTab(tab.id)}
           >
             {tab.label}
-            {tab.id === 'consumers' && data && data.consumerGroups.length > 0 && (
-              <span className="ml-1 text-muted-foreground">({data.consumerGroups.length})</span>
-            )}
           </button>
         ))}
       </div>
@@ -140,7 +137,7 @@ export function TopicView({
             )}
             {selectedTab === 'consumers' && (
               <div className="h-full overflow-y-auto">
-                <ConsumersTab consumerGroups={data.consumerGroups} onSelectGroup={onSelectGroup} />
+                <ConsumersTab brokerId={brokerId} topic={topic} onSelectGroup={onSelectGroup} />
               </div>
             )}
             {selectedTab === 'produce' && (

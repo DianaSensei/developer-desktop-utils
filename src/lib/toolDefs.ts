@@ -203,6 +203,7 @@ export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
 // Edit this array to change the out-of-box sort order before a build.
 export const DEFAULT_TOOL_ORDER: string[] = [
   "task-tracker",
+    "meeting-notes",
   "api-client",
   "json",
   "deduplicate",
@@ -216,14 +217,13 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "diff",
   "checksum",
   "cron-generator",
+    "kafka-explorer",
   "qrcode",
   "image-base64",
   "color-picker",
   "jwt",
   "markdown",
-  "meeting-notes",
   "lucky-wheel",
   "network",
-  "kafka-explorer",
   "2fa",
 ];

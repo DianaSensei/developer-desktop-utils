@@ -52,7 +52,6 @@ pub struct GroupLag {
 pub struct TopicDetails {
     pub name: String,
     pub partitions: Vec<PartitionInfo>,
-    pub consumer_groups: Vec<GroupLag>,
     pub replication_factor: i32,
 }
 
@@ -631,12 +630,60 @@ pub async fn kafka_topic_details(
         latest_offset: latest_map.get(&id).copied().unwrap_or(-1),
     }).collect();
 
+    // Note: consumer groups are NOT gathered here — opening a topic must stay
+    // cheap. The Consumers tab fetches them on demand via
+    // `kafka_topic_consumer_groups`.
     Ok(TopicDetails {
         name: topic,
         partitions,
-        consumer_groups: vec![],
         replication_factor: summary.replication_factor,
     })
+}
+
+/// Consumer groups committed to a topic — used only when the user opens the
+/// Consumers tab, never on topic open. Lists every group once, then asks each
+/// for its committed offsets on this topic's partitions over a single
+/// connection. `wire_offset_fetch` only returns partitions with a real (>= 0)
+/// committed offset, so groups that never consumed this topic contribute
+/// nothing.
+#[tauri::command]
+pub async fn kafka_topic_consumer_groups(
+    app: AppHandle,
+    config_id: String,
+    topic: String,
+) -> Result<Vec<GroupLag>, String> {
+    let config = find_config(&app, &config_id)?;
+    let mut stream = open_kafka_stream(&config).await?;
+
+    let meta = wire_metadata(&mut stream, &[topic.as_str()]).await?;
+    let summary = meta.into_iter().find(|t| t.name == topic)
+        .ok_or_else(|| format!("Topic '{}' not found", topic))?;
+    let partition_ids: Vec<i32> = (0..summary.partition_count).collect();
+
+    let latest: std::collections::HashMap<i32, i64> =
+        wire_list_offsets(&mut stream, &topic, &partition_ids, -1).await
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+
+    let groups = wire_list_groups(&mut stream).await?;
+    let topics_arg = [(topic.as_str(), partition_ids)];
+    let mut result: Vec<GroupLag> = Vec::new();
+    for g in &groups {
+        if let Ok(offsets) = wire_offset_fetch(&mut stream, &g.group_id, &topics_arg).await {
+            for (_t, partition, committed_offset) in offsets {
+                let latest_off = latest.get(&partition).copied().unwrap_or(-1);
+                let lag = if latest_off >= 0 && committed_offset >= 0 {
+                    latest_off - committed_offset
+                } else {
+                    -1
+                };
+                result.push(GroupLag { group_id: g.group_id.clone(), partition, committed_offset, lag });
+            }
+        }
+    }
+    result.sort_by(|a, b| a.group_id.cmp(&b.group_id).then(a.partition.cmp(&b.partition)));
+    Ok(result)
 }
 
 #[tauri::command]

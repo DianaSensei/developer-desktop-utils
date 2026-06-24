@@ -23,6 +23,7 @@ fn main() {
             kafka::kafka_test_connection,
             kafka::kafka_list_topics,
             kafka::kafka_topic_details,
+            kafka::kafka_topic_consumer_groups,
             kafka::kafka_create_topic,
             kafka::kafka_list_groups,
             kafka::kafka_group_details,

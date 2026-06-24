@@ -33,7 +33,6 @@ export interface GroupLag {
 export interface TopicDetails {
   name: string;
   partitions: PartitionInfo[];
-  consumerGroups: GroupLag[];
   replicationFactor: number;
 }
 
@@ -109,6 +108,10 @@ export const kafkaApi = {
 
   topicDetails: (configId: string, topic: string) =>
     invoke<TopicDetails>('kafka_topic_details', { configId, topic }),
+
+  // On-demand only (Consumers tab) — scans groups, so never call on topic open.
+  topicConsumerGroups: (configId: string, topic: string) =>
+    invoke<GroupLag[]>('kafka_topic_consumer_groups', { configId, topic }),
 
   createTopic: (configId: string, name: string, numPartitions: number, replicationFactor: number) =>
     invoke<void>('kafka_create_topic', { configId, name, numPartitions, replicationFactor }),

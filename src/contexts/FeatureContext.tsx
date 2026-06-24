@@ -39,7 +39,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'kafka-explorer': false,
   'sql-formatter': false,
   'network': false,
-  'meeting-notes': false,
+  'meeting-notes': true,
   'lucky-wheel': false,
   '2fa': true,
   'settings': true,
