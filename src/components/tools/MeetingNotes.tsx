@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Input } from '@/components/ui/input';
+import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { Copy, CheckCircle2, Plus, Search, Trash2, NotebookPen, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -126,21 +127,16 @@ export function MeetingNotes() {
       {selected ? (
         <div className="flex min-h-0 flex-col">
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/10 px-4 py-2">
-            <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-              {(['edit', 'markdown', 'preview'] as ViewMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMode(m)}
-                  className={cn(
-                    'rounded-md px-3 text-xs font-medium capitalize transition-all duration-150',
-                    mode === m ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              value={mode}
+              onValueChange={setMode}
+              options={[
+                { value: 'edit', label: 'Edit' },
+                { value: 'markdown', label: 'Markdown' },
+                { value: 'preview', label: 'Preview' },
+              ]}
+              aria-label="Note view"
+            />
             <div className="flex items-center gap-1.5">
               <button
                 type="button"

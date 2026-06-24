@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Segmented } from '@/components/ui/segmented';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -554,25 +555,16 @@ export function JsonFormatter() {
       {/* Toolbar */}
       <div className="shrink-0 header-premium px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-            {([
-              { id: 'beautify', label: 'Beautify' },
-              { id: 'string', label: 'JSON String' },
-              { id: 'minify', label: 'Minify' },
-            ] as Array<{ id: Mode; label: string }>).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setMode(item.id)}
-                className={cn(
-                  'rounded-md px-3 text-xs font-medium transition-all duration-150',
-                  mode === item.id ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            value={mode}
+            onValueChange={setMode}
+            options={[
+              { value: 'beautify', label: 'Beautify' },
+              { value: 'string', label: 'JSON String' },
+              { value: 'minify', label: 'Minify' },
+            ]}
+            aria-label="JSON mode"
+          />
 
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Indent</span>

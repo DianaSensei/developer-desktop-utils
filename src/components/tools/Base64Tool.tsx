@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, Workflow } from 'lucide-react';
 import { PipelineTab } from './PipelineTab';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
+import { Segmented } from '@/components/ui/segmented';
 import CryptoJS from 'crypto-js';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -605,27 +606,17 @@ export function Base64Tool() {
 
       {/* Top-level tab navigation */}
       <div className="shrink-0 header-premium px-4 py-2.5 flex items-center gap-3">
-        <div className="inline-flex h-9 rounded-lg border border-border bg-muted/50 p-0.5">
-          {([
-            { id: 'encode',   icon: Code,           label: 'Encode'   },
-            { id: 'hash',     icon: Lock,           label: 'Hash'     },
-            { id: 'encrypt',  icon: ArrowLeftRight, label: 'Encrypt'  },
-            { id: 'pipeline', icon: Workflow,        label: 'Pipeline' },
-          ] as const).map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-md px-4 text-sm font-medium transition-all duration-150',
-                tab === id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          value={tab}
+          onValueChange={setTab}
+          options={[
+            { value: 'encode', label: 'Encode', icon: Code },
+            { value: 'hash', label: 'Hash', icon: Lock },
+            { value: 'encrypt', label: 'Encrypt', icon: ArrowLeftRight },
+            { value: 'pipeline', label: 'Pipeline', icon: Workflow },
+          ]}
+          aria-label="Tool tab"
+        />
       </div>
 
       {/* ── Encode tab ───────────────────────────────────────────────────────── */}
@@ -638,21 +629,16 @@ export function Base64Tool() {
                 {CODECS.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
               </SelectContent>
             </Select>
-            <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-              {(['encode', 'decode'] as EncodeMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setEncodeMode(m)}
-                  className={cn(
-                    'rounded-md px-3.5 text-xs font-medium capitalize transition-all duration-150',
-                    encodeMode === m ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              value={encodeMode}
+              onValueChange={setEncodeMode}
+              size="sm"
+              options={[
+                { value: 'encode', label: 'Encode' },
+                { value: 'decode', label: 'Decode' },
+              ]}
+              aria-label="Encode mode"
+            />
             <span className="text-xs text-muted-foreground truncate hidden sm:block">{codec.description}</span>
           </div>
 
@@ -859,21 +845,16 @@ export function Base64Tool() {
               </SelectContent>
             </Select>
 
-            <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-              {(['encrypt', 'decrypt'] as CryptoMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setCryptoMode(m)}
-                  className={cn(
-                    'rounded-md px-3.5 text-xs font-medium capitalize transition-all duration-150',
-                    cryptoMode === m ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              value={cryptoMode}
+              onValueChange={setCryptoMode}
+              size="sm"
+              options={[
+                { value: 'encrypt', label: 'Encrypt' },
+                { value: 'decrypt', label: 'Decrypt' },
+              ]}
+              aria-label="Crypto mode"
+            />
           </div>
 
           {/* Algorithm description banner */}

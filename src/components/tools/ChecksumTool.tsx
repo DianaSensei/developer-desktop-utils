@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Upload, X, CheckCircle, XCircle } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/utils';
 
 const ALGORITHMS = [
@@ -210,22 +211,12 @@ export function ChecksumTool() {
         {/* Algorithm */}
         <div className="space-y-1.5">
           <div className="text-xs text-muted-foreground font-medium">Algorithm</div>
-          <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-            {ALGORITHMS.map(({ label, id }) => (
-              <button
-                key={id}
-                onClick={() => handleAlgoChange(id)}
-                className={cn(
-                  'rounded-md px-3 text-xs font-mono transition-all duration-150',
-                  algo === id
-                    ? 'bg-card text-foreground shadow-sm-premium'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            value={algo}
+            onValueChange={handleAlgoChange}
+            options={ALGORITHMS.map(({ label, id }) => ({ value: id, label }))}
+            aria-label="Checksum algorithm"
+          />
         </div>
 
         {/* Step 2 — drop zone */}

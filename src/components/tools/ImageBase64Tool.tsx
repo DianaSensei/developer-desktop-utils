@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Upload, X, AlertCircle, ClipboardPaste } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
-import { cn } from '@/lib/utils';
+import { Segmented } from '@/components/ui/segmented';
+import { DropZone } from '@/components/ui/drop-zone';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { copyImageToClipboard, readImageFromClipboard } from '@/lib/clipboard';
@@ -36,8 +37,6 @@ export function ImageBase64Tool() {
   // Encode side
   const [encodeDataUrl, setEncodeDataUrl] = useState<string | null>(null);
   const [encodeFile, setEncodeFile] = useState<File | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Decode side
   const [decodeInput, setDecodeInput] = usePersistentState('devtool:imgbase64:input', '');
@@ -72,17 +71,9 @@ export function ImageBase64Tool() {
     if (dataUrl) loadFromDataUrl(dataUrl);
   }, [loadFromDataUrl]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) processImageFile(f);
-  }, [processImageFile]);
-
   const clearEncode = () => {
     setEncodeFile(null);
     setEncodeDataUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const base64Only = encodeDataUrl ? encodeDataUrl.split(',')[1] : '';
@@ -94,47 +85,27 @@ export function ImageBase64Tool() {
       <div className="p-4 space-y-4">
 
         {/* Mode tabs */}
-        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-          {([['encode', 'Image → Base64'], ['decode', 'Base64 → Image']] as [Mode, string][]).map(([m, label]) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={cn(
-                'rounded-md px-3 text-xs font-medium transition-all duration-150',
-                mode === m ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          value={mode}
+          onValueChange={setMode}
+          options={[
+            { value: 'encode', label: 'Image → Base64' },
+            { value: 'decode', label: 'Base64 → Image' },
+          ]}
+          aria-label="Image/Base64 mode"
+        />
 
         {mode === 'encode' ? (
           <div className="space-y-3">
             {/* Drop zone */}
             {!encodeDataUrl ? (
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 cursor-pointer transition-colors',
-                  dragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/30'
-                )}
+              <DropZone
+                icon={Upload}
+                title="Drop an image here"
+                hint="or click to browse · PNG, JPG, GIF, WebP…"
+                accept="image/*"
+                onFiles={(files) => { const f = files[0]; if (f) processImageFile(f); }}
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) processImageFile(f); }}
-                />
-                <Upload className="h-8 w-8 text-muted-foreground/50" />
-                <div className="text-center">
-                  <p className="text-sm font-medium">Drop an image here</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">or click to browse · PNG, JPG, GIF, WebP…</p>
-                </div>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); void pasteFromClipboard(); }}
@@ -143,7 +114,7 @@ export function ImageBase64Tool() {
                   <ClipboardPaste className="h-3.5 w-3.5" />
                   Paste from clipboard · {quickPasteHint}
                 </button>
-              </div>
+              </DropZone>
             ) : (
               <div className="space-y-3">
                 {/* Preview */}

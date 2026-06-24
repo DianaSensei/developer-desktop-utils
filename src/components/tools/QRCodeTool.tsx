@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { Segmented } from '@/components/ui/segmented';
 import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Loader2, ExternalLink, ClipboardPaste } from 'lucide-react';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -646,25 +647,15 @@ export function QRCodeTool() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-4 space-y-4">
-        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-          {([
-            { id: 'generate' as QrMode, label: 'Generate', Icon: QrCodeIcon },
-            { id: 'read' as QrMode, label: 'Read', Icon: ScanLine },
-          ]).map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setMode(id)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-all duration-150',
-                mode === id ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          value={mode}
+          onValueChange={setMode}
+          options={[
+            { value: 'generate', label: 'Generate', icon: QrCodeIcon },
+            { value: 'read', label: 'Read', icon: ScanLine },
+          ]}
+          aria-label="QR mode"
+        />
         {mode === 'generate' ? <QrGenerator /> : <QrReader />}
       </div>
     </div>

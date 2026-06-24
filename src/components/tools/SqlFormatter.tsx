@@ -9,6 +9,7 @@ import type { CompletionContext, CompletionResult, Completion } from '@codemirro
 import { Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -402,27 +403,6 @@ const codeHighlight = HighlightStyle.define([
 
 type Mode = 'sql' | 'mongo';
 
-function ModeTab({ active, onClick, children }: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'rounded-md px-3 text-xs font-medium transition-all duration-150',
-        active
-          ? 'bg-card text-foreground shadow-sm-premium'
-          : 'text-muted-foreground hover:text-foreground'
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 function ToggleChip({ active, onClick, children }: {
   active: boolean;
   onClick: () => void;
@@ -565,10 +545,16 @@ export function SqlFormatter() {
       <div className="shrink-0 header-premium px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* Mode switcher */}
-          <div className="inline-flex h-8 gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5 shrink-0">
-            <ModeTab active={mode === 'sql'}   onClick={() => handleModeChange('sql')}>SQL</ModeTab>
-            <ModeTab active={mode === 'mongo'} onClick={() => handleModeChange('mongo')}>MongoDB</ModeTab>
-          </div>
+          <Segmented
+            value={mode}
+            onValueChange={handleModeChange}
+            options={[
+              { value: 'sql', label: 'SQL' },
+              { value: 'mongo', label: 'MongoDB' },
+            ]}
+            aria-label="Formatter mode"
+            className="shrink-0"
+          />
 
           <div className="h-4 w-px bg-border shrink-0" />
 

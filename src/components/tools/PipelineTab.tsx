@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -534,31 +535,30 @@ function JsonInputSection({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground font-medium">Format</span>
-          <div className="inline-flex h-7 rounded-lg border border-border bg-muted/40 p-0.5">
-            {(['key=value', 'value'] as const).map((f) => (
-              <button key={f} type="button" onClick={() => onUpdate({ jsonFormat: f })}
-                className={cn(
-                  'rounded-md px-2.5 text-[10px] font-mono transition-all',
-                  jsonFormat === f ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                )}>
-                {f === 'key=value' ? 'key=value' : 'value only'}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            value={jsonFormat}
+            onValueChange={(v) => onUpdate({ jsonFormat: v })}
+            size="sm"
+            options={[
+              { value: 'key=value', label: 'key=value' },
+              { value: 'value', label: 'value only' },
+            ]}
+            aria-label="JSON format"
+          />
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground font-medium">Sort</span>
-          <div className="inline-flex h-7 rounded-lg border border-border bg-muted/40 p-0.5">
-            {(['none', 'asc', 'desc'] as const).map((s) => (
-              <button key={s} type="button" onClick={() => onUpdate({ jsonSort: s })}
-                className={cn(
-                  'rounded-md px-2 text-[10px] font-medium transition-all flex items-center gap-0.5',
-                  jsonSort === s ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                )}>
-                {s === 'none' ? 'None' : s === 'asc' ? 'A→Z' : 'Z→A'}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            value={jsonSort}
+            onValueChange={(v) => onUpdate({ jsonSort: v })}
+            size="sm"
+            options={[
+              { value: 'none', label: 'None' },
+              { value: 'asc', label: 'A→Z' },
+              { value: 'desc', label: 'Z→A' },
+            ]}
+            aria-label="JSON sort"
+          />
         </div>
       </div>
 

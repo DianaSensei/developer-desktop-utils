@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
@@ -183,7 +184,7 @@ export function TextTransformer() {
   return (
     <div className="flex flex-col h-full">
       {/* Options toolbar */}
-      <div className="shrink-0 header-premium px-4 py-2.5">
+      <ToolToolbar>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
             <SelectTrigger className="h-8 w-52 text-xs rounded-lg">
@@ -236,46 +237,42 @@ export function TextTransformer() {
             </div>
           )}
         </div>
-      </div>
+      </ToolToolbar>
 
-      {/* Input / Output — each half of remaining height */}
-      <div className="flex-1 min-h-0 grid grid-rows-2 divide-y divide-border overflow-hidden">
-        {/* Input */}
-        <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Input</span>
-            <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
-          </div>
+      <ToolPanes>
+        <ToolPane>
+          <PaneHeader label="Input" hint={quickPasteHint} />
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Enter text to transform"
             className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
           />
-        </div>
+        </ToolPane>
 
-        {/* Output */}
-        <div className="flex flex-col min-h-0">
-          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Output</span>
-            <CopyButton
-              value={output}
-              label="Copy"
-              size="sm"
-              variant="ghost"
-              disabled={!output}
-              className="h-6 px-2 text-xs rounded-lg"
-              iconClassName="h-3 w-3"
-            />
-          </div>
+        <ToolPane>
+          <PaneHeader
+            label="Output"
+            action={
+              <CopyButton
+                value={output}
+                label="Copy"
+                size="sm"
+                variant="ghost"
+                disabled={!output}
+                className="h-6 px-2 text-xs rounded-lg"
+                iconClassName="h-3 w-3"
+              />
+            }
+          />
           <Textarea
             value={output}
             readOnly
             placeholder="Result appears here"
             className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
           />
-        </div>
-      </div>
+        </ToolPane>
+      </ToolPanes>
     </div>
   );
 }

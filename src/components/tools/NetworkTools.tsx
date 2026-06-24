@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Segmented } from '@/components/ui/segmented';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -666,21 +667,12 @@ export function NetworkTools() {
     <div className="flex h-full min-h-0 flex-col">
       {/* View switcher */}
       <div className="shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-border px-3 py-2.5 sm:px-4">
-        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5">
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => setView(v.id)}
-              className={cn(
-                'rounded-md px-3 text-xs font-medium transition-all duration-150 whitespace-nowrap',
-                view === v.id ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          value={view}
+          onValueChange={setView}
+          options={VIEWS.map((v) => ({ value: v.id, label: v.label }))}
+          aria-label="Network view"
+        />
         <span className="ml-auto hidden shrink-0 lg:block text-[11px] text-muted-foreground">
           via Cloudflare · Google · Quad9 · AdGuard · ipapi.co
         </span>

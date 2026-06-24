@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Segmented } from '@/components/ui/segmented';
 import { RefreshCw } from 'lucide-react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
@@ -33,20 +34,6 @@ function randomNumber(min: number, max: number, decimals: number): string {
   const range = max - min;
   const val = min + Math.random() * range;
   return decimals === 0 ? Math.floor(val).toString() : val.toFixed(decimals);
-}
-
-function ModeTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'rounded-md px-3 text-xs font-medium transition-all duration-150',
-        active ? 'bg-card text-foreground shadow-sm-premium' : 'text-muted-foreground hover:text-foreground'
-      )}
-    >
-      {children}
-    </button>
-  );
 }
 
 function ResultList({ items }: { items: string[] }) {
@@ -133,11 +120,16 @@ export function GeneratorTool() {
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="shrink-0 header-premium px-4 py-2.5 flex items-center gap-3">
-        <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5 gap-0.5">
-          <ModeTab active={mode === 'uuid'}   onClick={() => setMode('uuid')}>UUID</ModeTab>
-          <ModeTab active={mode === 'number'} onClick={() => setMode('number')}>Number</ModeTab>
-          <ModeTab active={mode === 'text'}   onClick={() => setMode('text')}>Text</ModeTab>
-        </div>
+        <Segmented
+          value={mode}
+          onValueChange={setMode}
+          options={[
+            { value: 'uuid', label: 'UUID' },
+            { value: 'number', label: 'Number' },
+            { value: 'text', label: 'Text' },
+          ]}
+          aria-label="Generator mode"
+        />
 
         {mode === 'uuid' && (
           <div className="flex items-center gap-1.5">
