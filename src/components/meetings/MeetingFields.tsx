@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,45 +50,41 @@ export function MeetingFields({
   // ── compact stack (dialog) ─────────────────────────────────────────────────
   if (variant === 'dialog') {
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
+        {/* Title — prominent, borderless */}
+        <Input
+          value={meeting.title}
+          onChange={(e) => onChange({ title: e.target.value })}
+          placeholder="Untitled meeting"
+          autoFocus={!meeting.title}
+          className="h-auto rounded-none border-0 border-b bg-transparent px-0 py-1.5 text-base font-semibold shadow-none focus-visible:border-ring/60 focus-visible:ring-0"
+        />
+
+        {/* When — one tidy row */}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-2">
+          <DatePicker value={dateISO} onChange={setDate} className="h-8" />
+          <TimePicker value={toHM(meeting.start)} onChange={setStartTime} className="h-8 w-[86px]" />
+          <span className="text-muted-foreground">–</span>
+          <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-8 w-[86px]" />
+          <span className="ml-auto rounded-md bg-foreground/5 px-2 py-1 text-xs font-medium tabular-nums text-muted-foreground">{duration}</span>
+        </div>
+
+        {/* Participants — single line */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Title</Label>
-          <Input value={meeting.title} onChange={(e) => onChange({ title: e.target.value })} placeholder="Weekly sync…" className="h-9 text-sm" />
+          <Label className="flex items-center gap-1.5 text-xs"><Users className="h-3.5 w-3.5 text-muted-foreground" /> Participants</Label>
+          <Input value={meeting.participants} onChange={(e) => onChange({ participants: e.target.value })} placeholder="Alice, Bob, Carol" className="h-9 text-sm" />
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Date</Label>
-            <DatePicker value={dateISO} onChange={setDate} className="h-9" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Start</Label>
-            <TimePicker value={toHM(meeting.start)} onChange={setStartTime} className="h-9 w-[94px]" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">End</Label>
-            <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-9 w-[94px]" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Duration</Label>
-            <div className="flex h-9 items-center rounded-md border bg-muted/40 px-2.5 text-sm font-medium tabular-nums">{duration}</div>
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Participants <span className="text-muted-foreground/60">— commas or new lines</span></Label>
-          <Textarea value={meeting.participants} onChange={(e) => onChange({ participants: e.target.value })} placeholder="Alice, Bob, Carol" className="min-h-[44px] resize-y text-sm" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Agenda &amp; Discussion</Label>
-          <Textarea value={meeting.agenda} onChange={(e) => onChange({ agenda: e.target.value })} placeholder={'Reviewed Q2 roadmap'} className="min-h-[72px] resize-y text-sm" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Decisions</Label>
-          <Textarea value={meeting.decisions} onChange={(e) => onChange({ decisions: e.target.value })} placeholder={'Ship v2 on June 30'} className="min-h-[56px] resize-y text-sm" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Action Items</Label>
-          <Textarea value={meeting.actions} onChange={(e) => onChange({ actions: e.target.value })} placeholder={'Alice: draft the spec'} className="min-h-[56px] resize-y text-sm" />
-        </div>
+
+        {/* Notes — icon-headed, auto-growing so empty sections stay compact */}
+        <Section icon={MessageSquare} title="Agenda & Discussion" hint="one per line">
+          <AutoTextarea value={meeting.agenda} onChange={(v) => onChange({ agenda: v })} placeholder={'Reviewed Q2 roadmap'} minHeight={60} />
+        </Section>
+        <Section icon={Gavel} title="Decisions">
+          <AutoTextarea value={meeting.decisions} onChange={(v) => onChange({ decisions: v })} placeholder={'Ship v2 on June 30'} minHeight={44} />
+        </Section>
+        <Section icon={ListChecks} title="Action Items">
+          <AutoTextarea value={meeting.actions} onChange={(v) => onChange({ actions: v })} placeholder={'Alice: draft the spec'} minHeight={44} />
+        </Section>
       </div>
     );
   }
@@ -160,6 +156,38 @@ export function MeetingFields({
         </Section>
       </div>
     </div>
+  );
+}
+
+// Textarea that grows to fit its content, so empty note sections stay compact
+// and the dialog only gets as tall as it needs to.
+function AutoTextarea({
+  value,
+  onChange,
+  placeholder,
+  minHeight = 48,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  minHeight?: number;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(minHeight, el.scrollHeight)}px`;
+  }, [value, minHeight]);
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{ minHeight }}
+      className="resize-none overflow-hidden text-sm leading-relaxed"
+    />
   );
 }
 

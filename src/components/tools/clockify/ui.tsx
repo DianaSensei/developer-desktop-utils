@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, DollarSign, Minus, Plus, Tag as TagIcon, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clock, Minus, Plus, Tag as TagIcon, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useClockify } from './store';
-import { fmtHM, parseDuration } from './time';
+import { fmtHM, pad, parseDuration } from './time';
 
 // ---------------------------------------------------------------------------
 // NumberStepper — themed −/＋ stepper (replaces native number-input arrows,
@@ -97,6 +97,109 @@ export function TimeField({
       }}
       className={cn('h-7 w-[68px] text-center font-mono text-xs tabular-nums', className)}
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TimeStepperField — compact, fully-inline "HH:MM" control. Typeable and
+// nudgeable with ▲/▼ buttons or ↑/↓ keys. Has no dropdown/popover, so it can
+// never overflow or get clipped and reflows with any container width.
+// ---------------------------------------------------------------------------
+
+function parseHm(v: string): { h: number; m: number } | null {
+  const match = v.trim().match(/^(\d{1,2}):?(\d{0,2})$/);
+  if (!match) return null;
+  return { h: Math.min(23, Number(match[1] || 0)), m: Math.min(59, Number(match[2] || 0)) };
+}
+
+export function TimeStepperField({
+  value,
+  onChange,
+  step = 15,
+  className,
+}: {
+  value: string;
+  onChange: (hm: string) => void;
+  /** Minutes added/removed per ▲/▼ press or ↑/↓ key. */
+  step?: number;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const fmt = (h: number, m: number) => `${pad(h)}:${pad(m)}`;
+
+  // Read the latest value from a ref so the auto-repeat timer keeps stepping
+  // from the *current* time instead of the value captured when the press began.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const nudge = (dir: number) => {
+    const p = parseHm(valueRef.current) ?? { h: 0, m: 0 };
+    const total = (p.h * 60 + p.m + dir * step + 1440) % 1440;
+    onChange(fmt(Math.floor(total / 60), total % 60));
+  };
+
+  const commit = (raw: string) => {
+    const p = parseHm(raw);
+    if (p) onChange(fmt(p.h, p.m));
+    setDraft(null);
+  };
+
+  // Press-and-hold → step once, then auto-repeat after a short delay.
+  const timers = useRef<{ delay?: ReturnType<typeof setTimeout>; tick?: ReturnType<typeof setInterval> }>({});
+  const stopHold = () => {
+    if (timers.current.delay) clearTimeout(timers.current.delay);
+    if (timers.current.tick) clearInterval(timers.current.tick);
+    timers.current = {};
+  };
+  const startHold = (dir: number) => {
+    setDraft(null);
+    nudge(dir);
+    timers.current.delay = setTimeout(() => {
+      timers.current.tick = setInterval(() => nudge(dir), 90);
+    }, 400);
+  };
+  useEffect(() => stopHold, []);
+
+  const stepBtn = (dir: 1 | -1, Icon: typeof ChevronUp, label: string, extra?: string) => (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={label}
+      onPointerDown={(e) => { e.preventDefault(); startHold(dir); }}
+      onPointerUp={stopHold}
+      onPointerLeave={stopHold}
+      onPointerCancel={stopHold}
+      className={cn('flex flex-1 select-none items-center justify-center px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', extra)}
+    >
+      <Icon className="h-3 w-3" />
+    </button>
+  );
+
+  return (
+    <div className={cn('flex h-9 items-stretch overflow-hidden rounded-md border border-input bg-background', className)}>
+      <span className="flex items-center pl-2 text-muted-foreground">
+        <Clock className="h-3.5 w-3.5" />
+      </span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={draft ?? value}
+        onFocus={(e) => { setDraft(value); e.currentTarget.select(); }}
+        // Allow only digits and a single colon, capped at "HH:MM".
+        onChange={(e) => setDraft(e.target.value.replace(/[^\d:]/g, '').slice(0, 5))}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.currentTarget.blur(); return; }
+          if (e.key === 'Escape') { setDraft(null); e.currentTarget.blur(); return; }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setDraft(null); nudge(1); }
+          if (e.key === 'ArrowDown') { e.preventDefault(); setDraft(null); nudge(-1); }
+        }}
+        className="w-full min-w-0 bg-transparent px-1.5 text-center font-mono text-sm tabular-nums focus:outline-none"
+      />
+      <div className="flex flex-col border-l border-input">
+        {stepBtn(1, ChevronUp, 'Later')}
+        {stepBtn(-1, ChevronDown, 'Earlier', 'border-t border-input')}
+      </div>
+    </div>
   );
 }
 
@@ -514,27 +617,6 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
         </div>
       )}
     </Popover>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// BillableToggle — small $ button
-// ---------------------------------------------------------------------------
-
-export function BillableButton({ value, onChange, compact }: { value: boolean; onChange: (v: boolean) => void; compact?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      title={value ? 'Billable' : 'Non-billable'}
-      className={cn(
-        'flex items-center justify-center rounded-lg border border-border transition-colors',
-        compact ? 'h-7 w-7' : 'h-9 w-9',
-        value ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground hover:bg-muted'
-      )}
-    >
-      <DollarSign className="h-4 w-4" />
-    </button>
   );
 }
 

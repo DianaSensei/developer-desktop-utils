@@ -2,10 +2,7 @@ import { useState } from 'react';
 import {
   Clock,
   CalendarDays,
-  CalendarRange,
   LayoutGrid,
-  Receipt,
-  Plane,
   Settings as SettingsIcon,
   FolderKanban,
   Plus,
@@ -22,19 +19,13 @@ import { fmtTimer, workHoursForRanges } from './time';
 import { TimeTracker } from './TimeTracker';
 import { Timesheet } from './Timesheet';
 import { CalendarView } from './CalendarView';
-import { Schedule } from './Schedule';
-import { Expenses } from './Expenses';
-import { TimeOff } from './TimeOff';
 
-type TabId = 'tracker' | 'timesheet' | 'calendar' | 'schedule' | 'expenses' | 'timeoff';
+type TabId = 'tracker' | 'timesheet' | 'calendar';
 
 const TABS: { id: TabId; label: string; icon: typeof Clock; render: () => JSX.Element }[] = [
   { id: 'tracker', label: 'Time Tracker', icon: Clock, render: () => <TimeTracker /> },
   { id: 'timesheet', label: 'Timesheet', icon: LayoutGrid, render: () => <Timesheet /> },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, render: () => <CalendarView /> },
-  { id: 'schedule', label: 'Schedule', icon: CalendarRange, render: () => <Schedule /> },
-  { id: 'expenses', label: 'Expenses', icon: Receipt, render: () => <Expenses /> },
-  { id: 'timeoff', label: 'Time Off', icon: Plane, render: () => <TimeOff /> },
 ];
 
 function SuiteInner() {
@@ -128,13 +119,6 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
               <ColorMenu color={p.color} onPick={(c) => updateProject(p.id, { color: c })} />
               <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-8 flex-1 text-sm rounded-lg" />
               <button
-                onClick={() => updateProject(p.id, { billable: !p.billable })}
-                title="Billable by default"
-                className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors', p.billable ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground hover:bg-muted')}
-              >
-                billable
-              </button>
-              <button
                 onClick={() => updateProject(p.id, { archived: !p.archived })}
                 className="text-[10px] text-muted-foreground hover:text-foreground"
               >
@@ -173,7 +157,6 @@ function ColorMenu({ color, onPick }: { color: string; onPick: (c: string) => vo
 
 function SettingsPanel({ onClose }: { onClose: () => void }) {
   const { settings, updateSettings } = useClockify();
-  const [newCat, setNewCat] = useState('');
 
   // Daily target is derived from the work-hours ranges so the rest of the suite stays consistent.
   const dailyTarget = workHoursForRanges(settings.workStart, settings.lunchStart, settings.lunchEnd, settings.workEnd);
@@ -188,10 +171,6 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
         <section className="space-y-2.5">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">General</h4>
           <Toggle label="Week starts Monday" checked={settings.weekStartsMon} onChange={(v) => updateSettings({ weekStartsMon: v })} />
-          <label className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-muted-foreground">Currency symbol</span>
-            <Input value={settings.currencySymbol} onChange={(e) => updateSettings({ currencySymbol: e.target.value.slice(0, 3) })} className="h-7 w-16 text-center text-xs" />
-          </label>
         </section>
 
         <section className="space-y-2.5 border-t border-border pt-3">
@@ -239,37 +218,6 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
             <NumberStepper value={settings.breakMinutes} min={1} max={120} onChange={(v) => updateSettings({ breakMinutes: v })} />
           </label>
           <Toggle label="Phase chime" checked={settings.sound} onChange={(v) => updateSettings({ sound: v })} />
-        </section>
-
-        <section className="space-y-2 border-t pt-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Expense categories</h4>
-          <div className="flex flex-wrap gap-1.5">
-            {settings.expenseCategories.map((c) => (
-              <span key={c} className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
-                {c}
-                <button
-                  onClick={() => updateSettings({ expenseCategories: settings.expenseCategories.filter((x) => x !== c) })}
-                  className="text-muted-foreground hover:text-red-500"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <Input
-              value={newCat}
-              onChange={(e) => setNewCat(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newCat.trim() && !settings.expenseCategories.includes(newCat.trim())) {
-                  updateSettings({ expenseCategories: [...settings.expenseCategories, newCat.trim()] });
-                  setNewCat('');
-                }
-              }}
-              placeholder="Add category…"
-              className="h-7 text-xs"
-            />
-          </div>
         </section>
 
         <div className="flex justify-end border-t border-border pt-3">

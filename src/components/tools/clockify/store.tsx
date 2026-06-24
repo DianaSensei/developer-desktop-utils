@@ -19,7 +19,6 @@ export interface Project {
   id: string;
   name: string;
   color: string;
-  billable: boolean;
   archived: boolean;
   createdAt: number;
 }
@@ -47,7 +46,6 @@ export interface TimeEntry {
   projectId: string | null;
   taskId: string | null;
   tagIds: string[];
-  billable: boolean;
   start: number;
   end: number | null; // null = running
   source: EntrySource;
@@ -63,40 +61,6 @@ export interface Subtask {
   createdAt: number;
 }
 
-export interface Expense {
-  id: string;
-  date: number; // day-start timestamp
-  projectId: string | null;
-  category: string;
-  amount: number;
-  note: string;
-  billable: boolean;
-}
-
-export interface TimeOffPolicy {
-  id: string;
-  name: string;
-  color: string;
-  balanceDays: number | null; // null = unlimited
-}
-
-export interface TimeOffRequest {
-  id: string;
-  policyId: string;
-  start: number; // day-start
-  end: number; // day-start (inclusive)
-  note: string;
-}
-
-export interface ScheduleAssignment {
-  id: string;
-  projectId: string | null;
-  taskId: string | null;
-  date: number; // day-start
-  hours: number;
-  note: string;
-}
-
 export interface Settings {
   workMinutes: number;
   breakMinutes: number;
@@ -104,8 +68,6 @@ export interface Settings {
   sound: boolean;
   weekStartsMon: boolean;
   dailyTargetHours: number;
-  currencySymbol: string;
-  expenseCategories: string[];
   // Work schedule as time ranges (local "HH:MM"). Work happens before and after a
   // lunch break, so the break itself is the lunchStart–lunchEnd range.
   workStart: string;
@@ -121,8 +83,6 @@ export const DEFAULT_SETTINGS: Settings = {
   sound: true,
   weekStartsMon: true,
   dailyTargetHours: 8,
-  currencySymbol: '$',
-  expenseCategories: ['General', 'Travel', 'Meals', 'Equipment', 'Software', 'Other'],
   workStart: '09:00',
   lunchStart: '12:00',
   lunchEnd: '13:00',
@@ -149,10 +109,6 @@ interface ClockifyContextValue {
   tags: Tag[];
   entries: TimeEntry[];
   subtasks: Subtask[];
-  expenses: Expense[];
-  policies: TimeOffPolicy[];
-  timeOff: TimeOffRequest[];
-  schedule: ScheduleAssignment[];
   settings: Settings;
 
   /** The currently running entry (end === null), if any. */
@@ -184,6 +140,8 @@ interface ClockifyContextValue {
   // entries
   startEntry: (partial: Partial<Omit<TimeEntry, 'id' | 'start' | 'end'>>) => void;
   stopRunning: () => void;
+  /** Rename a task group: rewrites every matching entry's description and subtask registry key. */
+  renameTask: (oldName: string, newName: string) => void;
   // subtasks
   addSubtask: (taskName: string, name: string) => void;
   deleteSubtask: (taskName: string, name: string) => void;
@@ -192,23 +150,6 @@ interface ClockifyContextValue {
   deleteEntry: (id: string) => void;
   /** Set the total duration (ms) for a project/task on a given day (timesheet semantics). */
   setDayTotal: (projectId: string | null, taskId: string | null, dayTs: number, ms: number) => void;
-
-  // expenses
-  addExpense: (expense: Omit<Expense, 'id'>) => void;
-  updateExpense: (id: string, patch: Partial<Expense>) => void;
-  deleteExpense: (id: string) => void;
-
-  // time off
-  addPolicy: (name: string, color: string, balanceDays: number | null) => void;
-  updatePolicy: (id: string, patch: Partial<TimeOffPolicy>) => void;
-  deletePolicy: (id: string) => void;
-  addTimeOff: (req: Omit<TimeOffRequest, 'id'>) => void;
-  deleteTimeOff: (id: string) => void;
-
-  // schedule
-  addAssignment: (a: Omit<ScheduleAssignment, 'id'>) => void;
-  updateAssignment: (id: string, patch: Partial<ScheduleAssignment>) => void;
-  deleteAssignment: (id: string) => void;
 }
 
 const ClockifyContext = createContext<ClockifyContextValue | undefined>(undefined);
@@ -223,13 +164,9 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
   const [tags, setTags] = usePersistentState<Tag[]>('devtool:clockify:tags', []);
   const [entries, setEntries] = usePersistentState<TimeEntry[]>('devtool:clockify:entries', []);
   const [subtasks, setSubtasks] = usePersistentState<Subtask[]>('devtool:clockify:subtasks', []);
-  const [expenses, setExpenses] = usePersistentState<Expense[]>('devtool:clockify:expenses', []);
-  const [policies, setPolicies] = usePersistentState<TimeOffPolicy[]>('devtool:clockify:timeoff-policies', []);
-  const [timeOff, setTimeOff] = usePersistentState<TimeOffRequest[]>('devtool:clockify:timeoff', []);
-  const [schedule, setSchedule] = usePersistentState<ScheduleAssignment[]>('devtool:clockify:schedule', []);
   const [settingsRaw, setSettings] = usePersistentState<Settings>('devtool:tasks:settings', DEFAULT_SETTINGS);
   // Old installs persisted only the original Pomodoro fields; merge defaults on
-  // every read so new fields (weekStartsMon, expenseCategories, …) are present
+  // every read so new fields (weekStartsMon, work-hours, …) are present
   // before the migration effect runs.
   const settings = useMemo(() => ({ ...DEFAULT_SETTINGS, ...settingsRaw }), [settingsRaw]);
 
@@ -267,7 +204,6 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
                   projectId: null,
                   taskId: r.taskId,
                   tagIds: [],
-                  billable: false,
                   start: r.start,
                   end: r.end,
                   source: 'tracker' as EntrySource,
@@ -276,22 +212,44 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // seed default time-off policies if none exist
-      setPolicies((cur) =>
-        cur.length
-          ? cur
-          : [
-              { id: uid(), name: 'Vacation', color: '#3b82f6', balanceDays: null },
-              { id: uid(), name: 'Sick leave', color: '#f97316', balanceDays: null },
-            ]
-      );
-
       // merge any newer default settings fields onto persisted settings
       setSettings((cur) => ({ ...DEFAULT_SETTINGS, ...cur }));
 
       localStorage.setItem('devtool:clockify:migrated', '1');
     } catch {
       // migration is best-effort
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- one-time purge of removed features (expenses, billable, schedule, time off) ---
+  // Drops the orphaned data stores and strips the now-unused `billable` flag from
+  // any persisted entries/projects so no removed-feature data lingers.
+  const purged = useRef(false);
+  useEffect(() => {
+    if (purged.current) return;
+    purged.current = true;
+    try {
+      if (localStorage.getItem('devtool:clockify:purged-v2')) return;
+      for (const key of [
+        'devtool:clockify:expenses',
+        'devtool:clockify:schedule',
+        'devtool:clockify:timeoff',
+        'devtool:clockify:timeoff-policies',
+      ]) {
+        localStorage.removeItem(key);
+      }
+      const strip = <T extends object>(o: T): T => {
+        if (!('billable' in o)) return o;
+        const copy = { ...o } as Record<string, unknown>;
+        delete copy.billable;
+        return copy as T;
+      };
+      setEntries((prev) => (prev.some((e) => 'billable' in e) ? prev.map(strip) : prev));
+      setProjects((prev) => (prev.some((p) => 'billable' in p) ? prev.map(strip) : prev));
+      localStorage.setItem('devtool:clockify:purged-v2', '1');
+    } catch {
+      // best-effort
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -335,7 +293,6 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
         id: uid(),
         name: name.trim() || 'Untitled',
         color: color ?? randomColor(),
-        billable: false,
         archived: false,
         createdAt: Date.now(),
       };
@@ -355,10 +312,8 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
       // detach references rather than deleting the time data
       setEntries((prev) => prev.map((e) => (e.projectId === id ? { ...e, projectId: null } : e)));
       setTasks((prev) => prev.map((t) => (t.projectId === id ? { ...t, projectId: null } : t)));
-      setExpenses((prev) => prev.map((x) => (x.projectId === id ? { ...x, projectId: null } : x)));
-      setSchedule((prev) => prev.map((a) => (a.projectId === id ? { ...a, projectId: null } : a)));
     },
-    [setProjects, setEntries, setTasks, setExpenses, setSchedule]
+    [setProjects, setEntries, setTasks]
   );
 
   // --- tasks ---
@@ -425,7 +380,6 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
             projectId: partial.projectId ?? null,
             taskId: partial.taskId ?? null,
             tagIds: partial.tagIds ?? [],
-            billable: partial.billable ?? false,
             start: ts,
             end: null,
             source: partial.source ?? 'tracker',
@@ -435,6 +389,34 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
       });
     },
     [setEntries]
+  );
+
+  // --- rename a task group ---
+  // Tasks are grouped by (lowercased) description, so renaming rewrites the
+  // description on every matching entry and re-keys its subtask definitions.
+  const renameTask = useCallback(
+    (oldName: string, newName: string) => {
+      const from = oldName.trim().toLowerCase();
+      const to = newName.trim();
+      if (!from || !to || to.toLowerCase() === from) return;
+      const toKey = to.toLowerCase();
+      setEntries((prev) =>
+        prev.map((e) => (e.description.trim().toLowerCase() === from ? { ...e, description: to } : e))
+      );
+      setSubtasks((prev) => {
+        const renamed = prev.map((s) => (s.task === from ? { ...s, task: toKey } : s));
+        // Drop duplicate subtask names that now collide under the destination key.
+        const seen = new Set<string>();
+        return renamed.filter((s) => {
+          if (s.task !== toKey) return true;
+          const k = s.name.toLowerCase();
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      });
+    },
+    [setEntries, setSubtasks]
   );
 
   // --- subtasks ---
@@ -516,7 +498,6 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
               projectId,
               taskId,
               tagIds: [],
-              billable: false,
               start,
               end: start + delta,
               source: 'timesheet' as EntrySource,
@@ -536,65 +517,8 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     [setEntries]
   );
 
-  // --- expenses ---
-  const addExpense = useCallback(
-    (expense: Omit<Expense, 'id'>) => setExpenses((prev) => [...prev, { ...expense, id: uid() }]),
-    [setExpenses]
-  );
-  const updateExpense = useCallback(
-    (id: string, patch: Partial<Expense>) =>
-      setExpenses((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x))),
-    [setExpenses]
-  );
-  const deleteExpense = useCallback(
-    (id: string) => setExpenses((prev) => prev.filter((x) => x.id !== id)),
-    [setExpenses]
-  );
-
-  // --- time off ---
-  const addPolicy = useCallback(
-    (name: string, color: string, balanceDays: number | null) =>
-      setPolicies((prev) => [...prev, { id: uid(), name: name.trim() || 'Policy', color, balanceDays }]),
-    [setPolicies]
-  );
-  const updatePolicy = useCallback(
-    (id: string, patch: Partial<TimeOffPolicy>) =>
-      setPolicies((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p))),
-    [setPolicies]
-  );
-  const deletePolicy = useCallback(
-    (id: string) => {
-      setPolicies((prev) => prev.filter((p) => p.id !== id));
-      setTimeOff((prev) => prev.filter((r) => r.policyId !== id));
-    },
-    [setPolicies, setTimeOff]
-  );
-  const addTimeOff = useCallback(
-    (req: Omit<TimeOffRequest, 'id'>) => setTimeOff((prev) => [...prev, { ...req, id: uid() }]),
-    [setTimeOff]
-  );
-  const deleteTimeOff = useCallback(
-    (id: string) => setTimeOff((prev) => prev.filter((r) => r.id !== id)),
-    [setTimeOff]
-  );
-
-  // --- schedule ---
-  const addAssignment = useCallback(
-    (a: Omit<ScheduleAssignment, 'id'>) => setSchedule((prev) => [...prev, { ...a, id: uid() }]),
-    [setSchedule]
-  );
-  const updateAssignment = useCallback(
-    (id: string, patch: Partial<ScheduleAssignment>) =>
-      setSchedule((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a))),
-    [setSchedule]
-  );
-  const deleteAssignment = useCallback(
-    (id: string) => setSchedule((prev) => prev.filter((a) => a.id !== id)),
-    [setSchedule]
-  );
-
   const value: ClockifyContextValue = {
-    projects, tasks, tags, entries, subtasks, expenses, policies, timeOff, schedule, settings,
+    projects, tasks, tags, entries, subtasks, settings,
     running, now,
     projectById, taskById, tagById,
     updateSettings,
@@ -602,10 +526,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     addTask, updateTask, deleteTask,
     addTag,
     startEntry, stopRunning, addEntry, updateEntry, deleteEntry, setDayTotal,
-    addSubtask, deleteSubtask,
-    addExpense, updateExpense, deleteExpense,
-    addPolicy, updatePolicy, deletePolicy, addTimeOff, deleteTimeOff,
-    addAssignment, updateAssignment, deleteAssignment,
+    renameTask, addSubtask, deleteSubtask,
   };
 
   return <ClockifyContext.Provider value={value}>{children}</ClockifyContext.Provider>;

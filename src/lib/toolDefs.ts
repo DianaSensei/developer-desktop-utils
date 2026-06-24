@@ -158,7 +158,7 @@ export const TOOL_DEFS: ToolDef[] = [
     label: "Time Tracker",
     icon: Timer,
     description:
-      "Clockify-style time suite: tracker, timesheet, calendar, schedule, expenses, and time off.",
+      "Time tracker with timesheet and calendar views, projects, tags, and pomodoro.",
   },
   {
     id: "network",

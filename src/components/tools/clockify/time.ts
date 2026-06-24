@@ -36,7 +36,7 @@ export function fmtTotal(ms: number): string {
   return `${total % 60}s`;
 }
 
-/** Decimal-hour style used by timesheet/schedule cells: "1:30", "0:00". */
+/** Decimal-hour style used by timesheet cells: "1:30", "0:00". */
 export function fmtHM(ms: number): string {
   const total = Math.round(Math.max(0, ms) / MS_MIN);
   const h = Math.floor(total / 60);
