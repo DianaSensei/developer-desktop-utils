@@ -25,7 +25,7 @@ This document describes every tool in the app: what computation it performs, wha
 | Lucky Wheel | — | — | — | — | Choices + options (localStorage) |
 | Array Deduplicator | ✓ | — | — | — | Input (localStorage) |
 | Generator | ✓ | — | — | — | Mode pref (localStorage) |
-| Time Tracker | ✓ | — | — | — | Time entries, projects, expenses (localStorage) |
+| Time Tracker | ✓ | — | — | — | Time entries, projects, tags (localStorage) |
 | Checksum | ✓ | ✓ | — | — | — |
 | Image ↔ Base64 | ✓ | ✓ (browser) | — | — | — |
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
@@ -149,7 +149,7 @@ Renders Markdown to HTML using `react-markdown`. Does not execute any embedded s
 
 A manager for meeting minutes: create, search, edit, and delete notes from a sidebar list. Each note has a title, date, start/end time (with derived duration), participants, agenda/discussion, decisions, and action items, assembled into clean Markdown in real time (action items become task checkboxes). The output renders with `react-markdown` in the preview pane; copy writes the Markdown to your clipboard. All composition is pure JS — no network, no file access.
 
-Notes are stored in a shared `devtool:meetings` record that the **Time Tracker** also reads: a meeting with a time range shows on the Time Tracker **Calendar** and **Schedule**, and you can create or edit a meeting from either tool — edits sync both ways because they share the same data.
+Notes are stored in a shared `devtool:meetings` record that the **Time Tracker** also reads: a meeting with a time range shows on the Time Tracker **Calendar**, and you can create or edit a meeting from either tool — edits sync both ways because they share the same data.
 
 **OS / system impact:** clipboard write only. Notes persist in `localStorage` (`devtool:meetings`).
 
@@ -187,7 +187,7 @@ Generates random values in three modes:
 
 ### Time Tracker
 
-A Clockify-style time-management suite: time tracker, timesheet, calendar, schedule, expenses, and time off. All entries, projects, clients, tags, and expenses are computed and stored **locally in `localStorage`** — there is no account, sync, or server. Closing and reopening the app preserves your data; clearing browser storage erases it.
+A time-management suite with three views: time tracker, timesheet, and calendar. All entries, projects, and tags are computed and stored **locally in `localStorage`** — there is no account, sync, or server. Closing and reopening the app preserves your data; clearing browser storage erases it.
 
 **OS / system impact:** clipboard write only. No network, no file access — everything persists in `localStorage`.
 
