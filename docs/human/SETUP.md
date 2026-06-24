@@ -57,8 +57,15 @@ sudo apt update && sudo apt install -y \
 ```bash
 git clone <repo-url>
 cd devtool
-npm install
+npm ci          # clean install straight from package-lock.json
 ```
+
+> **Use `npm ci`, not `npm install`, for a fresh pull.** `npm ci` installs exactly
+> what's in `package-lock.json` (including the per-OS native binaries for your
+> platform — e.g. the Linux Rolldown/Tauri-CLI builds on Ubuntu) and **never
+> rewrites the lockfile**. `npm install` re-resolves and can churn
+> `package-lock.json` on a different OS/npm version, which shows up as noisy git
+> diffs. Only run `npm install` when you intentionally add/upgrade a dependency.
 
 ---
 
