@@ -1,11 +1,11 @@
 // "Generate Code" modal (Bruno-style): pick a language + variant, optionally
 // interpolate {{vars}}, preview the snippet, and copy it.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { copyToClipboard } from '@/lib/clipboard';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponseViewer } from './ResponseViewer';
 import { CODE_TARGETS, generateCode } from './codegen';
@@ -22,9 +22,6 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
   const [lang, setLang] = useState('Shell');
   const [variant, setVariant] = useState('curl');
   const [interpolate, setInterpolate] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   const target = CODE_TARGETS.find((t) => t.lang === lang) ?? CODE_TARGETS[0];
 
@@ -39,12 +36,6 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
     if (next && !next.variants.some((v) => v.id === variant)) setVariant(next.variants[0].id);
   };
 
-  const copy = async () => {
-    await copyToClipboard(code);
-    setCopied(true);
-    if (copyTimer.current) clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied(false), 1200);
-  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -69,7 +60,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
                 onClick={() => setVariant(v.id)}
                 className={cn(
                   'rounded-md border px-3 py-1 text-xs font-medium transition-colors',
-                  variant === v.id ? 'border-transparent bg-blue-500 text-white' : 'hover:bg-accent',
+                  variant === v.id ? 'border-primary/30 bg-primary/10 text-primary' : 'hover:bg-accent',
                 )}
               >
                 {v.label}
@@ -85,7 +76,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
               onClick={() => setInterpolate((i) => !i)}
               className={cn(
                 'flex h-4 w-4 items-center justify-center rounded border transition-colors',
-                interpolate ? 'border-amber-400 bg-amber-400 text-neutral-900' : 'border-input',
+                interpolate ? 'border-primary bg-primary text-primary-foreground' : 'border-input',
               )}
             >
               {interpolate && <Check className="h-3 w-3" />}
@@ -97,13 +88,14 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
         {/* code preview */}
         <div className="relative min-h-0 flex-1 border-t">
           <ResponseViewer value={code} language="text" />
-          <button
-            onClick={copy}
+          <CopyButton
+            value={() => code}
             title="Copy"
-            className="absolute right-3 top-3 rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-          </button>
+            variant="ghost"
+            size="icon"
+            className="absolute right-3 top-3 h-8 w-8 text-muted-foreground"
+            iconClassName="h-4 w-4"
+          />
         </div>
       </DialogContent>
     </Dialog>

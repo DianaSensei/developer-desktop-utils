@@ -82,10 +82,19 @@ pub struct Assignment {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GroupMember {
+    pub member_id: String,
+    pub client_id: String,
+    pub client_host: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GroupDetails {
     pub group_id: String,
     pub state: String,
     pub member_count: i32,
+    pub members: Vec<GroupMember>,
     pub assignments: Vec<Assignment>,
 }
 
@@ -441,8 +450,8 @@ async fn wire_list_groups(stream: &mut TcpStream) -> Result<Vec<GroupSummary>, S
 async fn wire_describe_groups(
     stream: &mut TcpStream,
     group_ids: &[&str],
-) -> Result<Vec<(String, String, i32)>, String> {
-    // returns (group_id, state, member_count)
+) -> Result<Vec<(String, String, Vec<GroupMember>)>, String> {
+    // returns (group_id, state, members)
     let mut body = Vec::new();
     enc_i32(&mut body, group_ids.len() as i32);
     for gid in group_ids {
@@ -457,14 +466,14 @@ async fn wire_describe_groups(
         let _protocol_type = d.str()?;
         let _protocol = d.str()?;
         let members = d.array(|d| {
-            d.str()?; // member_id
-            d.str()?; // client_id
-            d.str()?; // client_host
+            let member_id = d.str()?;
+            let client_id = d.str()?;
+            let client_host = d.str()?;
             d.bytes()?; // member_metadata
             d.bytes()?; // member_assignment
-            Ok(())
+            Ok(GroupMember { member_id, client_id, client_host })
         })?;
-        Ok((group_id, state, members.len() as i32))
+        Ok((group_id, state, members))
     })
 }
 
@@ -686,7 +695,7 @@ pub async fn kafka_list_groups(
         let gids: Vec<&str> = groups.iter().map(|g| g.group_id.as_str()).collect();
         if let Ok(details) = wire_describe_groups(&mut stream, &gids).await {
             let state_map: std::collections::HashMap<String, String> =
-                details.into_iter().map(|(id, state, _)| (id, state)).collect();
+                details.into_iter().map(|(id, state, _members)| (id, state)).collect();
             for g in &mut groups {
                 if let Some(state) = state_map.get(&g.group_id) {
                     g.state = state.clone();
@@ -708,13 +717,14 @@ pub async fn kafka_group_details(
     let config = find_config(&app, &config_id)?;
     let mut stream = open_kafka_stream(&config).await?;
 
-    // Describe group for state + member count
+    // Describe group for state + members
     let desc = wire_describe_groups(&mut stream, &[group_id.as_str()]).await?;
-    let (state, member_count) = desc
+    let (state, members) = desc
         .into_iter()
         .find(|(id, _, _)| id == &group_id)
         .map(|(_, s, m)| (s, m))
-        .unwrap_or_else(|| (String::from("Unknown"), 0));
+        .unwrap_or_else(|| (String::from("Unknown"), Vec::new()));
+    let member_count = members.len() as i32;
 
     // Get all topics so we can fetch offsets for all partitions
     let all_topics = wire_metadata(&mut stream, &[]).await?;
@@ -731,24 +741,36 @@ pub async fn kafka_group_details(
     let committed = wire_offset_fetch(&mut stream, &group_id, &topics_args).await
         .unwrap_or_default();
 
-    // For each committed offset, get the latest offset to compute lag
-    let mut assignments = Vec::new();
+    // Compute lag. Batch ListOffsets per topic (one request for all of a
+    // topic's partitions) instead of one request per partition — avoids the
+    // old N+1 (50 partitions = 50 round-trips).
+    let mut by_topic: std::collections::HashMap<String, Vec<(i32, i64)>> = std::collections::HashMap::new();
     for (topic, partition, committed_offset) in committed {
-        let latest_offsets =
-            wire_list_offsets(&mut stream, &topic, &[partition], -1).await
-                .unwrap_or_default();
-        let latest = latest_offsets.into_iter().next().map(|(_, o)| o).unwrap_or(-1);
-        let lag = if latest >= 0 && committed_offset >= 0 {
-            latest - committed_offset
-        } else {
-            -1
-        };
-        assignments.push(Assignment { topic, partition, committed_offset, lag });
+        by_topic.entry(topic).or_default().push((partition, committed_offset));
+    }
+
+    let mut assignments = Vec::new();
+    for (topic, parts) in by_topic {
+        let pids: Vec<i32> = parts.iter().map(|(p, _)| *p).collect();
+        let latest_map: std::collections::HashMap<i32, i64> =
+            wire_list_offsets(&mut stream, &topic, &pids, -1).await
+                .unwrap_or_default()
+                .into_iter()
+                .collect();
+        for (partition, committed_offset) in parts {
+            let latest = latest_map.get(&partition).copied().unwrap_or(-1);
+            let lag = if latest >= 0 && committed_offset >= 0 {
+                latest - committed_offset
+            } else {
+                -1
+            };
+            assignments.push(Assignment { topic: topic.clone(), partition, committed_offset, lag });
+        }
     }
 
     assignments.sort_by(|a, b| a.topic.cmp(&b.topic).then(a.partition.cmp(&b.partition)));
 
-    Ok(GroupDetails { group_id, state, member_count, assignments })
+    Ok(GroupDetails { group_id, state, member_count, members, assignments })
 }
 
 #[tauri::command]
@@ -790,6 +812,51 @@ pub async fn kafka_produce(
     Ok(ProduceResult { partition: part, offset })
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchRecord {
+    pub key: Option<String>,
+    pub value: String,
+    #[serde(default)]
+    pub headers: std::collections::HashMap<String, String>,
+}
+
+/// Produce many records to one partition in a single request (e.g. from a
+/// pasted JSON array). Returns the assigned offsets in order.
+#[tauri::command]
+pub async fn kafka_produce_batch(
+    app: AppHandle,
+    config_id: String,
+    topic: String,
+    partition: Option<i32>,
+    records: Vec<BatchRecord>,
+) -> Result<Vec<i64>, String> {
+    if records.is_empty() {
+        return Err("No records to produce".into());
+    }
+    let config = find_config(&app, &config_id)?;
+    let client = make_client(&config).await?;
+    let part = partition.unwrap_or(0);
+    let pc = client
+        .partition_client(topic.as_str(), part, UnknownTopicHandling::Retry)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let recs: Vec<Record> = records
+        .into_iter()
+        .map(|r| Record {
+            key: r.key.map(|k| k.into_bytes()),
+            value: Some(r.value.into_bytes()),
+            headers: r.headers.into_iter().map(|(k, v)| (k, v.into_bytes())).collect(),
+            timestamp: Utc::now(),
+        })
+        .collect();
+
+    pc.produce(recs, Compression::NoCompression)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn kafka_fetch_messages(
     app: AppHandle,
@@ -798,16 +865,37 @@ pub async fn kafka_fetch_messages(
     partition: i32,
     offset: i64,  // -1 = tail (latest - limit), >= 0 = exact offset
     limit: i32,
+    // When set, fetch from the first offset whose timestamp is >= this epoch-ms
+    // (resolved via ListOffsets). Takes precedence over `offset`.
+    start_timestamp: Option<i64>,
 ) -> Result<Vec<KafkaMessage>, String> {
     let config = find_config(&app, &config_id)?;
+
+    // Time-based start: resolve the offset at/after the given timestamp first.
+    let resolved_from_ts = if let Some(ts_ms) = start_timestamp {
+        let mut stream = open_kafka_stream(&config).await?;
+        let offs = wire_list_offsets(&mut stream, &topic, &[partition], ts_ms)
+            .await
+            .unwrap_or_default();
+        match offs.into_iter().next().map(|(_, o)| o) {
+            Some(o) if o >= 0 => Some(o),
+            // No message at/after that time — nothing to show.
+            _ => return Ok(Vec::new()),
+        }
+    } else {
+        None
+    };
+
     let client = make_client(&config).await?;
     let pc = client
         .partition_client(topic.as_str(), partition, UnknownTopicHandling::Retry)
         .await
         .map_err(|e| e.to_string())?;
 
-    // Resolve start offset: if -1, fetch from (latest - limit)
-    let start_offset = if offset < 0 {
+    // Resolve start offset: timestamp > exact offset > tail (latest - limit).
+    let start_offset = if let Some(o) = resolved_from_ts {
+        o
+    } else if offset < 0 {
         let (_, high) = pc.get_offset(rskafka::client::partition::OffsetAt::Latest)
             .await
             .map(|o| (0i64, o))

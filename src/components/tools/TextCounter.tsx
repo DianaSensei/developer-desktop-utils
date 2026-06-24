@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
+import { PaneHeader } from '@/components/ui/tool-layout';
 import { Check, X } from 'lucide-react';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -134,10 +135,7 @@ export function TextCounter() {
     <div className="flex h-full overflow-hidden">
       {/* Left: textarea input */}
       <div className="flex flex-col min-h-0 border-r" style={{ width: '40%' }}>
-        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Text Input</span>
-          <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
-        </div>
+        <PaneHeader label="Text Input" hint={quickPasteHint} />
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}

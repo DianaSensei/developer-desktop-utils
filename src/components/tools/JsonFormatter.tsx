@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
+import { PaneHeader } from '@/components/ui/tool-layout';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -599,10 +600,7 @@ export function JsonFormatter() {
       {/* Input panel (collapsible, fixed height) */}
       {showInput && (
         <div className="shrink-0 border-b border-border flex flex-col" style={{ height: '180px' }}>
-          <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Input</span>
-            <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
-          </div>
+          <PaneHeader label="Input" hint={quickPasteHint} />
           <Textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
@@ -702,10 +700,10 @@ export function JsonFormatter() {
 
         {parsed.value !== undefined && mode !== 'beautify' && (
           <>
-            <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">{mode === 'string' ? 'JSON String' : 'Minified'}</span>
-              <CopyButton value={() => outputText} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />
-            </div>
+            <PaneHeader
+              label={mode === 'string' ? 'JSON String' : 'Minified'}
+              action={<CopyButton value={() => outputText} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />}
+            />
             <Textarea
               value={outputText}
               readOnly

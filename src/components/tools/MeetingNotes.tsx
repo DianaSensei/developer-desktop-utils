@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
-import { Copy, CheckCircle2, Plus, Search, Trash2, NotebookPen, Clock } from 'lucide-react';
+import { CopyButton } from '@/components/ui/copy-button';
+import { Plus, Search, Trash2, NotebookPen, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { copyToClipboard } from '@/lib/clipboard';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import {
   buildMeetingMarkdown,
@@ -33,9 +33,6 @@ export function MeetingNotes() {
   const [selectedId, setSelectedId] = usePersistentState<string | null>('devtool:meeting:selected', null);
   const [query, setQuery] = useState('');
   const [mode, setMode] = usePersistentState<ViewMode>('devtool:meeting:mode', 'edit');
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   const sorted = useMemo(
     () => [...meetings].sort((a, b) => b.start - a.start),
@@ -52,13 +49,6 @@ export function MeetingNotes() {
   const createNew = () => {
     const m = addMeeting();
     setSelectedId(m.id);
-  };
-
-  const copy = async () => {
-    await copyToClipboard(markdown);
-    setCopied(true);
-    if (copyTimer.current) clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied(false), 1400);
   };
 
   const remove = (id: string) => {
@@ -138,14 +128,14 @@ export function MeetingNotes() {
               aria-label="Note view"
             />
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={copy}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? 'Copied' : 'Copy markdown'}
-              </button>
+              <CopyButton
+                value={() => markdown}
+                label="Copy markdown"
+                variant="outline"
+                size="sm"
+                className="h-auto rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground"
+                iconClassName="h-3.5 w-3.5"
+              />
               <button
                 type="button"
                 onClick={() => remove(selected.id)}
@@ -173,7 +163,7 @@ export function MeetingNotes() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-col items-center justify-center gap-3 p-4 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-card">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-card">
             <NotebookPen className="h-6 w-6 text-muted-foreground/40" />
           </div>
           <p className="max-w-xs text-sm text-muted-foreground">

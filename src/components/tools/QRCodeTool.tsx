@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { Segmented } from '@/components/ui/segmented';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Loader2, ExternalLink, ClipboardPaste } from 'lucide-react';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -11,7 +12,7 @@ import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { copyToClipboard, copyImageToClipboard } from '@/lib/clipboard';
+import { copyImageToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 
 type FrameStyle = 'none' | 'border' | 'scan-bottom' | 'scan-top';
@@ -379,7 +380,7 @@ function QrGenerator() {
   const chip = (active: boolean) =>
     cn('rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none',
       active
-        ? 'border-primary bg-primary text-primary-foreground'
+        ? 'border-primary/30 bg-primary/10 text-primary'
         : 'border-border bg-background hover:border-primary/60 hover:bg-muted/50');
 
   return (
@@ -468,7 +469,7 @@ function QrGenerator() {
 
         {dataUrl && (
           <div className="space-y-3">
-            <div className="flex justify-center p-6 rounded-xl border bg-background shadow-sm">
+            <div className="flex justify-center p-6 rounded-lg border bg-background shadow-sm">
               <img src={dataUrl} alt="QR Code" className="max-w-full w-[280px]" />
             </div>
             <div className="flex gap-2">
@@ -508,9 +509,6 @@ function QrReader() {
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   const run = async (img: HTMLImageElement, dataUrl: string) => {
     setLoading(true); setError(''); setResult(''); setImageUrl(dataUrl);
@@ -566,13 +564,6 @@ function QrReader() {
     reader.readAsDataURL(file);
   };
 
-  const copy = async () => {
-    await copyToClipboard(result);
-    setCopied(true);
-    if (copyTimer.current) clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied(false), 1400);
-  };
-
   const isUrl = /^https?:\/\//i.test(result.trim());
   const openLink = async () => {
     const url = result.trim();
@@ -590,7 +581,7 @@ function QrReader() {
         onClick={handleUpload}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
-        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors hover:border-primary/60 hover:bg-muted/40"
+        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors hover:border-primary/60 hover:bg-muted/40"
       >
         {loading
           ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -610,7 +601,7 @@ function QrReader() {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {imageUrl && (
-        <div className="flex justify-center rounded-xl border bg-background p-6 shadow-sm">
+        <div className="flex justify-center rounded-lg border bg-background p-6 shadow-sm">
           <img src={imageUrl} alt="Uploaded QR" className="w-[200px] max-w-full object-contain" />
         </div>
       )}
@@ -620,10 +611,7 @@ function QrReader() {
           <span className="text-xs font-medium text-muted-foreground">Decoded content</span>
           <Textarea value={result} readOnly className="min-h-[80px] resize-y font-mono text-sm" />
           <div className="flex gap-2">
-            <Button onClick={copy} className="flex-1">
-              {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-              {copied ? 'Copied!' : 'Copy content'}
-            </Button>
+            <CopyButton value={() => result} label="Copy content" variant="default" size="default" className="flex-1" iconClassName="h-4 w-4" />
             {isUrl && (
               <Button onClick={openLink} variant="outline" className="flex-1">
                 <ExternalLink className="h-4 w-4 mr-2" />

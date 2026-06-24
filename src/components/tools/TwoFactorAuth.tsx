@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,11 +9,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  ShieldCheck, Copy, Check, Plus, Trash2, Eye, EyeOff,
+  ShieldCheck, Check, Plus, Trash2, Eye, EyeOff,
   RefreshCw, KeyRound, ChevronDown, ChevronUp, ArrowRight,
   Upload, Download, QrCode, FileText, Search, X, Loader2, ClipboardPaste,
 } from 'lucide-react';
-import { copyToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { base32Decode, parseOtpImport, type ParsedOtp } from '@/lib/otpauth';
@@ -152,7 +152,6 @@ interface OTPCardProps {
 function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
   const [code, setCode] = useState('');
   const [remaining, setRemaining] = useState(account.period);
-  const [copied, setCopied] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [error, setError] = useState('');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -185,12 +184,6 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [account, generate]);
 
-  const handleCopy = async () => {
-    if (!code) return;
-    await copyToClipboard(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
 
   const isTotp = account.type === 'totp';
   const accentClass = isTotp ? 'border-l-emerald-500' : 'border-l-indigo-500';
@@ -237,15 +230,15 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
                   #{account.counter}
                 </span>
               )}
-              <Button
-                variant="ghost" size="icon"
-                className={cn('h-8 w-8 transition-colors', copied && 'text-emerald-500')}
-                onClick={handleCopy}
+              <CopyButton
+                value={() => code}
                 disabled={!code}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                iconClassName="h-4 w-4"
                 title="Copy code"
-              >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
+              />
             </div>
           </div>
         )}
@@ -537,7 +530,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center gap-4 px-4">
       <div className="relative">
-        <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
+        <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
           <ShieldCheck className="h-8 w-8 text-muted-foreground/40" />
         </div>
         <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">

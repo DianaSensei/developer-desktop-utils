@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, ChevronRight, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type TopicDetails } from './types';
@@ -20,22 +20,26 @@ const TABS: { id: KafkaTab; label: string }[] = [
 
 interface TopicViewProps {
   brokerId: string;
+  brokerName?: string;
   topic: string;
   refreshKey: number;
   selectedTab: KafkaTab;
   onSelectTab: (tab: KafkaTab) => void;
   onRefresh: () => void;
   onSelectGroup: (groupId: string) => void;
+  onBackToTopics?: () => void;
 }
 
 export function TopicView({
   brokerId,
+  brokerName,
   topic,
   refreshKey,
   selectedTab,
   onSelectTab,
   onRefresh,
   onSelectGroup,
+  onBackToTopics,
 }: TopicViewProps) {
   const [data, setData] = useState<TopicDetails | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,18 +57,35 @@ export function TopicView({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
+      {/* Header — breadcrumb: Broker › Topic › Tab */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-mono font-semibold text-sm truncate">{topic}</span>
+        <div className="flex items-center gap-1.5 min-w-0 text-sm">
+          {brokerName && (
+            <>
+              <span className="flex items-center gap-1 text-muted-foreground shrink-0">
+                <Server className="w-3.5 h-3.5" />
+                <span className="truncate max-w-[10rem]">{brokerName}</span>
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+            </>
+          )}
+          <button
+            onClick={onBackToTopics}
+            className="font-mono font-semibold truncate hover:text-primary transition-colors"
+            title="Back to topics"
+          >
+            {topic}
+          </button>
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+          <span className="text-muted-foreground shrink-0">{TABS.find((t) => t.id === selectedTab)?.label}</span>
           {data && (
-            <span className="text-xs text-muted-foreground">
+            <span className="ml-2 text-xs text-muted-foreground shrink-0 hidden sm:inline">
               {data.partitions.length}p · RF {data.replicationFactor}
             </span>
           )}
-          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />}
         </div>
-        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs rounded-lg" onClick={onRefresh}>
+        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs rounded-lg shrink-0" onClick={onRefresh}>
           <RefreshCw className="w-3 h-3" /> Refresh
         </Button>
       </div>

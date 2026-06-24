@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
+import { PaneHeader } from '@/components/ui/tool-layout';
 import { Shield } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -32,10 +33,7 @@ export function JwtDebugger() {
     <div className="flex flex-col h-full">
       {/* Token input — fixed height */}
       <div className="shrink-0 border-b border-border flex flex-col" style={{ height: '160px' }}>
-        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">JWT Token</span>
-          <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
-        </div>
+        <PaneHeader label="JWT Token" hint={quickPasteHint} />
         <Textarea
           value={token}
           onChange={(e) => setToken(e.target.value)}

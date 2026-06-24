@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
+import { PaneHeader } from '@/components/ui/tool-layout';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -255,7 +256,7 @@ export function RegexTester() {
                 className={cn(
                   'w-6 rounded-md font-mono text-xs font-medium transition-all duration-150',
                   flags.includes(flag)
-                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -295,10 +296,7 @@ export function RegexTester() {
 
       {/* Test string — fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col">
-        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Test String</span>
-          <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
-        </div>
+        <PaneHeader label="Test String" hint={quickPasteHint} />
         <Textarea
           value={testString}
           onChange={(e) => setTestString(e.target.value)}

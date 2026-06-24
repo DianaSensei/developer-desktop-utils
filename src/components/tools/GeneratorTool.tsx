@@ -175,7 +175,7 @@ export function GeneratorTool() {
               {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
                 <button key={k} onClick={() => toggleCharset(k)}
                   className={cn('rounded-lg border px-2 py-0.5 text-xs font-medium transition-colors',
-                    charsets[k] ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground hover:text-foreground')}>
+                    charsets[k] ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground hover:text-foreground')}>
                   {k === 'lower' ? 'a–z' : k === 'upper' ? 'A–Z' : k === 'digits' ? '0–9' : '!@#'}
                 </button>
               ))}

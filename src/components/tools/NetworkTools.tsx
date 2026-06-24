@@ -2,16 +2,16 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
+import { CopyButton } from '@/components/ui/copy-button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Globe, Search, Loader2, Copy, RefreshCw, MapPin, Wifi, Building2,
+  Globe, Search, Loader2, RefreshCw, MapPin, Wifi, Building2,
   Network as NetworkIcon, ShieldCheck, ShieldAlert, CheckCircle2, XCircle,
   AlertCircle, Clock, Server, X, Router, Laptop,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { copyToClipboard } from '@/lib/clipboard';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import {
   DNS_RECORD_TYPES, DOH_PROVIDERS, DOH_PROVIDER_MAP,
@@ -57,16 +57,14 @@ function useSessionState<T>(slot: Record<string, unknown>, key: string): [T, Dis
 // ─── shared bits ────────────────────────────────────────────────────────────
 
 function CopyBtn({ value }: { value: string }) {
-  const [done, setDone] = useState(false);
   return (
-    <button
-      type="button"
-      onClick={async () => { await copyToClipboard(value); setDone(true); setTimeout(() => setDone(false), 1200); }}
-      className="shrink-0 text-muted-foreground/60 hover:text-foreground transition-colors"
-      title="Copy"
-    >
-      {done ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-    </button>
+    <CopyButton
+      value={value}
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 shrink-0 text-muted-foreground/60 hover:text-foreground"
+      iconClassName="h-3.5 w-3.5"
+    />
   );
 }
 
@@ -98,7 +96,7 @@ function ErrorBox({ message }: { message: string }) {
 function Empty({ icon: Icon = Globe, children }: { icon?: typeof Globe; children: React.ReactNode }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl border bg-card">
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-card">
         <Icon className="h-6 w-6 text-muted-foreground/40" />
       </div>
       <p className="max-w-xs text-sm text-muted-foreground">{children}</p>

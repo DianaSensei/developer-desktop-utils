@@ -1,4 +1,5 @@
 import { Textarea } from '@/components/ui/textarea';
+import { PaneHeader } from '@/components/ui/tool-layout';
 import ReactMarkdown from 'react-markdown';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -39,9 +40,7 @@ export function MarkdownPreview() {
     <div className="grid grid-cols-2 h-full divide-x overflow-hidden">
       {/* Editor */}
       <div className="flex flex-col min-h-0">
-        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 text-xs font-medium text-muted-foreground">
-          Markdown — {quickPasteHint}
-        </div>
+        <PaneHeader label="Markdown" hint={quickPasteHint} />
         <Textarea
           value={markdown}
           onChange={(e) => setMarkdown(e.target.value)}
@@ -52,9 +51,7 @@ export function MarkdownPreview() {
 
       {/* Preview */}
       <div className="flex flex-col min-h-0">
-        <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 text-xs font-medium text-muted-foreground">
-          Preview
-        </div>
+        <PaneHeader label="Preview" />
         <div className="flex-1 min-h-0 overflow-y-auto p-4 prose dark:prose-invert prose-sm max-w-none">
           <ReactMarkdown>{markdown}</ReactMarkdown>
         </div>

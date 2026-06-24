@@ -396,7 +396,7 @@ export function ColorPicker() {
               <h2 className="text-sm font-semibold">Image</h2>
               <Help text="Move over the image to magnify it, then click to pick the color under the crosshair." />
             </div>
-            <div className="relative w-full overflow-hidden rounded-xl border bg-muted/30">
+            <div className="relative w-full overflow-hidden rounded-lg border bg-muted/30">
               <canvas
                 ref={canvasRef}
                 onPointerMove={onMove}
@@ -407,7 +407,7 @@ export function ColorPicker() {
               {/* Magnifier loupe */}
               {loupe && (
                 <div
-                  className="pointer-events-none absolute z-10 overflow-hidden rounded-xl border-2 border-white shadow-xl"
+                  className="pointer-events-none absolute z-10 overflow-hidden rounded-lg border-2 border-white shadow-xl"
                   style={{
                     width: LOUPE, height: LOUPE,
                     left: Math.min(Math.max(loupe.x + 24, 0), (canvasRef.current?.clientWidth ?? 0) - LOUPE),
@@ -499,7 +499,7 @@ export function ColorPicker() {
           </div>
 
           {/* Use your own image */}
-          <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
+          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
             <h3 className="text-sm font-semibold">Use your own image</h3>
             <Button onClick={onUpload} className="w-full gap-2">
               <ImageIcon className="h-4 w-4" /> Use your image

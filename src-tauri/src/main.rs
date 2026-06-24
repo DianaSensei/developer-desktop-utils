@@ -27,6 +27,7 @@ fn main() {
             kafka::kafka_list_groups,
             kafka::kafka_group_details,
             kafka::kafka_produce,
+            kafka::kafka_produce_batch,
             kafka::kafka_fetch_messages,
             kafka::kafka_delete_topic,
             kafka::kafka_topic_configs,

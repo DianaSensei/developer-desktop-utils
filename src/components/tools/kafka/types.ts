@@ -55,11 +55,24 @@ export interface Assignment {
   lag: number;
 }
 
+export interface GroupMember {
+  memberId: string;
+  clientId: string;
+  clientHost: string;
+}
+
 export interface GroupDetails {
   groupId: string;
   state: string;
   memberCount: number;
+  members: GroupMember[];
   assignments: Assignment[];
+}
+
+export interface BatchRecord {
+  key: string | null;
+  value: string;
+  headers?: Record<string, string>;
 }
 
 export interface ProduceResult {
@@ -109,8 +122,11 @@ export const kafkaApi = {
   produce: (configId: string, topic: string, partition: number | null, key: string | null, value: string, headers: Record<string, string>) =>
     invoke<ProduceResult>('kafka_produce', { configId, topic, partition, key, value, headers }),
 
-  fetchMessages: (configId: string, topic: string, partition: number, offset: number, limit: number) =>
-    invoke<KafkaMessage[]>('kafka_fetch_messages', { configId, topic, partition, offset, limit }),
+  produceBatch: (configId: string, topic: string, partition: number | null, records: BatchRecord[]) =>
+    invoke<number[]>('kafka_produce_batch', { configId, topic, partition, records }),
+
+  fetchMessages: (configId: string, topic: string, partition: number, offset: number, limit: number, startTimestamp?: number | null) =>
+    invoke<KafkaMessage[]>('kafka_fetch_messages', { configId, topic, partition, offset, limit, startTimestamp: startTimestamp ?? null }),
 
   deleteTopic: (configId: string, name: string) =>
     invoke<void>('kafka_delete_topic', { configId, name }),

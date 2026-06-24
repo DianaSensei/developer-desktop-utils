@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Server } from 'lucide-react';
 import { LeftPanel } from './LeftPanel';
 import { TopicView } from './TopicView';
 import { GroupView } from './GroupView';
 import { KafkaInfoModal } from './KafkaInfoModal';
 import { useKafkaState } from './useKafkaState';
+import { kafkaApi } from './types';
 import { usePersistentState } from '@/hooks/usePersistentState';
 
 export function KafkaExplorer() {
@@ -23,6 +24,17 @@ export function KafkaExplorer() {
 
   const [infoDismissed, setInfoDismissed] = usePersistentState('devtool:kafka:info-dismissed', false);
   const [showInfo, setShowInfo] = useState(!infoDismissed);
+
+  // Resolve the selected broker's display name for the breadcrumb.
+  const [brokerName, setBrokerName] = useState('');
+  useEffect(() => {
+    if (!selectedBrokerId) { setBrokerName(''); return; }
+    let alive = true;
+    kafkaApi.listConfigs()
+      .then((cfgs) => { if (alive) setBrokerName(cfgs.find((c) => c.id === selectedBrokerId)?.name ?? ''); })
+      .catch(() => { if (alive) setBrokerName(''); });
+    return () => { alive = false; };
+  }, [selectedBrokerId, refreshKey]);
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
@@ -50,12 +62,14 @@ export function KafkaExplorer() {
         ) : selectedTopic ? (
           <TopicView
             brokerId={selectedBrokerId}
+            brokerName={brokerName}
             topic={selectedTopic}
             refreshKey={refreshKey}
             selectedTab={selectedTab}
             onSelectTab={setSelectedTab}
             onRefresh={refresh}
             onSelectGroup={setSelectedGroup}
+            onBackToTopics={() => setSelectedTopic(null)}
           />
         ) : selectedGroup ? (
           <GroupView

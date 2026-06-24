@@ -7,6 +7,7 @@ import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTrian
 import { PipelineTab } from './PipelineTab';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import { Segmented } from '@/components/ui/segmented';
+import { ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import CryptoJS from 'crypto-js';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -642,32 +643,29 @@ export function Base64Tool() {
             <span className="text-xs text-muted-foreground truncate hidden sm:block">{codec.description}</span>
           </div>
 
-          <div className="flex-1 min-h-0 grid grid-rows-2 divide-y divide-border overflow-hidden">
-            <div className="flex flex-col min-h-0">
-              <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Input</span>
-                <span className="text-[11px] text-muted-foreground/70">{quickPasteHint}</span>
-              </div>
+          <ToolPanes>
+            <ToolPane>
+              <PaneHeader label="Input" hint={quickPasteHint} />
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={encodeMode === 'encode' ? 'Enter text to encode' : `Enter ${codec.label} to decode`}
                 className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
               />
-            </div>
-            <div className="flex flex-col min-h-0">
-              <div className="shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Output</span>
-                <CopyButton value={encodeOutput} label="Copy" variant="ghost" size="sm" disabled={!encodeOutput} className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />
-              </div>
+            </ToolPane>
+            <ToolPane>
+              <PaneHeader
+                label="Output"
+                action={<CopyButton value={encodeOutput} label="Copy" variant="ghost" size="sm" disabled={!encodeOutput} className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />}
+              />
               <Textarea
                 value={encodeError ? `Error: ${encodeError}` : encodeOutput}
                 readOnly
                 placeholder="Result appears here"
                 className={cn('flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4', encodeError && 'text-destructive')}
               />
-            </div>
-          </div>
+            </ToolPane>
+          </ToolPanes>
         </div>
       )}
 

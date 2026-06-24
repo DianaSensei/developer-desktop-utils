@@ -18,9 +18,10 @@ export interface KafkaState {
 
 export function useKafkaState(): KafkaState {
   const [selectedBrokerId, setSelectedBrokerId] = usePersistentState('devtool:kafka:selectedBrokerId', '');
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<KafkaTab>('data');
+  // Selection persists across restarts so you resume where you left off.
+  const [selectedTopic, setSelectedTopic] = usePersistentState<string | null>('devtool:kafka:selectedTopic', null);
+  const [selectedGroup, setSelectedGroup] = usePersistentState<string | null>('devtool:kafka:selectedGroup', null);
+  const [selectedTab, setSelectedTab] = usePersistentState<KafkaTab>('devtool:kafka:selectedTab', 'data');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = () => setRefreshKey((k) => k + 1);

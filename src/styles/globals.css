@@ -1,146 +1,9 @@
+/* Portable design-system tokens, base + utilities (must come before @tailwind). */
+@import "../design-system/tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@layer base {
-  :root {
-    /* Premium light mode — inspired by Bruno, Postman, and Apple design system
-       Soft, approachable, with high contrast for clarity and accessibility */
-    --background: 0 0% 95%;
-    /* Richer grays with subtle warmth for sophistication */
-    --sidebar: 0 0% 92%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
-
-    /* Premium foreground colors — darker for better readability */
-    --foreground: 0 0% 8%;
-    --muted-foreground: 0 0% 42%;
-
-    /* Primary: vivid azure / cobalt — eye-catching but kept comfortable on
-       white by holding lightness mid-range (no neon glare). */
-    --primary: 216 94% 52%;
-    --primary-foreground: 0 0% 100%;
-
-    /* Accent: Complementary blue for interactions */
-    --accent: 216 92% 56%;
-    --accent-foreground: 0 0% 100%;
-
-    /* Secondary & inputs with better definition */
-    --secondary: 0 0% 88%;
-    --secondary-foreground: 0 0% 4%;
-    --input: 0 0% 96%;
-    --muted: 0 0% 92%;
-
-    /* Borders: Subtle but visible separation */
-    --border: 0 0% 86%;
-    --ring: 216 94% 52%;
-    /* Low-alpha-ready primary (HSL components) for animated focus / accent glow */
-    --accent-glow: 216 96% 56%;
-
-    /* Status colors */
-    --destructive: 0 84% 52%;
-    --destructive-foreground: 0 0% 100%;
-
-    /* SQL / JS editor syntax colors */
-    --sql-keyword: hsl(216 90% 46%);
-    --sql-string: hsl(130 50% 35%);
-    --sql-comment: hsl(0 0% 50%);
-    --sql-number: hsl(25 90% 42%);
-    --sql-operator: hsl(0 0% 45%);
-    --sql-function: hsl(185 75% 33%);
-    --sql-type: hsl(270 55% 45%);
-    --js-property: hsl(32 90% 44%);
-    --js-method: hsl(270 60% 52%);
-
-    /* Premium rounded corners — Apple aesthetic */
-    --radius: 1rem;
-
-    /* Premium shadow system — multi-layer for richer depth */
-    --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.06);
-    --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.09), 0 1px 2px -1px rgba(15, 23, 42, 0.08);
-    --shadow-md: 0 4px 8px -2px rgba(15, 23, 42, 0.10), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
-    --shadow-lg: 0 12px 20px -4px rgba(15, 23, 42, 0.12), 0 4px 8px -4px rgba(15, 23, 42, 0.10);
-    --shadow-xl: 0 22px 30px -8px rgba(15, 23, 42, 0.16), 0 8px 14px -6px rgba(15, 23, 42, 0.12);
-    --shadow-2xl: 0 32px 64px -12px rgba(15, 23, 42, 0.22), 0 12px 24px -8px rgba(15, 23, 42, 0.14);
-
-    color-scheme: light;
-  }
-
-  .dark {
-    /* Premium dark mode — inspired by modern API tools (Bruno, Postman dark theme)
-       Deep, sophisticated, with careful contrast for extended viewing */
-    --background: 0 0% 10%;
-    --sidebar: 0 0% 8%;
-    --card: 0 0% 14%;
-    --card-foreground: 0 0% 94%;
-    --popover: 0 0% 15%;
-    --popover-foreground: 0 0% 94%;
-
-    /* Foreground colors for dark mode */
-    --foreground: 0 0% 92%;
-    --muted-foreground: 0 0% 58%;
-
-    /* Primary & Accent — same azure, more luminous so it pops on dark without
-       glare; foreground stays near-black for legible text on the bright blue. */
-    --primary: 214 100% 66%;
-    --primary-foreground: 216 60% 10%;
-    --accent: 214 98% 70%;
-    --accent-foreground: 216 60% 10%;
-
-    /* Secondary colors for dark mode */
-    --secondary: 0 0% 22%;
-    --secondary-foreground: 0 0% 92%;
-    --input: 0 0% 18%;
-    --muted: 0 0% 20%;
-
-    /* Subtle borders in dark mode */
-    --border: 0 0% 22%;
-    --ring: 214 100% 66%;
-    --accent-glow: 214 100% 66%;
-
-    /* Status colors for dark mode */
-    --destructive: 0 80% 64%;
-    --destructive-foreground: 0 0% 100%;
-
-    /* SQL / JS editor syntax colors — dark */
-    --sql-keyword: hsl(214 100% 74%);
-    --sql-string: hsl(130 55% 60%);
-    --sql-comment: hsl(0 0% 50%);
-    --sql-number: hsl(25 90% 65%);
-    --sql-operator: hsl(0 0% 60%);
-    --sql-function: hsl(185 70% 60%);
-    --sql-type: hsl(270 60% 72%);
-    --js-property: hsl(32 90% 66%);
-    --js-method: hsl(270 65% 75%);
-
-    /* Same rounded corners for consistency */
-    --radius: 1rem;
-
-    /* Premium shadow system — deeper for dark mode */
-    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
-    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 12px 20px -4px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.5);
-    --shadow-xl: 0 22px 30px -8px rgba(0, 0, 0, 0.6), 0 8px 14px -6px rgba(0, 0, 0, 0.5);
-    --shadow-2xl: 0 32px 64px -12px rgba(0, 0, 0, 0.7), 0 12px 24px -8px rgba(0, 0, 0, 0.55);
-
-    color-scheme: dark;
-  }
-
-  /* ── Motion system ──────────────────────────────────────────────────────
-     Shared easing + duration tokens so every animation/micro-interaction in
-     the app moves with one premium rhythm. Used by primitives, the shell, and
-     the Tailwind animation utilities registered against matching keyframes. */
-  :root {
-    --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
-    --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
-    --dur-fast: 150ms;
-    --dur-base: 220ms;
-    --dur-slow: 340ms;
-  }
-}
 
 @layer base {
   * {
@@ -149,8 +12,7 @@
   html {
     height: 100%;
     overflow: hidden;
-    /* Prevent rubber-band elastic overscroll on macOS WKWebView and Windows WebView2.
-       overflow:hidden on html/body stops CSS scroll but not the native bounce layer. */
+    /* Prevent rubber-band elastic overscroll on macOS WKWebView and Windows WebView2. */
     overscroll-behavior: none;
     /* Stop mobile/webview auto-inflating text; keep sizes identical per-OS */
     -webkit-text-size-adjust: 100%;
@@ -165,19 +27,13 @@
     font-family: "Inter Variable", "Inter", system-ui, -apple-system, BlinkMacSystemFont,
       "Segoe UI Variable Text", "Segoe UI", "Ubuntu", "Cantarell", "Noto Sans",
       "Helvetica Neue", Arial, sans-serif;
-    /* Only portable OpenType features — kerning + standard ligatures. The previous
-       "cv02/cv03/cv04/cv11" are San-Francisco-only character variants that map to
-       unintended glyphs on Segoe UI / Ubuntu, which looked "broken" off macOS. */
     font-feature-settings: "kern", "liga";
     font-kerning: normal;
     height: 100%;
-    /* Consistent, crisp anti-aliasing across macOS / Windows / Linux webviews */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    /* Apple/Google-style tracking: a hair tight on body for crisp, modern text
-       (the previous absolute +0.3px loosened everything unnaturally). Headings
-       tighten further via the heading utilities' tracking-tight. */
+    /* Apple/Google-style tracking: a hair tight for crisp, modern body text. */
     letter-spacing: -0.006em;
   }
   #root {
@@ -185,10 +41,8 @@
     isolation: isolate;
   }
 
-  /* Override optimizeLegibility on large monospace outputs and code editors.
-     WebKitGTK/FreeType applies full OpenType shaping per text node reflow under
-     optimizeLegibility, which is measurably expensive on long JSON/diff/code bodies
-     where there are no useful ligatures anyway. */
+  /* Override optimizeLegibility on large monospace outputs and code editors —
+     full OpenType shaping per reflow is expensive on long JSON/diff/code bodies. */
   pre,
   code,
   .cm-editor {
@@ -210,409 +64,76 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Crisp pixel art / raster images at fractional DPRs. SVGs are vector and need
-     no hint; canvas DPR is handled in JS. -webkit-optimize-contrast is WebKit-only
-     (ignored on Windows/Chromium WebView2), so pair it with the standard value. */
+  /* Crisp pixel art / raster images at fractional DPRs. SVGs are vector; canvas
+     DPR is handled in JS. -webkit-optimize-contrast is WebKit-only (ignored on
+     Windows/Chromium WebView2), so pair it with the standard value. */
   img,
   canvas {
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
   }
-
-  ::selection {
-    @apply bg-primary/20;
-  }
-
-  /* Smooth, controlled light/dark transition. This class is added to <html> by
-     the theme toggle handler only for the duration of the swap, then removed —
-     so it is never present on first paint (no load flash) and never fires on
-     anything other than an explicit user toggle. Only the color-bearing
-     properties transition; layout properties are intentionally excluded so
-     nothing reflows. Guarded out under reduce-motion via the block below. */
-  .theme-transition,
-  .theme-transition *,
-  .theme-transition *::before,
-  .theme-transition *::after {
-    transition: background-color 220ms ease, border-color 220ms ease,
-      color 220ms ease, fill 220ms ease, stroke 220ms ease,
-      box-shadow 220ms ease !important;
-  }
-
-  /* Respect the OS "reduce motion" setting — neutralize all animation/transition
-     so the app stays instant and jank-free for users who opt out (and on the
-     lowest-end Linux/Windows GPUs where compositing animation is expensive). */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
-
-  /* ── Cross-platform custom scrollbar ─────────────────────────────────────
-     Premium scrollbar design inspired by modern applications.
-     Smooth, refined, with soft shadows for premium appearance.
-     Replaces every native OS scrollbar with a single consistent design that
-     looks identical on macOS (WKWebView), Windows (WebView2/Chromium), and
-     Linux (WebKitGTK).
-
-     Architecture:
-       • Firefox uses the standard `scrollbar-width` / `scrollbar-color` API.
-       • All three Tauri webviews support ::-webkit-scrollbar pseudo-elements
-       • Premium 10px hit-area with 3px transparent border = 4px visual pill
-       • Soft gradient shadow for premium appearance
-       • Smooth transitions and hover states                                 */
-
-  /* Firefox — Premium thin scrollbar */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
-  }
-
-  /* WebKit (macOS/Linux) and Chromium (Windows WebView2) — all three Tauri platforms */
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.35);
-    border-radius: 9999px;
-    /* 3px transparent border on each side = 4px visual pill within 10px hit-area */
-    border: 3px solid transparent;
-    background-clip: padding-box;
-    min-height: 40px;
-    min-width: 40px;
-    transition: background-color 0.2s ease, box-shadow 0.2s ease;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.55);
-  }
-  ::-webkit-scrollbar-thumb:active {
-    background-color: hsl(var(--muted-foreground) / 0.75);
-  }
-  /* Remove OS-native arrow buttons */
-  ::-webkit-scrollbar-button {
-    display: none;
-  }
-  /* Transparent corner where horizontal and vertical bars meet */
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
 }
 
 @layer utilities {
-  /* ── Scrollbar Utilities ───────────────────────────────────────────── */
-  .no-scrollbar {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* ── Premium Shadow System ─────────────────────────────────────────── */
-  /* Layered shadows inspired by Apple and modern UI design */
-  .shadow-sm-premium {
-    box-shadow: var(--shadow-sm);
-  }
-  .shadow-md-premium {
-    box-shadow: var(--shadow-md);
-  }
-  .shadow-lg-premium {
-    box-shadow: var(--shadow-lg);
-  }
-  .shadow-xl-premium {
-    box-shadow: var(--shadow-xl);
-  }
-  .shadow-2xl-premium {
-    box-shadow: var(--shadow-2xl);
-  }
-
-  /* Tinted accent elevation — a soft blue glow under primary/accent elements,
-     the way Apple & Material lift their key action. Subtle at rest, fuller on
-     hover (use shadow-primary-lg). */
-  .shadow-primary {
-    box-shadow: 0 2px 8px -2px hsl(var(--accent-glow) / 0.35),
-                0 1px 2px -1px hsl(var(--accent-glow) / 0.25);
-  }
-  .shadow-primary-lg {
-    box-shadow: 0 8px 20px -4px hsl(var(--accent-glow) / 0.45),
-                0 3px 8px -3px hsl(var(--accent-glow) / 0.30);
-  }
-
-  /* ── Glass surfaces ─────────────────────────────────────────────────────
-     Frosted, translucent panels with backdrop blur + saturation boost and a
-     faint top sheen. Standard + -webkit- prefixes paired for all three Tauri
-     webviews (WKWebView / WebView2 / WebKitGTK). Degrades to a translucent
-     fill where backdrop-filter is unavailable. */
-  /* Apple-style frosted glass: heavy blur + vibrancy (saturation) so content
-     behind reads as a soft, colorful frost, but kept at a HIGH fill opacity so
-     text/controls ON the glass stay crisp and legible (easy to see). */
-  .glass {
-    background-color: hsl(var(--card) / 0.80);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    backdrop-filter: blur(24px) saturate(180%);
-  }
-  .glass-strong {
-    background-color: hsl(var(--card) / 0.90);
-    -webkit-backdrop-filter: blur(30px) saturate(190%);
-    backdrop-filter: blur(30px) saturate(190%);
-  }
-  /* Glass tuned for the app chrome (sidebar/header) — tints from the sidebar
-     surface so it reads as part of the frame, opaque enough to stay readable. */
-  .glass-chrome {
-    background-color: hsl(var(--sidebar) / 0.86);
-    -webkit-backdrop-filter: blur(26px) saturate(185%);
-    backdrop-filter: blur(26px) saturate(185%);
-  }
-  /* Faint inner top-edge highlight gives glass its lit Apple sheen; the dark
-     hairline at the bottom adds the subtle edge that defines the pane. */
-  .glass-sheen {
-    box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.14),
-                inset 0 -1px 0 0 hsl(0 0% 0% / 0.04);
-  }
-
-  /* ── Premium Motion Utilities ──────────────────────────────────────────
-     Reusable micro-interactions so "every action" gets premium motion.
-     All transform-based effects sit behind motion-safe: so the reduce-motion
-     block below fully neutralizes them. */
-
-  /* Signature hover for raised, interactive surfaces — lifts a hair and
-     deepens its shadow, settling back on press. */
-  .hover-elevate {
-    @apply transition-[transform,box-shadow,border-color] duration-200 ease-out
-           motion-safe:hover:-translate-y-0.5 hover:shadow-md-premium hover:border-border/70
-           motion-safe:active:translate-y-0 active:shadow-sm-premium;
-  }
-
-  /* Animated indigo/blue focus glow ring for non-input affordances. */
-  .accent-glow {
-    box-shadow: 0 0 0 3px hsl(var(--accent-glow) / 0.22);
-  }
-  .accent-glow-soft {
-    box-shadow: 0 0 0 3px hsl(var(--accent-glow) / 0.14);
-  }
-
-  /* Premium press feedback for clickable glyphs/rows without a full button. */
-  .press {
-    @apply transition-transform duration-150 ease-out motion-safe:active:scale-[0.96];
-  }
-
-  .animate-pop {
-    animation: pop var(--dur-base) var(--ease-spring);
-  }
-
-  /* ── Premium Card & Container Utilities ────────────────────────────── */
-  /* Premium card with subtle shadow and smooth transitions */
-  .card-premium {
-    @apply bg-card rounded-lg border border-border shadow-sm-premium transition-all duration-200 ease-out;
-  }
-
-  /* Card that elevates on hover (API tool style) */
-  .card-interactive {
-    @apply card-premium hover:shadow-md-premium hover:border-border/70 active:shadow-sm-premium;
-  }
-
-  /* Premium container for tool sections */
-  .container-premium {
-    @apply rounded-lg border border-border bg-card/50 backdrop-blur-sm transition-colors duration-150;
-  }
-
-  /* ── Typography Utilities ──────────────────────────────────────────── */
-  /* Premium headings with improved hierarchy */
-  .heading-xl {
-    @apply text-xl font-semibold leading-tight tracking-tight;
-  }
-  .heading-lg {
-    @apply text-lg font-semibold leading-snug tracking-tight;
-  }
-  .heading-md {
-    @apply text-base font-semibold leading-relaxed tracking-tight;
-  }
-  .heading-sm {
-    @apply text-sm font-semibold leading-relaxed;
-  }
-  .heading-xs {
-    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
-  }
-
-  /* Premium body text with proper line height */
-  .text-body {
-    @apply text-sm leading-relaxed;
-  }
-  .text-caption {
-    @apply text-xs leading-relaxed text-muted-foreground;
-  }
-
-  /* ── Tool styling utilities ────────────────────────────────────────────
-     Consistent spacing, typography, and layout for developer tools */
-
-  /* Tool container spacer — premium spacing */
+  /* ── Tool layout helpers (app-specific spacing/scaffolding) ──────────── */
   .tool-spacer {
     @apply space-y-6 sm:space-y-7;
   }
-
-  /* Premium tool section with clear visual hierarchy */
   .tool-section-premium {
     @apply space-y-3;
   }
-
-  /* Input row — groups input + label consistently */
   .tool-input-row {
     @apply space-y-2.5;
   }
-
-  /* Output row — groups output + label consistently */
   .tool-output-row {
     @apply space-y-2.5 pb-5 sm:pb-6 border-b last:border-0 last:pb-0;
   }
-
-  /* Button group for actions (copy, paste, etc.) */
   .tool-button-group {
     @apply flex gap-2.5;
   }
-
-  /* Icon used in sections — consistent sizing */
   .tool-icon {
     @apply h-4 w-4;
   }
-
-  /* Responsive padding — premium spacing with better rhythm */
   .tool-padding {
     @apply px-4 py-5 sm:px-5 sm:py-6 lg:px-6;
   }
-
-  /* Full-height tool with content inside */
   .tool-full-height {
     @apply h-full overflow-hidden flex flex-col;
   }
-
-  /* Content area inside full-height tool — should flex-1 and overflow-y-auto */
   .tool-scrollable {
     @apply flex-1 min-h-0 overflow-y-auto;
   }
-
-  /* ── API Tool Style Utilities ──────────────────────────────────────── */
-  /* Inspired by Bruno, Postman — clean, organized layouts */
-
-  /* Split pane for request/response views */
   .split-pane {
     @apply flex gap-4 h-full;
   }
 
-  /* Tab-like navigation with premium styling */
-  .tab-premium {
-    @apply px-4 py-2.5 rounded-t-lg border border-b-0 border-border bg-muted/50 text-sm font-medium
-           text-muted-foreground transition-all duration-150 cursor-pointer hover:text-foreground hover:bg-muted/70;
-  }
-
-  .tab-premium.active {
-    @apply bg-card border-border text-foreground shadow-sm-premium;
-  }
-
-  /* Pill-style badge for status/tags */
-  .badge-premium {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
-           bg-muted/60 text-foreground border border-border/50 transition-colors duration-150;
-  }
-
-  /* ── Form & Input Utilities ────────────────────────────────────────── */
-  /* Premium input styling with focus states */
+  /* ── Premium form/button utilities (used by a few tools directly) ────── */
   .input-premium {
     @apply h-9 rounded-lg border border-border bg-input px-3 py-2 text-sm
            transition-all duration-150 ease-out
            placeholder:text-muted-foreground/50
            focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card;
   }
-
   .textarea-premium {
     @apply rounded-lg border border-border bg-input px-3 py-2 text-sm
            transition-all duration-150 ease-out
            placeholder:text-muted-foreground/50
            focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card;
   }
-
-  /* ── Button Utilities ──────────────────────────────────────────────── */
-  /* Premium button with micro-interactions */
   .btn-premium {
     @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-150 ease-out
            focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-1
            active:scale-95;
   }
-
   .btn-primary-premium {
     @apply btn-premium px-4 py-2 bg-primary text-primary-foreground shadow-sm-premium
            hover:shadow-md-premium hover:bg-primary/95 active:shadow-sm-premium;
   }
-
   .btn-secondary-premium {
     @apply btn-premium px-4 py-2 bg-muted text-foreground border border-border
            hover:bg-muted/80 hover:shadow-sm-premium;
   }
-
   .btn-ghost-premium {
     @apply btn-premium px-3 py-2 text-foreground hover:bg-muted/50;
-  }
-
-  /* ── Layout Utilities ──────────────────────────────────────────────── */
-  /* Premium sidebar styling */
-  .sidebar-premium {
-    @apply glass-chrome glass-sheen border-r border-border/70;
-  }
-
-  /* Premium header styling — frosted glass that blurs content scrolling under it */
-  .header-premium {
-    @apply glass-chrome border-b border-border/70;
-  }
-
-  /* Content wrapper with optimal reading width */
-  .content-wrapper {
-    @apply mx-auto w-full max-w-7xl;
-  }
-
-  /* ── Animation Utilities ───────────────────────────────────────────── */
-  /* Smooth fade and slide animations */
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .animate-fade-in-up {
-    animation: fadeInUp 0.3s ease-out;
-  }
-
-  /* Smooth scale animation for interactive elements */
-  @keyframes scaleIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  .animate-scale-in {
-    animation: scaleIn 0.2s ease-out;
-  }
-
-  /* Springy pop — for confirmations, badges, freshly-revealed results. */
-  @keyframes pop {
-    0% { transform: scale(0.9); }
-    60% { transform: scale(1.04); }
-    100% { transform: scale(1); }
   }
 }

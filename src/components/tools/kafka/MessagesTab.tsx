@@ -1,16 +1,39 @@
 import { useState, useRef, useMemo } from 'react';
-import { Loader2, AlertCircle, Search, Copy, Check, X, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Loader2, AlertCircle, Search, X, ArrowUp, ArrowDown, ArrowUpDown, Regex, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { copyToClipboard } from '@/lib/clipboard';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { kafkaApi, type KafkaMessage, type PartitionInfo } from './types';
 
-type FetchMode = 'tail' | 'from' | 'range';
+// Export helpers — bulk copy of the currently-shown messages.
+function messagesToJson(msgs: KafkaMessage[]): string {
+  return JSON.stringify(msgs, null, 2);
+}
+function messagesToCsv(msgs: KafkaMessage[]): string {
+  const esc = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+  const rows = [['partition', 'offset', 'timestamp', 'key', 'value', 'headers'].join(',')];
+  for (const m of msgs) {
+    rows.push([
+      m.partition, m.offset, esc(m.timestamp), esc(m.key), esc(m.value), esc(JSON.stringify(m.headers)),
+    ].join(','));
+  }
+  return rows.join('\n');
+}
+
+type FetchMode = 'tail' | 'from' | 'range' | 'time';
+
+const SINCE_PRESETS: { ms: number; label: string }[] = [
+  { ms: 15 * 60_000, label: 'Last 15 min' },
+  { ms: 60 * 60_000, label: 'Last 1 hour' },
+  { ms: 6 * 60 * 60_000, label: 'Last 6 hours' },
+  { ms: 24 * 60 * 60_000, label: 'Last 24 hours' },
+  { ms: 7 * 24 * 60 * 60_000, label: 'Last 7 days' },
+];
 type ValueMode = 'text' | 'json' | 'hex';
 type SortCol = 'partition' | 'offset' | 'key' | 'value' | 'timestamp';
 type SortDir = 'asc' | 'desc';
@@ -67,28 +90,15 @@ function formatTs(ts: string): string {
 // ── Shared: Copy button ───────────────────────────────────────────────────────
 
 function CopyBtn({ text, className }: { text: string; className?: string }) {
-  const { config } = useAppConfig();
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const copy = async () => {
-    await copyToClipboard(text);
-    setCopied(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
-  };
-
   return (
-    <button
-      onClick={copy}
+    <CopyButton
+      value={text}
       title="Copy to clipboard"
-      className={cn(
-        'p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors shrink-0',
-        className,
-      )}
-    >
-      {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-    </button>
+      variant="ghost"
+      size="icon"
+      className={cn('h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground', className)}
+      iconClassName="w-3 h-3"
+    />
   );
 }
 
@@ -362,10 +372,12 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
   );
   const [partition, setPartition] = useState<number>(partitions[0]?.id ?? 0);
   const [mode, setMode] = useState<FetchMode>('tail');
+  const [sinceMs, setSinceMs] = useState<number>(60 * 60_000);
   const [fromOffset, setFromOffset] = useState('0');
   const [toOffset, setToOffset] = useState('100');
   const [limit, setLimit] = useState<number>(50);
   const [keyword, setKeyword] = useState('');
+  const [useRegex, setUseRegex] = useState(false);
   const [messages, setMessages] = useState<KafkaMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -374,13 +386,14 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Column widths (px) — value column is always 1fr
-  const [colWidths, setColWidths] = useState<ColWidths>(DEFAULT_WIDTHS);
+  // Column widths (px) — value column is always 1fr. Persisted so a tuned
+  // layout survives refetch / tab switches / app restart.
+  const [colWidths, setColWidths] = usePersistentState<ColWidths>('devtool:kafka:colWidths', DEFAULT_WIDTHS);
   const colWidthsRef = useRef(colWidths);
   colWidthsRef.current = colWidths;
 
-  // Detail panel width (px)
-  const [detailWidth, setDetailWidth] = useState(DETAIL_DEFAULT);
+  // Detail panel width (px) — also persisted.
+  const [detailWidth, setDetailWidth] = usePersistentState('devtool:kafka:detailWidth', DETAIL_DEFAULT);
   const detailWidthRef = useRef(detailWidth);
   detailWidthRef.current = detailWidth;
 
@@ -454,19 +467,24 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
     try {
       let startOffset: number;
       let fetchLimit: number;
+      let startTimestamp: number | null = null;
       if (mode === 'tail') {
         startOffset = -1;
         fetchLimit = limit;
       } else if (mode === 'from') {
         startOffset = parseInt(fromOffset, 10) || 0;
         fetchLimit = limit;
+      } else if (mode === 'time') {
+        startOffset = 0;
+        fetchLimit = limit;
+        startTimestamp = Date.now() - sinceMs;
       } else {
         const from = parseInt(fromOffset, 10) || 0;
         const to = parseInt(toOffset, 10) || 0;
         startOffset = from;
         fetchLimit = Math.min(Math.max(to - from, 1), config.kafka.maxFetchMessages);
       }
-      const msgs = await kafkaApi.fetchMessages(brokerId, topic, partition, startOffset, fetchLimit);
+      const msgs = await kafkaApi.fetchMessages(brokerId, topic, partition, startOffset, fetchLimit, startTimestamp);
       setMessages(msgs);
       setFetched(true);
       if (mode !== 'range' && msgs.length >= fetchLimit) {
@@ -509,15 +527,26 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
     setSelectedMsg(isSame ? null : msg);
   };
 
-  const filtered = useMemo(() =>
-    keyword
-      ? messages.filter((m) =>
-          [m.key, m.value, ...Object.values(m.headers)]
-            .some((v) => v?.toLowerCase().includes(keyword.toLowerCase()))
-        )
-      : messages,
-    [messages, keyword],
-  );
+  // Invalid regex while in regex mode — surfaced in the filter bar; filter is
+  // bypassed (show all) so the list doesn't vanish mid-typing.
+  const regexError = useMemo(() => {
+    if (!useRegex || !keyword) return false;
+    try { new RegExp(keyword); return false; } catch { return true; }
+  }, [useRegex, keyword]);
+
+  const filtered = useMemo(() => {
+    if (!keyword || regexError) return messages;
+    if (useRegex) {
+      const re = new RegExp(keyword, 'i');
+      return messages.filter((m) =>
+        [m.key, m.value, ...Object.values(m.headers)].some((v) => v != null && re.test(v))
+      );
+    }
+    const kw = keyword.toLowerCase();
+    return messages.filter((m) =>
+      [m.key, m.value, ...Object.values(m.headers)].some((v) => v?.toLowerCase().includes(kw))
+    );
+  }, [messages, keyword, useRegex, regexError]);
 
   const sorted = useMemo(() => {
     if (!sortCol) return filtered;
@@ -566,7 +595,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Start from</Label>
           <div className="flex rounded-md border border-input overflow-hidden text-xs h-8">
-            {(['tail', 'from', 'range'] as FetchMode[]).map((m) => (
+            {(['tail', 'from', 'range', 'time'] as FetchMode[]).map((m) => (
               <button
                 key={m}
                 className={cn(
@@ -575,11 +604,27 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 )}
                 onClick={() => setMode(m)}
               >
-                {m === 'tail' ? 'Latest' : m === 'from' ? 'Offset' : 'Range'}
+                {m === 'tail' ? 'Latest' : m === 'from' ? 'Offset' : m === 'range' ? 'Range' : 'Time'}
               </button>
             ))}
           </div>
         </div>
+
+        {mode === 'time' && (
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-muted-foreground">Since</Label>
+            <Select value={String(sinceMs)} onValueChange={(v) => setSinceMs(Number(v))}>
+              <SelectTrigger className="h-8 text-xs w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SINCE_PRESETS.map((p) => (
+                  <SelectItem key={p.ms} value={String(p.ms)}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {mode === 'from' && (
           <div className="flex flex-col gap-1">
@@ -674,17 +719,40 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         <Input
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          placeholder="Filter by key, value, or headers…"
-          className="h-7 text-xs border-0 shadow-none focus-visible:ring-0 px-0 flex-1"
+          placeholder={useRegex ? 'Filter by regex (key, value, headers)…' : 'Filter by key, value, or headers…'}
+          className={cn(
+            'h-7 text-xs border-0 shadow-none focus-visible:ring-0 px-0 flex-1',
+            useRegex && 'font-mono',
+            regexError && 'text-destructive',
+          )}
           disabled={!fetched}
         />
+        {regexError && <span className="text-[10px] text-destructive shrink-0">invalid regex</span>}
+        <button
+          title={useRegex ? 'Regex mode on' : 'Use regular expression'}
+          aria-pressed={useRegex}
+          onClick={() => setUseRegex((v) => !v)}
+          className={cn(
+            'p-1 rounded transition-colors shrink-0',
+            useRegex ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+          )}
+        >
+          <Regex className="w-3.5 h-3.5" />
+        </button>
         {keyword && (
           <button
-            className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+            className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
             onClick={() => setKeyword('')}
           >
             <X className="w-3 h-3" />
           </button>
+        )}
+        {fetched && sorted.length > 0 && (
+          <div className="flex items-center gap-1 shrink-0 border-l border-border/50 pl-2 ml-1">
+            <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">Export</span>
+            <CopyButton value={() => messagesToJson(sorted)} label="JSON" variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" iconClassName="h-3 w-3" />
+            <CopyButton value={() => messagesToCsv(sorted)} label="CSV" variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" iconClassName="h-3 w-3" />
+          </div>
         )}
       </div>
 
@@ -746,11 +814,12 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 return (
                   <button
                     key={`${msg.partition}-${msg.offset}`}
+                    title="Click to view full message"
                     className={cn(
-                      'w-full grid px-3 py-1.5 text-left border-b border-border/30 transition-colors border-l-2',
+                      'group w-full grid cursor-pointer px-3 py-1.5 text-left border-b border-border/30 transition-colors border-l-2',
                       isSelected
                         ? 'bg-primary/10 border-l-primary'
-                        : 'border-l-transparent hover:bg-muted/40',
+                        : 'border-l-transparent hover:bg-muted/40 hover:border-l-primary/40',
                     )}
                     style={{ gridTemplateColumns: gridCols, gap: '0.5rem' }}
                     onClick={() => handleRowClick(msg)}
@@ -767,7 +836,15 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                         ? msg.value
                         : <span className="italic text-muted-foreground/40">null</span>}
                     </span>
-                    <span className="text-xs text-muted-foreground truncate">{ts}</span>
+                    <span className="flex items-center justify-between gap-1 text-xs text-muted-foreground min-w-0">
+                      <span className="truncate">{ts}</span>
+                      <ChevronRight
+                        className={cn(
+                          'w-3 h-3 shrink-0 transition-opacity',
+                          isSelected ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-50',
+                        )}
+                      />
+                    </span>
                   </button>
                 );
               })}

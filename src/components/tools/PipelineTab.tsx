@@ -3,16 +3,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Plus, Trash2, Copy, Eye, EyeOff, ChevronDown, ChevronUp,
+  Plus, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
   Hash, KeyRound, Code2, Type, Scissors, Search, CornerDownRight,
   AlertTriangle, CheckCircle2, ArrowRight, FileText, Braces,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
-import { copyToClipboard } from '@/lib/clipboard';
 import CryptoJS from 'crypto-js';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -298,23 +298,19 @@ function HexToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
 }
 
 function CopyBtn({ value, mini = false }: { value: string; mini?: boolean }) {
-  const [done, setDone] = useState(false);
-  const go = () => { copyToClipboard(value); setDone(true); setTimeout(() => setDone(false), 1400); };
   return (
-    <button
-      type="button" disabled={!value} onClick={go}
+    <CopyButton
+      value={value}
+      disabled={!value}
+      label={mini ? undefined : 'Copy'}
+      variant="ghost"
+      size="sm"
       className={cn(
-        'flex items-center gap-1 rounded-md font-medium transition-colors disabled:opacity-30',
-        mini
-          ? 'text-[10px] px-1.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/60'
-          : 'text-xs px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-muted/60'
+        'h-auto rounded-md font-medium text-muted-foreground',
+        mini ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs',
       )}
-    >
-      {done
-        ? <><CheckCircle2 className="h-3 w-3 text-green-500" />{!mini && 'Copied'}</>
-        : <><Copy className="h-3 w-3" />{!mini && 'Copy'}</>
-      }
-    </button>
+      iconClassName="h-3 w-3"
+    />
   );
 }
 
@@ -646,7 +642,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
 
   return (
     <div className={cn(
-      'rounded-xl border bg-card shadow-sm overflow-hidden',
+      'rounded-lg border bg-card shadow-sm overflow-hidden',
       result?.error ? 'border-destructive/30' : 'border-border'
     )}>
       {/* Header */}
@@ -829,7 +825,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="w-px h-3 bg-border/50" />
-      <div className="w-full rounded-xl border border-dashed border-primary/30 bg-primary/3 p-3 space-y-3">
+      <div className="w-full rounded-lg border border-dashed border-primary/30 bg-primary/3 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold">Add a step</p>
           <button type="button" onClick={() => setOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
@@ -862,7 +858,7 @@ function FinalResult({ result }: { result: StepResult | undefined }) {
   if (!result || (!result.output && !result.error)) return null;
   const ok = !!result.output && !result.error;
   return (
-    <div className={cn('rounded-xl border p-4', ok ? 'border-primary/25 bg-primary/5' : 'border-destructive/25 bg-destructive/5')}>
+    <div className={cn('rounded-lg border p-4', ok ? 'border-primary/25 bg-primary/5' : 'border-destructive/25 bg-destructive/5')}>
       <div className="flex items-center justify-between mb-2.5">
         <span className="flex items-center gap-1.5 text-xs font-semibold">
           {ok ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <AlertTriangle className="h-4 w-4 text-destructive" />}
