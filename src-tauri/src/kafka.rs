@@ -342,6 +342,26 @@ impl<'a> Dec<'a> {
         Ok(v)
     }
 
+    fn uvarint(&mut self) -> Result<u64, String> {
+        let mut result: u64 = 0;
+        let mut shift = 0u32;
+        loop {
+            self.ensure(1)?;
+            let b = self.data[self.pos];
+            self.pos += 1;
+            result |= ((b & 0x7f) as u64) << shift;
+            if b & 0x80 == 0 { break; }
+            shift += 7;
+            if shift >= 64 { return Err("varint overflow".into()); }
+        }
+        Ok(result)
+    }
+
+    fn svarint(&mut self) -> Result<i64, String> {
+        let n = self.uvarint()?;
+        Ok(((n >> 1) as i64) ^ -((n & 1) as i64))
+    }
+
     fn skip(&mut self, n: usize) -> Result<(), String> {
         self.ensure(n)?;
         self.pos += n;
@@ -368,6 +388,21 @@ fn enc_i32(buf: &mut Vec<u8>, v: i32) {
 
 fn enc_i64(buf: &mut Vec<u8>, v: i64) {
     buf.extend_from_slice(&v.to_be_bytes());
+}
+
+fn ms_to_rfc3339(ms: i64) -> String {
+    use chrono::TimeZone;
+    let secs = ms / 1000;
+    let nanos = ((ms % 1000).max(0) * 1_000_000) as u32;
+    chrono::Utc.timestamp_opt(secs, nanos)
+        .single()
+        .map(|dt| dt.to_rfc3339())
+        .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
+}
+
+fn bytes_to_string(b: &[u8]) -> String {
+    String::from_utf8(b.to_vec())
+        .unwrap_or_else(|_| format!("<binary {} bytes>", b.len()))
 }
 
 // MetadataRequest v0 (API 3) — returns topics with partition/replica info
@@ -439,6 +474,210 @@ async fn wire_list_offsets(
         })
     })?;
     Ok(result)
+}
+
+// ── Record set parsing ────────────────────────────────────────────────────────
+
+fn parse_legacy_message(base_offset: i64, body: &[u8], partition: i32) -> Result<KafkaMessage, String> {
+    // body starts at the message boundary: [crc:4][magic:1][attrs:1][timestamp?:8][key:bytes4][value:bytes4]
+    if body.len() < 6 { return Err("message body too short".into()); }
+    let magic = body[4];
+    let attrs = body[5];
+    let compression = attrs & 0x07;
+    let mut d = Dec::new(body);
+    d.skip(6)?; // crc + magic + attrs
+    let timestamp_ms: i64 = if magic >= 1 { d.i64()? } else { 0 };
+    let key = {
+        let len = d.i32()?;
+        if len < 0 { None } else {
+            d.ensure(len as usize)?;
+            let b = d.data[d.pos..d.pos + len as usize].to_vec();
+            d.pos += len as usize;
+            Some(b)
+        }
+    };
+    let value = {
+        let len = d.i32()?;
+        if len < 0 { None } else {
+            d.ensure(len as usize)?;
+            let b = d.data[d.pos..d.pos + len as usize].to_vec();
+            d.pos += len as usize;
+            Some(b)
+        }
+    };
+    let value_str = if compression != 0 {
+        Some(format!("<compressed {} bytes>", value.as_ref().map_or(0, |b: &Vec<u8>| b.len())))
+    } else {
+        value.map(|b| bytes_to_string(&b))
+    };
+    Ok(KafkaMessage {
+        offset: base_offset,
+        partition,
+        timestamp: ms_to_rfc3339(timestamp_ms),
+        key: key.map(|b| bytes_to_string(&b)),
+        value: value_str,
+        headers: Default::default(),
+    })
+}
+
+fn parse_record_batch(base_offset: i64, body: &[u8], partition: i32) -> Result<Vec<KafkaMessage>, String> {
+    // body starts at partition_leader_epoch: [ple:4][magic:1][crc:4][attrs:2][last_offset_delta:4]
+    //   [base_timestamp:8][max_timestamp:8][producer_id:8][producer_epoch:2][base_seq:4][count:4][records...]
+    let mut d = Dec::new(body);
+    d.skip(4)?; // partition_leader_epoch
+    d.skip(1)?; // magic (already known = 2)
+    d.skip(4)?; // crc32c
+    let attrs = d.i16()?;
+    let compression = attrs & 0x07;
+    d.skip(4)?; // last_offset_delta
+    let base_timestamp = d.i64()?;
+    d.skip(8)?; // max_timestamp
+    d.skip(8)?; // producer_id
+    d.skip(2)?; // producer_epoch
+    d.skip(4)?; // base_sequence
+    let records_count = d.i32()?;
+
+    if compression != 0 {
+        return Ok(vec![KafkaMessage {
+            offset: base_offset,
+            partition,
+            timestamp: ms_to_rfc3339(base_timestamp),
+            key: None,
+            value: Some(format!("<compressed batch {} records>", records_count)),
+            headers: Default::default(),
+        }]);
+    }
+
+    let mut messages = Vec::new();
+    for _ in 0..records_count {
+        let _record_len = d.svarint()?;
+        d.ensure(1)?;
+        d.pos += 1; // attributes (i8)
+        let timestamp_delta = d.svarint()?;
+        let offset_delta = d.svarint()?;
+        let key_len = d.svarint()?;
+        let key = if key_len < 0 {
+            None
+        } else {
+            d.ensure(key_len as usize)?;
+            let b = d.data[d.pos..d.pos + key_len as usize].to_vec();
+            d.pos += key_len as usize;
+            Some(bytes_to_string(&b))
+        };
+        let val_len = d.svarint()?;
+        let value = if val_len < 0 {
+            None
+        } else {
+            d.ensure(val_len as usize)?;
+            let b = d.data[d.pos..d.pos + val_len as usize].to_vec();
+            d.pos += val_len as usize;
+            Some(bytes_to_string(&b))
+        };
+        let headers_count = d.uvarint()?;
+        let mut headers = std::collections::HashMap::new();
+        for _ in 0..headers_count {
+            let hk_len = d.svarint()?;
+            let hk = if hk_len <= 0 {
+                String::new()
+            } else {
+                d.ensure(hk_len as usize)?;
+                let s = String::from_utf8_lossy(&d.data[d.pos..d.pos + hk_len as usize]).to_string();
+                d.pos += hk_len as usize;
+                s
+            };
+            let hv_len = d.svarint()?;
+            let hv = if hv_len <= 0 {
+                String::new()
+            } else {
+                d.ensure(hv_len as usize)?;
+                let s = String::from_utf8_lossy(&d.data[d.pos..d.pos + hv_len as usize]).to_string();
+                d.pos += hv_len as usize;
+                s
+            };
+            headers.insert(hk, hv);
+        }
+        messages.push(KafkaMessage {
+            offset: base_offset + offset_delta,
+            partition,
+            timestamp: ms_to_rfc3339(base_timestamp + timestamp_delta),
+            key,
+            value,
+            headers,
+        });
+    }
+    Ok(messages)
+}
+
+fn parse_record_set(data: &[u8], partition: i32) -> Result<Vec<KafkaMessage>, String> {
+    let mut messages = Vec::new();
+    let mut pos = 0usize;
+    while pos + 12 <= data.len() {
+        let base_offset = i64::from_be_bytes(data[pos..pos + 8].try_into().unwrap());
+        let entry_size = i32::from_be_bytes(data[pos + 8..pos + 12].try_into().unwrap());
+        if entry_size <= 0 { break; }
+        let entry_size = entry_size as usize;
+        if pos + 12 + entry_size > data.len() { break; } // truncated at end, normal
+        let body = &data[pos + 12..pos + 12 + entry_size];
+        if body.len() >= 5 {
+            let magic = body[4];
+            match magic {
+                0 | 1 => {
+                    if let Ok(msg) = parse_legacy_message(base_offset, body, partition) {
+                        messages.push(msg);
+                    }
+                }
+                2 => {
+                    if let Ok(mut batch) = parse_record_batch(base_offset, body, partition) {
+                        messages.append(&mut batch);
+                    }
+                }
+                _ => {}
+            }
+        }
+        pos += 12 + entry_size;
+    }
+    Ok(messages)
+}
+
+// FetchRequest v1 (API 1) — fetch messages from a single partition
+async fn wire_fetch(
+    stream: &mut TcpStream,
+    topic: &str,
+    partition: i32,
+    fetch_offset: i64,
+    max_bytes: i32,
+) -> Result<Vec<KafkaMessage>, String> {
+    let mut body = Vec::new();
+    enc_i32(&mut body, -1);        // replica_id
+    enc_i32(&mut body, 5_000);     // max_wait_ms
+    enc_i32(&mut body, 1);         // min_bytes
+    enc_i32(&mut body, 1);         // topics count
+    enc_str(&mut body, topic);
+    enc_i32(&mut body, 1);         // partitions count
+    enc_i32(&mut body, partition);
+    enc_i64(&mut body, fetch_offset);
+    enc_i32(&mut body, max_bytes);
+    let resp = send_request(stream, 1, 1, 6, &body).await?;
+    let mut d = Dec::new(&resp);
+    d.skip(4)?; // throttle_time_ms
+    let topic_count = d.i32()?;
+    if topic_count < 1 { return Ok(vec![]); }
+    let _resp_topic = d.str()?;
+    let part_count = d.i32()?;
+    if part_count < 1 { return Ok(vec![]); }
+    let _resp_part = d.i32()?;
+    let err = d.i16()?;
+    let _high_watermark = d.i64()?;
+    let rset_len = d.i32()?;
+    if err != 0 {
+        return Err(format!("Kafka fetch error code {}", err));
+    }
+    if rset_len <= 0 {
+        return Ok(vec![]);
+    }
+    d.ensure(rset_len as usize)?;
+    let rset_bytes = d.data[d.pos..d.pos + rset_len as usize].to_vec();
+    parse_record_set(&rset_bytes, partition)
 }
 
 // ListGroupsRequest v0 (API 16)
@@ -931,71 +1170,27 @@ pub async fn kafka_fetch_messages(
     start_timestamp: Option<i64>,
 ) -> Result<Vec<KafkaMessage>, String> {
     let config = find_config(&app, &config_id)?;
+    let mut stream = open_kafka_stream(&config).await?;
 
-    // Time-based start: resolve the offset at/after the given timestamp first.
-    let resolved_from_ts = if let Some(ts_ms) = start_timestamp {
-        let mut stream = open_kafka_stream(&config).await?;
+    let start_offset = if let Some(ts_ms) = start_timestamp {
         let offs = wire_list_offsets(&mut stream, &topic, &[partition], ts_ms)
             .await
             .unwrap_or_default();
         match offs.into_iter().next().map(|(_, o)| o) {
-            Some(o) if o >= 0 => Some(o),
-            // No message at/after that time — nothing to show.
+            Some(o) if o >= 0 => o,
             _ => return Ok(Vec::new()),
         }
-    } else {
-        None
-    };
-
-    let client = make_client(&config).await?;
-    let pc = client
-        .partition_client(topic.as_str(), partition, UnknownTopicHandling::Retry)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Resolve start offset: timestamp > exact offset > tail (latest - limit).
-    let start_offset = if let Some(o) = resolved_from_ts {
-        o
     } else if offset < 0 {
-        let (_, high) = pc.get_offset(rskafka::client::partition::OffsetAt::Latest)
+        let offs = wire_list_offsets(&mut stream, &topic, &[partition], -1)
             .await
-            .map(|o| (0i64, o))
-            .unwrap_or((0, 0));
-        (high - limit as i64).max(0)
+            .unwrap_or_default();
+        let latest = offs.into_iter().next().map(|(_, o)| o).unwrap_or(0);
+        (latest - limit as i64).max(0)
     } else {
         offset
     };
 
-    let bytes_range = 1..10 * 1024 * 1024; // up to 10 MB
-    let (records, _) = pc
-        .fetch_records(start_offset, bytes_range, 1000)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let messages: Vec<KafkaMessage> = records
-        .into_iter()
-        .take(limit as usize)
-        .map(|ro| {
-            let key = ro.record.key.map(|b| {
-                String::from_utf8(b.clone()).unwrap_or_else(|_| format!("<binary {} bytes>", b.len()))
-            });
-            let value = ro.record.value.map(|b| {
-                String::from_utf8(b.clone()).unwrap_or_else(|_| format!("<binary {} bytes>", b.len()))
-            });
-            let headers = ro.record.headers
-                .into_iter()
-                .map(|(k, v)| (k, String::from_utf8(v.clone()).unwrap_or_else(|_| format!("<binary {} bytes>", v.len()))))
-                .collect();
-            KafkaMessage {
-                offset: ro.offset,
-                partition,
-                timestamp: ro.record.timestamp.to_rfc3339(),
-                key,
-                value,
-                headers,
-            }
-        })
-        .collect();
-
+    let mut messages = wire_fetch(&mut stream, &topic, partition, start_offset, 10 * 1024 * 1024).await?;
+    messages.truncate(limit as usize);
     Ok(messages)
 }
