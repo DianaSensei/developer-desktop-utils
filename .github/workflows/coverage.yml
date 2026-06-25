@@ -55,13 +55,18 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Generate coverage (lcov)
-        working-directory: src-tauri
-        run: cargo llvm-cov --lcov --output-path lcov.info
+        run: cargo llvm-cov --manifest-path src-tauri/Cargo.toml --lcov --output-path lcov.info
+
+      # cargo-llvm-cov writes absolute SF: paths. Strip the workspace prefix so
+      # they become repo-relative (src-tauri/src/...) and Codecov can map them to
+      # files in the commit — otherwise the report is "unusable" (path mismatch).
+      - name: Normalize report paths to repo root
+        run: sed -i "s|${GITHUB_WORKSPACE}/||g" lcov.info
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: src-tauri/lcov.info
+          files: lcov.info
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
