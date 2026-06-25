@@ -66,9 +66,9 @@ export function LeftPanel({
   const [deleteNameInput, setDeleteNameInput] = useState('');
   const [deleteMathInput, setDeleteMathInput] = useState('');
 
-  // Favourites — filter is ON by default; user opts out to see all topics
+  // Topic filter — patterns persisted; "search all" toggle is local (resets to off on reopen)
   const [favouritePatterns, setFavouritePatterns] = usePersistentState<string[]>('devtool:kafka:favouritePatterns', []);
-  const [favouritesActive, setFavouritesActive] = usePersistentState('devtool:kafka:favouritesActive', true);
+  const [showAllTopics, setShowAllTopics] = useState(false);
   const [showFavEditor, setShowFavEditor] = useState(false);
   const [newPattern, setNewPattern] = useState('');
   const [patternError, setPatternError] = useState('');
@@ -219,15 +219,19 @@ export function LeftPanel({
     return <span className="w-3 h-3 rounded-full border border-muted-foreground/30 inline-block shrink-0" />;
   };
 
-  const isFiltering = favouritesActive && favouritePatterns.length > 0;
+  // Regex filter is active when "search all" is off and patterns are configured
+  const isFiltering = !showAllTopics && favouritePatterns.length > 0;
   const filteredTopics = topics.filter((t) => {
-    if (topicSearch && !t.name.toLowerCase().includes(topicSearch.toLowerCase())) return false;
+    // Step 1: apply regex filter (OR) unless "search all" is on
     if (isFiltering) {
-      return favouritePatterns.some((p) => {
+      const matchesAny = favouritePatterns.some((p) => {
         try { return new RegExp(p).test(t.name); }
         catch { return false; }
       });
+      if (!matchesAny) return false;
     }
+    // Step 2: keyword search within the filtered set (case-insensitive)
+    if (topicSearch && !t.name.toLowerCase().includes(topicSearch.toLowerCase())) return false;
     return true;
   });
 
@@ -360,35 +364,34 @@ export function LeftPanel({
         {/* Header row */}
         <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
           <span className="text-xs font-medium text-muted-foreground">
-            Topics{isFiltering
-              ? ` (${filteredTopics.length}/${topics.length})`
-              : topics.length > 0 ? ` (${topics.length})` : ''}
+            Topics{topics.length > 0
+              ? isFiltering
+                ? ` (${filteredTopics.length}/${topics.length})`
+                : ` (${topicSearch ? `${filteredTopics.length}/` : ''}${topics.length})`
+              : ''}
           </span>
           {isActive && (
             <div className="flex items-center gap-1">
-              {/* Filtered / All toggle — only shown when patterns are configured */}
-              {favouritePatterns.length > 0 && (
-                <button
-                  className={cn(
-                    'flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors',
-                    isFiltering
-                      ? 'bg-amber-400/15 border-amber-400/40 text-amber-500 hover:bg-amber-400/25'
-                      : 'border-border text-muted-foreground hover:bg-muted/50',
-                  )}
-                  title={isFiltering ? 'Favourites filter active — click to show all topics' : 'Showing all topics — click to apply filters'}
-                  onClick={() => setFavouritesActive((v) => !v)}
-                >
-                  <Star className={cn('w-3 h-3', isFiltering && 'fill-amber-400')} />
-                  <span>{isFiltering ? 'Filtered' : 'All'}</span>
-                </button>
-              )}
-              {/* Pencil: manage patterns (always visible when connected) */}
+              {/* Search all toggle — off by default, resets on app reopen */}
+              <button
+                className={cn(
+                  'px-1.5 py-0.5 rounded-full text-xs border transition-colors',
+                  showAllTopics
+                    ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/20'
+                    : 'border-border text-muted-foreground hover:bg-muted/50',
+                )}
+                title={showAllTopics ? 'Showing all topics — click to apply regex filters' : 'Regex filter active — click to show all topics'}
+                onClick={() => setShowAllTopics((v) => !v)}
+              >
+                {showAllTopics ? 'All topics' : 'Filtered'}
+              </button>
+              {/* Pencil: manage regex patterns */}
               <button
                 className={cn(
                   'p-0.5 transition-colors',
                   showFavEditor ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
-                title="Manage favourite filters"
+                title="Manage topic regex filters"
                 onClick={() => setShowFavEditor((v) => !v)}
               >
                 <Pencil className="w-3 h-3" />
@@ -478,8 +481,8 @@ export function LeftPanel({
           </div>
         )}
 
-        {/* Setup nudge — shown when no patterns are configured yet */}
-        {isActive && favouritePatterns.length === 0 && !showFavEditor && (
+        {/* Setup nudge — shown when "search all" is off but no patterns are configured */}
+        {isActive && !showAllTopics && favouritePatterns.length === 0 && !showFavEditor && (
           <div className="mx-2 mb-1.5 flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1.5 shrink-0">
             <Star className="w-3 h-3 text-amber-500 shrink-0" />
             <span className="text-xs text-amber-600/90 flex-1">Set up topic filters to avoid accidental changes</span>
@@ -581,7 +584,7 @@ export function LeftPanel({
               {topicSearch
                 ? 'No matching topics'
                 : isFiltering
-                  ? <span>No topics match your filters — <button className="underline hover:text-foreground" onClick={() => setFavouritesActive(false)}>show all</button></span>
+                  ? <span>No topics match your filters — <button className="underline hover:text-foreground" onClick={() => setShowAllTopics(true)}>show all</button></span>
                   : 'No topics'}
             </div>
           )}
