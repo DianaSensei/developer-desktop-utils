@@ -593,9 +593,13 @@ function AppContent() {
                 )}
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
+            <div className="flex items-center gap-1">
+              {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
+              <div id="tool-header-actions" className="flex items-center gap-1" />
+              <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
         </div>
         {isFullHeight ? (

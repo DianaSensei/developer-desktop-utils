@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   CheckCircle, XCircle, Loader2, Pencil, Trash2, Plus,
-  ChevronDown, Search, RefreshCw, WifiOff, Wifi, Info, Filter, List, Users,
+  ChevronDown, Search, RefreshCw, WifiOff, Wifi, Filter, List, Users,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,6 @@ interface LeftPanelProps {
   selectedGroup: string | null;
   onSelectGroup: (g: string | null) => void;
   refreshKey: number;
-  onShowInfo: () => void;
 }
 
 export function LeftPanel({
@@ -40,7 +39,6 @@ export function LeftPanel({
   selectedGroup,
   onSelectGroup,
   refreshKey,
-  onShowInfo,
 }: LeftPanelProps) {
   const [configs, setConfigs] = useState<BrokerConfig[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -440,13 +438,6 @@ export function LeftPanel({
               <RefreshCw className={cn('w-3 h-3', groupsLoading && 'animate-spin')} />
             </button>
           ))}
-          <button
-            onClick={onShowInfo}
-            title="How Kafka Explorer accesses your cluster"
-            className="p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-          >
-            <Info className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
 

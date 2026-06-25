@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Server } from 'lucide-react';
+import { Server, Info } from 'lucide-react';
 import { LeftPanel } from './LeftPanel';
 import { TopicView } from './TopicView';
 import { GroupView } from './GroupView';
 import { KafkaInfoModal } from './KafkaInfoModal';
+import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 import { useKafkaState } from './useKafkaState';
 import { kafkaApi } from './types';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -62,6 +63,17 @@ export function KafkaExplorer() {
 
   return (
     <div className={cn('flex h-full min-h-0 overflow-hidden', isResizing && 'select-none cursor-col-resize')}>
+      {/* Info button injected into the global tool header */}
+      <ToolHeaderActions>
+        <button
+          onClick={() => setShowInfo(true)}
+          title="How Kafka Explorer accesses your cluster"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
+        >
+          <Info className="h-4 w-4" />
+        </button>
+      </ToolHeaderActions>
+
       {/* Left panel — width is user-resizable and persisted */}
       <div
         className="shrink-0 flex flex-col h-full overflow-hidden"
@@ -75,7 +87,6 @@ export function KafkaExplorer() {
           selectedGroup={selectedGroup}
           onSelectGroup={setSelectedGroup}
           refreshKey={refreshKey}
-          onShowInfo={() => setShowInfo(true)}
         />
       </div>
 
