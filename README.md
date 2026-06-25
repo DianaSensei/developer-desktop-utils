@@ -4,6 +4,7 @@ A fast, **offline-first** desktop toolbox for developers — 24 everyday utiliti
 
 [![Latest release](https://img.shields.io/github/v/release/DianaSensei/developer-desktop-utils?sort=semver&display_name=tag&logo=github&label=release)](https://github.com/DianaSensei/developer-desktop-utils/releases/latest)
 [![Release](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml/badge.svg)](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml)
+[![Coverage](https://codecov.io/gh/DianaSensei/developer-desktop-utils/branch/main/graph/badge.svg)](https://codecov.io/gh/DianaSensei/developer-desktop-utils)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
