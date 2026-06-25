@@ -15,8 +15,8 @@ comment:
   layout: "reach, diff, flags, files"
   require_changes: true
 
-# Only the Rust backend is instrumented; ignore everything else.
+# The lcov report only contains the Rust backend (src-tauri/src), so no
+# frontend ignores are needed. Exclude the Tauri entrypoint, which is plumbing
+# that can't be exercised by unit tests.
 ignore:
-  - "src"
-  - "dist"
-  - "node_modules"
+  - "src-tauri/src/main.rs"
