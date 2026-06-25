@@ -1,0 +1,22 @@
+# Codecov configuration.
+# Coverage here measures the Rust backend (src-tauri). Much of that crate is
+# Tauri command glue and network/file I/O that can't run in unit tests, so
+# coverage is reported as informational — it never fails CI or blocks a PR.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: true
+
+# Only the Rust backend is instrumented; ignore everything else.
+ignore:
+  - "src"
+  - "dist"
+  - "node_modules"

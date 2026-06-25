@@ -164,6 +164,22 @@ fn parse_brokers(bootstrap_servers: &str) -> Vec<String> {
         .collect()
 }
 
+/// Validate create-topic inputs before any broker call, so obviously-invalid
+/// requests (empty name, 0/negative/absurd partition count, bad RF) are
+/// rejected client-side with a clear message.
+fn validate_create_topic(name: &str, num_partitions: i32, replication_factor: i16) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("Topic name is required".into());
+    }
+    if !(1..=10_000).contains(&num_partitions) {
+        return Err(format!("Partitions must be between 1 and 10000 (got {num_partitions})"));
+    }
+    if replication_factor < 1 {
+        return Err(format!("Replication factor must be at least 1 (got {replication_factor})"));
+    }
+    Ok(())
+}
+
 async fn make_client(config: &BrokerConfig) -> Result<rskafka::client::Client, String> {
     let brokers = parse_brokers(&config.bootstrap_servers);
     if brokers.is_empty() {
@@ -811,15 +827,7 @@ pub async fn kafka_create_topic(
 ) -> Result<(), String> {
     // Validate client-side so an obviously-invalid request (0/negative, or an
     // absurd partition count) never reaches the broker.
-    if name.trim().is_empty() {
-        return Err("Topic name is required".into());
-    }
-    if !(1..=10_000).contains(&num_partitions) {
-        return Err(format!("Partitions must be between 1 and 10000 (got {num_partitions})"));
-    }
-    if replication_factor < 1 {
-        return Err(format!("Replication factor must be at least 1 (got {replication_factor})"));
-    }
+    validate_create_topic(&name, num_partitions, replication_factor)?;
     let config = find_config(&app, &config_id)?;
     let client = make_client(&config).await?;
     let controller = client.controller_client().map_err(|e| e.to_string())?;
@@ -1127,4 +1135,158 @@ pub async fn kafka_fetch_messages(
         .collect();
 
     Ok(messages)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── parse_brokers ──────────────────────────────────────────────────────
+    #[test]
+    fn parse_brokers_handles_whitespace_and_empties() {
+        assert_eq!(parse_brokers("localhost:9092"), vec!["localhost:9092"]);
+        assert_eq!(parse_brokers("a:1, b:2 , c:3"), vec!["a:1", "b:2", "c:3"]);
+        assert_eq!(parse_brokers("  ,  , a:1 ,"), vec!["a:1"]);
+        assert!(parse_brokers("").is_empty());
+        assert!(parse_brokers("   ").is_empty());
+        assert!(parse_brokers(",,,").is_empty());
+    }
+
+    // ── validate_create_topic ──────────────────────────────────────────────
+    #[test]
+    fn validate_create_topic_accepts_sane_input() {
+        assert!(validate_create_topic("orders", 3, 1).is_ok());
+        assert!(validate_create_topic("t", 1, 1).is_ok());
+        assert!(validate_create_topic("t", 10_000, 3).is_ok());
+    }
+
+    #[test]
+    fn validate_create_topic_rejects_bad_input() {
+        assert!(validate_create_topic("", 1, 1).is_err());
+        assert!(validate_create_topic("   ", 1, 1).is_err());
+        assert!(validate_create_topic("t", 0, 1).is_err());
+        assert!(validate_create_topic("t", -1, 1).is_err());
+        assert!(validate_create_topic("t", 10_001, 1).is_err());
+        assert!(validate_create_topic("t", 3, 0).is_err());
+        assert!(validate_create_topic("t", 3, -1).is_err());
+    }
+
+    // ── encode/decode round-trips ──────────────────────────────────────────
+    #[test]
+    fn enc_str_round_trips_through_dec() {
+        let mut buf = Vec::new();
+        enc_str(&mut buf, "demo-events");
+        let mut d = Dec::new(&buf);
+        assert_eq!(d.str().unwrap(), "demo-events");
+    }
+
+    #[test]
+    fn enc_i32_i64_round_trip() {
+        let mut buf = Vec::new();
+        enc_i32(&mut buf, -123);
+        enc_i64(&mut buf, 9_000_000_000);
+        let mut d = Dec::new(&buf);
+        assert_eq!(d.i32().unwrap(), -123);
+        assert_eq!(d.i64().unwrap(), 9_000_000_000);
+    }
+
+    // ── Dec primitives ─────────────────────────────────────────────────────
+    #[test]
+    fn dec_reads_fixed_width_big_endian() {
+        let mut d = Dec::new(&[0x12, 0x34, 0x00, 0x00, 0x00, 0x2A]);
+        assert_eq!(d.i16().unwrap(), 0x1234);
+        assert_eq!(d.i32().unwrap(), 42);
+    }
+
+    #[test]
+    fn dec_ensure_guards_short_buffers() {
+        assert!(Dec::new(&[0x00]).i32().is_err());
+        assert!(Dec::new(&[]).i16().is_err());
+        // bytes() with a length longer than the remaining buffer must error.
+        assert!(Dec::new(&[0, 0, 0, 5, b'a']).bytes().is_err());
+    }
+
+    #[test]
+    fn dec_string_and_bytes() {
+        // string: i16 len=3 then "abc"
+        let mut d = Dec::new(&[0, 3, b'a', b'b', b'c']);
+        assert_eq!(d.str().unwrap(), "abc");
+        // bytes: i32 len=2 then 0xDE 0xAD
+        let mut d = Dec::new(&[0, 0, 0, 2, 0xDE, 0xAD]);
+        assert_eq!(d.bytes().unwrap(), vec![0xDE, 0xAD]);
+    }
+
+    #[test]
+    fn dec_negative_lengths_are_null_like() {
+        // i16 = -1 → empty string
+        assert_eq!(Dec::new(&[0xFF, 0xFF]).str().unwrap(), "");
+        // i16 = -1 → None for nullable_str
+        assert_eq!(Dec::new(&[0xFF, 0xFF]).nullable_str().unwrap(), None);
+        // i32 = -1 → empty Vec for bytes
+        assert_eq!(Dec::new(&[0xFF, 0xFF, 0xFF, 0xFF]).bytes().unwrap(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn dec_array_reads_each_element() {
+        // count=2 then two i32 values 10, 20
+        let bytes = [0, 0, 0, 2, 0, 0, 0, 10, 0, 0, 0, 20];
+        let mut d = Dec::new(&bytes);
+        let out = d.array(|d| d.i32()).unwrap();
+        assert_eq!(out, vec![10, 20]);
+    }
+
+    #[test]
+    fn dec_array_negative_count_is_empty() {
+        let mut d = Dec::new(&[0xFF, 0xFF, 0xFF, 0xFF]);
+        let out: Vec<i32> = d.array(|d| d.i32()).unwrap();
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn dec_array_count_exceeding_buffer_is_rejected() {
+        // count = 1000 but no element bytes follow → must error early, not spin.
+        let mut d = Dec::new(&[0, 0, 0x03, 0xE8]);
+        let res = d.array(|d| d.i32());
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("exceeds remaining buffer"));
+    }
+
+    // ── parse_member_assignment ────────────────────────────────────────────
+    fn build_assignment(topics: &[(&str, &[i32])]) -> Vec<u8> {
+        let mut b = Vec::new();
+        b.extend_from_slice(&0i16.to_be_bytes()); // version
+        b.extend_from_slice(&(topics.len() as i32).to_be_bytes());
+        for (topic, parts) in topics {
+            enc_str(&mut b, topic);
+            b.extend_from_slice(&(parts.len() as i32).to_be_bytes());
+            for &p in *parts {
+                b.extend_from_slice(&p.to_be_bytes());
+            }
+        }
+        b.extend_from_slice(&0i32.to_be_bytes()); // userdata: empty bytes
+        b
+    }
+
+    #[test]
+    fn parse_member_assignment_decodes_owned_partitions() {
+        let blob = build_assignment(&[("demo-events", &[0, 2]), ("orders", &[5])]);
+        let owned = parse_member_assignment(&blob);
+        assert_eq!(
+            owned,
+            vec![
+                ("demo-events".to_string(), 0),
+                ("demo-events".to_string(), 2),
+                ("orders".to_string(), 5),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_member_assignment_is_tolerant_of_empty_and_garbage() {
+        assert!(parse_member_assignment(&[]).is_empty());
+        // Only a version, no topic array → tolerated as empty, never panics.
+        assert!(parse_member_assignment(&[0, 0]).is_empty());
+        // Truncated topic array length → tolerated.
+        assert!(parse_member_assignment(&[0, 0, 0, 0, 0, 5]).is_empty());
+    }
 }
