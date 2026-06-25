@@ -66,9 +66,9 @@ export function LeftPanel({
   const [deleteNameInput, setDeleteNameInput] = useState('');
   const [deleteMathInput, setDeleteMathInput] = useState('');
 
-  // Favourites
+  // Favourites — filter is ON by default; user opts out to see all topics
   const [favouritePatterns, setFavouritePatterns] = usePersistentState<string[]>('devtool:kafka:favouritePatterns', []);
-  const [favouritesActive, setFavouritesActive] = usePersistentState('devtool:kafka:favouritesActive', false);
+  const [favouritesActive, setFavouritesActive] = usePersistentState('devtool:kafka:favouritesActive', true);
   const [showFavEditor, setShowFavEditor] = useState(false);
   const [newPattern, setNewPattern] = useState('');
   const [patternError, setPatternError] = useState('');
@@ -241,9 +241,7 @@ export function LeftPanel({
   };
 
   const removeFavPattern = (p: string) => {
-    const next = favouritePatterns.filter((x) => x !== p);
-    setFavouritePatterns(next);
-    if (next.length === 0) setFavouritesActive(false);
+    setFavouritePatterns(favouritePatterns.filter((x) => x !== p));
   };
 
   return (
@@ -368,31 +366,33 @@ export function LeftPanel({
           </span>
           {isActive && (
             <div className="flex items-center gap-1">
+              {/* Filtered / All toggle — only shown when patterns are configured */}
+              {favouritePatterns.length > 0 && (
+                <button
+                  className={cn(
+                    'flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors',
+                    isFiltering
+                      ? 'bg-amber-400/15 border-amber-400/40 text-amber-500 hover:bg-amber-400/25'
+                      : 'border-border text-muted-foreground hover:bg-muted/50',
+                  )}
+                  title={isFiltering ? 'Favourites filter active — click to show all topics' : 'Showing all topics — click to apply filters'}
+                  onClick={() => setFavouritesActive((v) => !v)}
+                >
+                  <Star className={cn('w-3 h-3', isFiltering && 'fill-amber-400')} />
+                  <span>{isFiltering ? 'Filtered' : 'All'}</span>
+                </button>
+              )}
+              {/* Pencil: manage patterns (always visible when connected) */}
               <button
                 className={cn(
                   'p-0.5 transition-colors',
-                  isFiltering ? 'text-amber-400 hover:text-amber-500' : 'text-muted-foreground hover:text-foreground',
+                  showFavEditor ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
-                title={isFiltering ? 'Favourites filter active — click to disable' : 'Filter by favourites'}
-                onClick={() => {
-                  if (favouritePatterns.length === 0) {
-                    setShowFavEditor(true);
-                  } else {
-                    setFavouritesActive((v) => !v);
-                  }
-                }}
+                title="Manage favourite filters"
+                onClick={() => setShowFavEditor((v) => !v)}
               >
-                <Star className={cn('w-3 h-3', isFiltering && 'fill-amber-400')} />
+                <Pencil className="w-3 h-3" />
               </button>
-              {favouritePatterns.length > 0 && (
-                <button
-                  className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                  title="Manage favourite patterns"
-                  onClick={() => setShowFavEditor((v) => !v)}
-                >
-                  <Pencil className="w-3 h-3" />
-                </button>
-              )}
               <button
                 className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
                 title="Refresh topics"
@@ -478,15 +478,29 @@ export function LeftPanel({
           </div>
         )}
 
+        {/* Setup nudge — shown when no patterns are configured yet */}
+        {isActive && favouritePatterns.length === 0 && !showFavEditor && (
+          <div className="mx-2 mb-1.5 flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1.5 shrink-0">
+            <Star className="w-3 h-3 text-amber-500 shrink-0" />
+            <span className="text-xs text-amber-600/90 flex-1">Set up topic filters to avoid accidental changes</span>
+            <button
+              className="text-xs font-medium text-amber-600 hover:text-amber-700 shrink-0"
+              onClick={() => setShowFavEditor(true)}
+            >
+              Set up
+            </button>
+          </div>
+        )}
+
         {/* Favourites editor */}
         {isActive && showFavEditor && (
           <div className="mx-2 mb-1.5 p-2 border border-border rounded-lg bg-muted/10 shrink-0 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium">Favourite filters <span className="text-muted-foreground font-normal">(regex, OR)</span></span>
+              <span className="text-xs font-medium">Topic filters <span className="text-muted-foreground font-normal">(regex, OR)</span></span>
               <button className="text-muted-foreground hover:text-foreground text-xs" onClick={() => setShowFavEditor(false)}>✕</button>
             </div>
             {favouritePatterns.length === 0 && (
-              <p className="text-xs text-muted-foreground">No patterns yet — topics matching any pattern will be shown.</p>
+              <p className="text-xs text-muted-foreground">Add patterns — only matching topics will be shown by default.</p>
             )}
             {favouritePatterns.map((p) => (
               <div key={p} className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1">
@@ -512,19 +526,6 @@ export function LeftPanel({
               <Button size="sm" className="h-7 text-xs px-2 shrink-0" onClick={addFavPattern}>Add</Button>
             </div>
             {patternError && <p className="text-xs text-destructive">{patternError}</p>}
-            {favouritePatterns.length > 0 && (
-              <button
-                className={cn(
-                  'w-full text-xs py-1 rounded-md border transition-colors',
-                  isFiltering
-                    ? 'border-amber-400/50 text-amber-500 bg-amber-400/10 hover:bg-amber-400/20'
-                    : 'border-border text-muted-foreground hover:bg-muted/50',
-                )}
-                onClick={() => setFavouritesActive((v) => !v)}
-              >
-                {isFiltering ? '★ Filter active — click to disable' : '☆ Click to enable filter'}
-              </button>
-            )}
           </div>
         )}
 
@@ -577,7 +578,11 @@ export function LeftPanel({
           ))}
           {!topicsLoading && isActive && filteredTopics.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              {topicSearch ? 'No matching topics' : 'No topics'}
+              {topicSearch
+                ? 'No matching topics'
+                : isFiltering
+                  ? <span>No topics match your filters — <button className="underline hover:text-foreground" onClick={() => setFavouritesActive(false)}>show all</button></span>
+                  : 'No topics'}
             </div>
           )}
         </div>
