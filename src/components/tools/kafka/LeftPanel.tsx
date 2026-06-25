@@ -433,30 +433,54 @@ export function LeftPanel({
         {activeList === 'topics' && (
         <div className="flex flex-col flex-1 min-h-0">
 
-        {/* Scope control — which topics are listed (tertiary; topic-only feature) */}
+        {/* Filter mode toggle with merged edit button — sets which topic set search runs against */}
         {isActive && (
-          <div className="flex items-center gap-2 px-2 pt-1.5 pb-1 shrink-0">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/60 shrink-0">Show</span>
-            <div className="flex items-center rounded-md bg-muted/50 p-0.5 text-[11px]">
+          <div className="px-2 pt-2 pb-1.5 shrink-0">
+            <div className="flex items-center w-full rounded-lg border border-border bg-muted/30 p-1 gap-1 text-xs">
+              {/* Filtered side: tab + inline edit pencil share one card */}
+              <div className={cn(
+                'flex-1 flex items-center rounded-md transition-all',
+                inFilteredMode && 'bg-background shadow-sm',
+              )}>
+                <button
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 py-1.5 pl-2.5 rounded-md transition-colors',
+                    inFilteredMode ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground/80',
+                  )}
+                  title="Show only topics matching your filter patterns"
+                  onClick={() => setFilterMode(false)}
+                >
+                  <Filter className="w-3.5 h-3.5 shrink-0" />
+                  Filtered
+                  {favouritePatterns.length > 0 && (
+                    <span className={cn(
+                      'inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full text-[10px] leading-none transition-colors',
+                      inFilteredMode ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20 text-muted-foreground',
+                    )}>
+                      {favouritePatterns.length}
+                    </span>
+                  )}
+                </button>
+                {inFilteredMode && (
+                  <button
+                    className={cn(
+                      'shrink-0 flex items-center justify-center w-7 h-7 mr-0.5 rounded-md transition-colors',
+                      showFavEditor ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                    )}
+                    title={showFavEditor ? 'Close pattern editor' : 'Edit filter patterns'}
+                    onClick={() => setShowFavEditor((v) => !v)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              {/* All side */}
               <button
                 className={cn(
-                  'flex items-center gap-1 px-2 py-1 rounded transition-colors',
-                  inFilteredMode ? 'bg-background shadow-sm text-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
-                )}
-                title="Show only topics matching your saved patterns"
-                onClick={() => setFilterMode(false)}
-              >
-                Filtered
-                {favouritePatterns.length > 0 && (
-                  <span className={cn('tabular-nums', inFilteredMode ? 'text-primary font-semibold' : 'text-muted-foreground')}>
-                    {favouritePatterns.length}
-                  </span>
-                )}
-              </button>
-              <button
-                className={cn(
-                  'px-2 py-1 rounded transition-colors',
-                  !inFilteredMode ? 'bg-background shadow-sm text-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
+                  'flex-1 py-1.5 rounded-md transition-all',
+                  !inFilteredMode
+                    ? 'bg-background shadow-sm text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground/80',
                 )}
                 title="Show every topic in the cluster"
                 onClick={() => setFilterMode(true)}
@@ -464,19 +488,6 @@ export function LeftPanel({
                 All
               </button>
             </div>
-            {inFilteredMode && (
-              <button
-                className={cn(
-                  'flex items-center gap-1 ml-auto text-[11px] shrink-0 transition-colors',
-                  showFavEditor ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
-                )}
-                title={showFavEditor ? 'Close pattern editor' : 'Edit filter patterns'}
-                onClick={() => setShowFavEditor((v) => !v)}
-              >
-                <Pencil className="w-3 h-3" />
-                Edit
-              </button>
-            )}
           </div>
         )}
 
