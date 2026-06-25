@@ -470,48 +470,66 @@ export function LeftPanel({
           </div>
         )}
 
-        {/* Filter-mode bar: choose which set the search runs against (layer 2) */}
+        {/* Filter mode toggle — determines which topic set the search runs against */}
         {isActive && (
-          <div className="flex items-center gap-1 px-2 pb-1 shrink-0">
-            <div className="flex items-center rounded-md border border-border overflow-hidden text-[11px]">
-              <button
-                className={cn(
-                  'flex items-center gap-1 px-2 py-1 transition-colors',
-                  inFilteredMode ? 'bg-primary/15 text-primary font-medium' : 'text-muted-foreground hover:bg-muted/50',
-                )}
-                title="Show only topics matching your filter patterns"
-                onClick={() => setFilterMode(false)}
-              >
-                <Filter className="w-3 h-3" />
-                Filtered{favouritePatterns.length > 0 ? ` (${favouritePatterns.length})` : ''}
-              </button>
-              <button
-                className={cn(
-                  'px-2 py-1 border-l border-border transition-colors',
-                  !inFilteredMode ? 'bg-primary/15 text-primary font-medium' : 'text-muted-foreground hover:bg-muted/50',
-                )}
-                title="Show every topic in the cluster"
-                onClick={() => setFilterMode(true)}
-              >
-                All
-              </button>
+          <div className="px-2 pb-1.5 shrink-0">
+            <div className="flex items-center gap-1.5">
+              {/* Segmented pill: Filtered | All */}
+              <div className="flex items-center flex-1 rounded-lg border border-border bg-muted/30 p-0.5 gap-0.5 text-xs">
+                <button
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 py-1 rounded-md transition-all',
+                    inFilteredMode
+                      ? 'bg-background shadow-sm text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground/80',
+                  )}
+                  title="Show only topics matching your filter patterns"
+                  onClick={() => setFilterMode(false)}
+                >
+                  <Filter className="w-3 h-3 shrink-0" />
+                  Filtered
+                  {favouritePatterns.length > 0 && (
+                    <span className={cn(
+                      'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] leading-none transition-colors',
+                      inFilteredMode ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20 text-muted-foreground',
+                    )}>
+                      {favouritePatterns.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  className={cn(
+                    'flex-1 py-1 rounded-md transition-all',
+                    !inFilteredMode
+                      ? 'bg-background shadow-sm text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground/80',
+                  )}
+                  title="Show every topic in the cluster"
+                  onClick={() => setFilterMode(true)}
+                >
+                  All
+                </button>
+              </div>
+              {/* Edit patterns — only available in filtered mode */}
+              {inFilteredMode && (
+                <button
+                  className={cn(
+                    'shrink-0 p-1.5 rounded-lg border transition-colors',
+                    showFavEditor
+                      ? 'border-primary/50 bg-primary/10 text-primary'
+                      : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                  )}
+                  title={showFavEditor ? 'Close pattern editor' : 'Edit filter patterns'}
+                  onClick={() => setShowFavEditor((v) => !v)}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-            {inFilteredMode && (
-              <button
-                className={cn(
-                  'p-1 rounded-md border border-border transition-colors',
-                  showFavEditor ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50',
-                )}
-                title="Edit filter patterns"
-                onClick={() => setShowFavEditor((v) => !v)}
-              >
-                <Pencil className="w-3 h-3" />
-              </button>
-            )}
           </div>
         )}
 
-        {/* Search — runs on whichever set the mode above produced */}
+        {/* Search — prefix match for plain text; auto-regex when metacharacters present */}
         {isActive && (
           <div className="px-2 pb-1 shrink-0">
             <div className="relative">
@@ -519,10 +537,10 @@ export function LeftPanel({
               <Input
                 value={topicSearch}
                 onChange={(e) => setTopicSearch(e.target.value)}
-                placeholder={inFilteredMode ? 'Search in filtered…' : 'Search all topics…'}
+                placeholder={inFilteredMode ? 'Prefix search in filtered…' : 'Prefix search in all topics…'}
                 className={cn(
                   'h-7 text-xs pl-6',
-                  topicSearch ? 'pr-14' : '',
+                  topicSearch ? 'pr-16' : '',
                   searchIsRegex && !searchRegexValid && 'border-destructive/60 focus-visible:ring-destructive/20',
                 )}
                 onKeyDown={(e) => { if (e.key === 'Escape') setTopicSearch(''); }}
@@ -530,17 +548,17 @@ export function LeftPanel({
               {topicSearch && (
                 <span
                   className={cn(
-                    'absolute right-1.5 top-1/2 -translate-y-1/2 px-1 py-0.5 rounded text-[10px] leading-none cursor-pointer select-none transition-colors',
+                    'absolute right-1.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md text-[10px] font-medium leading-none cursor-pointer select-none transition-colors',
                     searchIsRegex
                       ? searchRegexValid
                         ? 'bg-violet-500/15 text-violet-400 hover:bg-violet-500/25'
                         : 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                      : 'bg-muted/80 text-muted-foreground hover:bg-muted',
+                      : 'bg-muted text-muted-foreground hover:bg-muted/60',
                   )}
-                  title="Click to clear search"
+                  title="Click to clear"
                   onClick={() => setTopicSearch('')}
                 >
-                  {searchIsRegex ? (searchRegexValid ? 'regex' : 'invalid') : 'prefix'}
+                  {searchIsRegex ? (searchRegexValid ? '.*' : '!regex') : 'ab|'}
                 </span>
               )}
             </div>
