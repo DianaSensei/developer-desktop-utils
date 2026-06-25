@@ -410,34 +410,21 @@ export function LeftPanel({
           </button>
         </div>
         <div className="flex items-center gap-1 pb-1.5">
-          {isActive && (activeList === 'topics' ? (
-            <>
-              <button
-                className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                title="Refresh topics"
-                onClick={() => setTopicsRefreshTick((k) => k + 1)}
-                disabled={topicsLoading}
-              >
-                <RefreshCw className={cn('w-3 h-3', topicsLoading && 'animate-spin')} />
-              </button>
-              <button
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-                title="Create topic"
-                onClick={() => { setShowCreateTopic((v) => !v); setCreateError(''); }}
-              >
-                <Plus className="w-3 h-3" /> New
-              </button>
-            </>
-          ) : (
+          {isActive && (
             <button
               className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-              title="Refresh groups"
-              onClick={() => setGroupsRefreshTick((k) => k + 1)}
-              disabled={groupsLoading}
+              title={activeList === 'topics' ? 'Refresh topics' : 'Refresh groups'}
+              onClick={() => activeList === 'topics'
+                ? setTopicsRefreshTick((k) => k + 1)
+                : setGroupsRefreshTick((k) => k + 1)}
+              disabled={activeList === 'topics' ? topicsLoading : groupsLoading}
             >
-              <RefreshCw className={cn('w-3 h-3', groupsLoading && 'animate-spin')} />
+              <RefreshCw className={cn(
+                'w-3 h-3',
+                (activeList === 'topics' ? topicsLoading : groupsLoading) && 'animate-spin',
+              )} />
             </button>
-          ))}
+          )}
         </div>
       </div>
 
@@ -445,57 +432,6 @@ export function LeftPanel({
       <div className="flex flex-col flex-1 min-h-0">
         {activeList === 'topics' && (
         <div className="flex flex-col flex-1 min-h-0">
-
-        {/* Inline create form */}
-        {showCreateTopic && (
-          <div className="mx-2 mb-1.5 p-2 border border-border rounded-lg bg-muted/10 shrink-0 space-y-2">
-            <div>
-              <Label className="text-xs text-muted-foreground">Topic name</Label>
-              <Input
-                value={newTopicName}
-                onChange={(e) => setNewTopicName(e.target.value)}
-                placeholder="my-topic"
-                className="h-7 text-xs font-mono mt-0.5"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateTopic()}
-                autoFocus
-              />
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Label className="text-xs text-muted-foreground">Partitions</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={newTopicPartitions}
-                  onChange={(e) => setNewTopicPartitions(e.target.value)}
-                  className="h-7 text-xs mt-0.5"
-                  title="Number of partitions"
-                />
-              </div>
-              <div className="flex-1">
-                <Label className="text-xs text-muted-foreground">Replication</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={newTopicRf}
-                  onChange={(e) => setNewTopicRf(e.target.value)}
-                  className="h-7 text-xs mt-0.5"
-                  title="Replication factor (must be ≤ number of brokers)"
-                />
-              </div>
-            </div>
-            <div className="flex gap-1">
-              <Button size="sm" className="h-7 text-xs flex-1" onClick={handleCreateTopic} disabled={creating}>
-                {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Create'}
-              </Button>
-              <button
-                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => { setShowCreateTopic(false); setCreateError(''); }}
-              >✕</button>
-            </div>
-            {createError && <p className="text-xs text-destructive">{createError}</p>}
-          </div>
-        )}
 
         {/* Scope control — which topics are listed (tertiary; topic-only feature) */}
         {isActive && (
@@ -603,10 +539,10 @@ export function LeftPanel({
           </div>
         )}
 
-        {/* Search — prefix match for plain text; auto-regex when metacharacters present */}
+        {/* Search + create — topic-only actions, kept under the Topics tab */}
         {isActive && (
-          <div className="px-2 pb-1 shrink-0">
-            <div className="relative">
+          <div className="flex items-center gap-1.5 px-2 pb-1 shrink-0">
+            <div className="relative flex-1">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
               <Input
                 value={topicSearch}
@@ -636,6 +572,69 @@ export function LeftPanel({
                 </span>
               )}
             </div>
+            <button
+              className={cn(
+                'shrink-0 flex items-center gap-1 h-7 px-2 rounded-md border text-xs transition-colors',
+                showCreateTopic
+                  ? 'border-primary/40 bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted/60',
+              )}
+              title="Create topic"
+              onClick={() => { setShowCreateTopic((v) => !v); setCreateError(''); }}
+            >
+              <Plus className="w-3.5 h-3.5" /> New
+            </button>
+          </div>
+        )}
+
+        {/* Inline create form — opens right under the New button */}
+        {isActive && showCreateTopic && (
+          <div className="mx-2 mb-1.5 p-2 border border-border rounded-lg bg-muted/10 shrink-0 space-y-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Topic name</Label>
+              <Input
+                value={newTopicName}
+                onChange={(e) => setNewTopicName(e.target.value)}
+                placeholder="my-topic"
+                className="h-7 text-xs font-mono mt-0.5"
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateTopic()}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Label className="text-xs text-muted-foreground">Partitions</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={newTopicPartitions}
+                  onChange={(e) => setNewTopicPartitions(e.target.value)}
+                  className="h-7 text-xs mt-0.5"
+                  title="Number of partitions"
+                />
+              </div>
+              <div className="flex-1">
+                <Label className="text-xs text-muted-foreground">Replication</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={newTopicRf}
+                  onChange={(e) => setNewTopicRf(e.target.value)}
+                  className="h-7 text-xs mt-0.5"
+                  title="Replication factor (must be ≤ number of brokers)"
+                />
+              </div>
+            </div>
+            <div className="flex gap-1">
+              <Button size="sm" className="h-7 text-xs flex-1" onClick={handleCreateTopic} disabled={creating}>
+                {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Create'}
+              </Button>
+              <button
+                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => { setShowCreateTopic(false); setCreateError(''); }}
+              >✕</button>
+            </div>
+            {createError && <p className="text-xs text-destructive">{createError}</p>}
           </div>
         )}
 
