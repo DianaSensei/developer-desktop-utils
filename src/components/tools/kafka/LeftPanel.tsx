@@ -219,6 +219,13 @@ export function LeftPanel({
     return <span className="w-3 h-3 rounded-full border border-muted-foreground/30 inline-block shrink-0" />;
   };
 
+  // Detect if the search input contains regex metacharacters → treat as regex, else prefix match
+  const SEARCH_REGEX_CHARS = /[\\^$.*+?()[\]{}|]/;
+  const searchIsRegex = topicSearch.length > 0 && SEARCH_REGEX_CHARS.test(topicSearch);
+  const searchRegexValid = searchIsRegex
+    ? (() => { try { new RegExp(topicSearch, 'i'); return true; } catch { return false; } })()
+    : true;
+
   // Regex filter is active when "search all" is off and patterns are configured
   const isFiltering = !showAllTopics && favouritePatterns.length > 0;
   const filteredTopics = topics.filter((t) => {
@@ -230,8 +237,16 @@ export function LeftPanel({
       });
       if (!matchesAny) return false;
     }
-    // Step 2: keyword search within the filtered set (case-insensitive)
-    if (topicSearch && !t.name.toLowerCase().includes(topicSearch.toLowerCase())) return false;
+    // Step 2: keyword search — prefix match for plain text, regex for metacharacter input
+    if (topicSearch) {
+      if (searchIsRegex) {
+        if (!searchRegexValid) return false;
+        try { if (!new RegExp(topicSearch, 'i').test(t.name)) return false; }
+        catch { return false; }
+      } else {
+        if (!t.name.toLowerCase().startsWith(topicSearch.toLowerCase())) return false;
+      }
+    }
     return true;
   });
 
@@ -383,7 +398,9 @@ export function LeftPanel({
                 title={showAllTopics ? 'Showing all topics — click to apply regex filters' : 'Regex filter active — click to show all topics'}
                 onClick={() => setShowAllTopics((v) => !v)}
               >
-                {showAllTopics ? 'All topics' : 'Filtered'}
+                {showAllTopics
+                ? 'All topics'
+                : favouritePatterns.length > 0 ? `Filtered (${favouritePatterns.length})` : 'Filtered'}
               </button>
               {/* Pencil: manage regex patterns */}
               <button
@@ -474,9 +491,30 @@ export function LeftPanel({
               <Input
                 value={topicSearch}
                 onChange={(e) => setTopicSearch(e.target.value)}
-                placeholder="Search topics…"
-                className="h-7 text-xs pl-6"
+                placeholder="Prefix or .* regex…"
+                className={cn(
+                  'h-7 text-xs pl-6',
+                  topicSearch ? 'pr-14' : '',
+                  searchIsRegex && !searchRegexValid && 'border-destructive/60 focus-visible:ring-destructive/20',
+                )}
+                onKeyDown={(e) => { if (e.key === 'Escape') setTopicSearch(''); }}
               />
+              {topicSearch && (
+                <span
+                  className={cn(
+                    'absolute right-1.5 top-1/2 -translate-y-1/2 px-1 py-0.5 rounded text-[10px] leading-none cursor-pointer select-none transition-colors',
+                    searchIsRegex
+                      ? searchRegexValid
+                        ? 'bg-violet-500/15 text-violet-400 hover:bg-violet-500/25'
+                        : 'bg-destructive/15 text-destructive hover:bg-destructive/25'
+                      : 'bg-muted/80 text-muted-foreground hover:bg-muted',
+                  )}
+                  title="Click to clear search"
+                  onClick={() => setTopicSearch('')}
+                >
+                  {searchIsRegex ? (searchRegexValid ? 'regex' : 'invalid') : 'prefix'}
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -505,18 +543,26 @@ export function LeftPanel({
             {favouritePatterns.length === 0 && (
               <p className="text-xs text-muted-foreground">Add patterns — only matching topics will be shown by default.</p>
             )}
-            {favouritePatterns.map((p) => (
-              <div key={p} className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1">
-                <span className="font-mono text-xs flex-1 truncate text-foreground">{p}</span>
-                <button
-                  className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
-                  onClick={() => removeFavPattern(p)}
-                  title="Remove pattern"
-                >
-                  <XCircle className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+            {favouritePatterns.map((p) => {
+              const matchCount = topics.filter((t) => { try { return new RegExp(p).test(t.name); } catch { return false; } }).length;
+              return (
+                <div key={p} className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1">
+                  <span className="font-mono text-xs flex-1 truncate text-foreground">{p}</span>
+                  {topics.length > 0 && (
+                    <span className="text-[10px] text-muted-foreground shrink-0" title={`${matchCount} topic${matchCount !== 1 ? 's' : ''} match this pattern`}>
+                      {matchCount}t
+                    </span>
+                  )}
+                  <button
+                    className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                    onClick={() => removeFavPattern(p)}
+                    title="Remove pattern"
+                  >
+                    <XCircle className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
             <div className="flex gap-1">
               <Input
                 value={newPattern}
@@ -581,11 +627,13 @@ export function LeftPanel({
           ))}
           {!topicsLoading && isActive && filteredTopics.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              {topicSearch
-                ? 'No matching topics'
-                : isFiltering
-                  ? <span>No topics match your filters — <button className="underline hover:text-foreground" onClick={() => setShowAllTopics(true)}>show all</button></span>
-                  : 'No topics'}
+              {topicSearch && !searchRegexValid
+                ? <span className="text-destructive">Invalid regex pattern</span>
+                : topicSearch
+                  ? 'No topics match this search'
+                  : isFiltering
+                    ? <span>No topics match your filters — <button className="underline hover:text-foreground" onClick={() => setShowAllTopics(true)}>show all</button></span>
+                    : 'No topics'}
             </div>
           )}
         </div>
