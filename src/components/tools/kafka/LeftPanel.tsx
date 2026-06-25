@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   CheckCircle, XCircle, Loader2, Pencil, Trash2, Plus,
-  ChevronDown, ChevronRight, Search, RefreshCw, WifiOff, Wifi, Info,
+  ChevronDown, ChevronRight, Search, RefreshCw, WifiOff, Wifi, Info, Star,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { BrokerForm } from './BrokerForm';
 import { kafkaApi, type BrokerConfig, type TopicSummary, type GroupSummary } from './types';
 
@@ -64,6 +65,13 @@ export function LeftPanel({
   const [deleteConfirm, setDeleteConfirm] = useState<{ name: string; a: number; b: number } | null>(null);
   const [deleteNameInput, setDeleteNameInput] = useState('');
   const [deleteMathInput, setDeleteMathInput] = useState('');
+
+  // Favourites
+  const [favouritePatterns, setFavouritePatterns] = usePersistentState<string[]>('devtool:kafka:favouritePatterns', []);
+  const [favouritesActive, setFavouritesActive] = usePersistentState('devtool:kafka:favouritesActive', false);
+  const [showFavEditor, setShowFavEditor] = useState(false);
+  const [newPattern, setNewPattern] = useState('');
+  const [patternError, setPatternError] = useState('');
 
   // Groups
   const [groups, setGroups] = useState<GroupSummary[]>([]);
@@ -211,9 +219,32 @@ export function LeftPanel({
     return <span className="w-3 h-3 rounded-full border border-muted-foreground/30 inline-block shrink-0" />;
   };
 
-  const filteredTopics = topics.filter((t) =>
-    !topicSearch || t.name.toLowerCase().includes(topicSearch.toLowerCase())
-  );
+  const isFiltering = favouritesActive && favouritePatterns.length > 0;
+  const filteredTopics = topics.filter((t) => {
+    if (topicSearch && !t.name.toLowerCase().includes(topicSearch.toLowerCase())) return false;
+    if (isFiltering) {
+      return favouritePatterns.some((p) => {
+        try { return new RegExp(p).test(t.name); }
+        catch { return false; }
+      });
+    }
+    return true;
+  });
+
+  const addFavPattern = () => {
+    const p = newPattern.trim();
+    if (!p) return;
+    try { new RegExp(p); } catch { setPatternError('Invalid regex'); return; }
+    setPatternError('');
+    if (!favouritePatterns.includes(p)) setFavouritePatterns([...favouritePatterns, p]);
+    setNewPattern('');
+  };
+
+  const removeFavPattern = (p: string) => {
+    const next = favouritePatterns.filter((x) => x !== p);
+    setFavouritePatterns(next);
+    if (next.length === 0) setFavouritesActive(false);
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden text-sm">
@@ -331,10 +362,37 @@ export function LeftPanel({
         {/* Header row */}
         <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
           <span className="text-xs font-medium text-muted-foreground">
-            Topics{topics.length > 0 ? ` (${topics.length})` : ''}
+            Topics{isFiltering
+              ? ` (${filteredTopics.length}/${topics.length})`
+              : topics.length > 0 ? ` (${topics.length})` : ''}
           </span>
           {isActive && (
             <div className="flex items-center gap-1">
+              <button
+                className={cn(
+                  'p-0.5 transition-colors',
+                  isFiltering ? 'text-amber-400 hover:text-amber-500' : 'text-muted-foreground hover:text-foreground',
+                )}
+                title={isFiltering ? 'Favourites filter active — click to disable' : 'Filter by favourites'}
+                onClick={() => {
+                  if (favouritePatterns.length === 0) {
+                    setShowFavEditor(true);
+                  } else {
+                    setFavouritesActive((v) => !v);
+                  }
+                }}
+              >
+                <Star className={cn('w-3 h-3', isFiltering && 'fill-amber-400')} />
+              </button>
+              {favouritePatterns.length > 0 && (
+                <button
+                  className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Manage favourite patterns"
+                  onClick={() => setShowFavEditor((v) => !v)}
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
               <button
                 className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
                 title="Refresh topics"
@@ -417,6 +475,56 @@ export function LeftPanel({
                 className="h-7 text-xs pl-6"
               />
             </div>
+          </div>
+        )}
+
+        {/* Favourites editor */}
+        {isActive && showFavEditor && (
+          <div className="mx-2 mb-1.5 p-2 border border-border rounded-lg bg-muted/10 shrink-0 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">Favourite filters <span className="text-muted-foreground font-normal">(regex, OR)</span></span>
+              <button className="text-muted-foreground hover:text-foreground text-xs" onClick={() => setShowFavEditor(false)}>✕</button>
+            </div>
+            {favouritePatterns.length === 0 && (
+              <p className="text-xs text-muted-foreground">No patterns yet — topics matching any pattern will be shown.</p>
+            )}
+            {favouritePatterns.map((p) => (
+              <div key={p} className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1">
+                <span className="font-mono text-xs flex-1 truncate text-foreground">{p}</span>
+                <button
+                  className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                  onClick={() => removeFavPattern(p)}
+                  title="Remove pattern"
+                >
+                  <XCircle className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+            <div className="flex gap-1">
+              <Input
+                value={newPattern}
+                onChange={(e) => { setNewPattern(e.target.value); setPatternError(''); }}
+                placeholder="e.g. ^prod\. or \.events$"
+                className="h-7 text-xs font-mono flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && addFavPattern()}
+                autoFocus={favouritePatterns.length === 0}
+              />
+              <Button size="sm" className="h-7 text-xs px-2 shrink-0" onClick={addFavPattern}>Add</Button>
+            </div>
+            {patternError && <p className="text-xs text-destructive">{patternError}</p>}
+            {favouritePatterns.length > 0 && (
+              <button
+                className={cn(
+                  'w-full text-xs py-1 rounded-md border transition-colors',
+                  isFiltering
+                    ? 'border-amber-400/50 text-amber-500 bg-amber-400/10 hover:bg-amber-400/20'
+                    : 'border-border text-muted-foreground hover:bg-muted/50',
+                )}
+                onClick={() => setFavouritesActive((v) => !v)}
+              >
+                {isFiltering ? '★ Filter active — click to disable' : '☆ Click to enable filter'}
+              </button>
+            )}
           </div>
         )}
 
