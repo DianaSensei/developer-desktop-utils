@@ -1,0 +1,76 @@
+# Simulated producers/consumers for exercising the Kafka Explorer's Consumers tab.
+#
+# Requires the main stack to be running first:
+#   docker-compose up -d
+#
+# Then:
+#   docker-compose -f docker-compose.consumers.yml up -d     # start simulators
+#   docker-compose -f docker-compose.consumers.yml down       # stop them
+#
+# In the Kafka tool, open the demo-events topic -> Consumers tab -> Refresh.
+# You should see: app-consumers (lag ~0), lagging-group (growing lag),
+# and an anonymous console-consumer-NNNN group.
+services:
+  # Continuously produces one JSON message per second to demo-events,
+  # so consumers always have a moving stream and lag is observable.
+  producer:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: devtool-kafka-producer
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        i=0
+        while true; do
+          i=$$((i+1))
+          echo "{\"event\":\"tick\",\"n\":$$i,\"ts\":\"$$(date -u +%FT%TZ)\"}"
+          sleep 1
+        done | kafka-console-producer --bootstrap-server kafka:29092 --topic demo-events
+    restart: unless-stopped
+
+  # Named group that stays connected and keeps up -> lag stays ~0 (green).
+  consumer-group:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: devtool-kafka-consumer-group
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        exec kafka-console-consumer --bootstrap-server kafka:29092 \
+          --topic demo-events --group app-consumers --from-beginning \
+          --consumer-property enable.auto.commit=true \
+          --consumer-property auto.commit.interval.ms=1000
+    restart: unless-stopped
+
+  # Anonymous consumer: no --group, so Kafka assigns an ephemeral
+  # console-consumer-NNNN group id. Stays connected and keeps up.
+  consumer-anon:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: devtool-kafka-consumer-anon
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        exec kafka-console-consumer --bootstrap-server kafka:29092 \
+          --topic demo-events --from-beginning \
+          --consumer-property enable.auto.commit=true \
+          --consumer-property auto.commit.interval.ms=1000
+    restart: unless-stopped
+
+  # Lagging group: consumes a handful of messages, commits, then exits.
+  # Because the producer keeps going, this group's lag grows over time (orange).
+  consumer-lagging:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: devtool-kafka-consumer-lagging
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        kafka-console-consumer --bootstrap-server kafka:29092 \
+          --topic demo-events --group lagging-group --from-beginning \
+          --max-messages 5 \
+          --consumer-property enable.auto.commit=true \
+          --consumer-property auto.commit.interval.ms=500
+        echo "lagging-group committed and exited; lag will now grow."
+    restart: "no"
+
+networks:
+  default:
+    name: devtool_default
+    external: true

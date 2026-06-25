@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { kafkaApi, type GroupDetails } from './types';
+import { kafkaApi, type GroupDetails, type Assignment } from './types';
 
 interface GroupViewProps {
   brokerId: string;
@@ -9,6 +9,17 @@ interface GroupViewProps {
   refreshKey: number;
   onRefresh: () => void;
   onSelectTopic: (topic: string) => void;
+}
+
+// Group assignments by topic, preserving the backend's topic/partition order.
+function groupByTopic(assignments: Assignment[]): [string, Assignment[]][] {
+  const byTopic = new Map<string, Assignment[]>();
+  for (const a of assignments) {
+    const arr = byTopic.get(a.topic);
+    if (arr) arr.push(a);
+    else byTopic.set(a.topic, [a]);
+  }
+  return [...byTopic.entries()];
 }
 
 const STATE_STYLES: Record<string, string> = {
@@ -23,16 +34,28 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
   const [data, setData] = useState<GroupDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Topics expanded in the assignments view. Collapsed by default.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!brokerId || !groupId) return;
     setLoading(true);
     setError('');
     kafkaApi.groupDetails(brokerId, groupId)
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        setExpanded(new Set());
+      })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, [brokerId, groupId, refreshKey]);
+
+  const toggleTopic = (topic: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(topic) ? next.delete(topic) : next.add(topic);
+      return next;
+    });
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -93,52 +116,91 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                 No committed offsets — group may not be active yet
               </div>
             ) : (
-              <>
-                {/* Column headers */}
-                <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-1.5 text-xs font-medium text-muted-foreground border-b bg-muted/20 sticky top-0">
-                  <span>Topic</span>
-                  <span className="text-right">Part</span>
-                  <span className="text-right">Committed</span>
-                  <span className="text-right">Latest</span>
-                  <span className="text-right">Lag</span>
-                </div>
-
-                {data.assignments.map((a, i) => {
-                  const lagColor = a.lag < 0
-                    ? 'text-muted-foreground'
-                    : a.lag === 0
-                    ? 'text-green-600'
-                    : 'text-orange-500';
-
-                  return (
+              groupByTopic(data.assignments).map(([topic, parts]) => {
+                const open = expanded.has(topic);
+                const totalLag = parts.reduce((s, a) => s + (a.lag > 0 ? a.lag : 0), 0);
+                const hasLag = parts.some((a) => a.lag > 0);
+                return (
+                  <div key={topic} className="border-b border-border/40">
+                    {/* Topic header — toggles partition detail; topic name browses the topic */}
                     <div
-                      key={i}
-                      className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-1.5 border-b border-border/40 text-sm"
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-muted/15 cursor-pointer select-none"
+                      onClick={() => toggleTopic(topic)}
                     >
+                      {open
+                        ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                        : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
                       <button
-                        className="text-left font-mono text-xs truncate hover:text-primary hover:underline"
-                        onClick={() => onSelectTopic(a.topic)}
-                        title={`Browse topic: ${a.topic}`}
+                        className="font-mono text-xs truncate flex-1 text-left hover:text-primary hover:underline"
+                        onClick={(e) => { e.stopPropagation(); onSelectTopic(topic); }}
+                        title={`Browse topic: ${topic}`}
                       >
-                        {a.topic}
+                        {topic}
                       </button>
-                      <span className="text-right text-xs text-muted-foreground tabular-nums">{a.partition}</span>
-                      <span className="text-right font-mono text-xs tabular-nums">
-                        {a.committedOffset >= 0 ? a.committedOffset.toLocaleString() : '—'}
+                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                        {parts.length} part{parts.length !== 1 ? 's' : ''}
                       </span>
-                      <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
-                        {/* latest = committed + lag */}
-                        {a.lag >= 0 && a.committedOffset >= 0
-                          ? (a.committedOffset + a.lag).toLocaleString()
-                          : '—'}
-                      </span>
-                      <span className={`text-right font-mono text-xs tabular-nums ${lagColor}`}>
-                        {a.lag >= 0 ? a.lag.toLocaleString() : '—'}
+                      <span className={`text-xs font-mono tabular-nums w-24 text-right shrink-0 ${hasLag ? 'text-orange-500' : 'text-green-600'}`}>
+                        lag {totalLag.toLocaleString()}
                       </span>
                     </div>
-                  );
-                })}
-              </>
+
+                    {open && (
+                      <div className="pb-1">
+                        {/* Per-partition column headers */}
+                        <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-muted-foreground bg-muted/10">
+                          <span className="text-right">Part</span>
+                          <span>Consumer</span>
+                          <span className="text-right">Committed</span>
+                          <span className="text-right">Latest</span>
+                          <span className="text-right">Lag</span>
+                        </div>
+
+                        {parts.map((a) => {
+                          const lagColor = a.lag < 0
+                            ? 'text-muted-foreground'
+                            : a.lag === 0
+                            ? 'text-green-600'
+                            : 'text-orange-500';
+                          const latest = a.lag >= 0 && a.committedOffset >= 0
+                            ? a.committedOffset + a.lag
+                            : -1;
+
+                          return (
+                            <div
+                              key={a.partition}
+                              className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-border/20 text-sm"
+                            >
+                              <span className="text-right text-xs text-muted-foreground tabular-nums">{a.partition}</span>
+                              <span className="min-w-0 truncate text-xs" title={a.memberId ?? undefined}>
+                                {a.clientId ? (
+                                  <>
+                                    <span className="font-mono">{a.clientId}</span>
+                                    {a.clientHost && (
+                                      <span className="text-muted-foreground font-mono"> {a.clientHost}</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-muted-foreground italic">unassigned</span>
+                                )}
+                              </span>
+                              <span className="text-right font-mono text-xs tabular-nums">
+                                {a.committedOffset >= 0 ? a.committedOffset.toLocaleString() : '—'}
+                              </span>
+                              <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                                {latest >= 0 ? latest.toLocaleString() : '—'}
+                              </span>
+                              <span className={`text-right font-mono text-xs tabular-nums ${lagColor}`}>
+                                {a.lag >= 0 ? a.lag.toLocaleString() : '—'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </>
         )}

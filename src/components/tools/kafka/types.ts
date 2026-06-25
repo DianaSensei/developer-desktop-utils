@@ -52,6 +52,10 @@ export interface Assignment {
   partition: number;
   committedOffset: number;
   lag: number;
+  // The consumer currently assigned this partition, if the group is active.
+  clientId?: string | null;
+  clientHost?: string | null;
+  memberId?: string | null;
 }
 
 export interface GroupMember {

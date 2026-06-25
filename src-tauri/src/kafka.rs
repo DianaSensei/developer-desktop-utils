@@ -77,6 +77,11 @@ pub struct Assignment {
     pub partition: i32,
     pub committed_offset: i64,
     pub lag: i64,
+    // The member currently assigned this partition, if the group is active.
+    // None for committed offsets with no live owner (e.g. Empty groups).
+    pub client_id: Option<String>,
+    pub client_host: Option<String>,
+    pub member_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -453,11 +458,48 @@ async fn wire_list_groups(stream: &mut TcpStream) -> Result<Vec<GroupSummary>, S
     })
 }
 
+// A group member plus the topic/partitions it currently owns, decoded from
+// the member_assignment blob in the DescribeGroups response.
+struct MemberWithAssignment {
+    member: GroupMember,
+    owned: Vec<(String, i32)>,
+}
+
+// Decode the consumer-protocol member_assignment blob:
+//   Version: int16
+//   Assignment: [ Topic: string, Partitions: [int32] ]
+//   UserData: bytes
+// Returns the (topic, partition) pairs owned by the member. Tolerant of
+// non-consumer protocols / malformed data — returns what it could parse.
+fn parse_member_assignment(bytes: &[u8]) -> Vec<(String, i32)> {
+    if bytes.is_empty() {
+        return Vec::new();
+    }
+    let mut d = Dec::new(bytes);
+    if d.i16().is_err() {
+        return Vec::new();
+    }
+    let mut owned = Vec::new();
+    let topics = d.array(|d| {
+        let topic = d.str()?;
+        let parts = d.array(|d| d.i32())?;
+        Ok((topic, parts))
+    });
+    if let Ok(topics) = topics {
+        for (topic, parts) in topics {
+            for p in parts {
+                owned.push((topic.clone(), p));
+            }
+        }
+    }
+    owned
+}
+
 // DescribeGroupsRequest v0 (API 15)
 async fn wire_describe_groups(
     stream: &mut TcpStream,
     group_ids: &[&str],
-) -> Result<Vec<(String, String, Vec<GroupMember>)>, String> {
+) -> Result<Vec<(String, String, Vec<MemberWithAssignment>)>, String> {
     // returns (group_id, state, members)
     let mut body = Vec::new();
     enc_i32(&mut body, group_ids.len() as i32);
@@ -477,8 +519,12 @@ async fn wire_describe_groups(
             let client_id = d.str()?;
             let client_host = d.str()?;
             d.bytes()?; // member_metadata
-            d.bytes()?; // member_assignment
-            Ok(GroupMember { member_id, client_id, client_host })
+            let assignment = d.bytes()?; // member_assignment
+            let owned = parse_member_assignment(&assignment);
+            Ok(MemberWithAssignment {
+                member: GroupMember { member_id, client_id, client_host },
+                owned,
+            })
         })?;
         Ok((group_id, state, members))
     })
@@ -780,12 +826,25 @@ pub async fn kafka_group_details(
 
     // Describe group for state + members
     let desc = wire_describe_groups(&mut stream, &[group_id.as_str()]).await?;
-    let (state, members) = desc
+    let (state, members_raw) = desc
         .into_iter()
         .find(|(id, _, _)| id == &group_id)
         .map(|(_, s, m)| (s, m))
         .unwrap_or_else(|| (String::from("Unknown"), Vec::new()));
-    let member_count = members.len() as i32;
+    let member_count = members_raw.len() as i32;
+
+    // Map each owned (topic, partition) -> its assigned member, so we can show
+    // which consumer is reading each partition.
+    let owner_map: std::collections::HashMap<(String, i32), GroupMember> = members_raw
+        .iter()
+        .flat_map(|mw| {
+            let member = mw.member.clone();
+            mw.owned
+                .iter()
+                .map(move |(t, p)| ((t.clone(), *p), member.clone()))
+        })
+        .collect();
+    let members: Vec<GroupMember> = members_raw.into_iter().map(|mw| mw.member).collect();
 
     // Get all topics so we can fetch offsets for all partitions
     let all_topics = wire_metadata(&mut stream, &[]).await?;
@@ -825,7 +884,16 @@ pub async fn kafka_group_details(
             } else {
                 -1
             };
-            assignments.push(Assignment { topic: topic.clone(), partition, committed_offset, lag });
+            let owner = owner_map.get(&(topic.clone(), partition));
+            assignments.push(Assignment {
+                topic: topic.clone(),
+                partition,
+                committed_offset,
+                lag,
+                client_id: owner.map(|m| m.client_id.clone()),
+                client_host: owner.map(|m| m.client_host.clone()),
+                member_id: owner.map(|m| m.member_id.clone()),
+            });
         }
     }
 
