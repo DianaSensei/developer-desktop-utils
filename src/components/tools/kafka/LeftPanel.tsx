@@ -279,18 +279,6 @@ export function LeftPanel({
   return (
     <div className="flex flex-col h-full overflow-hidden text-sm">
 
-      {/* ── Panel header ── */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Kafka</span>
-        <button
-          onClick={onShowInfo}
-          title="How Kafka Explorer accesses your cluster"
-          className="p-1 rounded text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60 transition-colors"
-        >
-          <Info className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
       {/* ── Broker section ── */}
       <div className="px-2 pt-2 pb-2 border-b border-border shrink-0 space-y-1.5">
         {/* Dropdown trigger */}
@@ -423,38 +411,43 @@ export function LeftPanel({
             )}
           </button>
         </div>
-        {isActive && (
-          <div className="flex items-center gap-1 pb-1.5">
-            {activeList === 'topics' ? (
-              <>
-                <button
-                  className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                  title="Refresh topics"
-                  onClick={() => setTopicsRefreshTick((k) => k + 1)}
-                  disabled={topicsLoading}
-                >
-                  <RefreshCw className={cn('w-3 h-3', topicsLoading && 'animate-spin')} />
-                </button>
-                <button
-                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-                  title="Create topic"
-                  onClick={() => { setShowCreateTopic((v) => !v); setCreateError(''); }}
-                >
-                  <Plus className="w-3 h-3" /> New
-                </button>
-              </>
-            ) : (
+        <div className="flex items-center gap-1 pb-1.5">
+          {isActive && (activeList === 'topics' ? (
+            <>
               <button
                 className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                title="Refresh groups"
-                onClick={() => setGroupsRefreshTick((k) => k + 1)}
-                disabled={groupsLoading}
+                title="Refresh topics"
+                onClick={() => setTopicsRefreshTick((k) => k + 1)}
+                disabled={topicsLoading}
               >
-                <RefreshCw className={cn('w-3 h-3', groupsLoading && 'animate-spin')} />
+                <RefreshCw className={cn('w-3 h-3', topicsLoading && 'animate-spin')} />
               </button>
-            )}
-          </div>
-        )}
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+                title="Create topic"
+                onClick={() => { setShowCreateTopic((v) => !v); setCreateError(''); }}
+              >
+                <Plus className="w-3 h-3" /> New
+              </button>
+            </>
+          ) : (
+            <button
+              className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+              title="Refresh groups"
+              onClick={() => setGroupsRefreshTick((k) => k + 1)}
+              disabled={groupsLoading}
+            >
+              <RefreshCw className={cn('w-3 h-3', groupsLoading && 'animate-spin')} />
+            </button>
+          ))}
+          <button
+            onClick={onShowInfo}
+            title="How Kafka Explorer accesses your cluster"
+            className="p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          >
+            <Info className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* ── List area: shows the active tab's content ── */}
