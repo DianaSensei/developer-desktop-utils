@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   CheckCircle, XCircle, Loader2, Pencil, Trash2, Plus,
-  ChevronDown, ChevronRight, Search, RefreshCw, WifiOff, Wifi, Info, Star,
+  ChevronDown, ChevronRight, Search, RefreshCw, WifiOff, Wifi, Info, Filter,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -226,29 +226,42 @@ export function LeftPanel({
     ? (() => { try { new RegExp(topicSearch, 'i'); return true; } catch { return false; } })()
     : true;
 
-  // Regex filter is active when "search all" is off and patterns are configured
-  const isFiltering = !showAllTopics && favouritePatterns.length > 0;
-  const filteredTopics = topics.filter((t) => {
-    // Step 1: apply regex filter (OR) unless "search all" is on
-    if (isFiltering) {
-      const matchesAny = favouritePatterns.some((p) => {
-        try { return new RegExp(p).test(t.name); }
-        catch { return false; }
-      });
-      if (!matchesAny) return false;
+  // ── Three-layer pipeline ──
+  // (1) `topics`          — every topic fetched from the broker
+  // (2) `modeTopics`      — mode layer: "Filtered" keeps only topics matching a saved
+  //                         regex (OR); "All topics" keeps everything. Filtered mode
+  //                         requires ≥1 pattern, so with none it intentionally yields
+  //                         nothing — you must opt in to seeing topics.
+  // (3) `filteredTopics`  — search layer applied on top of (2)
+  const inFilteredMode = !showAllTopics;
+  const needsPatternSetup = inFilteredMode && favouritePatterns.length === 0;
+
+  const modeTopics = inFilteredMode
+    ? topics.filter((t) => favouritePatterns.some((p) => {
+        try { return new RegExp(p).test(t.name); } catch { return false; }
+      }))
+    : topics;
+
+  const filteredTopics = modeTopics.filter((t) => {
+    if (!topicSearch) return true;
+    // Prefix match for plain text; regex (case-insensitive) when metacharacters are present
+    if (searchIsRegex) {
+      if (!searchRegexValid) return false;
+      try { return new RegExp(topicSearch, 'i').test(t.name); } catch { return false; }
     }
-    // Step 2: keyword search — prefix match for plain text, regex for metacharacter input
-    if (topicSearch) {
-      if (searchIsRegex) {
-        if (!searchRegexValid) return false;
-        try { if (!new RegExp(topicSearch, 'i').test(t.name)) return false; }
-        catch { return false; }
-      } else {
-        if (!t.name.toLowerCase().startsWith(topicSearch.toLowerCase())) return false;
-      }
-    }
-    return true;
+    return t.name.toLowerCase().startsWith(topicSearch.toLowerCase());
   });
+
+  // Switch between "Filtered" and "All topics". Filtered mode needs ≥1 pattern, so
+  // entering it with none open the editor; All mode hides the regex-filter UI entirely.
+  const setFilterMode = (allTopics: boolean) => {
+    setShowAllTopics(allTopics);
+    if (allTopics) {
+      setShowFavEditor(false);
+    } else if (favouritePatterns.length === 0) {
+      setShowFavEditor(true);
+    }
+  };
 
   const addFavPattern = () => {
     const p = newPattern.trim();
@@ -380,39 +393,13 @@ export function LeftPanel({
         <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
           <span className="text-xs font-medium text-muted-foreground">
             Topics{topics.length > 0
-              ? isFiltering
+              ? filteredTopics.length !== topics.length
                 ? ` (${filteredTopics.length}/${topics.length})`
-                : ` (${topicSearch ? `${filteredTopics.length}/` : ''}${topics.length})`
+                : ` (${topics.length})`
               : ''}
           </span>
           {isActive && (
             <div className="flex items-center gap-1">
-              {/* Search all toggle — off by default, resets on app reopen */}
-              <button
-                className={cn(
-                  'px-1.5 py-0.5 rounded-full text-xs border transition-colors',
-                  showAllTopics
-                    ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/20'
-                    : 'border-border text-muted-foreground hover:bg-muted/50',
-                )}
-                title={showAllTopics ? 'Showing all topics — click to apply regex filters' : 'Regex filter active — click to show all topics'}
-                onClick={() => setShowAllTopics((v) => !v)}
-              >
-                {showAllTopics
-                ? 'All topics'
-                : favouritePatterns.length > 0 ? `Filtered (${favouritePatterns.length})` : 'Filtered'}
-              </button>
-              {/* Pencil: manage regex patterns */}
-              <button
-                className={cn(
-                  'p-0.5 transition-colors',
-                  showFavEditor ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                )}
-                title="Manage topic regex filters"
-                onClick={() => setShowFavEditor((v) => !v)}
-              >
-                <Pencil className="w-3 h-3" />
-              </button>
               <button
                 className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
                 title="Refresh topics"
@@ -483,7 +470,48 @@ export function LeftPanel({
           </div>
         )}
 
-        {/* Search */}
+        {/* Filter-mode bar: choose which set the search runs against (layer 2) */}
+        {isActive && (
+          <div className="flex items-center gap-1 px-2 pb-1 shrink-0">
+            <div className="flex items-center rounded-md border border-border overflow-hidden text-[11px]">
+              <button
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1 transition-colors',
+                  inFilteredMode ? 'bg-primary/15 text-primary font-medium' : 'text-muted-foreground hover:bg-muted/50',
+                )}
+                title="Show only topics matching your filter patterns"
+                onClick={() => setFilterMode(false)}
+              >
+                <Filter className="w-3 h-3" />
+                Filtered{favouritePatterns.length > 0 ? ` (${favouritePatterns.length})` : ''}
+              </button>
+              <button
+                className={cn(
+                  'px-2 py-1 border-l border-border transition-colors',
+                  !inFilteredMode ? 'bg-primary/15 text-primary font-medium' : 'text-muted-foreground hover:bg-muted/50',
+                )}
+                title="Show every topic in the cluster"
+                onClick={() => setFilterMode(true)}
+              >
+                All
+              </button>
+            </div>
+            {inFilteredMode && (
+              <button
+                className={cn(
+                  'p-1 rounded-md border border-border transition-colors',
+                  showFavEditor ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50',
+                )}
+                title="Edit filter patterns"
+                onClick={() => setShowFavEditor((v) => !v)}
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Search — runs on whichever set the mode above produced */}
         {isActive && (
           <div className="px-2 pb-1 shrink-0">
             <div className="relative">
@@ -491,7 +519,7 @@ export function LeftPanel({
               <Input
                 value={topicSearch}
                 onChange={(e) => setTopicSearch(e.target.value)}
-                placeholder="Prefix or .* regex…"
+                placeholder={inFilteredMode ? 'Search in filtered…' : 'Search all topics…'}
                 className={cn(
                   'h-7 text-xs pl-6',
                   topicSearch ? 'pr-14' : '',
@@ -519,22 +547,22 @@ export function LeftPanel({
           </div>
         )}
 
-        {/* Setup nudge — shown when "search all" is off but no patterns are configured */}
-        {isActive && !showAllTopics && favouritePatterns.length === 0 && !showFavEditor && (
+        {/* Setup nudge — filtered mode is on but no patterns exist yet */}
+        {isActive && needsPatternSetup && !showFavEditor && (
           <div className="mx-2 mb-1.5 flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1.5 shrink-0">
-            <Star className="w-3 h-3 text-amber-500 shrink-0" />
-            <span className="text-xs text-amber-600/90 flex-1">Set up topic filters to avoid accidental changes</span>
+            <Filter className="w-3 h-3 text-amber-500 shrink-0" />
+            <span className="text-xs text-amber-600/90 flex-1">Add a filter pattern, or switch to All topics</span>
             <button
               className="text-xs font-medium text-amber-600 hover:text-amber-700 shrink-0"
               onClick={() => setShowFavEditor(true)}
             >
-              Set up
+              Add
             </button>
           </div>
         )}
 
-        {/* Favourites editor */}
-        {isActive && showFavEditor && (
+        {/* Filter pattern editor — only available in Filtered mode */}
+        {isActive && inFilteredMode && showFavEditor && (
           <div className="mx-2 mb-1.5 p-2 border border-border rounded-lg bg-muted/10 shrink-0 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium">Topic filters <span className="text-muted-foreground font-normal">(regex, OR)</span></span>
@@ -629,11 +657,13 @@ export function LeftPanel({
             <div className="px-3 py-2 text-xs text-muted-foreground">
               {topicSearch && !searchRegexValid
                 ? <span className="text-destructive">Invalid regex pattern</span>
-                : topicSearch
-                  ? 'No topics match this search'
-                  : isFiltering
-                    ? <span>No topics match your filters — <button className="underline hover:text-foreground" onClick={() => setShowAllTopics(true)}>show all</button></span>
-                    : 'No topics'}
+                : needsPatternSetup
+                  ? <span><button className="underline hover:text-foreground" onClick={() => setShowFavEditor(true)}>Add a filter pattern</button> or <button className="underline hover:text-foreground" onClick={() => setFilterMode(true)}>show all topics</button></span>
+                  : topicSearch
+                    ? 'No topics match this search'
+                    : inFilteredMode
+                      ? <span>No topics match your filters — <button className="underline hover:text-foreground" onClick={() => setFilterMode(true)}>show all</button></span>
+                      : 'No topics'}
             </div>
           )}
         </div>
