@@ -234,8 +234,13 @@ async fn send_request(
     stream.write_all(&size.to_be_bytes()).await.map_err(|e| e.to_string())?;
     stream.write_all(&msg).await.map_err(|e| e.to_string())?;
 
+    const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
     let mut size_buf = [0u8; 4];
-    stream.read_exact(&mut size_buf).await.map_err(|e| e.to_string())?;
+    tokio::time::timeout(READ_TIMEOUT, stream.read_exact(&mut size_buf))
+        .await
+        .map_err(|_| "Kafka read timed out (30 s)".to_string())?
+        .map_err(|e| e.to_string())?;
     let rlen = i32::from_be_bytes(size_buf);
     // The length comes straight off the socket. Validate it before allocating:
     // a non-Kafka server (e.g. an HTTP/TLS port reached by a typo in
@@ -249,7 +254,10 @@ async fn send_request(
         ));
     }
     let mut resp = vec![0u8; rlen as usize];
-    stream.read_exact(&mut resp).await.map_err(|e| e.to_string())?;
+    tokio::time::timeout(READ_TIMEOUT, stream.read_exact(&mut resp))
+        .await
+        .map_err(|_| "Kafka read timed out (30 s)".to_string())?
+        .map_err(|e| e.to_string())?;
     // skip correlation_id (4 bytes)
     Ok(resp[4..].to_vec())
 }
@@ -670,16 +678,22 @@ pub async fn kafka_topic_consumer_groups(
     let topics_arg = [(topic.as_str(), partition_ids)];
     let mut result: Vec<GroupLag> = Vec::new();
     for g in &groups {
-        if let Ok(offsets) = wire_offset_fetch(&mut stream, &g.group_id, &topics_arg).await {
-            for (_t, partition, committed_offset) in offsets {
-                let latest_off = latest.get(&partition).copied().unwrap_or(-1);
-                let lag = if latest_off >= 0 && committed_offset >= 0 {
-                    latest_off - committed_offset
-                } else {
-                    -1
-                };
-                result.push(GroupLag { group_id: g.group_id.clone(), partition, committed_offset, lag });
+        match wire_offset_fetch(&mut stream, &g.group_id, &topics_arg).await {
+            Ok(offsets) => {
+                for (_t, partition, committed_offset) in offsets {
+                    let latest_off = latest.get(&partition).copied().unwrap_or(-1);
+                    let lag = if latest_off >= 0 && committed_offset >= 0 {
+                        latest_off - committed_offset
+                    } else {
+                        -1
+                    };
+                    result.push(GroupLag { group_id: g.group_id.clone(), partition, committed_offset, lag });
+                }
             }
+            // A read error leaves the TCP stream in an unknown state. Stop here
+            // rather than continuing: subsequent reads on a corrupted stream
+            // would each block for the full 30 s timeout before failing.
+            Err(_) => break,
         }
     }
     result.sort_by(|a, b| a.group_id.cmp(&b.group_id).then(a.partition.cmp(&b.partition)));

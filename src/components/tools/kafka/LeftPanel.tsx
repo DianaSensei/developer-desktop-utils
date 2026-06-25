@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   CheckCircle, XCircle, Loader2, Pencil, Trash2, Plus,
-  ChevronDown, ChevronRight, Search, RefreshCw, WifiOff, Wifi, Info,
+  ChevronDown, Search, RefreshCw, WifiOff, Wifi, Filter, List, Users,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { BrokerForm } from './BrokerForm';
 import { kafkaApi, type BrokerConfig, type TopicSummary, type GroupSummary } from './types';
 
@@ -28,7 +29,6 @@ interface LeftPanelProps {
   selectedGroup: string | null;
   onSelectGroup: (g: string | null) => void;
   refreshKey: number;
-  onShowInfo: () => void;
 }
 
 export function LeftPanel({
@@ -39,7 +39,6 @@ export function LeftPanel({
   selectedGroup,
   onSelectGroup,
   refreshKey,
-  onShowInfo,
 }: LeftPanelProps) {
   const [configs, setConfigs] = useState<BrokerConfig[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -65,11 +64,18 @@ export function LeftPanel({
   const [deleteNameInput, setDeleteNameInput] = useState('');
   const [deleteMathInput, setDeleteMathInput] = useState('');
 
+  // Topic filter — patterns persisted; "search all" toggle is local (resets to off on reopen)
+  const [favouritePatterns, setFavouritePatterns] = usePersistentState<string[]>('devtool:kafka:favouritePatterns', []);
+  const [showAllTopics, setShowAllTopics] = useState(false);
+  const [showFavEditor, setShowFavEditor] = useState(false);
+  const [newPattern, setNewPattern] = useState('');
+  const [patternError, setPatternError] = useState('');
+
   // Groups
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupsRefreshTick, setGroupsRefreshTick] = useState(0);
-  const [groupsOpen, setGroupsOpen] = useState(true);
+  const [activeList, setActiveList] = useState<'topics' | 'groups'>('topics');
 
   const selectedConfig = configs.find((c) => c.id === selectedBrokerId) ?? null;
   const isDisconnected = connStatus[selectedBrokerId] === 'disconnected';
@@ -211,24 +217,65 @@ export function LeftPanel({
     return <span className="w-3 h-3 rounded-full border border-muted-foreground/30 inline-block shrink-0" />;
   };
 
-  const filteredTopics = topics.filter((t) =>
-    !topicSearch || t.name.toLowerCase().includes(topicSearch.toLowerCase())
-  );
+  // Detect if the search input contains regex metacharacters → treat as regex, else prefix match
+  const SEARCH_REGEX_CHARS = /[\\^$.*+?()[\]{}|]/;
+  const searchIsRegex = topicSearch.length > 0 && SEARCH_REGEX_CHARS.test(topicSearch);
+  const searchRegexValid = searchIsRegex
+    ? (() => { try { new RegExp(topicSearch, 'i'); return true; } catch { return false; } })()
+    : true;
+
+  // ── Three-layer pipeline ──
+  // (1) `topics`          — every topic fetched from the broker
+  // (2) `modeTopics`      — mode layer: "Filtered" keeps only topics matching a saved
+  //                         regex (OR); "All topics" keeps everything. Filtered mode
+  //                         requires ≥1 pattern, so with none it intentionally yields
+  //                         nothing — you must opt in to seeing topics.
+  // (3) `filteredTopics`  — search layer applied on top of (2)
+  const inFilteredMode = !showAllTopics;
+  const needsPatternSetup = inFilteredMode && favouritePatterns.length === 0;
+
+  const modeTopics = inFilteredMode
+    ? topics.filter((t) => favouritePatterns.some((p) => {
+        try { return new RegExp(p).test(t.name); } catch { return false; }
+      }))
+    : topics;
+
+  const filteredTopics = modeTopics.filter((t) => {
+    if (!topicSearch) return true;
+    // Prefix match for plain text; regex (case-insensitive) when metacharacters are present
+    if (searchIsRegex) {
+      if (!searchRegexValid) return false;
+      try { return new RegExp(topicSearch, 'i').test(t.name); } catch { return false; }
+    }
+    return t.name.toLowerCase().startsWith(topicSearch.toLowerCase());
+  });
+
+  // Switch between "Filtered" and "All topics". Filtered mode needs ≥1 pattern, so
+  // entering it with none open the editor; All mode hides the regex-filter UI entirely.
+  const setFilterMode = (allTopics: boolean) => {
+    setShowAllTopics(allTopics);
+    if (allTopics) {
+      setShowFavEditor(false);
+    } else if (favouritePatterns.length === 0) {
+      setShowFavEditor(true);
+    }
+  };
+
+  const addFavPattern = () => {
+    const p = newPattern.trim();
+    if (!p) return;
+    try { new RegExp(p); } catch { setPatternError('Invalid regex'); return; }
+    setPatternError('');
+    if (!favouritePatterns.includes(p)) setFavouritePatterns([...favouritePatterns, p]);
+    setNewPattern('');
+  };
+
+  const removeFavPattern = (p: string) => {
+    setFavouritePatterns(favouritePatterns.filter((x) => x !== p));
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden text-sm">
-
-      {/* ── Panel header ── */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Kafka</span>
-        <button
-          onClick={onShowInfo}
-          title="How Kafka Explorer accesses your cluster"
-          className="p-1 rounded text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60 transition-colors"
-        >
-          <Info className="w-3.5 h-3.5" />
-        </button>
-      </div>
 
       {/* ── Broker section ── */}
       <div className="px-2 pt-2 pb-2 border-b border-border shrink-0 space-y-1.5">
@@ -326,36 +373,233 @@ export function LeftPanel({
         )}
       </div>
 
-      {/* ── Topics section ── */}
-      <div className="flex flex-col border-b border-border flex-1 min-h-0">
-        {/* Header row */}
-        <div className="flex items-center justify-between px-2 py-1.5 shrink-0">
-          <span className="text-xs font-medium text-muted-foreground">
-            Topics{topics.length > 0 ? ` (${topics.length})` : ''}
-          </span>
+      {/* ── Tab bar: Topics | Groups (replaces the old bottom-pinned groups list) ── */}
+      <div className="flex items-end justify-between px-2 pt-2 border-b border-border shrink-0">
+        <div className="flex items-center gap-1">
+          <button
+            className={cn(
+              'flex items-center gap-1.5 px-2 pb-2 border-b-2 -mb-px transition-colors',
+              activeList === 'topics'
+                ? 'border-primary text-foreground font-medium'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setActiveList('topics')}
+          >
+            <List className="w-3.5 h-3.5" />
+            <span className="text-xs">Topics</span>
+            {topics.length > 0 && (
+              <span className="text-[10px] text-muted-foreground tabular-nums">
+                {filteredTopics.length !== topics.length ? `${filteredTopics.length}/${topics.length}` : topics.length}
+              </span>
+            )}
+          </button>
+          <button
+            className={cn(
+              'flex items-center gap-1.5 px-2 pb-2 border-b-2 -mb-px transition-colors',
+              activeList === 'groups'
+                ? 'border-primary text-foreground font-medium'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setActiveList('groups')}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span className="text-xs">Groups</span>
+            {groups.length > 0 && (
+              <span className="text-[10px] text-muted-foreground tabular-nums">{groups.length}</span>
+            )}
+          </button>
+        </div>
+        <div className="flex items-center gap-1 pb-2">
           {isActive && (
-            <div className="flex items-center gap-1">
-              <button
-                className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                title="Refresh topics"
-                onClick={() => setTopicsRefreshTick((k) => k + 1)}
-                disabled={topicsLoading}
-              >
-                <RefreshCw className={cn('w-3 h-3', topicsLoading && 'animate-spin')} />
-              </button>
-              <button
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-                title="Create topic"
-                onClick={() => { setShowCreateTopic((v) => !v); setCreateError(''); }}
-              >
-                <Plus className="w-3 h-3" /> New
-              </button>
-            </div>
+            <button
+              className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+              title={activeList === 'topics' ? 'Refresh topics' : 'Refresh groups'}
+              onClick={() => activeList === 'topics'
+                ? setTopicsRefreshTick((k) => k + 1)
+                : setGroupsRefreshTick((k) => k + 1)}
+              disabled={activeList === 'topics' ? topicsLoading : groupsLoading}
+            >
+              <RefreshCw className={cn(
+                'w-3.5 h-3.5',
+                (activeList === 'topics' ? topicsLoading : groupsLoading) && 'animate-spin',
+              )} />
+            </button>
           )}
         </div>
+      </div>
 
-        {/* Inline create form */}
-        {showCreateTopic && (
+      {/* ── List area: shows the active tab's content ── */}
+      <div className="flex flex-col flex-1 min-h-0">
+        {activeList === 'topics' && (
+        <div className="flex flex-col flex-1 min-h-0">
+
+        {/* Filter mode toggle with merged edit button — sets which topic set search runs against */}
+        {isActive && (
+          <div className="px-2 pt-2 pb-1.5 shrink-0">
+            <div className="flex items-center w-full rounded-lg border border-border bg-muted/30 p-1 gap-1 text-xs">
+              {/* Filtered side: tab + inline edit pencil share one card */}
+              <div className={cn(
+                'flex-1 flex items-center rounded-md transition-all',
+                inFilteredMode && 'bg-background shadow-sm',
+              )}>
+                <button
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-1.5 py-1.5 pl-2.5 rounded-md transition-colors',
+                    inFilteredMode ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground/80',
+                  )}
+                  title="Show only topics matching your filter patterns"
+                  onClick={() => setFilterMode(false)}
+                >
+                  <Filter className="w-3.5 h-3.5 shrink-0" />
+                  Filtered
+                  {favouritePatterns.length > 0 && (
+                    <span className={cn(
+                      'inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full text-[10px] leading-none transition-colors',
+                      inFilteredMode ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/20 text-muted-foreground',
+                    )}>
+                      {favouritePatterns.length}
+                    </span>
+                  )}
+                </button>
+                {inFilteredMode && (
+                  <button
+                    className={cn(
+                      'shrink-0 flex items-center justify-center w-7 h-7 mr-0.5 rounded-md transition-colors',
+                      showFavEditor ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                    )}
+                    title={showFavEditor ? 'Close pattern editor' : 'Edit filter patterns'}
+                    onClick={() => setShowFavEditor((v) => !v)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              {/* All side */}
+              <button
+                className={cn(
+                  'flex-1 py-1.5 rounded-md transition-all',
+                  !inFilteredMode
+                    ? 'bg-background shadow-sm text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground/80',
+                )}
+                title="Show every topic in the cluster"
+                onClick={() => setFilterMode(true)}
+              >
+                All
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Setup nudge — sits directly under the toggle when filtered mode has no patterns */}
+        {isActive && needsPatternSetup && !showFavEditor && (
+          <div className="mx-2 mb-1.5 flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1.5 shrink-0">
+            <Filter className="w-3 h-3 text-amber-500 shrink-0" />
+            <span className="text-xs text-amber-600/90 flex-1">Add a filter pattern, or switch to All topics</span>
+            <button
+              className="text-xs font-medium text-amber-600 hover:text-amber-700 shrink-0"
+              onClick={() => setShowFavEditor(true)}
+            >
+              Add
+            </button>
+          </div>
+        )}
+
+        {/* Filter pattern editor — placed directly below the toggle it belongs to */}
+        {isActive && inFilteredMode && showFavEditor && (
+          <div className="mx-2 mb-1.5 p-2 border border-border rounded-lg bg-muted/10 shrink-0 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">Topic filters <span className="text-muted-foreground font-normal">(regex, OR)</span></span>
+              <button className="text-muted-foreground hover:text-foreground text-xs" onClick={() => setShowFavEditor(false)}>✕</button>
+            </div>
+            {favouritePatterns.length === 0 && (
+              <p className="text-xs text-muted-foreground">Add patterns — only matching topics will be shown by default.</p>
+            )}
+            {favouritePatterns.map((p) => {
+              const matchCount = topics.filter((t) => { try { return new RegExp(p).test(t.name); } catch { return false; } }).length;
+              return (
+                <div key={p} className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1">
+                  <span className="font-mono text-xs flex-1 truncate text-foreground">{p}</span>
+                  {topics.length > 0 && (
+                    <span className="text-[10px] text-muted-foreground shrink-0" title={`${matchCount} topic${matchCount !== 1 ? 's' : ''} match this pattern`}>
+                      {matchCount}t
+                    </span>
+                  )}
+                  <button
+                    className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                    onClick={() => removeFavPattern(p)}
+                    title="Remove pattern"
+                  >
+                    <XCircle className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+            <div className="flex gap-1">
+              <Input
+                value={newPattern}
+                onChange={(e) => { setNewPattern(e.target.value); setPatternError(''); }}
+                placeholder="e.g. ^prod\. or \.events$"
+                className="h-7 text-xs font-mono flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && addFavPattern()}
+                autoFocus={favouritePatterns.length === 0}
+              />
+              <Button size="sm" className="h-7 text-xs px-2 shrink-0" onClick={addFavPattern}>Add</Button>
+            </div>
+            {patternError && <p className="text-xs text-destructive">{patternError}</p>}
+          </div>
+        )}
+
+        {/* Search + create — topic-only actions, kept under the Topics tab */}
+        {isActive && (
+          <div className="flex items-center gap-1.5 px-2 pb-1 shrink-0">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+              <Input
+                value={topicSearch}
+                onChange={(e) => setTopicSearch(e.target.value)}
+                placeholder="Search topics…"
+                className={cn(
+                  'h-7 text-xs pl-6',
+                  topicSearch ? 'pr-16' : '',
+                  searchIsRegex && !searchRegexValid && 'border-destructive/60 focus-visible:ring-destructive/20',
+                )}
+                onKeyDown={(e) => { if (e.key === 'Escape') setTopicSearch(''); }}
+              />
+              {topicSearch && (
+                <span
+                  className={cn(
+                    'absolute right-1.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md text-[10px] font-medium leading-none cursor-pointer select-none transition-colors',
+                    searchIsRegex
+                      ? searchRegexValid
+                        ? 'bg-violet-500/15 text-violet-400 hover:bg-violet-500/25'
+                        : 'bg-destructive/15 text-destructive hover:bg-destructive/25'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/60',
+                  )}
+                  title="Click to clear"
+                  onClick={() => setTopicSearch('')}
+                >
+                  {searchIsRegex ? (searchRegexValid ? '.*' : '!regex') : 'ab|'}
+                </span>
+              )}
+            </div>
+            <button
+              className={cn(
+                'shrink-0 flex items-center gap-1 h-7 px-2 rounded-md border text-xs transition-colors',
+                showCreateTopic
+                  ? 'border-primary/40 bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted/60',
+              )}
+              title="Create topic"
+              onClick={() => { setShowCreateTopic((v) => !v); setCreateError(''); }}
+            >
+              <Plus className="w-3.5 h-3.5" /> New
+            </button>
+          </div>
+        )}
+
+        {/* Inline create form — opens right under the New button */}
+        {isActive && showCreateTopic && (
           <div className="mx-2 mb-1.5 p-2 border border-border rounded-lg bg-muted/10 shrink-0 space-y-2">
             <div>
               <Label className="text-xs text-muted-foreground">Topic name</Label>
@@ -405,21 +649,6 @@ export function LeftPanel({
           </div>
         )}
 
-        {/* Search */}
-        {isActive && (
-          <div className="px-2 pb-1 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-              <Input
-                value={topicSearch}
-                onChange={(e) => setTopicSearch(e.target.value)}
-                placeholder="Search topics…"
-                className="h-7 text-xs pl-6"
-              />
-            </div>
-          </div>
-        )}
-
         {/* Delete error banner */}
         {deleteError && (
           <div className="mx-2 mb-1.5 flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 shrink-0">
@@ -441,7 +670,7 @@ export function LeftPanel({
             <div
               key={t.name}
               className={cn(
-                'group flex items-center gap-1.5 px-2 py-1 hover:bg-muted/50 transition-colors cursor-pointer',
+                'group flex items-center gap-2 px-2 py-1.5 hover:bg-muted/50 transition-colors cursor-pointer',
                 selectedTopic === t.name && 'bg-muted',
               )}
               onClick={() => onSelectTopic(t.name)}
@@ -451,10 +680,10 @@ export function LeftPanel({
                 selectedTopic === t.name ? 'bg-primary' : 'bg-muted-foreground/30',
               )} />
               <span className={cn(
-                'truncate font-mono text-xs flex-1',
+                'truncate font-mono text-xs flex-1 text-foreground',
                 selectedTopic === t.name && 'font-medium',
               )}>{t.name}</span>
-              <span className="text-xs text-muted-foreground shrink-0 group-hover:hidden">{t.partitionCount}p</span>
+              <span className="text-[11px] text-muted-foreground/70 shrink-0 group-hover:hidden">{t.partitionCount}p</span>
               <button
                 className="hidden group-hover:flex shrink-0 text-muted-foreground hover:text-destructive transition-colors p-0.5"
                 title={`Delete topic "${t.name}"`}
@@ -469,56 +698,49 @@ export function LeftPanel({
           ))}
           {!topicsLoading && isActive && filteredTopics.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              {topicSearch ? 'No matching topics' : 'No topics'}
+              {topicSearch && !searchRegexValid
+                ? <span className="text-destructive">Invalid regex pattern</span>
+                : needsPatternSetup
+                  ? <span><button className="underline hover:text-foreground" onClick={() => setShowFavEditor(true)}>Add a filter pattern</button> or <button className="underline hover:text-foreground" onClick={() => setFilterMode(true)}>show all topics</button></span>
+                  : topicSearch
+                    ? 'No topics match this search'
+                    : inFilteredMode
+                      ? <span>No topics match your filters — <button className="underline hover:text-foreground" onClick={() => setFilterMode(true)}>show all</button></span>
+                      : 'No topics'}
             </div>
           )}
         </div>
-      </div>
-
-      {/* ── Groups section ── */}
-      <div className={cn('flex flex-col shrink-0', groupsOpen && 'max-h-[220px]')}>
-        <div
-          className="flex items-center justify-between px-2 py-1.5 shrink-0 cursor-pointer hover:bg-muted/30 transition-colors"
-          onClick={() => setGroupsOpen((v) => !v)}
-        >
-          <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-            {groupsOpen
-              ? <ChevronDown className="w-3 h-3" />
-              : <ChevronRight className="w-3 h-3" />}
-            Groups{groups.length > 0 ? ` (${groups.length})` : ''}
-          </span>
-          {isActive && (
-            <button
-              className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-              title="Refresh groups"
-              onClick={(e) => { e.stopPropagation(); setGroupsRefreshTick((k) => k + 1); }}
-              disabled={groupsLoading}
-            >
-              <RefreshCw className={cn('w-3 h-3', groupsLoading && 'animate-spin')} />
-            </button>
-          )}
         </div>
+        )}
 
-        {groupsOpen && (
+        {/* Groups tab content */}
+        {activeList === 'groups' && (
           <div className="overflow-y-auto flex-1 min-h-0">
             {groups.map((g) => (
               <button
                 key={g.groupId}
                 className={cn(
-                  'w-full flex items-center gap-1.5 px-2 py-1 text-left hover:bg-muted/50 transition-colors',
+                  'w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-muted/50 transition-colors',
                   selectedGroup === g.groupId && 'bg-muted font-medium',
                 )}
                 onClick={() => onSelectGroup(g.groupId)}
+                title={g.state}
               >
                 <span className={cn(
                   'w-1.5 h-1.5 rounded-full shrink-0',
                   GROUP_STATE_BG[g.state] ?? 'bg-muted-foreground/30',
                 )} />
-                <span className="truncate text-xs">{g.groupId}</span>
+                <span className="truncate text-xs font-mono flex-1">{g.groupId}</span>
+                <span className="text-[10px] text-muted-foreground shrink-0">{g.state}</span>
               </button>
             ))}
+            {groupsLoading && (
+              <div className="px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin" /> Loading groups…
+              </div>
+            )}
             {!groupsLoading && isActive && groups.length === 0 && (
-              <div className="px-3 py-2 text-xs text-muted-foreground">No groups</div>
+              <div className="px-3 py-2 text-xs text-muted-foreground">No consumer groups</div>
             )}
           </div>
         )}
