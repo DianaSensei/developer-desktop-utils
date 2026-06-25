@@ -409,7 +409,7 @@ export function LeftPanel({
             )}
           </button>
         </div>
-        <div className="flex items-center gap-1 pb-1.5">
+        <div className="flex items-center gap-1 pb-2">
           {isActive && (
             <button
               className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
@@ -420,7 +420,7 @@ export function LeftPanel({
               disabled={activeList === 'topics' ? topicsLoading : groupsLoading}
             >
               <RefreshCw className={cn(
-                'w-3 h-3',
+                'w-3.5 h-3.5',
                 (activeList === 'topics' ? topicsLoading : groupsLoading) && 'animate-spin',
               )} />
             </button>
