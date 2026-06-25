@@ -74,6 +74,8 @@ devtool/
 
 ## Design Principles (mandatory — read before writing any UI or feature code)
 
+> Full design system reference — tokens, utilities, components, accessibility — is in [../design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md). The source of truth for actual values is [`src/design-system/`](../../src/design-system/) (`tokens.css`, `tailwind-preset.cjs`, `index.ts`).
+
 ### UI Components — always use the shared library, never OS-native
 
 - **Always** use components from `src/components/ui/` (shadcn/ui) for every interactive element: buttons, inputs, selects, dialogs, toggles, checkboxes, dropdowns.
@@ -630,7 +632,7 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 
 ---
 
-## Human Docs
+## Docs
 
 | File | Contents |
 |------|----------|
@@ -638,6 +640,7 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 | [SETUP.md](../human/SETUP.md) | Prerequisites, running, building, troubleshooting |
 | [TOOLS.md](../human/TOOLS.md) | Per-tool transparency: system access, permissions, storage, risk |
 | [kafka-explorer.md](../human/kafka-explorer.md) | Kafka Explorer — full operation-level Kafka API reference |
+| [design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md) | Design system — tokens, utilities, components, accessibility |
 
 ---
 

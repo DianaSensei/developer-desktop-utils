@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { Loader2, AlertCircle, Search, X, ArrowUp, ArrowDown, ArrowUpDown, Regex, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -499,6 +499,16 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
       setLoading(false);
     }
   };
+
+  // Auto-load the latest page when the tab opens or the partition changes —
+  // no manual Fetch click needed for the default tail view. Only fires in
+  // 'tail' mode; the from/range/time modes need user-entered values, so they
+  // still wait for an explicit Fetch. `mode` is intentionally not a dependency
+  // so switching modes doesn't auto-fetch.
+  useEffect(() => {
+    if (mode === 'tail') doFetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brokerId, topic, partition]);
 
   const loadMore = async () => {
     if (loadingMore || messages.length === 0) return;

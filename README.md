@@ -85,7 +85,7 @@ DevTool is **local-first by design**:
 - **Your data stays on your machine.** Inputs, time entries, meeting notes, saved broker configs, and API collections are stored in the app's local storage / data directory and never leave your device.
 - **The only outbound traffic is user-initiated**, limited to these tools:
   - **API Client** — requests go only to the URLs you send them to.
-  - **Kafka Explorer** — connects only to the brokers you configure.
+  - **Kafka Explorer** — connects only to the brokers you configure (plaintext; no TLS/SASL).
   - **Network Tools** — runs the DNS-over-HTTPS / IP-geolocation lookups you trigger.
   - **App updater** — an optional check against GitHub Releases (toggle in **Settings → Updates**).
 - **Every other tool runs 100% offline** — text, encoding, hashing, crypto, JSON/JWT/regex/diff, checksums, generators, QR, color, time tracking, etc. make no network requests at all.
@@ -141,6 +141,7 @@ To build distributable installers: `npm run tauri:build` → output in `src-taur
 - **[docs/human/CONTRIBUTING.md](docs/human/CONTRIBUTING.md)** — how to add a tool, step by step
 - **[docs/human/TOOLS.md](docs/human/TOOLS.md)** — per-tool system access, permissions & storage
 - **[docs/human/kafka-explorer.md](docs/human/kafka-explorer.md)** — Kafka Explorer operation reference
+- **[docs/design/DESIGN-SYSTEM.md](docs/design/DESIGN-SYSTEM.md)** — design system: tokens, utilities & components
 - **[docs/ai/CLAUDE.md](docs/ai/CLAUDE.md)** — guide for AI coding agents
 
 ---

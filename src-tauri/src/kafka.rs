@@ -122,15 +122,16 @@ pub struct KafkaMessage {
 
 // ── Config persistence ────────────────────────────────────────────────────────
 
-fn configs_path(app: &AppHandle) -> std::path::PathBuf {
+fn configs_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     app.path()
         .app_data_dir()
-        .expect("no app data dir")
-        .join("kafka-brokers.json")
+        .map(|dir| dir.join("kafka-brokers.json"))
+        .map_err(|e| format!("Could not resolve app data directory: {e}"))
 }
 
 fn load_configs(app: &AppHandle) -> Vec<BrokerConfig> {
-    let path = configs_path(app);
+    // Treat a missing/unresolvable path as "no configs yet" rather than panicking.
+    let Ok(path) = configs_path(app) else { return Vec::new(); };
     std::fs::read_to_string(&path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -138,7 +139,7 @@ fn load_configs(app: &AppHandle) -> Vec<BrokerConfig> {
 }
 
 fn save_configs(app: &AppHandle, configs: &[BrokerConfig]) -> Result<(), String> {
-    let path = configs_path(app);
+    let path = configs_path(app)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -202,8 +203,12 @@ async fn open_kafka_stream(config: &BrokerConfig) -> Result<TcpStream, String> {
             Ok(mut probe) => {
                 match wire_metadata(&mut probe, &[]).await {
                     Ok(_) => {
-                        // Confirmed Kafka; return a fresh stream for the actual command
-                        return connect_broker(addr).await;
+                        // Confirmed Kafka. Reuse this very connection for the command:
+                        // send_request read the probe's full framed response, so the
+                        // stream is at a clean message boundary. Reusing it (instead of
+                        // opening a second connection) halves the TCP connections every
+                        // read operation makes against the broker.
+                        return Ok(probe);
                     }
                     Err(e) => {
                         errors.push(format!("{addr}: {e} (not a Kafka broker?)"));
@@ -235,11 +240,20 @@ async fn send_request(
     msg.extend_from_slice(client_id);
     msg.extend_from_slice(body);
 
-    let size = msg.len() as i32;
-    stream.write_all(&size.to_be_bytes()).await.map_err(|e| e.to_string())?;
-    stream.write_all(&msg).await.map_err(|e| e.to_string())?;
-
+    const WRITE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
     const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+    // Wrap writes in a timeout too — a half-open / wedged socket would otherwise
+    // let write_all block indefinitely and hang the command.
+    let size = msg.len() as i32;
+    tokio::time::timeout(WRITE_TIMEOUT, stream.write_all(&size.to_be_bytes()))
+        .await
+        .map_err(|_| "Kafka write timed out (30 s)".to_string())?
+        .map_err(|e| e.to_string())?;
+    tokio::time::timeout(WRITE_TIMEOUT, stream.write_all(&msg))
+        .await
+        .map_err(|_| "Kafka write timed out (30 s)".to_string())?
+        .map_err(|e| e.to_string())?;
 
     let mut size_buf = [0u8; 4];
     tokio::time::timeout(READ_TIMEOUT, stream.read_exact(&mut size_buf))
@@ -327,7 +341,23 @@ impl<'a> Dec<'a> {
         if count < 0 {
             return Ok(vec![]);
         }
-        (0..count).map(|_| f(self)).collect()
+        // Reject impossible counts before iterating. Every array element occupies
+        // at least one byte on the wire, so a count larger than the bytes left in
+        // the buffer is malformed — bail instead of spinning the loop (and
+        // pre-sizing a huge Vec) on a bogus/hostile length.
+        let count = count as usize;
+        if count > self.data.len() - self.pos {
+            return Err(format!(
+                "Decode array count ({}) exceeds remaining buffer ({} bytes)",
+                count,
+                self.data.len() - self.pos
+            ));
+        }
+        let mut out = Vec::with_capacity(count);
+        for _ in 0..count {
+            out.push(f(self)?);
+        }
+        Ok(out)
     }
 
     fn nullable_str(&mut self) -> Result<Option<String>, String> {
@@ -530,25 +560,34 @@ async fn wire_describe_groups(
     })
 }
 
-// OffsetFetchRequest v1 (API 9) — committed offsets for a group per topic/partition
+// OffsetFetchRequest v2 (API 9) — committed offsets for a group.
+//
+// `topics = Some(&[...])` fetches the listed topic/partitions; `topics = None`
+// uses v2's null-topics form to return *all* committed offsets for the group in
+// a single request — no need to enumerate cluster topics first. v2 adds a
+// trailing top-level error_code (consumed and ignored below).
 async fn wire_offset_fetch(
     stream: &mut TcpStream,
     group_id: &str,
-    // topic -> partition ids
-    topics: &[(&str, Vec<i32>)],
+    topics: Option<&[(&str, Vec<i32>)]>,
 ) -> Result<Vec<(String, i32, i64)>, String> {
     // returns (topic, partition, committed_offset)
     let mut body = Vec::new();
     enc_str(&mut body, group_id);
-    enc_i32(&mut body, topics.len() as i32);
-    for (topic, parts) in topics {
-        enc_str(&mut body, topic);
-        enc_i32(&mut body, parts.len() as i32);
-        for &p in parts {
-            enc_i32(&mut body, p);
+    match topics {
+        None => enc_i32(&mut body, -1), // null array = all topics for the group
+        Some(topics) => {
+            enc_i32(&mut body, topics.len() as i32);
+            for (topic, parts) in topics {
+                enc_str(&mut body, topic);
+                enc_i32(&mut body, parts.len() as i32);
+                for &p in parts {
+                    enc_i32(&mut body, p);
+                }
+            }
         }
     }
-    let resp = send_request(stream, 9, 1, 5, &body).await?;
+    let resp = send_request(stream, 9, 2, 5, &body).await?;
     let mut d = Dec::new(&resp);
     let mut result = Vec::new();
     d.array(|d| {
@@ -564,6 +603,7 @@ async fn wire_offset_fetch(
             Ok(())
         })
     })?;
+    let _top_level_err = d.i16(); // v2 trailing error_code; ignore (may be absent on error)
     Ok(result)
 }
 
@@ -721,10 +761,14 @@ pub async fn kafka_topic_consumer_groups(
             .collect();
 
     let groups = wire_list_groups(&mut stream).await?;
+    // Safety cap: this issues one OffsetFetch per group (O(#groups) round-trips).
+    // On clusters with thousands of groups, bound the scan so opening this tab
+    // can't hammer the broker.
+    const MAX_GROUPS_SCANNED: usize = 500;
     let topics_arg = [(topic.as_str(), partition_ids)];
     let mut result: Vec<GroupLag> = Vec::new();
-    for g in &groups {
-        match wire_offset_fetch(&mut stream, &g.group_id, &topics_arg).await {
+    for g in groups.iter().take(MAX_GROUPS_SCANNED) {
+        match wire_offset_fetch(&mut stream, &g.group_id, Some(&topics_arg)).await {
             Ok(offsets) => {
                 for (_t, partition, committed_offset) in offsets {
                     let latest_off = latest.get(&partition).copied().unwrap_or(-1);
@@ -765,6 +809,17 @@ pub async fn kafka_create_topic(
     num_partitions: i32,
     replication_factor: i16,
 ) -> Result<(), String> {
+    // Validate client-side so an obviously-invalid request (0/negative, or an
+    // absurd partition count) never reaches the broker.
+    if name.trim().is_empty() {
+        return Err("Topic name is required".into());
+    }
+    if !(1..=10_000).contains(&num_partitions) {
+        return Err(format!("Partitions must be between 1 and 10000 (got {num_partitions})"));
+    }
+    if replication_factor < 1 {
+        return Err(format!("Replication factor must be at least 1 (got {replication_factor})"));
+    }
     let config = find_config(&app, &config_id)?;
     let client = make_client(&config).await?;
     let controller = client.controller_client().map_err(|e| e.to_string())?;
@@ -846,19 +901,10 @@ pub async fn kafka_group_details(
         .collect();
     let members: Vec<GroupMember> = members_raw.into_iter().map(|mw| mw.member).collect();
 
-    // Get all topics so we can fetch offsets for all partitions
-    let all_topics = wire_metadata(&mut stream, &[]).await?;
-
-    // OffsetFetch: ask for all topic/partitions
-    let topics_args: Vec<(&str, Vec<i32>)> = all_topics
-        .iter()
-        .map(|t| {
-            let parts: Vec<i32> = (0..t.partition_count).collect();
-            (t.name.as_str(), parts)
-        })
-        .collect();
-
-    let committed = wire_offset_fetch(&mut stream, &group_id, &topics_args).await
+    // OffsetFetch v2 with null topics returns every committed offset for the
+    // group in one request — no need to fetch all-cluster metadata and ask for
+    // every topic/partition first.
+    let committed = wire_offset_fetch(&mut stream, &group_id, None).await
         .unwrap_or_default();
 
     // Compute lag. Batch ListOffsets per topic (one request for all of a
@@ -963,6 +1009,15 @@ pub async fn kafka_produce_batch(
     if records.is_empty() {
         return Err("No records to produce".into());
     }
+    // Bound a single batch so a runaway paste can't try to ship an unreasonable
+    // request to the broker in one go.
+    const MAX_BATCH_RECORDS: usize = 10_000;
+    if records.len() > MAX_BATCH_RECORDS {
+        return Err(format!(
+            "Batch too large: {} records (max {MAX_BATCH_RECORDS} per send)",
+            records.len()
+        ));
+    }
     let config = find_config(&app, &config_id)?;
     let client = make_client(&config).await?;
     let part = partition.unwrap_or(0);
@@ -998,6 +1053,12 @@ pub async fn kafka_fetch_messages(
     // (resolved via ListOffsets). Takes precedence over `offset`.
     start_timestamp: Option<i64>,
 ) -> Result<Vec<KafkaMessage>, String> {
+    // Server-side backstop on the requested count. The UI clamps to
+    // config.kafka.maxFetchMessages, but an out-of-range value must never reach
+    // `.take(limit)` / `(high - limit)` and drive a huge allocation.
+    const MAX_FETCH_MESSAGES: i32 = 100_000;
+    let limit = limit.clamp(1, MAX_FETCH_MESSAGES);
+
     let config = find_config(&app, &config_id)?;
 
     // Time-based start: resolve the offset at/after the given timestamp first.

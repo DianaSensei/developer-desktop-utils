@@ -6,11 +6,15 @@ This document describes every interaction Kafka Explorer makes with your Kafka c
 
 ## Connection model
 
-**There is no persistent connection.** Every operation opens a new TCP connection to your broker and closes it when the operation finishes. Most read-path operations actually open *two* TCP connections per action: one short-lived probe connection (a MetadataRequest is sent to verify the host is a Kafka broker, not a ZooKeeper or other port), then a second fresh connection for the real command.
+**There is no persistent connection.** Every operation opens one TCP connection to your broker and closes it when the operation finishes. The first request on that connection is a short MetadataRequest **probe** (to verify the host is a Kafka broker — not ZooKeeper or another port); the **same connection is then reused** for the actual command. Each read-path action therefore makes a single TCP connection.
 
-The `fetch_messages` and `produce` operations use [rskafka](https://github.com/influxdata/rskafka) as the client library, which manages its own connection lifecycle per call.
+The `fetch_messages`, `produce`, and create/delete topic operations use [rskafka](https://github.com/influxdata/rskafka) as the client library, which manages its own connection lifecycle per call.
 
 The client identifies itself to brokers with the client ID **`devtool`**. You will see this in broker logs and JMX metrics.
+
+**No background polling.** Data loads automatically when you open a view — topic messages, the Consumers tab, group details — and refreshes only when you navigate or click Refresh. Nothing polls or holds a subscription open between actions.
+
+> ⚠ **Transport is plaintext.** Connections are unencrypted; **TLS/SSL and SASL authentication are not implemented** (the connection form does not collect credentials). Do not point Kafka Explorer at a broker that requires encryption or authentication.
 
 ---
 
@@ -24,10 +28,9 @@ Each entry below lists: **when it fires**, **what Kafka API calls are made**, an
 
 | Call | Kafka API | Direction |
 |---|---|---|
-| Probe (confirm this is a Kafka port) | MetadataRequest v0 (API 3) | Read |
-| Test connection | MetadataRequest v0 (API 3) | Read |
+| Probe / test connection | MetadataRequest v0 (API 3) | Read |
 
-- 2 TCP connections, 2 MetadataRequests.
+- 1 TCP connection. The probe MetadataRequest doubles as the connectivity check.
 - Reads broker list and topic names (payload is small).
 - **No data is written. No consumer group is created.**
 
@@ -39,10 +42,9 @@ Each entry below lists: **when it fires**, **what Kafka API calls are made**, an
 
 | Call | Kafka API | Direction |
 |---|---|---|
-| Probe | MetadataRequest v0 | Read |
 | Fetch all topics | MetadataRequest v0 (empty topic filter = all) | Read |
 
-- 2 TCP connections, 2 MetadataRequests.
+- 1 TCP connection.
 - Returns all topic names, partition counts, and replication factors.
 - **Scales with total number of topics on the cluster.** A cluster with thousands of topics returns a proportionally larger metadata payload.
 
@@ -54,29 +56,27 @@ Each entry below lists: **when it fires**, **what Kafka API calls are made**, an
 
 | Call | Kafka API | Direction |
 |---|---|---|
-| Probe | MetadataRequest v0 | Read |
 | Topic partition metadata | MetadataRequest v0 (single topic) | Read |
 | Earliest offsets (all partitions) | ListOffsetsRequest v0 (API 2), timestamp=−2 | Read |
 | Latest offsets (all partitions) | ListOffsetsRequest v0 (API 2), timestamp=−1 | Read |
 
-- 2 TCP connections, 4 Kafka API calls.
-- The two ListOffsets calls each cover all partitions in one request.
+- 1 TCP connection. The two ListOffsets calls each cover all partitions in one request.
 - **No data is written. No consumer group is created.**
 
 ---
 
 ### ⬡ Messages tab — Fetch
 
-**When:** user clicks **Fetch** in the Messages tab.
+**When:** the latest page **loads automatically** when you open a topic (tail mode). The *From offset*, *Range*, and *Since time* modes load when you click **Fetch**.
 
 | Call | Kafka API / action | Direction |
 |---|---|---|
 | Build rskafka client | New TCP connection to broker | — |
-| (Latest mode only) Resolve tail offset | OffsetFetch (get high-watermark) | Read |
+| (Tail mode only) Resolve tail offset | get high-watermark | Read |
 | Fetch records | FetchRequest — up to **10 MB** per call | Read |
 
 - 1 rskafka client connection, 1–2 Kafka API calls.
-- **Up to 10 MB of message data is pulled per fetch.** On high-throughput topics with large messages this can be a meaningful read.
+- **Up to 10 MB of message data is pulled per fetch.** On high-throughput topics with large messages this can be a meaningful read. The requested message count is clamped (UI: *Max fetch messages* setting; server-side hard cap: 100,000) so a bad value can't trigger a runaway read.
 - **No consumer group offset is committed.** Kafka Explorer does not create a consumer group, does not register a group ID, and does not advance any consumer position. Your existing consumer groups are not affected.
 - **Messages are read-only** — no data is modified or deleted.
 
@@ -92,14 +92,13 @@ Same as a Fetch operation above: one new rskafka client connection, one FetchReq
 
 ### ⬡ Config tab
 
-**When:** user opens the **Config** tab on a topic.
+**When:** user opens the **Config** tab on a topic (loads automatically).
 
 | Call | Kafka API | Direction |
 |---|---|---|
-| Probe | MetadataRequest v0 | Read |
 | All config entries | DescribeConfigs v0 (API 32) | Read |
 
-- 2 TCP connections, 2 Kafka API calls.
+- 1 TCP connection.
 - Reads all dynamic and static configuration keys for the topic (retention, compaction, etc.).
 - **Read-only.**
 
@@ -111,47 +110,62 @@ Same as a Fetch operation above: one new rskafka client connection, one FetchReq
 
 | Call | Kafka API | Direction |
 |---|---|---|
-| Probe | MetadataRequest v0 | Read |
 | All groups | ListGroups v0 (API 16) | Read |
 | Group states | DescribeGroups v0 (API 15, all groups in one request) | Read |
 
-- 2 TCP connections, 3 Kafka API calls.
+- 1 TCP connection, 2 Kafka API calls.
 - **Read-only.**
+
+---
+
+### ⬡ Topic → Consumers tab (group scan)
+
+**When:** loads automatically when you open the **Consumers** tab on a topic; or user clicks Refresh.
+
+| Call | Kafka API | Direction |
+|---|---|---|
+| Latest offsets for the topic | ListOffsetsRequest v0 (all partitions) | Read |
+| All groups | ListGroups v0 | Read |
+| Committed offsets for this topic | **OffsetFetch v2 (API 9), one call per group** | Read |
+
+> ⚠ **Scan cost scales with the number of groups.** This issues one OffsetFetch per consumer group to find which ones have committed offsets on the topic. To protect large clusters, the scan is **capped at the first 500 groups**.
+
+- 1 TCP connection, 2 + G calls (G = groups scanned, ≤ 500).
+- **Read-only.** No consumer group is modified.
 
 ---
 
 ### ⬡ Consumer group details
 
-**When:** user clicks a consumer group in the left panel.
+**When:** user clicks a consumer group (loads automatically).
 
 | Call | Kafka API | Direction |
 |---|---|---|
-| Probe | MetadataRequest v0 | Read |
-| Group state + member count | DescribeGroups v0 | Read |
-| All topic metadata (for partition enumeration) | MetadataRequest v0 (all topics) | Read |
-| Committed offsets (all topics + partitions at once) | OffsetFetch v1 (API 9) | Read |
-| Latest offset for each committed partition | **ListOffsetsRequest v0, one call per partition** | Read |
+| Group state + members + partition assignment | DescribeGroups v0 | Read |
+| Committed offsets (whole group, one request) | **OffsetFetch v2 (API 9), null topics** | Read |
+| Latest offset per committed topic | ListOffsetsRequest v0, **one call per topic** (batched over partitions) | Read |
 
-> ⚠ **Potential performance impact.** The lag calculation requires fetching the latest offset for each individual partition that has a committed offset. A consumer group with committed offsets on 50 partitions across several topics will issue **50 individual ListOffsets requests** in sequence. On large clusters or groups with wide topic coverage this can be slow and generates noticeable broker-side load.
-
-- 2 TCP connections, 3 + N Kafka API calls (N = number of partitions with a committed offset).
+- 1 TCP connection, 2 + T Kafka API calls (T = number of distinct topics with a committed offset).
+- A single OffsetFetch returns all of the group's committed offsets — no all-cluster metadata fetch and no per-partition request. ListOffsets is then batched once per topic.
+- The member assignment is decoded to show **which consumer owns each partition**.
 - **Read-only.** No consumer group offset is modified.
 
 ---
 
-### ✏ Produce tab — Send Message
+### ✏ Produce tab — Send Message / Send Batch
 
-**When:** user clicks **Send Message** in the Produce tab.
+**When:** user clicks **Send Message** or **Send Batch** in the Produce tab. Never automatic.
 
 | Call | Kafka API / action | Direction |
 |---|---|---|
 | Build rskafka client | New TCP connection | — |
-| Write message | ProduceRequest (no compression) | **Write** |
+| Write message(s) | ProduceRequest (no compression) | **Write** |
 
-> ⚠ **This permanently writes a message to the topic.** The message is retained according to the topic's retention policy (time or size). It cannot be undone. Send only intentional test or operational messages.
+> ⚠ **This permanently writes to the topic.** Messages are retained according to the topic's retention policy (time or size). It cannot be undone. Send only intentional test or operational messages.
 
 - 1 TCP connection, 1 ProduceRequest.
-- The message is appended at the next available offset in the selected partition (or any partition if Auto mode is used).
+- The message is appended at the next available offset in the selected partition (or partition 0 if Auto mode is used).
+- A batch is capped at **10,000 records** per send.
 
 ---
 
@@ -166,11 +180,13 @@ Same as a Fetch operation above: one new rskafka client connection, one FetchReq
 
 > ⚠ **Permanently creates a topic on the cluster.** Partition count and replication factor cannot easily be reduced after creation.
 
+- Inputs are validated client-side first: partitions must be 1–10,000 and replication factor ≥ 1, so an obviously invalid request never reaches the broker.
+
 ---
 
 ### 🗑 Delete Topic
 
-**When:** user confirms a topic deletion.
+**When:** user confirms a topic deletion. The UI requires typing the exact topic name **and** solving a small arithmetic check before the delete button enables.
 
 | Call | Kafka API / action | Direction |
 |---|---|---|
@@ -185,15 +201,15 @@ Same as a Fetch operation above: one new rskafka client connection, one FetchReq
 
 - No consumer group is ever created or modified by read operations.
 - No offsets are committed except by the Produce flow (which is a write).
-- No background polling or subscriptions are kept open between user actions.
+- No background polling or subscriptions are kept open between user actions — reads fire on navigation or an explicit Refresh, nothing on a timer.
 - No message data is cached outside of the app's memory (closes with the window).
 
 ## Notes on production use
 
 | Risk level | Operations |
 |---|---|
-| Safe to run on production | Broker selection, topic list, topic details, Config tab, Consumer groups list |
-| Low risk (read ≤10 MB per click) | Fetch messages, Load more |
-| Medium risk on large groups | Consumer group details |
+| Safe to run on production | Broker selection, topic list, topic details, Config tab, Consumer groups list, Consumer group details |
+| Low risk (read ≤10 MB per call) | Fetch messages, Load more |
+| Medium risk on huge clusters | Topic → Consumers tab scan (capped at 500 groups) |
 | **Write — irreversible** | Produce message |
 | **Destructive — irreversible** | Delete topic |

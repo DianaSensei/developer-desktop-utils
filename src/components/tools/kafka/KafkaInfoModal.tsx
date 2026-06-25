@@ -76,12 +76,20 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
         <div className="flex-1 overflow-y-auto min-h-0 px-5 py-3">
 
           {/* Connection model */}
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
             <span className="font-semibold text-foreground">No persistent connection.</span>{' '}
-            Each action opens a new TCP connection to your broker and closes it when done.
-            Most read operations open <span className="font-medium text-foreground">two</span> connections:
-            a short probe (MetadataRequest to confirm this is a Kafka port), then a second for the actual command.
-            The app identifies itself to brokers as client ID <span className="font-mono">devtool</span>.
+            Each action opens one TCP connection to your broker and closes it when done.
+            The connection starts with a short probe (MetadataRequest, to confirm this is a Kafka port)
+            and is then reused for the command. The app identifies itself to brokers as
+            client ID <span className="font-mono">devtool</span>. There is no background polling —
+            data loads when you open a view and refreshes only when you navigate or click Refresh.
+          </p>
+
+          {/* Security note */}
+          <p className="text-[11px] leading-relaxed mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
+            <span className="font-semibold">Plaintext only.</span>{' '}
+            Connections are unencrypted — TLS/SSL and SASL authentication are not implemented.
+            Don't point this at a broker that requires encryption or credentials.
           </p>
 
           {/* Operations table */}
@@ -93,13 +101,13 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
               <Row
                 action="Select broker / Test connection"
                 when="on broker select or Refresh"
-                calls="2× MetadataRequest v0 (API 3)"
+                calls="MetadataRequest v0 (API 3)"
                 badge={{ label: 'Read', variant: 'read' }}
               />
               <Row
                 action="Topic list"
                 when="on broker select or Refresh"
-                calls="2× MetadataRequest v0 (all topics)"
+                calls="MetadataRequest v0 (all topics)"
                 badge={{ label: 'Read', variant: 'read' }}
               />
               <Row
@@ -116,10 +124,10 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
               />
               <Row
                 action="Fetch messages / Load more"
-                when="on Fetch button or Load more click"
-                calls="FetchRequest via rskafka — up to 10 MB per click"
+                when="auto on open (latest), then Fetch or Load more"
+                calls="FetchRequest via rskafka — up to 10 MB per call"
                 badge={{ label: 'Read', variant: 'read' }}
-                note="No consumer group is created. No offset is committed. Existing consumers are not affected."
+                note="The latest page loads automatically when you open a topic. No consumer group is created, no offset is committed, and existing consumers are not affected."
               />
               <Row
                 action="Consumer groups list"
@@ -128,11 +136,18 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
                 badge={{ label: 'Read', variant: 'read' }}
               />
               <Row
+                action="Topic → Consumers tab"
+                when="auto on tab open, or Refresh"
+                calls="ListGroups + 1× OffsetFetch v2 per group (capped at 500 groups)"
+                badge={{ label: 'Read', variant: 'read' }}
+                note="Scans groups for committed offsets on this topic. Bounded to the first 500 groups so large clusters aren't hammered."
+              />
+              <Row
                 action="Consumer group details"
                 when="on group click"
-                calls="DescribeGroups + MetadataRequest (all topics) + OffsetFetch + 1× ListOffsets per committed partition"
-                badge={{ label: 'Read', variant: 'warn' }}
-                note="⚠ N+1 requests: one ListOffsets call per committed partition. A group with 50 partitions issues 50+ Kafka API calls. Can be slow and visible in broker metrics on large clusters."
+                calls="DescribeGroups + 1× OffsetFetch v2 (all committed offsets) + 1× ListOffsets per committed topic"
+                badge={{ label: 'Read', variant: 'read' }}
+                note="A single OffsetFetch returns the group's committed offsets; ListOffsets is then batched once per topic (not per partition)."
               />
               <Row
                 action="Produce message"

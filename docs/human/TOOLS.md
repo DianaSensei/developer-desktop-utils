@@ -258,7 +258,7 @@ Generates QR codes from text/URLs and decodes QR codes from image files.
 
 ### Kafka Explorer
 
-Opens TCP connections to Kafka brokers you configure. All network activity is user-initiated — there is no background polling or auto-connect on launch.
+Opens TCP connections to Kafka brokers you configure. Reads load automatically when you open a view (topic messages, consumers, group details) and refresh on navigation or an explicit Refresh — there is **no background polling**, no auto-connect on launch, and writes (produce/create/delete) are always explicit. Connections are **plaintext only**: TLS/SSL and SASL authentication are not implemented, so don't point it at a broker requiring encryption or credentials.
 
 See **[kafka-explorer.md](kafka-explorer.md)** for the full operation-by-operation breakdown including which Kafka API calls are made, their direction, and their impact.
 
