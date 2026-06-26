@@ -1,13 +1,11 @@
 import { DatePicker } from './date-picker';
 import { TimePicker } from './time-picker';
-import { cn } from '@/lib/utils';
+import { cn, pad2 } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Date + time picker. Combines the shared DatePicker with the constrained
 // TimePicker. Value is an epoch-ms timestamp.
 // ---------------------------------------------------------------------------
-
-const pad2 = (n: number) => String(n).padStart(2, '0');
 
 function toISO(ts: number): string {
   const d = new Date(ts);

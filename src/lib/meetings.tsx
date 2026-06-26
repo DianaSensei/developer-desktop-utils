@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { pad2 as pad } from '@/lib/utils';
 
 // Meeting notes are shared app-wide so both the Meeting Notes tool and the Time
 // Tracker (calendar + schedule) read and write the same records. The provider is
@@ -98,8 +99,6 @@ export function useMeetings(): MeetingsContextValue {
 export function meetingDurationMs(m: Pick<Meeting, 'start' | 'end'>): number {
   return Math.max(0, m.end - m.start);
 }
-
-const pad = (n: number) => String(n).padStart(2, '0');
 
 export function toDateISO(ts: number): string {
   const d = new Date(ts);

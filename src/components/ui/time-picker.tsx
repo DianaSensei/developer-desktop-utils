@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Clock, ChevronUp, ChevronDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, pad2 } from '@/lib/utils';
+import { useDismissable } from '@/hooks/useDismissable';
 
 // ---------------------------------------------------------------------------
 // Cross-platform time picker — replaces free-text / native <input type="time">.
@@ -8,8 +9,6 @@ import { cn } from '@/lib/utils';
 // never accepts free text: you set the time by picking from the hour/minute/
 // second lists or nudging with the steppers, so an invalid time can't be entered.
 // ---------------------------------------------------------------------------
-
-const pad2 = (n: number) => String(n).padStart(2, '0');
 
 function parse(value: string): { h: number; m: number; s: number } {
   const [hs, ms, ss] = (value || '').split(':');
@@ -78,7 +77,8 @@ function Column({
 
 export function TimePicker({ value, onChange, disabled, className, minuteStep = 1, showSeconds = false, inline = false }: TimePickerProps) {
   const [open, setOpen] = React.useState(false);
-  const wrapRef = React.useRef<HTMLDivElement>(null);
+  // Inline mode has no popover to dismiss, so only arm it when open && !inline.
+  const wrapRef = useDismissable<HTMLDivElement>(open && !inline, () => setOpen(false));
   const hourRef = React.useRef<HTMLButtonElement>(null);
   const minRef = React.useRef<HTMLButtonElement>(null);
   const secRef = React.useRef<HTMLButtonElement>(null);
@@ -95,21 +95,6 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
       secRef.current?.scrollIntoView({ block: 'center' });
     });
   }, []);
-
-  // Close on outside click / Escape (popover mode only).
-  React.useEffect(() => {
-    if (inline || !open) return;
-    const onDown = (e: PointerEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('pointerdown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open, inline]);
 
   // Scroll the current values into view (when opening, or on mount if inline).
   React.useEffect(() => {

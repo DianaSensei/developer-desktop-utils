@@ -1,6 +1,8 @@
 // Date / time / calendar helpers shared across the time-tracking suite.
 // All timestamps are epoch milliseconds in local time.
 
+import { pad2 } from '@/lib/utils';
+
 export const MS_MIN = 60_000;
 export const MS_HOUR = 3_600_000;
 export const MS_DAY = 86_400_000;
@@ -11,7 +13,7 @@ export const uid = (): string =>
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${(uidCounter.n++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
-export const pad = (n: number) => String(n).padStart(2, '0');
+export const pad = pad2;
 
 // ---------------------------------------------------------------------------
 // Duration formatting

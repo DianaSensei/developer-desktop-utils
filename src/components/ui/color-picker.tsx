@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { useDismissable } from '@/hooks/useDismissable';
 
 // ---------------------------------------------------------------------------
 // Cross-platform color picker — replaces the native <input type="color">.
@@ -109,7 +110,7 @@ export interface ColorPickerProps {
 
 export function ColorPicker({ value, onChange, disabled, className, wrapClassName, title, children }: ColorPickerProps) {
   const [open, setOpen] = React.useState(false);
-  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const wrapRef = useDismissable<HTMLDivElement>(open, () => setOpen(false));
 
   // Local hue keeps the slider stable when saturation/value hit 0 (where hue
   // is otherwise undefined and would snap back to red).
@@ -119,21 +120,6 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
 
   const [hexDraft, setHexDraft] = React.useState(value);
   React.useEffect(() => { setHexDraft(value); }, [value]);
-
-  // Close on outside click / Escape.
-  React.useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('pointerdown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
 
   const emit = (next: HSV) => onChange(rgbToHex(hsvToRgb(next)));
 

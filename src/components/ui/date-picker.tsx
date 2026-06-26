@@ -6,6 +6,7 @@ import {
 } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useDismissable } from '@/hooks/useDismissable';
 
 // ---------------------------------------------------------------------------
 // Cross-platform date picker — replaces the native <input type="date">.
@@ -31,7 +32,7 @@ export interface DatePickerProps {
 
 export function DatePicker({ value, onChange, disabled, className, placeholder = 'Pick a date', inline = false, monthYearNav = false }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
-  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const wrapRef = useDismissable<HTMLDivElement>(open, () => setOpen(false));
 
   const selected = React.useMemo(() => {
     if (!value) return null;
@@ -41,21 +42,6 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
 
   const [viewMonth, setViewMonth] = React.useState(() => startOfMonth(selected ?? new Date()));
   React.useEffect(() => { if (selected) setViewMonth(startOfMonth(selected)); }, [selected]);
-
-  // Close on outside click / Escape.
-  React.useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('pointerdown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
 
   // 6 weeks × 7 days grid covering the visible month.
   const gridStart = startOfWeek(startOfMonth(viewMonth));

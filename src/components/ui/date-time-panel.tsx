@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { DatePicker } from './date-picker';
 import { TimePicker } from './time-picker';
-import { cn } from '@/lib/utils';
+import { cn, pad2 } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // DateTimePanel — a self-contained, confirm-on-apply date + time picker panel.
@@ -36,8 +36,6 @@ function tzShortLabel(tz: string): string {
     return '';
   }
 }
-
-const p2 = (n: number) => String(n).padStart(2, '0');
 
 export interface DateTimePanelProps {
   /** The date+time to seed the panel with. */
@@ -73,10 +71,10 @@ export function DateTimePanel({
   const [minute, setMinute] = useState(initWall.getMinutes());
   const [second, setSecond] = useState(initWall.getSeconds());
 
-  const dateISO = `${selYear}-${p2(selMonth + 1)}-${p2(selDay)}`;
+  const dateISO = `${selYear}-${pad2(selMonth + 1)}-${pad2(selDay)}`;
   const timeStr = showSeconds
-    ? `${p2(hour)}:${p2(minute)}:${p2(second)}`
-    : `${p2(hour)}:${p2(minute)}`;
+    ? `${pad2(hour)}:${pad2(minute)}:${pad2(second)}`
+    : `${pad2(hour)}:${pad2(minute)}`;
 
   const handleConfirm = () => {
     const utcGuess = new Date(Date.UTC(selYear, selMonth, selDay, hour, minute, second));
