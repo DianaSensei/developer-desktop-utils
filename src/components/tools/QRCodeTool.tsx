@@ -10,6 +10,7 @@ import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { copyImageToClipboard } from '@/lib/clipboard';
@@ -542,6 +543,22 @@ function QrReader() {
   };
   useImagePaste(loadFromDataUrl);
 
+  // OS file drop (Finder / Explorer) under Tauri: read the dropped path into a
+  // data URL via the backend, then decode it like any other image.
+  const loadFromPath = async (path: string) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const file = await invoke<{ mime: string; dataUrl: string }>('read_file_data_url', { path });
+      if (!file.mime.startsWith('image/')) { setError('That file is not an image.'); return; }
+      loadFromDataUrl(file.dataUrl);
+    } catch {
+      setError('Could not read the dropped file.');
+    }
+  };
+  const { dropRef, dragging } = useTauriFileDrop<HTMLDivElement>((paths) => {
+    if (paths[0]) void loadFromPath(paths[0]);
+  });
+
   const pasteFromClipboard = async () => {
     const { readImageFromClipboard } = await import('@/lib/clipboard');
     const dataUrl = await readImageFromClipboard();
@@ -578,10 +595,14 @@ function QrReader() {
   return (
     <div className="space-y-4">
       <div
+        ref={dropRef}
         onClick={handleUpload}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
-        className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors hover:border-primary/60 hover:bg-muted/40"
+        className={cn(
+          'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors',
+          dragging ? 'border-primary bg-primary/5' : 'hover:border-primary/60 hover:bg-muted/40',
+        )}
       >
         {loading
           ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

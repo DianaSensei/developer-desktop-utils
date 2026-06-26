@@ -1,6 +1,7 @@
 import * as React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
 
 export interface DropZoneProps {
   icon: LucideIcon;
@@ -10,6 +11,13 @@ export interface DropZoneProps {
   accept?: string;
   /** Called with dropped/selected files (drop always fires this). */
   onFiles?: (files: FileList) => void;
+  /**
+   * Called with the filesystem path(s) of files dragged in from outside the app
+   * (Finder / Explorer / other windows) when running in Tauri. Provide this to
+   * support OS-level file drops — the browser's File drop (onFiles) can't see
+   * real paths, and Tauri delivers paths instead. In a browser this never fires.
+   */
+  onPaths?: (paths: string[]) => void;
   /**
    * Custom activation on click (e.g. open a Tauri native dialog). When set, it
    * runs instead of opening the hidden file input — but drops still call onFiles.
@@ -24,6 +32,9 @@ export interface DropZoneProps {
  * Shared drag-and-drop / click-to-browse surface. Consolidates the dashed
  * upload zone hand-rolled in QR, Checksum, Image↔Base64 and 2FA into one
  * primitive with consistent drag-over highlight and the app's motion.
+ *
+ * Supports both in-browser File drops (onFiles) and, under Tauri, OS-level file
+ * drops from Finder / Explorer / other windows (onPaths).
  */
 export function DropZone({
   icon: Icon,
@@ -31,12 +42,22 @@ export function DropZone({
   hint,
   accept,
   onFiles,
+  onPaths,
   onActivate,
   children,
   className,
 }: DropZoneProps) {
-  const [dragging, setDragging] = React.useState(false);
+  const [webDragging, setWebDragging] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // OS-level drops (Tauri). Inert in a browser. Scoped to this element via the
+  // returned ref + the hook's hit-testing.
+  const { dropRef, dragging: osDragging } = useTauriFileDrop<HTMLDivElement>(
+    (paths) => onPaths?.(paths),
+    !!onPaths,
+  );
+
+  const dragging = webDragging || osDragging;
 
   const activate = () => {
     if (onActivate) onActivate();
@@ -45,11 +66,12 @@ export function DropZone({
 
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
+      ref={dropRef}
+      onDragOver={(e) => { e.preventDefault(); setWebDragging(true); }}
+      onDragLeave={() => setWebDragging(false)}
       onDrop={(e) => {
         e.preventDefault();
-        setDragging(false);
+        setWebDragging(false);
         if (e.dataTransfer.files?.length && onFiles) onFiles(e.dataTransfer.files);
       }}
       onClick={activate}

@@ -50,18 +50,36 @@ export function ImageBase64Tool() {
     reader.readAsDataURL(f);
   }, []);
 
-  // Load an image straight from a data URL (clipboard paste) and synthesize a
-  // File so the size/type info line still renders.
-  const loadFromDataUrl = useCallback((dataUrl: string) => {
+  // Load an image straight from a data URL (clipboard paste, or an OS file drop
+  // read through Tauri) and synthesize a File so the size/type info line still
+  // renders. `name` is used when known (dropped files); paste falls back to a
+  // generic name.
+  const loadFromDataUrl = useCallback((dataUrl: string, name?: string) => {
     setEncodeDataUrl(dataUrl);
     fetch(dataUrl)
       .then((r) => r.blob())
       .then((b) => {
         const ext = (b.type.split('/')[1] || 'png').split('+')[0];
-        setEncodeFile(new File([b], `pasted-image.${ext}`, { type: b.type || 'image/png' }));
+        setEncodeFile(new File([b], name ?? `pasted-image.${ext}`, { type: b.type || 'image/png' }));
       })
       .catch(() => setEncodeFile(null));
   }, []);
+
+  // OS file drop (Finder / Explorer) under Tauri: read the dropped path into a
+  // data URL via the backend, then load it like any other image.
+  const loadFromPath = useCallback(async (path: string) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const file = await invoke<{ name: string; mime: string; dataUrl: string }>(
+        'read_file_data_url',
+        { path },
+      );
+      if (!file.mime.startsWith('image/')) return; // ignore non-images
+      loadFromDataUrl(file.dataUrl, file.name);
+    } catch {
+      /* unreadable / too large — ignore */
+    }
+  }, [loadFromDataUrl]);
 
   // ⌘V / Ctrl+V captures an image from the clipboard while on the encode tab.
   useImagePaste(loadFromDataUrl, mode === 'encode' && !encodeDataUrl);
@@ -105,6 +123,7 @@ export function ImageBase64Tool() {
                 hint="or click to browse · PNG, JPG, GIF, WebP…"
                 accept="image/*"
                 onFiles={(files) => { const f = files[0]; if (f) processImageFile(f); }}
+                onPaths={(paths) => { if (paths[0]) void loadFromPath(paths[0]); }}
               >
                 <button
                   type="button"
