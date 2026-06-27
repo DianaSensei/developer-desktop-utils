@@ -42,7 +42,7 @@ const JsonFormatter = lazy(() => named(import('@/components/tools/JsonFormatter'
 const DataConverter = lazy(() => named(import('@/components/tools/DataConverter'), 'DataConverter'));
 const JwtDebugger = lazy(() => named(import('@/components/tools/JwtDebugger'), 'JwtDebugger'));
 const RegexTester = lazy(() => named(import('@/components/tools/RegexTester'), 'RegexTester'));
-const RandomGenerator = lazy(() => named(import('@/components/tools/RandomGenerator'), 'RandomGenerator'));
+const Generator = lazy(() => named(import('@/components/tools/Generator'), 'Generator'));
 const TextDiff = lazy(() => named(import('@/components/tools/TextDiff'), 'TextDiff'));
 const QRCodeTool = lazy(() => named(import('@/components/tools/QRCodeTool'), 'QRCodeTool'));
 const MarkdownPreview = lazy(() => named(import('@/components/tools/MarkdownPreview'), 'MarkdownPreview'));
@@ -74,7 +74,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'qrcode':         { path: '/qrcode',         component: QRCodeTool,        fullHeight: true },
   'markdown':       { path: '/markdown',       component: MarkdownPreview,   fullHeight: true },
   'deduplicate':    { path: '/deduplicate',    component: ArrayDeduplicator, fullHeight: true },
-  'generator':      { path: '/generator',      component: RandomGenerator,   fullHeight: true },
+  'generator':      { path: '/generator',      component: Generator,         fullHeight: true },
   'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer,     fullHeight: true },
   'sql-formatter':  { path: '/sql-formatter',  component: SqlFormatter,      fullHeight: true },
   'task-tracker':   { path: '/task-tracker',   component: TimeTracker,       fullHeight: true },

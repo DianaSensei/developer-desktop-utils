@@ -63,7 +63,7 @@ export const TOOL_DEFS: ToolDef[] = [
     label: "Encode·Hash·Encrypt",
     icon: Binary,
     description:
-      "Encode/decode (Base64, URL, Hex, Morse…), image↔Base64, hash text or files (MD5, SHA, HMAC, checksums), and AES-256 encrypt/decrypt.",
+      "Encode/decode (Base64, URL, Hex, Morse…), image↔Base64, hash text or files (MD5, SHA, HMAC, checksums), password hashing (bcrypt/Argon2), and AES-256 encrypt/decrypt.",
   },
   {
     id: "unix-time",
@@ -102,10 +102,10 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     id: "diff",
-    label: "Text Diff",
+    label: "Diff",
     icon: GitCompare,
     description:
-      "Compare two text blocks and highlight additions and removals.",
+      "Compare two text blocks (word-level) or two JSON values (structural, by path).",
   },
   {
     id: "qrcode",
@@ -127,10 +127,10 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     id: "generator",
-    label: "Random Generator",
+    label: "Generator",
     icon: Dices,
     description:
-      "Generate UUIDs, random numbers, and text with custom character sets.",
+      "Generate UUIDs, random numbers and text, or realistic fake datasets (names, emails, dates…) exported as JSON, CSV, SQL, and more.",
   },
   {
     id: "kafka-explorer",

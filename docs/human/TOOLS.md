@@ -19,11 +19,11 @@ This document describes every tool in the app: what computation it performs, wha
 | SQL Formatter | ✓ | — | — | — | Input + options (localStorage) |
 | JWT Debugger | — | — | — | — | Input (localStorage) |
 | Regex Tester | — | — | — | — | Input (localStorage) |
-| Text Diff | — | — | — | — | Input (localStorage) |
+| Diff | — | — | — | — | Input + mode (localStorage) |
 | Markdown Preview | — | — | — | — | Input (localStorage) |
 | Lucky Wheel | — | — | — | — | Choices + options (localStorage) |
 | Array Deduplicator | ✓ | — | — | — | Input (localStorage) |
-| Generator | ✓ | — | — | — | Mode pref (localStorage) |
+| Generator | ✓ | — | ✓ | — | Random + Test Data schema/options (localStorage) |
 | Time Tracker | ✓ | — | — | — | Time entries, projects, tags (localStorage) |
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data) |
@@ -73,7 +73,7 @@ Converts a color between HEX, RGB, HSL, HSV, and CMYK. Renders a color swatch in
 
 Encodes and decodes text in multiple formats: Base64, URL percent-encoding, HTML entities, hexadecimal, and Morse code. All conversions run in JS with no external dependencies.
 
-> The **Encode · Hash · Encrypt** tool bundles six tabs: Encode/Decode (this section), **Image ↔ Base64**, **Hash & Encrypt**, **Checksum** (file hashing), Encrypt, and Pipeline. The sections below describe each tab; only the Image and Checksum tabs read files.
+> The **Encode · Hash · Encrypt** tool bundles seven tabs: Encode/Decode (this section), **Image ↔ Base64**, **Hash & Encrypt**, **Checksum** (file hashing), **Password** (bcrypt/Argon2), Encrypt, and Pipeline. The sections below describe each tab; only the Image and Checksum tabs read files.
 
 **OS / system impact:** clipboard write only.
 
@@ -137,9 +137,9 @@ Runs the regex you provide against the test input using the browser's built-in `
 
 ---
 
-### Text Diff
+### Diff
 
-Compares two text blocks and highlights line/character-level additions and removals using the `diff` npm package.
+Two modes. **Text** compares two blocks word-level and highlights additions/removals using the `diff` npm package. **JSON** parses both sides and computes a structural diff — every difference is listed by key/index path as added, removed, or changed (old → new), ignoring formatting and key order. The JSON diff is a small hand-rolled recursive walk; both modes run entirely in JS.
 
 **OS / system impact:** none.
 
@@ -171,7 +171,9 @@ Removes duplicate lines from a list. Supports case-insensitive matching and sort
 
 ### Generator
 
-Generates random values in three modes:
+Two tabs behind one tool: **Random** and **Test Data**.
+
+**Random** generates quick values in three modes:
 
 | Mode | Algorithm | Notes |
 |------|-----------|-------|
@@ -179,7 +181,17 @@ Generates random values in three modes:
 | Random text | Custom charset + `crypto.getRandomValues` | Cryptographically random |
 | Random number | `Math.random()` | Not cryptographically random |
 
-**OS / system impact:** clipboard write only. Uses the browser's `crypto.getRandomValues` (built into every modern browser/WebView) — no external RNG service.
+**Test Data** generates realistic fake records from a field schema you define. 40+ field types grouped by Identity (name, job title…), Internet (email, username, URL, IP, MAC…), Location (address, city, country, lat/long…), Business, Finance (IBAN, currency, credit card…), Content (lorem), and primitives (int/float/boolean/date/enum). Choose a row count and export as a JSON array, NDJSON, YAML, CSV, TSV, SQL `INSERT` statements (with a table name), or Java `.properties`. Generation uses the **`@faker-js/faker`** library, which is bundled and **lazy-loaded** (fetched only when the tool opens) so it works fully offline; `faker.seed()` makes output deterministic for a given seed. Useful for seeding databases or feeding the Mock Server / API Client.
+
+**OS / system impact:** clipboard write; file write on Test Data download only. Uses the browser's `crypto.getRandomValues` — no external RNG service, no network.
+
+---
+
+### Password Hash
+
+*(The Password tab of Encode · Hash · Encrypt.)* Hashes and verifies passwords with **bcrypt** and **Argon2** (id / i / d), backed by the `hash-wasm` library whose WebAssembly is bundled inline (no fetch), so it runs fully offline. Hashing uses a fresh random 16-byte salt (`crypto.getRandomValues`) and outputs the standard encoded string (bcrypt modular-crypt `$2b$…` or Argon2 PHC `$argon2id$…`). Verify auto-detects the algorithm from the hash prefix. Work factors (bcrypt cost; Argon2 memory/iterations/parallelism) are adjustable; hashing runs on an explicit button, not as you type.
+
+**OS / system impact:** clipboard write only. The password is processed in memory and **never stored** — only non-secret parameters (algorithm, cost) persist in `localStorage`. Nothing leaves the machine.
 
 ---
 

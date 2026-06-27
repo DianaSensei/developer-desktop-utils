@@ -196,16 +196,19 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Image tab: convert an image to Base64 (drop/paste/upload, copy raw or data URL) or paste Base64 back to a preview.',
       'Hash tab: see MD5/SHA-1/2/3 & RIPEMD at once; toggle case, verify against a known hash, or add a key for HMAC.',
       'Checksum tab: drag a file in to compute MD5/SHA-1/256/512 with a progress bar, then verify against a known hash.',
+      'Password tab: hash a password with bcrypt or Argon2 (id/i/d) and a fresh random salt, or Verify a password against an existing hash (algorithm auto-detected).',
       'Encrypt tab: choose an AES/3DES/Rabbit mode, enter a passphrase, and encrypt/decrypt.',
       'Pipeline tab: chain multiple encode/hash/encrypt stages together.',
     ],
     know: [
       'Hashes are one-way; most codecs are reversible. Everything runs locally — files and text are never uploaded.',
       'Files are checksummed in chunks (in Rust on desktop, a Web Worker on the web), so the UI stays responsive.',
+      'Password hashing uses hash-wasm (WASM bundled inline → offline) and runs on a button since it’s intentionally slow.',
     ],
     caveat: [
       'Encryption is CryptoJS passphrase-based (no AEAD/PBKDF2); ECB mode leaks patterns — prefer CBC or CTR.',
       'Base64 is ~33% larger than the binary; very large images/files strain memory, and clipboard image copy isn’t supported on every platform.',
+      'Higher bcrypt cost / Argon2 memory is slower by design; bcrypt only uses the first 72 bytes of a password.',
     ],
   }),
 
@@ -253,11 +256,12 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 
   diff: makeGuide({
     use: [
-      'Paste the original on the left and the modified text on the right.',
-      'Differences render below: red = removed, green = added.',
+      'Paste the original on the left and the modified version on the right.',
+      'Text mode: word-level diff renders below — red = removed, green = added.',
+      'JSON mode: a syntax-highlighted editor that auto-formats each side (on paste and when you click away); changes are listed by path as added / removed / changed (old → new).',
     ],
-    know: ['Comparison is word-level and updates live as you type.'],
-    caveat: ['No line/character diff or unified-diff export, and the two panes don’t scroll in sync.'],
+    know: ['Both modes update live as you type; JSON mode reports differences by key/index path, ignoring formatting and key order.'],
+    caveat: ['Text mode has no line/character or unified-diff export; JSON mode needs valid JSON on both sides (parse errors show in the result panel). Panes don’t scroll in sync.'],
   }),
 
   qrcode: makeGuide({
@@ -297,12 +301,16 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 
   generator: makeGuide({
     use: [
-      'Pick UUID, Number, or Text.',
-      'Set the options (count; min/max/decimals for numbers; length + character sets + custom chars for text) and click Generate.',
-      'Copy a single result or all at once.',
+      <><strong className="text-foreground">Random</strong> tab: pick UUID, Number, or Text, set the options (count; min/max/decimals; length + character sets), and click Generate. Copy one result or all.</>,
+      <><strong className="text-foreground">Test Data</strong> tab: define a field schema (40+ types across Identity, Internet, Location, Business, Finance, Content…), set a row count, and export as JSON, NDJSON, YAML, CSV, TSV, SQL inserts, or .properties.</>,
+      <>Test Data output is deterministic for a given <strong className="text-foreground">seed</strong> — edit the schema and it stays stable; hit the seed’s refresh button for fresh data.</>,
+      'Great for seeding a database or pasting into a Mock Server stub / API Client body.',
     ],
-    know: ['Uses cryptographically secure randomness (crypto.getRandomValues); UUIDs are v4.'],
-    caveat: ['Counts are clamped to configured limits; an empty character set produces nothing.'],
+    know: [
+      'Random uses cryptographically secure randomness (crypto.getRandomValues); UUIDs are v4.',
+      'Test Data is powered by the Faker dataset (bundled, lazy-loaded → fully offline). int/float take min/max; enum takes comma-separated values; Date/Birthdate take an output format (ISO, US/EU, Unix s/ms, readable…).',
+    ],
+    caveat: ['Fake data is realistic-looking but synthetic, and not guaranteed unique across rows (e.g. emails can repeat).'],
   }),
 
   network: makeGuide({

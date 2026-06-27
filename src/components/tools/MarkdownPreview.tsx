@@ -45,6 +45,7 @@ export function MarkdownPreview() {
           value={markdown}
           onChange={(e) => setMarkdown(e.target.value)}
           placeholder="Enter markdown here"
+          spellCheck  // prose editor — keep spell-check squiggles
           className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
         />
       </div>

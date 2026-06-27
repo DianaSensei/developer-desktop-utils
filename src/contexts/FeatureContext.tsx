@@ -35,7 +35,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'qrcode': true,
   'markdown': false,
   'deduplicate': false,
-  'generator': false,
+  'generator': true,
   'kafka-explorer': false,
   'sql-formatter': false,
   'network': false,

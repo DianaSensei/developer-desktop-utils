@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
+import { sql } from '@codemirror/lang-sql';
 import { HighlightStyle, syntaxHighlighting, type LanguageSupport } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { tags } from '@lezer/highlight';
@@ -14,6 +15,7 @@ import { varExtensions, varTheme } from './varSupport';
 
 const jsLang = javascript();
 const jsonLang = json();
+const sqlLang = sql();
 
 const editorTheme = EditorView.theme({
   // flex:1 (not height:100%) fills the parent in flex chains without an explicit pixel height.
@@ -63,22 +65,26 @@ interface Props {
   // Grammar used for syntax highlighting. Defaults to JavaScript (scripts).
   // 'text' applies no grammar (plain). Language is fixed at mount — change the
   // component `key` to switch it.
-  language?: 'javascript' | 'json' | 'text';
+  language?: 'javascript' | 'json' | 'sql' | 'text';
   // When true the document can't be edited (read-only output view). Fixed at mount.
   readOnly?: boolean;
+  // Fired when the editor loses focus, with the current value (e.g. to reformat).
+  onBlur?: (value: string) => void;
 }
 
-export function CodeEditor({ value, onChange, placeholder, className, vars, language = 'javascript', readOnly = false }: Props) {
+export function CodeEditor({ value, onChange, placeholder, className, vars, language = 'javascript', readOnly = false, onBlur }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onBlurRef = useRef(onBlur);
+  onBlurRef.current = onBlur;
   const lastValueRef = useRef(value);
   const varsRef = useRef(vars);
   varsRef.current = vars;
   const hasVars = useRef(!!vars).current;
   const lang = useRef<LanguageSupport | null>(
-    language === 'json' ? jsonLang : language === 'text' ? null : jsLang,
+    language === 'json' ? jsonLang : language === 'sql' ? sqlLang : language === 'text' ? null : jsLang,
   ).current;
 
   useEffect(() => {
@@ -88,6 +94,10 @@ export function CodeEditor({ value, onChange, placeholder, className, vars, lang
         doc: value,
         extensions: [
           basicSetup,
+          // Stop macOS/WebKit from substituting smart quotes / autocorrecting
+          // code — a typed " must stay a straight ASCII quote (curly quotes
+          // break JSON). No-op on Windows/Linux WebViews.
+          EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
           ...(lang ? [lang] : []),
           ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
           syntaxHighlighting(codeHighlight),
@@ -99,6 +109,9 @@ export function CodeEditor({ value, onChange, placeholder, className, vars, lang
             const val = upd.state.doc.toString();
             lastValueRef.current = val;
             onChangeRef.current(val);
+          }),
+          EditorView.domEventHandlers({
+            blur: () => { onBlurRef.current?.(viewRef.current?.state.doc.toString() ?? ''); return false; },
           }),
         ],
       }),

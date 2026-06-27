@@ -186,6 +186,7 @@ function AutoTextarea({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       style={{ minHeight }}
+      spellCheck  // prose field — keep spell-check squiggles
       className="resize-none overflow-hidden text-sm leading-relaxed"
     />
   );

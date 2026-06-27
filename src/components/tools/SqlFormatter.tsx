@@ -456,6 +456,8 @@ export function SqlFormatter() {
         doc: modeRef.current === 'sql' ? sqlInputRef.current : mongoInputRef.current,
         extensions: [
           basicSetup,
+          // Keep typed quotes straight (no macOS smart-quote substitution).
+          EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
           langConfRef.current.of(modeRef.current === 'sql' ? sqlLang : jsLangWithMongo),
           syntaxHighlighting(codeHighlight),
           editorTheme,
