@@ -291,8 +291,8 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                   </div>
                   <ToolHint>
                     Templates: <code>{'{{path.id}}'}</code>, <code>{'{{request.query.x}}'}</code>,{' '}
-                    <code>{'{{request.body}}'}</code>, <code>{'{{uuid}}'}</code>, <code>{'{{now.iso}}'}</code>,{' '}
-                    <code>{'{{randomInt(1,99)}}'}</code>.
+                    <code>{'{{request.header.x}}'}</code>, <code>{'{{request.body}}'}</code>,{' '}
+                    <code>{'{{uuid}}'}</code>, <code>{'{{now.iso}}'}</code>, <code>{'{{randomInt(1,99)}}'}</code>.
                   </ToolHint>
                 </>
               )}

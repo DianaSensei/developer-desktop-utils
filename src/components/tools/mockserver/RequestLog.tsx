@@ -17,9 +17,13 @@ function statusColor(status: number): string {
 interface Props {
   log: RequestLogEntry[];
   onClear: () => void;
+  /** Resolve a stub id to its display name (undefined if it no longer exists). */
+  stubName?: (id: string) => string | undefined;
+  /** Jump to / select a stub in the editor. */
+  onSelectStub?: (id: string) => void;
 }
 
-export function RequestLog({ log, onClear }: Props) {
+export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = log.find((e) => e.id === selectedId) ?? null;
 
@@ -82,6 +86,21 @@ export function RequestLog({ log, onClear }: Props) {
           {selected && (
             <div className="max-h-[45%] shrink-0 space-y-2 overflow-y-auto border-t border-border bg-muted/10 p-3 text-xs">
               <Detail label="Time" value={new Date(selected.ts).toLocaleTimeString()} />
+              <div className="flex gap-2">
+                <span className="w-14 shrink-0 text-muted-foreground">Matched</span>
+                {selected.matchedStubId ? (
+                  <button
+                    type="button"
+                    onClick={() => selected.matchedStubId && onSelectStub?.(selected.matchedStubId)}
+                    className="truncate text-left font-medium text-primary hover:underline"
+                    title="Open this stub"
+                  >
+                    {stubName?.(selected.matchedStubId) ?? '(deleted stub)'}
+                  </button>
+                ) : (
+                  <span className="text-amber-600 dark:text-amber-400">No stub — default response</span>
+                )}
+              </div>
               {selected.reqHeaders.length > 0 && (
                 <div>
                   <div className="mb-0.5 text-muted-foreground">Request headers</div>

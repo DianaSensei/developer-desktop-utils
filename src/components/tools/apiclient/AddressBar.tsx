@@ -60,7 +60,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
             onChange={handleUrl}
             vars={vars}
             onEnter={onSend}
-            placeholder="https://api.example.com/endpoint  ·  {{var}} for environment values"
+            placeholder="https://api.example.com/users/{{id}}"
           />
         </div>
 

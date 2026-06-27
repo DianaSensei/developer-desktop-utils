@@ -65,20 +65,26 @@ export function KeyValueEditor({
 
   const removeRow = (id: string) => onChange(realRows.filter((r) => r.id !== id));
 
+  // Disabled rows round-trip through bulk mode with a leading `//` (Postman's
+  // convention), so toggling a row off and editing in bulk doesn't silently
+  // re-enable it.
   const enterBulk = () => {
-    setBulkText(realRows.map((r) => `${r.key}:${r.value}`).join('\n'));
+    setBulkText(realRows.map((r) => `${r.enabled ? '' : '//'}${r.key}:${r.value}`).join('\n'));
     setBulk(true);
   };
 
   const parseBulk = (value: string) => {
     setBulkText(value);
     const parsed: KeyValue[] = [];
-    for (const line of value.split('\n')) {
-      if (!line.trim()) continue;
+    for (const raw of value.split('\n')) {
+      let line = raw.trim();
+      if (!line) continue;
+      const enabled = !line.startsWith('//');
+      if (!enabled) line = line.slice(2).trim();
       const idx = line.indexOf(':');
       const k = (idx === -1 ? line : line.slice(0, idx)).trim();
       const v = idx === -1 ? '' : line.slice(idx + 1).trim();
-      if (k || v) parsed.push(newKeyValue(k, v));
+      if (k || v) parsed.push({ ...newKeyValue(k, v), enabled });
     }
     onChange(parsed);
   };

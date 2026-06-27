@@ -85,6 +85,9 @@ export function ApiClient() {
   }, [sidebarWidth, setSidebarWidth]);
   // Session-scoped runtime variables (bru.setVar), cleared on app restart.
   const runtimeVarsRef = useRef<VarMap>({});
+  // Bumped whenever runtime vars change so {{var}} highlighting re-resolves
+  // (the ref itself is invisible to React's memoization).
+  const [runtimeVarsVersion, setRuntimeVarsVersion] = useState(0);
 
   // Abort all in-flight requests when the component unmounts.
   useEffect(() => () => {
@@ -106,6 +109,7 @@ export function ApiClient() {
   // After a run, persist runtime/env-var changes and record a history entry.
   const persistResult = useCallback((req: ApiRequest, result: Awaited<ReturnType<typeof executeRequest>>) => {
     runtimeVarsRef.current = result.runtimeVars;
+    setRuntimeVarsVersion((v) => v + 1);
     // Capture any Set-Cookie into the jar (scoped to the URL that returned them).
     if (store.cookiesEnabled && result.response?.setCookies?.length) {
       store.captureCookies(result.response.url ?? req.url, result.response.setCookies);
@@ -234,7 +238,9 @@ export function ApiClient() {
     if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) map[v.key] = v.value;
     if (activeRequest) for (const v of activeRequest.vars.req) if (v.name) map[v.name] = v.value;
     return map;
-  }, [store.activeEnv, activeRequest]);
+    // runtimeVarsVersion is intentionally a dep: the ref mutates invisibly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.activeEnv, activeRequest, runtimeVarsVersion]);
 
   const run = activeRequest ? (runs[activeRequest.id] ?? EMPTY_RUN) : EMPTY_RUN;
 

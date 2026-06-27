@@ -1,31 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Square, Plus, Copy as CopyIcon, Trash2, AlertTriangle, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import {
+  Play, Square, Plus, Copy as CopyIcon, Trash2, AlertTriangle, PanelRightClose, PanelRightOpen,
+  ChevronUp, ChevronDown, Upload, FileJson, Ban,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CopyButton } from '@/components/ui/copy-button';
 import { ToolToolbar } from '@/components/ui/tool-layout';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { SplitPane } from '../apiclient/SplitPane';
 import { methodBadgeStyle } from '../apiclient/method-color';
 import type { HttpMethod } from '../apiclient/types';
 import { StubEditor } from './StubEditor';
+import { FallbackEditor } from './FallbackEditor';
 import { RequestLog } from './RequestLog';
 import { useMockServer, isTauri } from './useMockServer';
-import { newStub, type Stub } from './types';
+import { newStub, type MockConfig, type Stub } from './types';
+
+// Sentinel selection id for the editable "no-match" fallback response.
+const FALLBACK_ID = '__fallback__';
+
+// "ANY" matches every method, so give it a distinct (dashed, neutral) badge
+// instead of looking like a specific verb.
+const badgeClass = (method: string) =>
+  method === 'ANY'
+    ? 'border border-dashed border-muted-foreground/50 text-muted-foreground'
+    : methodBadgeStyle(method as HttpMethod);
 
 export function MockServer() {
-  const { config, setConfig, updateStub, status, log, error, busy, start, stop, testScript, clearLog } =
+  const { config, setConfig, updateConfig, updateStub, status, log, error, busy, start, stop, testScript, clearLog } =
     useMockServer();
 
   const [selectedId, setSelectedId] = useState<string | null>(config.stubs[0]?.id ?? null);
   const [logVisible, setLogVisible] = usePersistentState('devtool:mockServer:logVisible', true);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Stub list is a fixed-width sidebar (px, persisted) so it stays narrow and
   // stable regardless of whether the request log is shown — the editor and log
   // share all the remaining space.
-  const [sidebarW, setSidebarW] = usePersistentState('devtool:mockServer:sidebarW', 220);
+  const [sidebarW, setSidebarW] = usePersistentState('devtool:mockServer:sidebarW', 230);
   const [dragging, setDragging] = useState(false);
   const dragCleanup = useRef<(() => void) | null>(null);
   useEffect(() => () => dragCleanup.current?.(), []);
@@ -36,7 +54,7 @@ export function MockServer() {
       const startX = e.clientX;
       const startW = sidebarW;
       setDragging(true);
-      const move = (ev: PointerEvent) => setSidebarW(Math.min(420, Math.max(160, startW + ev.clientX - startX)));
+      const move = (ev: PointerEvent) => setSidebarW(Math.min(420, Math.max(170, startW + ev.clientX - startX)));
       const up = () => {
         setDragging(false);
         window.removeEventListener('pointermove', move);
@@ -50,8 +68,10 @@ export function MockServer() {
     [sidebarW, setSidebarW],
   );
 
-  // Keep the selection valid as stubs are added / removed.
+  // Keep the selection valid as stubs are added / removed (the fallback sentinel
+  // is always valid).
   useEffect(() => {
+    if (selectedId === FALLBACK_ID) return;
     if (!config.stubs.some((s) => s.id === selectedId)) {
       setSelectedId(config.stubs[0]?.id ?? null);
     }
@@ -76,6 +96,34 @@ export function MockServer() {
   };
   const deleteStub = (id: string) => setConfig((prev) => ({ ...prev, stubs: prev.stubs.filter((s) => s.id !== id) }));
 
+  // Order matters (first match wins), so let users reorder stubs.
+  const moveStub = (id: string, dir: -1 | 1) =>
+    setConfig((prev) => {
+      const i = prev.stubs.findIndex((s) => s.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.stubs.length) return prev;
+      const stubs = [...prev.stubs];
+      [stubs[i], stubs[j]] = [stubs[j], stubs[i]];
+      return { ...prev, stubs };
+    });
+
+  const exportJson = () => JSON.stringify(config, null, 2);
+  const doImport = () => {
+    try {
+      const parsed = JSON.parse(importText) as Partial<MockConfig>;
+      if (!parsed || !Array.isArray(parsed.stubs)) throw new Error('JSON must contain a "stubs" array.');
+      // Normalize each stub against defaults so older/partial exports still load.
+      const stubs: Stub[] = parsed.stubs.map((s) => ({ ...newStub(), ...(s as Stub), id: (s as Stub).id || crypto.randomUUID() }));
+      setConfig((prev) => ({ ...prev, ...parsed, stubs }));
+      setSelectedId(stubs[0]?.id ?? null);
+      setImportOpen(false);
+      setImportText('');
+      setImportError(null);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const displayHost = status.running ? status.host : config.host;
   const displayPort = status.running ? status.port : config.port;
   // Local + LAN binds are reachable as localhost (the local option binds both
@@ -88,12 +136,36 @@ export function MockServer() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
         <span className="text-xs font-medium text-muted-foreground">Stubs</span>
-        <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={addStub} aria-label="Add stub">
-          <Plus className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-0.5">
+          <CopyButton
+            value={exportJson}
+            icon={FileJson}
+            iconClassName="h-3.5 w-3.5"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            label=""
+            title="Copy all stubs as JSON"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => { setImportText(''); setImportError(null); setImportOpen(true); }}
+            aria-label="Import stubs"
+            title="Import stubs from JSON"
+          >
+            <Upload className="h-3.5 w-3.5" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={addStub} aria-label="Add stub" title="Add stub">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {config.stubs.map((s) => (
+        {config.stubs.map((s, i) => (
           <div
             key={s.id}
             role="button"
@@ -106,43 +178,26 @@ export function MockServer() {
               !s.enabled && 'opacity-50',
             )}
           >
-            <span
-              className={cn(
-                'w-12 shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold',
-                methodBadgeStyle(s.method as HttpMethod),
-              )}
-            >
+            <span className={cn('w-11 shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold', badgeClass(s.method))}>
               {s.method}
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium">{s.name || '(unnamed)'}</div>
               <div className="truncate font-mono text-[10px] text-muted-foreground">{s.path}</div>
             </div>
-            <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  duplicateStub(s);
-                }}
-                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Duplicate stub"
-                title="Duplicate"
-              >
+            <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+              <IconBtn label="Move up" title="Move up" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveStub(s.id, -1); }}>
+                <ChevronUp className="h-3.5 w-3.5" />
+              </IconBtn>
+              <IconBtn label="Move down" title="Move down" disabled={i === config.stubs.length - 1} onClick={(e) => { e.stopPropagation(); moveStub(s.id, 1); }}>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </IconBtn>
+              <IconBtn label="Duplicate stub" title="Duplicate" onClick={(e) => { e.stopPropagation(); duplicateStub(s); }}>
                 <CopyIcon className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteStub(s.id);
-                }}
-                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
-                aria-label="Delete stub"
-                title="Delete"
-              >
+              </IconBtn>
+              <IconBtn label="Delete stub" title="Delete" danger onClick={(e) => { e.stopPropagation(); deleteStub(s.id); }}>
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </IconBtn>
             </div>
           </div>
         ))}
@@ -156,21 +211,35 @@ export function MockServer() {
           </button>
         )}
       </div>
+
+      {/* Pinned editable fallback (no-match) response */}
+      <button
+        type="button"
+        onClick={() => setSelectedId(FALLBACK_ID)}
+        className={cn(
+          'flex shrink-0 items-center gap-2 border-l-2 border-t border-border px-3 py-2 text-left transition-colors hover:bg-muted/40',
+          selectedId === FALLBACK_ID ? 'border-l-primary bg-muted/60' : 'border-l-transparent',
+        )}
+      >
+        <span className="flex w-11 shrink-0 items-center justify-center rounded bg-muted/60 py-0.5 text-muted-foreground">
+          <Ban className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium">No-match response</div>
+          <div className="truncate font-mono text-[10px] text-muted-foreground">default · {config.notFoundStatus}</div>
+        </div>
+      </button>
     </div>
   );
 
-  const editorPane = selected ? (
-    <StubEditor
-      key={selected.id}
-      stub={selected}
-      onChange={(patch) => updateStub(selected.id, patch)}
-      testScript={testScript}
-    />
-  ) : (
-    <div className="flex h-full w-full flex-1 items-center justify-center text-sm text-muted-foreground">
-      Select or add a stub.
-    </div>
-  );
+  const editorPane =
+    selectedId === FALLBACK_ID ? (
+      <FallbackEditor config={config} onChange={updateConfig} />
+    ) : selected ? (
+      <StubEditor key={selected.id} stub={selected} onChange={(patch) => updateStub(selected.id, patch)} testScript={testScript} />
+    ) : (
+      <div className="flex h-full w-full flex-1 items-center justify-center text-sm text-muted-foreground">Select or add a stub.</div>
+    );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -246,7 +315,6 @@ export function MockServer() {
 
       {/* ── Body: [stubs] · editor [· log] ──────────────────────────────── */}
       <div className="flex min-h-0 flex-1">
-        {/* Fixed-width, drag-resizable stub list */}
         <div className="flex min-h-0 shrink-0 flex-col overflow-hidden" style={{ width: sidebarW }}>
           {stubListPane}
         </div>
@@ -260,7 +328,6 @@ export function MockServer() {
           <span className="absolute -inset-x-1 inset-y-0" />
         </div>
 
-        {/* Editor (hero) + optional resizable log */}
         <div className="flex min-h-0 min-w-0 flex-1">
           {logVisible ? (
             <SplitPane
@@ -269,13 +336,76 @@ export function MockServer() {
               minPercent={35}
               minPanePx={300}
               first={editorPane}
-              second={<RequestLog log={log} onClear={clearLog} />}
+              second={
+                <RequestLog
+                  log={log}
+                  onClear={clearLog}
+                  stubName={(id) => config.stubs.find((s) => s.id === id)?.name}
+                  onSelectStub={(id) => setSelectedId(id)}
+                />
+              }
             />
           ) : (
             editorPane
           )}
         </div>
       </div>
+
+      {/* Import dialog */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import stubs</DialogTitle>
+            <DialogDescription>
+              Paste a Mock Server config exported with the JSON button. This replaces your current stubs and settings.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            placeholder='{ "stubs": [ … ], "host": "127.0.0.1", "port": 8787, … }'
+            spellCheck={false}
+            className="h-56 w-full resize-none rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          />
+          {importError && <p className="text-xs text-destructive">{importError}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" size="sm" onClick={doImport} disabled={!importText.trim()}>
+              Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+// Small hover-action icon button used in the stub list rows.
+function IconBtn({
+  children, onClick, label, title, disabled, danger,
+}: {
+  children: React.ReactNode;
+  onClick: (e: React.MouseEvent) => void;
+  label: string;
+  title: string;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={title}
+      className={cn(
+        'rounded p-1 text-muted-foreground transition-colors',
+        disabled ? 'cursor-default opacity-30' : danger ? 'hover:bg-muted hover:text-destructive' : 'hover:bg-muted hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
   );
 }

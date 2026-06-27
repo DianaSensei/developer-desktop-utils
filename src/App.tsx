@@ -13,6 +13,7 @@ import {
   Search,
   Plus,
   Loader2,
+  HelpCircle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
@@ -24,6 +25,7 @@ import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { MeetingsProvider } from '@/lib/meetings';
 import { UpdateDialog } from '@/components/UpdateDialog';
+import { ToolGuideModal } from '@/components/ToolGuideModal';
 import { AppLogo } from '@/components/AppLogo';
 
 // Tools are code-split: each loads its own chunk on first navigation instead of
@@ -551,6 +553,8 @@ function AppContent() {
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
   const ActiveIcon = activeTool.icon;
   const isFullHeight = !!(activeTool as typeof allTools[0] & { fullHeight?: boolean }).fullHeight;
+  const [guideOpen, setGuideOpen] = useState(false);
+  const showGuide = activeTool.featureId !== 'settings';
 
   const routes = (
     <Suspense fallback={<ToolLoading />}>
@@ -598,6 +602,18 @@ function AppContent() {
             <div className="flex items-center gap-1">
               {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
               <div id="tool-header-actions" className="flex items-center gap-1" />
+              {showGuide && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground/70 hover:text-foreground"
+                  onClick={() => setGuideOpen(true)}
+                  title={`How to use ${activeTool.label}`}
+                  aria-label={`How to use ${activeTool.label}`}
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              )}
               <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
                 {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
@@ -622,6 +638,14 @@ function AppContent() {
           </div>
         )}
       </main>
+
+      <ToolGuideModal
+        toolId={activeTool.featureId}
+        label={activeTool.label}
+        description={activeTool.description ?? ''}
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+      />
     </div>
   );
 }

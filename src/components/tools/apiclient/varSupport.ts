@@ -14,8 +14,20 @@ import { autocompletion, type CompletionContext, type CompletionResult } from '@
 const TOKEN = /\{\{\s*([\w.-]+)\s*\}\}/g;
 
 export const varTheme = EditorView.theme({
-  '.cm-var': { color: 'hsl(150 55% 45%)', fontStyle: 'italic' },
-  '.cm-var-unknown': { color: 'hsl(0 72% 60%)', fontStyle: 'italic' },
+  // Known variables get a green pill, unknown ones a red pill (Postman-style),
+  // so what will resolve at send time is obvious at a glance.
+  '.cm-var': {
+    color: 'hsl(152 62% 40%)',
+    backgroundColor: 'hsl(152 62% 45% / 0.13)',
+    borderRadius: '3px',
+    padding: '0 1px',
+  },
+  '.cm-var-unknown': {
+    color: 'hsl(0 72% 58%)',
+    backgroundColor: 'hsl(0 72% 60% / 0.11)',
+    borderRadius: '3px',
+    padding: '0 1px',
+  },
   '.cm-tooltip.cm-tooltip-autocomplete': {
     border: '1px solid hsl(var(--border))', borderRadius: '6px', backgroundColor: 'hsl(var(--popover))',
     boxShadow: '0 4px 12px rgb(0 0 0 / 0.2)', overflow: 'hidden',

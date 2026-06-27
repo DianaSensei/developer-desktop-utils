@@ -404,6 +404,7 @@ fn build_engine() -> Engine {
     let mut engine = Engine::new();
     engine.set_max_operations(500_000);
     engine.set_max_expr_depths(64, 64);
+    engine.set_max_call_levels(64);
     engine.set_max_string_size(MAX_BODY);
     engine.set_max_array_size(100_000);
     engine.set_max_map_size(100_000);
