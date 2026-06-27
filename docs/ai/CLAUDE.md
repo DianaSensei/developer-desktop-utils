@@ -74,7 +74,7 @@ devtool/
 
 ## Design Principles (mandatory — read before writing any UI or feature code)
 
-> Full design system reference — tokens, utilities, components, accessibility — is in [../design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md). The source of truth for actual values is [`src/design-system/`](../../src/design-system/) (`tokens.css`, `tailwind-preset.cjs`, `index.ts`).
+> Full design system reference — **design decision rules** (hierarchy, color, feedback, accessibility, self-review checklist), tokens, utilities, and components — is in [../design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md). Read its "Design rules" and "Self-review" sections before building, editing, or reviewing any UI. The source of truth for actual values is [`src/design-system/`](../../src/design-system/) (`tokens.css`, `tailwind-preset.cjs`, `index.ts`).
 
 ### UI Components — always use the shared library, never OS-native
 

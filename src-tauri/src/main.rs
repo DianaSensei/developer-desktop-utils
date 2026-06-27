@@ -5,9 +5,11 @@ mod kafka;
 mod checksum;
 mod netinfo;
 mod files;
+mod mockserver;
 
 fn main() {
     tauri::Builder::default()
+        .manage(mockserver::MockState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -34,6 +36,11 @@ fn main() {
             kafka::kafka_fetch_messages,
             kafka::kafka_delete_topic,
             kafka::kafka_topic_configs,
+            mockserver::mock_start,
+            mockserver::mock_stop,
+            mockserver::mock_status,
+            mockserver::mock_update_rules,
+            mockserver::mock_test_script,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

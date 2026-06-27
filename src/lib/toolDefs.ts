@@ -22,6 +22,7 @@ import {
   Disc3,
   Send,
   ShieldCheck,
+  ServerCog,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -189,6 +190,13 @@ export const TOOL_DEFS: ToolDef[] = [
       "Postman/Bruno-style HTTP workbench: collections, environments with {{vars}}, auth, pre/post-request scripts, tests & assertions, and Postman collection import/export.",
   },
   {
+    id: "mock-server",
+    label: "Mock Server",
+    icon: ServerCog,
+    description:
+      "Run a local HTTP mock server: match requests by method, path, query, header, and body, then reply with templated or Rhai-scripted responses. Live request log.",
+  },
+  {
     id: "2fa",
     label: "2FA Authenticator",
     icon: ShieldCheck,
@@ -205,6 +213,7 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "task-tracker",
     "meeting-notes",
   "api-client",
+  "mock-server",
   "json",
   "deduplicate",
   "text-transform",

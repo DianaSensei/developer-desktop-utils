@@ -20,6 +20,7 @@ const FeatureContext = createContext<FeatureContextType | undefined>(undefined);
 const DEFAULT_FEATURES: FeatureSettings = {
   'task-tracker': true,
   'api-client': true,
+  'mock-server': true,
   'cron-generator': true,
   'text-transform': true,
   'text-counter': true,

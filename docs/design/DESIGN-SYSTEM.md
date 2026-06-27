@@ -17,6 +17,71 @@ The single reference for how DevTool looks and feels: **azure-blue accent · sof
 
 ---
 
+## Design rules (apply when building, editing, or reviewing any UI)
+
+These are behavioral commands, not background reading — they govern how to *decide*, while the foundations below define *what to use*. When a request conflicts with a rule here, flag the conflict before proceeding. **Reuse before inventing:** existing tokens, utilities, and scaffolding always win over a new parallel style, even a "nicer" one.
+
+### Before writing any UI code
+
+Answer these first; if unknown, ask or state the assumption inline:
+
+- Who is the user and what is the **one** primary action on this screen? There is exactly one focal point per view.
+- What states must exist: empty, loading, partial, error, success, ideal?
+- Which existing component, token, or scaffolding (`ToolSection`/`ToolToolbar`/`ToolPanes`, the primitives) covers this? Use it — do not invent a parallel style.
+
+### Hierarchy & layout
+
+- One primary action per view; secondary actions visibly de-emphasized; tertiary quietest. Never give two elements equal maximum emphasis — if everything is bold, nothing is.
+- Build from the scaffolding so every tool shares the same rhythm and headers. The content area is the hero: inputs and outputs fill the available width; chrome shrinks to the minimum.
+- Group related items by proximity; separate unrelated groups with space, not just borders.
+- Align to the spacing scale and a consistent grid — no one-off pixel values. Lead the eye most-to-least important; put the primary action where the user looks first (top-left for input) or acts last (inline/right for output).
+
+### Spacing
+
+- Use Tailwind's scale only. Vertical rhythm inside a tool is `tool-spacer` (`space-y-5 sm:space-y-6`); section padding `tool-padding`. Keep step sizes consistent within a view — inconsistent gaps read as bugs.
+- Prefer whitespace over cramming. Density is a deliberate choice, not a default.
+
+### Typography
+
+- Use the typography utilities, never ad-hoc sizes: labels `text-xs font-medium`, hints `text-[11px] text-muted-foreground`, body `text-sm`, mono `font-mono text-sm`, headings via `.heading-xl…xs`. (See the type scale below.)
+- One family (Inter) plus the mono fallback; express hierarchy through weight and size, not new fonts.
+- Left-align body and long-form text; never justify or center it.
+
+### Color
+
+- Color communicates meaning (state, action, status), not decoration. **Never use color as the only signal** — pair it with text, icon, or shape (e.g. error = red + icon + message) for colorblind users.
+- Pull every color from tokens (`bg-card`, `text-muted-foreground`, …); no raw hex when a token exists. Reserve solid accent blue for the single primary action; use `bg-primary/10` + `text-primary` for selected/active states. Keep semantic palettes (amber/red/green, HTTP-method, syntax) un-tinted by the accent.
+
+### Affordances & interaction
+
+- Interactive elements look interactive; non-interactive elements must not mimic them. Every action gets immediate visible feedback (hover, active, focus, loading, success, error) using the shared motion tokens — no jarring instant swaps.
+- Keep clickable targets comfortable (≥44px on touch; dense pointer targets fine on desktop, but not cramped).
+- Prefer recognition over recall: show options, autocomplete, and visible navigation. Use progressive disclosure — hide advanced/rare options until needed.
+- **Keyboard-first:** wire `useQuickPaste` (⌘V) and `useInputHistory` (⌘Z/⌘⇧Z) on every text tool.
+
+### Feedback & system status
+
+- Implement **all** states for any data-driven view: loading, empty, error, populated. An empty state guides the user to the next action — never a blank void.
+- Show progress for anything over ~1s (spinner, skeleton, progress bar). Never freeze the UI; offload heavy work to a worker/Rust command.
+- Confirm destructive or irreversible actions and offer undo where possible.
+
+### Error prevention & recovery
+
+- Prevent errors first: sensible defaults, input constraints, inline validation, disabled-until-valid where appropriate.
+- Error messages say what went wrong **and** how to fix it, in plain language — no raw codes or "An error occurred."
+- Never trap the user: always provide a clear exit/back/cancel. Preserve user input on error — never wipe a form because one field failed.
+
+### Forms
+
+- One column. Labels above fields (never placeholder-only — placeholders disappear and fail accessibility). Mark required vs optional explicitly; match field width to expected input length.
+- Group related fields and order them logically; ask only for what is truly needed. Validate inline and on blur, not only on submit.
+
+### Responsive
+
+- Desktop-first (this is a cross-platform desktop tool), but content must reflow down to narrow widths without horizontal scroll — use the responsive scaffolding utilities rather than fixed pixel widths.
+
+---
+
 ## Foundations
 
 ### Color tokens
@@ -124,15 +189,38 @@ import { Button, Card, Input, Select, Segmented, ToolSection, PaneHeader, cn } f
 - Paint large areas in saturated accent blue.
 - Add bespoke shadows or easing curves — use the scales and motion tokens.
 - Animate transforms without a `motion-safe:` guard.
+- Ship a UI with missing loading/empty/error states.
+- Use placeholder text as the only label, or rely on color alone for status.
+- Remove focus outlines without a visible replacement.
+- Add a second co-equal primary button on the same view.
+- Center or justify long body text, or block the user with no way back/cancel.
 
 ---
 
-## Accessibility
+## Accessibility (non-negotiable)
 
-- **Reduced motion:** a global `prefers-reduced-motion` guard neutralizes animations/transitions; transform effects are additionally gated behind `motion-safe:`.
-- **Focus:** visible focus rings use `--ring` (the accent); the `.accent-glow` utilities provide soft focus halos.
-- **Contrast:** text tokens (`--foreground`, `--muted-foreground`) are tuned for legible contrast in both themes; keep custom text on accent/semantic fills above WCAG AA.
+- **Contrast:** meet WCAG AA — 4.5:1 normal text, 3:1 large text and UI components. Text tokens (`--foreground`, `--muted-foreground`) are tuned for both themes; keep custom text on accent/semantic fills above AA.
+- **Keyboard:** every interactive element is keyboard reachable and operable. Visible focus rings use `--ring`; the `.accent-glow` utilities provide soft halos. Never remove a focus outline without replacing it.
+- **Semantics:** use native controls and the shared primitives first (`button`, `a`, `label`, headings in order); reach for ARIA only when semantics are insufficient. Every input has an associated label; every meaningful image has alt text (decorative images marked empty).
+- **Reduced motion:** a global `prefers-reduced-motion` guard neutralizes animations/transitions; transform effects are additionally gated behind `motion-safe:`. Never rely on motion alone to convey meaning.
 - **Scrollbars:** one thin, themed cross-platform scrollbar (`.no-scrollbar` opts out where needed).
+
+---
+
+## Self-review before declaring UI done
+
+Verify each item and report the result; if any answer is "no," fix it or explicitly flag it before finishing:
+
+1. Exactly one clear primary action per view? Hierarchy obvious at a glance (squint test)?
+2. Spacing, type, and color all from the defined scale/tokens (no raw hex or one-off px)?
+3. Loading, empty, error, and success states all handled?
+4. Keyboard navigable with a visible focus state; ⌘V / ⌘Z hooks wired on text tools?
+5. Contrast meets AA; every input labeled; every meaningful image has alt text?
+6. Color never the only signal for status?
+7. Destructive actions confirmed/reversible; user input preserved on error?
+8. Reflows to narrow width without horizontal scroll?
+9. Consistent with existing components and patterns; built from the scaffolding?
+10. Verified in **both** light and dark themes?
 
 ---
 

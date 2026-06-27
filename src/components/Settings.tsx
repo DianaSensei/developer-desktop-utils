@@ -100,10 +100,11 @@ const APP_PERMISSIONS = [
   {
     Icon: Globe,
     name: 'Network',
-    scope: 'Brokers you add + URLs you send to + DNS/IP services you query + update check',
+    scope: 'Brokers you add + URLs you send to + a local HTTP listener you start + DNS/IP services you query + update check',
     reasons: [
       { text: 'Connect to Kafka brokers you configure', tool: 'Kafka Explorer' },
       { text: 'Send HTTP requests to URLs you enter', tool: 'API Client' },
+      { text: 'Open a local HTTP listener on a port you choose (127.0.0.1, or 0.0.0.0 to expose on your LAN); responses can run sandboxed Rhai scripts with no file or network access', tool: 'Mock Server' },
       { text: 'Run DNS record, propagation & DNSSEC lookups', tool: 'Network Tools' },
       { text: 'Look up public IP & geolocation', tool: 'Network Tools' },
       { text: 'Read this machine\'s local network info', tool: 'Network Tools' },

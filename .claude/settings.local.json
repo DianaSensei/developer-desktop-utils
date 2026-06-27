@@ -7,7 +7,8 @@
       "Bash(npx tsc *)",
       "Bash(npm run *)",
       "Skill(code-review)",
-      "Skill(code-review:*)"
+      "Skill(code-review:*)",
+      "Bash(cargo test *)"
     ]
   }
 }

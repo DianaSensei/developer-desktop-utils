@@ -5,13 +5,15 @@
 import { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { json } from '@codemirror/lang-json';
+import { HighlightStyle, syntaxHighlighting, type LanguageSupport } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { tags } from '@lezer/highlight';
 import { cn } from '@/lib/utils';
 import { varExtensions, varTheme } from './varSupport';
 
 const jsLang = javascript();
+const jsonLang = json();
 
 const editorTheme = EditorView.theme({
   // flex:1 (not height:100%) fills the parent in flex chains without an explicit pixel height.
@@ -58,9 +60,13 @@ interface Props {
   // When provided, {{variables}} are highlighted/autocompleted in the editor
   // (used for the request body; omitted for scripts/tests).
   vars?: Record<string, string>;
+  // Grammar used for syntax highlighting. Defaults to JavaScript (scripts).
+  // 'text' applies no grammar (plain). Language is fixed at mount — change the
+  // component `key` to switch it.
+  language?: 'javascript' | 'json' | 'text';
 }
 
-export function CodeEditor({ value, onChange, placeholder, className, vars }: Props) {
+export function CodeEditor({ value, onChange, placeholder, className, vars, language = 'javascript' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -69,6 +75,9 @@ export function CodeEditor({ value, onChange, placeholder, className, vars }: Pr
   const varsRef = useRef(vars);
   varsRef.current = vars;
   const hasVars = useRef(!!vars).current;
+  const lang = useRef<LanguageSupport | null>(
+    language === 'json' ? jsonLang : language === 'text' ? null : jsLang,
+  ).current;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -77,7 +86,7 @@ export function CodeEditor({ value, onChange, placeholder, className, vars }: Pr
         doc: value,
         extensions: [
           basicSetup,
-          jsLang,
+          ...(lang ? [lang] : []),
           syntaxHighlighting(codeHighlight),
           editorTheme,
           EditorView.lineWrapping,

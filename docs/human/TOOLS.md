@@ -32,6 +32,7 @@ This document describes every tool in the app: what computation it performs, wha
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
+| Mock Server | ✓ | — | — | **✓ Local HTTP listener you start (127.0.0.1, or 0.0.0.0 = LAN)** | Stubs + server settings (localStorage); request log in-memory, cleared on restart |
 
 ---
 
@@ -330,6 +331,24 @@ A Postman/Bruno-style HTTP request workbench: organize requests into collections
 **Postman compatibility:** import reads Postman Collection **v2.1** JSON (folders, requests, headers, query, body, bearer/basic auth, and pre-request/test scripts); export writes the same format. Postman scripts use the `pm.*` API — the script text is preserved on import so you can adapt it to Bruno's `bru`/`req`/`res` API. Import/export use the native file picker (desktop) or browser file input/download (web).
 
 **Permissions (Tauri):** `http:default` is widened in `capabilities/default.json` to allow `http://**` and `https://**` so the client can reach any API — the same access Postman/Bruno need. Requests still only fire on **Send**. In the desktop app requests are made from Rust via the HTTP plugin (no browser CORS/Origin restriction); the web build uses the WebView's `fetch` (subject to the target's CORS policy). Import/export use the `dialog` + `fs` plugins (user-triggered pickers only).
+
+### Mock Server
+
+A local HTTP mock server for stubbing an upstream API while you build or test a client (it is the *server* counterpart to the API Client's *caller*). You define **stubs** — each a method + path pattern plus optional matchers — and the first stub that matches an incoming request produces the response. Path patterns support `:param` captures (e.g. `/users/:id`) and `*` wildcards. Matchers can require a **query** param, **header**, **path** param, or **body** to `equals` / `contains` / match a `regex` / `exists`. A body matcher has a scope selector: **Whole body** (match the raw body string) or **JSON field** (match a path like `user.name` or `items.0.id` read from the request body as JSON).
+
+The three panels (stubs · editor · request log) are resizable by dragging the dividers, and the request log can be hidden.
+
+**Responses** are either:
+- **Static** — a status, headers, and a body whose type is **Text**, **JSON**, or **File**. Text/JSON bodies support `{{ token }}` interpolation: `{{request.method}}`, `{{request.path}}`, `{{request.query.NAME}}`, `{{request.header.NAME}}`, `{{request.body}}`, `{{path.NAME}}`, `{{uuid}}`, `{{now}}` (epoch ms), `{{now.iso}}`, `{{randomInt(a,b)}}`. A **File** body is base64 bytes (pick a file or paste base64) served as a binary download — set a download name to add `Content-Disposition: attachment` and the MIME type via the `Content-Type` header.
+- **Script** — a sandboxed **Rhai** script that receives `req` (`method`, `path`, `query`, `headers`, `params`, `body`) and returns either a string (a 200 body) or a map `#{ status, headers, body }`. An optional per-stub delay simulates latency.
+
+**What leaves the machine:** nothing outbound. The tool **opens a local TCP listener** on a port you choose so other processes can reach it. By default it binds **local** — both IPv4 `127.0.0.1` and IPv6 `::1` (this machine only), so `http://localhost:<port>` works from any client (browsers, curl, and the Rust-based API Client, which often resolves `localhost` to `::1`). You may switch to `0.0.0.0` to expose it to your local network for device testing — the UI shows a warning while bound this way, and your OS may prompt for firewall access. The server only runs while you click **Start**, and stops on **Stop**.
+
+**Scripting safety:** Rhai is a pure-Rust embedded language with **no filesystem, network, or system access**, and the engine is configured with operation/size/recursion limits so a stub script cannot hang the app or exhaust memory. Scripts are your own and run only when a matching request arrives (or when you click **Test script** in the editor).
+
+**Storage:** stubs and server settings (host/port, default-response) persist in `localStorage` under `devtool:mockServer:config`. The live request log is kept in memory only (capped) and is cleared when the app restarts.
+
+**Permissions (Tauri):** none beyond the default — binding a listener is owned by the app's Rust process and needs no capability grant. Clipboard write is used only for the "copy base URL" button.
 
 ---
 

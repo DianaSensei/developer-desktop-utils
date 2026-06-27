@@ -23,7 +23,7 @@ import { GenerateCodeDialog } from './GenerateCodeDialog';
 import { RunnerDialog } from './RunnerDialog';
 import { CookieManager } from './CookieManager';
 import { useApiStore } from './store';
-import { executeRequest } from './engine';
+import { executeRequest, errToString } from './engine';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 
 export type SplitDirection = 'horizontal' | 'vertical';
@@ -160,7 +160,7 @@ export function ApiClient() {
       if ((e as Error).name === 'AbortError') {
         patchRun(id, { error: 'Request cancelled.' });
       } else {
-        patchRun(id, { error: (e as Error).message || 'Request failed', response: null });
+        patchRun(id, { error: errToString(e), response: null });
       }
     } finally {
       patchRun(id, { sending: false });

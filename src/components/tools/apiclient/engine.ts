@@ -26,6 +26,22 @@ export interface ExecResult {
   envChanged: boolean;
 }
 
+// Tauri rejects commands with a plain string (not an Error), so reading
+// `e.message` loses the real cause. Normalize any thrown value to readable text
+// so transport failures (scope denials, connection refused, …) are visible.
+export function errToString(e: unknown): string {
+  if (e == null) return 'Request failed';
+  if (typeof e === 'string') return e;
+  if (e instanceof Error) return e.message || String(e);
+  if (typeof e === 'object') {
+    const o = e as Record<string, unknown>;
+    if (typeof o.message === 'string' && o.message) return o.message;
+    if (typeof o.error === 'string' && o.error) return o.error;
+    try { return JSON.stringify(e); } catch { return String(e); }
+  }
+  return String(e);
+}
+
 function envToMap(env: Environment | null): VarMap {
   const map: VarMap = {};
   if (env) for (const v of env.variables) if (v.enabled && v.key) map[v.key] = v.value;
@@ -81,7 +97,7 @@ export async function executeRequest(
     response = await sendRequest(draft, varMap(), signal, cookieJar);
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
-    return finish(null, out, stores, envBefore, (e as Error).message || 'Request failed');
+    return finish(null, out, stores, envBefore, errToString(e));
   }
 
   // 4–6. post-response vars + script (request, then inherited inner→outer),
