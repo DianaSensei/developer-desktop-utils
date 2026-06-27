@@ -1,19 +1,20 @@
 import {
-  Calendar,
-  Code,
+  CalendarClock,
+  CaseSensitive,
   Clock,
   FileJson,
-  Shield,
-  Search,
+  Binary,
+  KeyRound,
+  Regex,
   GitCompare,
   QrCode,
   FileText,
-  Filter,
+  CopyMinus,
   Type,
-  Palette,
+  Pipette,
   FileCheck,
   ImageIcon,
-  Shuffle,
+  Dices,
   Server,
   Database,
   Timer,
@@ -37,15 +38,15 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     id: "cron-generator",
     label: "Cron Generator",
-    icon: Calendar,
+    icon: CalendarClock,
     description: "Build and validate cron expressions with a visual editor.",
   },
   {
     id: "text-transform",
     label: "Text Transformer",
-    icon: Code,
+    icon: CaseSensitive,
     description:
-      "Convert case, sort, trim, reverse, and transform text in bulk.",
+      "Change case, join/split lines, build arrays, and convert Vietnamese phone numbers.",
   },
   {
     id: "text-counter",
@@ -56,13 +57,13 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     id: "color-picker",
     label: "Color Picker",
-    icon: Palette,
-    description: "Pick colors and convert between HEX, RGB, HSL, and HSV.",
+    icon: Pipette,
+    description: "Pick colors from an image and convert between HEX, RGB, HSL, and CMYK.",
   },
   {
     id: "base64",
     label: "Encode·Hash·Encrypt",
-    icon: Shield,
+    icon: Binary,
     description:
       "Encode/decode (Base64, URL, Hex, Morse…), hash (MD5, SHA-256, HMAC), and AES-256 encrypt/decrypt.",
   },
@@ -83,14 +84,14 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     id: "jwt",
     label: "JWT Debugger",
-    icon: Shield,
+    icon: KeyRound,
     description:
       "Decode and inspect JWT headers and payloads without verification.",
   },
   {
     id: "regex",
     label: "Regex Tester",
-    icon: Search,
+    icon: Regex,
     description:
       "Test regular expressions with live match highlighting and group capture.",
   },
@@ -105,7 +106,7 @@ export const TOOL_DEFS: ToolDef[] = [
     id: "qrcode",
     label: "QR Code",
     icon: QrCode,
-    description: "Generate QR codes from any text or URL and download as PNG.",
+    description: "Generate QR codes from text or URLs, or decode a QR image back to its content.",
   },
   {
     id: "markdown",
@@ -116,7 +117,7 @@ export const TOOL_DEFS: ToolDef[] = [
   {
     id: "deduplicate",
     label: "Deduplicate",
-    icon: Filter,
+    icon: CopyMinus,
     description: "Remove duplicate lines or items from any list.",
   },
   {
@@ -135,8 +136,8 @@ export const TOOL_DEFS: ToolDef[] = [
   },
   {
     id: "generator",
-    label: "Generator",
-    icon: Shuffle,
+    label: "Random Generator",
+    icon: Dices,
     description:
       "Generate UUIDs, random numbers, and text with custom character sets.",
   },

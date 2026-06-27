@@ -941,7 +941,7 @@ export function TwoFactorAuth() {
               onClick={() => setShowInfo((s) => !s)}
             >
               {showInfo ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              About
+              Info
             </Button>
             {accounts.length > 0 && (
               <Button

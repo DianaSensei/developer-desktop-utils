@@ -180,7 +180,7 @@ const SUGGESTIONS: Record<CronMode, Partial<Record<FieldKey, Array<{ label: stri
     month: [
       { label: 'Every month', value: '*' },
       { label: 'January', value: 'JAN' },
-      { label: 'Weekdays season', value: 'JAN-MAR' },
+      { label: 'Q1 (Jan–Mar)', value: 'JAN-MAR' },
     ],
     dayOfWeek: [
       { label: 'Every day', value: '*' },

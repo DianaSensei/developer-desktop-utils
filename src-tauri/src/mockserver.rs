@@ -4,15 +4,17 @@
 // request funnels into a single catch-all axum handler which runs the matching
 // engine (method + path + matchers, first-match-wins) and builds a response
 // either from a static template (`{{ token }}` interpolation) or a sandboxed
-// Rhai script. Each request is reported to the frontend via a `mock:request`
-// event so the UI can render a live log.
+// Rhai script. Requests are reported to the frontend in batches via a
+// `mock:request-batch` event (a background task flushes a bounded buffer every
+// ~250ms) so a flood of requests can't saturate the IPC bridge or the UI.
 //
-// The rule set lives behind an `Arc<RwLock<MockConfig>>` shared with the running
-// handler, so editing stubs hot-swaps them without restarting the server.
+// The rule set lives behind an `Arc<RwLock<Arc<MockConfig>>>` shared with the
+// running handler, so editing stubs hot-swaps them without restarting — and the
+// handler only clones a cheap `Arc` per request, never the whole stub set.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
@@ -27,7 +29,9 @@ use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
 const MAX_BODY: usize = 10 * 1024 * 1024; // 10 MB request body cap
-const LOG_BODY_CAP: usize = 64 * 1024; // truncate bodies in the event log
+const LOG_BODY_CAP: usize = 8 * 1024; // truncate bodies in the log preview (keeps IPC light)
+const LOG_BUFFER_CAP: usize = 1000; // max log entries buffered between flushes (drops oldest)
+const LOG_FLUSH_MS: u64 = 250; // how often the buffered log is streamed to the UI
 
 // ── Data types (serde camelCase to match the TS frontend) ───────────────────
 
@@ -190,14 +194,45 @@ struct RunningServer {
 
 #[derive(Clone)]
 struct HandlerState {
-    rules: Arc<RwLock<MockConfig>>,
-    app: AppHandle,
+    // Cheap to clone per request: shares the same lock + buffer.
+    rules: Arc<RwLock<Arc<MockConfig>>>,
+    log_buf: Arc<Mutex<VecDeque<LogEntry>>>,
 }
 
 #[derive(Default)]
 pub struct MockState {
-    rules: Arc<RwLock<MockConfig>>,
+    rules: Arc<RwLock<Arc<MockConfig>>>,
     server: Mutex<Option<RunningServer>>,
+    // Requests are buffered here and flushed to the UI in batches.
+    log_buf: Arc<Mutex<VecDeque<LogEntry>>>,
+}
+
+// Background task: drain the request-log buffer every LOG_FLUSH_MS and emit it
+// to the UI as one batched event. Bounds IPC traffic and UI re-renders to a few
+// per second regardless of how many requests/second the server is handling.
+fn spawn_log_flusher(
+    app: AppHandle,
+    buf: Arc<Mutex<VecDeque<LogEntry>>>,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_millis(LOG_FLUSH_MS));
+        loop {
+            tokio::select! {
+                _ = tick.tick() => {
+                    let batch: Vec<LogEntry> = {
+                        let mut b = match buf.lock() { Ok(b) => b, Err(_) => break };
+                        if b.is_empty() { continue; }
+                        b.drain(..).collect()
+                    };
+                    let _ = app.emit("mock:request-batch", batch);
+                }
+                _ = shutdown.changed() => {
+                    if *shutdown.borrow() { break; }
+                }
+            }
+        }
+    });
 }
 
 // ── Matching engine ───────────────────────────────────────────────────────────
@@ -238,6 +273,27 @@ fn match_path(pattern: &str, path: &str) -> Option<HashMap<String, String>> {
         return None;
     }
     Some(params)
+}
+
+// Compiled-regex cache so matcher patterns aren't recompiled on every request.
+// Cleared whenever the rule set changes (patterns are bounded by the stub set).
+static REGEX_CACHE: OnceLock<Mutex<HashMap<String, Option<regex::Regex>>>> = OnceLock::new();
+
+fn regex_for(pattern: &str) -> Option<regex::Regex> {
+    let cache = REGEX_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut c = cache.lock().unwrap();
+    if let Some(r) = c.get(pattern) {
+        return r.clone();
+    }
+    let compiled = regex::Regex::new(pattern).ok();
+    c.insert(pattern.to_string(), compiled.clone());
+    compiled
+}
+
+fn clear_regex_cache() {
+    if let Some(c) = REGEX_CACHE.get() {
+        c.lock().unwrap().clear();
+    }
 }
 
 fn method_matches(stub: &Stub, method: &str) -> bool {
@@ -290,9 +346,9 @@ fn matcher_passes(m: &Matcher, ctx: &RequestCtx, params: &HashMap<String, String
         },
         "equals" => subject.as_deref() == Some(m.value.as_str()),
         "contains" => subject.map(|s| s.contains(&m.value)).unwrap_or(false),
-        "regex" => match regex::Regex::new(&m.value) {
-            Ok(re) => subject.map(|s| re.is_match(&s)).unwrap_or(false),
-            Err(_) => false,
+        "regex" => match regex_for(&m.value) {
+            Some(re) => subject.map(|s| re.is_match(&s)).unwrap_or(false),
+            None => false,
         },
         _ => false,
     }
@@ -690,10 +746,15 @@ async fn handle(State(hs): State<HandlerState>, req: Request) -> Response {
         body: body_str.clone(),
     };
 
-    // Snapshot the config so we never hold the lock across the await below.
-    let cfg = hs.rules.read().map(|c| c.clone()).unwrap_or_default();
+    // Cheap Arc clone of the current rule set — never deep-clones the stubs, and
+    // never holds the lock across the await below.
+    let cfg = hs
+        .rules
+        .read()
+        .map(|g| Arc::clone(&g))
+        .unwrap_or_else(|_| Arc::new(MockConfig::default()));
 
-    let (resolved, matched_id, delay_ms) = match select_stub(&cfg, &ctx) {
+    let (resolved, matched_id, delay_ms) = match select_stub(cfg.as_ref(), &ctx) {
         Some((stub, params)) => {
             let id = stub.id.clone();
             let delay = stub.delay_ms;
@@ -733,7 +794,14 @@ async fn handle(State(hs): State<HandlerState>, req: Request) -> Response {
         req_body: truncate(&body_str),
         res_body: truncate(&resolved.log_body),
     };
-    let _ = hs.app.emit("mock:request", entry);
+    // Push into the bounded buffer (drop oldest on overflow); the flusher streams
+    // it to the UI in batches. This keeps the hot path lock-light and emit-free.
+    if let Ok(mut buf) = hs.log_buf.lock() {
+        if buf.len() >= LOG_BUFFER_CAP {
+            buf.pop_front();
+        }
+        buf.push_back(entry);
+    }
 
     // Build the axum response.
     let mut builder = Response::builder()
@@ -772,7 +840,8 @@ pub async fn mock_start(
     }
 
     // Replace the shared rule set before (re)starting.
-    *state.rules.write().map_err(|_| "lock poisoned")? = config;
+    *state.rules.write().map_err(|_| "lock poisoned")? = Arc::new(config);
+    clear_regex_cache();
 
     // Stop an existing server first (restart semantics).
     if let Some(old) = state.server.lock().map_err(|_| "lock poisoned")?.take() {
@@ -812,7 +881,7 @@ pub async fn mock_start(
 
     let handler_state = HandlerState {
         rules: state.rules.clone(),
-        app: app.clone(),
+        log_buf: state.log_buf.clone(),
     };
     let router = Router::new().fallback(handle).with_state(handler_state);
 
@@ -828,6 +897,9 @@ pub async fn mock_start(
                 .await;
         });
     }
+
+    // Stream buffered request logs to the UI; stops with the server.
+    spawn_log_flusher(app.clone(), state.log_buf.clone(), rx.clone());
 
     *state.server.lock().map_err(|_| "lock poisoned")? = Some(RunningServer {
         shutdown: tx,
@@ -872,7 +944,8 @@ pub async fn mock_update_rules(
     state: tauri::State<'_, MockState>,
     config: MockConfig,
 ) -> Result<(), String> {
-    *state.rules.write().map_err(|_| "lock poisoned")? = config;
+    *state.rules.write().map_err(|_| "lock poisoned")? = Arc::new(config);
+    clear_regex_cache();
     Ok(())
 }
 

@@ -70,7 +70,7 @@ function ResultList({ items }: { items: string[] }) {
   );
 }
 
-export function GeneratorTool() {
+export function RandomGenerator() {
   const { config } = useAppConfig();
   const { maxNumberCount, maxTextCount, maxTextLength } = config.generator;
   const [mode, setMode] = usePersistentState<Mode>('devtool:gen:mode', 'uuid');

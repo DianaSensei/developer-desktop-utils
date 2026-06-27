@@ -27,8 +27,13 @@ function ensureListening() {
   listening = true;
   import('@tauri-apps/api/event')
     .then(({ listen }) =>
-      listen<RequestLogEntry>('mock:request', (e) => {
-        entries = [e.payload, ...entries].slice(0, LOG_CAP);
+      // The backend batches requests (~1 event/250ms) so the UI never faces a
+      // per-request event storm under load.
+      listen<RequestLogEntry[]>('mock:request-batch', (e) => {
+        const batch = e.payload;
+        if (!batch || batch.length === 0) return;
+        // Batch arrives oldest→newest; show newest first, capped.
+        entries = [...batch].reverse().concat(entries).slice(0, LOG_CAP);
         notify();
       }),
     )

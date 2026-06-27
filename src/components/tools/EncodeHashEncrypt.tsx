@@ -492,7 +492,7 @@ function doDecrypt(algo: EncryptAlgo, ciphertext: string, key: string): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function Base64Tool() {
+export function EncodeHashEncrypt() {
   // Top-level tab
   const [tab, setTab] = usePersistentState<Tab>('devtool:codec:tab', 'encode');
 
