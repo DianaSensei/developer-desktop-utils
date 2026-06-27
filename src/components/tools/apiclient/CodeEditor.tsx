@@ -64,9 +64,11 @@ interface Props {
   // 'text' applies no grammar (plain). Language is fixed at mount — change the
   // component `key` to switch it.
   language?: 'javascript' | 'json' | 'text';
+  // When true the document can't be edited (read-only output view). Fixed at mount.
+  readOnly?: boolean;
 }
 
-export function CodeEditor({ value, onChange, placeholder, className, vars, language = 'javascript' }: Props) {
+export function CodeEditor({ value, onChange, placeholder, className, vars, language = 'javascript', readOnly = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
@@ -87,6 +89,7 @@ export function CodeEditor({ value, onChange, placeholder, className, vars, lang
         extensions: [
           basicSetup,
           ...(lang ? [lang] : []),
+          ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
           syntaxHighlighting(codeHighlight),
           editorTheme,
           EditorView.lineWrapping,

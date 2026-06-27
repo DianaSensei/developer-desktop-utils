@@ -193,13 +193,19 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
   base64: makeGuide({
     use: [
       'Encode tab: pick a codec (Base64/62, URL, HTML, Hex, Morse, Punycode…) and toggle Encode/Decode.',
+      'Image tab: convert an image to Base64 (drop/paste/upload, copy raw or data URL) or paste Base64 back to a preview.',
       'Hash tab: see MD5/SHA-1/2/3 & RIPEMD at once; toggle case, verify against a known hash, or add a key for HMAC.',
+      'Checksum tab: drag a file in to compute MD5/SHA-1/256/512 with a progress bar, then verify against a known hash.',
       'Encrypt tab: choose an AES/3DES/Rabbit mode, enter a passphrase, and encrypt/decrypt.',
       'Pipeline tab: chain multiple encode/hash/encrypt stages together.',
     ],
-    know: ['Hashes are one-way; most codecs are reversible. Everything runs locally — nothing is uploaded.'],
+    know: [
+      'Hashes are one-way; most codecs are reversible. Everything runs locally — files and text are never uploaded.',
+      'Files are checksummed in chunks (in Rust on desktop, a Web Worker on the web), so the UI stays responsive.',
+    ],
     caveat: [
       'Encryption is CryptoJS passphrase-based (no AEAD/PBKDF2); ECB mode leaks patterns — prefer CBC or CTR.',
+      'Base64 is ~33% larger than the binary; very large images/files strain memory, and clipboard image copy isn’t supported on every platform.',
     ],
   }),
 
@@ -289,25 +295,6 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     caveat: ['SQL formatting is general / PostgreSQL-leaning and may not perfectly handle every dialect or deeply nested CTEs.'],
   }),
 
-  checksum: makeGuide({
-    use: [
-      'Pick an algorithm (MD5, SHA-1/256/512); drag a file in or click to browse.',
-      'Watch the progress bar, then copy the hash.',
-      'Optionally paste a known hash to verify (✓ / ✗).',
-    ],
-    know: ['Files are hashed in chunks — in Rust on desktop, a Web Worker on the web — so the UI stays responsive.'],
-    caveat: ['Very large files still take time and memory; the file is read locally and never uploaded.'],
-  }),
-
-  'image-base64': makeGuide({
-    use: [
-      'Image → Base64: drop, upload, or paste an image; copy the raw Base64 or the full data URL.',
-      'Base64 → Image: paste a Base64 string (with or without the data: prefix) to preview and copy the image.',
-    ],
-    know: ['Supports PNG/JPG/GIF/WebP; the format is detected from the bytes when decoding.'],
-    caveat: ['Base64 is ~33% larger than the binary; very large images strain memory; clipboard image copy isn’t supported on every platform.'],
-  }),
-
   generator: makeGuide({
     use: [
       'Pick UUID, Number, or Text.',
@@ -330,15 +317,6 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     ],
   }),
 
-  'meeting-notes': makeGuide({
-    use: [
-      'Create a note, then fill title, participants, agenda, decisions and action items; set start/end times.',
-      'Search filters across all fields; use the Markdown tab to copy exportable minutes and Preview to read them.',
-    ],
-    know: ['Notes with a start time also appear in the Time Tracker calendar; everything is saved locally.'],
-    caveat: ['Markdown is generated one-way from the form (no markdown-to-form editing); there are no tags/categories.'],
-  }),
-
   'lucky-wheel': makeGuide({
     use: [
       'Enter choices (one per line; duplicates raise the odds); optionally toggle “Unique only” and “Remove winner”.',
@@ -359,6 +337,23 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     caveat: ['Secrets are stored UNENCRYPTED in local storage — convenient, but not a hardened vault. Keep an export backup; there’s no device sync.'],
   }),
 
+  'data-converter': makeGuide({
+    use: [
+      <>Pick the <strong className="text-foreground">From</strong> format, paste your data on the left, and choose the <strong className="text-foreground">To</strong> format — the result updates live on the right.</>,
+      <>Use the <Tok>⇄</Tok> button to swap directions; the current result becomes the new input, so you can round-trip a value.</>,
+      <>Adjust indent, CSV delimiter, or XML pretty-printing in the toolbar; copy or download the result.</>,
+    ],
+    know: [
+      <>Conversion runs entirely on your device (JSON, YAML, TOML, XML, .properties) — nothing is uploaded, so it works offline.</>,
+      <>Parse errors show inline on the right with the reason; fix the source and they clear.</>,
+    ],
+    caveat: [
+      <><strong className="text-foreground">TOML</strong> output needs a top-level table (object); a bare array or scalar at the root can’t be represented.</>,
+      <><strong className="text-foreground">XML</strong> uses <Tok>@_</Tok>-prefixed keys for attributes; arrays/scalars are wrapped in a <Tok>&lt;root&gt;</Tok> element so the output stays valid.</>,
+      <><strong className="text-foreground">.properties</strong> has no nesting: dotted keys map to nested objects and <Tok>key[0]</Tok> to arrays, values are type-inferred, and comments are dropped. A literal dot in a key name isn’t supported.</>,
+    ],
+  }),
+
   'kafka-explorer': makeGuide({
     use: [
       'Add a broker (host:port), then pick a topic or consumer group from the tree.',
@@ -375,10 +370,11 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
   'task-tracker': makeGuide({
     use: [
       <>Add a task (with a project), then Start/Stop the timer (<Key>{mod}</Key>+<Key>↵</Key> toggles); edit entry times inline.</>,
-      'Switch tabs: Timesheet grid (dates × projects) and Calendar; manage projects/colors and settings in the side panels.',
-      'Export entries as JSON or CSV.',
+      'Switch tabs: Timesheet grid (dates × projects), Calendar, and Meeting Notes; manage projects/colors and settings in the side panels.',
+      <>In <strong className="text-foreground">Meeting Notes</strong>, create a note and fill title, participants, agenda, decisions, and action items; a note with a start time also appears on the Calendar. Use the Markdown tab to copy exportable minutes.</>,
+      'Export time entries as JSON or CSV.',
     ],
-    know: ['The timer and all data persist locally; Pomodoro pauses and beeps after the configured interval; meeting notes with a start time appear on the calendar.'],
-    caveat: ['Local only (no cloud sync); desktop notifications need permission.'],
+    know: ['The timer and all data persist locally; Pomodoro pauses and beeps after the configured interval; meeting notes and time entries share the same calendar.'],
+    caveat: ['Local only (no cloud sync); desktop notifications need permission. Meeting-note Markdown is generated one-way from the form (no markdown-to-form editing).'],
   }),
 };

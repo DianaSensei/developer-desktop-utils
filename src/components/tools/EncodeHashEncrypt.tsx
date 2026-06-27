@@ -3,8 +3,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, Workflow } from 'lucide-react';
+import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, Workflow, FileCheck, ImageIcon } from 'lucide-react';
 import { PipelineTab } from './PipelineTab';
+import { ChecksumTool } from './ChecksumTool';
+import { ImageBase64Tool } from './ImageBase64Tool';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import { Segmented } from '@/components/ui/segmented';
 import { ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
@@ -17,7 +19,7 @@ import { CopyButton } from '@/components/ui/copy-button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'encode' | 'hash' | 'encrypt' | 'pipeline';
+type Tab = 'encode' | 'image' | 'hash' | 'checksum' | 'encrypt' | 'pipeline';
 type EncodeMode = 'encode' | 'decode';
 type CryptoMode = 'encrypt' | 'decrypt';
 
@@ -612,7 +614,9 @@ export function EncodeHashEncrypt() {
           onValueChange={setTab}
           options={[
             { value: 'encode', label: 'Encode', icon: Code },
+            { value: 'image', label: 'Image', icon: ImageIcon },
             { value: 'hash', label: 'Hash', icon: Lock },
+            { value: 'checksum', label: 'Checksum', icon: FileCheck },
             { value: 'encrypt', label: 'Encrypt', icon: ArrowLeftRight },
             { value: 'pipeline', label: 'Pipeline', icon: Workflow },
           ]}
@@ -817,6 +821,20 @@ export function EncodeHashEncrypt() {
               </p>
             )}
           </ToolSection>
+        </div>
+      )}
+
+      {/* ── Image ↔ Base64 tab ───────────────────────────────────────────────── */}
+      {tab === 'image' && (
+        <div className="flex-1 min-h-0">
+          <ImageBase64Tool />
+        </div>
+      )}
+
+      {/* ── Checksum (file hash) tab ─────────────────────────────────────────── */}
+      {tab === 'checksum' && (
+        <div className="flex-1 min-h-0">
+          <ChecksumTool />
         </div>
       )}
 

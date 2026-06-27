@@ -12,18 +12,16 @@ import {
   CopyMinus,
   Type,
   Pipette,
-  FileCheck,
-  ImageIcon,
   Dices,
   Server,
   Database,
   Timer,
   Network,
-  NotebookPen,
   Disc3,
   Send,
   ShieldCheck,
   ServerCog,
+  ArrowLeftRight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -65,7 +63,7 @@ export const TOOL_DEFS: ToolDef[] = [
     label: "Encode·Hash·Encrypt",
     icon: Binary,
     description:
-      "Encode/decode (Base64, URL, Hex, Morse…), hash (MD5, SHA-256, HMAC), and AES-256 encrypt/decrypt.",
+      "Encode/decode (Base64, URL, Hex, Morse…), image↔Base64, hash text or files (MD5, SHA, HMAC, checksums), and AES-256 encrypt/decrypt.",
   },
   {
     id: "unix-time",
@@ -80,6 +78,13 @@ export const TOOL_DEFS: ToolDef[] = [
     icon: FileJson,
     description:
       "Format, validate, minify, and explore JSON with syntax highlighting.",
+  },
+  {
+    id: "data-converter",
+    label: "Data Converter",
+    icon: ArrowLeftRight,
+    description:
+      "Convert structured data between JSON, YAML, TOML, XML, and .properties — fully offline.",
   },
   {
     id: "jwt",
@@ -121,20 +126,6 @@ export const TOOL_DEFS: ToolDef[] = [
     description: "Remove duplicate lines or items from any list.",
   },
   {
-    id: "checksum",
-    label: "Checksum",
-    icon: FileCheck,
-    description:
-      "Compute MD5, SHA-1, SHA-256, and SHA-512 checksums for any file.",
-  },
-  {
-    id: "image-base64",
-    label: "Image ↔ Base64",
-    icon: ImageIcon,
-    description:
-      "Convert images to Base64 strings and render Base64 back to images.",
-  },
-  {
     id: "generator",
     label: "Random Generator",
     icon: Dices,
@@ -160,7 +151,7 @@ export const TOOL_DEFS: ToolDef[] = [
     label: "Time Tracker",
     icon: Timer,
     description:
-      "Time tracker with timesheet and calendar views, projects, tags, and pomodoro.",
+      "Time tracker with timesheet, calendar, and meeting-notes views, projects, tags, and pomodoro.",
   },
   {
     id: "network",
@@ -168,13 +159,6 @@ export const TOOL_DEFS: ToolDef[] = [
     icon: Network,
     description:
       "DNS records (A, AAAA, CNAME, NS, TXT, SOA, SRV, CAA…), propagation, DNSSEC, plus what's my IP and IP geolocation lookup.",
-  },
-  {
-    id: "meeting-notes",
-    label: "Meeting Notes",
-    icon: NotebookPen,
-    description:
-      "Manage meeting minutes — search, create, and edit timed notes that sync with the Time Tracker calendar and export to Markdown.",
   },
   {
     id: "lucky-wheel",
@@ -212,10 +196,10 @@ export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
 // Edit this array to change the out-of-box sort order before a build.
 export const DEFAULT_TOOL_ORDER: string[] = [
   "task-tracker",
-    "meeting-notes",
   "api-client",
   "mock-server",
   "json",
+  "data-converter",
   "deduplicate",
   "text-transform",
   "sql-formatter",
@@ -225,11 +209,9 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "text-counter",
   "regex",
   "diff",
-  "checksum",
   "cron-generator",
     "kafka-explorer",
   "qrcode",
-  "image-base64",
   "color-picker",
   "jwt",
   "markdown",

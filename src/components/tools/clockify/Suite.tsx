@@ -3,6 +3,7 @@ import {
   Clock,
   CalendarDays,
   LayoutGrid,
+  NotebookPen,
   Settings as SettingsIcon,
   FolderKanban,
   Plus,
@@ -19,13 +20,15 @@ import { fmtTimer, workHoursForRanges } from './time';
 import { TimeTracker } from './TimeTracker';
 import { Timesheet } from './Timesheet';
 import { CalendarView } from './CalendarView';
+import { MeetingNotes } from './MeetingNotes';
 
-type TabId = 'tracker' | 'timesheet' | 'calendar';
+type TabId = 'tracker' | 'timesheet' | 'calendar' | 'notes';
 
 const TABS: { id: TabId; label: string; icon: typeof Clock; render: () => JSX.Element }[] = [
   { id: 'tracker', label: 'Time Tracker', icon: Clock, render: () => <TimeTracker /> },
   { id: 'timesheet', label: 'Timesheet', icon: LayoutGrid, render: () => <Timesheet /> },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, render: () => <CalendarView /> },
+  { id: 'notes', label: 'Meeting Notes', icon: NotebookPen, render: () => <MeetingNotes /> },
 ];
 
 function SuiteInner() {

@@ -39,10 +39,9 @@ const TextTransformer = lazy(() => named(import('@/components/tools/TextTransfor
 const EncodeHashEncrypt = lazy(() => named(import('@/components/tools/EncodeHashEncrypt'), 'EncodeHashEncrypt'));
 const DateTimeTool = lazy(() => named(import('@/components/tools/DateTimeTool'), 'DateTimeTool'));
 const JsonFormatter = lazy(() => named(import('@/components/tools/JsonFormatter'), 'JsonFormatter'));
+const DataConverter = lazy(() => named(import('@/components/tools/DataConverter'), 'DataConverter'));
 const JwtDebugger = lazy(() => named(import('@/components/tools/JwtDebugger'), 'JwtDebugger'));
 const RegexTester = lazy(() => named(import('@/components/tools/RegexTester'), 'RegexTester'));
-const ChecksumTool = lazy(() => named(import('@/components/tools/ChecksumTool'), 'ChecksumTool'));
-const ImageBase64Tool = lazy(() => named(import('@/components/tools/ImageBase64Tool'), 'ImageBase64Tool'));
 const RandomGenerator = lazy(() => named(import('@/components/tools/RandomGenerator'), 'RandomGenerator'));
 const TextDiff = lazy(() => named(import('@/components/tools/TextDiff'), 'TextDiff'));
 const QRCodeTool = lazy(() => named(import('@/components/tools/QRCodeTool'), 'QRCodeTool'));
@@ -55,7 +54,6 @@ const KafkaExplorer = lazy(() => named(import('@/components/tools/kafka/KafkaExp
 const SqlFormatter = lazy(() => named(import('@/components/tools/SqlFormatter'), 'SqlFormatter'));
 const TimeTracker = lazy(() => named(import('@/components/tools/clockify/Suite'), 'ClockifySuite'));
 const NetworkTools = lazy(() => named(import('@/components/tools/NetworkTools'), 'NetworkTools'));
-const MeetingNotes = lazy(() => named(import('@/components/tools/MeetingNotes'), 'MeetingNotes'));
 const LuckyWheel = lazy(() => named(import('@/components/tools/LuckyWheel'), 'LuckyWheel'));
 const ApiClient = lazy(() => named(import('@/components/tools/apiclient/ApiClient'), 'ApiClient'));
 const TwoFactorAuth = lazy(() => named(import('@/components/tools/TwoFactorAuth'), 'TwoFactorAuth'));
@@ -69,20 +67,18 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'base64':         { path: '/base64',         component: EncodeHashEncrypt, fullHeight: true },
   'unix-time':      { path: '/unix-time',      component: DateTimeTool,      fullHeight: true },
   'json':           { path: '/json',           component: JsonFormatter,     fullHeight: true },
+  'data-converter': { path: '/data-converter', component: DataConverter,     fullHeight: true },
   'jwt':            { path: '/jwt',            component: JwtDebugger,       fullHeight: true },
   'regex':          { path: '/regex',          component: RegexTester,       fullHeight: true },
   'diff':           { path: '/diff',           component: TextDiff,          fullHeight: true },
   'qrcode':         { path: '/qrcode',         component: QRCodeTool,        fullHeight: true },
   'markdown':       { path: '/markdown',       component: MarkdownPreview,   fullHeight: true },
   'deduplicate':    { path: '/deduplicate',    component: ArrayDeduplicator, fullHeight: true },
-  'checksum':       { path: '/checksum',       component: ChecksumTool,      fullHeight: true },
-  'image-base64':   { path: '/image-base64',   component: ImageBase64Tool,   fullHeight: true },
   'generator':      { path: '/generator',      component: RandomGenerator,   fullHeight: true },
   'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer,     fullHeight: true },
   'sql-formatter':  { path: '/sql-formatter',  component: SqlFormatter,      fullHeight: true },
   'task-tracker':   { path: '/task-tracker',   component: TimeTracker,       fullHeight: true },
   'network':        { path: '/network',        component: NetworkTools,      fullHeight: true },
-  'meeting-notes':  { path: '/meeting-notes',  component: MeetingNotes,      fullHeight: true },
   'lucky-wheel':    { path: '/lucky-wheel',    component: LuckyWheel,        fullHeight: true },
   'api-client':     { path: '/api-client',     component: ApiClient,         fullHeight: true },
   'mock-server':    { path: '/mock-server',    component: MockServer,        fullHeight: true },

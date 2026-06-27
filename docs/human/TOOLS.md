@@ -12,22 +12,19 @@ This document describes every tool in the app: what computation it performs, wha
 | Text Transformer | ✓ | — | — | — | Input (localStorage) |
 | Text Counter | — | — | — | — | Input (localStorage) |
 | Color Picker | ✓ | — | — | — | Input (localStorage) |
-| Encoder / Decoder | ✓ | — | — | — | Input (localStorage) |
-| Hash & Encrypt | ✓ | — | — | — | Input (localStorage) |
+| Encode · Hash · Encrypt | ✓ | ✓ | — | — | Input (localStorage) |
 | Date / Time | ✓ | — | — | — | Input (localStorage) |
 | JSON Formatter | ✓ | — | — | — | Input (localStorage) |
+| Data Converter | ✓ | — | ✓ | — | Input + options (localStorage) |
 | SQL Formatter | ✓ | — | — | — | Input + options (localStorage) |
 | JWT Debugger | — | — | — | — | Input (localStorage) |
 | Regex Tester | — | — | — | — | Input (localStorage) |
 | Text Diff | — | — | — | — | Input (localStorage) |
 | Markdown Preview | — | — | — | — | Input (localStorage) |
-| Meeting Notes | ✓ | — | — | — | Notes library, shared with Time Tracker (localStorage) |
 | Lucky Wheel | — | — | — | — | Choices + options (localStorage) |
 | Array Deduplicator | ✓ | — | — | — | Input (localStorage) |
 | Generator | ✓ | — | — | — | Mode pref (localStorage) |
 | Time Tracker | ✓ | — | — | — | Time entries, projects, tags (localStorage) |
-| Checksum | ✓ | ✓ | — | — | — |
-| Image ↔ Base64 | ✓ | ✓ (browser) | — | — | — |
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
@@ -76,6 +73,8 @@ Converts a color between HEX, RGB, HSL, HSV, and CMYK. Renders a color swatch in
 
 Encodes and decodes text in multiple formats: Base64, URL percent-encoding, HTML entities, hexadecimal, and Morse code. All conversions run in JS with no external dependencies.
 
+> The **Encode · Hash · Encrypt** tool bundles six tabs: Encode/Decode (this section), **Image ↔ Base64**, **Hash & Encrypt**, **Checksum** (file hashing), Encrypt, and Pipeline. The sections below describe each tab; only the Image and Checksum tabs read files.
+
 **OS / system impact:** clipboard write only.
 
 ---
@@ -84,7 +83,7 @@ Encodes and decodes text in multiple formats: Base64, URL percent-encoding, HTML
 
 Computes **MD5, SHA-1, SHA-256, SHA-512** hashes of typed/pasted text using the `crypto-js` library (JavaScript — not the browser's Web Crypto API). Also encrypts/decrypts text with **AES** using a passphrase.
 
-> Note: this tool hashes **text you type or paste**, not files. For file checksums, use the Checksum tool.
+> Note: this tab hashes **text you type or paste**, not files. For file checksums, use the Checksum tab.
 
 **OS / system impact:** clipboard write only. No data leaves the app.
 
@@ -103,6 +102,14 @@ Converts Unix timestamps to human-readable dates and vice versa. Formats dates i
 Formats, minifies, and validates JSON. Renders an interactive tree explorer. All processing is `JSON.parse` / `JSON.stringify` in JS.
 
 **OS / system impact:** clipboard write only.
+
+---
+
+### Data Converter
+
+Converts structured data between JSON, YAML, TOML, XML, and Java `.properties`. Each conversion parses the source into a plain in-memory value and re-serializes it into the target format — all in JS, with the per-format libraries (`js-yaml`, `smol-toml`, `fast-xml-parser`) bundled and lazy-loaded, and `.properties` parsed in-house, so it runs fully offline. For `.properties`, dotted keys map to nested objects and `key[0]` to array indices. No data leaves the device. "Download result" opens a native save dialog (desktop) or a browser download (web).
+
+**OS / system impact:** clipboard write; file write on download only.
 
 ---
 
@@ -146,16 +153,6 @@ Renders Markdown to HTML using `react-markdown`. Does not execute any embedded s
 
 ---
 
-### Meeting Notes
-
-A manager for meeting minutes: create, search, edit, and delete notes from a sidebar list. Each note has a title, date, start/end time (with derived duration), participants, agenda/discussion, decisions, and action items, assembled into clean Markdown in real time (action items become task checkboxes). The output renders with `react-markdown` in the preview pane; copy writes the Markdown to your clipboard. All composition is pure JS — no network, no file access.
-
-Notes are stored in a shared `devtool:meetings` record that the **Time Tracker** also reads: a meeting with a time range shows on the Time Tracker **Calendar**, and you can create or edit a meeting from either tool — edits sync both ways because they share the same data.
-
-**OS / system impact:** clipboard write only. Notes persist in `localStorage` (`devtool:meetings`).
-
----
-
 ### Lucky Wheel
 
 Spins a wheel built from your own choices (one per line) and picks a random winner. Duplicate lines are kept by default — repeating a value gives it more slices and higher odds — and a "unique values only" toggle collapses duplicates to one slice each. The wheel is drawn on an HTML `<canvas>` with an animated spin and a winning-segment pulse; the landing position uses `Math.random()` over a uniform rotation offset, so every slice has equal odds. Optionally removes the winner from the list after each spin. The spin duration is configurable, and an auto-spin mode draws up to *N − 1* distinct winners in a row (where *N* is the number of slices) without altering the list. Every spin is recorded in a winner history table (choice + time) that can be sorted by spin time (newest first by default).
@@ -188,9 +185,11 @@ Generates random values in three modes:
 
 ### Time Tracker
 
-A time-management suite with three views: time tracker, timesheet, and calendar. All entries, projects, and tags are computed and stored **locally in `localStorage`** — there is no account, sync, or server. Closing and reopening the app preserves your data; clearing browser storage erases it.
+A time-management suite with four views: time tracker, timesheet, calendar, and meeting notes. All entries, projects, and tags are computed and stored **locally in `localStorage`** — there is no account, sync, or server. Closing and reopening the app preserves your data; clearing browser storage erases it.
 
-**OS / system impact:** clipboard write only. No network, no file access — everything persists in `localStorage`.
+The **Meeting Notes** view manages meeting minutes: create, search, edit, and delete notes from a sidebar list. Each note has a title, date, start/end time (with derived duration), participants, agenda/discussion, decisions, and action items, assembled into clean Markdown in real time (action items become task checkboxes); the preview renders with `react-markdown` and copy writes the Markdown to your clipboard. Notes live in a shared `devtool:meetings` record, so a meeting with a time range also shows on the **Calendar** — edits sync both ways. Markdown is generated one-way from the form (no markdown-to-form editing).
+
+**OS / system impact:** clipboard write only. No network, no file access — everything persists in `localStorage` (`devtool:meetings` for notes).
 
 ---
 
@@ -198,7 +197,7 @@ A time-management suite with three views: time tracker, timesheet, and calendar.
 
 ### Checksum
 
-Computes MD5, SHA-1, SHA-256, or SHA-512 checksums of a file you select. Supports files of any size via chunked reading with a live progress bar.
+*(The Checksum tab of Encode · Hash · Encrypt.)* Computes MD5, SHA-1, SHA-256, or SHA-512 checksums of a file you select. Supports files of any size via chunked reading with a live progress bar.
 
 #### How it works by environment
 
@@ -222,7 +221,7 @@ Computes MD5, SHA-1, SHA-256, or SHA-512 checksums of a file you select. Support
 
 ### Image ↔ Base64
 
-Converts images to and from base64 data URLs. You can also preview a pasted base64 string as an image.
+*(The Image tab of Encode · Hash · Encrypt.)* Converts images to and from base64 data URLs. You can also preview a pasted base64 string as an image.
 
 #### How it works
 
