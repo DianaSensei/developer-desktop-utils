@@ -510,17 +510,23 @@ function QrReader() {
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Monotonic token so a slow decode of an earlier image can't overwrite the
+  // result of a newer one (rapid paste/drop/upload).
+  const runId = useRef(0);
 
   const run = async (img: HTMLImageElement, dataUrl: string) => {
+    const id = ++runId.current;
     setLoading(true); setError(''); setResult(''); setImageUrl(dataUrl);
     try {
       const text = await decodeQrFromImage(img);
+      if (id !== runId.current) return;
       if (text) setResult(text);
       else setError('No QR code found in this image.');
     } catch {
+      if (id !== runId.current) return;
       setError('Could not read the image.');
     } finally {
-      setLoading(false);
+      if (id === runId.current) setLoading(false);
     }
   };
 

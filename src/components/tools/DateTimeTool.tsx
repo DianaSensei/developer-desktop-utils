@@ -97,7 +97,12 @@ function parseInTz(str: string, tz: string): Date | null {
   // Parse naive components then reinterpret in tz
   let naive: Date | null = null;
   try {
-    naive = s.includes('T') ? parseISO(s) : new Date(s);
+    // Use parseISO for ISO date / date-time strings so a bare `YYYY-MM-DD`
+    // is read as local wall-clock midnight. `new Date('YYYY-MM-DD')` would
+    // parse it as UTC midnight, then the getLocal* reads below would shift it
+    // a day backwards in any timezone west of UTC.
+    const isIso = s.includes('T') || /^\d{4}-\d{2}-\d{2}$/.test(s);
+    naive = isIso ? parseISO(s) : new Date(s);
     if (isNaN(naive.getTime())) naive = null;
   } catch { /* */ }
   if (!naive) return null;

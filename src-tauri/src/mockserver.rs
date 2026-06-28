@@ -281,7 +281,9 @@ static REGEX_CACHE: OnceLock<Mutex<HashMap<String, Option<regex::Regex>>>> = Onc
 
 fn regex_for(pattern: &str) -> Option<regex::Regex> {
     let cache = REGEX_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    let mut c = cache.lock().unwrap();
+    // Recover from a poisoned lock instead of propagating a panic — a single
+    // panic elsewhere must not permanently break request matching.
+    let mut c = cache.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(r) = c.get(pattern) {
         return r.clone();
     }
@@ -292,7 +294,7 @@ fn regex_for(pattern: &str) -> Option<regex::Regex> {
 
 fn clear_regex_cache() {
     if let Some(c) = REGEX_CACHE.get() {
-        c.lock().unwrap().clear();
+        c.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 }
 
@@ -414,8 +416,11 @@ fn eval_token(expr: &str, ctx: &RequestCtx, params: &HashMap<String, String>) ->
                 if parts.len() == 2 {
                     if let (Ok(a), Ok(b)) = (parts[0].trim().parse::<i64>(), parts[1].trim().parse::<i64>()) {
                         let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
-                        let span = (hi - lo + 1).max(1) as u64;
-                        return Some((lo + (rand_u64() % span) as i64).to_string());
+                        // Compute the span in i128 so an extreme range
+                        // (e.g. i64::MIN..i64::MAX) can't overflow and panic.
+                        let span = ((hi as i128) - (lo as i128) + 1).max(1) as u128;
+                        let val = lo as i128 + (rand_u64() as u128 % span) as i128;
+                        return Some(val.to_string());
                     }
                 }
                 None
@@ -659,22 +664,37 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
+fn hex_val(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
 fn urldecode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
-            b'%' if i + 2 < bytes.len() => match u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                Ok(b) => {
-                    out.push(b);
-                    i += 3;
+            // Parse the two hex digits straight from the byte buffer. Slicing
+            // the &str by byte index (`&s[i+1..i+3]`) would panic when a
+            // multi-byte UTF-8 char straddles the cut, which is reachable from
+            // any request path/query the running mock server receives.
+            b'%' if i + 2 < bytes.len() => {
+                match (hex_val(bytes[i + 1]), hex_val(bytes[i + 2])) {
+                    (Some(hi), Some(lo)) => {
+                        out.push(hi << 4 | lo);
+                        i += 3;
+                    }
+                    _ => {
+                        out.push(bytes[i]);
+                        i += 1;
+                    }
                 }
-                Err(_) => {
-                    out.push(bytes[i]);
-                    i += 1;
-                }
-            },
+            }
             b'+' => {
                 out.push(b' ');
                 i += 1;
@@ -706,7 +726,13 @@ fn parse_query(q: Option<&str>) -> HashMap<String, String> {
 
 fn truncate(s: &str) -> String {
     if s.len() > LOG_BODY_CAP {
-        format!("{}… (truncated)", &s[..LOG_BODY_CAP])
+        // Snap to the nearest char boundary at or below the cap so slicing a
+        // multi-byte UTF-8 char at the cutoff can't panic.
+        let mut end = LOG_BODY_CAP.min(s.len());
+        while end > 0 && !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}… (truncated)", &s[..end])
     } else {
         s.to_string()
     }

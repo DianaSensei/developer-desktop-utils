@@ -91,10 +91,26 @@ const allTools = [
     label: def.label,
     icon: def.icon,
     description: def.description,
+    keywords: def.keywords ?? [],
     ...TOOL_ROUTES[def.id],
   })),
-  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', path: '/settings', component: Settings },
+  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', keywords: ['preferences', 'options', 'config'], path: '/settings', component: Settings },
 ];
+
+// Match a tool against the sidebar search box. Searches the label, description,
+// and keyword synonyms so e.g. "epoch", "guid", or "postman" find the right
+// tool. Multi-word queries match when every term appears somewhere (AND).
+function toolMatchesQuery(
+  tool: { label: string; description: string; keywords?: string[] },
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [tool.label, tool.description, ...(tool.keywords ?? [])]
+    .join(' ')
+    .toLowerCase();
+  return q.split(/\s+/).every((term) => haystack.includes(term));
+}
 
 function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder: string[]): T[] {
   const order = savedOrder.length ? savedOrder : DEFAULT_TOOL_ORDER;
@@ -299,7 +315,7 @@ function Sidebar({
   // Settings is pinned to the bottom — exclude from the nav list
   const allNavTools = orderedTools.filter((t) => t.featureId !== 'settings');
   const navTools = query.trim()
-    ? allNavTools.filter((t) => t.label.toLowerCase().includes(query.trim().toLowerCase()))
+    ? allNavTools.filter((t) => toolMatchesQuery(t, query))
     : allNavTools;
   const settingsTool = allTools.find((t) => t.featureId === 'settings')!;
   const isSettingsActive = location.pathname === settingsTool.path;
@@ -309,7 +325,7 @@ function Sidebar({
   const hiddenCount = disabledTools.length;
   // When a search finds nothing enabled but matches a disabled tool, point the user to Settings.
   const disabledMatches = query.trim()
-    ? disabledTools.filter((t) => t.label.toLowerCase().includes(query.trim().toLowerCase()))
+    ? disabledTools.filter((t) => toolMatchesQuery(t, query))
     : [];
 
   return (

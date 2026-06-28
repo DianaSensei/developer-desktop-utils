@@ -166,7 +166,8 @@ function randomHex(bytes: number): string {
 }
 
 // Compute the `Authorization: Digest ...` header value for a challenge. Supports
-// MD5 / MD5-sess and qop=auth (the common cases); qop=auth-int is treated as auth.
+// MD5 / MD5-sess and qop=auth (the common cases); an auth-int-only challenge
+// falls back to legacy RFC 2069 (no qop).
 export function buildDigestHeader(opts: {
   username: string;
   password: string;
@@ -176,10 +177,12 @@ export function buildDigestHeader(opts: {
 }): string {
   const { username, password, method, uri, challenge } = opts;
   const { realm, nonce, opaque, algorithm } = challenge;
-  const qop = challenge.qop
-    .split(',')
-    .map((s) => s.trim())
-    .find((q) => q === 'auth') ?? (challenge.qop ? 'auth' : '');
+  // Only claim qop=auth when the server actually offers it. If it offers solely
+  // auth-int (which needs the request-body hash folded into HA2 — not supported
+  // here), fall back to legacy RFC 2069 (no qop) rather than sending a qop=auth
+  // response the server will reject.
+  const offered = challenge.qop.split(',').map((s) => s.trim()).filter(Boolean);
+  const qop = offered.includes('auth') ? 'auth' : '';
   const cnonce = randomHex(8);
   const nc = '00000001';
 

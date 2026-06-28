@@ -16,8 +16,9 @@ export function JwtDebugger() {
   const decoded = useMemo(() => {
     if (!token.trim()) return { header: '', payload: '', error: '' };
     try {
-      const parts = token.split('.');
-      const headerDecoded = JSON.parse(atob(parts[0]));
+      // Both segments are base64url-encoded; jwt-decode handles base64url +
+      // UTF-8 correctly, whereas raw atob() rejects '-'/'_' and mangles UTF-8.
+      const headerDecoded = jwtDecode(token, { header: true });
       const payloadDecoded = jwtDecode(token, { header: false });
       return {
         header: JSON.stringify(headerDecoded, null, 2),

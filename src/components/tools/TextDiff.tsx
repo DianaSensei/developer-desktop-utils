@@ -118,13 +118,17 @@ export function TextDiff() {
   // happens at low priority and can be interrupted by further typing.
   const dText1 = useDeferredValue(text1);
   const dText2 = useDeferredValue(text2);
+  // Word-level diff is O(n·m); guard against pathological inputs that would
+  // otherwise freeze the UI for seconds-to-minutes on a low-end machine.
+  const DIFF_CHAR_LIMIT = 300_000;
+  const tooLarge = dText1.length + dText2.length > DIFF_CHAR_LIMIT;
   const textDiff = useMemo(
-    () => (mode === 'text' ? Diff.diffWords(dText1, dText2) : null),
-    [mode, dText1, dText2],
+    () => (mode === 'text' && !tooLarge ? Diff.diffWords(dText1, dText2) : null),
+    [mode, dText1, dText2, tooLarge],
   );
   const jsonDiff = useMemo(
-    () => (mode === 'json' ? computeJsonDiff(dText1, dText2) : null),
-    [mode, dText1, dText2],
+    () => (mode === 'json' && !tooLarge ? computeJsonDiff(dText1, dText2) : null),
+    [mode, dText1, dText2, tooLarge],
   );
 
   return (
@@ -220,7 +224,12 @@ export function TextDiff() {
             }
           />
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-            {mode === 'text' ? (
+            {tooLarge ? (
+              <p className="text-sm text-muted-foreground">
+                Input is too large to diff interactively ({(dText1.length + dText2.length).toLocaleString()} characters).
+                Reduce it below {DIFF_CHAR_LIMIT.toLocaleString()} characters to compare.
+              </p>
+            ) : mode === 'text' ? (
               <pre className="font-mono text-sm whitespace-pre-wrap">
                 {textDiff!.map((part, index) => {
                   const cls = part.added

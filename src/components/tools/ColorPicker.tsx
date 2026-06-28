@@ -13,8 +13,19 @@ import { copyToClipboard } from '@/lib/clipboard';
 // ---------------------------------------------------------------------------
 
 function hexToRgb(hex: string) {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex.trim());
-  return r ? { r: parseInt(r[1], 16), g: parseInt(r[2], 16), b: parseInt(r[3], 16) } : { r: 0, g: 0, b: 0 };
+  // Accept 3/4/6/8-digit hex (with or without leading #). The 4/8-digit forms
+  // carry an alpha channel, which we drop here. Shorthand digits are doubled
+  // (#f00 → #ff0000) so they don't silently read back as black.
+  let h = hex.trim().replace(/^#/, '');
+  if (/^[a-f\d]{3,4}$/i.test(h)) {
+    h = h.split('').map((c) => c + c).join('');
+  }
+  if (!/^[a-f\d]{6}([a-f\d]{2})?$/i.test(h)) return { r: 0, g: 0, b: 0 };
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
 }
 
 function rgbToHex(r: number, g: number, b: number) {
@@ -153,6 +164,9 @@ export function ColorPicker() {
   const [eyeError, setEyeError] = useState('');
 
   const [paletteScrollable, setPaletteScrollable] = useState(false);
+
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const loupeRef = useRef<HTMLCanvasElement>(null);
@@ -325,7 +339,8 @@ export function ColorPicker() {
   const copy = (label: string, value: string) => {
     copyToClipboard(value);
     setCopied(label);
-    window.setTimeout(() => setCopied((c) => (c === label ? null : c)), 1200);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied((c) => (c === label ? null : c)), 1200);
   };
 
   const downloadPalette = () => {

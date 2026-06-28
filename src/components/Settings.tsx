@@ -156,10 +156,11 @@ export function Settings() {
     await openUrl(url);
   }, []);
   const visibleTools = toolQuery.trim()
-    ? displayTools.filter((t) =>
-        t.label.toLowerCase().includes(toolQuery.trim().toLowerCase()) ||
-        t.description.toLowerCase().includes(toolQuery.trim().toLowerCase())
-      )
+    ? displayTools.filter((t) => {
+        const q = toolQuery.trim().toLowerCase();
+        const haystack = [t.label, t.description, ...(t.keywords ?? [])].join(' ').toLowerCase();
+        return q.split(/\s+/).every((term) => haystack.includes(term));
+      })
     : displayTools;
   const isSearching = toolQuery.trim().length > 0;
 

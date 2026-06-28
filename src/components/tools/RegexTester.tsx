@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { PaneHeader } from '@/components/ui/tool-layout';
 import { Textarea } from '@/components/ui/textarea';
@@ -173,28 +173,69 @@ export function RegexTester() {
     [pattern]
   );
 
-  const result = useMemo(() => {
-    if (!pattern) return { matches: [] as RegExpExecArray[], error: '' };
-    try {
-      const MAX = 500;
-      const matches: RegExpExecArray[] = [];
-      if (flags.includes('g') || flags.includes('y')) {
-        const re = new RegExp(pattern, flags);
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(deferredTest)) !== null) {
-          matches.push(m);
-          if (m.index === re.lastIndex) re.lastIndex++;
-          if (matches.length >= MAX) break;
-        }
-      } else {
-        const m = new RegExp(pattern, flags).exec(deferredTest);
-        if (m) matches.push(m);
-      }
-      return { matches, error: '' };
-    } catch (err) {
-      return { matches: [] as RegExpExecArray[], error: err instanceof Error ? err.message : 'Invalid regex' };
+  // Regex evaluation runs in a Web Worker so a pathological pattern (ReDoS /
+  // catastrophic backtracking) can't freeze the UI: a watchdog terminates the
+  // worker if it doesn't answer in time. Matches come back serialized and are
+  // rebuilt into array-with-`index` objects compatible with RegExpExecArray
+  // access (`m[0]`, `m.slice(1)`, `m.index`, `m.length`).
+  type EvalMatch = string[] & { index: number };
+  const [result, setResult] = useState<{ matches: EvalMatch[]; error: string }>({ matches: [], error: '' });
+  const [replaceResult, setReplaceResult] = useState<{ output: string; error: string }>({ output: '', error: '' });
+
+  const workerRef = useRef<Worker | null>(null);
+  const reqIdRef = useRef(0);
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const makeWorker = useCallback(() => {
+    const w = new Worker(new URL('../../workers/regex.worker.ts', import.meta.url), { type: 'module' });
+    w.onmessage = ({ data }: MessageEvent<{ id: number; matches: { index: number; groups: (string | undefined)[] }[]; replaceOutput: string; error: string }>) => {
+      if (data.id !== reqIdRef.current) return; // a newer request superseded this one
+      if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
+      const matches = data.matches.map((m) => {
+        // Unmatched optional groups come back as undefined; coerce to '' so the
+        // shape matches RegExpExecArray's string element access used in render.
+        const a = m.groups.map((g) => g ?? '') as EvalMatch;
+        a.index = m.index;
+        return a;
+      });
+      setResult({ matches, error: data.error });
+      setReplaceResult({ output: data.error ? '' : data.replaceOutput, error: data.error });
+    };
+    workerRef.current = w;
+    return w;
+  }, []);
+
+  useEffect(() => {
+    makeWorker();
+    return () => {
+      workerRef.current?.terminate();
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+    };
+  }, [makeWorker]);
+
+  useEffect(() => {
+    if (!pattern) {
+      reqIdRef.current++;
+      if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
+      setResult({ matches: [], error: '' });
+      setReplaceResult({ output: '', error: '' });
+      return;
     }
-  }, [pattern, flags, deferredTest]);
+    const id = ++reqIdRef.current;
+    const worker = workerRef.current;
+    if (!worker) return;
+    worker.postMessage({ id, pattern, flags, input: deferredTest, replacement, doReplace: resultView === 'replace' });
+    if (watchdogRef.current) clearTimeout(watchdogRef.current);
+    watchdogRef.current = setTimeout(() => {
+      worker.terminate();
+      makeWorker();
+      if (id === reqIdRef.current) {
+        const msg = 'Pattern is too slow to evaluate (possible catastrophic backtracking). Try simplifying it.';
+        setResult({ matches: [], error: msg });
+        setReplaceResult({ output: '', error: msg });
+      }
+    }, 1500);
+  }, [pattern, flags, deferredTest, replacement, resultView, makeWorker]);
 
   const stats = useMemo(() => {
     if (!result.matches.length || !deferredTest) return null;
@@ -221,15 +262,6 @@ export function RegexTester() {
     if (lastEnd < deferredTest.length) segs.push({ text: deferredTest.slice(lastEnd), isMatch: false, matchIndex: -1 });
     return segs;
   }, [result.matches, deferredTest]);
-
-  const replaceResult = useMemo(() => {
-    if (!pattern || !deferredTest) return { output: '', error: '' };
-    try {
-      return { output: deferredTest.replace(new RegExp(pattern, flags), replacement), error: '' };
-    } catch (err) {
-      return { output: '', error: err instanceof Error ? err.message : 'Error' };
-    }
-  }, [pattern, flags, deferredTest, replacement]);
 
   const hasResult = result.error || result.matches.length > 0 || (!result.error && pattern && deferredTest);
 

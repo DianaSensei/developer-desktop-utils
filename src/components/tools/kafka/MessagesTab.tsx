@@ -397,6 +397,9 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
   const detailWidthRef = useRef(detailWidth);
   detailWidthRef.current = detailWidth;
 
+  // Monotonic token to drop stale async fetch results (see doFetch/loadMore).
+  const fetchSeq = useRef(0);
+
   // Sort
   const [sortCol, setSortCol] = useState<SortCol | null>('offset');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -460,6 +463,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
   const gridCols = `${colWidths.partition}px ${colWidths.offset}px ${colWidths.key}px 1fr ${colWidths.timestamp}px`;
 
   const doFetch = async () => {
+    const id = ++fetchSeq.current;
     setLoading(true);
     setError('');
     setSelectedMsg(null);
@@ -485,6 +489,9 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         fetchLimit = Math.min(Math.max(to - from, 1), config.kafka.maxFetchMessages);
       }
       const msgs = await kafkaApi.fetchMessages(brokerId, topic, partition, startOffset, fetchLimit, startTimestamp);
+      // Discard if a newer fetch (e.g. partition switch) started meanwhile, so
+      // a slow response can't overwrite the data the user is now looking at.
+      if (id !== fetchSeq.current) return;
       setMessages(msgs);
       setFetched(true);
       if (mode !== 'range' && msgs.length >= fetchLimit) {
@@ -493,10 +500,11 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         setHasMore(!part || minLoaded > part.earliestOffset);
       }
     } catch (e) {
+      if (id !== fetchSeq.current) return;
       setError(String(e));
       setMessages([]);
     } finally {
-      setLoading(false);
+      if (id === fetchSeq.current) setLoading(false);
     }
   };
 
@@ -512,6 +520,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
   const loadMore = async () => {
     if (loadingMore || messages.length === 0) return;
+    const id = ++fetchSeq.current;
     setLoadingMore(true);
     try {
       const minOffset = messages.reduce((min, m) => Math.min(min, m.offset), Infinity);
@@ -521,14 +530,18 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
       const startOffset = Math.max(earliest, minOffset - limit);
       const fetchLimit = minOffset - startOffset;
       const more = await kafkaApi.fetchMessages(brokerId, topic, partition, startOffset, fetchLimit);
+      // Bail if a newer fetch/partition switch happened — otherwise we'd append
+      // this partition's rows onto a now-different message list.
+      if (id !== fetchSeq.current) return;
       if (more.length === 0) { setHasMore(false); return; }
       setMessages((prev) => [...prev, ...more]);
       const newMin = more.reduce((min, m) => Math.min(min, m.offset), Infinity);
       setHasMore(newMin > earliest);
     } catch (e) {
+      if (id !== fetchSeq.current) return;
       setError(String(e));
     } finally {
-      setLoadingMore(false);
+      if (id === fetchSeq.current) setLoadingMore(false);
     }
   };
 
