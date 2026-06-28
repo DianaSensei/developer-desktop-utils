@@ -2,13 +2,14 @@ import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Segmented } from '@/components/ui/segmented';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
   Globe, Search, Loader2, RefreshCw, MapPin, Wifi, Building2,
   Network as NetworkIcon, ShieldCheck, ShieldAlert, CheckCircle2, XCircle,
-  AlertCircle, Clock, Server, X, Router, Laptop, Plug, Star, Plus,
+  AlertCircle, Clock, Server, X, Router, Laptop, Plug, Star, Plus, ChevronUp, ChevronDown, Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -68,6 +69,13 @@ const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in windo
 // tool and come back (the module stays loaded for the app's lifetime), while a
 // fresh app launch starts clean — matching "keep until cleared or fresh start".
 
+// Sortable columns. Some apply only to one view (mem/uptime → processes;
+// proto/address → sockets); the other view falls back to sorting by port.
+type PortSortCol = 'pid' | 'port' | 'process' | 'mem' | 'uptime' | 'proto' | 'address';
+type SortDir = 'asc' | 'desc';
+// Grouped = one row per process; flat = one row per listening socket.
+type PortViewMode = 'grouped' | 'flat';
+
 const SESSION = {
   nav: { view: 'dns' as View },
   dns: { domain: '', type: 'A', providerId: 'cloudflare', answers: null as DnsAnswer[] | null, status: '', error: '' },
@@ -75,7 +83,7 @@ const SESSION = {
   dnssec: { domain: '', result: null as DnssecResult | null, error: '' },
   myip: { info: null as IpInfo | null, error: '' },
   local: { info: null as LocalNetworkInfo | null, error: '' },
-  ports: { entries: null as PortEntry[] | null, error: '', filter: '', favOnly: false },
+  ports: { entries: null as PortEntry[] | null, error: '', filter: '', favOnly: false, viewMode: 'grouped' as PortViewMode, sortCol: 'port' as PortSortCol, sortDir: 'asc' as SortDir },
   iplookup: { ip: '', info: null as IpInfo | null, error: '' },
 };
 
@@ -665,11 +673,265 @@ type PortRow =
   | { kind: 'socket'; entry: PortEntry }
   | { kind: 'free'; port: number };
 
+// One listening process and the port(s) it's bound to — the unit of the default
+// process-grouped view.
+// A distinct listening endpoint of a process: one port+protocol, plus every
+// address it's bound to (e.g. both 0.0.0.0 and ::, or 127.0.0.1 + a LAN IP).
+interface PortChip {
+  port: number;
+  protocol: string;
+  addresses: string[];
+}
+
+interface ProcGroup {
+  key: string;
+  pid: number | null;
+  processName: string | null;
+  memBytes: number | null;
+  uptimeSecs: number | null;
+  project: string | null;
+  framework: string | null;
+  command: string | null;
+  ports: PortChip[];
+}
+
+// Classify the addresses a port is bound to into a short reachability scope.
+type ScopeLabel = 'local' | 'LAN' | 'all';
+
+const SCOPE_DESC: Record<ScopeLabel, string> = {
+  local: 'Loopback only (127.0.0.1 / ::1) — not reachable from other machines',
+  LAN: 'Bound to a specific interface — reachable on your network',
+  all: 'Bound to all interfaces (0.0.0.0 / ::) — reachable on your network',
+};
+
+function bindScope(addresses: string[]): { label: ScopeLabel; exposed: boolean } {
+  const isWild = (a: string) => a === '0.0.0.0' || a === '::';
+  const isLoop = (a: string) => a === '::1' || a.startsWith('127.');
+  if (addresses.some(isWild)) return { label: 'all', exposed: true };
+  if (addresses.every(isLoop)) return { label: 'local', exposed: false };
+  return { label: 'LAN', exposed: true };
+}
+
+// A recognisable glyph per framework/runtime. Falls back to a neutral dot.
+const FRAMEWORK_EMOJI: Record<string, string> = {
+  'Next.js': '⚡', Nuxt: '💚', NestJS: '🐱', Vite: '⚡', Remix: '💿', Astro: '🚀',
+  'Create React App': '⚛️', React: '⚛️', Vue: '💚', Angular: '🅰️',
+  Express: '🚂', Fastify: '🛤️', Koa: '🌊', Hapi: '🎉',
+  Django: '🎸', Flask: '🧪', Gunicorn: '🦄', Uvicorn: '🦄', Celery: '🥬', Python: '🐍',
+  Rails: '💎', Puma: '🐾', Ruby: '💎', Java: '☕', Node: '🟢',
+  Docker: '🐳', Postgres: '🐘', MySQL: '🐬', MariaDB: '🐬', Redis: '🧱', MongoDB: '🍃',
+};
+
+// Format resident memory (raw bytes from sysinfo) in 1024-based units — the
+// binary convention `top` / `htop` use — labelled KB/MB/GB for readability.
+function formatMem(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  if (bytes >= 1024 ** 2) return `${Math.round(bytes / 1024 ** 2)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+function formatUptime(secs: number): string {
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+// Shared column template — header and every row use it so columns line up into
+// a clean, self-explanatory table:  PID · PORT · SCOPE · PROCESS · MEM · UPTIME
+const PROC_GRID = 'grid grid-cols-[52px_96px_64px_minmax(0,1fr)_56px_60px] items-start gap-x-3';
+
+// One process row. Minimalist and column-aligned: a bold port (the thing devs
+// scan by) anchors the left, the project/process name + its command identify it,
+// and memory / uptime / pid sit quietly in their own right-aligned columns.
+function ProcessRow({ group, isFav, onToggleFav }: {
+  group: ProcGroup;
+  isFav: (port: number) => boolean;
+  onToggleFav: (port: number) => void;
+}) {
+  const emoji = group.framework ? FRAMEWORK_EMOJI[group.framework] : undefined;
+  const title = group.project ?? group.processName ?? '—';
+  // Show the command; if the title already came from the project, keep the
+  // process name visible too when there's no command.
+  const subtitle = group.command ?? (group.project ? group.processName : null);
+  const [cmdOpen, setCmdOpen] = useState(false);
+
+  return (
+    <div className={cn(PROC_GRID, 'px-3 py-2')}>
+      {/* PID — first column */}
+      <span className="py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground" title="Process ID">
+        {group.pid != null ? group.pid : '—'}
+      </span>
+
+      {/* PORT — every port is its own chip, each a favourite toggle. The first
+          (lowest) port is the anchor; the rest stack beneath it. */}
+      <div className="flex flex-col gap-1.5">
+        {group.ports.map((p, i) => {
+          const fav = isFav(p.port);
+          return (
+            <button
+              key={`${p.protocol}-${p.port}`}
+              type="button"
+              onClick={() => onToggleFav(p.port)}
+              aria-pressed={fav}
+              title={`${p.port}/${p.protocol} on ${p.addresses.join(', ')} · ${fav ? 'remove from' : 'add to'} favourites`}
+              className="group/port flex h-5 items-center gap-1.5 text-left"
+            >
+              <Star className={cn('h-3 w-3 shrink-0', fav ? 'fill-current text-amber-500' : 'text-transparent group-hover/port:text-muted-foreground/40')} />
+              <span className={cn(
+                'w-10 font-mono text-xs tabular-nums',
+                i === 0 ? 'font-semibold' : 'font-medium',
+                fav ? 'text-amber-500' : i === 0 ? 'text-foreground' : 'text-muted-foreground',
+              )}>
+                {p.port}
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/40">{p.protocol}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* SCOPE — dedicated column, one quiet dot + label per port, aligned with
+          the port chips. Hover any cell (or the header) for what it means. */}
+      <div className="flex flex-col gap-1.5">
+        {group.ports.map((p) => {
+          const scope = bindScope(p.addresses);
+          return (
+            <span
+              key={`${p.protocol}-${p.port}`}
+              className={cn(
+                'flex h-5 items-center gap-1.5 text-[10px] font-medium',
+                scope.exposed ? 'text-amber-600 dark:text-amber-400/90' : 'text-muted-foreground/50',
+              )}
+              title={`${SCOPE_DESC[scope.label]} — ${p.addresses.join(', ')}`}
+            >
+              <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', scope.exposed ? 'bg-amber-500' : 'bg-muted-foreground/30')} />
+              {scope.label}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* PROCESS — name + framework + (exposed) on top, command beneath */}
+      <div className="min-w-0 py-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-medium" title={title}>{title}</span>
+          {group.framework && (
+            <span className="shrink-0 text-[11px] text-muted-foreground" title="Detected framework">
+              {emoji && <span aria-hidden>{emoji} </span>}{group.framework}
+            </span>
+          )}
+        </div>
+        {subtitle && (
+          <div className="group/cmd flex items-start gap-1">
+            <button
+              type="button"
+              onClick={() => setCmdOpen((o) => !o)}
+              title={cmdOpen ? 'Click to collapse' : 'Click to show the full command'}
+              className={cn(
+                'min-w-0 flex-1 text-left font-mono text-[11px] leading-tight text-muted-foreground/70 hover:text-muted-foreground',
+                cmdOpen ? 'whitespace-pre-wrap break-all' : 'truncate',
+              )}
+            >
+              {subtitle}
+            </button>
+            <CopyButton
+              value={subtitle}
+              iconClassName="h-3 w-3"
+              className="h-5 w-5 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity hover:text-foreground group-hover/cmd:opacity-100"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* MEM · UPTIME — quiet, right-aligned metric columns */}
+      <span className="py-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground" title="Resident memory">
+        {group.memBytes != null ? formatMem(group.memBytes) : ''}
+      </span>
+      <span className="py-0.5 text-right text-[11px] tabular-nums text-muted-foreground" title="Uptime">
+        {group.uptimeSecs != null ? formatUptime(group.uptimeSecs) : ''}
+      </span>
+    </div>
+  );
+}
+
+// Small star toggle used by the socket (flat / favourites) rows.
+function FavStar({ port, fav, onToggle }: { port: number; fav: boolean; onToggle: (port: number) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(port)}
+      aria-pressed={fav}
+      title={fav ? `Remove port ${port} from favourites` : `Add port ${port} to favourites`}
+      className={cn(
+        'group/star flex h-6 w-6 items-center justify-center rounded transition-colors',
+        fav ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground/40 hover:text-muted-foreground',
+      )}
+    >
+      <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
+    </button>
+  );
+}
+
+// One row per listening socket — the "flat" layout (and the favourites
+// watchlist): Port · Proto · Process · PID · Address.
+function SocketRow({ entry, isFav, onToggleFav }: {
+  entry: PortEntry;
+  isFav: (port: number) => boolean;
+  onToggleFav: (port: number) => void;
+}) {
+  return (
+    <div className={cn(PORTS_GRID, 'px-3 py-1.5 text-xs')}>
+      <FavStar port={entry.localPort} fav={isFav(entry.localPort)} onToggle={onToggleFav} />
+      <span className="font-mono font-semibold tabular-nums">{entry.localPort}</span>
+      <Pill tone={entry.protocol === 'UDP' ? 'amber' : 'primary'}>{entry.protocol}</Pill>
+      <span className="truncate" title={entry.processName ?? undefined}>{entry.processName ?? '—'}</span>
+      <span className="font-mono tabular-nums text-muted-foreground">{entry.pid ?? '—'}</span>
+      <span className="truncate font-mono text-muted-foreground" title={entry.localAddress}>{entry.localAddress}</span>
+    </div>
+  );
+}
+
+// A favourite port that isn't currently listening (favourites watchlist only).
+function FreeRow({ port, fav, onToggle }: { port: number; fav: boolean; onToggle: (port: number) => void }) {
+  return (
+    <div className={cn(PORTS_GRID, 'px-3 py-1.5 text-xs opacity-60')}>
+      <FavStar port={port} fav={fav} onToggle={onToggle} />
+      <span className="font-mono font-semibold tabular-nums">{port}</span>
+      <Pill tone="muted">FREE</Pill>
+      <span className="italic text-muted-foreground">not listening</span>
+      <span className="text-muted-foreground">—</span>
+      <span className="text-muted-foreground">—</span>
+    </div>
+  );
+}
+
+// Header row for the socket (flat / favourites) table.
+function SocketTableHeader() {
+  return (
+    <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground')}>
+      {/* Empty placeholder for the star column — must stay in flow so it occupies
+          its grid track (an sr-only span is position:absolute and would shift
+          every following header one column to the left). */}
+      <span aria-hidden="true" />
+      <span>Port</span><span>Proto</span><span>Process</span><span>PID</span><span>Address</span>
+    </div>
+  );
+}
+
 function PortsView() {
   const [entries, setEntries] = useSessionState<PortEntry[] | null>(SESSION.ports, 'entries');
   const [error, setError] = useSessionState<string>(SESSION.ports, 'error');
   const [filter, setFilter] = useSessionState<string>(SESSION.ports, 'filter');
   const [favOnly, setFavOnly] = useSessionState<boolean>(SESSION.ports, 'favOnly');
+  const [viewMode, setViewMode] = useSessionState<PortViewMode>(SESSION.ports, 'viewMode');
+  const [sortCol, setSortCol] = useSessionState<PortSortCol>(SESSION.ports, 'sortCol');
+  const [sortDir, setSortDir] = useSessionState<SortDir>(SESSION.ports, 'sortDir');
   // Favourites are a user preference, so they persist across app restarts
   // (unlike scan results, which live in the in-memory session store).
   const [favorites, setFavorites] = usePersistentState<number[]>('devtool:network:favoritePorts', []);
@@ -715,31 +977,120 @@ function PortsView() {
     e.protocol.toLowerCase().includes(q) ||
     e.localAddress.toLowerCase().includes(q) ||
     (e.processName ?? '').toLowerCase().includes(q) ||
+    (e.framework ?? '').toLowerCase().includes(q) ||
+    (e.project ?? '').toLowerCase().includes(q) ||
+    (e.command ?? '').toLowerCase().includes(q) ||
     (e.pid != null && String(e.pid).includes(q));
 
   const scanned = (entries ?? []).filter(matchesFilter);
 
-  // Build the rows to render. In "favourites only" mode we list every favourite
-  // port (sorted) with its live sockets, or a synthetic "free" row when nothing
-  // is bound to it. Otherwise we show all sockets with favourites pinned on top.
-  let rows: PortRow[];
-  if (favOnly) {
-    const byPort = new Map<number, PortEntry[]>();
+  // Favourites mode is a port-centric watchlist: list every favourite port with
+  // its live socket(s), or a synthetic "free" row when nothing is bound to it.
+  const favRows: PortRow[] = favorites
+    .filter((port) => !q || String(port).includes(q))
+    .flatMap((port): PortRow[] => {
+      const matches = scanned.filter((e) => e.localPort === port);
+      return matches.length ? matches.map((entry) => ({ kind: 'socket', entry })) : [{ kind: 'free', port }];
+    });
+
+  // Default mode groups sockets by owning process (one row per process), so a
+  // server listening on several ports shows once with all its ports as chips.
+  const groups: ProcGroup[] = (() => {
+    const map = new Map<string, ProcGroup>();
     for (const e of scanned) {
-      const list = byPort.get(e.localPort);
-      if (list) list.push(e); else byPort.set(e.localPort, [e]);
+      const key = e.pid != null
+        ? `pid-${e.pid}`
+        : `sock-${e.family}-${e.localAddress}-${e.localPort}-${e.protocol}`;
+      let g = map.get(key);
+      if (!g) {
+        g = {
+          key, pid: e.pid, processName: e.processName, memBytes: e.memBytes,
+          uptimeSecs: e.uptimeSecs, project: e.project, framework: e.framework,
+          command: e.command, ports: [],
+        };
+        map.set(key, g);
+      }
+      const chip = g.ports.find((p) => p.port === e.localPort && p.protocol === e.protocol);
+      if (chip) {
+        if (!chip.addresses.includes(e.localAddress)) chip.addresses.push(e.localAddress);
+      } else {
+        g.ports.push({ port: e.localPort, protocol: e.protocol, addresses: [e.localAddress] });
+      }
     }
-    rows = favorites
-      .filter((port) => !q || String(port).includes(q))
-      .flatMap((port): PortRow[] => {
-        const matches = byPort.get(port);
-        return matches?.length ? matches.map((entry) => ({ kind: 'socket', entry })) : [{ kind: 'free', port }];
-      });
-  } else {
-    rows = [...scanned]
-      .sort((a, b) => Number(isFav(b.localPort)) - Number(isFav(a.localPort)) || a.localPort - b.localPort)
-      .map((entry) => ({ kind: 'socket', entry }));
-  }
+    const arr = [...map.values()];
+    for (const g of arr) g.ports.sort((a, b) => a.port - b.port || a.protocol.localeCompare(b.protocol));
+    return arr;
+  })();
+
+  // Sort by the active column for both views. Missing numeric values (e.g. a
+  // socket with no resolvable process) always sink to the bottom regardless of
+  // direction, so empty cells never interrupt the ordering.
+  const dir = sortDir === 'asc' ? 1 : -1;
+  const cmpNum = (a: number | null, b: number | null) => {
+    if (a == null && b == null) return 0;
+    if (a == null) return 1;
+    if (b == null) return -1;
+    return (a - b) * dir;
+  };
+  const cmpStr = (a: string, b: string) => a.toLowerCase().localeCompare(b.toLowerCase()) * dir;
+
+  const sortedGroups = [...groups].sort((a, b) => {
+    switch (sortCol) {
+      case 'pid': return cmpNum(a.pid, b.pid);
+      case 'mem': return cmpNum(a.memBytes, b.memBytes);
+      case 'uptime': return cmpNum(a.uptimeSecs, b.uptimeSecs);
+      case 'process': return cmpStr(a.project ?? a.processName ?? '', b.project ?? b.processName ?? '');
+      case 'port':
+      default: return ((a.ports[0]?.port ?? 0) - (b.ports[0]?.port ?? 0)) * dir;
+    }
+  });
+
+  // Flat view: one row per socket, sorted by the same active column.
+  const sortedSockets = [...scanned].sort((a, b) => {
+    switch (sortCol) {
+      case 'pid': return cmpNum(a.pid, b.pid);
+      case 'mem': return cmpNum(a.memBytes, b.memBytes);
+      case 'uptime': return cmpNum(a.uptimeSecs, b.uptimeSecs);
+      case 'process': return cmpStr(a.processName ?? '', b.processName ?? '');
+      case 'proto': return cmpStr(a.protocol, b.protocol) || (a.localPort - b.localPort) * dir;
+      case 'address': return cmpStr(a.localAddress, b.localAddress) || (a.localPort - b.localPort) * dir;
+      case 'port':
+      default: return (a.localPort - b.localPort) * dir;
+    }
+  });
+
+  // Numeric columns default to descending (biggest/longest first) on first click.
+  const DEFAULT_DIR: Record<PortSortCol, SortDir> = {
+    pid: 'asc', port: 'asc', process: 'asc', mem: 'desc', uptime: 'desc', proto: 'asc', address: 'asc',
+  };
+  const toggleSort = (col: PortSortCol) => {
+    if (col === sortCol) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortCol(col); setSortDir(DEFAULT_DIR[col]); }
+  };
+  const sortHeader = (col: PortSortCol, label: string, alignRight?: boolean, className?: string) => {
+    // The chevron occupies a fixed slot whether active or not, so the label
+    // never shifts. For right-aligned columns it goes on the LEFT of the label
+    // so the label's right edge lines up with the right-aligned data below it.
+    const chevron = sortCol === col
+      ? (sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
+      : <ChevronUp className="h-3 w-3 opacity-0" />;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(col)}
+        className={cn(
+          'flex items-center gap-0.5 uppercase tracking-wide transition-colors hover:text-foreground',
+          alignRight && 'justify-end',
+          sortCol === col && 'text-foreground',
+          className,
+        )}
+      >
+        {alignRight && chevron}
+        {label}
+        {!alignRight && chevron}
+      </button>
+    );
+  };
 
   const favBtnActive = favOnly && 'border-primary/40 bg-primary/10 text-primary';
 
@@ -751,6 +1102,14 @@ function PortsView() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             {entries ? 'Refresh' : 'Scan ports'}
           </Button>
+          {!favOnly && (
+            <Segmented
+              value={viewMode}
+              onValueChange={(v) => setViewMode(v as PortViewMode)}
+              options={[{ value: 'grouped', label: 'Processes' }, { value: 'flat', label: 'Sockets' }]}
+              aria-label="Group by process or list every socket"
+            />
+          )}
           <Button
             variant="outline"
             onClick={() => setFavOnly((v) => !v)}
@@ -775,7 +1134,7 @@ function PortsView() {
               />
             </div>
           ) : entries && entries.length > 0 ? (
-            <SearchInput value={filter} onChange={setFilter} onEnter={() => {}} icon={Search} placeholder="Filter by port, process, PID, or address…" />
+            <SearchInput value={filter} onChange={setFilter} onEnter={() => {}} icon={Search} placeholder="Filter by port, process, framework, project, or PID…" />
           ) : null}
         </>
       }
@@ -790,67 +1149,78 @@ function PortsView() {
             summary={
               favOnly
                 ? `${favorites.length} favourite ${favorites.length === 1 ? 'port' : 'ports'} · read locally`
-                : `${scanned.length}${filter.trim() ? ` of ${entries.length}` : ''} listening ${entries.length === 1 ? 'socket' : 'sockets'} · read locally`
+                : `${groups.length} ${groups.length === 1 ? 'process' : 'processes'} · ${scanned.length}${filter.trim() ? ` of ${entries.length}` : ''} listening ${entries.length === 1 ? 'socket' : 'sockets'} · read locally`
             }
             onClear={clear}
           />
-          {rows.length === 0 ? (
+          {favOnly ? (
+            favRows.length === 0 ? (
+              <p className="px-1 py-6 text-center text-xs text-muted-foreground">No favourite ports match "{filter}".</p>
+            ) : (
+              <div className="overflow-hidden rounded-lg border">
+                <SocketTableHeader />
+                <div className="divide-y">
+                  {favRows.map((row, i) => row.kind === 'socket' ? (
+                    <SocketRow key={`${row.entry.protocol}-${row.entry.family}-${row.entry.localAddress}-${row.entry.localPort}-${i}`} entry={row.entry} isFav={isFav} onToggleFav={toggleFav} />
+                  ) : (
+                    <FreeRow key={`free-${row.port}`} port={row.port} fav={isFav(row.port)} onToggle={toggleFav} />
+                  ))}
+                </div>
+              </div>
+            )
+          ) : viewMode === 'flat' ? (
+            sortedSockets.length === 0 ? (
+              <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+                {entries.length === 0 ? 'No listening ports found.' : `Nothing matches "${filter}"`}
+              </p>
+            ) : (
+              <div className="overflow-hidden rounded-lg border">
+                <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground')}>
+                  <span aria-hidden="true" />
+                  {sortHeader('port', 'Port')}
+                  {sortHeader('proto', 'Proto')}
+                  {sortHeader('process', 'Process')}
+                  {sortHeader('pid', 'PID')}
+                  {sortHeader('address', 'Address')}
+                </div>
+                <div className="divide-y">
+                  {sortedSockets.map((e, i) => (
+                    <SocketRow key={`${e.protocol}-${e.family}-${e.localAddress}-${e.localPort}-${i}`} entry={e} isFav={isFav} onToggleFav={toggleFav} />
+                  ))}
+                </div>
+              </div>
+            )
+          ) : groups.length === 0 ? (
             <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-              {entries.length === 0 ? 'No listening ports found.' : `No ports match "${filter}"`}
+              {entries.length === 0 ? 'No listening ports found.' : `Nothing matches "${filter}"`}
             </p>
           ) : (
             <div className="overflow-hidden rounded-lg border">
-              <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground')}>
-                <span className="sr-only">Favourite</span><span>Port</span><span>Proto</span><span>Process</span><span>PID</span><span>Address</span>
+              <div className={cn(PROC_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground')}>
+                {sortHeader('pid', 'PID')}
+                {/* Indent past the in-cell favourite star (w-3 + gap-1.5) so the
+                    label sits above the port numbers, not the star. */}
+                {sortHeader('port', 'Port', false, 'pl-[18px]')}
+                <span
+                  className="flex cursor-help items-center gap-1 uppercase tracking-wide"
+                  title={`Where each port is reachable.\n• local — ${SCOPE_DESC.local}\n• LAN — ${SCOPE_DESC.LAN}\n• all — ${SCOPE_DESC.all}`}
+                >
+                  Scope
+                  <Info className="h-3 w-3 text-muted-foreground/50" />
+                </span>
+                {sortHeader('process', 'Process')}
+                {sortHeader('mem', 'Mem', true)}
+                {sortHeader('uptime', 'Uptime', true)}
               </div>
               <div className="divide-y">
-                {rows.map((row, i) => {
-                  const port = row.kind === 'socket' ? row.entry.localPort : row.port;
-                  const fav = isFav(port);
-                  return (
-                    <div
-                      key={row.kind === 'socket'
-                        ? `${row.entry.protocol}-${row.entry.family}-${row.entry.localAddress}-${row.entry.localPort}-${i}`
-                        : `free-${port}`}
-                      className={cn(PORTS_GRID, 'px-3 py-1.5 text-xs', row.kind === 'free' && 'opacity-60')}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleFav(port)}
-                        className={cn(
-                          'flex h-6 w-6 items-center justify-center rounded transition-colors',
-                          fav ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground/40 hover:text-muted-foreground',
-                        )}
-                        title={fav ? `Remove port ${port} from favourites` : `Add port ${port} to favourites`}
-                        aria-label={fav ? `Remove port ${port} from favourites` : `Add port ${port} to favourites`}
-                        aria-pressed={fav}
-                      >
-                        <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
-                      </button>
-                      <span className="font-mono font-semibold tabular-nums">{port}</span>
-                      {row.kind === 'socket' ? (
-                        <>
-                          <Pill tone={row.entry.protocol === 'UDP' ? 'amber' : 'primary'}>{row.entry.protocol}</Pill>
-                          <span className="truncate" title={row.entry.processName ?? undefined}>{row.entry.processName ?? '—'}</span>
-                          <span className="font-mono tabular-nums text-muted-foreground">{row.entry.pid ?? '—'}</span>
-                          <span className="truncate font-mono text-muted-foreground" title={row.entry.localAddress}>{row.entry.localAddress}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Pill tone="muted">FREE</Pill>
-                          <span className="text-muted-foreground italic">not listening</span>
-                          <span className="text-muted-foreground">—</span>
-                          <span className="text-muted-foreground">—</span>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
+                {sortedGroups.map((g) => (
+                  <ProcessRow key={g.key} group={g} isFav={isFav} onToggleFav={toggleFav} />
+                ))}
               </div>
             </div>
           )}
           <p className="px-1 text-[11px] text-muted-foreground/70">
-            Shows your own user's sockets. System or other-user processes may need elevated privileges to appear — an OS restriction, not a tool limit.
+            Shows your own user's processes. System or other-user processes may need elevated privileges to appear — an OS restriction, not a tool limit.
           </p>
         </div>
       ) : !loading ? (

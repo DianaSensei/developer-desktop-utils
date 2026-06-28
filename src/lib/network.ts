@@ -275,6 +275,11 @@ export interface PortEntry {
   state: string;               // TCP state ("LISTEN"); "" for UDP
   pid: number | null;
   processName: string | null;
+  memBytes: number | null;     // resident memory of the owning process
+  uptimeSecs: number | null;   // how long the process has been running
+  project: string | null;      // working-directory name (the project folder)
+  framework: string | null;    // detected framework/runtime (Next.js, Express…)
+  command: string | null;      // concise command line ("next dev", "node server.js")
 }
 
 // Reads the machine's own listening TCP / UDP sockets and the owning process via

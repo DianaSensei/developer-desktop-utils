@@ -624,11 +624,12 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 - `crypto-js` — hashing & AES encryption
 - `rskafka` (Rust, v0.6) — Kafka client (pulled via `rustls 0.23`)
 - `local-ip-address` + `hostname` (Rust) — back the `local_network_info` command (`src-tauri/src/netinfo.rs`) for the Network tool's Local Network view
+- `netstat2` + `sysinfo` (Rust) — back the `list_listening_ports` command (`src-tauri/src/ports.rs`) for the Network tool's Ports view (listening sockets + owning process: memory, uptime, project, detected framework, command)
 - `diff` — text diffing
 - `qrcode` — QR generation
 - `react-markdown` — markdown rendering
 
-> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, and local network info. It uses an **in-memory session store** (not `usePersistentState`) so results survive tab switches and leaving the tool but clear on app restart.
+> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, local network info, and a **Ports** view (listening sockets + owning process, with Processes/Sockets layouts, column sort, scope local/LAN/all, and persisted favourite ports). It uses an **in-memory session store** (not `usePersistentState`) so results survive tab switches and leaving the tool but clear on app restart — the one exception is favourite ports, persisted in `localStorage`.
 
 ---
 

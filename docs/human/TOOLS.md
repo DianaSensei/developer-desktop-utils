@@ -30,6 +30,7 @@ This document describes every tool in the app: what computation it performs, wha
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
 | Mock Server | ✓ | — | — | **✓ Local HTTP listener you start (127.0.0.1, or 0.0.0.0 = LAN)** | Stubs + server settings (localStorage); request log in-memory, cleared on restart |
+| 2FA Authenticator | ✓ | ✓ (QR image) | — | — | Accounts **including TOTP/HOTP secrets** (localStorage) |
 
 ---
 
@@ -313,9 +314,11 @@ A suite of DNS and IP utilities. Every lookup is user-initiated (you type a doma
 | What's My IP | Nothing (the request itself reveals your IP) | `ipapi.co`, falling back to `ipwho.is` / `freeipapi.com` |
 | IP Lookup | The IP address you enter | `ipapi.co`, falling back to `ipwho.is` / `freeipapi.com` (geolocation, ISP, ASN) |
 | Local Network | **Nothing — read locally** | None. Reads hostname, LAN addresses, and interfaces via the Rust `local_network_info` command. Desktop app only. |
-| Ports | **Nothing — read locally** | None. Lists the machine's listening TCP/UDP sockets and the owning process (pid + name) via the Rust `list_listening_ports` command (`netstat2` for the socket table on macOS/Linux/Windows, `sysinfo` for process names). Desktop app only. Sockets owned by your own user resolve their pid and name; processes owned by other users or the system may require running the app with elevated privileges to appear (this is an OS restriction, not a limitation of the tool). |
+| Ports | **Nothing — read locally** | None. Lists the machine's listening sockets grouped by owning process via the Rust `list_listening_ports` command (`netstat2` for the socket table on macOS/Linux/Windows, `sysinfo` for process info). Each process row shows its port(s), name, PID, resident memory, uptime, working-directory/project name, detected framework, and command line. Framework detection is heuristic — from the command line, the executable name, and (for Node projects) the dependencies in the project's `package.json`, which is read locally and never sent anywhere. CPU% is intentionally omitted so a scan stays instant. Desktop app only. Sockets owned by your own user resolve fully; processes owned by other users or the system may require running the app with elevated privileges to appear (an OS restriction, not a limitation of the tool). |
 
-**What leaves the machine:** only the domain name or IP you explicitly look up over HTTPS. The Local Network tab is entirely local. No telemetry. Inputs, selections, and results are held in an **in-memory session store** (not `localStorage`) so they survive switching tabs and leaving/returning to the tool, but are cleared on a fresh app launch — none of it leaves the machine.
+The **Ports** tab has two layouts (toggle in the toolbar): **Processes** (grouped — one row per process, with its ports as chips) and **Sockets** (one row per listening socket — the raw list). Both are filterable (by port, process, framework, project, or PID) and sortable by column; each port shows a reachability **Scope** (`local` loopback-only · `LAN` a specific interface · `all` every interface) and can be ⭐ **favourited** to track in a watchlist (favourites persist across restarts in `localStorage` under `devtool:network:favoritePorts`; a favourite that isn't currently bound shows as **FREE** so you can see if a port is free).
+
+**What leaves the machine:** only the domain name or IP you explicitly look up over HTTPS. The Local Network and Ports tabs are entirely local. No telemetry. Inputs, selections, and results are held in an **in-memory session store** (not `localStorage`) so they survive switching tabs and leaving/returning to the tool, but are cleared on a fresh app launch — none of it leaves the machine (favourite ports are the one persisted exception).
 
 **Accuracy note:** IP geolocation is approximate and provided by a third party; DoH answers reflect the chosen resolver's cache and may differ from your system resolver.
 
@@ -364,13 +367,29 @@ The three panels (stubs · editor · request log) are resizable by dragging the 
 
 ---
 
+### 2FA Authenticator
+
+A TOTP / HOTP one-time-password generator — the same codes a phone authenticator app produces. Add an account by entering a Base32 **secret** (with options) or by **importing**, then the tool shows the live code with a countdown ring (TOTP) or a "next code" button (HOTP).
+
+**Algorithms & options:** TOTP and HOTP, hash **SHA-1 / SHA-256 / SHA-512**, **6 or 8** digits, and **30 or 60 second** periods. Codes are computed locally with the WebView's built-in Web Crypto (`crypto.subtle` HMAC) — no library round-trip and nothing leaves the machine.
+
+**Import:** paste `otpauth://totp/...` / `otpauth://hotp/...` URIs, paste a Google Authenticator export string (`otpauth-migration://offline?data=...`), or **import a QR image** (a screenshot/photo of either) — decoded locally with `jsQR`. Each account can also be shown as its own `otpauth://` URI/QR to move it elsewhere.
+
+**What leaves the machine:** nothing. There is no network access at all — code generation, secret decoding, and QR decoding are entirely local.
+
+**Storage — sensitive:** accounts (label, issuer, and the **OTP secret itself**) persist in `localStorage` under `devtool:2fa:accounts`. The secret *is* the second factor, so treat this like any unencrypted local credential store: it's readable by anything running as your user, and the tool surfaces this in its UI. Remove accounts you no longer need.
+
+**Permissions (Tauri):** none beyond the default. Clipboard write copies the current code; QR import uses a file picker (`dialog`/`fs`) only when you choose an image.
+
+---
+
 ## What never happens in any tool
 
 - **No telemetry, analytics, or crash reporting.** The only outbound network activity is: Kafka connections you initiate, DNS/IP lookups you initiate in Network Tools, HTTP requests you send from the API Client, and the app update check described below.
 - **Daily auto-update check, on by default.** The auto-update check (Settings → About → Auto-check for updates) is **enabled by default** and contacts the GitHub Releases API at most once per day (plus whenever you click "Check"). It downloads or installs nothing without your action, and you can turn it off in Settings.
-- **No input data is sent to any server, except where a tool's whole purpose is a network query.** Computation — hashing, encoding, diffing, JWT decoding, regex matching — runs locally in the WebView or in Rust and never leaves the machine. The exceptions are explicit, user-initiated network tools: Kafka Explorer (broker traffic) and Network Tools (the single domain/IP you look up).
+- **No input data is sent to any server, except where a tool's whole purpose is a network query.** Computation — hashing, encoding, diffing, JWT decoding, regex matching, 2FA code generation — runs locally in the WebView or in Rust and never leaves the machine. The exceptions are explicit, user-initiated network tools: Kafka Explorer (broker traffic), Network Tools (the single domain/IP you look up), and the API Client (the exact request you click Send on). The Mock Server only *receives* requests on a local listener you start; it makes no outbound calls.
 - **No background file access.** No tool reads files except when you explicitly click "Browse", drag a file, or use a file input.
 
 ---
 
-*Last updated: 2026-06-18*
+*Last updated: 2026-06-28*
