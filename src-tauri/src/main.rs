@@ -6,6 +6,7 @@ mod checksum;
 mod netinfo;
 mod files;
 mod mockserver;
+mod ports;
 
 fn main() {
     tauri::Builder::default()
@@ -20,6 +21,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             checksum::hash_file,
             netinfo::local_network_info,
+            ports::list_listening_ports,
             files::read_file_data_url,
             kafka::kafka_list_configs,
             kafka::kafka_save_config,

@@ -108,6 +108,7 @@ const APP_PERMISSIONS = [
       { text: 'Run DNS record, propagation & DNSSEC lookups', tool: 'Network Tools' },
       { text: 'Look up public IP & geolocation', tool: 'Network Tools' },
       { text: 'Read this machine\'s local network info', tool: 'Network Tools' },
+      { text: 'List local listening ports and the owning process (read locally — nothing is sent)', tool: 'Network Tools' },
       { text: 'Check GitHub for app updates', tool: 'Auto-update' },
     ],
   },

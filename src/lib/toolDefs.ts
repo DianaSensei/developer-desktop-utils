@@ -182,8 +182,8 @@ export const TOOL_DEFS: ToolDef[] = [
     label: "Network Tools",
     icon: Network,
     description:
-      "DNS records (A, AAAA, CNAME, NS, TXT, SOA, SRV, CAA…), propagation, DNSSEC, plus what's my IP and IP geolocation lookup.",
-    keywords: ["dns", "ip address", "geolocation", "lookup", "propagation", "dnssec", "nslookup", "dig", "whats my ip", "cname", "txt record"],
+      "DNS records (A, AAAA, CNAME, NS, TXT, SOA, SRV, CAA…), propagation, DNSSEC, listening ports & processes, plus what's my IP and IP geolocation lookup.",
+    keywords: ["dns", "ip address", "geolocation", "lookup", "propagation", "dnssec", "nslookup", "dig", "whats my ip", "cname", "txt record", "ports", "listening ports", "open ports", "port viewer", "port in use", "whats using my port", "kill port", "process", "netstat", "lsof", "pid", "tcp", "udp", "socket"],
   },
   {
     id: "lucky-wheel",

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, lazy, Suspense } from 'react';
 import { cn } from '@/lib/utils';
 import {
@@ -148,6 +148,7 @@ function NavScrollArea({
   disabledMatches,
   settingsTool,
   onClose,
+  onEnableTool,
   isCollapsed,
   hiddenCount,
 }: {
@@ -156,6 +157,7 @@ function NavScrollArea({
   disabledMatches: SidebarTool[];
   settingsTool: SidebarTool;
   onClose: () => void;
+  onEnableTool: (tool: SidebarTool) => void;
   isCollapsed: boolean;
   hiddenCount: number;
 }) {
@@ -177,28 +179,13 @@ function NavScrollArea({
     const ro = new ResizeObserver(checkScroll);
     ro.observe(el);
     return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
-  }, [checkScroll, navTools.length, query]);
+  }, [checkScroll, navTools.length, disabledMatches.length, query]);
 
   return (
     <div className="relative flex-1 min-h-0">
       <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
-        {navTools.length === 0 && query && (
-          disabledMatches.length > 0 ? (
-            <div className="px-2 py-4 text-center text-[11px] text-muted-foreground space-y-2">
-              <p>
-                <span className="font-medium text-foreground">{disabledMatches[0].label}</span> is turned off.
-              </p>
-              <Link
-                to={settingsTool.path}
-                onClick={onClose}
-                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-primary hover:bg-muted transition-colors"
-              >
-                <Plus className="h-3 w-3" /> Enable in Settings
-              </Link>
-            </div>
-          ) : (
-            <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
-          )
+        {navTools.length === 0 && disabledMatches.length === 0 && query && (
+          <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
         )}
         <div className="space-y-0.5">
           {navTools.map((tool) => {
@@ -236,6 +223,36 @@ function NavScrollArea({
             );
           })}
         </div>
+
+        {/* Search also reaches tools the user has turned off. They have no route
+            until enabled, so each match is an Enable action (toggles the feature
+            on, then navigates) rather than a plain link. */}
+        {query && !isCollapsed && disabledMatches.length > 0 && (
+          <div className="mt-3 space-y-0.5">
+            <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              Disabled
+            </p>
+            {disabledMatches.map((tool) => {
+              const Icon = tool.icon;
+              const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
+              return (
+                <Tooltip key={tool.path} side="right" triggerClassName="block" label={`${tool.label} — turned off`} description={desc}>
+                  <button
+                    type="button"
+                    onClick={() => onEnableTool(tool)}
+                    className="group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-muted-foreground/70 transition-[color,background-color] duration-200 ease-out hover:text-foreground hover:bg-foreground/[0.05]"
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
+                    <span className="flex-1 truncate text-sm">{tool.label}</span>
+                    <span className="flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                      <Plus className="h-3 w-3" /> Enable
+                    </span>
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </div>
+        )}
 
         {/* Hint: more tools exist but are hidden — link to Settings to enable them.
             Deliberately low-emphasis (small, muted, no tab styling) so it reads as
@@ -296,9 +313,19 @@ function Sidebar({
   onToggleCollapse: () => void;
 }) {
   const location = useLocation();
-  const { isFeatureEnabled, toolOrder } = useFeatures();
+  const { isFeatureEnabled, toggleFeature, toolOrder } = useFeatures();
   const { updateAvailable } = useUpdate();
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
+
+  // Enabling a disabled search result turns its feature on (which registers its
+  // route) and navigates to it, then clears the search and closes the drawer.
+  const handleEnableTool = useCallback((tool: SidebarTool) => {
+    toggleFeature(tool.featureId);
+    navigate(tool.path);
+    setQuery('');
+    onClose();
+  }, [toggleFeature, navigate, onClose]);
   const searchRef = useRef<HTMLInputElement>(null);
   const pendingSearchFocus = useRef(false);
 
@@ -411,6 +438,7 @@ function Sidebar({
           disabledMatches={disabledMatches}
           settingsTool={settingsTool}
           onClose={onClose}
+          onEnableTool={handleEnableTool}
           isCollapsed={isCollapsed}
           hiddenCount={hiddenCount}
         />

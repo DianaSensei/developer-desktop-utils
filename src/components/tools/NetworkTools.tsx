@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -9,26 +8,57 @@ import {
 import {
   Globe, Search, Loader2, RefreshCw, MapPin, Wifi, Building2,
   Network as NetworkIcon, ShieldCheck, ShieldAlert, CheckCircle2, XCircle,
-  AlertCircle, Clock, Server, X, Router, Laptop,
+  AlertCircle, Clock, Server, X, Router, Laptop, Plug, Star, Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import {
   DNS_RECORD_TYPES, DOH_PROVIDERS, DOH_PROVIDER_MAP,
-  queryDns, queryAllRecords, checkPropagation, checkDnssec, lookupIp, getLocalNetworkInfo,
-  type DnsAnswer, type PropagationRow, type DnssecResult, type IpInfo, type LocalNetworkInfo,
+  queryDns, queryAllRecords, checkPropagation, checkDnssec, lookupIp, getLocalNetworkInfo, listListeningPorts,
+  type DnsAnswer, type PropagationRow, type DnssecResult, type IpInfo, type LocalNetworkInfo, type PortEntry,
 } from '@/lib/network';
 
-type View = 'dns' | 'propagation' | 'dnssec' | 'myip' | 'local' | 'iplookup';
+type View = 'dns' | 'propagation' | 'dnssec' | 'myip' | 'iplookup' | 'local' | 'ports';
+type Category = 'dns' | 'ip' | 'machine';
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: 'dns', label: 'DNS Lookup' },
-  { id: 'propagation', label: 'Propagation' },
-  { id: 'dnssec', label: 'DNSSEC' },
-  { id: 'myip', label: "What's My IP" },
-  { id: 'local', label: 'Local Network' },
-  { id: 'iplookup', label: 'IP Lookup' },
+// Two-tier navigation: a primary row of categories, then a secondary row of the
+// views inside the active category. Each view carries its own icon for quick
+// scanning.
+interface ViewMeta {
+  label: string;
+  icon: typeof Globe;
+  category: Category;
+}
+
+const VIEW_META: Record<View, ViewMeta> = {
+  dns:         { label: 'DNS Lookup',    icon: Search,      category: 'dns' },
+  propagation: { label: 'Propagation',   icon: Globe,       category: 'dns' },
+  dnssec:      { label: 'DNSSEC',        icon: ShieldCheck, category: 'dns' },
+  myip:        { label: "What's My IP",  icon: Wifi,        category: 'ip' },
+  iplookup:    { label: 'IP Lookup',     icon: MapPin,      category: 'ip' },
+  local:       { label: 'Local Network', icon: Router,      category: 'machine' },
+  ports:       { label: 'Ports',         icon: Plug,        category: 'machine' },
+};
+
+// Flat order used by keyboard navigation (←/→ cycle, number keys jump).
+const VIEW_ORDER: View[] = ['dns', 'propagation', 'dnssec', 'myip', 'iplookup', 'local', 'ports'];
+
+const CATEGORIES: { id: Category; label: string; icon: typeof Globe }[] = [
+  { id: 'dns', label: 'DNS', icon: Globe },
+  { id: 'ip', label: 'IP', icon: MapPin },
+  { id: 'machine', label: 'This machine', icon: Laptop },
 ];
+
+const VIEWS_BY_CATEGORY: Record<Category, View[]> =
+  VIEW_ORDER.reduce((acc, v) => {
+    (acc[VIEW_META[v].category] ??= []).push(v);
+    return acc;
+  }, {} as Record<Category, View[]>);
+
+// Remembers the last sub-view visited per category, so re-selecting a category
+// returns you to where you were rather than always its first view.
+const LAST_VIEW: Record<Category, View> = { dns: 'dns', ip: 'myip', machine: 'local' };
 
 const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -45,6 +75,7 @@ const SESSION = {
   dnssec: { domain: '', result: null as DnssecResult | null, error: '' },
   myip: { info: null as IpInfo | null, error: '' },
   local: { info: null as LocalNetworkInfo | null, error: '' },
+  ports: { entries: null as PortEntry[] | null, error: '', filter: '', favOnly: false },
   iplookup: { ip: '', info: null as IpInfo | null, error: '' },
 };
 
@@ -65,6 +96,25 @@ function CopyBtn({ value }: { value: string }) {
       className="h-6 w-6 shrink-0 text-muted-foreground/60 hover:text-foreground"
       iconClassName="h-3.5 w-3.5"
     />
+  );
+}
+
+// Shared label badge used across result lists (DNS record type, interface
+// family, port protocol/status) so every result surface reads the same way.
+function Pill({ children, tone = 'primary', className }: {
+  children: React.ReactNode;
+  tone?: 'primary' | 'muted' | 'amber';
+  className?: string;
+}) {
+  const tones = {
+    primary: 'bg-primary/10 text-primary',
+    muted: 'bg-muted text-muted-foreground',
+    amber: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  };
+  return (
+    <span className={cn('w-fit rounded px-1.5 py-0.5 text-center font-mono text-[10px] font-semibold', tones[tone], className)}>
+      {children}
+    </span>
   );
 }
 
@@ -242,7 +292,7 @@ function DnsView() {
             <div className="grid gap-1.5 lg:grid-cols-2">
               {answers.map((a, i) => (
                 <div key={i} className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2">
-                  <span className="shrink-0 w-12 rounded bg-primary/10 px-1.5 py-0.5 text-center font-mono text-[10px] font-semibold text-primary">{a.typeName}</span>
+                  <Pill className="shrink-0 w-12">{a.typeName}</Pill>
                   <span className="flex-1 font-mono text-xs break-all">{a.data}</span>
                   <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums" title="TTL (seconds)">{a.ttl}s</span>
                   <CopyBtn value={a.data} />
@@ -584,9 +634,7 @@ function LocalNetworkView() {
                       iface.internal && 'opacity-60',
                     )}
                   >
-                    <span className="shrink-0 w-12 rounded bg-primary/10 px-1.5 py-0.5 text-center font-mono text-[10px] font-semibold text-primary">
-                      {iface.family === 'IPv6' ? 'v6' : 'v4'}
-                    </span>
+                    <Pill className="shrink-0 w-12">{iface.family === 'IPv6' ? 'v6' : 'v4'}</Pill>
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] text-muted-foreground">
                         {iface.name}{iface.internal && ' · internal'}
@@ -602,6 +650,211 @@ function LocalNetworkView() {
         </div>
       ) : !loading ? (
         <Empty icon={Router}>Show this machine's hostname, LAN addresses, and network interfaces.</Empty>
+      ) : null}
+    </ViewShell>
+  );
+}
+
+// ─── Ports view (desktop only) ───────────────────────────────────────────────
+
+const PORTS_GRID = 'grid grid-cols-[32px_64px_60px_minmax(0,2fr)_72px_minmax(0,2fr)] items-center gap-2';
+
+// A rendered row is either a live socket or a favourite port that isn't
+// currently listening (shown so devs can see "is 3000 free?" at a glance).
+type PortRow =
+  | { kind: 'socket'; entry: PortEntry }
+  | { kind: 'free'; port: number };
+
+function PortsView() {
+  const [entries, setEntries] = useSessionState<PortEntry[] | null>(SESSION.ports, 'entries');
+  const [error, setError] = useSessionState<string>(SESSION.ports, 'error');
+  const [filter, setFilter] = useSessionState<string>(SESSION.ports, 'filter');
+  const [favOnly, setFavOnly] = useSessionState<boolean>(SESSION.ports, 'favOnly');
+  // Favourites are a user preference, so they persist across app restarts
+  // (unlike scan results, which live in the in-memory session store).
+  const [favorites, setFavorites] = usePersistentState<number[]>('devtool:network:favoritePorts', []);
+  const [addValue, setAddValue] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const favSet = new Set(favorites);
+  const isFav = (port: number) => favSet.has(port);
+  const toggleFav = (port: number) =>
+    setFavorites((prev) => (prev.includes(port) ? prev.filter((p) => p !== port) : [...prev, port].sort((a, b) => a - b)));
+
+  const addFavorite = () => {
+    const port = Number(addValue.trim());
+    if (!Number.isInteger(port) || port < 0 || port > 65535) return;
+    if (!favSet.has(port)) setFavorites((prev) => [...prev, port].sort((a, b) => a - b));
+    setAddValue('');
+  };
+
+  const run = useCallback(async () => {
+    setLoading(true); setError(''); setEntries(null);
+    try {
+      setEntries(await listListeningPorts());
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [setEntries, setError]);
+
+  // Reading local sockets is fast and side-effect-free — scan automatically the
+  // first time the view opens (desktop only), but keep the manual Refresh.
+  useEffect(() => {
+    if (IS_TAURI && !SESSION.ports.entries && !SESSION.ports.error) run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const clear = () => { setEntries(null); setError(''); setFilter(''); };
+
+  const q = filter.trim().toLowerCase();
+  const matchesFilter = (e: PortEntry) =>
+    !q ||
+    String(e.localPort).includes(q) ||
+    e.protocol.toLowerCase().includes(q) ||
+    e.localAddress.toLowerCase().includes(q) ||
+    (e.processName ?? '').toLowerCase().includes(q) ||
+    (e.pid != null && String(e.pid).includes(q));
+
+  const scanned = (entries ?? []).filter(matchesFilter);
+
+  // Build the rows to render. In "favourites only" mode we list every favourite
+  // port (sorted) with its live sockets, or a synthetic "free" row when nothing
+  // is bound to it. Otherwise we show all sockets with favourites pinned on top.
+  let rows: PortRow[];
+  if (favOnly) {
+    const byPort = new Map<number, PortEntry[]>();
+    for (const e of scanned) {
+      const list = byPort.get(e.localPort);
+      if (list) list.push(e); else byPort.set(e.localPort, [e]);
+    }
+    rows = favorites
+      .filter((port) => !q || String(port).includes(q))
+      .flatMap((port): PortRow[] => {
+        const matches = byPort.get(port);
+        return matches?.length ? matches.map((entry) => ({ kind: 'socket', entry })) : [{ kind: 'free', port }];
+      });
+  } else {
+    rows = [...scanned]
+      .sort((a, b) => Number(isFav(b.localPort)) - Number(isFav(a.localPort)) || a.localPort - b.localPort)
+      .map((entry) => ({ kind: 'socket', entry }));
+  }
+
+  const favBtnActive = favOnly && 'border-primary/40 bg-primary/10 text-primary';
+
+  return (
+    <ViewShell
+      toolbar={
+        <>
+          <Button onClick={run} disabled={loading || !IS_TAURI} className="h-9 gap-1.5">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {entries ? 'Refresh' : 'Scan ports'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setFavOnly((v) => !v)}
+            className={cn('h-9 gap-1.5', favBtnActive)}
+            title="Show only your favourite ports"
+          >
+            <Star className={cn('h-4 w-4', favOnly && 'fill-current')} />
+            Favourites{favorites.length > 0 ? ` (${favorites.length})` : ''}
+          </Button>
+          {favOnly ? (
+            <div className="relative flex-1 min-w-[160px]">
+              <Plus className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+              <Input
+                value={addValue}
+                onChange={(e) => setAddValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addFavorite()}
+                placeholder="Add a port, e.g. 3000"
+                inputMode="numeric"
+                className="h-9 pl-9 text-sm font-mono"
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </div>
+          ) : entries && entries.length > 0 ? (
+            <SearchInput value={filter} onChange={setFilter} onEnter={() => {}} icon={Search} placeholder="Filter by port, process, PID, or address…" />
+          ) : null}
+        </>
+      }
+    >
+      {!IS_TAURI ? (
+        <Empty icon={Plug}>The port viewer reads your machine's listening sockets and is only available in the desktop app.</Empty>
+      ) : error ? <ErrorBox message={error} /> : favOnly && favorites.length === 0 ? (
+        <Empty icon={Star}>No favourite ports yet. Add one above, or star a port in the full list to track whether it's free or in use.</Empty>
+      ) : entries ? (
+        <div className="space-y-2.5">
+          <MetaBar
+            summary={
+              favOnly
+                ? `${favorites.length} favourite ${favorites.length === 1 ? 'port' : 'ports'} · read locally`
+                : `${scanned.length}${filter.trim() ? ` of ${entries.length}` : ''} listening ${entries.length === 1 ? 'socket' : 'sockets'} · read locally`
+            }
+            onClear={clear}
+          />
+          {rows.length === 0 ? (
+            <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+              {entries.length === 0 ? 'No listening ports found.' : `No ports match "${filter}"`}
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border">
+              <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground')}>
+                <span className="sr-only">Favourite</span><span>Port</span><span>Proto</span><span>Process</span><span>PID</span><span>Address</span>
+              </div>
+              <div className="divide-y">
+                {rows.map((row, i) => {
+                  const port = row.kind === 'socket' ? row.entry.localPort : row.port;
+                  const fav = isFav(port);
+                  return (
+                    <div
+                      key={row.kind === 'socket'
+                        ? `${row.entry.protocol}-${row.entry.family}-${row.entry.localAddress}-${row.entry.localPort}-${i}`
+                        : `free-${port}`}
+                      className={cn(PORTS_GRID, 'px-3 py-1.5 text-xs', row.kind === 'free' && 'opacity-60')}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleFav(port)}
+                        className={cn(
+                          'flex h-6 w-6 items-center justify-center rounded transition-colors',
+                          fav ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground/40 hover:text-muted-foreground',
+                        )}
+                        title={fav ? `Remove port ${port} from favourites` : `Add port ${port} to favourites`}
+                        aria-label={fav ? `Remove port ${port} from favourites` : `Add port ${port} to favourites`}
+                        aria-pressed={fav}
+                      >
+                        <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
+                      </button>
+                      <span className="font-mono font-semibold tabular-nums">{port}</span>
+                      {row.kind === 'socket' ? (
+                        <>
+                          <Pill tone={row.entry.protocol === 'UDP' ? 'amber' : 'primary'}>{row.entry.protocol}</Pill>
+                          <span className="truncate" title={row.entry.processName ?? undefined}>{row.entry.processName ?? '—'}</span>
+                          <span className="font-mono tabular-nums text-muted-foreground">{row.entry.pid ?? '—'}</span>
+                          <span className="truncate font-mono text-muted-foreground" title={row.entry.localAddress}>{row.entry.localAddress}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Pill tone="muted">FREE</Pill>
+                          <span className="text-muted-foreground italic">not listening</span>
+                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">—</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <p className="px-1 text-[11px] text-muted-foreground/70">
+            Shows your own user's sockets. System or other-user processes may need elevated privileges to appear — an OS restriction, not a tool limit.
+          </p>
+        </div>
+      ) : !loading ? (
+        <Empty icon={Plug}>List the TCP/UDP ports this machine is listening on and the process that owns each one. Star the ports you care about to track them.</Empty>
       ) : null}
     </ViewShell>
   );
@@ -660,20 +913,99 @@ function IpLookupView() {
 
 export function NetworkTools() {
   const [view, setView] = useSessionState<View>(SESSION.nav, 'view');
+  const activeCategory = VIEW_META[view].category;
+
+  // Switch view and remember it as this category's last-visited sub-view.
+  const selectView = useCallback((next: View) => {
+    LAST_VIEW[VIEW_META[next].category] = next;
+    setView(next);
+  }, [setView]);
+
+  // Keyboard navigation: ←/→ (or ↑/↓) cycle through views, number keys 1–7 jump
+  // straight to one. Ignored while typing in a field so domain/IP entry — and
+  // each view's own Enter-to-run — keep working untouched.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const i = VIEW_ORDER.indexOf(view);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectView(VIEW_ORDER[(i + 1) % VIEW_ORDER.length]);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectView(VIEW_ORDER[(i - 1 + VIEW_ORDER.length) % VIEW_ORDER.length]);
+      } else if (/^[1-9]$/.test(e.key)) {
+        const n = Number(e.key) - 1;
+        if (n < VIEW_ORDER.length) { e.preventDefault(); selectView(VIEW_ORDER[n]); }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [view, selectView]);
+
+  const subViews = VIEWS_BY_CATEGORY[activeCategory];
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* View switcher */}
-      <div className="shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-border px-3 py-2.5 sm:px-4">
-        <Segmented
-          value={view}
-          onValueChange={setView}
-          options={VIEWS.map((v) => ({ value: v.id, label: v.label }))}
-          aria-label="Network view"
-        />
-        <span className="ml-auto hidden shrink-0 lg:block text-[11px] text-muted-foreground">
-          via Cloudflare · Google · Quad9 · AdGuard · ipapi.co
-        </span>
+      {/* Two-tier navigation: categories (underline tabs) on top, the active
+          category's views (tinted pills) below. Hierarchy comes from the two
+          different active treatments, keeping the azure accent restrained. */}
+      <div className="shrink-0 border-b border-border">
+        {/* Primary: categories — underline tabs */}
+        <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar px-2 sm:px-3" role="tablist" aria-label="Network category">
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
+            const active = cat.id === activeCategory;
+            return (
+              <button
+                key={cat.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => selectView(LAST_VIEW[cat.id])}
+                className={cn(
+                  'relative flex shrink-0 items-center gap-1.5 px-2.5 py-2.5 text-sm font-medium transition-colors',
+                  active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {cat.label}
+                <span
+                  className={cn(
+                    'absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-primary transition-opacity duration-200',
+                    active ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+              </button>
+            );
+          })}
+        </div>
+        {/* Secondary: views within the active category — tinted pills */}
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar px-2 pb-2 pt-1.5 sm:px-3" role="tablist" aria-label="Network view">
+          {subViews.map((v) => {
+            const meta = VIEW_META[v];
+            const Icon = meta.icon;
+            const active = v === view;
+            return (
+              <button
+                key={v}
+                role="tab"
+                aria-selected={active}
+                onClick={() => selectView(v)}
+                className={cn(
+                  'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  active
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {meta.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Active view — content is width-constrained so wide screens stay readable */}
@@ -683,8 +1015,9 @@ export function NetworkTools() {
           {view === 'propagation' && <PropagationView />}
           {view === 'dnssec' && <DnssecView />}
           {view === 'myip' && <MyIpView />}
-          {view === 'local' && <LocalNetworkView />}
           {view === 'iplookup' && <IpLookupView />}
+          {view === 'local' && <LocalNetworkView />}
+          {view === 'ports' && <PortsView />}
         </div>
       </div>
     </div>

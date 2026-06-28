@@ -303,7 +303,7 @@ This file is written by Rust (`fs::write`) whenever you save or delete a broker 
 
 ### Network Tools
 
-A suite of DNS and IP utilities. Every lookup is user-initiated (you type a domain/IP and click a button or press Enter) — there is no background polling or auto-query, except the **Local Network** tab, which reads your own machine's interfaces locally when first opened.
+A suite of DNS and IP utilities. Every lookup is user-initiated (you type a domain/IP and click a button or press Enter) — there is no background polling or auto-query, except the **Local Network** and **Ports** tabs, which read your own machine locally when first opened.
 
 | Sub-tool | What is sent | Service contacted |
 |----------|--------------|-------------------|
@@ -313,12 +313,13 @@ A suite of DNS and IP utilities. Every lookup is user-initiated (you type a doma
 | What's My IP | Nothing (the request itself reveals your IP) | `ipapi.co`, falling back to `ipwho.is` / `freeipapi.com` |
 | IP Lookup | The IP address you enter | `ipapi.co`, falling back to `ipwho.is` / `freeipapi.com` (geolocation, ISP, ASN) |
 | Local Network | **Nothing — read locally** | None. Reads hostname, LAN addresses, and interfaces via the Rust `local_network_info` command. Desktop app only. |
+| Ports | **Nothing — read locally** | None. Lists the machine's listening TCP/UDP sockets and the owning process (pid + name) via the Rust `list_listening_ports` command (`netstat2` for the socket table on macOS/Linux/Windows, `sysinfo` for process names). Desktop app only. Sockets owned by your own user resolve their pid and name; processes owned by other users or the system may require running the app with elevated privileges to appear (this is an OS restriction, not a limitation of the tool). |
 
 **What leaves the machine:** only the domain name or IP you explicitly look up over HTTPS. The Local Network tab is entirely local. No telemetry. Inputs, selections, and results are held in an **in-memory session store** (not `localStorage`) so they survive switching tabs and leaving/returning to the tool, but are cleared on a fresh app launch — none of it leaves the machine.
 
 **Accuracy note:** IP geolocation is approximate and provided by a third party; DoH answers reflect the chosen resolver's cache and may differ from your system resolver.
 
-**Permissions (Tauri):** `http:default`, scoped in `capabilities/default.json` to exactly the seven hosts above (Cloudflare/Google/Quad9/AdGuard DNS + ipapi.co/ipwho.is/freeipapi.com) — no other URLs are reachable. In the desktop app, HTTP requests are made from Rust via the HTTP plugin (so they aren't blocked by browser CORS/Origin rules); the web build uses the WebView's `fetch` (where some IP services may be unreachable due to CORS). Local network info uses the `local_network_info` Rust command (reads interfaces only, no file access).
+**Permissions (Tauri):** `http:default`, scoped in `capabilities/default.json` to exactly the seven hosts above (Cloudflare/Google/Quad9/AdGuard DNS + ipapi.co/ipwho.is/freeipapi.com) — no other URLs are reachable. In the desktop app, HTTP requests are made from Rust via the HTTP plugin (so they aren't blocked by browser CORS/Origin rules); the web build uses the WebView's `fetch` (where some IP services may be unreachable due to CORS). Local network info uses the `local_network_info` Rust command (reads interfaces only, no file access), and the Ports tab uses the `list_listening_ports` Rust command (reads the OS socket table + process list locally, no file or network access).
 
 ### API Client
 

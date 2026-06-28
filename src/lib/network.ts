@@ -265,6 +265,27 @@ export async function getLocalNetworkInfo(): Promise<LocalNetworkInfo> {
   return invoke<LocalNetworkInfo>('local_network_info');
 }
 
+// ─── Listening ports / processes ──────────────────────────────────────────────
+
+export interface PortEntry {
+  protocol: string;            // "TCP" | "UDP"
+  family: string;              // "IPv4" | "IPv6"
+  localAddress: string;        // bound address (0.0.0.0 / 127.0.0.1 / ::)
+  localPort: number;
+  state: string;               // TCP state ("LISTEN"); "" for UDP
+  pid: number | null;
+  processName: string | null;
+}
+
+// Reads the machine's own listening TCP / UDP sockets and the owning process via
+// the Rust `list_listening_ports` command. Local-only — nothing leaves the
+// machine. Desktop app only.
+export async function listListeningPorts(): Promise<PortEntry[]> {
+  if (!isTauri) throw new Error('The port viewer is only available in the desktop app.');
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<PortEntry[]>('list_listening_ports');
+}
+
 // ─── IP info ────────────────────────────────────────────────────────────────
 
 export interface IpInfo {
