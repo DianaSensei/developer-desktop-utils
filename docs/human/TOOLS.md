@@ -26,7 +26,7 @@ This document describes every tool in the app: what computation it performs, wha
 | Generator | ✓ | — | ✓ | — | Random + Test Data schema/options (localStorage) |
 | Time Tracker | ✓ | — | — | — | Time entries, projects, tags (localStorage) |
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
-| Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data) |
+| Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data); produce draft in-memory |
 | RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
@@ -272,9 +272,13 @@ Generates QR codes from text/URLs and decodes QR codes from image files.
 
 ### Kafka Explorer
 
-Opens TCP connections to Kafka brokers you configure. Reads load automatically when you open a view (topic messages, consumers, group details) and refresh on navigation or an explicit Refresh — there is **no background polling**, no auto-connect on launch, and writes (produce/create/delete) are always explicit. Connections are **plaintext only**: TLS/SSL and SASL authentication are not implemented, so don't point it at a broker requiring encryption or credentials.
+Opens TCP connections to Kafka brokers you configure. You must **Connect** a broker before any views are accessible — there is no auto-connect on launch. Reads load when you open a view (topic messages, consumers, group details) and refresh on navigation or explicit Refresh — there is **no background polling**. Writes (produce/create/delete) are always explicit. Connections are **plaintext only**: TLS/SSL and SASL authentication are not implemented, so don't point it at a broker requiring encryption or credentials.
 
 See **[kafka-explorer.md](kafka-explorer.md)** for the full operation-by-operation breakdown including which Kafka API calls are made, their direction, and their impact.
+
+**Produce form** persists across tool and tab switches until the app closes (in-memory only — nothing written to disk). The produce value field supports JSON syntax highlighting and a Format (pretty-print) button. Topic and key inputs record per-broker history for quick re-use.
+
+**Live consume** streams messages directly to the UI via a Tauri channel; message bodies support JSON and plain-text highlighting. Consumers keep running while you navigate within the tool and stop when you leave or click Stop.
 
 #### Broker config storage
 
@@ -301,13 +305,15 @@ This file is written by Rust (`fs::write`) whenever you save or delete a broker 
 
 ### RabbitMQ
 
-Talks to the RabbitMQ **Management plugin** HTTP REST API (default port `15672`) at the host you configure for everything except Publish, Consume and Request/Response. Each request sends your username and password as HTTP Basic auth to that host; use TLS (HTTPS) for any non-local broker. Reads (overview, queues, exchanges, bindings, connections) load when you open a view and refresh on navigation or an explicit Refresh — there is **no background polling** and no auto-connect on launch. Writes are always explicit and **non-destructive by design**: Publish sends a real message and Create exchange/queue/binding apply via the management API, but the tool exposes **no purge or delete** of queues/exchanges. There is no "get messages" peek over HTTP — to inspect messages you start a real consumer (see below), because AMQP has no side-effect-free way to read a message.
+You must **Connect** a connection profile before any views are accessible — there is no auto-connect on launch. Talks to the RabbitMQ **Management plugin** HTTP REST API (default port `15672`) at the host you configure for everything except Publish, Consume and Request/Response. Each request sends your username and password as HTTP Basic auth to that host; use TLS (HTTPS) for any non-local broker. Reads (overview, queues, exchanges, bindings, connections) load when you open a view and refresh on navigation or an explicit Refresh — there is **no background polling**. Writes are always explicit and **non-destructive by design**: Publish sends a real message and Create exchange/queue/binding apply via the management API, but the tool exposes **no purge or delete** of queues/exchanges.
+
+**Multiple hosts (HA failover):** a connection profile can list multiple broker addresses (e.g. `10.0.0.1:5672, 10.0.0.2:5672`). The tool tries each within a 15-second timeout and uses the first that responds.
 
 **Publish, Consume and Request/Response** use **AMQP** rather than the management API (these are real broker operations the HTTP API can't do faithfully). They connect to the configured host on the **AMQP port** (default `5672`, or `5671` when TLS is on):
 
-- **Publish** — a real `basic.publish` with full message properties, optional **mandatory** flag (unroutable messages are returned, not silently dropped) and **publisher confirms** (so the tool can report confirmed/routed).
+- **Publish** — a real `basic.publish` with full message properties, optional **mandatory** flag (unroutable messages are returned, not silently dropped) and **publisher confirms** (so the tool can report confirmed/routed). The request payload and reply support JSON syntax highlighting.
 - **Consume** — `basic.consume` with a bounded **prefetch**, managed centrally in the **Consumers** panel and **confirmed before it starts**. *Peek* is non-destructive — messages are delivered unacked and requeued (flagged `redelivered`) when you stop — but it is still a real subscription, so on a queue with other consumers it competes for and temporarily withholds the messages it holds. *Consume* acknowledges and **permanently removes** each message it receives. *Respond* makes the tool an **RPC server** — it acks (removes) each request and publishes a reply (echo or a fixed payload) to the request's `reply_to` with the same correlation id. Because RabbitMQ delivers each message to only one consumer, **any** mode takes a share of messages from existing consumers on the same queue; the panel warns you when the target queue already has consumers. Consumers keep running while you navigate within the tool and stop on Stop or when you leave the tool — there is no unbounded buffering.
-- **Request/Response** — direct reply-to (`amq.rabbitmq.reply-to`) over a one-shot connection.
+- **Request/Response** — direct reply-to (`amq.rabbitmq.reply-to`) over a one-shot connection. Exchange, routing-key, and queue fields remember per-connection history for quick re-use.
 
 **AMQP-only mode** — for brokers that expose no management HTTP API, enable *AMQP-only* on the connection. The tool then talks to the broker exclusively over AMQP: AMQP can't *enumerate* queues/exchanges, so you **track them by name** (the names are remembered per connection in `localStorage`), and the tool uses a **passive declare** to report whether a named queue/exchange exists plus its live ready/consumer counts. Create queue/exchange and bind run over AMQP (`queue_declare` / `exchange_declare` / `queue_bind`); publish/consume/RPC are unchanged. **Overview, Connections and the browse-all lists are unavailable** in this mode because there is no way to enumerate them over AMQP. The management port is ignored, and **Test** opens an AMQP connection instead of an HTTP request.
 
@@ -315,7 +321,7 @@ TLS supports trusting a **custom CA certificate (PEM)** for self-signed/private 
 
 #### Connection profile storage
 
-Connection profiles (name, host, management port, AMQP port, vhost, username, **password**, TLS flag, optional **CA cert** + **PKCS#12 client identity & password**, heartbeat, connection name) are saved to:
+Connection profiles (name, host(s), management port, AMQP port, vhost, username, **password**, TLS flag, optional **CA cert** + **PKCS#12 client identity & password**, heartbeat, connection name, extra hosts for HA failover) are saved to:
 
 ```
 macOS:    ~/Library/Application Support/devtool/rabbit-connections.json
@@ -431,4 +437,4 @@ A TOTP / HOTP one-time-password generator — the same codes a phone authenticat
 
 ---
 
-*Last updated: 2026-06-28*
+*Last updated: 2026-06-30*

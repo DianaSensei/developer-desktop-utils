@@ -47,13 +47,12 @@ devtool/
 │   │   ├── StatusMessage.tsx    # Inline success/error/info banner
 │   │   ├── ToolGuideModal.tsx   # "How to use" modal opened by the header ? button
 │   │   ├── ToolHeaderActions.tsx # Portal: renders tool-specific buttons into the app header
-│   │   ├── UpdateDialog.tsx     # Auto-update install prompt
-│   │   └── Settings.tsx     # Settings page (reads TOOL_DEFS; no FEATURE_LIST)
+│   │   └── UpdateDialog.tsx     # Auto-update install prompt
 │   ├── config/
 │   │   └── appConfig.ts     # AppConfig type + DEFAULT_APP_CONFIG + CONFIG_FIELDS (Settings editor)
 │   ├── contexts/
 │   │   ├── AppConfigContext.tsx  # Tunable app-wide numbers (editor, generator, kafka, updates)
-│   │   ├── FeatureContext.tsx    # Tool enable/disable + sidebar order
+│   │   ├── FeatureContext.tsx    # Tool enable/disable + sidebar order + favorites
 │   │   ├── UpdateContext.tsx     # Auto-update state, badge, toggle
 │   │   └── (MeetingsProvider in src/lib/meetings.tsx)
 │   ├── design-system/
@@ -73,6 +72,7 @@ devtool/
 │   ├── lib/
 │   │   ├── toolDefs.ts      # TOOL_DEFS array + DEFAULT_TOOL_ORDER — single source of truth
 │   │   ├── toolGuides.tsx   # Per-tool "how to use" guide content for ToolGuideModal
+│   │   ├── liveConnections.ts   # Global live-connection registry (rabbit/kafka live dot)
 │   │   ├── utils.ts         # cn() classname merger
 │   │   ├── clipboard.ts     # copyToClipboard(), copyImageToClipboard(), readImageFromClipboard()
 │   │   ├── faker.ts         # Faker.js helpers for the Generator tool
@@ -89,7 +89,7 @@ devtool/
 │   ├── App.tsx              # Router, layout, TOOL_ROUTES, sidebar, provider hierarchy
 │   └── main.tsx             # React entry point
 ├── src-tauri/               # Tauri 2 (Rust) backend
-│   ├── src/main.rs          # Rust main — registers all plugins
+│   ├── src/main.rs          # Rust main — registers all plugins + Edit menu (undo/redo/copy/paste)
 │   ├── Cargo.toml           # Rust dependencies
 │   ├── capabilities/
 │   │   └── default.json     # Permission grants (Tauri 2 capability system)
@@ -109,7 +109,7 @@ devtool/
 
 ```
 AppConfigProvider          ← tunable numbers (src/config/appConfig.ts)
-  FeatureProvider          ← tool enable/disable, sidebar order
+  FeatureProvider          ← tool enable/disable, sidebar order, favorites
     UpdateProvider         ← auto-update polling and state
       MeetingsProvider     ← time-tracker meeting notes
         Router
@@ -592,13 +592,22 @@ const { config, setField, resetConfig } = useAppConfig();
 ```
 
 ### FeatureContext — `src/contexts/FeatureContext.tsx`
-Manages tool enable/disable and sidebar drag order. Persisted in `localStorage` (`devtool-features`, `devtool-tool-order`).
+Manages tool enable/disable, sidebar drag order, and **favorites** (starred tools that float to the top of the sidebar). All persisted in `localStorage`.
 
 ```tsx
-const { features, toggleFeature, isFeatureEnabled, resetToDefaults, toolOrder, reorderTools } = useFeatures();
+const { features, toggleFeature, isFeatureEnabled, resetToDefaults,
+        toolOrder, reorderTools,
+        favorites, toggleFavorite, isFavorite } = useFeatures();
 ```
 
-Default enabled/disabled state is in `DEFAULT_FEATURES` (in this file). Tools not listed default to `enabled`.
+Storage keys:
+- `devtool-features` — `{ [featureId]: boolean }` enabled/disabled map
+- `devtool-tool-order` — `string[]` sidebar drag order
+- `devtool-favorites` — `string[]` favorited tool ids (most-recently-starred first)
+
+Default enabled/disabled state is in `DEFAULT_FEATURES`. Tools not listed default to `enabled`.
+
+**Favorites in the sidebar:** starred tools float to the top of the nav list sorted by most-recently-starred. When favorites exist and the sidebar is expanded, "Favorites" / "All tools" section headers appear. Each nav item shows a star toggle on hover (filled amber = favorited). The star is also accessible in Settings → tool list. No changes needed to add favorites to new tools — the behavior is automatic.
 
 ### UpdateContext — `src/contexts/UpdateContext.tsx`
 Auto-update polling, badge state, and install flow. Persisted in `localStorage` (`devtool-auto-update`, `devtool-last-update-check`).
@@ -615,6 +624,27 @@ const { status, updateInfo, updateAvailable, autoCheckEnabled, toggleAutoCheck, 
 
 ---
 
+## Sidebar Live Connection Indicator
+
+`src/lib/liveConnections.ts` maintains a module-scope `Set<string>` of currently-connected tool `featureId`s (e.g. `'rabbit-client'`, `'kafka-explorer'`). It is seeded on startup from each tool's persisted connected-id key in `localStorage`, so the dot is correct before the tool component mounts.
+
+```tsx
+import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
+
+// In a tool component — report live state:
+useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected]);
+
+// In the sidebar — read reactive list:
+const liveIds = useLiveConnections();
+const isLive = liveIds.includes(tool.featureId);
+```
+
+When `isLive` is true, `App.tsx` renders a small emerald dot absolutely positioned on the tool's icon (`-top-1 -right-1`), visible both in collapsed and expanded sidebar mode.
+
+Currently registered feature IDs: `'rabbit-client'` (seeded from `devtool:rabbit:connectedConnId`), `'kafka-explorer'` (seeded from `devtool:kafka:connectedBrokerId`).
+
+---
+
 ## Tauri 2 Notes
 
 - **Permissions**: `src-tauri/capabilities/default.json` — Tauri 2 capability system, not the old v1 `allowlist`
@@ -622,6 +652,7 @@ const { status, updateInfo, updateAvailable, autoCheckEnabled, toggleAutoCheck, 
 - **Tauri detection**: `'__TAURI_INTERNALS__' in window` (not `__TAURI_IPC__`)
 - **Config keys**: `build.devUrl` (not `devPath`), `build.frontendDist` (not `distDir`), `plugins.updater` (not `tauri.updater`)
 - **Adding a capability**: add permission string to `capabilities/default.json` AND document it in the `APP_PERMISSIONS` array in `Settings.tsx`
+- **macOS Edit menu**: `src-tauri/src/main.rs` registers a native Edit menu (`Undo`, `Redo`, `Cut`, `Copy`, `Paste`, `Select All`) via `tauri::menu::PredefinedMenuItem`. This is required on macOS to route Cmd+Z/X/C/V/A into the WebView; Windows/Linux work without it.
 
 Common capability strings:
 ```json
@@ -725,11 +756,105 @@ git push origin main --tags
 | `diff` | Diff | ❌ | Word-level text diff, structural JSON diff |
 | `markdown` | Markdown | ❌ | Live preview, GFM |
 | `deduplicate` | Deduplicate | ❌ | Remove duplicate lines, Web Worker |
-| `kafka-explorer` | Kafka Explorer | ❌ | Topics, partitions, consumer groups, producer |
-| `rabbit-client` | RabbitMQ | ❌ | Management REST + AMQP via Rust (lapin) |
+| `kafka-explorer` | Kafka Explorer | ❌ | Topics, partitions, consumer groups, live produce/consume |
+| `rabbit-client` | RabbitMQ | ❌ | Management REST + AMQP via Rust (lapin), live consume/RPC |
 | `sql-formatter` | SQL Formatter | ❌ | SQL + MongoDB aggregation formatting |
 | `network` | Network Tools | ❌ | DNS, propagation, DNSSEC, IP, listening ports |
 | `lucky-wheel` | Lucky Wheel | ❌ | Random winner spinner |
+
+---
+
+## Complex Tool Reference
+
+### Kafka Explorer (`src/components/tools/kafka/`)
+
+**Connect/Disconnect flow:** a broker must be explicitly connected (`handleConnect` in `KafkaExplorer.tsx`) before any views are accessible. `connectedBrokerId` is persisted in `localStorage` (`devtool:kafka:connectedBrokerId`). Connecting a new broker stops the previous broker's consumers (`kafkaConsumerStore.stopForBroker`). The right panel shows a `DisconnectedPanel` until connected.
+
+**Live consumers:** `kafkaConsumerStore.ts` (module-scope `Map`) manages streaming consumers via `kafka_consume_start` / `kafka_consume_stop` Rust commands. Tauri `Channel` pushes messages to the frontend. Store is outside the component tree so consumers survive view switches; `stopAll()` is called on tool unmount.
+
+**Input history:** `kafkaInputHistoryStore.ts` — per-broker history (localStorage, fields `'topic'|'key'`, cap 25, most-recent-first). `kafkaInputHistory.add/remove/get`, `useKafkaRecentMatches(brokerId, field, query)`. `RecentSuggestions.tsx` renders a "Recent" dropdown group with clock icon + hover × to remove.
+
+**Produce draft:** `produceDraft.ts` — in-memory module-scope object (`topic`, `key`, `value`, `headers`, `batch`, `partitionMode`, `partition`, `valueFormat`). Survives tool and tab switches; reset only on app restart (not written to disk). `ProduceTab.tsx` seeds from it and writes back on every render via `useEffect(() => { Object.assign(produceDraft, {...}); })` (no deps).
+
+**Format for produce value / consume body:** `ProduceTab.tsx` uses `CodeEditor` (CodeMirror, editable, JSON/plain Segmented toggle + Format button). `ConsumeView.tsx` uses `ResponseViewer` (read-only, JSON/plain) for message body; hex stays `<pre>`.
+
+**Live indicator:** `useEffect(() => { liveConnections.set('kafka-explorer', isConnected); }, [isConnected])` in `KafkaExplorer.tsx`.
+
+Key files:
+- `KafkaExplorer.tsx` — root component, connect/disconnect, resize, routing
+- `LeftPanel.tsx` — broker selector + status dot + Connect/Disconnect button
+- `useKafkaState.ts` — navigation state + persisted `connectedBrokerId`
+- `kafkaConsumerStore.ts` — module-scope consumer registry + `stopForBroker(id)`
+- `kafkaInputHistoryStore.ts` — per-broker topic/key history
+- `produceDraft.ts` — in-memory produce form state
+- `types.ts` — `kafkaApi` (thin wrappers over Tauri `invoke`)
+
+---
+
+### RabbitMQ Client (`src/components/tools/rabbit/`)
+
+**Connect/Disconnect flow:** a connection must be explicitly connected (`handleConnect` in `RabbitClient.tsx`) — runs AMQP test + management test (if not AMQP-only), then sets `connectedConnId` in `localStorage` (`devtool:rabbit:connectedConnId`). Connecting elsewhere stops the previous connection's consumers (`consumerStore.stopForConn`). The right panel shows `DisconnectedPanel` until connected.
+
+**Connection profiles:** stored in `rabbit-connections.json` in the app data directory (Rust `fs::write`). Fields: `id`, `name`, `host`, `port` (management), `amqpPort`, `vhost`, `username`, `password`, `useTls`, `caPem`, `clientIdentityPkcs12` (base64), `clientIdentityPassword`, `heartbeat`, `connectionName`, `amqpOnly`, `extraHosts` (for HA failover). All fields with `#[serde(default)]` for backward compatibility. `null_as_default` custom deserializer handles legacy `null` values for `Vec<String>` fields.
+
+**Multiple hosts (HA failover):** `extraHosts: string[]` — additional `"host"` or `"host:port"` entries. `connect_amqp` iterates all endpoints (primary + extras) with a 15 s per-endpoint timeout, returning on first success. `ConnectionForm.tsx` exposes an **Addresses** field (comma-separated `host:port`).
+
+**AMQP-only mode:** when `amqpOnly: true`, the management API is not called. Queue/exchange topology is tracked by name per connection in `knownNamesStore.ts` (`localStorage`). `useKnownNames(connId, kind)` provides the typed-name list. Management-dependent views (Overview, Connections) resolve to Queues in this mode.
+
+**Queue list pagination:** `QueueListView.tsx` fetches pages of 200 via management API (`page`, `page_size`, `pagination=true`, `disable_stats=true`, `enable_queue_totals=true`). Server-side name filter with 300 ms debounce. `useRabbitData.ts` is **load-once** — serves cache and does not background-revalidate; `refresh()` is explicit.
+
+**Input history:** `inputHistoryStore.ts` — per-connection history (localStorage, fields `'exchange'|'routingKey'|'queue'`, cap 25). `inputHistory.add/remove/get`, `useRecentMatches(connId, field, query)`. `RecentSuggestions.tsx` renders a "Recent" group combobox dropdown.
+
+**RPC view:** `RpcView.tsx` — module-scope `rpcDraft` (in-memory) seeds and mirrors all fields. Payload uses `CodeEditor` (JSON/plain Segmented + Format button). Reply uses `ResponseViewer` (JSON/plain, auto-detect from contentType). Exchange/routing-key/queue comboboxes use `useRecentMatches` + `RecentSuggestions`.
+
+**Live consumers:** `consumerStore.ts` (module-scope `Map`) manages `rabbit_consume_start` / `rabbit_consume_stop` Rust AMQP consumers. `stopForConn(connId)` stops all consumers for a connection; `stopAll()` on unmount.
+
+**Rust backend (`src-tauri/src/rabbit.rs`):**
+- `rabbit_amqp_test` — connect test (iterates all endpoints)
+- `rabbit_publish` — full AMQP publish with properties + mandatory + publisher confirms → `PublishOutcome`
+- `rabbit_consume_start` / `rabbit_consume_stop` — live consumer via `ConsumerRegistry` (Mutex<HashMap<String, Arc<Notify>>>); prefetch-bounded; peek (non-destructive) or consume (ack)
+- `rabbit_rpc_call` — one-shot request/response via `amq.rabbitmq.reply-to`
+- `rabbit_amqp_queues_info` / `rabbit_amqp_exchanges_info` — passive declare for AMQP-only mode
+- `rabbit_amqp_declare_queue` / `rabbit_amqp_declare_exchange` / `rabbit_amqp_bind_queue` — topology management over AMQP
+
+**Live indicator:** `useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected])` in `RabbitClient.tsx`.
+
+Key files:
+- `RabbitClient.tsx` — root component, connect/disconnect, resize, routing
+- `LeftPanel.tsx` — connection selector + status dot + Connect/Disconnect button
+- `useRabbitState.ts` — navigation state + persisted `connectedConnId`
+- `ConnectionForm.tsx` — AMQP-first form: Addresses (comma-separated multi-host), optional management API toggle, Advanced (vhost), Paste URI collapsible
+- `api.ts` — `rabbitMgmt` HTTP client + `QUEUE_LIST_QUERY` / `EXCHANGE_LIST_QUERY` constants
+- `types.ts` — `RabbitConnection`, `rabbitApi` Tauri invoke wrappers
+- `consumerStore.ts` — module-scope consumer registry + `stopForConn(id)`
+- `inputHistoryStore.ts` — per-connection exchange/routingKey/queue history
+- `knownNamesStore.ts` — AMQP-only typed queue/exchange names per connection
+- `useRabbitData.ts` — load-once SWR-style data cache
+
+---
+
+## Shared Components for Complex Tools
+
+### `ViewHeader` — `src/components/ui/view-header.tsx`
+Reusable detail/list header: icon chip + title + muted subtitle + action buttons + optional back chevron. Used by `QueueView`, `ExchangeView`, `GroupView`, `TopicListView`, etc.
+
+```tsx
+import { ViewHeader } from '@/components/ui/view-header';
+
+<ViewHeader
+  icon={<Layers className="h-4 w-4" />}
+  title={queueName}
+  subtitle={`${readyCount} ready`}
+  actions={<Button size="sm">Publish</Button>}
+  onBack={handleBack}
+/>
+```
+
+### `CodeEditor` — `src/components/tools/apiclient/CodeEditor.tsx`
+Editable CodeMirror 6 editor. Props: `value`, `onChange`, `language` (`'json'|'text'|…`), `placeholder`. Used for request payloads (RPC, Produce). Implements the flex layout pattern described in Cross-Platform Rules.
+
+### `ResponseViewer` — `src/components/tools/apiclient/ResponseViewer.tsx`
+Read-only CodeMirror 6 viewer with JSON/text syntax highlight. Props: `value`, `language`. Used for RPC reply and Kafka/RabbitMQ consume message body.
 
 ---
 
@@ -751,6 +876,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { CopyButton } from '@/components/ui/copy-button';
 import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
+import { ViewHeader } from '@/components/ui/view-header';
 ```
 
 ### Most Used Utilities
@@ -765,6 +891,7 @@ import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
 import { ToolHeaderActions } from '@/components/ToolHeaderActions';
+import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 ```
 
 ### Key npm Packages
@@ -781,9 +908,9 @@ import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 - `fast-xml-parser` — XML parse/serialize (Data Converter)
 - `js-yaml` — YAML parse/serialize
 - `rskafka` (Rust, v0.6) — Kafka client (via `rustls 0.23`)
-- **RabbitMQ Client** (`src/components/tools/rabbit/`): browse/create queues & exchanges via the Management REST API (`:15672`) from the frontend (`@tauri-apps/plugin-http` `fetch`, Basic auth, `api.ts`/`rabbitMgmt`). **Publish, Consume and Request/Response** use real AMQP via `lapin` in `src-tauri/src/rabbit.rs`. Connection profiles (incl. password, AMQP port, CA/PKCS#12, `amqpOnly`) persist to `rabbit-connections.json`. **AMQP-only mode** (`amqpOnly` on the connection): drops all REST calls and works off typed names tracked per-connection in `localStorage` (`knownNamesStore.ts`, `useKnownNames`); topology over AMQP via `rabbit_amqp_*` commands. Rust unit tests live in `rabbit.rs`; env-gated broker integration tests in `src-tauri/tests/rabbit_it.rs` (`cargo test -- --ignored`).
-- `local-ip-address` + `hostname` (Rust) — back `local_network_info` (`src-tauri/src/netinfo.rs`) for Network tool Local Network view
-- `netstat2` + `sysinfo` (Rust) — back `list_listening_ports` (`src-tauri/src/ports.rs`) for Network tool Ports view
+- `lapin` (Rust, v4.x) — AMQP 0-9-1 client; TLS via `rustls-platform-verifier` (OS trust store) + optional CA PEM / PKCS#12 mTLS
+- `local-ip-address` + `hostname` (Rust) — back `local_network_info` for Network tool Local Network view
+- `netstat2` + `sysinfo` (Rust) — back `list_listening_ports` for Network tool Ports view
 - `diff` — text diffing
 - `qrcode` — QR generation
 - `jsqr` — QR image decoding
@@ -818,6 +945,7 @@ import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 | `src/lib/toolGuides.tsx` | ✅ Safe — add/edit per-tool help text |
 | `src/hooks/*.ts` | ⚠️ Careful — many tools depend on these |
 | `src/lib/toolDefs.ts` | ⚠️ Careful — all tools depend on this |
+| `src/lib/liveConnections.ts` | ⚠️ Careful — sidebar live dot reads this |
 | `src/config/appConfig.ts` | ⚠️ Careful — Settings editor is driven by this |
 | `src/App.tsx` | ⚠️ Careful — core routing and layout |
 | `src/contexts/*.tsx` | ⚠️ Careful — shared state |
@@ -843,6 +971,10 @@ import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 
 **AppConfig value not updating in Settings**: verify that `CONFIG_FIELDS` in `src/config/appConfig.ts` has a matching entry with the right `section`/`key`/`min`/`max` — the Settings editor is code-generated from that array.
 
+**Undo/redo/copy/paste not working (macOS)**: the native Edit menu is registered in `src-tauri/src/main.rs` via `tauri::menu::PredefinedMenuItem`. If these shortcuts stop working after a `main.rs` change, verify the `.setup()` block is still present and `app.set_menu(menu)?` is called.
+
+**Kafka/RabbitMQ live dot missing**: check that the tool's `useEffect(() => { liveConnections.set(featureId, isConnected); }, [isConnected])` is present and that `liveConnections.ts` has a matching `seed()` call for that tool's localStorage key.
+
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-06-30*
