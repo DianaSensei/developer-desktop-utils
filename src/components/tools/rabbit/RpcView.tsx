@@ -7,6 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
+// Read-only CodeMirror viewer (line numbers, folding, JSON/plain highlighting) —
+// reused so the reply renders like a code editor.
+import { ResponseViewer } from '@/components/tools/apiclient/ResponseViewer';
+// Editable CodeMirror editor for the request payload (same highlighting).
+import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection, RpcReply, PublishOutcome, MessageProperties, ExchangeInfo, QueueInfo, BindingInfo } from './types';
@@ -34,6 +39,8 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
   const [exchange, setExchange] = useState('');
   const [routingKey, setRoutingKey] = useState('');
   const [payload, setPayload] = useState('');
+  // Payload editor: JSON highlighting (+ Format action) or plain text.
+  const [payloadFormat, setPayloadFormat] = usePersistentState<'json' | 'plain'>('devtool:rabbit:payloadFormat', 'json');
 
   // Message properties
   const [contentType, setContentType] = useState('application/json');
@@ -57,6 +64,8 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
 
   const [sending, setSending] = useState(false);
   const [reply, setReply] = useState<RpcReply | null>(null);
+  // Reply rendering: pretty-printed + highlighted JSON, or plain text.
+  const [replyFormat, setReplyFormat] = usePersistentState<'json' | 'plain'>('devtool:rabbit:replyFormat', 'json');
   const [elapsed, setElapsed] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<PublishOutcome | null>(null);
   const [stopped, setStopped] = useState(false);
@@ -73,6 +82,11 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
   );
 
   const reset = () => { setReply(null); setElapsed(null); setOutcome(null); setStopped(false); setError(null); };
+
+  /** Pretty-print the payload as JSON in place; no-op if it isn't valid JSON. */
+  const formatPayload = () => {
+    try { setPayload(JSON.stringify(JSON.parse(payload), null, 2)); reset(); } catch { /* leave as typed */ }
+  };
 
   // Apply a prefill from an entry point (e.g. a queue/exchange Publish button).
   useEffect(() => {
@@ -131,6 +145,10 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
         });
         if (reqGen.current !== myGen) return;
         setReply(r);
+        // Default to JSON view when the reply looks like JSON (by content type or
+        // by parsing); otherwise plain. The user can still flip it.
+        const ct = r.contentType?.toLowerCase() ?? '';
+        setReplyFormat(ct.includes('json') || isJsonParseable(r.payload) ? 'json' : 'plain');
         setElapsed(Math.round(performance.now() - started));
       }
     } catch (e) {
@@ -142,6 +160,10 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
   };
 
   const cancel = () => { reqGen.current++; setSending(false); setStopped(true); };
+
+  // The reply as shown: pretty-printed when JSON view is on (falls back to raw if
+  // it doesn't parse), else the raw payload.
+  const replyText = reply ? (replyFormat === 'json' ? prettyJsonOrRaw(reply.payload) : reply.payload) : '';
 
   const routingHint = exchange === ''
     ? <>Default exchange — the message goes to the queue <span className="font-mono text-foreground">named exactly the routing key</span>.</>
@@ -192,13 +214,40 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
 
           {/* Payload */}
           <div>
-            <Label htmlFor="rpc-payload" className="text-xs">Payload</Label>
-            <Textarea
-              id="rpc-payload"
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <Label className="text-xs">Payload</Label>
+              <div className="flex items-center gap-2">
+                {payloadFormat === 'json' && (
+                  <button
+                    type="button"
+                    onClick={formatPayload}
+                    disabled={!payload.trim()}
+                    className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-40"
+                    title="Pretty-print as JSON"
+                  >
+                    Format
+                  </button>
+                )}
+                <Segmented<'json' | 'plain'>
+                  value={payloadFormat}
+                  onValueChange={setPayloadFormat}
+                  size="sm"
+                  aria-label="Payload format"
+                  options={[
+                    { value: 'json', label: 'JSON' },
+                    { value: 'plain', label: 'Plain' },
+                  ]}
+                />
+              </div>
+            </div>
+            {/* key on format so CodeMirror swaps grammar cleanly (language is fixed at mount). */}
+            <CodeEditor
+              key={payloadFormat}
               value={payload}
-              onChange={(e) => { setPayload(e.target.value); reset(); }}
+              onChange={(v) => { setPayload(v); reset(); }}
+              language={payloadFormat === 'json' ? 'json' : 'text'}
               placeholder={'{"hello": "world"}'}
-              className="mt-1 font-mono text-sm min-h-40"
+              className="min-h-40"
             />
           </div>
 
@@ -326,20 +375,43 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
 
           {reply && (
             <div className="rounded-lg border bg-card/40 overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20 border-b text-[11px] text-muted-foreground">
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/20 border-b text-[11px] text-muted-foreground">
                 <span className="font-mono truncate">
                   Reply{reply.contentType ? ` · ${reply.contentType}` : ''}
                   {reply.correlationId ? ` · correlation_id: ${reply.correlationId}` : ''}
                 </span>
-                <CopyButton value={reply.payload} iconClassName="h-3.5 w-3.5" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <Segmented<'json' | 'plain'>
+                    value={replyFormat}
+                    onValueChange={setReplyFormat}
+                    size="sm"
+                    aria-label="Reply format"
+                    options={[
+                      { value: 'json', label: 'JSON' },
+                      { value: 'plain', label: 'Plain' },
+                    ]}
+                  />
+                  <CopyButton value={replyText} iconClassName="h-3.5 w-3.5" />
+                </div>
               </div>
-              <pre className="px-3 py-2 text-xs font-mono whitespace-pre-wrap break-words max-h-80 overflow-y-auto">{reply.payload}</pre>
+              <div className="flex h-72 flex-col">
+                <ResponseViewer value={replyText} language={replyFormat === 'json' ? 'json' : 'text'} />
+              </div>
             </div>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+function isJsonParseable(s: string): boolean {
+  try { JSON.parse(s); return true; } catch { return false; }
+}
+
+/** Pretty-print JSON for the reply viewer; return the raw text if it doesn't parse. */
+function prettyJsonOrRaw(payload: string): string {
+  try { return JSON.stringify(JSON.parse(payload), null, 2); } catch { return payload; }
 }
 
 function Field({ label, value, onChange, reset, placeholder }: {
