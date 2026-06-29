@@ -11,9 +11,13 @@ interface FeatureContextType {
   resetToDefaults: () => void;
   toolOrder: string[];
   reorderTools: (order: string[]) => void;
+  favorites: string[];
+  toggleFavorite: (featureId: string) => void;
+  isFavorite: (featureId: string) => boolean;
 }
 
 const TOOL_ORDER_KEY = 'devtool-tool-order';
+const FAVORITES_KEY = 'devtool-favorites';
 
 const FeatureContext = createContext<FeatureContextType | undefined>(undefined);
 
@@ -64,6 +68,17 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
     } catch { return []; }
   });
 
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(FAVORITES_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  }, [favorites]);
+
   useEffect(() => {
     localStorage.setItem('devtool-features', JSON.stringify(features));
   }, [features]);
@@ -88,8 +103,18 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(TOOL_ORDER_KEY, JSON.stringify(order));
   };
 
+  // Most-recently-favorited goes first, so the top of the sidebar reflects the
+  // order the user starred things.
+  const toggleFavorite = (featureId: string) => {
+    setFavorites((prev) =>
+      prev.includes(featureId) ? prev.filter((id) => id !== featureId) : [featureId, ...prev]
+    );
+  };
+
+  const isFavorite = (featureId: string) => favorites.includes(featureId);
+
   return (
-    <FeatureContext.Provider value={{ features, toggleFeature, isFeatureEnabled, resetToDefaults, toolOrder, reorderTools }}>
+    <FeatureContext.Provider value={{ features, toggleFeature, isFeatureEnabled, resetToDefaults, toolOrder, reorderTools, favorites, toggleFavorite, isFavorite }}>
       {children}
     </FeatureContext.Provider>
   );
