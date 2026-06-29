@@ -24,7 +24,8 @@ type Tab = 'overview' | 'bindings';
 
 export function ExchangeView({ conn, exchangeName, refreshKey, onRefresh, onBack, onPublish }: ExchangeViewProps) {
   const [tab, setTab] = usePersistentState<Tab>('devtool:rabbit:exchangeTab', 'overview');
-  const activeTab: Tab = (tab as string) === 'publish' ? 'overview' : tab;
+  // Tolerate stale persisted values (e.g. a removed 'publish' tab).
+  const activeTab: Tab = tab === 'overview' || tab === 'bindings' ? tab : 'overview';
   const isDefault = exchangeName === '';
 
   return (

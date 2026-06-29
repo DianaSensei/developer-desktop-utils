@@ -164,17 +164,6 @@ export interface BindingInfo {
   arguments?: Record<string, unknown>;
 }
 
-export interface GetMessage {
-  payload: string;
-  payload_bytes?: number;
-  payload_encoding?: string;
-  redelivered?: boolean;
-  exchange?: string;
-  routing_key?: string;
-  message_count?: number;
-  properties?: Record<string, unknown>;
-}
-
 export interface ConnectionRow {
   name: string;
   user?: string;

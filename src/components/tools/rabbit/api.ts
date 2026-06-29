@@ -14,7 +14,6 @@ import type {
   QueueInfo,
   ExchangeInfo,
   BindingInfo,
-  GetMessage,
   ConnectionRow,
   ChannelRow,
 } from './types';
@@ -103,21 +102,6 @@ export const rabbitMgmt = {
     request<QueueInfo>(c, `/queues/${enc(c.vhost)}/${enc(name)}`),
   queueBindings: (c: RabbitConnection, name: string) =>
     request<BindingInfo[]>(c, `/queues/${enc(c.vhost)}/${enc(name)}/bindings`),
-  getMessages: (c: RabbitConnection, name: string, count: number) =>
-    request<GetMessage[]>(c, `/queues/${enc(c.vhost)}/${enc(name)}/get`, {
-      method: 'POST',
-      body: JSON.stringify({
-        count,
-        // Peek without consuming: take the messages then put them back.
-        ackmode: 'ack_requeue_true',
-        encoding: 'auto',
-        truncate: 50000,
-      }),
-    }),
-  purgeQueue: (c: RabbitConnection, name: string) =>
-    request<void>(c, `/queues/${enc(c.vhost)}/${enc(name)}/contents`, { method: 'DELETE' }),
-  deleteQueue: (c: RabbitConnection, name: string) =>
-    request<void>(c, `/queues/${enc(c.vhost)}/${enc(name)}`, { method: 'DELETE' }),
   createQueue: (c: RabbitConnection, name: string, durable: boolean) =>
     request<void>(c, `/queues/${enc(c.vhost)}/${enc(name)}`, {
       method: 'PUT',
@@ -131,8 +115,6 @@ export const rabbitMgmt = {
     request<ExchangeInfo>(c, `/exchanges/${enc(c.vhost)}/${enc(name)}`),
   exchangeBindings: (c: RabbitConnection, name: string) =>
     request<BindingInfo[]>(c, `/exchanges/${enc(c.vhost)}/${enc(name)}/bindings/source`),
-  deleteExchange: (c: RabbitConnection, name: string) =>
-    request<void>(c, `/exchanges/${enc(c.vhost)}/${enc(name)}`, { method: 'DELETE' }),
   createExchange: (
     c: RabbitConnection,
     name: string,
