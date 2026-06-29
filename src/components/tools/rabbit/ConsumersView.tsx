@@ -383,7 +383,7 @@ function ConsumerDetail({ session: s, onBack }: { session: ConsumerSession; onBa
           ? <p className="px-5 py-4 text-sm text-muted-foreground">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
           : (
             <div className="divide-y divide-border/40">
-              {shown.map((m, i) => <MessageRow key={`${m.deliveryTag}-${i}`} m={m} format={format} />)}
+              {shown.map((m) => <MessageRow key={m.deliveryTag} m={m} format={format} />)}
               {matches.length > shown.length && (
                 <p className="px-5 py-2 text-[11px] text-muted-foreground">
                   Showing first {RENDER_CAP} of {matches.length.toLocaleString()}{q ? ' matches' : ''}. Narrow your search to see more.

@@ -110,7 +110,7 @@ export const kafkaConsumerStore = {
       emit();
     } catch (e) {
       sessions.delete(k);
-      discardPending(k);
+      discardPending(k); // clear any messages that arrived during the failed start
       emit();
       throw e;
     }

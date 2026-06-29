@@ -508,6 +508,16 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
     }
   };
 
+  // Reset the selected partition when the topic changes so the stale value from
+  // a previous topic (which may have fewer partitions) never causes an immediate
+  // out-of-range fetch error. TopicView remounts only on mount, not on topic
+  // switch, so this guard is necessary.
+  useEffect(() => {
+    if (partitions.length > 0 && partition >= partitions.length) {
+      setPartition(partitions[0].id);
+    }
+  }, [topic, partitions.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-load the latest page when the tab opens or the partition changes —
   // no manual Fetch click needed for the default tail view. Only fires in
   // 'tail' mode; the from/range/time modes need user-entered values, so they
