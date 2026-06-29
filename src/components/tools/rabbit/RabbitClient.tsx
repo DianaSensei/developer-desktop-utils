@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Rabbit, Info } from 'lucide-react';
+import { Rabbit, Info, Plug, Loader2, AlertCircle } from 'lucide-react';
 import { ToolHeaderActions } from '@/components/ToolHeaderActions';
+import { Button } from '@/components/ui/button';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { rabbitApi, type RabbitConnection } from './types';
+import { rabbitMgmt } from './api';
 import { useRabbitState } from './useRabbitState';
 import { LeftPanel } from './LeftPanel';
 import { OverviewView } from './OverviewView';
@@ -28,7 +30,7 @@ let cachedConnections: RabbitConnection[] | null = null;
 
 export function RabbitClient() {
   const {
-    selectedConnId, setSelectedConnId,
+    selectedConnId, setSelectedConnId, connectedConnId, setConnectedConnId,
     view, selectedQueue, selectedExchange, rpcPrefill, consumerPrefill, consumeDetailQueue,
     showOverview, showConnections, showRpc, showConsumers, openConsumer, showQueues, showExchanges, selectQueue, selectExchange,
     refreshKey, refresh,
@@ -36,6 +38,8 @@ export function RabbitClient() {
 
   const [connections, setConnections] = useState<RabbitConnection[]>(cachedConnections ?? []);
   const [connLoading, setConnLoading] = useState(cachedConnections === null);
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const loadConnections = useCallback(() => {
     rabbitApi.listConfigs()
@@ -52,6 +56,32 @@ export function RabbitClient() {
   useEffect(() => () => { consumerStore.stopAll(); }, []);
 
   const conn = connections.find((c) => c.id === selectedConnId) ?? null;
+  const isConnected = !!conn && connectedConnId === conn.id;
+
+  // Connect = verify the broker is reachable (AMQP, plus the management API when
+  // enabled), then mark this connection live. Only one connection is live at a
+  // time, so connecting elsewhere stops the previous one's consumers.
+  const handleConnect = useCallback(async () => {
+    if (!conn) return;
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      await rabbitApi.amqpTest(conn);
+      if (!conn.amqpOnly) await rabbitMgmt.testConnection(conn);
+      if (connectedConnId && connectedConnId !== conn.id) consumerStore.stopForConn(connectedConnId);
+      setConnectedConnId(conn.id);
+    } catch (e) {
+      setConnectError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setConnecting(false);
+    }
+  }, [conn, connectedConnId, setConnectedConnId]);
+
+  const handleDisconnect = useCallback(() => {
+    if (conn) consumerStore.stopForConn(conn.id);
+    setConnectError(null);
+    setConnectedConnId('');
+  }, [conn, setConnectedConnId]);
 
   // Overview & Connections require the management API. On an AMQP-only connection,
   // resolve those views to Queues during render (they're hidden in the nav too) so
@@ -100,6 +130,10 @@ export function RabbitClient() {
           selectedConnId={selectedConnId}
           onSelectConn={setSelectedConnId}
           onConnectionsChanged={loadConnections}
+          connected={isConnected}
+          connecting={connecting}
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
           view={effectiveView}
           onShowOverview={showOverview}
           onShowConnections={showConnections}
@@ -138,6 +172,8 @@ export function RabbitClient() {
               <p className="text-sm">Add a connection to get started</p>
             </div>
           )
+        ) : !isConnected ? (
+          <DisconnectedPanel conn={conn} connecting={connecting} error={connectError} onConnect={handleConnect} />
         ) : effectiveView === 'queue' && selectedQueue != null ? (
           <QueueView
             key={`${conn.id}:${selectedQueue}`}
@@ -187,6 +223,33 @@ export function RabbitClient() {
           onClose={() => setShowInfo(false)}
           onDismissPermanently={() => { setInfoDismissed(true); setShowInfo(false); }}
         />
+      )}
+    </div>
+  );
+}
+
+/** Shown when a connection is selected but not yet connected. */
+function DisconnectedPanel({ conn, connecting, error, onConnect }: {
+  conn: RabbitConnection; connecting: boolean; error: string | null; onConnect: () => void;
+}) {
+  const endpoint = conn.amqpOnly ? `${conn.host}:${conn.amqpPort}` : `${conn.host}:${conn.port}`;
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4 px-8 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/30">
+        <Plug className="h-7 w-7 text-muted-foreground/50" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-medium">{conn.name}</p>
+        <p className="text-xs text-muted-foreground font-mono">{endpoint}{conn.extraHosts?.length ? ` +${conn.extraHosts.length}` : ''}</p>
+      </div>
+      <Button onClick={onConnect} disabled={connecting}>
+        {connecting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plug className="h-4 w-4 mr-1.5" />}
+        {connecting ? 'Connecting…' : 'Connect'}
+      </Button>
+      {error && (
+        <div className="flex items-start gap-2 max-w-md rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive text-left">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span>
+        </div>
       )}
     </div>
   );

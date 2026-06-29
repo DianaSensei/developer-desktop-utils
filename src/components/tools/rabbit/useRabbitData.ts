@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface RabbitDataState<T> {
   data: T | null;
@@ -27,9 +27,11 @@ function cacheSet(key: string, value: unknown) {
  * from a stale request when deps change (or the component unmounts). `deps`
  * should include the connection id and the shared `refreshKey`.
  *
- * On revisit, the last successful result for the same deps is shown immediately
- * while a fresh load runs in the background, so navigating between tabs doesn't
- * flash a spinner.
+ * Load-once: a resource that's already been fetched for the same deps is shown
+ * from cache and is NOT silently re-fetched on revisit — navigating away and back
+ * shows the last result without a new request. A fresh load happens only on a
+ * cache miss (e.g. a manual Refresh bumps `refreshKey`, which changes the deps) or
+ * an explicit `reload()`.
  */
 export function useRabbitData<T>(
   loader: () => Promise<T>,
@@ -45,15 +47,26 @@ export function useRabbitData<T>(
       : { data: null, loading: true, error: null },
   );
   const [tick, setTick] = useState(0);
+  const prevKey = useRef<string | null>(null);
+  const prevTick = useRef(tick);
 
   useEffect(() => {
+    const keyChanged = prevKey.current !== cacheKey;
+    const manualReload = prevTick.current !== tick && !keyChanged;
+    prevKey.current = cacheKey;
+    prevTick.current = tick;
+
+    // Already loaded for these deps and not an explicit reload → serve the cached
+    // result and don't hit the broker again. The user refreshes manually later.
+    if (cache.has(cacheKey) && !manualReload) {
+      setState({ data: cache.get(cacheKey) as T, loading: false, error: null });
+      return;
+    }
+
     let alive = true;
-    // Show cached data instantly and revalidate silently; only spin when empty.
-    setState((s) =>
-      cache.has(cacheKey)
-        ? { data: cache.get(cacheKey) as T, loading: false, error: null }
-        : (s.data !== null ? { ...s, error: null } : { data: null, loading: true, error: null }),
-    );
+    // Keep showing prior data (no spinner) while a cache-miss/manual reload runs;
+    // only spin when there's nothing to show yet.
+    setState((s) => (s.data !== null ? { ...s, error: null } : { data: null, loading: true, error: null }));
     loader()
       .then((data) => { if (alive) { cacheSet(cacheKey, data); setState({ data, loading: false, error: null }); } })
       .catch((e) => {

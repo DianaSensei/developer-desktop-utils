@@ -15,6 +15,38 @@ interface ConnectionFormProps {
   onCancel: () => void;
 }
 
+const defaultPort = (tls: boolean) => (tls ? 5671 : 5672);
+
+/**
+ * Parse a comma/newline-separated host list ("127.0.0.1:5672, broker2:5672")
+ * into the canonical fields: the first entry is the primary host+port, the rest
+ * are failover endpoints (`extraHosts`). A bare host falls back to the AMQP
+ * default port for the current TLS setting.
+ */
+function parseHostsText(text: string, tls: boolean): { host: string; amqpPort: number; extraHosts: string[] } {
+  const one = (e: string): { host: string; port: number } => {
+    const i = e.lastIndexOf(':');
+    if (i > 0) {
+      const h = e.slice(0, i).trim();
+      const p = Number(e.slice(i + 1).trim());
+      if (h && Number.isInteger(p) && p > 0 && p <= 65535) return { host: h, port: p };
+    }
+    return { host: e, port: defaultPort(tls) };
+  };
+  const entries = text.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).map(one);
+  if (entries.length === 0) return { host: '', amqpPort: defaultPort(tls), extraHosts: [] };
+  return {
+    host: entries[0].host,
+    amqpPort: entries[0].port,
+    extraHosts: entries.slice(1).map((x) => `${x.host}:${x.port}`),
+  };
+}
+
+/** Render the canonical host fields back into the editable "host:port, …" string. */
+function hostsToText(c: { host: string; amqpPort: number; extraHosts?: string[] | null }): string {
+  return [c.host ? `${c.host}:${c.amqpPort}` : '', ...(c.extraHosts ?? [])].filter(Boolean).join(', ');
+}
+
 export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProps) {
   const [form, setForm] = useState<RabbitConnection>(initial ?? EMPTY_CONNECTION);
   const [saving, setSaving] = useState(false);
@@ -23,9 +55,13 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
   const [error, setError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [uri, setUri] = useState('');
+  // The editable "host:port, host:port" string; parsed into form.host/amqpPort/extraHosts.
+  const [hostsText, setHostsText] = useState(() => hostsToText(initial ?? EMPTY_CONNECTION));
 
   useEffect(() => {
-    setForm(initial ?? EMPTY_CONNECTION);
+    const c = initial ?? EMPTY_CONNECTION;
+    setForm(c);
+    setHostsText(hostsToText(c));
     setError('');
     setTested(null);
   }, [initial]);
@@ -35,35 +71,51 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
     setTested(null);
   };
 
-  /** Parse an amqp(s):// URI into the AMQP fields (host, port, creds, vhost, TLS). */
+  const onHostsChange = (text: string) => {
+    setHostsText(text);
+    setForm((f) => ({ ...f, ...parseHostsText(text, f.useTls) }));
+    setTested(null);
+  };
+
+  // Re-default portless host entries when TLS flips (5672 ↔ 5671).
+  const onTlsChange = (v: boolean) => {
+    setForm((f) => ({ ...f, useTls: v, ...parseHostsText(hostsText, v) }));
+    setTested(null);
+  };
+
+  /**
+   * Parse an amqp(s):// URI — including a comma-separated multi-host authority
+   * (amqp://u:p@h1:5672,h2:5672/vhost) — into the host list, credentials, vhost
+   * and TLS, and reflect it in the visible Host(s) field.
+   */
   const applyUri = () => {
-    try {
-      const u = new URL(uri.trim());
-      if (u.protocol !== 'amqp:' && u.protocol !== 'amqps:') throw new Error('scheme');
-      const tls = u.protocol === 'amqps:';
-      const vh = decodeURIComponent(u.pathname.replace(/^\//, '')) || '/';
-      setForm((f) => ({
-        ...f,
-        host: u.hostname || f.host,
-        amqpPort: u.port ? Number(u.port) : (tls ? 5671 : 5672),
-        username: u.username ? decodeURIComponent(u.username) : f.username,
-        password: u.password ? decodeURIComponent(u.password) : f.password,
-        vhost: vh,
-        useTls: tls,
-      }));
-      setError('');
-      setTested(null);
-    } catch {
-      setError('Could not parse AMQP URI — expected amqp(s)://user:pass@host:port/vhost');
+    const m = /^(amqps?):\/\/(?:([^:@/]*)(?::([^@/]*))?@)?([^/]+)(?:\/(.*))?$/i.exec(uri.trim());
+    if (!m) {
+      setError('Could not parse AMQP URI — expected amqp(s)://user:pass@host:port[,host:port]/vhost');
+      return;
     }
+    const tls = m[1].toLowerCase() === 'amqps';
+    const parsed = parseHostsText(m[4], tls);
+    setHostsText(hostsToText(parsed));
+    setForm((f) => ({
+      ...f,
+      ...parsed,
+      username: m[2] ? decodeURIComponent(m[2]) : f.username,
+      password: m[3] ? decodeURIComponent(m[3]) : f.password,
+      vhost: m[5] != null && m[5] !== '' ? decodeURIComponent(m[5]) : f.vhost,
+      useTls: tls,
+    }));
+    setUri('');
+    setError('');
+    setTested(null);
   };
 
   const amqpOnly = !!form.amqpOnly;
 
   const validate = (): string | null => {
     if (!form.name.trim()) return 'Name is required';
-    if (!form.host.trim()) return 'Host is required';
-    if (!amqpOnly && (!form.port || form.port < 1 || form.port > 65535)) return 'Port must be 1–65535';
+    if (!form.host.trim()) return 'At least one host is required';
+    if (!amqpOnly && (!form.port || form.port < 1 || form.port > 65535)) return 'Management port must be 1–65535';
     if (!form.amqpPort || form.amqpPort < 1 || form.amqpPort > 65535) return 'AMQP port must be 1–65535';
     return null;
   };
@@ -130,32 +182,20 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
             />
           </div>
 
-          {/* AMQP connection — the only required part. */}
-          <div className="grid grid-cols-[1fr_auto] gap-3">
-            <div>
-              <Label htmlFor="rb-host">Host</Label>
-              <Input
-                id="rb-host"
-                value={form.host}
-                onChange={(e) => set('host', e.target.value)}
-                placeholder="localhost"
-                className="mt-1 font-mono text-sm"
-              />
-            </div>
-            <div className="w-24">
-              <Label htmlFor="rb-amqpport">AMQP port</Label>
-              <Input
-                id="rb-amqpport"
-                type="number"
-                value={form.amqpPort}
-                onChange={(e) => set('amqpPort', Number(e.target.value))}
-                className="mt-1 font-mono text-sm"
-              />
-            </div>
+          {/* AMQP host(s) — the only required part. Accepts a comma-separated list. */}
+          <div>
+            <Label htmlFor="rb-hosts">Host(s)</Label>
+            <Input
+              id="rb-hosts"
+              value={hostsText}
+              onChange={(e) => onHostsChange(e.target.value)}
+              placeholder="127.0.0.1:5672, broker2:5672"
+              className="mt-1 font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              <span className="font-mono">host:port</span>, comma-separated. The first is primary; the rest are tried on failover. Default port <span className="font-mono">{defaultPort(form.useTls)}</span> ({form.useTls ? 'amqps' : 'amqp'}).
+            </p>
           </div>
-          <p className="-mt-2 text-xs text-muted-foreground">
-            Used by publish / consume / request-response — default <span className="font-mono">5672</span> ({form.useTls ? 'amqps' : 'amqp'}).
-          </p>
 
           <div>
             <Label htmlFor="rb-uri">Paste AMQP URI <span className="font-normal text-muted-foreground">(optional)</span></Label>
@@ -164,23 +204,12 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                 id="rb-uri"
                 value={uri}
                 onChange={(e) => setUri(e.target.value)}
-                placeholder="amqp://user:pass@host:5672/vhost"
+                placeholder="amqp://user:pass@host1:5672,host2:5672/vhost"
                 className="font-mono text-xs"
               />
               <Button type="button" variant="outline" size="sm" onClick={applyUri} disabled={!uri.trim()}>Fill</Button>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1">Fills host, AMQP port, credentials, vhost and TLS from the URI.</p>
-          </div>
-
-          <div>
-            <Label htmlFor="rb-vhost">Virtual host</Label>
-            <Input
-              id="rb-vhost"
-              value={form.vhost}
-              onChange={(e) => set('vhost', e.target.value)}
-              placeholder="/"
-              className="mt-1 font-mono text-sm"
-            />
+            <p className="text-[11px] text-muted-foreground mt-1">Fills the Host(s), credentials, virtual host and TLS fields from the URI (multi-host supported).</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -214,7 +243,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                 Connect over <span className="font-mono">amqps</span> (and <span className="font-mono">https</span> for the management API).
               </p>
             </div>
-            <Switch checked={form.useTls} onCheckedChange={(v) => set('useTls', v)} aria-label="Use TLS" />
+            <Switch checked={form.useTls} onCheckedChange={onTlsChange} aria-label="Use TLS" />
           </div>
 
           {/* Management API — optional. Powers browse-all lists, overview and
@@ -255,7 +284,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
             >
               {showAdvanced ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               Advanced / TLS
-              <span className="text-[11px] font-normal text-muted-foreground/70">— CA, client cert, heartbeat, name</span>
+              <span className="text-[11px] font-normal text-muted-foreground/70">— vhost, heartbeat, name, CA, client cert</span>
             </button>
             {showAdvanced && (
               <div className="px-3 pb-3 space-y-3 border-t pt-3">
@@ -278,24 +307,15 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="rb-hosts" className="text-xs">Additional hosts <span className="font-normal text-muted-foreground">(HA failover)</span></Label>
-                  <Textarea
-                    id="rb-hosts"
-                    value={(form.extraHosts ?? []).join('\n')}
-                    onChange={(e) => {
-                      const list = e.target.value
-                        .split(/[\n,]/)
-                        .map((s) => s.trim())
-                        .filter(Boolean);
-                      setForm((f) => ({ ...f, extraHosts: list.length ? list : null }));
-                      setTested(null);
-                    }}
-                    placeholder={'node2.broker\nnode3.broker:5672'}
-                    className="mt-1 font-mono text-[11px] min-h-16"
+                  <Label htmlFor="rb-vhost" className="text-xs">Virtual host</Label>
+                  <Input
+                    id="rb-vhost"
+                    value={form.vhost}
+                    onChange={(e) => set('vhost', e.target.value)}
+                    placeholder="/"
+                    className="mt-1 font-mono text-xs h-8"
                   />
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Tried in order if the primary host is unreachable. One per line — <span className="font-mono">host</span> or <span className="font-mono">host:port</span> (defaults to the AMQP port). Applies to AMQP (publish / consume / request-response).
-                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Host(s) field above for HA failover.</p>
                 </div>
                 <div>
                   <Label htmlFor="rb-ca" className="text-xs">Trust CA certificate (PEM)</Label>

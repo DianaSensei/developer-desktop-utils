@@ -19,6 +19,8 @@ import { rabbitApi } from './types';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { useKnownNames } from './knownNamesStore';
+import { inputHistory, useRecentMatches } from './inputHistoryStore';
+import { RecentSuggestions } from './RecentSuggestions';
 import type { RpcPrefill } from './useRabbitState';
 
 interface RpcViewProps {
@@ -117,6 +119,11 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
     }
 
     const trim = (v: string) => (v.trim() ? v.trim() : undefined);
+    // Remember what was actually used so the comboboxes can suggest it again.
+    const recordHistory = () => {
+      if (exchange.trim()) inputHistory.add(conn.id, 'exchange', exchange);
+      if (routingKey.trim()) inputHistory.add(conn.id, 'routingKey', routingKey);
+    };
     const started = performance.now();
     try {
       if (mode === 'send') {
@@ -135,6 +142,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
         const o = await rabbitApi.publish({ configId: conn.id, exchange, routingKey, payload, properties, mandatory, confirm });
         if (reqGen.current !== myGen) return;
         setOutcome(o);
+        recordHistory();
       } else {
         const r = await rabbitApi.rpcCall({
           configId: conn.id, exchange, routingKey, payload,
@@ -145,6 +153,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
         });
         if (reqGen.current !== myGen) return;
         setReply(r);
+        recordHistory();
         // Default to JSON view when the reply looks like JSON (by content type or
         // by parsing); otherwise plain. The user can still flip it.
         const ct = r.contentType?.toLowerCase() ?? '';
@@ -198,7 +207,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Exchange</Label>
-              <ExchangeCombobox value={exchange} exchanges={exchanges.data ?? []} onChange={(v) => { setExchange(v); reset(); }} />
+              <ExchangeCombobox connId={conn.id} value={exchange} exchanges={exchanges.data ?? []} onChange={(v) => { setExchange(v); reset(); }} />
             </div>
             <div>
               <Label className="text-xs">Routing key</Label>
@@ -440,6 +449,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
   const ex = exchange.trim();
   const isDefault = ex === '';
   const knownQueues = useKnownNames(conn.id).queues;
+  const recent = useRecentMatches(conn.id, 'routingKey', value);
 
   const suggestions = useRabbitData<RkSuggestion[]>(async () => {
     if (conn.amqpOnly) {
@@ -468,7 +478,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
   const q = value.trim().toLowerCase();
   const all = suggestions.data ?? [];
   const matches = all
-    .filter((s) => s.key.toLowerCase().includes(q))
+    .filter((s) => s.key.toLowerCase().includes(q) && !recent.includes(s.key))
     .sort((a, b) => a.key.localeCompare(b.key))
     .slice(0, 50);
 
@@ -489,8 +499,9 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
         placeholder={isDefault ? 'queue name' : 'e.g. orders.created'}
         className="font-mono text-sm h-9"
       />
-      {open && matches.length > 0 && (
+      {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+          <RecentSuggestions items={recent} connId={conn.id} field="routingKey" value={value} onPick={pick} />
           {matches.map((s) => (
             <button
               key={s.key}
@@ -510,15 +521,16 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
 }
 
 /** Searchable exchange picker that also accepts a typed (custom) exchange name. */
-function ExchangeCombobox({ value, exchanges, onChange }: {
-  value: string; exchanges: ExchangeInfo[]; onChange: (v: string) => void;
+function ExchangeCombobox({ connId, value, exchanges, onChange }: {
+  connId: string; value: string; exchanges: ExchangeInfo[]; onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recent = useRecentMatches(connId, 'exchange', value);
 
   const q = value.trim().toLowerCase();
   const matches = exchanges
-    .filter((e) => e.name !== '' && e.name.toLowerCase().includes(q))
+    .filter((e) => e.name !== '' && !recent.includes(e.name) && e.name.toLowerCase().includes(q))
     .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, 50);
 
@@ -541,6 +553,7 @@ function ExchangeCombobox({ value, exchanges, onChange }: {
       />
       {open && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+          <RecentSuggestions items={recent} connId={connId} field="exchange" value={value} onPick={pick} />
           <button
             type="button"
             onMouseDown={(e) => { e.preventDefault(); pick(''); }}
