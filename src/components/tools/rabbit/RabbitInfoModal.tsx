@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,7 +45,10 @@ function Row({ action, when, calls, badge, note }: {
 }
 
 export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoModalProps) {
-  return (
+  // Portal to <body> so the fixed overlay isn't positioned relative to the tool's
+  // entrance-animation wrapper (an animating `transform` ancestor would make the
+  // modal jump to viewport coords when the animation ends — a visible flicker).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -163,6 +167,7 @@ export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoMod
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -98,7 +98,9 @@ export function LeftPanel(props: LeftPanelProps) {
 
       {!conn ? (
         <div className="flex-1 flex items-center justify-center p-4 text-center">
-          <p className="text-xs text-muted-foreground">Add a connection to get started.</p>
+          {!connectionsLoading && (
+            <p className="text-xs text-muted-foreground">Add a connection to get started.</p>
+          )}
         </div>
       ) : (
         <div className="p-2 space-y-0.5 overflow-y-auto">

@@ -26,6 +26,7 @@ import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { MeetingsProvider } from '@/lib/meetings';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { ToolGuideModal } from '@/components/ToolGuideModal';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppLogo } from '@/components/AppLogo';
 
 // Tools are code-split: each loads its own chunk on first navigation instead of
@@ -599,14 +600,16 @@ function AppContent() {
   const showGuide = activeTool.featureId !== 'settings';
 
   const routes = (
-    <Suspense fallback={<ToolLoading />}>
-      <Routes>
-        {enabledTools.map((tool) => (
-          <Route key={tool.path} path={tool.path} element={<tool.component />} />
-        ))}
-        <Route path="/settings" element={<Settings />} />
-      </Routes>
-    </Suspense>
+    <ErrorBoundary resetKey={location.pathname}>
+      <Suspense fallback={<ToolLoading />}>
+        <Routes>
+          {enabledTools.map((tool) => (
+            <Route key={tool.path} path={tool.path} element={<tool.component />} />
+          ))}
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 
   return (

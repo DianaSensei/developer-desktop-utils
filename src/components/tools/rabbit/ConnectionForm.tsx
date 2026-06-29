@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -99,7 +100,9 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
     }
   };
 
-  return (
+  // Portal to <body> so the fixed overlay escapes the tool's entrance-animation
+  // wrapper (an animating `transform` ancestor would offset a fixed child).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
@@ -341,6 +344,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

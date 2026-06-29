@@ -21,6 +21,11 @@ const LEFT_MIN = 200;
 const LEFT_MAX = 480;
 const LEFT_DEFAULT = 264;
 
+// The tool is lazy-loaded and remounts on every tab switch. Cache the last-loaded
+// connection list at module scope so a remount renders instantly (no empty-state
+// flash) while a fresh list loads in the background.
+let cachedConnections: RabbitConnection[] | null = null;
+
 export function RabbitClient() {
   const {
     selectedConnId, setSelectedConnId,
@@ -29,14 +34,13 @@ export function RabbitClient() {
     refreshKey, refresh,
   } = useRabbitState();
 
-  const [connections, setConnections] = useState<RabbitConnection[]>([]);
-  const [connLoading, setConnLoading] = useState(true);
+  const [connections, setConnections] = useState<RabbitConnection[]>(cachedConnections ?? []);
+  const [connLoading, setConnLoading] = useState(cachedConnections === null);
 
   const loadConnections = useCallback(() => {
-    setConnLoading(true);
     rabbitApi.listConfigs()
-      .then(setConnections)
-      .catch(() => setConnections([]))
+      .then((c) => { cachedConnections = c; setConnections(c); })
+      .catch(() => { cachedConnections = cachedConnections ?? []; })
       .finally(() => setConnLoading(false));
   }, []);
 
@@ -50,10 +54,9 @@ export function RabbitClient() {
   const conn = connections.find((c) => c.id === selectedConnId) ?? null;
 
   // Overview & Connections require the management API. On an AMQP-only connection,
-  // steer those views to Queues (they're hidden in the nav too).
-  useEffect(() => {
-    if (conn?.amqpOnly && (view === 'overview' || view === 'connections')) showQueues();
-  }, [conn?.id, conn?.amqpOnly, view, showQueues]);
+  // resolve those views to Queues during render (they're hidden in the nav too) so
+  // we never flash a management-only view before redirecting.
+  const effectiveView = conn?.amqpOnly && (view === 'overview' || view === 'connections') ? 'queues' : view;
 
   const [infoDismissed, setInfoDismissed] = usePersistentState('devtool:rabbit:info-dismissed', false);
   const [showInfo, setShowInfo] = useState(!infoDismissed);
@@ -97,7 +100,7 @@ export function RabbitClient() {
           selectedConnId={selectedConnId}
           onSelectConn={setSelectedConnId}
           onConnectionsChanged={loadConnections}
-          view={view}
+          view={effectiveView}
           onShowOverview={showOverview}
           onShowConnections={showConnections}
           onShowRpc={() => showRpc()}
@@ -124,11 +127,17 @@ export function RabbitClient() {
       {/* Right panel */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {!conn ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-            <Rabbit className="w-8 h-8 opacity-30" />
-            <p className="text-sm">Add a connection to get started</p>
-          </div>
-        ) : view === 'queue' && selectedQueue != null ? (
+          connLoading ? (
+            // Brief: while the saved connections load. Stays blank to avoid a flash
+            // of the "add a connection" empty state on every tab switch.
+            <div className="h-full" />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+              <Rabbit className="w-8 h-8 opacity-30" />
+              <p className="text-sm">Add a connection to get started</p>
+            </div>
+          )
+        ) : effectiveView === 'queue' && selectedQueue != null ? (
           <QueueView
             key={`${conn.id}:${selectedQueue}`}
             conn={conn}
@@ -139,7 +148,7 @@ export function RabbitClient() {
             onPublish={(exchange, routingKey) => showRpc({ exchange, routingKey, mode: 'send' })}
             onConsume={(queue) => showConsumers({ queue })}
           />
-        ) : view === 'exchange' && selectedExchange != null ? (
+        ) : effectiveView === 'exchange' && selectedExchange != null ? (
           <ExchangeView
             key={`${conn.id}:${selectedExchange}`}
             conn={conn}
@@ -149,15 +158,15 @@ export function RabbitClient() {
             onBack={showExchanges}
             onPublish={(exchange, routingKey) => showRpc({ exchange, routingKey, mode: 'send' })}
           />
-        ) : view === 'queues' ? (
+        ) : effectiveView === 'queues' ? (
           <QueueListView conn={conn} refreshKey={refreshKey} onRefresh={refresh} onSelectQueue={selectQueue} />
-        ) : view === 'exchanges' ? (
+        ) : effectiveView === 'exchanges' ? (
           <ExchangeListView conn={conn} refreshKey={refreshKey} onRefresh={refresh} onSelectExchange={selectExchange} />
-        ) : view === 'connections' ? (
+        ) : effectiveView === 'connections' ? (
           <ConnectionsView conn={conn} refreshKey={refreshKey} onRefresh={refresh} />
-        ) : view === 'consumers' ? (
+        ) : effectiveView === 'consumers' ? (
           <ConsumersView conn={conn} refreshKey={refreshKey} onRefresh={refresh} prefill={consumerPrefill} />
-        ) : view === 'rpc' ? (
+        ) : effectiveView === 'rpc' ? (
           <RpcView conn={conn} prefill={rpcPrefill} />
         ) : (
           <OverviewView conn={conn} refreshKey={refreshKey} onRefresh={refresh} />
