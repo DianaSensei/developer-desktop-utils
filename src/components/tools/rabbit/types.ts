@@ -13,6 +13,11 @@ export interface RabbitConnection {
   useTls: boolean;
   /** AMQP port (default 5672) — used by publish / consume / request-response. */
   amqpPort: number;
+  /**
+   * Extra AMQP endpoints to try, in order, if the primary host is unreachable
+   * (HA clusters with no load balancer). Each entry is `host` or `host:port`.
+   */
+  extraHosts?: string[] | null;
   /** Custom CA certificate (PEM) to trust — for self-signed / private brokers. */
   tlsCaPem?: string | null;
   /** Client identity for mutual-TLS: a PKCS#12 bundle, base64-encoded. */
@@ -41,6 +46,7 @@ export const EMPTY_CONNECTION: RabbitConnection = {
   password: 'guest',
   useTls: false,
   amqpPort: 5672,
+  extraHosts: null,
   tlsCaPem: null,
   clientPkcs12B64: null,
   clientPkcs12Password: null,

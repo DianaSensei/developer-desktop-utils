@@ -284,6 +284,26 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                   </div>
                 </div>
                 <div>
+                  <Label htmlFor="rb-hosts" className="text-xs">Additional hosts <span className="font-normal text-muted-foreground">(HA failover)</span></Label>
+                  <Textarea
+                    id="rb-hosts"
+                    value={(form.extraHosts ?? []).join('\n')}
+                    onChange={(e) => {
+                      const list = e.target.value
+                        .split(/[\n,]/)
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                      setForm((f) => ({ ...f, extraHosts: list.length ? list : null }));
+                      setTested(null);
+                    }}
+                    placeholder={'node2.broker\nnode3.broker:5672'}
+                    className="mt-1 font-mono text-[11px] min-h-16"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Tried in order if the primary host is unreachable. One per line — <span className="font-mono">host</span> or <span className="font-mono">host:port</span> (defaults to the AMQP port). Applies to AMQP (publish / consume / request-response).
+                  </p>
+                </div>
+                <div>
                   <Label htmlFor="rb-ca" className="text-xs">Trust CA certificate (PEM)</Label>
                   <Textarea
                     id="rb-ca" value={form.tlsCaPem ?? ''}

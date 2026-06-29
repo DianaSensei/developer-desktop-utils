@@ -40,6 +40,11 @@ pub struct RabbitConnection {
     /// AMQP port (default 5672) — used by publish / consume / request-response.
     #[serde(default = "default_amqp_port")]
     pub amqp_port: u16,
+    /// Extra AMQP endpoints to try, in order, if the primary host can't be reached
+    /// (HA clusters / no load balancer). Each entry is `host` or `host:port`;
+    /// without a port it falls back to `amqp_port`.
+    #[serde(default)]
+    pub extra_hosts: Vec<String>,
     /// Custom CA certificate (PEM) to trust — for self-signed / private brokers.
     #[serde(default)]
     pub tls_ca_pem: Option<String>,
@@ -195,21 +200,40 @@ fn nonempty(o: &Option<String>) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-/// Build the AMQP URI. vhost "/" is percent-encoded to "%2F" as RabbitMQ requires.
-fn amqp_uri(config: &RabbitConnection) -> String {
+/// Build the AMQP URI for a specific endpoint. vhost "/" is percent-encoded to
+/// "%2F" as RabbitMQ requires. Credentials/vhost come from the profile; only the
+/// host:port varies across an HA cluster's endpoints.
+fn amqp_uri_for(config: &RabbitConnection, host: &str, port: u16) -> String {
     let scheme = if config.use_tls { "amqps" } else { "amqp" };
     let user = utf8_percent_encode(&config.username, NON_ALPHANUMERIC);
     let pass = utf8_percent_encode(&config.password, NON_ALPHANUMERIC);
     let vhost = utf8_percent_encode(&config.vhost, NON_ALPHANUMERIC);
-    let mut uri = format!(
-        "{scheme}://{user}:{pass}@{host}:{port}/{vhost}",
-        host = config.host,
-        port = config.amqp_port,
-    );
+    let mut uri = format!("{scheme}://{user}:{pass}@{host}:{port}/{vhost}");
     if let Some(hb) = config.heartbeat {
         uri.push_str(&format!("?heartbeat={hb}"));
     }
     uri
+}
+
+/// The ordered list of `(host, port)` endpoints to try: the primary first, then
+/// each `extra_hosts` entry (`host` or `host:port`, defaulting to `amqp_port`).
+/// Blank entries are skipped.
+fn endpoints(config: &RabbitConnection) -> Vec<(String, u16)> {
+    let mut out = vec![(config.host.clone(), config.amqp_port)];
+    for raw in &config.extra_hosts {
+        let entry = raw.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        // Split host:port on the LAST ':' so IPv6-in-brackets still parses host-only.
+        match entry.rsplit_once(':') {
+            Some((h, p)) if !h.is_empty() && p.parse::<u16>().is_ok() => {
+                out.push((h.to_string(), p.parse().unwrap()));
+            }
+            _ => out.push((entry.to_string(), config.amqp_port)),
+        }
+    }
+    out
 }
 
 fn build_identity(config: &RabbitConnection) -> Result<Option<OwnedIdentity>, String> {
@@ -227,26 +251,49 @@ fn build_identity(config: &RabbitConnection) -> Result<Option<OwnedIdentity>, St
     }
 }
 
+/// How long to wait for the TCP+TLS+AMQP handshake before giving up. Without a
+/// bound, a wrong host/port, a firewall that drops packets, or an unreachable
+/// cluster node makes the handshake hang for the OS default (tens of seconds) or
+/// indefinitely, so Test/publish/consume appear frozen with no error.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+
 /// Open an AMQP connection using the profile's TLS/heartbeat/connection-name
-/// settings, integrated with the app's tokio runtime.
+/// settings, integrated with the app's tokio runtime. Tries each endpoint in turn
+/// (primary, then `extra_hosts`) so an HA cluster stays reachable when a node is
+/// down; returns on the first success, or the collected errors if all fail.
 async fn connect_amqp(config: &RabbitConnection) -> Result<Connection, String> {
-    let uri = amqp_uri(config);
     let mut options = ConnectionProperties::default();
     if let Some(name) = nonempty(&config.connection_name) {
         options = options.with_connection_name(name.into());
     }
-    let tls = OwnedTLSConfig {
-        identity: build_identity(config)?,
-        cert_chain: nonempty(&config.tls_ca_pem),
-    };
-    // lapin 4 owns the executor/reactor internally; the default runtime is tokio
-    // (the `tokio` default feature). Its concrete type is private, so build it
-    // inline rather than naming it.
-    let runtime = lapin::runtime::default_runtime()
-        .map_err(|e| format!("AMQP runtime init failed: {e}"))?;
-    Connection::connect_with_config(&uri, options, tls, runtime)
+    let mut errors: Vec<String> = Vec::new();
+    for (host, port) in endpoints(config) {
+        let uri = amqp_uri_for(config, &host, port);
+        let tls = OwnedTLSConfig {
+            identity: build_identity(config)?,
+            cert_chain: nonempty(&config.tls_ca_pem),
+        };
+        // lapin 4 owns the executor/reactor internally; the default runtime is
+        // tokio (the `tokio` default feature). Its concrete type is private, so
+        // build it inline rather than naming it. One runtime per attempt.
+        let runtime = lapin::runtime::default_runtime()
+            .map_err(|e| format!("AMQP runtime init failed: {e}"))?;
+        match tokio::time::timeout(
+            CONNECT_TIMEOUT,
+            Connection::connect_with_config(&uri, options.clone(), tls, runtime),
+        )
         .await
-        .map_err(|e| format!("AMQP connect to {}:{} failed: {e}", config.host, config.amqp_port))
+        {
+            Ok(Ok(conn)) => return Ok(conn),
+            Ok(Err(e)) => errors.push(format!("{host}:{port}: {e}")),
+            Err(_) => errors.push(format!("{host}:{port}: timed out after {}s", CONNECT_TIMEOUT.as_secs())),
+        }
+    }
+    Err(format!(
+        "AMQP connect failed (tried {} endpoint(s)): {}. Check the host(s), AMQP port, TLS setting and that the broker is reachable.",
+        errors.len(),
+        errors.join("; "),
+    ))
 }
 
 fn to_field_table(headers: &BTreeMap<String, String>) -> FieldTable {
@@ -827,6 +874,7 @@ mod tests {
             password: "guest".into(),
             use_tls: false,
             amqp_port: 5672,
+            extra_hosts: Vec::new(),
             tls_ca_pem: None,
             client_pkcs12_b64: None,
             client_pkcs12_password: None,
@@ -834,6 +882,10 @@ mod tests {
             connection_name: None,
             amqp_only: false,
         }
+    }
+
+    fn amqp_uri(c: &RabbitConnection) -> String {
+        amqp_uri_for(c, &c.host, c.amqp_port)
     }
 
     #[test]
@@ -860,6 +912,26 @@ mod tests {
         let uri = amqp_uri(&c);
         assert!(uri.contains("user%40host"));
         assert!(uri.contains("p%3As%2Fw"));
+    }
+
+    #[test]
+    fn endpoints_lists_primary_then_extras_with_port_fallback() {
+        let mut c = base_config();
+        c.extra_hosts = vec![
+            "node2".into(),          // host only → falls back to amqp_port
+            "node3:5673".into(),     // explicit port
+            "  ".into(),             // blank → skipped
+            "node4:notaport".into(), // bad port → whole entry treated as host
+        ];
+        assert_eq!(
+            endpoints(&c),
+            vec![
+                ("localhost".to_string(), 5672),
+                ("node2".to_string(), 5672),
+                ("node3".to_string(), 5673),
+                ("node4:notaport".to_string(), 5672),
+            ],
+        );
     }
 
     #[test]
