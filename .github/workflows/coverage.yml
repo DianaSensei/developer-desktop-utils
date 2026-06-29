@@ -45,11 +45,17 @@ jobs:
         with:
           components: llvm-tools-preview
 
+      # GitHub scopes Actions caches per ref: a PR can RESTORE the default
+      # branch's cache, but a cache it SAVES is visible only to that PR branch
+      # (never to other PRs or main). Saving on every PR therefore mints large,
+      # un-shareable, instrumented-build caches that just churn the 10 GB limit
+      # and evict main's useful one. So only main saves; PRs restore-only.
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
           shared-key: coverage
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
