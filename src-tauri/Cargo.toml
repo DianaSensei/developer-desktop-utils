@@ -36,9 +36,12 @@ sysinfo = "0.32"
 axum = "0.8"
 rhai = "1"
 regex = "1"
-lapin = "2"
-tokio-executor-trait = "2"
-tokio-reactor-trait = "1"
+# lapin 4 bundles its own async runtime (via async-rs) and is selected by feature
+# (default-runtime = tokio), so the old external tokio-executor-trait /
+# tokio-reactor-trait glue is gone — which also removes the reactor-trait version
+# skew that broke the Windows build. Default features (rustls + tokio) cover our
+# TLS + tokio usage.
+lapin = "4"
 futures-util = "0.3"
 percent-encoding = "2"
 base64 = "0.21"

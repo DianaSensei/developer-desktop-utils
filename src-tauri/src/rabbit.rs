@@ -219,7 +219,7 @@ fn build_identity(config: &RabbitConnection) -> Result<Option<OwnedIdentity>, St
             let der = base64::engine::general_purpose::STANDARD
                 .decode(b64.replace(['\n', '\r', ' '], ""))
                 .map_err(|e| format!("Client identity (PKCS#12) is not valid base64: {e}"))?;
-            Ok(Some(OwnedIdentity {
+            Ok(Some(OwnedIdentity::PKCS12 {
                 der,
                 password: config.client_pkcs12_password.clone().unwrap_or_default(),
             }))
@@ -231,9 +231,7 @@ fn build_identity(config: &RabbitConnection) -> Result<Option<OwnedIdentity>, St
 /// settings, integrated with the app's tokio runtime.
 async fn connect_amqp(config: &RabbitConnection) -> Result<Connection, String> {
     let uri = amqp_uri(config);
-    let mut options = ConnectionProperties::default()
-        .with_executor(tokio_executor_trait::Tokio::current())
-        .with_reactor(tokio_reactor_trait::Tokio);
+    let mut options = ConnectionProperties::default();
     if let Some(name) = nonempty(&config.connection_name) {
         options = options.with_connection_name(name.into());
     }
@@ -241,7 +239,12 @@ async fn connect_amqp(config: &RabbitConnection) -> Result<Connection, String> {
         identity: build_identity(config)?,
         cert_chain: nonempty(&config.tls_ca_pem),
     };
-    Connection::connect_with_config(&uri, options, tls)
+    // lapin 4 owns the executor/reactor internally; the default runtime is tokio
+    // (the `tokio` default feature). Its concrete type is private, so build it
+    // inline rather than naming it.
+    let runtime = lapin::runtime::default_runtime()
+        .map_err(|e| format!("AMQP runtime init failed: {e}"))?;
+    Connection::connect_with_config(&uri, options, tls, runtime)
         .await
         .map_err(|e| format!("AMQP connect to {}:{} failed: {e}", config.host, config.amqp_port))
 }
@@ -348,8 +351,8 @@ pub async fn rabbit_publish(
     let props = build_properties(&properties);
     let publish = channel
         .basic_publish(
-            &exchange,
-            &routing_key,
+            exchange.into(),
+            routing_key.into(),
             BasicPublishOptions { mandatory, ..Default::default() },
             payload.as_bytes(),
             props,
@@ -397,8 +400,8 @@ pub async fn rabbit_rpc_call(
     // Consume the direct reply-to pseudo-queue BEFORE publishing. Requires no-ack.
     let mut consumer = channel
         .basic_consume(
-            "amq.rabbitmq.reply-to",
-            "devtool-rpc",
+            "amq.rabbitmq.reply-to".into(),
+            "devtool-rpc".into(),
             BasicConsumeOptions { no_ack: true, ..Default::default() },
             FieldTable::default(),
         )
@@ -423,8 +426,8 @@ pub async fn rabbit_rpc_call(
 
     channel
         .basic_publish(
-            &exchange,
-            &routing_key,
+            exchange.into(),
+            routing_key.into(),
             BasicPublishOptions::default(),
             payload.as_bytes(),
             props,
@@ -514,8 +517,8 @@ pub async fn rabbit_consume_start(
     let should_reply = ack_mode == "respond" && reply.is_some();
     let mut consumer = channel
         .basic_consume(
-            &queue,
-            "devtool-consumer",
+            queue.clone().into(),
+            "devtool-consumer".into(),
             BasicConsumeOptions::default(), // manual ack
             FieldTable::default(),
         )
@@ -560,8 +563,8 @@ pub async fn rabbit_consume_start(
                                 }
                                 let _ = channel
                                     .basic_publish(
-                                        "",
-                                        reply_to.as_str(),
+                                        "".into(),
+                                        reply_to.as_str().into(),
                                         BasicPublishOptions::default(),
                                         &body,
                                         rprops,
@@ -654,7 +657,7 @@ pub async fn rabbit_amqp_queues_info(
         };
         match channel
             .queue_declare(
-                &name,
+                name.clone().into(),
                 QueueDeclareOptions { passive: true, ..Default::default() },
                 FieldTable::default(),
             )
@@ -668,7 +671,7 @@ pub async fn rabbit_amqp_queues_info(
                     consumers: Some(q.consumer_count()),
                     error: None,
                 });
-                let _ = channel.close(200, "ok").await;
+                let _ = channel.close(200, "ok".into()).await;
             }
             Err(e) => {
                 let msg = e.to_string();
@@ -707,7 +710,7 @@ pub async fn rabbit_amqp_exchanges_info(
         // Passive declare ignores the kind; it only checks existence.
         match channel
             .exchange_declare(
-                &name,
+                name.clone().into(),
                 ExchangeKind::Direct,
                 ExchangeDeclareOptions { passive: true, ..Default::default() },
                 FieldTable::default(),
@@ -716,7 +719,7 @@ pub async fn rabbit_amqp_exchanges_info(
         {
             Ok(_) => {
                 out.push(ExchangeAmqpInfo { name, exists: true, error: None });
-                let _ = channel.close(200, "ok").await;
+                let _ = channel.close(200, "ok".into()).await;
             }
             Err(e) => {
                 let msg = e.to_string();
@@ -741,7 +744,7 @@ pub async fn rabbit_amqp_declare_queue(
     let channel = conn.create_channel().await.map_err(|e| e.to_string())?;
     channel
         .queue_declare(
-            &name,
+            name.into(),
             QueueDeclareOptions { durable, auto_delete, ..Default::default() },
             FieldTable::default(),
         )
@@ -773,7 +776,7 @@ pub async fn rabbit_amqp_declare_exchange(
     };
     channel
         .exchange_declare(
-            &name,
+            name.into(),
             ek,
             ExchangeDeclareOptions { durable, auto_delete, internal, ..Default::default() },
             FieldTable::default(),
@@ -796,9 +799,9 @@ pub async fn rabbit_amqp_bind_queue(
     let channel = conn.create_channel().await.map_err(|e| e.to_string())?;
     channel
         .queue_bind(
-            &queue,
-            &exchange,
-            &routing_key,
+            queue.into(),
+            exchange.into(),
+            routing_key.into(),
             QueueBindOptions::default(),
             FieldTable::default(),
         )

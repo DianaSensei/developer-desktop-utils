@@ -26,10 +26,8 @@ fn amqp_url() -> String {
 }
 
 async fn connect() -> Connection {
-    let props = ConnectionProperties::default()
-        .with_executor(tokio_executor_trait::Tokio::current())
-        .with_reactor(tokio_reactor_trait::Tokio);
-    Connection::connect(&amqp_url(), props)
+    // lapin 4 manages the tokio runtime itself (default feature).
+    Connection::connect(&amqp_url(), ConnectionProperties::default())
         .await
         .expect("connect to broker (is the docker-compose stack up?)")
 }
@@ -44,7 +42,7 @@ async fn publish_then_consume_roundtrip() {
 
     let queue = format!("devtool.it.{}", Uuid::new_v4());
     ch.queue_declare(
-        &queue,
+        queue.as_str().into(),
         QueueDeclareOptions { auto_delete: true, ..Default::default() },
         FieldTable::default(),
     )
@@ -53,7 +51,7 @@ async fn publish_then_consume_roundtrip() {
 
     let body = b"hello-roundtrip";
     let confirm = ch
-        .basic_publish("", &queue, BasicPublishOptions::default(), body, BasicProperties::default())
+        .basic_publish("".into(), queue.as_str().into(), BasicPublishOptions::default(), body, BasicProperties::default())
         .await
         .unwrap()
         .await
@@ -61,7 +59,7 @@ async fn publish_then_consume_roundtrip() {
     assert!(confirm.is_ack(), "broker should confirm the publish");
 
     let mut consumer = ch
-        .basic_consume(&queue, "it", BasicConsumeOptions { no_ack: true, ..Default::default() }, FieldTable::default())
+        .basic_consume(queue.as_str().into(), "it".into(), BasicConsumeOptions { no_ack: true, ..Default::default() }, FieldTable::default())
         .await
         .unwrap();
     let delivery = tokio::time::timeout(Duration::from_secs(5), consumer.next())
@@ -83,8 +81,8 @@ async fn mandatory_unroutable_is_returned() {
     let nowhere = format!("devtool.it.nowhere.{}", Uuid::new_v4());
     let confirmation = ch
         .basic_publish(
-            "",
-            &nowhere,
+            "".into(),
+            nowhere.as_str().into(),
             BasicPublishOptions { mandatory: true, ..Default::default() },
             b"orphan",
             BasicProperties::default(),
@@ -108,11 +106,11 @@ async fn direct_reply_to_rpc() {
     let req_queue = format!("devtool.it.rpc.{}", Uuid::new_v4());
     let responder = conn.create_channel().await.unwrap();
     responder
-        .queue_declare(&req_queue, QueueDeclareOptions { auto_delete: true, ..Default::default() }, FieldTable::default())
+        .queue_declare(req_queue.as_str().into(), QueueDeclareOptions { auto_delete: true, ..Default::default() }, FieldTable::default())
         .await
         .unwrap();
     let mut requests = responder
-        .basic_consume(&req_queue, "responder", BasicConsumeOptions { no_ack: true, ..Default::default() }, FieldTable::default())
+        .basic_consume(req_queue.as_str().into(), "responder".into(), BasicConsumeOptions { no_ack: true, ..Default::default() }, FieldTable::default())
         .await
         .unwrap();
     let responder_ch = responder.clone();
@@ -124,7 +122,7 @@ async fn direct_reply_to_rpc() {
                 let props = BasicProperties::default()
                     .with_correlation_id(req.properties.correlation_id().clone().unwrap_or_default());
                 let _ = responder_ch
-                    .basic_publish("", reply_to.as_str(), BasicPublishOptions::default(), up.as_bytes(), props)
+                    .basic_publish("".into(), reply_to.as_str().into(), BasicPublishOptions::default(), up.as_bytes(), props)
                     .await;
             }
         }
@@ -133,14 +131,14 @@ async fn direct_reply_to_rpc() {
     // Client: consume direct reply-to, publish a request, await the reply.
     let client = conn.create_channel().await.unwrap();
     let mut replies = client
-        .basic_consume("amq.rabbitmq.reply-to", "client", BasicConsumeOptions { no_ack: true, ..Default::default() }, FieldTable::default())
+        .basic_consume("amq.rabbitmq.reply-to".into(), "client".into(), BasicConsumeOptions { no_ack: true, ..Default::default() }, FieldTable::default())
         .await
         .unwrap();
     let corr = Uuid::new_v4().to_string();
     client
         .basic_publish(
-            "",
-            &req_queue,
+            "".into(),
+            req_queue.as_str().into(),
             BasicPublishOptions::default(),
             b"ping",
             BasicProperties::default()
