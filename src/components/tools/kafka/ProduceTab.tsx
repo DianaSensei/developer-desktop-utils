@@ -7,8 +7,9 @@ import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { kafkaApi, type PartitionInfo, type BatchRecord } from './types';
-
-interface Header { key: string; value: string; }
+import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
+import { produceDraft, type ProduceHeader as Header } from './produceDraft';
+import { kafkaInputHistory } from './kafkaInputHistoryStore';
 
 interface RecentSend { key: string; value: string; headers: Header[]; at: number }
 
@@ -44,12 +45,14 @@ interface ProduceTabProps {
 }
 
 export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
-  const [partitionMode, setPartitionMode] = useState<'auto' | 'manual'>('auto');
-  const [partition, setPartition] = useState(0);
-  const [key, setKey] = useState('');
-  const [headers, setHeaders] = useState<Header[]>([]);
-  const [value, setValue] = useState('');
-  const [batch, setBatch] = useState(false);
+  // Seeded from the in-memory draft so the form survives tab/tool/topic switches.
+  const [partitionMode, setPartitionMode] = useState<'auto' | 'manual'>(() => produceDraft.partitionMode);
+  const [partition, setPartition] = useState(() => produceDraft.partition);
+  const [key, setKey] = useState(() => produceDraft.key);
+  const [headers, setHeaders] = useState<Header[]>(() => produceDraft.headers);
+  const [value, setValue] = useState(() => produceDraft.value);
+  const [valueFormat, setValueFormat] = useState<'json' | 'plain'>(() => produceDraft.valueFormat);
+  const [batch, setBatch] = useState(() => produceDraft.batch);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ partition: number; offset: number } | null>(null);
   const [batchResult, setBatchResult] = useState<number | null>(null);
@@ -71,6 +74,19 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
     }
     return () => { if (clearTimer.current) clearTimeout(clearTimer.current); };
   }, [result, error, batchResult]);
+
+  // Mirror the form into the in-memory draft on every render so it survives remounts.
+  useEffect(() => {
+    Object.assign(produceDraft, { key, value, headers, batch, partitionMode, partition, valueFormat });
+  });
+
+  // Keep a manual partition selection within range when the topic changes.
+  useEffect(() => { if (partition >= partitions.length) setPartition(0); }, [partitions.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Pretty-print the value as JSON in place; no-op if it isn't valid JSON. */
+  const formatValue = () => {
+    try { setValue(JSON.stringify(JSON.parse(value), null, 2)); } catch { /* leave as typed */ }
+  };
 
   const rememberSend = () => {
     setRecent((prev) => [
@@ -120,6 +136,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         });
         const offsets = await kafkaApi.produceBatch(brokerId, topic, targetPartition, records);
         setBatchResult(offsets.length);
+        kafkaInputHistory.add(brokerId, 'topic', topic);
       } else {
         const headersMap = Object.fromEntries(
           headers.filter((h) => h.key.trim()).map((h) => [h.key.trim(), h.value])
@@ -127,6 +144,8 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         const r = await kafkaApi.produce(brokerId, topic, targetPartition, key.trim() || null, value, headersMap);
         setResult(r);
         rememberSend();
+        kafkaInputHistory.add(brokerId, 'topic', topic);
+        if (key.trim()) kafkaInputHistory.add(brokerId, 'key', key);
       }
     } catch (e) {
       setError(String(e));
@@ -270,24 +289,42 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
 
         {/* Value */}
         <div>
-          <Label htmlFor="pk-value" className="text-xs">
-            {batch ? 'Records (JSON array)' : 'Value'}
-          </Label>
+          <div className="flex items-center justify-between mb-1">
+            <Label className="text-xs">{batch ? 'Records (JSON array)' : 'Value'}</Label>
+            <div className="flex items-center gap-2">
+              {valueFormat === 'json' && (
+                <button
+                  type="button"
+                  onClick={formatValue}
+                  disabled={!value.trim()}
+                  className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-40"
+                  title="Pretty-print as JSON"
+                >
+                  Format
+                </button>
+              )}
+              <Segmented<'json' | 'plain'>
+                value={valueFormat}
+                onValueChange={setValueFormat}
+                size="sm"
+                aria-label="Value format"
+                options={[{ value: 'json', label: 'JSON' }, { value: 'plain', label: 'Plain' }]}
+              />
+            </div>
+          </div>
           {batch && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <p className="mb-1 text-[11px] text-muted-foreground">
               An array of strings or <span className="font-mono">{'{ value, key?, headers? }'}</span> objects — produced to one partition.
             </p>
           )}
-          <textarea
-            id="pk-value"
+          {/* key on format so CodeMirror swaps grammar cleanly (language is fixed at mount). */}
+          <CodeEditor
+            key={valueFormat}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={setValue}
+            language={valueFormat === 'json' ? 'json' : 'text'}
             placeholder={batch ? '[\n  "first message",\n  { "key": "k2", "value": "second" }\n]' : '{"key": "value"}'}
-            rows={8}
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono shadow-sm resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="min-h-40"
           />
         </div>
 

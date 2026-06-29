@@ -6,6 +6,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { rabbitApi, type RabbitConnection } from './types';
 import { rabbitMgmt } from './api';
+import { liveConnections } from '@/lib/liveConnections';
 import { useRabbitState } from './useRabbitState';
 import { LeftPanel } from './LeftPanel';
 import { OverviewView } from './OverviewView';
@@ -57,6 +58,9 @@ export function RabbitClient() {
 
   const conn = connections.find((c) => c.id === selectedConnId) ?? null;
   const isConnected = !!conn && connectedConnId === conn.id;
+
+  // Surface the live state to the app sidebar's connection indicator.
+  useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected]);
 
   // Connect = verify the broker is reachable (AMQP, plus the management API when
   // enabled), then mark this connection live. Only one connection is live at a

@@ -17,6 +17,9 @@ export interface TopicPrefill {
 export interface KafkaState {
   selectedBrokerId: string;
   setSelectedBrokerId: (id: string) => void;
+  /** The broker the user has explicitly connected to ('' = none). */
+  connectedBrokerId: string;
+  setConnectedBrokerId: (id: string) => void;
   view: KafkaView;
   selectedTopic: string | null;
   selectedGroup: string | null;
@@ -41,6 +44,7 @@ export interface KafkaState {
 export function useKafkaState(): KafkaState {
   // Selection persists across restarts so you resume where you left off.
   const [selectedBrokerId, setSelectedBrokerIdRaw] = usePersistentState('devtool:kafka:selectedBrokerId', '');
+  const [connectedBrokerId, setConnectedBrokerId] = usePersistentState('devtool:kafka:connectedBrokerId', '');
   const [view, setView] = usePersistentState<KafkaView>('devtool:kafka:view', 'topics');
   const [selectedTopic, setSelectedTopic] = usePersistentState<string | null>('devtool:kafka:selectedTopic', null);
   const [selectedGroup, setSelectedGroup] = usePersistentState<string | null>('devtool:kafka:selectedGroup', null);
@@ -104,6 +108,8 @@ export function useKafkaState(): KafkaState {
   return {
     selectedBrokerId,
     setSelectedBrokerId,
+    connectedBrokerId,
+    setConnectedBrokerId,
     view,
     selectedTopic,
     selectedGroup,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Plus, Pencil, Trash2, List, Users, Radio, Send, Square, ChevronRight, ChevronDown,
+  Plus, Pencil, Trash2, List, Users, Radio, Send, Square, ChevronRight, ChevronDown, Plug, PlugZap, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +15,10 @@ import type { KafkaView } from './useKafkaState';
 interface LeftPanelProps {
   selectedBrokerId: string;
   onSelectBroker: (id: string) => void;
+  connected: boolean;
+  connecting: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
   view: KafkaView;
   onShowTopics: () => void;
   onShowGroups: () => void;
@@ -24,7 +28,8 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel({
-  selectedBrokerId, onSelectBroker, view, onShowTopics, onShowGroups, onShowConsumers, onOpenConsumer, onShowProduce,
+  selectedBrokerId, onSelectBroker, connected, connecting, onConnect, onDisconnect,
+  view, onShowTopics, onShowGroups, onShowConsumers, onOpenConsumer, onShowProduce,
 }: LeftPanelProps) {
   const [configs, setConfigs] = useState<BrokerConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,26 +99,41 @@ export function LeftPanel({
           </Button>
         </div>
         {conn && (
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-mono truncate" title={conn.bootstrapServers}>
-              {conn.bootstrapServers}
-            </span>
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button
-                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-              <button
-                className={cn('p-1 rounded hover:bg-muted', removeArmed ? 'text-destructive' : 'text-muted-foreground hover:text-destructive')}
-                title={removeArmed ? 'Click again to remove' : 'Remove this saved broker'}
-                onClick={handleRemove}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 min-w-0">
+                <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', connected ? 'bg-emerald-500' : 'bg-muted-foreground/40')} title={connected ? 'connected' : 'not connected'} />
+                <span className="text-[11px] text-muted-foreground font-mono truncate" title={conn.bootstrapServers}>
+                  {conn.bootstrapServers}
+                </span>
+              </span>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                  title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className={cn('p-1 rounded hover:bg-muted', removeArmed ? 'text-destructive' : 'text-muted-foreground hover:text-destructive')}
+                  title={removeArmed ? 'Click again to remove' : 'Remove this saved broker'}
+                  onClick={handleRemove}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
+            {connected ? (
+              <Button variant="outline" size="sm" className="w-full h-7 text-xs" onClick={onDisconnect}>
+                <Plug className="h-3.5 w-3.5 mr-1.5" /> Disconnect
+              </Button>
+            ) : (
+              <Button size="sm" className="w-full h-7 text-xs" onClick={onConnect} disabled={connecting}>
+                {connecting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5 mr-1.5" />}
+                {connecting ? 'Connecting…' : 'Connect'}
+              </Button>
+            )}
+          </>
         )}
       </div>
 

@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
+import { useLiveConnections } from '@/lib/liveConnections';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
@@ -167,6 +168,7 @@ function NavScrollArea({
   const location = useLocation();
   const navRef = useRef<HTMLElement>(null);
   const [hasMore, setHasMore] = useState(false);
+  const liveIds = useLiveConnections();
 
   const checkScroll = useCallback(() => {
     const el = navRef.current;
@@ -194,9 +196,10 @@ function NavScrollArea({
           {navTools.map((tool) => {
             const Icon = tool.icon;
             const isActive = location.pathname === tool.path;
+            const isLive = liveIds.includes(tool.featureId);
             const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
             return (
-              <Tooltip key={tool.path} side="right" triggerClassName="block" label={tool.label} description={desc}>
+              <Tooltip key={tool.path} side="right" triggerClassName="block" label={isLive ? `${tool.label} — connected` : tool.label} description={desc}>
                 <Link
                   to={tool.path}
                   onClick={onClose}
@@ -208,7 +211,15 @@ function NavScrollArea({
                       : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
                   )}
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
+                  <span className="relative flex-shrink-0">
+                    <Icon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
+                    {isLive && (
+                      <span
+                        className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[hsl(var(--sidebar))]"
+                        title="Connected"
+                      />
+                    )}
+                  </span>
                   {/* Label is always mounted and fades/collapses with the sidebar
                       (300ms, matching the aside width animation) so it glides
                       rather than popping in/out on collapse-expand. */}

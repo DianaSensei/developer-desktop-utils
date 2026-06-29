@@ -55,6 +55,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
   const [error, setError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [uri, setUri] = useState('');
+  const [showUri, setShowUri] = useState(false);
   // The editable "host:port, host:port" string; parsed into form.host/amqpPort/extraHosts.
   const [hostsText, setHostsText] = useState(() => hostsToText(initial ?? EMPTY_CONNECTION));
 
@@ -106,6 +107,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
       useTls: tls,
     }));
     setUri('');
+    setShowUri(false);
     setError('');
     setTested(null);
   };
@@ -182,9 +184,19 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
             />
           </div>
 
-          {/* AMQP host(s) — the only required part. Accepts a comma-separated list. */}
+          {/* AMQP addresses — the only required part. Accepts a comma-separated list. */}
           <div>
-            <Label htmlFor="rb-hosts">Host(s)</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="rb-hosts">Addresses</Label>
+              <button
+                type="button"
+                onClick={() => setShowUri((s) => !s)}
+                className="text-[11px] text-muted-foreground hover:text-foreground"
+                title="Fill the fields from an amqp:// URI"
+              >
+                {showUri ? 'Hide URI' : 'Paste URI'}
+              </button>
+            </div>
             <Input
               id="rb-hosts"
               value={hostsText}
@@ -195,21 +207,19 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
             <p className="text-xs text-muted-foreground mt-1">
               <span className="font-mono">host:port</span>, comma-separated. The first is primary; the rest are tried on failover. Default port <span className="font-mono">{defaultPort(form.useTls)}</span> ({form.useTls ? 'amqps' : 'amqp'}).
             </p>
-          </div>
-
-          <div>
-            <Label htmlFor="rb-uri">Paste AMQP URI <span className="font-normal text-muted-foreground">(optional)</span></Label>
-            <div className="mt-1 flex gap-1">
-              <Input
-                id="rb-uri"
-                value={uri}
-                onChange={(e) => setUri(e.target.value)}
-                placeholder="amqp://user:pass@host1:5672,host2:5672/vhost"
-                className="font-mono text-xs"
-              />
-              <Button type="button" variant="outline" size="sm" onClick={applyUri} disabled={!uri.trim()}>Fill</Button>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-1">Fills the Host(s), credentials, virtual host and TLS fields from the URI (multi-host supported).</p>
+            {showUri && (
+              <div className="mt-2 flex gap-1">
+                <Input
+                  id="rb-uri"
+                  value={uri}
+                  onChange={(e) => setUri(e.target.value)}
+                  placeholder="amqp://user:pass@host1:5672,host2:5672/vhost"
+                  className="font-mono text-xs"
+                  autoFocus
+                />
+                <Button type="button" variant="outline" size="sm" onClick={applyUri} disabled={!uri.trim()}>Fill</Button>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -315,7 +325,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                     placeholder="/"
                     className="mt-1 font-mono text-xs h-8"
                   />
-                  <p className="text-[11px] text-muted-foreground mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Host(s) field above for HA failover.</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Addresses field above for HA failover.</p>
                 </div>
                 <div>
                   <Label htmlFor="rb-ca" className="text-xs">Trust CA certificate (PEM)</Label>

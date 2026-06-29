@@ -10,6 +10,9 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type ConsumeFrom, type KafkaConsumedMessage } from './types';
 import { kafkaConsumerStore, useKafkaConsumers, type KafkaConsumerSession } from './kafkaConsumerStore';
+import { kafkaInputHistory, useKafkaRecentMatches } from './kafkaInputHistoryStore';
+import { RecentSuggestions } from './RecentSuggestions';
+import { ResponseViewer } from '@/components/tools/apiclient/ResponseViewer';
 import type { TopicPrefill } from './useKafkaState';
 
 type ValueFormat = 'json' | 'plain' | 'hex';
@@ -136,6 +139,7 @@ function StartConsumerForm({ brokerId, refreshKey, sessions, prefill, onStarted 
     const started = topic.trim();
     try {
       await kafkaConsumerStore.start(brokerId, started, from);
+      kafkaInputHistory.add(brokerId, 'topic', started); // remember for the combobox
       setTopic('');
       onStarted(started); // jump straight to the new consumer's detail panel
     } catch (e) {
@@ -151,7 +155,7 @@ function StartConsumerForm({ brokerId, refreshKey, sessions, prefill, onStarted 
       <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
         <div>
           <Label className="text-xs">Topic</Label>
-          <TopicCombobox value={topic} topics={topics} onChange={(v) => { setTopic(v); setError(null); }} />
+          <TopicCombobox brokerId={brokerId} value={topic} topics={topics} onChange={(v) => { setTopic(v); setError(null); }} />
         </div>
         <div>
           <Label className="text-xs">From</Label>
@@ -355,7 +359,13 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
               <span className="text-[11px] font-medium text-muted-foreground">Value</span>
               <CopyButton value={m.value ?? ''} iconClassName="h-3.5 w-3.5" />
             </div>
-            <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto rounded-md border bg-background px-2.5 py-2">{formatValue(m, format)}</pre>
+            {format === 'hex' ? (
+              <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto rounded-md border bg-background px-2.5 py-2">{formatValue(m, format)}</pre>
+            ) : (
+              <div className="flex h-64 rounded-md border bg-background overflow-hidden">
+                <ResponseViewer value={formatValue(m, format)} language={format === 'json' ? 'json' : 'text'} />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -426,13 +436,14 @@ function hexDump(bytes: Uint8Array): string {
 }
 
 /** Searchable topic picker that also accepts a typed (custom) topic name. */
-function TopicCombobox({ value, topics, onChange }: {
-  value: string; topics: string[]; onChange: (v: string) => void;
+function TopicCombobox({ brokerId, value, topics, onChange }: {
+  brokerId: string; value: string; topics: string[]; onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recent = useKafkaRecentMatches(brokerId, 'topic', value);
   const q = value.trim().toLowerCase();
-  const matches = topics.filter((t) => t.toLowerCase().includes(q)).slice(0, 50);
+  const matches = topics.filter((t) => t.toLowerCase().includes(q) && !recent.includes(t)).slice(0, 50);
 
   const pick = (v: string) => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
@@ -451,8 +462,9 @@ function TopicCombobox({ value, topics, onChange }: {
         placeholder="topic name — type to search"
         className="font-mono text-sm h-9"
       />
-      {open && matches.length > 0 && (
+      {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+          <RecentSuggestions items={recent} brokerId={brokerId} field="topic" value={value} onPick={pick} />
           {matches.map((t) => (
             <button
               key={t}
