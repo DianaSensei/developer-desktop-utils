@@ -9,8 +9,30 @@ mod mockserver;
 mod ports;
 mod rabbit;
 
+use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
+
 fn main() {
     tauri::Builder::default()
+        .setup(|app| {
+            // On macOS the OS only routes Cmd+Z/X/C/V/A to the webview when a
+            // native Edit menu with PredefinedMenuItems exists. Without it, none
+            // of the standard text-editing shortcuts work in <input>/<textarea>
+            // or CodeMirror. Windows/Linux work without this but the menu is
+            // harmless there.
+            let edit = Submenu::with_items(app, "Edit", true, &[
+                &PredefinedMenuItem::undo(app, None)?,
+                &PredefinedMenuItem::redo(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::cut(app, None)?,
+                &PredefinedMenuItem::copy(app, None)?,
+                &PredefinedMenuItem::paste(app, None)?,
+                &PredefinedMenuItem::separator(app)?,
+                &PredefinedMenuItem::select_all(app, None)?,
+            ])?;
+            let menu = Menu::with_items(app, &[&edit])?;
+            app.set_menu(menu)?;
+            Ok(())
+        })
         .manage(mockserver::MockState::default())
         .manage(rabbit::ConsumerRegistry::default())
         .manage(kafka::KafkaConsumerRegistry::default())
