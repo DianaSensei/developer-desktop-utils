@@ -1,0 +1,132 @@
+# Test stack for the DevTool "RabbitMQ" tool.
+#
+#   docker compose up --build        # start everything
+#   docker compose down              # stop (add -v to wipe RabbitMQ data)
+#
+# Then in DevTool add a connection:
+#   host localhost · port 15672 · vhost / · user guest · pass guest
+#
+# Services:
+#   rabbitmq    broker + management UI (http://localhost:15672, guest/guest)
+#   producer    publishes a JSON message to "demo.work" every 2s
+#   consumer    consumes "demo.work" (1s simulated work, manual ack)
+#   rpc-server  request/response: serves "rpc_queue", replies to reply_to
+#   rpc-client  sends an RPC request every 5s and prints the reply
+#   fanout-pub  publishes to the "demo.fanout" exchange every 3s (→ a + b queues)
+#   topic-pub   publishes to the "demo.topic" exchange with rotating routing keys
+#   spring-rpc  Spring Boot @RabbitListener responder on "spring.rpc.requests"
+#               (bound to exchange "spring.rpc.exchange" via key "rpc.request"),
+#               plus a RabbitTemplate.convertSendAndReceive self-test every 10s
+#
+# The broker preloads a demo topology (definitions.json): direct / fanout / topic
+# / headers exchanges, bound queues, a dead-letter (TTL) example, and a 2nd vhost.
+#
+# NOTE: only `producer` builds the shared `rabbitmq-demo` image. The other Python
+# workers reuse it (image: rabbitmq-demo) and depend on producer, so the image is
+# built exactly once — building the same tag from several services at once races
+# and fails with "AlreadyExists".
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Management HTTP API + web UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      # Predeclare the full demo topology (direct/fanout/topic/headers/DLX + a 2nd vhost).
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Build owner for the shared Python worker image.
+  producer:
+    build: .
+    image: rabbitmq-demo
+    command: python producer.py
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  consumer:
+    image: rabbitmq-demo
+    command: python consumer.py
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      producer:
+        condition: service_started
+    restart: unless-stopped
+
+  rpc-server:
+    image: rabbitmq-demo
+    command: python rpc_server.py
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      producer:
+        condition: service_started
+    restart: unless-stopped
+
+  rpc-client:
+    image: rabbitmq-demo
+    command: python rpc_client.py
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      producer:
+        condition: service_started
+    restart: unless-stopped
+
+  fanout-publisher:
+    image: rabbitmq-demo
+    command: python fanout_publisher.py
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      producer:
+        condition: service_started
+    restart: unless-stopped
+
+  topic-publisher:
+    image: rabbitmq-demo
+    command: python topic_publisher.py
+    environment:
+      RABBITMQ_HOST: rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      producer:
+        condition: service_started
+    restart: unless-stopped
+
+  spring-rpc:
+    build: ./spring-rpc
+    image: spring-rpc-demo
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      # set to false to stop the scheduled self-test pings
+      RPC_SELFTEST: "true"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped

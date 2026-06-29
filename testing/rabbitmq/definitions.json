@@ -1,0 +1,48 @@
+{
+  "users": [
+    {
+      "name": "guest",
+      "password_hash": "kI3GCrswBLNZQzHJJ95QLoyfAVooYhnvf7jbqiW9BjOYUloe",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"]
+    }
+  ],
+  "vhosts": [
+    { "name": "/" },
+    { "name": "demo" }
+  ],
+  "permissions": [
+    { "user": "guest", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*" },
+    { "user": "guest", "vhost": "demo", "configure": ".*", "write": ".*", "read": ".*" }
+  ],
+  "exchanges": [
+    { "name": "demo.direct", "vhost": "/", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "demo.fanout", "vhost": "/", "type": "fanout", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "demo.topic", "vhost": "/", "type": "topic", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "demo.headers", "vhost": "/", "type": "headers", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "demo.dlx", "vhost": "/", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "demo.direct", "vhost": "demo", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {} }
+  ],
+  "queues": [
+    { "name": "demo.work", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "demo.direct.q", "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-max-length": 1000 } },
+    { "name": "demo.fanout.a", "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-max-length": 1000 } },
+    { "name": "demo.fanout.b", "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-max-length": 1000 } },
+    { "name": "demo.topic.all", "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-max-length": 1000 } },
+    { "name": "demo.topic.orders", "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-max-length": 1000 } },
+    { "name": "demo.headers.q", "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-max-length": 1000 } },
+    { "name": "demo.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "demo.ttl", "vhost": "/", "durable": true, "auto_delete": false, "arguments": { "x-message-ttl": 10000, "x-dead-letter-exchange": "demo.dlx", "x-dead-letter-routing-key": "dead", "x-max-length": 1000 } },
+    { "name": "demo.q", "vhost": "demo", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "bindings": [
+    { "source": "demo.direct", "vhost": "/", "destination": "demo.direct.q", "destination_type": "queue", "routing_key": "rk", "arguments": {} },
+    { "source": "demo.fanout", "vhost": "/", "destination": "demo.fanout.a", "destination_type": "queue", "routing_key": "", "arguments": {} },
+    { "source": "demo.fanout", "vhost": "/", "destination": "demo.fanout.b", "destination_type": "queue", "routing_key": "", "arguments": {} },
+    { "source": "demo.topic", "vhost": "/", "destination": "demo.topic.all", "destination_type": "queue", "routing_key": "#", "arguments": {} },
+    { "source": "demo.topic", "vhost": "/", "destination": "demo.topic.orders", "destination_type": "queue", "routing_key": "orders.*", "arguments": {} },
+    { "source": "demo.headers", "vhost": "/", "destination": "demo.headers.q", "destination_type": "queue", "routing_key": "", "arguments": { "x-match": "all", "type": "report", "format": "pdf" } },
+    { "source": "demo.dlx", "vhost": "/", "destination": "demo.dlq", "destination_type": "queue", "routing_key": "dead", "arguments": {} },
+    { "source": "demo.direct", "vhost": "demo", "destination": "demo.q", "destination_type": "queue", "routing_key": "rk", "arguments": {} }
+  ]
+}

@@ -37,6 +37,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'deduplicate': false,
   'generator': true,
   'kafka-explorer': false,
+  'rabbit-client': true,
   'sql-formatter': false,
   'network': false,
   'lucky-wheel': false,

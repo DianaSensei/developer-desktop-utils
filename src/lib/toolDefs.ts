@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   ServerCog,
   ArrowLeftRight,
+  Rabbit,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -162,6 +163,14 @@ export const TOOL_DEFS: ToolDef[] = [
     keywords: ["kafka", "topic", "partition", "offset", "consumer group", "producer", "message", "broker", "stream"],
   },
   {
+    id: "rabbit-client",
+    label: "RabbitMQ",
+    icon: Rabbit,
+    description:
+      "RabbitMQ management client: browse queues and exchanges, peek and publish messages, view bindings, connections, and cluster overview.",
+    keywords: ["rabbitmq", "rabbit", "amqp", "queue", "exchange", "message broker", "management", "vhost", "binding", "publish", "consume", "broker"],
+  },
+  {
     id: "sql-formatter",
     label: "SQL Formatter",
     icon: Database,
@@ -240,6 +249,7 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "diff",
   "cron-generator",
   "kafka-explorer",
+  "rabbit-client",
   "qrcode",
   "color-picker",
   "jwt",

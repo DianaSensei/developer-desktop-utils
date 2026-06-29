@@ -27,6 +27,7 @@ This document describes every tool in the app: what computation it performs, wha
 | Time Tracker | ✓ | — | — | — | Time entries, projects, tags (localStorage) |
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data) |
+| RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
 | Mock Server | ✓ | — | — | **✓ Local HTTP listener you start (127.0.0.1, or 0.0.0.0 = LAN)** | Stubs + server settings (localStorage); request log in-memory, cleared on restart |
@@ -298,6 +299,44 @@ This file is written by Rust (`fs::write`) whenever you save or delete a broker 
 | Create topic | **Permanent** — partition count cannot be reduced after creation |
 | Delete topic | **Irreversible** — all data is gone |
 
+### RabbitMQ
+
+Talks to the RabbitMQ **Management plugin** HTTP REST API (default port `15672`) at the host you configure for everything except Publish, Consume and Request/Response. Each request sends your username and password as HTTP Basic auth to that host; use TLS (HTTPS) for any non-local broker. Reads (overview, queues, exchanges, bindings, connections) load when you open a view and refresh on navigation or an explicit Refresh — there is **no background polling** and no auto-connect on launch. Writes are always explicit and **non-destructive by design**: Publish sends a real message and Create exchange/queue/binding apply via the management API, but the tool exposes **no purge or delete** of queues/exchanges. There is no "get messages" peek over HTTP — to inspect messages you start a real consumer (see below), because AMQP has no side-effect-free way to read a message.
+
+**Publish, Consume and Request/Response** use **AMQP** rather than the management API (these are real broker operations the HTTP API can't do faithfully). They connect to the configured host on the **AMQP port** (default `5672`, or `5671` when TLS is on):
+
+- **Publish** — a real `basic.publish` with full message properties, optional **mandatory** flag (unroutable messages are returned, not silently dropped) and **publisher confirms** (so the tool can report confirmed/routed).
+- **Consume** — `basic.consume` with a bounded **prefetch**, managed centrally in the **Consumers** panel and **confirmed before it starts**. *Peek* is non-destructive — messages are delivered unacked and requeued (flagged `redelivered`) when you stop — but it is still a real subscription, so on a queue with other consumers it competes for and temporarily withholds the messages it holds. *Consume* acknowledges and **permanently removes** each message it receives. *Respond* makes the tool an **RPC server** — it acks (removes) each request and publishes a reply (echo or a fixed payload) to the request's `reply_to` with the same correlation id. Because RabbitMQ delivers each message to only one consumer, **any** mode takes a share of messages from existing consumers on the same queue; the panel warns you when the target queue already has consumers. Consumers keep running while you navigate within the tool and stop on Stop or when you leave the tool — there is no unbounded buffering.
+- **Request/Response** — direct reply-to (`amq.rabbitmq.reply-to`) over a one-shot connection.
+
+**AMQP-only mode** — for brokers that expose no management HTTP API, enable *AMQP-only* on the connection. The tool then talks to the broker exclusively over AMQP: AMQP can't *enumerate* queues/exchanges, so you **track them by name** (the names are remembered per connection in `localStorage`), and the tool uses a **passive declare** to report whether a named queue/exchange exists plus its live ready/consumer counts. Create queue/exchange and bind run over AMQP (`queue_declare` / `exchange_declare` / `queue_bind`); publish/consume/RPC are unchanged. **Overview, Connections and the browse-all lists are unavailable** in this mode because there is no way to enumerate them over AMQP. The management port is ignored, and **Test** opens an AMQP connection instead of an HTTP request.
+
+TLS supports trusting a **custom CA certificate (PEM)** for self-signed/private brokers and **mutual TLS** via a **PKCS#12 client identity** (base64). Heartbeat interval and a client connection name can be set (the name shows in the broker's Connections list).
+
+#### Connection profile storage
+
+Connection profiles (name, host, management port, AMQP port, vhost, username, **password**, TLS flag, optional **CA cert** + **PKCS#12 client identity & password**, heartbeat, connection name) are saved to:
+
+```
+macOS:    ~/Library/Application Support/devtool/rabbit-connections.json
+Windows:  %APPDATA%\devtool\rabbit-connections.json
+Linux:    ~/.local/share/devtool/rabbit-connections.json
+```
+
+Written by Rust (`fs::write`) whenever you save or delete a connection. It is **not** encrypted and **includes the password** — do not store credentials you would not want readable by other processes on the same machine. The file is local-only; it is never transmitted anywhere except as Basic auth to the management host you configured.
+
+#### Risk levels at a glance
+
+| Action | Risk |
+|--------|------|
+| Browse overview, queues, exchanges, bindings, connections | Read-only (management API) — safe on production |
+| Create exchange / queue / binding | **Permanent write** via the management API — the tool offers no delete to undo it |
+| Publish message | **Permanent write** — a real `basic.publish`; routed/persistent messages are stored by the broker and cannot be unsent |
+| Consume — Peek | Non-destructive (nothing acked), but a real subscription: on a queue with other consumers it competes for and temporarily withholds up to *prefetch* messages, requeued as `redelivered` on stop |
+| Consume — Consume (ack) | **Permanent** — acknowledges and removes the messages it receives |
+| Respond (RPC server) | **Permanent** — acks (removes) each request and publishes a reply to its `reply_to` |
+| Purge / delete queue or exchange | **Not available** — the tool never purges or deletes |
+
 **Permissions (Tauri):** `core:default` (for Tauri IPC), outbound TCP via Rust (no Tauri capability needed — Rust has unrestricted network access).
 
 ---
@@ -385,9 +424,9 @@ A TOTP / HOTP one-time-password generator — the same codes a phone authenticat
 
 ## What never happens in any tool
 
-- **No telemetry, analytics, or crash reporting.** The only outbound network activity is: Kafka connections you initiate, DNS/IP lookups you initiate in Network Tools, HTTP requests you send from the API Client, and the app update check described below.
+- **No telemetry, analytics, or crash reporting.** The only outbound network activity is: Kafka connections you initiate, RabbitMQ management API calls and Request/Response AMQP connections you initiate, DNS/IP lookups you initiate in Network Tools, HTTP requests you send from the API Client, and the app update check described below.
 - **Daily auto-update check, on by default.** The auto-update check (Settings → About → Auto-check for updates) is **enabled by default** and contacts the GitHub Releases API at most once per day (plus whenever you click "Check"). It downloads or installs nothing without your action, and you can turn it off in Settings.
-- **No input data is sent to any server, except where a tool's whole purpose is a network query.** Computation — hashing, encoding, diffing, JWT decoding, regex matching, 2FA code generation — runs locally in the WebView or in Rust and never leaves the machine. The exceptions are explicit, user-initiated network tools: Kafka Explorer (broker traffic), Network Tools (the single domain/IP you look up), and the API Client (the exact request you click Send on). The Mock Server only *receives* requests on a local listener you start; it makes no outbound calls.
+- **No input data is sent to any server, except where a tool's whole purpose is a network query.** Computation — hashing, encoding, diffing, JWT decoding, regex matching, 2FA code generation — runs locally in the WebView or in Rust and never leaves the machine. The exceptions are explicit, user-initiated network tools: Kafka Explorer (broker traffic), RabbitMQ (management API calls to the host you configure), Network Tools (the single domain/IP you look up), and the API Client (the exact request you click Send on). The Mock Server only *receives* requests on a local listener you start; it makes no outbound calls.
 - **No background file access.** No tool reads files except when you explicitly click "Browse", drag a file, or use a file input.
 
 ---

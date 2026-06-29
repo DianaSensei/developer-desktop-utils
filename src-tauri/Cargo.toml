@@ -36,6 +36,12 @@ sysinfo = "0.32"
 axum = "0.8"
 rhai = "1"
 regex = "1"
+lapin = "2"
+tokio-executor-trait = "2"
+tokio-reactor-trait = "1"
+futures-util = "0.3"
+percent-encoding = "2"
+base64 = "0.21"
 
 [features]
 default = ["custom-protocol"]

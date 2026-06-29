@@ -51,6 +51,7 @@ const TextCounter = lazy(() => named(import('@/components/tools/TextCounter'), '
 const ColorPicker = lazy(() => named(import('@/components/tools/ColorPicker'), 'ColorPicker'));
 const Settings = lazy(() => named(import('@/components/Settings'), 'Settings'));
 const KafkaExplorer = lazy(() => named(import('@/components/tools/kafka/KafkaExplorer'), 'KafkaExplorer'));
+const RabbitClient = lazy(() => named(import('@/components/tools/rabbit/RabbitClient'), 'RabbitClient'));
 const SqlFormatter = lazy(() => named(import('@/components/tools/SqlFormatter'), 'SqlFormatter'));
 const TimeTracker = lazy(() => named(import('@/components/tools/clockify/Suite'), 'ClockifySuite'));
 const NetworkTools = lazy(() => named(import('@/components/tools/NetworkTools'), 'NetworkTools'));
@@ -76,6 +77,7 @@ const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType
   'deduplicate':    { path: '/deduplicate',    component: ArrayDeduplicator, fullHeight: true },
   'generator':      { path: '/generator',      component: Generator,         fullHeight: true },
   'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer,     fullHeight: true },
+  'rabbit-client':  { path: '/rabbit-client',  component: RabbitClient,      fullHeight: true },
   'sql-formatter':  { path: '/sql-formatter',  component: SqlFormatter,      fullHeight: true },
   'task-tracker':   { path: '/task-tracker',   component: TimeTracker,       fullHeight: true },
   'network':        { path: '/network',        component: NetworkTools,      fullHeight: true },

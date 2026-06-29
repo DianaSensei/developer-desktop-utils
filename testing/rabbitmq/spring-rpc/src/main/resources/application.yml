@@ -1,0 +1,26 @@
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    # Wait for the broker to come up rather than failing fast on first connect.
+    connection-timeout: 30s
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 2s
+          max-attempts: 30
+    template:
+      # How long convertSendAndReceive() waits for the reply.
+      reply-timeout: 5s
+
+# Set RPC_SELFTEST=false to stop the scheduled self-test pings.
+rpc:
+  selftest:
+    enabled: ${RPC_SELFTEST:true}
+
+logging:
+  level:
+    com.example.rpc: INFO

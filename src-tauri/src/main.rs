@@ -7,10 +7,12 @@ mod netinfo;
 mod files;
 mod mockserver;
 mod ports;
+mod rabbit;
 
 fn main() {
     tauri::Builder::default()
         .manage(mockserver::MockState::default())
+        .manage(rabbit::ConsumerRegistry::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -43,6 +45,19 @@ fn main() {
             mockserver::mock_status,
             mockserver::mock_update_rules,
             mockserver::mock_test_script,
+            rabbit::rabbit_list_configs,
+            rabbit::rabbit_save_config,
+            rabbit::rabbit_delete_config,
+            rabbit::rabbit_rpc_call,
+            rabbit::rabbit_publish,
+            rabbit::rabbit_consume_start,
+            rabbit::rabbit_consume_stop,
+            rabbit::rabbit_amqp_test,
+            rabbit::rabbit_amqp_queues_info,
+            rabbit::rabbit_amqp_exchanges_info,
+            rabbit::rabbit_amqp_declare_queue,
+            rabbit::rabbit_amqp_declare_exchange,
+            rabbit::rabbit_amqp_bind_queue,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
