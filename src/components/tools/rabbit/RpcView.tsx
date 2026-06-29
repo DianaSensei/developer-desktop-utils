@@ -7,6 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
+// Read-only CodeMirror viewer (line numbers, folding, JSON/plain highlighting) —
+// reused so the reply renders like a code editor.
+import { ResponseViewer } from '@/components/tools/apiclient/ResponseViewer';
+// Editable CodeMirror editor for the request payload (same highlighting).
+import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection, RpcReply, PublishOutcome, MessageProperties, ExchangeInfo, QueueInfo, BindingInfo } from './types';
@@ -14,6 +19,8 @@ import { rabbitApi } from './types';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { useKnownNames } from './knownNamesStore';
+import { inputHistory, useRecentMatches } from './inputHistoryStore';
+import { RecentSuggestions } from './RecentSuggestions';
 import type { RpcPrefill } from './useRabbitState';
 
 interface RpcViewProps {
@@ -23,6 +30,37 @@ interface RpcViewProps {
 
 type Mode = 'request' | 'send';
 
+// In-memory draft of the Send/Request form. The panel remounts on every tab/tool
+// switch, so its fields live here (module scope) to survive that — kept while the
+// app is open and reset only when it's fully closed. Not persisted to disk
+// (payloads can be large/sensitive); `mode` and the JSON/plain toggles use
+// usePersistentState separately.
+const rpcDraft = {
+  exchange: '',
+  routingKey: '',
+  payload: '',
+  contentType: 'application/json',
+  contentEncoding: '',
+  persistent: true,
+  priority: '',
+  expiration: '',
+  correlationId: '',
+  replyTo: '',
+  messageId: '',
+  type: '',
+  appId: '',
+  userId: '',
+  headersText: '',
+  showOptions: false,
+  mandatory: false,
+  confirm: true,
+  timeoutMs: 5000,
+  reply: null as RpcReply | null,
+  elapsed: null as number | null,
+  outcome: null as PublishOutcome | null,
+  stopped: false,
+};
+
 /**
  * The single publish surface for the tool. "Publish" is a full AMQP publish (all
  * message properties, mandatory + publisher confirms); "Request/Response" awaits a
@@ -31,37 +69,53 @@ type Mode = 'request' | 'send';
  */
 export function RpcView({ conn, prefill }: RpcViewProps) {
   const [mode, setMode] = usePersistentState<Mode>('devtool:rabbit:rpcMode', 'request');
-  const [exchange, setExchange] = useState('');
-  const [routingKey, setRoutingKey] = useState('');
-  const [payload, setPayload] = useState('');
+  // Most fields are seeded from the in-memory draft (see `rpcDraft`) so the form
+  // survives tab/tool switches while the app is open.
+  const [exchange, setExchange] = useState(() => rpcDraft.exchange);
+  const [routingKey, setRoutingKey] = useState(() => rpcDraft.routingKey);
+  const [payload, setPayload] = useState(() => rpcDraft.payload);
+  // Payload editor: JSON highlighting (+ Format action) or plain text.
+  const [payloadFormat, setPayloadFormat] = usePersistentState<'json' | 'plain'>('devtool:rabbit:payloadFormat', 'json');
 
   // Message properties
-  const [contentType, setContentType] = useState('application/json');
-  const [contentEncoding, setContentEncoding] = useState('');
-  const [persistent, setPersistent] = useState(true);
-  const [priority, setPriority] = useState('');
-  const [expiration, setExpiration] = useState('');
-  const [correlationId, setCorrelationId] = useState('');
-  const [replyTo, setReplyTo] = useState('');
-  const [messageId, setMessageId] = useState('');
-  const [type, setType] = useState('');
-  const [appId, setAppId] = useState('');
-  const [userId, setUserId] = useState('');
-  const [headersText, setHeadersText] = useState('');
-  const [showOptions, setShowOptions] = useState(false);
+  const [contentType, setContentType] = useState(() => rpcDraft.contentType);
+  const [contentEncoding, setContentEncoding] = useState(() => rpcDraft.contentEncoding);
+  const [persistent, setPersistent] = useState(() => rpcDraft.persistent);
+  const [priority, setPriority] = useState(() => rpcDraft.priority);
+  const [expiration, setExpiration] = useState(() => rpcDraft.expiration);
+  const [correlationId, setCorrelationId] = useState(() => rpcDraft.correlationId);
+  const [replyTo, setReplyTo] = useState(() => rpcDraft.replyTo);
+  const [messageId, setMessageId] = useState(() => rpcDraft.messageId);
+  const [type, setType] = useState(() => rpcDraft.type);
+  const [appId, setAppId] = useState(() => rpcDraft.appId);
+  const [userId, setUserId] = useState(() => rpcDraft.userId);
+  const [headersText, setHeadersText] = useState(() => rpcDraft.headersText);
+  const [showOptions, setShowOptions] = useState(() => rpcDraft.showOptions);
 
   // Delivery (publish mode) / wait (request mode)
-  const [mandatory, setMandatory] = useState(false);
-  const [confirm, setConfirm] = useState(true);
-  const [timeoutMs, setTimeoutMs] = useState(5000);
+  const [mandatory, setMandatory] = useState(() => rpcDraft.mandatory);
+  const [confirm, setConfirm] = useState(() => rpcDraft.confirm);
+  const [timeoutMs, setTimeoutMs] = useState(() => rpcDraft.timeoutMs);
 
   const [sending, setSending] = useState(false);
-  const [reply, setReply] = useState<RpcReply | null>(null);
-  const [elapsed, setElapsed] = useState<number | null>(null);
-  const [outcome, setOutcome] = useState<PublishOutcome | null>(null);
-  const [stopped, setStopped] = useState(false);
+  const [reply, setReply] = useState<RpcReply | null>(() => rpcDraft.reply);
+  // Reply rendering: pretty-printed + highlighted JSON, or plain text.
+  const [replyFormat, setReplyFormat] = usePersistentState<'json' | 'plain'>('devtool:rabbit:replyFormat', 'json');
+  const [elapsed, setElapsed] = useState<number | null>(() => rpcDraft.elapsed);
+  const [outcome, setOutcome] = useState<PublishOutcome | null>(() => rpcDraft.outcome);
+  const [stopped, setStopped] = useState(() => rpcDraft.stopped);
   const [error, setError] = useState<string | null>(null);
   const reqGen = useRef(0);
+
+  // Mirror the live form into the in-memory draft on every render so a remount
+  // (tab/tool switch) restores exactly what was there. Not written to disk.
+  useEffect(() => {
+    Object.assign(rpcDraft, {
+      exchange, routingKey, payload, contentType, contentEncoding, persistent,
+      priority, expiration, correlationId, replyTo, messageId, type, appId, userId,
+      headersText, showOptions, mandatory, confirm, timeoutMs, reply, elapsed, outcome, stopped,
+    });
+  });
 
   // Exchange suggestions: the broker's list (management) or the tracked names (AMQP-only).
   const knownExchanges = useKnownNames(conn.id).exchanges;
@@ -73,6 +127,11 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
   );
 
   const reset = () => { setReply(null); setElapsed(null); setOutcome(null); setStopped(false); setError(null); };
+
+  /** Pretty-print the payload as JSON in place; no-op if it isn't valid JSON. */
+  const formatPayload = () => {
+    try { setPayload(JSON.stringify(JSON.parse(payload), null, 2)); reset(); } catch { /* leave as typed */ }
+  };
 
   // Apply a prefill from an entry point (e.g. a queue/exchange Publish button).
   useEffect(() => {
@@ -103,6 +162,11 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
     }
 
     const trim = (v: string) => (v.trim() ? v.trim() : undefined);
+    // Remember what was actually used so the comboboxes can suggest it again.
+    const recordHistory = () => {
+      if (exchange.trim()) inputHistory.add(conn.id, 'exchange', exchange);
+      if (routingKey.trim()) inputHistory.add(conn.id, 'routingKey', routingKey);
+    };
     const started = performance.now();
     try {
       if (mode === 'send') {
@@ -121,6 +185,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
         const o = await rabbitApi.publish({ configId: conn.id, exchange, routingKey, payload, properties, mandatory, confirm });
         if (reqGen.current !== myGen) return;
         setOutcome(o);
+        recordHistory();
       } else {
         const r = await rabbitApi.rpcCall({
           configId: conn.id, exchange, routingKey, payload,
@@ -131,6 +196,11 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
         });
         if (reqGen.current !== myGen) return;
         setReply(r);
+        recordHistory();
+        // Default to JSON view when the reply looks like JSON (by content type or
+        // by parsing); otherwise plain. The user can still flip it.
+        const ct = r.contentType?.toLowerCase() ?? '';
+        setReplyFormat(ct.includes('json') || isJsonParseable(r.payload) ? 'json' : 'plain');
         setElapsed(Math.round(performance.now() - started));
       }
     } catch (e) {
@@ -142,6 +212,10 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
   };
 
   const cancel = () => { reqGen.current++; setSending(false); setStopped(true); };
+
+  // The reply as shown: pretty-printed when JSON view is on (falls back to raw if
+  // it doesn't parse), else the raw payload.
+  const replyText = reply ? (replyFormat === 'json' ? prettyJsonOrRaw(reply.payload) : reply.payload) : '';
 
   const routingHint = exchange === ''
     ? <>Default exchange — the message goes to the queue <span className="font-mono text-foreground">named exactly the routing key</span>.</>
@@ -176,7 +250,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Exchange</Label>
-              <ExchangeCombobox value={exchange} exchanges={exchanges.data ?? []} onChange={(v) => { setExchange(v); reset(); }} />
+              <ExchangeCombobox connId={conn.id} value={exchange} exchanges={exchanges.data ?? []} onChange={(v) => { setExchange(v); reset(); }} />
             </div>
             <div>
               <Label className="text-xs">Routing key</Label>
@@ -192,13 +266,40 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
 
           {/* Payload */}
           <div>
-            <Label htmlFor="rpc-payload" className="text-xs">Payload</Label>
-            <Textarea
-              id="rpc-payload"
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <Label className="text-xs">Payload</Label>
+              <div className="flex items-center gap-2">
+                {payloadFormat === 'json' && (
+                  <button
+                    type="button"
+                    onClick={formatPayload}
+                    disabled={!payload.trim()}
+                    className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-40"
+                    title="Pretty-print as JSON"
+                  >
+                    Format
+                  </button>
+                )}
+                <Segmented<'json' | 'plain'>
+                  value={payloadFormat}
+                  onValueChange={setPayloadFormat}
+                  size="sm"
+                  aria-label="Payload format"
+                  options={[
+                    { value: 'json', label: 'JSON' },
+                    { value: 'plain', label: 'Plain' },
+                  ]}
+                />
+              </div>
+            </div>
+            {/* key on format so CodeMirror swaps grammar cleanly (language is fixed at mount). */}
+            <CodeEditor
+              key={payloadFormat}
               value={payload}
-              onChange={(e) => { setPayload(e.target.value); reset(); }}
+              onChange={(v) => { setPayload(v); reset(); }}
+              language={payloadFormat === 'json' ? 'json' : 'text'}
               placeholder={'{"hello": "world"}'}
-              className="mt-1 font-mono text-sm min-h-40"
+              className="min-h-40"
             />
           </div>
 
@@ -326,20 +427,43 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
 
           {reply && (
             <div className="rounded-lg border bg-card/40 overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20 border-b text-[11px] text-muted-foreground">
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/20 border-b text-[11px] text-muted-foreground">
                 <span className="font-mono truncate">
                   Reply{reply.contentType ? ` · ${reply.contentType}` : ''}
                   {reply.correlationId ? ` · correlation_id: ${reply.correlationId}` : ''}
                 </span>
-                <CopyButton value={reply.payload} iconClassName="h-3.5 w-3.5" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <Segmented<'json' | 'plain'>
+                    value={replyFormat}
+                    onValueChange={setReplyFormat}
+                    size="sm"
+                    aria-label="Reply format"
+                    options={[
+                      { value: 'json', label: 'JSON' },
+                      { value: 'plain', label: 'Plain' },
+                    ]}
+                  />
+                  <CopyButton value={replyText} iconClassName="h-3.5 w-3.5" />
+                </div>
               </div>
-              <pre className="px-3 py-2 text-xs font-mono whitespace-pre-wrap break-words max-h-80 overflow-y-auto">{reply.payload}</pre>
+              <div className="flex h-72 flex-col">
+                <ResponseViewer value={replyText} language={replyFormat === 'json' ? 'json' : 'text'} />
+              </div>
             </div>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+function isJsonParseable(s: string): boolean {
+  try { JSON.parse(s); return true; } catch { return false; }
+}
+
+/** Pretty-print JSON for the reply viewer; return the raw text if it doesn't parse. */
+function prettyJsonOrRaw(payload: string): string {
+  try { return JSON.stringify(JSON.parse(payload), null, 2); } catch { return payload; }
 }
 
 function Field({ label, value, onChange, reset, placeholder }: {
@@ -368,6 +492,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
   const ex = exchange.trim();
   const isDefault = ex === '';
   const knownQueues = useKnownNames(conn.id).queues;
+  const recent = useRecentMatches(conn.id, 'routingKey', value);
 
   const suggestions = useRabbitData<RkSuggestion[]>(async () => {
     if (conn.amqpOnly) {
@@ -396,7 +521,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
   const q = value.trim().toLowerCase();
   const all = suggestions.data ?? [];
   const matches = all
-    .filter((s) => s.key.toLowerCase().includes(q))
+    .filter((s) => s.key.toLowerCase().includes(q) && !recent.includes(s.key))
     .sort((a, b) => a.key.localeCompare(b.key))
     .slice(0, 50);
 
@@ -417,8 +542,9 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
         placeholder={isDefault ? 'queue name' : 'e.g. orders.created'}
         className="font-mono text-sm h-9"
       />
-      {open && matches.length > 0 && (
+      {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+          <RecentSuggestions items={recent} connId={conn.id} field="routingKey" value={value} onPick={pick} />
           {matches.map((s) => (
             <button
               key={s.key}
@@ -438,15 +564,16 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
 }
 
 /** Searchable exchange picker that also accepts a typed (custom) exchange name. */
-function ExchangeCombobox({ value, exchanges, onChange }: {
-  value: string; exchanges: ExchangeInfo[]; onChange: (v: string) => void;
+function ExchangeCombobox({ connId, value, exchanges, onChange }: {
+  connId: string; value: string; exchanges: ExchangeInfo[]; onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recent = useRecentMatches(connId, 'exchange', value);
 
   const q = value.trim().toLowerCase();
   const matches = exchanges
-    .filter((e) => e.name !== '' && e.name.toLowerCase().includes(q))
+    .filter((e) => e.name !== '' && !recent.includes(e.name) && e.name.toLowerCase().includes(q))
     .sort((a, b) => a.name.localeCompare(b.name))
     .slice(0, 50);
 
@@ -469,6 +596,7 @@ function ExchangeCombobox({ value, exchanges, onChange }: {
       />
       {open && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+          <RecentSuggestions items={recent} connId={connId} field="exchange" value={value} onPick={pick} />
           <button
             type="button"
             onMouseDown={(e) => { e.preventDefault(); pick(''); }}

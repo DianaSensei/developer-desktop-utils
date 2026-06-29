@@ -6,6 +6,9 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type TopicDetails } from './types';
 import { ProduceTab } from './ProduceTab';
+import { useKafkaRecentMatches } from './kafkaInputHistoryStore';
+import { RecentSuggestions } from './RecentSuggestions';
+import { produceDraft } from './produceDraft';
 import type { TopicPrefill } from './useKafkaState';
 
 interface ProduceViewProps {
@@ -21,7 +24,8 @@ interface ProduceViewProps {
  * pre-filled via `prefill` — mirroring the RabbitMQ tool's Send/Request panel.
  */
 export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: ProduceViewProps) {
-  const [topic, setTopic] = useState('');
+  // Seed the topic from the in-memory draft so it survives tab/tool switches.
+  const [topic, setTopic] = useState(() => produceDraft.topic);
   const [topics, setTopics] = useState<string[]>([]);
   const [details, setDetails] = useState<TopicDetails | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,6 +42,9 @@ export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: Produc
   useEffect(() => {
     if (prefill?.topic) setTopic(prefill.topic);
   }, [prefill?.token]);
+
+  // Mirror the selected topic into the draft so returning to Produce restores it.
+  useEffect(() => { produceDraft.topic = topic; });
 
   // Load partition metadata for the chosen topic (the produce form needs it).
   useEffect(() => {
@@ -70,7 +77,7 @@ export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: Produc
         <div className="mx-auto w-full max-w-2xl space-y-5">
           <div>
             <Label className="text-xs">Topic</Label>
-            <TopicCombobox value={topic} topics={topics} onChange={setTopic} />
+            <TopicCombobox brokerId={brokerId} value={topic} topics={topics} onChange={setTopic} />
             {loading && <p className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> Loading partitions…</p>}
             {error && (
               <div className="mt-2 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -89,13 +96,14 @@ export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: Produc
 }
 
 /** Searchable topic picker that also accepts a typed (custom) topic name. */
-function TopicCombobox({ value, topics, onChange }: {
-  value: string; topics: string[]; onChange: (v: string) => void;
+function TopicCombobox({ brokerId, value, topics, onChange }: {
+  brokerId: string; value: string; topics: string[]; onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recent = useKafkaRecentMatches(brokerId, 'topic', value);
   const q = value.trim().toLowerCase();
-  const matches = topics.filter((t) => t.toLowerCase().includes(q)).slice(0, 50);
+  const matches = topics.filter((t) => t.toLowerCase().includes(q) && !recent.includes(t)).slice(0, 50);
 
   const pick = (v: string) => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
@@ -114,8 +122,9 @@ function TopicCombobox({ value, topics, onChange }: {
         placeholder="topic name — type to search"
         className="font-mono text-sm h-9"
       />
-      {open && matches.length > 0 && (
+      {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+          <RecentSuggestions items={recent} brokerId={brokerId} field="topic" value={value} onPick={pick} />
           {matches.map((t) => (
             <button
               key={t}

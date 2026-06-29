@@ -22,6 +22,9 @@ export interface ConsumerPrefill {
 export interface RabbitState {
   selectedConnId: string;
   setSelectedConnId: (id: string) => void;
+  /** The connection the user has explicitly connected to ('' = none). */
+  connectedConnId: string;
+  setConnectedConnId: (id: string) => void;
   view: RabbitView;
   selectedQueue: string | null;
   selectedExchange: string | null;
@@ -46,6 +49,7 @@ export interface RabbitState {
 export function useRabbitState(): RabbitState {
   // Selection persists across restarts so you resume where you left off.
   const [selectedConnId, setSelectedConnIdRaw] = usePersistentState('devtool:rabbit:selectedConnId', '');
+  const [connectedConnId, setConnectedConnId] = usePersistentState('devtool:rabbit:connectedConnId', '');
   const [view, setView] = usePersistentState<RabbitView>('devtool:rabbit:view', 'overview');
   const [selectedQueue, setSelectedQueue] = usePersistentState<string | null>('devtool:rabbit:selectedQueue', null);
   const [selectedExchange, setSelectedExchange] = usePersistentState<string | null>('devtool:rabbit:selectedExchange', null);
@@ -126,6 +130,8 @@ export function useRabbitState(): RabbitState {
   return {
     selectedConnId,
     setSelectedConnId,
+    connectedConnId,
+    setConnectedConnId,
     view,
     selectedQueue,
     selectedExchange,

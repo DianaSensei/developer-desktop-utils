@@ -24,6 +24,9 @@ interface ExchangeListViewProps {
   onSelectExchange: (name: string) => void;
 }
 
+// Cap rendered rows so a cluster with very many exchanges doesn't choke the DOM.
+const LIST_RENDER_CAP = 500;
+
 export function ExchangeListView(props: ExchangeListViewProps) {
   if (props.conn.amqpOnly) return <AmqpExchangeListView {...props} />;
   return <MgmtExchangeListView {...props} />;
@@ -38,6 +41,7 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
   const rows = (exchanges.data ?? [])
     .filter((e) => (e.name || '(default)').toLowerCase().includes(f))
     .sort((a, b) => a.name.localeCompare(b.name));
+  const shown = rows.slice(0, LIST_RENDER_CAP);
 
   return (
     <div className="tool-full-height">
@@ -71,26 +75,31 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
           rows.length === 0
             ? <p className="text-sm text-muted-foreground">{f ? 'No matching exchanges.' : 'No exchanges.'}</p>
             : (
-              <div className="overflow-x-auto rounded-xl border border-border/50">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/20 border-b border-border/50">
-                    <tr>
-                      <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Name</th>
-                      <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Type</th>
-                      <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Durable</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {rows.map((e) => (
-                      <tr key={e.name || '(default)'} className="hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => onSelectExchange(e.name)}>
-                        <td className="px-3.5 py-2.5 font-mono">{e.name || '(AMQP default)'}</td>
-                        <td className="px-3.5 py-2.5">{e.type ?? '—'}</td>
-                        <td className="px-3.5 py-2.5">{e.durable ? 'Yes' : 'No'}</td>
+              <>
+                <div className="overflow-x-auto rounded-xl border border-border/50">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/20 border-b border-border/50">
+                      <tr>
+                        <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Name</th>
+                        <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Type</th>
+                        <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Durable</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {shown.map((e) => (
+                        <tr key={e.name || '(default)'} className="hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => onSelectExchange(e.name)}>
+                          <td className="px-3.5 py-2.5 font-mono">{e.name || '(AMQP default)'}</td>
+                          <td className="px-3.5 py-2.5">{e.type ?? '—'}</td>
+                          <td className="px-3.5 py-2.5">{e.durable ? 'Yes' : 'No'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {rows.length > shown.length && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">Showing first {LIST_RENDER_CAP} of {rows.length.toLocaleString()} — search to narrow.</p>
+                )}
+              </>
             )
         )}
       </div>

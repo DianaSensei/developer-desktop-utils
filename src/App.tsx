@@ -14,10 +14,12 @@ import {
   Plus,
   Loader2,
   HelpCircle,
+  Star,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
+import { useLiveConnections } from '@/lib/liveConnections';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
@@ -145,6 +147,16 @@ function ToolLoading() {
 // component so hooks (useRef, useState, useLayoutEffect) follow React rules —
 // calling hooks inside an IIFE inside another component's render is invalid.
 type SidebarTool = (typeof allTools)[0];
+
+// Small uppercase group header used to separate Favorites from the rest.
+function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <p className={cn('px-2.5 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60', className)}>
+      {children}
+    </p>
+  );
+}
+
 function NavScrollArea({
   navTools,
   query,
@@ -154,6 +166,9 @@ function NavScrollArea({
   onEnableTool,
   isCollapsed,
   hiddenCount,
+  favoriteCount,
+  isFavorite,
+  onToggleFavorite,
 }: {
   navTools: SidebarTool[];
   query: string;
@@ -163,10 +178,18 @@ function NavScrollArea({
   onEnableTool: (tool: SidebarTool) => void;
   isCollapsed: boolean;
   hiddenCount: number;
+  favoriteCount: number;
+  isFavorite: (featureId: string) => boolean;
+  onToggleFavorite: (featureId: string) => void;
 }) {
   const location = useLocation();
   const navRef = useRef<HTMLElement>(null);
   const [hasMore, setHasMore] = useState(false);
+  const liveIds = useLiveConnections();
+
+  // Section labels ("Favorites" / "All tools") only make sense when favourites
+  // are pinned to the top of the full, unfiltered, expanded list.
+  const showSections = !query && !isCollapsed && favoriteCount > 0 && favoriteCount < navTools.length;
 
   const checkScroll = useCallback(() => {
     const el = navRef.current;
@@ -191,38 +214,72 @@ function NavScrollArea({
           <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
         )}
         <div className="space-y-0.5">
-          {navTools.map((tool) => {
+          {navTools.map((tool, i) => {
             const Icon = tool.icon;
             const isActive = location.pathname === tool.path;
+            const isLive = liveIds.includes(tool.featureId);
+            const fav = isFavorite(tool.featureId);
             const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
             return (
-              <Tooltip key={tool.path} side="right" triggerClassName="block" label={tool.label} description={desc}>
-                <Link
-                  to={tool.path}
-                  onClick={onClose}
-                  className={cn(
-                    'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.98]',
-                    isCollapsed ? 'justify-center' : 'gap-2.5',
-                    isActive
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
-                  )}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
-                  {/* Label is always mounted and fades/collapses with the sidebar
-                      (300ms, matching the aside width animation) so it glides
-                      rather than popping in/out on collapse-expand. */}
-                  <span
+              <div key={tool.path}>
+                {/* Group headers — only when favourites are pinned at the top */}
+                {showSections && i === 0 && <SectionLabel>Favorites</SectionLabel>}
+                {showSections && i === favoriteCount && <SectionLabel className="mt-2">All tools</SectionLabel>}
+                <Tooltip side="right" triggerClassName="block" label={isLive ? `${tool.label} — connected` : tool.label} description={desc}>
+                  <Link
+                    to={tool.path}
+                    onClick={onClose}
                     className={cn(
-                      'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
-                      isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
-                      isActive && 'font-medium'
+                      'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.98]',
+                      isCollapsed ? 'justify-center' : 'gap-2.5',
+                      isActive
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
                     )}
                   >
-                    {tool.label}
-                  </span>
-                </Link>
-              </Tooltip>
+                    <span className="relative flex-shrink-0">
+                      <Icon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
+                      {isLive && (
+                        <span
+                          className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[hsl(var(--sidebar))]"
+                          title="Connected"
+                        />
+                      )}
+                    </span>
+                    {/* Label is always mounted and fades/collapses with the sidebar
+                        (300ms, matching the aside width animation) so it glides
+                        rather than popping in/out on collapse-expand. */}
+                    <span
+                      className={cn(
+                        'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                        isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
+                        isActive && 'font-medium'
+                      )}
+                    >
+                      {tool.label}
+                    </span>
+                    {/* Favourite toggle — pins the tool to the top of the list.
+                        Hidden when collapsed (no room); a starred tool shows a
+                        filled star always, others reveal an outline on hover. */}
+                    {!isCollapsed && (
+                      <button
+                        type="button"
+                        aria-label={fav ? `Unfavorite ${tool.label}` : `Favorite ${tool.label}`}
+                        title={fav ? 'Remove from favorites' : 'Add to favorites'}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(tool.featureId); }}
+                        className={cn(
+                          'ml-auto shrink-0 rounded p-0.5 transition-all duration-150',
+                          fav
+                            ? 'text-amber-400 opacity-100 hover:text-amber-300'
+                            : 'text-muted-foreground/50 opacity-0 hover:text-amber-400 group-hover:opacity-100 focus-visible:opacity-100'
+                        )}
+                      >
+                        <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
+                      </button>
+                    )}
+                  </Link>
+                </Tooltip>
+              </div>
             );
           })}
         </div>
@@ -316,7 +373,7 @@ function Sidebar({
   onToggleCollapse: () => void;
 }) {
   const location = useLocation();
-  const { isFeatureEnabled, toggleFeature, toolOrder } = useFeatures();
+  const { isFeatureEnabled, toggleFeature, toolOrder, favorites, toggleFavorite, isFavorite } = useFeatures();
   const { updateAvailable } = useUpdate();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -344,9 +401,17 @@ function Sidebar({
 
   // Settings is pinned to the bottom — exclude from the nav list
   const allNavTools = orderedTools.filter((t) => t.featureId !== 'settings');
-  const navTools = query.trim()
+  const filteredNavTools = query.trim()
     ? allNavTools.filter((t) => toolMatchesQuery(t, query))
     : allNavTools;
+  // Favourites float to the top (most-recently-favorited first), the rest keep
+  // their saved order. Applied after search so a query still surfaces matches.
+  const favNavTools = filteredNavTools
+    .filter((t) => isFavorite(t.featureId))
+    .sort((a, b) => favorites.indexOf(a.featureId) - favorites.indexOf(b.featureId));
+  const restNavTools = filteredNavTools.filter((t) => !isFavorite(t.featureId));
+  const navTools = [...favNavTools, ...restNavTools];
+  const favoriteCount = favNavTools.length;
   const settingsTool = allTools.find((t) => t.featureId === 'settings')!;
   const isSettingsActive = location.pathname === settingsTool.path;
 
@@ -444,6 +509,9 @@ function Sidebar({
           onEnableTool={handleEnableTool}
           isCollapsed={isCollapsed}
           hiddenCount={hiddenCount}
+          favoriteCount={favoriteCount}
+          isFavorite={isFavorite}
+          onToggleFavorite={toggleFavorite}
         />
 
         {/* Pinned bottom bar — always visible, order: Collapse → Dark mode → Settings */}

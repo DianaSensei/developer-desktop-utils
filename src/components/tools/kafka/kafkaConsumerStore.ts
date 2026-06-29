@@ -145,6 +145,14 @@ export const kafkaConsumerStore = {
     emit();
   },
 
+  /** Stop every consumer for one broker (used on Disconnect). */
+  async stopForBroker(brokerId: string): Promise<void> {
+    const all = Array.from(sessions.values()).filter((s) => s.brokerId === brokerId);
+    for (const s of all) { sessions.delete(key(s.brokerId, s.topic)); discardPending(key(s.brokerId, s.topic)); }
+    emit();
+    await Promise.all(all.map((s) => (s.id ? kafkaApi.consumeStop(s.id).catch(() => {}) : Promise.resolve())));
+  },
+
   async stopAll(): Promise<void> {
     const all = Array.from(sessions.values());
     sessions.clear();

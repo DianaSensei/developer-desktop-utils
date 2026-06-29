@@ -15,6 +15,8 @@ import { rabbitApi } from './types';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { useKnownNames } from './knownNamesStore';
+import { inputHistory, useRecentMatches } from './inputHistoryStore';
+import { RecentSuggestions } from './RecentSuggestions';
 import { consumerStore, useConsumers, type ConsumerSession } from './consumerStore';
 import { ConfirmDialog } from './ConfirmDialog';
 import type { ConsumerPrefill } from './useRabbitState';
@@ -168,6 +170,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
     try {
       const reply = mode === 'respond' ? { echo, payload: replyPayload, contentType: replyContentType.trim() || undefined } : null;
       await consumerStore.start(conn.id, started, mode, prefetch, reply);
+      inputHistory.add(conn.id, 'queue', started); // remember for the combobox
       setQueue('');
       onStarted(started); // jump to the new consumer's detail panel
     } catch (e) {
@@ -193,7 +196,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
       <div className="grid grid-cols-[1fr_auto] gap-3">
         <div>
           <Label className="text-xs">Queue</Label>
-          <QueueCombobox value={queue} queues={queues} onChange={(v) => { setQueue(v); setError(null); }} />
+          <QueueCombobox connId={conn.id} value={queue} queues={queues} onChange={(v) => { setQueue(v); setError(null); }} />
         </div>
         <div className="w-24">
           <Label htmlFor="cs-prefetch" className="text-xs">Prefetch</Label>
@@ -466,13 +469,14 @@ function tryPretty(payload: string): string {
 }
 
 /** Searchable queue picker that also accepts a typed (custom) queue name. */
-function QueueCombobox({ value, queues, onChange }: {
-  value: string; queues: QueueInfo[]; onChange: (v: string) => void;
+function QueueCombobox({ connId, value, queues, onChange }: {
+  connId: string; value: string; queues: QueueInfo[]; onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recent = useRecentMatches(connId, 'queue', value);
   const q = value.trim().toLowerCase();
-  const matches = queues.filter((x) => x.name.toLowerCase().includes(q)).slice(0, 50);
+  const matches = queues.filter((x) => x.name.toLowerCase().includes(q) && !recent.includes(x.name)).slice(0, 50);
 
   const pick = (v: string) => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
@@ -491,8 +495,9 @@ function QueueCombobox({ value, queues, onChange }: {
         placeholder="queue name — type to search"
         className="font-mono text-sm h-9"
       />
-      {open && matches.length > 0 && (
+      {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+          <RecentSuggestions items={recent} connId={connId} field="queue" value={value} onPick={pick} />
           {matches.map((x) => (
             <button
               key={x.name}

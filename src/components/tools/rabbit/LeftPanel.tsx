@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Gauge, Plug, Repeat, Inbox, Radio, Square, Headphones, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Gauge, Plug, PlugZap, Repeat, Inbox, Radio, Square, Headphones, ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -18,6 +18,10 @@ interface LeftPanelProps {
   selectedConnId: string;
   onSelectConn: (id: string) => void;
   onConnectionsChanged: () => void;
+  connected: boolean;
+  connecting: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
   view: RabbitView;
   onShowOverview: () => void;
   onShowConnections: () => void;
@@ -31,6 +35,7 @@ interface LeftPanelProps {
 export function LeftPanel(props: LeftPanelProps) {
   const {
     connections, connectionsLoading, selectedConnId, onSelectConn, onConnectionsChanged,
+    connected, connecting, onConnect, onDisconnect,
     view, onShowOverview, onShowConnections, onShowRpc, onShowConsumers, onOpenConsumer, onShowQueues, onShowExchanges,
   } = props;
 
@@ -75,25 +80,41 @@ export function LeftPanel(props: LeftPanelProps) {
           </Button>
         </div>
         {conn && (
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-mono truncate" title={conn.amqpOnly ? 'AMQP endpoint' : 'Management endpoint'}>
-              {conn.amqpOnly ? `${conn.host}:${conn.amqpPort}` : `${conn.host}:${conn.port}`}
-            </span>
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button
-                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-              <button
-                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
-                title="Remove this saved connection" onClick={() => setDeleteOpen(true)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 min-w-0">
+                <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', connected ? 'bg-emerald-500' : 'bg-muted-foreground/40')} title={connected ? 'connected' : 'not connected'} />
+                <span className="text-[11px] text-muted-foreground font-mono truncate" title={conn.amqpOnly ? 'AMQP endpoint' : 'Management endpoint'}>
+                  {conn.amqpOnly ? `${conn.host}:${conn.amqpPort}` : `${conn.host}:${conn.port}`}
+                  {conn.extraHosts?.length ? ` +${conn.extraHosts.length}` : ''}
+                </span>
+              </span>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                  title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                  title="Remove this saved connection" onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
+            {connected ? (
+              <Button variant="outline" size="sm" className="w-full h-7 text-xs" onClick={onDisconnect}>
+                <Plug className="h-3.5 w-3.5 mr-1.5" /> Disconnect
+              </Button>
+            ) : (
+              <Button size="sm" className="w-full h-7 text-xs" onClick={onConnect} disabled={connecting}>
+                {connecting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5 mr-1.5" />}
+                {connecting ? 'Connecting…' : 'Connect'}
+              </Button>
+            )}
+          </>
         )}
       </div>
 

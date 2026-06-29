@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Server, Info } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Server, Info, Plug, Loader2, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { LeftPanel } from './LeftPanel';
 import { TopicListView } from './TopicListView';
 import { GroupListView } from './GroupListView';
@@ -12,6 +13,7 @@ import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 import { useKafkaState } from './useKafkaState';
 import { kafkaApi } from './types';
 import { kafkaConsumerStore } from './kafkaConsumerStore';
+import { liveConnections } from '@/lib/liveConnections';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +25,8 @@ export function KafkaExplorer() {
   const {
     selectedBrokerId,
     setSelectedBrokerId,
+    connectedBrokerId,
+    setConnectedBrokerId,
     view,
     selectedTopic,
     selectedGroup,
@@ -41,6 +45,36 @@ export function KafkaExplorer() {
     refreshKey,
     refresh,
   } = useKafkaState();
+
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const isConnected = !!selectedBrokerId && connectedBrokerId === selectedBrokerId;
+
+  // Connect = verify the broker is reachable, then mark it live. Only one broker
+  // is live at a time, so connecting elsewhere stops the previous one's consumers.
+  const handleConnect = useCallback(async () => {
+    if (!selectedBrokerId) return;
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      await kafkaApi.testConnection(selectedBrokerId);
+      if (connectedBrokerId && connectedBrokerId !== selectedBrokerId) kafkaConsumerStore.stopForBroker(connectedBrokerId);
+      setConnectedBrokerId(selectedBrokerId);
+    } catch (e) {
+      setConnectError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setConnecting(false);
+    }
+  }, [selectedBrokerId, connectedBrokerId, setConnectedBrokerId]);
+
+  const handleDisconnect = useCallback(() => {
+    if (selectedBrokerId) kafkaConsumerStore.stopForBroker(selectedBrokerId);
+    setConnectError(null);
+    setConnectedBrokerId('');
+  }, [selectedBrokerId, setConnectedBrokerId]);
+
+  // Surface the live state to the app sidebar's connection indicator.
+  useEffect(() => { liveConnections.set('kafka-explorer', isConnected); }, [isConnected]);
 
   // Stop any realtime consumers when leaving the tool so nothing keeps running
   // in the background. They persist across view switches within the tool (the
@@ -101,6 +135,10 @@ export function KafkaExplorer() {
         <LeftPanel
           selectedBrokerId={selectedBrokerId}
           onSelectBroker={setSelectedBrokerId}
+          connected={isConnected}
+          connecting={connecting}
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
           view={view}
           onShowTopics={showTopics}
           onShowGroups={showGroups}
@@ -131,6 +169,13 @@ export function KafkaExplorer() {
             <Server className="w-8 h-8 opacity-30" />
             <p className="text-sm">Add a broker to get started</p>
           </div>
+        ) : !isConnected ? (
+          <DisconnectedPanel
+            name={brokerName}
+            connecting={connecting}
+            error={connectError}
+            onConnect={handleConnect}
+          />
         ) : view === 'topic' && selectedTopic != null ? (
           <TopicView
             brokerId={selectedBrokerId}
@@ -182,6 +227,29 @@ export function KafkaExplorer() {
             setShowInfo(false);
           }}
         />
+      )}
+    </div>
+  );
+}
+
+/** Shown when a broker is selected but not yet connected. */
+function DisconnectedPanel({ name, connecting, error, onConnect }: {
+  name: string; connecting: boolean; error: string | null; onConnect: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-4 px-8 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/30">
+        <Plug className="h-7 w-7 text-muted-foreground/50" />
+      </div>
+      {name && <p className="text-sm font-medium">{name}</p>}
+      <Button onClick={onConnect} disabled={connecting}>
+        {connecting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plug className="h-4 w-4 mr-1.5" />}
+        {connecting ? 'Connecting…' : 'Connect'}
+      </Button>
+      {error && (
+        <div className="flex items-start gap-2 max-w-md rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive text-left">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span>
+        </div>
       )}
     </div>
   );

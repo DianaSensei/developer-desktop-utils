@@ -6,7 +6,7 @@
 // that the REST API can't do: full-feature publish (properties + mandatory +
 // publisher confirms), request/response via direct reply-to, and a live consumer.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -42,8 +42,10 @@ pub struct RabbitConnection {
     pub amqp_port: u16,
     /// Extra AMQP endpoints to try, in order, if the primary host can't be reached
     /// (HA clusters / no load balancer). Each entry is `host` or `host:port`;
-    /// without a port it falls back to `amqp_port`.
-    #[serde(default)]
+    /// without a port it falls back to `amqp_port`. The frontend sends `null` when
+    /// empty, so accept that as an empty list (plain `default` only covers a
+    /// *missing* field, not an explicit `null`).
+    #[serde(default, deserialize_with = "null_as_default")]
     pub extra_hosts: Vec<String>,
     /// Custom CA certificate (PEM) to trust — for self-signed / private brokers.
     #[serde(default)]
@@ -68,6 +70,17 @@ pub struct RabbitConnection {
 
 fn default_amqp_port() -> u16 {
     5672
+}
+
+/// Deserialize a value that may be `null` into `T::default()` (e.g. a `null` JSON
+/// array field → an empty `Vec`). Plain `#[serde(default)]` only handles a field
+/// that is *absent*, not one explicitly set to `null`.
+fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -912,6 +925,18 @@ mod tests {
         let uri = amqp_uri(&c);
         assert!(uri.contains("user%40host"));
         assert!(uri.contains("p%3As%2Fw"));
+    }
+
+    #[test]
+    fn config_deserializes_null_extra_hosts_as_empty() {
+        // The frontend sends `extraHosts: null` when empty; it must not error.
+        let json = r#"{
+            "id": "1", "name": "t", "host": "localhost", "port": 15672,
+            "vhost": "/", "username": "guest", "password": "guest", "useTls": false,
+            "amqpPort": 5672, "extraHosts": null
+        }"#;
+        let c: RabbitConnection = serde_json::from_str(json).unwrap();
+        assert!(c.extra_hosts.is_empty());
     }
 
     #[test]

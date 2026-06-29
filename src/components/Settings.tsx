@@ -2,7 +2,7 @@ import { useRef, useCallback, useState, useEffect } from 'react';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
 import {
-  RotateCcw, GripVertical, X, Search, CheckCheck, Ban,
+  RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, Loader2, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles,
 } from 'lucide-react';
@@ -115,7 +115,7 @@ const APP_PERMISSIONS = [
 ];
 
 export function Settings() {
-  const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools } = useFeatures();
+  const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools, isFavorite, toggleFavorite } = useFeatures();
   const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall, openUpdateDialog } = useUpdate();
   const { config, setField, resetConfig } = useAppConfig();
   const [configOpen, setConfigOpen] = useState(false);
@@ -330,6 +330,19 @@ export function Settings() {
                     <p className="text-xs font-medium leading-none">{tool.label}</p>
                     <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{tool.description}</p>
                   </div>
+                  {/* Favourite — pins the tool to the top of the sidebar */}
+                  <button
+                    type="button"
+                    aria-label={isFavorite(tool.id) ? `Unfavorite ${tool.label}` : `Favorite ${tool.label}`}
+                    title={isFavorite(tool.id) ? 'Remove from favorites' : 'Add to favorites'}
+                    onClick={() => toggleFavorite(tool.id)}
+                    className={cn(
+                      'shrink-0 rounded p-1 transition-colors',
+                      isFavorite(tool.id) ? 'text-amber-400 hover:text-amber-300' : 'text-muted-foreground/40 hover:text-amber-400'
+                    )}
+                  >
+                    <Star className={cn('h-3.5 w-3.5', isFavorite(tool.id) && 'fill-current')} />
+                  </button>
                   <Toggle checked={enabled} onChange={() => toggleFeature(tool.id)} />
                 </div>
               );
