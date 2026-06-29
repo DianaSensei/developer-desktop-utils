@@ -4,16 +4,17 @@
 
 ## Project Overview
 
-**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, Kafka explorer, etc.).
+**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, Kafka explorer, RabbitMQ client, API client, mock server, etc.).
 
 **Key Technologies:**
 - **Frontend**: React 18, TypeScript, Vite 8 (Rolldown bundler)
 - **Desktop**: Tauri 2 (Rust backend)
 - **UI**: Tailwind CSS, shadcn/ui components (`src/components/ui/`)
-- **State**: React Context API (`FeatureContext`, `UpdateContext`)
+- **Design System**: `src/design-system/` — single import surface (`@/design-system`), CSS tokens (`tokens.css`), Tailwind preset (`tailwind-preset.cjs`)
+- **State**: React Context API (`AppConfigContext`, `FeatureContext`, `UpdateContext`, `MeetingsProvider`)
 - **Routing**: React Router v6
 
-**Version**: 0.2.3  
+**Version**: 1.0.0  
 **Platform Support**: macOS 11+ · Windows 10/11 · Ubuntu 22.04+
 
 ---
@@ -23,7 +24,7 @@
 ```bash
 npm run dev              # Web only (fast)
 npm run tauri:dev        # Desktop app
-npm run build            # Build web assets
+npm run build            # Build web assets (tsc + vite build)
 npm run tauri:build      # Build desktop binary
 ```
 
@@ -38,36 +39,82 @@ npm run tauri:build      # Build desktop binary
 devtool/
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # shadcn/ui components (Button, Input, etc.)
-│   │   ├── tools/           # Tool components (one per utility)
-│   │   └── Settings.tsx     # Settings page (reads TOOL_DEFS; no FEATURE_LIST)
+│   │   ├── ui/              # shadcn/ui components (Button, Input, CopyButton, etc.)
+│   │   ├── tools/           # Tool components (one per utility; sub-dirs for complex tools)
+│   │   ├── AppLogo.tsx      # App icon/logo component
+│   │   ├── ErrorBoundary.tsx    # Catches render errors per-route; resets on pathname change
+│   │   ├── LoadingOverlay.tsx   # Full-screen spinner for async operations
+│   │   ├── StatusMessage.tsx    # Inline success/error/info banner
+│   │   ├── ToolGuideModal.tsx   # "How to use" modal opened by the header ? button
+│   │   ├── ToolHeaderActions.tsx # Portal: renders tool-specific buttons into the app header
+│   │   └── UpdateDialog.tsx     # Auto-update install prompt
+│   ├── config/
+│   │   └── appConfig.ts     # AppConfig type + DEFAULT_APP_CONFIG + CONFIG_FIELDS (Settings editor)
 │   ├── contexts/
-│   │   ├── FeatureContext.tsx  # Tool enable/disable + sidebar order
-│   │   └── UpdateContext.tsx   # Auto-update state, badge, toggle
+│   │   ├── AppConfigContext.tsx  # Tunable app-wide numbers (editor, generator, kafka, updates)
+│   │   ├── FeatureContext.tsx    # Tool enable/disable + sidebar order + favorites
+│   │   ├── UpdateContext.tsx     # Auto-update state, badge, toggle
+│   │   └── (MeetingsProvider in src/lib/meetings.tsx)
+│   ├── design-system/
+│   │   ├── index.ts         # Single re-export surface — import from '@/design-system'
+│   │   ├── tokens.css       # CSS custom properties (colors, radii, shadows, etc.)
+│   │   ├── tailwind-preset.cjs  # Tailwind theme preset
+│   │   └── README.md
 │   ├── hooks/
 │   │   ├── usePersistentState.ts  # useState + localStorage
 │   │   ├── useQuickPaste.ts       # ⌘V / Ctrl+V clipboard paste
-│   │   └── useInputHistory.ts     # ⌘Z / ⌘⇧Z undo/redo
+│   │   ├── useInputHistory.ts     # ⌘Z / ⌘⇧Z undo/redo
+│   │   ├── useImagePaste.ts       # ⌘V / paste event → PNG data URL
+│   │   ├── useCopyFeedback.ts     # Animated Copy→Check state (used inside CopyButton)
+│   │   ├── useDesktopChrome.ts    # Blocks browser nav shortcuts (Backspace, ⌘R, ⌘F, ⌘W…)
+│   │   ├── useDismissable.ts      # Click-outside / Escape dismissal for overlays
+│   │   └── useTauriFileDrop.ts    # OS-level file drag-drop (Tauri webview event)
 │   ├── lib/
-│   │   ├── toolDefs.ts      # TOOL_DEFS array — single source of truth for tool metadata
+│   │   ├── toolDefs.ts      # TOOL_DEFS array + DEFAULT_TOOL_ORDER — single source of truth
+│   │   ├── toolGuides.tsx   # Per-tool "how to use" guide content for ToolGuideModal
+│   │   ├── liveConnections.ts   # Global live-connection registry (rabbit/kafka live dot)
 │   │   ├── utils.ts         # cn() classname merger
-│   │   └── clipboard.ts     # copyToClipboard() — Tauri-aware write helper
-│   ├── workers/             # Web Workers for heavy computation (e.g. checksum)
+│   │   ├── clipboard.ts     # copyToClipboard(), copyImageToClipboard(), readImageFromClipboard()
+│   │   ├── faker.ts         # Faker.js helpers for the Generator tool
+│   │   ├── meetings.tsx     # MeetingsProvider + useMeetings() — time-tracker meeting notes
+│   │   ├── network.ts       # DNS / IP utilities for the Network tool
+│   │   ├── otpauth.ts       # TOTP/HOTP logic for the 2FA tool
+│   │   └── properties.ts    # .properties format parser/serializer for Data Converter
+│   ├── workers/             # Web Workers for heavy computation
+│   │   ├── checksum.worker.ts
+│   │   ├── deduplicate.worker.ts
+│   │   └── regex.worker.ts
 │   ├── styles/
-│   │   └── globals.css      # Tailwind + CSS theme variables
-│   ├── App.tsx              # Router, layout, TOOL_ROUTES, sidebar, UpdateProvider
+│   │   └── globals.css      # Tailwind directives + CSS theme variables + custom scrollbar
+│   ├── App.tsx              # Router, layout, TOOL_ROUTES, sidebar, provider hierarchy
 │   └── main.tsx             # React entry point
 ├── src-tauri/               # Tauri 2 (Rust) backend
-│   ├── src/main.rs          # Rust main — registers all plugins
+│   ├── src/main.rs          # Rust main — registers all plugins + Edit menu (undo/redo/copy/paste)
 │   ├── Cargo.toml           # Rust dependencies
 │   ├── capabilities/
 │   │   └── default.json     # Permission grants (Tauri 2 capability system)
-│   └── tauri.conf.json      # Tauri 2 configuration
+│   └── tauri.conf.json      # Tauri 2 configuration (version: 1.0.0)
 ├── docs/
 │   ├── ai/                  # AI agent guides (this file)
-│   └── human/               # Human contributor guides
+│   ├── human/               # Human contributor guides
+│   └── design/DESIGN-SYSTEM.md
+├── testing/rabbitmq/        # RabbitMQ integration test harness (Python + Docker)
 ├── public/                  # Static assets
 └── package.json
+```
+
+---
+
+## Provider Hierarchy (App.tsx)
+
+```
+AppConfigProvider          ← tunable numbers (src/config/appConfig.ts)
+  FeatureProvider          ← tool enable/disable, sidebar order, favorites
+    UpdateProvider         ← auto-update polling and state
+      MeetingsProvider     ← time-tracker meeting notes
+        Router
+          AppContent       ← sidebar + header + routes
+          UpdateDialog     ← install-update prompt
 ```
 
 ---
@@ -81,24 +128,45 @@ devtool/
 - **Always** use components from `src/components/ui/` (shadcn/ui) for every interactive element: buttons, inputs, selects, dialogs, toggles, checkboxes, dropdowns.
 - **Never** use browser- or OS-native elements (`<select>`, `window.alert`, `window.confirm`, native context menus, etc.). They break visual consistency across macOS / Windows / Linux.
 - If a needed component doesn't exist in `src/components/ui/`, create a new shadcn/ui-style component using Radix UI primitives and Tailwind.
+- You can import all shared components directly from `@/design-system` as a convenience (see `src/design-system/index.ts`).
 
 ### Tool Layout — use the standard container pattern
 
-Use the standardized tool layout components for consistency across all tools:
+Two layout patterns exist. Pick the right one for the tool:
 
+**Pattern A — `ToolToolbar` + `ToolPanes`** (preferred for input/output tools):
 ```tsx
-import { ToolSection, ToolLabel, ToolHint, ToolContent } from '@/components/ui/tool-section';
+import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
+import { CopyButton } from '@/components/ui/copy-button';
+
+<div className="flex flex-col h-full">
+  <ToolToolbar>
+    {/* mode toggles, format selectors, action buttons */}
+  </ToolToolbar>
+  <ToolPanes rows={2}>          {/* rows={2} or rows={3} */}
+    <ToolPane>
+      <PaneHeader label="Input" hint={quickPasteHint} />
+      <Textarea className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" … />
+    </ToolPane>
+    <ToolPane>
+      <PaneHeader label="Output" action={<CopyButton value={output} />} />
+      <Textarea readOnly className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" … />
+    </ToolPane>
+  </ToolPanes>
+</div>
+```
+
+**Pattern B — `ToolSection` / `ToolLabel` / `ToolHint`** (for form-style tools):
+```tsx
+import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 
 <div className="tool-full-height">
   <div className="tool-scrollable tool-padding tool-spacer">
-    {/* Section 1 */}
     <ToolSection>
       <ToolLabel>Label</ToolLabel>
       <ToolHint>Helper text</ToolHint>
       <Input />
     </ToolSection>
-
-    {/* Section 2 */}
     <ToolSection>
       <ToolLabel>Output</ToolLabel>
       <Textarea readOnly />
@@ -145,7 +213,7 @@ import { ToolSection, ToolLabel, ToolHint, ToolContent } from '@/components/ui/t
 
 ## Adding a New Tool (Step-by-Step)
 
-Tool metadata, routing, and feature toggles are kept separate. All three need updating.
+Tool metadata, routing, and feature toggles are kept separate. All four need updating.
 
 ### Step 1: Create the tool component
 
@@ -153,10 +221,10 @@ Create `src/components/tools/YourTool.tsx`. Use the **modern tool pattern**: rea
 
 ```tsx
 import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { YourIcon } from 'lucide-react';
+import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
+import { Textarea } from '@/components/ui/textarea';
+import { CopyButton } from '@/components/ui/copy-button';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
@@ -169,38 +237,32 @@ export function YourTool() {
   useInputHistory(input, setInput);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <YourIcon className="h-5 w-5" />
-          Tool Name
-        </CardTitle>
-        <CardDescription>Brief description</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Input</Label>
+    <div className="flex flex-col h-full">
+      <ToolToolbar>
+        {/* mode selectors, options */}
+      </ToolToolbar>
+      <ToolPanes>
+        <ToolPane>
+          <PaneHeader label="Input" hint={quickPasteHint} />
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={`Enter something — ${quickPasteHint}`}
+            className="flex-1 min-h-0 resize-none font-mono rounded-none border-0"
           />
-        </div>
-        {output && (
-          <div className="space-y-2">
-            <Label>Output</Label>
-            <Textarea value={output} readOnly />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        </ToolPane>
+        <ToolPane>
+          <PaneHeader label="Output" action={<CopyButton value={output} iconClassName="h-3.5 w-3.5" />} />
+          <Textarea value={output} readOnly className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" />
+        </ToolPane>
+      </ToolPanes>
+    </div>
   );
 }
 ```
 
 ### Step 2: Add to TOOL_DEFS — `src/lib/toolDefs.ts`
 
-`TOOL_DEFS` is the single source of truth for tool metadata (id, label, icon, description). Settings and the sidebar read from it automatically.
+`TOOL_DEFS` is the single source of truth for tool metadata (id, label, icon, description, keywords). Settings and the sidebar read from it automatically.
 
 ```ts
 import { YourIcon } from 'lucide-react';
@@ -212,24 +274,27 @@ export const TOOL_DEFS: ToolDef[] = [
     label: 'Your Tool',
     icon: YourIcon,
     description: 'One-line description shown in sidebar tooltip and Settings.',
+    keywords: ['synonym1', 'synonym2'],   // optional; improves sidebar search
   },
 ];
 ```
 
+Also add the tool id to `DEFAULT_TOOL_ORDER` (same file) in the desired position for fresh installs.
+
 ### Step 3: Register route in App.tsx
 
 ```tsx
-// 1. Import component at top of App.tsx
-import { YourTool } from '@/components/tools/YourTool';
+// 1. Lazy-import at top of App.tsx (code-split)
+const YourTool = lazy(() => named(import('@/components/tools/YourTool'), 'YourTool'));
 
-// 2. Add entry to TOOL_ROUTES (maps id → path + component)
-const TOOL_ROUTES = {
+// 2. Add entry to TOOL_ROUTES
+const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
   // ... existing routes
-  'your-tool': { path: '/your-tool', component: YourTool },
+  'your-tool': { path: '/your-tool', component: YourTool, fullHeight: true },
 };
 ```
 
-Use `fullHeight: true` in the route entry if your tool needs to stretch to full viewport height (e.g. KafkaExplorer).
+All tools should use `fullHeight: true` — it removes the scrolling wrapper so the tool controls its own overflow.
 
 ### Step 4: Enable by default — `src/contexts/FeatureContext.tsx`
 
@@ -239,6 +304,10 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'your-tool': true,
 };
 ```
+
+### Step 5 (optional): Add a tool guide — `src/lib/toolGuides.tsx`
+
+Tools listed in `toolGuides.tsx` get a hand-written help section shown by the `?` button in the app header. Any tool not listed falls back to a generic guide built from its description. Add a named export matching the tool id (camelCase the id).
 
 **That's it.** No changes needed in `Settings.tsx` — it reads `TOOL_DEFS` automatically.
 
@@ -266,10 +335,7 @@ useQuickPaste(setInput);
 
 ### `useImagePaste(onImage, enabled?)` — `src/hooks/useImagePaste.ts`
 
-Image counterpart to `useQuickPaste`: ⌘V / Ctrl+V (and the native `paste`
-event) captures an image from the clipboard and calls `onImage(dataUrl)` with a
-PNG data URL. Tauri-aware (clipboard plugin in the desktop app, async Clipboard
-API on the web). Use for tools that take image input (e.g. `ImageBase64Tool`).
+Image counterpart to `useQuickPaste`: ⌘V / Ctrl+V (and the native `paste` event) captures an image from the clipboard and calls `onImage(dataUrl)` with a PNG data URL. Tauri-aware (clipboard plugin in the desktop app, async Clipboard API on the web). Use for tools that take image input (e.g. `ImageBase64Tool`).
 
 ```tsx
 useImagePaste(loadFromDataUrl, mode === 'encode');
@@ -277,13 +343,49 @@ useImagePaste(loadFromDataUrl, mode === 'encode');
 
 ### `useInputHistory(value, applyValue, enabled?)` — `src/hooks/useInputHistory.ts`
 
-Adds undo (⌘Z) / redo (⌘⇧Z / Ctrl+Y) to a tool's primary input. Debounces user edits ~400ms into history entries.
+Adds undo (⌘Z) / redo (⌘⇧Z / Ctrl+Y) to a tool's primary input. Debounces user edits ~400ms into history entries (configurable via `AppConfig.editor.historyDebounceMs`).
 
 ```tsx
 useInputHistory(input, setInput);
 ```
 
+### `useTauriFileDrop(onDropPaths, enabled?)` — `src/hooks/useTauriFileDrop.ts`
+
+OS-level file drag-and-drop (Finder / Explorer → app). Tauri intercepts native file drops before the webview, so HTML5 `ondrop` never receives them. This hook listens for the Tauri window event, hit-tests against the element referenced by `dropRef`, and calls `onDropPaths(paths[])`. Returns `{ dropRef, dragging, isTauri }`.
+
+```tsx
+const { dropRef, dragging } = useTauriFileDrop((paths) => loadFile(paths[0]));
+<div ref={dropRef} className={dragging ? 'ring-2 ring-primary' : ''}>…</div>
+```
+
+### `useDismissable(onDismiss)` — `src/hooks/useDismissable.ts`
+
+Registers click-outside + Escape key handlers to dismiss an overlay/popover. Returns a `ref` to attach to the container.
+
 > Convention: **real-time output** (`useMemo`), **persisted input** (`usePersistentState`), **quick paste** (`useQuickPaste`), **undo/redo** (`useInputHistory`). Tools with no transformable input (UUID/QR generator) may keep an action button.
+
+---
+
+## ToolHeaderActions — injecting buttons into the app header
+
+Tools that need their own header controls (e.g. import/export, connection status) use the `ToolHeaderActions` portal to render into the shared app header without lifting state:
+
+```tsx
+import { ToolHeaderActions } from '@/components/ToolHeaderActions';
+
+export function YourTool() {
+  return (
+    <>
+      <ToolHeaderActions>
+        <Button size="sm" onClick={handleExport}>Export</Button>
+      </ToolHeaderActions>
+      {/* … tool body … */}
+    </>
+  );
+}
+```
+
+The slot is `#tool-header-actions` in `App.tsx`. Portals are cleaned up automatically on unmount.
 
 ---
 
@@ -346,13 +448,14 @@ CodeMirror components in this repo that implement this pattern: `CodeEditor.tsx`
 - **Do not use `window.alert`, `window.confirm`, `window.prompt`** — these spawn native OS dialogs that look wrong on every platform. Use shadcn/ui `Dialog` or `AlertDialog`.
 - **Do not use native `<select>`** — rendering differs dramatically between macOS, Windows, and Linux. Always use shadcn/ui `Select` (Radix UI `SelectPrimitive`).
 - **Tauri detection**: `'__TAURI_INTERNALS__' in window` (not `window.__TAURI__` or any other symbol).
+- **Blocked keyboard shortcuts** (handled globally by `useDesktopChrome`): ⌘R/Ctrl+R (reload), ⌘F/Ctrl+F (find), ⌘W/Ctrl+W (close window), ⌘P/Ctrl+P (print), Backspace nav, ⌘[/] history. Do not re-implement these; `useDesktopChrome` is called once at the app root.
 
 ### React Hooks
-- **Never call hooks inside IIFEs, callbacks, or conditionals** inside a component's render. This violates the Rules of Hooks and causes unpredictable behavior (bugs that appear/disappear depending on render order). If you need hooks in a logically-grouped sub-section of JSX, extract that section into its own named component.
+- **Never call hooks inside IIFEs, callbacks, or conditionals** inside a component's render. This violates the Rules of Hooks and causes unpredictable behavior. If you need hooks in a logically-grouped sub-section of JSX, extract that section into its own named component.
   ```tsx
   // ❌ Wrong — hooks inside IIFE in JSX
   {(() => {
-    const ref = useRef(null);   // ESLint rule violation
+    const ref = useRef(null);
     useEffect(() => { ... });
     return <div ref={ref} />;
   })()}
@@ -363,9 +466,8 @@ CodeMirror components in this repo that implement this pattern: `CodeEditor.tsx`
     useEffect(() => { ... });
     return <div ref={ref} />;
   }
-  // then use <MySection /> in the parent's JSX
   ```
-- **`useLayoutEffect` must always have a dependency array.** Without one it runs after *every* render — the most expensive possible schedule. Only omit the array if you have a measured, documented reason. Reading `offsetWidth` / `getBoundingClientRect()` in an unconstrained `useLayoutEffect` causes layout thrashing.
+- **`useLayoutEffect` must always have a dependency array.** Without one it runs after *every* render. Only omit the array if you have a measured, documented reason.
 - **Stable refs for long-lived event listeners.** When a `useEffect` adds a `window` event listener and its handler reads React state, keep the handler registered once (empty `[]` deps) by storing the latest state in a `useRef` and reading from the ref inside the handler:
   ```ts
   const valueRef = useRef(value);
@@ -374,7 +476,7 @@ CodeMirror components in this repo that implement this pattern: `CodeEditor.tsx`
     const handler = () => { /* read valueRef.current, not value */ };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []); // stable — no re-registration on every state change
+  }, []);
   ```
 - **Always clean up timers on unmount.** Any `setTimeout` or `setInterval` stored in a `useRef` must be cleared in a `useEffect` cleanup:
   ```ts
@@ -422,44 +524,42 @@ await copyToClipboard(text);
 ```
 
 ### Image clipboard (Tauri-aware)
-The WebView clipboard only handles plain text reliably across platforms, so
-images route through the Tauri clipboard plugin in the desktop app and fall back
-to the async Clipboard API (`ClipboardItem`) on the web. Both helpers live in
-`src/lib/clipboard.ts`:
 ```tsx
 import { copyImageToClipboard, readImageFromClipboard } from '@/lib/clipboard';
 await copyImageToClipboard(blobOrDataUrl);            // copy an image out
 const dataUrl = await readImageFromClipboard();       // null when no image
 ```
-For "copy image" buttons, reuse `CopyButton` with its `copyAction` prop so the
-animated Copy→Check affordance is identical to text copies:
+For "copy image" buttons, reuse `CopyButton` with its `copyAction` prop so the animated Copy→Check affordance is identical to text copies:
 ```tsx
 <CopyButton copyAction={async () => { try { await copyImageToClipboard(src); return true; } catch { return false; } }} label="Copy image" />
 ```
-Requires the `clipboard-manager:allow-read-image` / `allow-write-image`
-capabilities (already granted in `capabilities/default.json`).
+Requires the `clipboard-manager:allow-read-image` / `allow-write-image` capabilities (already granted in `capabilities/default.json`).
 
 ### Copy button — always use the shared `CopyButton`
-For any user-facing "copy" control, use `CopyButton` instead of wiring a raw
-`Button` to `copyToClipboard`. It gives every copy the same affordance: an
-animated Copy→Check cross-fade held for the user-configurable
-`editor.copyFeedbackMs` duration, with its own timer cleanup. Do **not**
-re-implement a local `copied` state / `setTimeout` swap.
+For any user-facing "copy" control, use `CopyButton` instead of wiring a raw `Button` to `copyToClipboard`. It gives every copy the same affordance: an animated Copy→Check cross-fade held for the user-configurable `editor.copyFeedbackMs` duration (default 1500 ms), with its own timer cleanup. Do **not** re-implement a local `copied` state / `setTimeout` swap.
 
 ```tsx
 import { CopyButton } from '@/components/ui/copy-button';
 
-// Icon-only (size defaults to "icon" when there is no label)
+// Icon-only
 <CopyButton value={output} iconClassName="h-3.5 w-3.5" />
 
 // With a label and a lazily-computed value (resolved at click time)
 <CopyButton value={() => buildExport()} label="Copy" variant="outline" size="sm" />
 
-// Custom idle glyph (Check still shows on success)
+// Custom idle glyph
 <CopyButton value={all} icon={Layers} label="Copy all" />
 ```
-Props mirror `Button` (`variant`, `size`, `className`, `disabled`). `value`
-may be a string or a sync/async getter; empty/nullish values are ignored.
+
+### AppConfig — reading tunable numbers
+```tsx
+import { useAppConfig } from '@/contexts/AppConfigContext';
+
+const { config } = useAppConfig();
+const ms = config.editor.historyDebounceMs;   // default 400
+const feedbackMs = config.editor.copyFeedbackMs;  // default 1500
+```
+All tunable values are defined in `src/config/appConfig.ts`. Users edit them in Settings → Configuration. Never hard-code a value that belongs in `AppConfig`.
 
 ### Persist a setting
 ```tsx
@@ -484,12 +584,30 @@ See `src/workers/checksum.worker.ts` for a reference implementation.
 
 ## State Management
 
-### FeatureContext — `src/contexts/FeatureContext.tsx`
-Manages tool enable/disable and sidebar drag order. Persisted in `localStorage` (`devtool-features`, `devtool-tool-order`).
+### AppConfigContext — `src/contexts/AppConfigContext.tsx`
+Centralized tunable numbers stored in `localStorage` (`devtool-app-config`). Sections: `updates`, `editor`, `generator`, `kafka`. Every value has min/max/step metadata in `CONFIG_FIELDS` and appears automatically in Settings → Configuration.
 
 ```tsx
-const { features, toggleFeature, isFeatureEnabled, resetToDefaults, toolOrder, reorderTools } = useFeatures();
+const { config, setField, resetConfig } = useAppConfig();
 ```
+
+### FeatureContext — `src/contexts/FeatureContext.tsx`
+Manages tool enable/disable, sidebar drag order, and **favorites** (starred tools that float to the top of the sidebar). All persisted in `localStorage`.
+
+```tsx
+const { features, toggleFeature, isFeatureEnabled, resetToDefaults,
+        toolOrder, reorderTools,
+        favorites, toggleFavorite, isFavorite } = useFeatures();
+```
+
+Storage keys:
+- `devtool-features` — `{ [featureId]: boolean }` enabled/disabled map
+- `devtool-tool-order` — `string[]` sidebar drag order
+- `devtool-favorites` — `string[]` favorited tool ids (most-recently-starred first)
+
+Default enabled/disabled state is in `DEFAULT_FEATURES`. Tools not listed default to `enabled`.
+
+**Favorites in the sidebar:** starred tools float to the top of the nav list sorted by most-recently-starred. When favorites exist and the sidebar is expanded, "Favorites" / "All tools" section headers appear. Each nav item shows a star toggle on hover (filled amber = favorited). The star is also accessible in Settings → tool list. No changes needed to add favorites to new tools — the behavior is automatic.
 
 ### UpdateContext — `src/contexts/UpdateContext.tsx`
 Auto-update polling, badge state, and install flow. Persisted in `localStorage` (`devtool-auto-update`, `devtool-last-update-check`).
@@ -506,6 +624,27 @@ const { status, updateInfo, updateAvailable, autoCheckEnabled, toggleAutoCheck, 
 
 ---
 
+## Sidebar Live Connection Indicator
+
+`src/lib/liveConnections.ts` maintains a module-scope `Set<string>` of currently-connected tool `featureId`s (e.g. `'rabbit-client'`, `'kafka-explorer'`). It is seeded on startup from each tool's persisted connected-id key in `localStorage`, so the dot is correct before the tool component mounts.
+
+```tsx
+import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
+
+// In a tool component — report live state:
+useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected]);
+
+// In the sidebar — read reactive list:
+const liveIds = useLiveConnections();
+const isLive = liveIds.includes(tool.featureId);
+```
+
+When `isLive` is true, `App.tsx` renders a small emerald dot absolutely positioned on the tool's icon (`-top-1 -right-1`), visible both in collapsed and expanded sidebar mode.
+
+Currently registered feature IDs: `'rabbit-client'` (seeded from `devtool:rabbit:connectedConnId`), `'kafka-explorer'` (seeded from `devtool:kafka:connectedBrokerId`).
+
+---
+
 ## Tauri 2 Notes
 
 - **Permissions**: `src-tauri/capabilities/default.json` — Tauri 2 capability system, not the old v1 `allowlist`
@@ -513,6 +652,7 @@ const { status, updateInfo, updateAvailable, autoCheckEnabled, toggleAutoCheck, 
 - **Tauri detection**: `'__TAURI_INTERNALS__' in window` (not `__TAURI_IPC__`)
 - **Config keys**: `build.devUrl` (not `devPath`), `build.frontendDist` (not `distDir`), `plugins.updater` (not `tauri.updater`)
 - **Adding a capability**: add permission string to `capabilities/default.json` AND document it in the `APP_PERMISSIONS` array in `Settings.tsx`
+- **macOS Edit menu**: `src-tauri/src/main.rs` registers a native Edit menu (`Undo`, `Redo`, `Cut`, `Copy`, `Paste`, `Select All`) via `tauri::menu::PredefinedMenuItem`. This is required on macOS to route Cmd+Z/X/C/V/A into the WebView; Windows/Linux work without it.
 
 Common capability strings:
 ```json
@@ -557,7 +697,7 @@ Builds on: `macos-latest` (Apple Silicon), `windows-latest`, `ubuntu-22.04`.
 ### Trigger a release
 ```bash
 # Update "version" in src-tauri/tauri.conf.json, then:
-git tag v0.2.0
+git tag v1.x.x
 git push origin main --tags
 ```
 
@@ -572,11 +712,13 @@ git push origin main --tags
 │  │         WebView Container          │  │
 │  │  ┌──────────────────────────────┐  │  │
 │  │  │      React Application       │  │  │
-│  │  │  FeatureProvider             │  │  │
-│  │  │  └─ UpdateProvider           │  │  │
-│  │  │     └─ Router                │  │  │
-│  │  │        ├─ Sidebar (nav)      │  │  │
-│  │  │        └─ Tool Components    │  │  │
+│  │  │  AppConfigProvider           │  │  │
+│  │  │  └─ FeatureProvider          │  │  │
+│  │  │     └─ UpdateProvider        │  │  │
+│  │  │        └─ MeetingsProvider   │  │  │
+│  │  │           └─ Router          │  │  │
+│  │  │              ├─ Sidebar      │  │  │
+│  │  │              └─ Tool Components│  │  │
 │  │  └──────────────────────────────┘  │  │
 │  └────────────────────────────────────┘  │
 │  System APIs: Clipboard · FS · Dialogs   │
@@ -591,9 +733,139 @@ git push origin main --tags
 
 ---
 
+## Tool Inventory
+
+| Tool ID | Label | Default On | Notes |
+|---|---|---|---|
+| `task-tracker` | Time Tracker | ✅ | Timesheet, calendar, pomodoro, meeting notes |
+| `api-client` | API Client | ✅ | Collections, environments, pre/post scripts, Postman import/export |
+| `mock-server` | Mock Server | ✅ | Local HTTP mock: Rhai scripts, live request log |
+| `cron-generator` | Cron Generator | ✅ | Visual editor, Quartz/Spring support |
+| `text-transform` | Text Transformer | ✅ | Case, join/split, arrays, Vietnamese phone numbers |
+| `text-counter` | Text Counter | ✅ | Chars, words, lines, reading time |
+| `base64` | Encode·Hash·Encrypt | ✅ | Base64, URL, Hex, Morse, MD5, SHA, HMAC, bcrypt, Argon2, AES-256 |
+| `unix-time` | Date / Time | ✅ | Timestamp conversion, timezone, ISO 8601 |
+| `json` | JSON Formatter | ✅ | Format, validate, minify, tree view |
+| `data-converter` | Data Converter | ✅ | JSON ↔ YAML ↔ TOML ↔ XML ↔ .properties |
+| `generator` | Generator | ✅ | UUID, random, fake datasets (JSON/CSV/SQL) |
+| `qrcode` | QR Code | ✅ | Generate + decode |
+| `2fa` | 2FA Authenticator | ✅ | TOTP/HOTP, SHA-1/256/512, 6/8 digits |
+| `color-picker` | Color Picker | ❌ | HEX/RGB/HSL/CMYK, image eyedropper |
+| `jwt` | JWT Debugger | ❌ | Decode headers + payloads |
+| `regex` | Regex Tester | ❌ | Live match highlighting, Web Worker |
+| `diff` | Diff | ❌ | Word-level text diff, structural JSON diff |
+| `markdown` | Markdown | ❌ | Live preview, GFM |
+| `deduplicate` | Deduplicate | ❌ | Remove duplicate lines, Web Worker |
+| `kafka-explorer` | Kafka Explorer | ❌ | Topics, partitions, consumer groups, live produce/consume |
+| `rabbit-client` | RabbitMQ | ❌ | Management REST + AMQP via Rust (lapin), live consume/RPC |
+| `sql-formatter` | SQL Formatter | ❌ | SQL + MongoDB aggregation formatting |
+| `network` | Network Tools | ❌ | DNS, propagation, DNSSEC, IP, listening ports |
+| `lucky-wheel` | Lucky Wheel | ❌ | Random winner spinner |
+
+---
+
+## Complex Tool Reference
+
+### Kafka Explorer (`src/components/tools/kafka/`)
+
+**Connect/Disconnect flow:** a broker must be explicitly connected (`handleConnect` in `KafkaExplorer.tsx`) before any views are accessible. `connectedBrokerId` is persisted in `localStorage` (`devtool:kafka:connectedBrokerId`). Connecting a new broker stops the previous broker's consumers (`kafkaConsumerStore.stopForBroker`). The right panel shows a `DisconnectedPanel` until connected.
+
+**Live consumers:** `kafkaConsumerStore.ts` (module-scope `Map`) manages streaming consumers via `kafka_consume_start` / `kafka_consume_stop` Rust commands. Tauri `Channel` pushes messages to the frontend. Store is outside the component tree so consumers survive view switches; `stopAll()` is called on tool unmount.
+
+**Input history:** `kafkaInputHistoryStore.ts` — per-broker history (localStorage, fields `'topic'|'key'`, cap 25, most-recent-first). `kafkaInputHistory.add/remove/get`, `useKafkaRecentMatches(brokerId, field, query)`. `RecentSuggestions.tsx` renders a "Recent" dropdown group with clock icon + hover × to remove.
+
+**Produce draft:** `produceDraft.ts` — in-memory module-scope object (`topic`, `key`, `value`, `headers`, `batch`, `partitionMode`, `partition`, `valueFormat`). Survives tool and tab switches; reset only on app restart (not written to disk). `ProduceTab.tsx` seeds from it and writes back on every render via `useEffect(() => { Object.assign(produceDraft, {...}); })` (no deps).
+
+**Format for produce value / consume body:** `ProduceTab.tsx` uses `CodeEditor` (CodeMirror, editable, JSON/plain Segmented toggle + Format button). `ConsumeView.tsx` uses `ResponseViewer` (read-only, JSON/plain) for message body; hex stays `<pre>`.
+
+**Live indicator:** `useEffect(() => { liveConnections.set('kafka-explorer', isConnected); }, [isConnected])` in `KafkaExplorer.tsx`.
+
+Key files:
+- `KafkaExplorer.tsx` — root component, connect/disconnect, resize, routing
+- `LeftPanel.tsx` — broker selector + status dot + Connect/Disconnect button
+- `useKafkaState.ts` — navigation state + persisted `connectedBrokerId`
+- `kafkaConsumerStore.ts` — module-scope consumer registry + `stopForBroker(id)`
+- `kafkaInputHistoryStore.ts` — per-broker topic/key history
+- `produceDraft.ts` — in-memory produce form state
+- `types.ts` — `kafkaApi` (thin wrappers over Tauri `invoke`)
+
+---
+
+### RabbitMQ Client (`src/components/tools/rabbit/`)
+
+**Connect/Disconnect flow:** a connection must be explicitly connected (`handleConnect` in `RabbitClient.tsx`) — runs AMQP test + management test (if not AMQP-only), then sets `connectedConnId` in `localStorage` (`devtool:rabbit:connectedConnId`). Connecting elsewhere stops the previous connection's consumers (`consumerStore.stopForConn`). The right panel shows `DisconnectedPanel` until connected.
+
+**Connection profiles:** stored in `rabbit-connections.json` in the app data directory (Rust `fs::write`). Fields: `id`, `name`, `host`, `port` (management), `amqpPort`, `vhost`, `username`, `password`, `useTls`, `caPem`, `clientIdentityPkcs12` (base64), `clientIdentityPassword`, `heartbeat`, `connectionName`, `amqpOnly`, `extraHosts` (for HA failover). All fields with `#[serde(default)]` for backward compatibility. `null_as_default` custom deserializer handles legacy `null` values for `Vec<String>` fields.
+
+**Multiple hosts (HA failover):** `extraHosts: string[]` — additional `"host"` or `"host:port"` entries. `connect_amqp` iterates all endpoints (primary + extras) with a 15 s per-endpoint timeout, returning on first success. `ConnectionForm.tsx` exposes an **Addresses** field (comma-separated `host:port`).
+
+**AMQP-only mode:** when `amqpOnly: true`, the management API is not called. Queue/exchange topology is tracked by name per connection in `knownNamesStore.ts` (`localStorage`). `useKnownNames(connId, kind)` provides the typed-name list. Management-dependent views (Overview, Connections) resolve to Queues in this mode.
+
+**Queue list pagination:** `QueueListView.tsx` fetches pages of 200 via management API (`page`, `page_size`, `pagination=true`, `disable_stats=true`, `enable_queue_totals=true`). Server-side name filter with 300 ms debounce. `useRabbitData.ts` is **load-once** — serves cache and does not background-revalidate; `refresh()` is explicit.
+
+**Input history:** `inputHistoryStore.ts` — per-connection history (localStorage, fields `'exchange'|'routingKey'|'queue'`, cap 25). `inputHistory.add/remove/get`, `useRecentMatches(connId, field, query)`. `RecentSuggestions.tsx` renders a "Recent" group combobox dropdown.
+
+**RPC view:** `RpcView.tsx` — module-scope `rpcDraft` (in-memory) seeds and mirrors all fields. Payload uses `CodeEditor` (JSON/plain Segmented + Format button). Reply uses `ResponseViewer` (JSON/plain, auto-detect from contentType). Exchange/routing-key/queue comboboxes use `useRecentMatches` + `RecentSuggestions`.
+
+**Live consumers:** `consumerStore.ts` (module-scope `Map`) manages `rabbit_consume_start` / `rabbit_consume_stop` Rust AMQP consumers. `stopForConn(connId)` stops all consumers for a connection; `stopAll()` on unmount.
+
+**Rust backend (`src-tauri/src/rabbit.rs`):**
+- `rabbit_amqp_test` — connect test (iterates all endpoints)
+- `rabbit_publish` — full AMQP publish with properties + mandatory + publisher confirms → `PublishOutcome`
+- `rabbit_consume_start` / `rabbit_consume_stop` — live consumer via `ConsumerRegistry` (Mutex<HashMap<String, Arc<Notify>>>); prefetch-bounded; peek (non-destructive) or consume (ack)
+- `rabbit_rpc_call` — one-shot request/response via `amq.rabbitmq.reply-to`
+- `rabbit_amqp_queues_info` / `rabbit_amqp_exchanges_info` — passive declare for AMQP-only mode
+- `rabbit_amqp_declare_queue` / `rabbit_amqp_declare_exchange` / `rabbit_amqp_bind_queue` — topology management over AMQP
+
+**Live indicator:** `useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected])` in `RabbitClient.tsx`.
+
+Key files:
+- `RabbitClient.tsx` — root component, connect/disconnect, resize, routing
+- `LeftPanel.tsx` — connection selector + status dot + Connect/Disconnect button
+- `useRabbitState.ts` — navigation state + persisted `connectedConnId`
+- `ConnectionForm.tsx` — AMQP-first form: Addresses (comma-separated multi-host), optional management API toggle, Advanced (vhost), Paste URI collapsible
+- `api.ts` — `rabbitMgmt` HTTP client + `QUEUE_LIST_QUERY` / `EXCHANGE_LIST_QUERY` constants
+- `types.ts` — `RabbitConnection`, `rabbitApi` Tauri invoke wrappers
+- `consumerStore.ts` — module-scope consumer registry + `stopForConn(id)`
+- `inputHistoryStore.ts` — per-connection exchange/routingKey/queue history
+- `knownNamesStore.ts` — AMQP-only typed queue/exchange names per connection
+- `useRabbitData.ts` — load-once SWR-style data cache
+
+---
+
+## Shared Components for Complex Tools
+
+### `ViewHeader` — `src/components/ui/view-header.tsx`
+Reusable detail/list header: icon chip + title + muted subtitle + action buttons + optional back chevron. Used by `QueueView`, `ExchangeView`, `GroupView`, `TopicListView`, etc.
+
+```tsx
+import { ViewHeader } from '@/components/ui/view-header';
+
+<ViewHeader
+  icon={<Layers className="h-4 w-4" />}
+  title={queueName}
+  subtitle={`${readyCount} ready`}
+  actions={<Button size="sm">Publish</Button>}
+  onBack={handleBack}
+/>
+```
+
+### `CodeEditor` — `src/components/tools/apiclient/CodeEditor.tsx`
+Editable CodeMirror 6 editor. Props: `value`, `onChange`, `language` (`'json'|'text'|…`), `placeholder`. Used for request payloads (RPC, Produce). Implements the flex layout pattern described in Cross-Platform Rules.
+
+### `ResponseViewer` — `src/components/tools/apiclient/ResponseViewer.tsx`
+Read-only CodeMirror 6 viewer with JSON/text syntax highlight. Props: `value`, `language`. Used for RPC reply and Kafka/RabbitMQ consume message body.
+
+---
+
 ## Dependencies Quick Reference
 
-### Most Used UI Components
+### Design System import (preferred)
+```tsx
+import { Button, Card, Textarea, Select, CopyButton, ToolSection, ToolToolbar, ToolPanes, ToolPane, PaneHeader, cn } from '@/design-system';
+```
+
+### Most Used UI Components (direct path)
 ```tsx
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -601,17 +873,25 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { CopyButton } from '@/components/ui/copy-button';
+import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
+import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
+import { ViewHeader } from '@/components/ui/view-header';
 ```
 
 ### Most Used Utilities
 ```tsx
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { useUpdate } from '@/contexts/UpdateContext';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
+import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
+import { ToolHeaderActions } from '@/components/ToolHeaderActions';
+import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 ```
 
 ### Key npm Packages
@@ -621,16 +901,27 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 - `@tauri-apps/plugin-process` — `relaunch()`
 - `@tauri-apps/plugin-updater` — `check()` → `update.downloadAndInstall()`
 - `@tauri-apps/plugin-http` — Rust-side `fetch` for Network Tools (bypasses WebView CORS/Origin)
+- `@tauri-apps/plugin-opener` — open URLs in the default browser
 - `crypto-js` — hashing & AES encryption
-- `rskafka` (Rust, v0.6) — Kafka client (pulled via `rustls 0.23`)
-- **RabbitMQ Client** (`src/components/tools/rabbit/`): browse/create queues & exchanges via the Management REST API (`:15672`) from the frontend (`@tauri-apps/plugin-http` `fetch`, Basic auth, `api.ts`/`rabbitMgmt`). **Publish, Consume and Request/Response** use real AMQP via `lapin` in `src-tauri/src/rabbit.rs`: `rabbit_publish` (full `BasicProperties` + mandatory + publisher confirms → `PublishOutcome`), `rabbit_consume_start`/`rabbit_consume_stop` (live consumer streaming `ConsumedMessage` over a `tauri::ipc::Channel`, bounded `basic_qos` prefetch, `ack_mode` peek=leave-unacked / consume=ack / respond=ack+reply-to-`reply_to`, tracked in a `ConsumerRegistry` managed state; starting a consumer is gated by a confirmation in the Consumers panel), and `rabbit_rpc_call` (direct reply-to). All share `connect_amqp` (URI build + heartbeat + connection name + TLS via `OwnedTLSConfig`: custom CA PEM `cert_chain`, PKCS#12 client identity for mTLS). Connection profiles (incl. password, AMQP port, CA/PKCS#12, `amqpOnly`) persist to `rabbit-connections.json` (`rabbit_list_configs`/`save`/`delete`). **AMQP-only mode** (`amqpOnly` on the connection, for brokers with no management API): the tool drops all REST calls and works off typed names tracked per-connection in `localStorage` (`knownNamesStore.ts`, `useKnownNames`); topology over AMQP via `rabbit_amqp_test`, `rabbit_amqp_queues_info`/`rabbit_amqp_exchanges_info` (passive declare → existence + counts), `rabbit_amqp_declare_queue`/`declare_exchange`/`bind_queue`. List/detail views (`QueueListView`/`ExchangeListView`/`QueueView`/`ExchangeView`) and the consumer/publish comboboxes branch on `conn.amqpOnly`; Overview/Connections are hidden and redirected (AMQP can't enumerate). No new capability — HTTP plugin allows any host; AMQP is a raw Rust TCP socket. Rust unit tests live in `rabbit.rs`; env-gated broker integration tests in `src-tauri/tests/rabbit_it.rs` (`cargo test -- --ignored`).
-- `local-ip-address` + `hostname` (Rust) — back the `local_network_info` command (`src-tauri/src/netinfo.rs`) for the Network tool's Local Network view
-- `netstat2` + `sysinfo` (Rust) — back the `list_listening_ports` command (`src-tauri/src/ports.rs`) for the Network tool's Ports view (listening sockets + owning process: memory, uptime, project, detected framework, command)
+- `hash-wasm` — WASM-accelerated checksums
+- `smol-toml` — TOML parse/serialize (Data Converter)
+- `fast-xml-parser` — XML parse/serialize (Data Converter)
+- `js-yaml` — YAML parse/serialize
+- `rskafka` (Rust, v0.6) — Kafka client (via `rustls 0.23`)
+- `lapin` (Rust, v4.x) — AMQP 0-9-1 client; TLS via `rustls-platform-verifier` (OS trust store) + optional CA PEM / PKCS#12 mTLS
+- `local-ip-address` + `hostname` (Rust) — back `local_network_info` for Network tool Local Network view
+- `netstat2` + `sysinfo` (Rust) — back `list_listening_ports` for Network tool Ports view
 - `diff` — text diffing
 - `qrcode` — QR generation
+- `jsqr` — QR image decoding
 - `react-markdown` — markdown rendering
+- `@faker-js/faker` — fake data generation
+- `date-fns` — date formatting
+- `lodash` — utility functions
+- `jwt-decode` — JWT parsing
+- `uuid` — UUID v4/v7 generation
 
-> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, local network info, and a **Ports** view (listening sockets + owning process, with Processes/Sockets layouts, column sort, scope local/LAN/all, and persisted favourite ports). It uses an **in-memory session store** (not `usePersistentState`) so results survive tab switches and leaving the tool but clear on app restart — the one exception is favourite ports, persisted in `localStorage`.
+> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, local network info, and a **Ports** view (listening sockets + owning process, with Processes/Sockets layouts, column sort, scope local/LAN/all, and persisted favourite ports). Uses an **in-memory session store** (not `usePersistentState`) so results survive tab switches but clear on app restart — the one exception is favourite ports, persisted in `localStorage`.
 
 ---
 
@@ -651,11 +942,15 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 | Path | Safety |
 |---|---|
 | `src/components/tools/*.tsx` | ✅ Safe — add/edit tools freely |
+| `src/lib/toolGuides.tsx` | ✅ Safe — add/edit per-tool help text |
 | `src/hooks/*.ts` | ⚠️ Careful — many tools depend on these |
 | `src/lib/toolDefs.ts` | ⚠️ Careful — all tools depend on this |
+| `src/lib/liveConnections.ts` | ⚠️ Careful — sidebar live dot reads this |
+| `src/config/appConfig.ts` | ⚠️ Careful — Settings editor is driven by this |
 | `src/App.tsx` | ⚠️ Careful — core routing and layout |
 | `src/contexts/*.tsx` | ⚠️ Careful — shared state |
 | `src/components/Settings.tsx` | ⚠️ Careful — Settings UI |
+| `src/design-system/` | ⚠️ Careful — shared tokens; changes affect whole app |
 | `src/components/ui/*.tsx` | ❌ Rarely — regenerate via shadcn CLI instead |
 | `vite.config.ts` | ❌ Rarely — build pipeline |
 | `src-tauri/*` | ❌ Rarely — only for new Rust features or capabilities |
@@ -664,7 +959,7 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 
 ## Common Issues
 
-**Tool not in sidebar**: check `id` in `TOOL_DEFS` matches key in `TOOL_ROUTES` and `DEFAULT_FEATURES`. Clear stale localStorage: `localStorage.clear()`.
+**Tool not in sidebar**: check `id` in `TOOL_DEFS` matches key in `TOOL_ROUTES` and `DEFAULT_FEATURES`, and that the id appears in `DEFAULT_TOOL_ORDER`. Clear stale localStorage: `localStorage.clear()`.
 
 **TypeScript errors**: run `npm run build` to surface all errors at once.
 
@@ -674,6 +969,12 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 
 **Worker build fails**: workers must be imported as `new Worker(new URL('./file.ts', import.meta.url), { type: 'module' })`. Do not use esbuild minify option — Vite 8 uses OXC (`minify: true` boolean).
 
+**AppConfig value not updating in Settings**: verify that `CONFIG_FIELDS` in `src/config/appConfig.ts` has a matching entry with the right `section`/`key`/`min`/`max` — the Settings editor is code-generated from that array.
+
+**Undo/redo/copy/paste not working (macOS)**: the native Edit menu is registered in `src-tauri/src/main.rs` via `tauri::menu::PredefinedMenuItem`. If these shortcuts stop working after a `main.rs` change, verify the `.setup()` block is still present and `app.set_menu(menu)?` is called.
+
+**Kafka/RabbitMQ live dot missing**: check that the tool's `useEffect(() => { liveConnections.set(featureId, isConnected); }, [isConnected])` is present and that `liveConnections.ts` has a matching `seed()` call for that tool's localStorage key.
+
 ---
 
-*Last updated: 2026-06-21*
+*Last updated: 2026-06-30*
