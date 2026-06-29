@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,7 +54,9 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
     }
   };
 
-  return (
+  // Portal to <body> so the fixed overlay escapes the tool's entrance-animation
+  // wrapper (an animating `transform` ancestor would offset a fixed child).
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-background border rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
@@ -110,6 +113,7 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
