@@ -44,6 +44,16 @@ function enc(segment: string): string {
   return encodeURIComponent(segment);
 }
 
+// Fast list queries: fetch only the columns the list tables render and skip the
+// broker's expensive per-object rate statistics. Keep these in sync with the
+// fields read by QueueListView / ExchangeListView.
+const QUEUE_LIST_QUERY = [
+  'disable_stats=true',
+  'enable_queue_totals=true',
+  'columns=name,messages,messages_ready,messages_unacknowledged,consumers,state',
+].join('&');
+const EXCHANGE_LIST_QUERY = 'disable_stats=true&columns=name,type,durable,internal';
+
 async function request<T>(
   conn: RabbitConnection,
   path: string,
@@ -96,8 +106,14 @@ export const rabbitMgmt = {
   testConnection: (c: RabbitConnection) => request<Overview>(c, '/overview'),
 
   // ── Queues ──────────────────────────────────────────────────────────────
+  // The list only needs a few columns. By default `/api/queues` returns every
+  // queue with full per-queue statistics (rates, message_stats, consumer/GC
+  // details) which the broker computes and serializes — very slow on large or
+  // busy clusters. `columns` trims the payload to what the table shows, and
+  // `disable_stats` + `enable_queue_totals` skip the rate machinery while still
+  // returning the message/consumer counts.
   listQueues: (c: RabbitConnection) =>
-    request<QueueInfo[]>(c, `/queues/${enc(c.vhost)}`),
+    request<QueueInfo[]>(c, `/queues/${enc(c.vhost)}?${QUEUE_LIST_QUERY}`),
   queue: (c: RabbitConnection, name: string) =>
     request<QueueInfo>(c, `/queues/${enc(c.vhost)}/${enc(name)}`),
   queueBindings: (c: RabbitConnection, name: string) =>
@@ -110,7 +126,7 @@ export const rabbitMgmt = {
 
   // ── Exchanges ─────────────────────────────────────────────────────────────
   listExchanges: (c: RabbitConnection) =>
-    request<ExchangeInfo[]>(c, `/exchanges/${enc(c.vhost)}`),
+    request<ExchangeInfo[]>(c, `/exchanges/${enc(c.vhost)}?${EXCHANGE_LIST_QUERY}`),
   exchange: (c: RabbitConnection, name: string) =>
     request<ExchangeInfo>(c, `/exchanges/${enc(c.vhost)}/${enc(name)}`),
   exchangeBindings: (c: RabbitConnection, name: string) =>

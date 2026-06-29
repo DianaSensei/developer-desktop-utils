@@ -30,6 +30,37 @@ interface RpcViewProps {
 
 type Mode = 'request' | 'send';
 
+// In-memory draft of the Send/Request form. The panel remounts on every tab/tool
+// switch, so its fields live here (module scope) to survive that — kept while the
+// app is open and reset only when it's fully closed. Not persisted to disk
+// (payloads can be large/sensitive); `mode` and the JSON/plain toggles use
+// usePersistentState separately.
+const rpcDraft = {
+  exchange: '',
+  routingKey: '',
+  payload: '',
+  contentType: 'application/json',
+  contentEncoding: '',
+  persistent: true,
+  priority: '',
+  expiration: '',
+  correlationId: '',
+  replyTo: '',
+  messageId: '',
+  type: '',
+  appId: '',
+  userId: '',
+  headersText: '',
+  showOptions: false,
+  mandatory: false,
+  confirm: true,
+  timeoutMs: 5000,
+  reply: null as RpcReply | null,
+  elapsed: null as number | null,
+  outcome: null as PublishOutcome | null,
+  stopped: false,
+};
+
 /**
  * The single publish surface for the tool. "Publish" is a full AMQP publish (all
  * message properties, mandatory + publisher confirms); "Request/Response" awaits a
@@ -38,41 +69,53 @@ type Mode = 'request' | 'send';
  */
 export function RpcView({ conn, prefill }: RpcViewProps) {
   const [mode, setMode] = usePersistentState<Mode>('devtool:rabbit:rpcMode', 'request');
-  const [exchange, setExchange] = useState('');
-  const [routingKey, setRoutingKey] = useState('');
-  const [payload, setPayload] = useState('');
+  // Most fields are seeded from the in-memory draft (see `rpcDraft`) so the form
+  // survives tab/tool switches while the app is open.
+  const [exchange, setExchange] = useState(() => rpcDraft.exchange);
+  const [routingKey, setRoutingKey] = useState(() => rpcDraft.routingKey);
+  const [payload, setPayload] = useState(() => rpcDraft.payload);
   // Payload editor: JSON highlighting (+ Format action) or plain text.
   const [payloadFormat, setPayloadFormat] = usePersistentState<'json' | 'plain'>('devtool:rabbit:payloadFormat', 'json');
 
   // Message properties
-  const [contentType, setContentType] = useState('application/json');
-  const [contentEncoding, setContentEncoding] = useState('');
-  const [persistent, setPersistent] = useState(true);
-  const [priority, setPriority] = useState('');
-  const [expiration, setExpiration] = useState('');
-  const [correlationId, setCorrelationId] = useState('');
-  const [replyTo, setReplyTo] = useState('');
-  const [messageId, setMessageId] = useState('');
-  const [type, setType] = useState('');
-  const [appId, setAppId] = useState('');
-  const [userId, setUserId] = useState('');
-  const [headersText, setHeadersText] = useState('');
-  const [showOptions, setShowOptions] = useState(false);
+  const [contentType, setContentType] = useState(() => rpcDraft.contentType);
+  const [contentEncoding, setContentEncoding] = useState(() => rpcDraft.contentEncoding);
+  const [persistent, setPersistent] = useState(() => rpcDraft.persistent);
+  const [priority, setPriority] = useState(() => rpcDraft.priority);
+  const [expiration, setExpiration] = useState(() => rpcDraft.expiration);
+  const [correlationId, setCorrelationId] = useState(() => rpcDraft.correlationId);
+  const [replyTo, setReplyTo] = useState(() => rpcDraft.replyTo);
+  const [messageId, setMessageId] = useState(() => rpcDraft.messageId);
+  const [type, setType] = useState(() => rpcDraft.type);
+  const [appId, setAppId] = useState(() => rpcDraft.appId);
+  const [userId, setUserId] = useState(() => rpcDraft.userId);
+  const [headersText, setHeadersText] = useState(() => rpcDraft.headersText);
+  const [showOptions, setShowOptions] = useState(() => rpcDraft.showOptions);
 
   // Delivery (publish mode) / wait (request mode)
-  const [mandatory, setMandatory] = useState(false);
-  const [confirm, setConfirm] = useState(true);
-  const [timeoutMs, setTimeoutMs] = useState(5000);
+  const [mandatory, setMandatory] = useState(() => rpcDraft.mandatory);
+  const [confirm, setConfirm] = useState(() => rpcDraft.confirm);
+  const [timeoutMs, setTimeoutMs] = useState(() => rpcDraft.timeoutMs);
 
   const [sending, setSending] = useState(false);
-  const [reply, setReply] = useState<RpcReply | null>(null);
+  const [reply, setReply] = useState<RpcReply | null>(() => rpcDraft.reply);
   // Reply rendering: pretty-printed + highlighted JSON, or plain text.
   const [replyFormat, setReplyFormat] = usePersistentState<'json' | 'plain'>('devtool:rabbit:replyFormat', 'json');
-  const [elapsed, setElapsed] = useState<number | null>(null);
-  const [outcome, setOutcome] = useState<PublishOutcome | null>(null);
-  const [stopped, setStopped] = useState(false);
+  const [elapsed, setElapsed] = useState<number | null>(() => rpcDraft.elapsed);
+  const [outcome, setOutcome] = useState<PublishOutcome | null>(() => rpcDraft.outcome);
+  const [stopped, setStopped] = useState(() => rpcDraft.stopped);
   const [error, setError] = useState<string | null>(null);
   const reqGen = useRef(0);
+
+  // Mirror the live form into the in-memory draft on every render so a remount
+  // (tab/tool switch) restores exactly what was there. Not written to disk.
+  useEffect(() => {
+    Object.assign(rpcDraft, {
+      exchange, routingKey, payload, contentType, contentEncoding, persistent,
+      priority, expiration, correlationId, replyTo, messageId, type, appId, userId,
+      headersText, showOptions, mandatory, confirm, timeoutMs, reply, elapsed, outcome, stopped,
+    });
+  });
 
   // Exchange suggestions: the broker's list (management) or the tracked names (AMQP-only).
   const knownExchanges = useKnownNames(conn.id).exchanges;
