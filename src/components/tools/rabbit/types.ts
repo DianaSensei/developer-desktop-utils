@@ -52,7 +52,8 @@ export const EMPTY_CONNECTION: RabbitConnection = {
   clientPkcs12Password: null,
   heartbeat: 30,
   connectionName: null,
-  amqpOnly: false,
+  // AMQP is the simple default; the management API is opt-in (see ConnectionForm).
+  amqpOnly: true,
 };
 
 // ── AMQP-only topology probes (no management API) ─────────────────────────────

@@ -75,9 +75,10 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
     setError('');
     setTested(null);
     try {
-      // AMQP-only brokers have no management API, so test the AMQP connection itself.
-      if (amqpOnly) await rabbitApi.amqpTest(form);
-      else await rabbitMgmt.testConnection(form);
+      // The AMQP connection is the core path — always verify it. If the optional
+      // management API is enabled, verify that too (it needs the plugin).
+      await rabbitApi.amqpTest(form);
+      if (!amqpOnly) await rabbitMgmt.testConnection(form);
       setTested('ok');
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
@@ -129,17 +130,8 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
-            <div className="pr-2">
-              <Label className="cursor-pointer">AMQP-only mode</Label>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Broker has no management HTTP API. Work off typed queue/exchange names; no browse-all lists, Overview or Connections.
-              </p>
-            </div>
-            <Switch checked={amqpOnly} onCheckedChange={(v) => set('amqpOnly', v)} aria-label="AMQP-only mode" />
-          </div>
-
-          {amqpOnly ? (
+          {/* AMQP connection — the only required part. */}
+          <div className="grid grid-cols-[1fr_auto] gap-3">
             <div>
               <Label htmlFor="rb-host">Host</Label>
               <Input
@@ -150,49 +142,20 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                 className="mt-1 font-mono text-sm"
               />
             </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-[1fr_auto] gap-3">
-                <div>
-                  <Label htmlFor="rb-host">Host</Label>
-                  <Input
-                    id="rb-host"
-                    value={form.host}
-                    onChange={(e) => set('host', e.target.value)}
-                    placeholder="localhost"
-                    className="mt-1 font-mono text-sm"
-                  />
-                </div>
-                <div className="w-24">
-                  <Label htmlFor="rb-port">Port</Label>
-                  <Input
-                    id="rb-port"
-                    type="number"
-                    value={form.port}
-                    onChange={(e) => set('port', Number(e.target.value))}
-                    className="mt-1 font-mono text-sm"
-                  />
-                </div>
-              </div>
-              <p className="-mt-2 text-xs text-muted-foreground">
-                Management API port — default <span className="font-mono">15672</span>.
-              </p>
-            </>
-          )}
-
-          <div>
-            <Label htmlFor="rb-amqpport">AMQP port</Label>
-            <Input
-              id="rb-amqpport"
-              type="number"
-              value={form.amqpPort}
-              onChange={(e) => set('amqpPort', Number(e.target.value))}
-              className="mt-1 font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Used by publish / consume / request-response — default <span className="font-mono">5672</span> ({form.useTls ? 'amqps' : 'amqp'}).
-            </p>
+            <div className="w-24">
+              <Label htmlFor="rb-amqpport">AMQP port</Label>
+              <Input
+                id="rb-amqpport"
+                type="number"
+                value={form.amqpPort}
+                onChange={(e) => set('amqpPort', Number(e.target.value))}
+                className="mt-1 font-mono text-sm"
+              />
+            </div>
           </div>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            Used by publish / consume / request-response — default <span className="font-mono">5672</span> ({form.useTls ? 'amqps' : 'amqp'}).
+          </p>
 
           <div>
             <Label htmlFor="rb-uri">Paste AMQP URI <span className="font-normal text-muted-foreground">(optional)</span></Label>
@@ -246,10 +209,41 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
 
           <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
             <div>
-              <Label htmlFor="rb-tls" className="cursor-pointer">Use TLS (HTTPS)</Label>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Connect over <span className="font-mono">https://</span></p>
+              <Label htmlFor="rb-tls" className="cursor-pointer">Use TLS</Label>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Connect over <span className="font-mono">amqps</span> (and <span className="font-mono">https</span> for the management API).
+              </p>
             </div>
             <Switch checked={form.useTls} onCheckedChange={(v) => set('useTls', v)} aria-label="Use TLS" />
+          </div>
+
+          {/* Management API — optional. Powers browse-all lists, overview and
+              connections; never required to publish/consume/request over AMQP. */}
+          <div className="rounded-md border">
+            <div className="flex items-center justify-between px-3 py-2.5">
+              <div className="pr-2">
+                <Label className="cursor-pointer">Management API <span className="font-normal text-muted-foreground">— optional</span></Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Adds browse-all queues &amp; exchanges, the overview dashboard and connections — needs the RabbitMQ <span className="font-medium">management</span> plugin. Leave off to work over AMQP with typed names.
+                </p>
+              </div>
+              <Switch checked={!amqpOnly} onCheckedChange={(v) => set('amqpOnly', !v)} aria-label="Enable management API" />
+            </div>
+            {!amqpOnly && (
+              <div className="px-3 pb-3 border-t pt-3">
+                <Label htmlFor="rb-port" className="text-xs">Management port</Label>
+                <Input
+                  id="rb-port"
+                  type="number"
+                  value={form.port}
+                  onChange={(e) => set('port', Number(e.target.value))}
+                  className="mt-1 font-mono text-sm h-8 w-32"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Default <span className="font-mono">15672</span> on <span className="font-mono">{form.host || 'host'}</span> ({form.useTls ? 'https' : 'http'}).
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Advanced / TLS */}
@@ -335,12 +329,9 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
           <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
             <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-              {amqpOnly ? (
-                <>Credentials are stored on this device and used only over AMQP ({form.useTls ? 'amqps' : 'amqp'}). No management API is contacted — queues/exchanges are addressed by the names you enter.</>
-              ) : (
-                <>Credentials are stored on this device and sent as HTTP Basic auth to the
-                management host above. Requires the RabbitMQ <span className="font-medium">management</span> plugin.</>
-              )}
+              Credentials are stored on this device. {amqpOnly
+                ? <>They're used only over AMQP ({form.useTls ? 'amqps' : 'amqp'}); no management API is contacted.</>
+                : <>They're used over AMQP and also sent as HTTP Basic auth to the management API.</>}
             </p>
           </div>
 
