@@ -23,6 +23,7 @@ interface LeftPanelProps {
   onShowConnections: () => void;
   onShowRpc: () => void;
   onShowConsumers: () => void;
+  onOpenConsumer: (queue: string) => void;
   onShowQueues: () => void;
   onShowExchanges: () => void;
 }
@@ -30,7 +31,7 @@ interface LeftPanelProps {
 export function LeftPanel(props: LeftPanelProps) {
   const {
     connections, connectionsLoading, selectedConnId, onSelectConn, onConnectionsChanged,
-    view, onShowOverview, onShowConnections, onShowRpc, onShowConsumers, onShowQueues, onShowExchanges,
+    view, onShowOverview, onShowConnections, onShowRpc, onShowConsumers, onOpenConsumer, onShowQueues, onShowExchanges,
   } = props;
 
   const [formOpen, setFormOpen] = useState(false);
@@ -143,11 +144,11 @@ export function LeftPanel(props: LeftPanelProps) {
               key={s.queue}
               className="group flex items-center gap-2 pl-3.5 pr-2 py-1 rounded-md text-xs hover:bg-muted/60"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" title={s.starting ? 'starting' : 'live'} />
+              <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', s.paused ? 'bg-amber-500' : 'bg-emerald-500')} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
               <button
                 className="flex-1 min-w-0 text-left font-mono truncate text-muted-foreground group-hover:text-foreground"
                 title={`${s.queue} (${s.mode})`}
-                onClick={onShowConsumers}
+                onClick={() => onOpenConsumer(s.queue)}
               >
                 {s.queue}
               </button>

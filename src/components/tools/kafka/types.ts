@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, Channel } from '@tauri-apps/api/core';
 
 export interface BrokerConfig {
   id: string;
@@ -92,6 +92,21 @@ export interface KafkaMessage {
   headers: Record<string, string>;
 }
 
+/** A record streamed by the realtime (anonymous) consumer. */
+export interface KafkaConsumedMessage {
+  partition: number;
+  offset: number;
+  timestamp: string;
+  key: string | null;
+  /** UTF-8 value when decodable, else null. */
+  value: string | null;
+  /** Raw value bytes, base64 (null when the record had no value) — used for the hex view. */
+  valueB64: string | null;
+  headers: Record<string, string>;
+}
+
+export type ConsumeFrom = 'latest' | 'earliest';
+
 // ── Invoke wrappers ───────────────────────────────────────────────────────────
 
 export const kafkaApi = {
@@ -140,4 +155,19 @@ export const kafkaApi = {
 
   topicConfigs: (configId: string, topic: string) =>
     invoke<TopicConfig[]>('kafka_topic_configs', { configId, topic }),
+
+  /** Start a realtime anonymous consumer over all partitions; records stream to `onMessage`. */
+  consumeStart: (
+    args: { configId: string; topic: string; from: ConsumeFrom },
+    onMessage: Channel<KafkaConsumedMessage>,
+  ) =>
+    invoke<string>('kafka_consume_start', {
+      configId: args.configId,
+      topic: args.topic,
+      from: args.from,
+      onMessage,
+    }),
+
+  consumeStop: (consumerId: string) =>
+    invoke<void>('kafka_consume_stop', { consumerId }),
 };

@@ -13,6 +13,7 @@ fn main() {
     tauri::Builder::default()
         .manage(mockserver::MockState::default())
         .manage(rabbit::ConsumerRegistry::default())
+        .manage(kafka::KafkaConsumerRegistry::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -40,6 +41,8 @@ fn main() {
             kafka::kafka_fetch_messages,
             kafka::kafka_delete_topic,
             kafka::kafka_topic_configs,
+            kafka::kafka_consume_start,
+            kafka::kafka_consume_stop,
             mockserver::mock_start,
             mockserver::mock_stop,
             mockserver::mock_status,

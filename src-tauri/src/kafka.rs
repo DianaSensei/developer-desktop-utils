@@ -1,10 +1,15 @@
-use rskafka::client::{ClientBuilder, partition::{Compression, UnknownTopicHandling}};
+use rskafka::client::{ClientBuilder, partition::{Compression, OffsetAt, UnknownTopicHandling}};
 use rskafka::record::Record;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
+use tauri::ipc::Channel;
 use chrono::Utc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::sync::watch;
+use base64::Engine;
 use uuid::Uuid;
 
 // ── Data types ────────────────────────────────────────────────────────────────
@@ -118,6 +123,31 @@ pub struct KafkaMessage {
     pub key: Option<String>,
     pub value: Option<String>,
     pub headers: std::collections::BTreeMap<String, String>,
+}
+
+/// A record delivered by the realtime (anonymous) consumer. Carries the value
+/// both as UTF-8 text (when decodable) and base64 of the raw bytes, so the UI can
+/// render it as plain string, prettified JSON, or a hex dump.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KafkaConsumedMessage {
+    pub partition: i32,
+    pub offset: i64,
+    pub timestamp: String,
+    pub key: Option<String>,
+    /// UTF-8 value when decodable, else null.
+    pub value: Option<String>,
+    /// Raw value bytes, base64-encoded (None when the record had no value).
+    pub value_b64: Option<String>,
+    pub headers: std::collections::BTreeMap<String, String>,
+}
+
+/// Tracks running realtime consumers so they can be stopped. Each entry's
+/// `watch::Sender<bool>` flips to `true` to signal every per-partition poll task
+/// to stop. The spawned task removes itself from the map on exit.
+#[derive(Default, Clone)]
+pub struct KafkaConsumerRegistry {
+    inner: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,
 }
 
 // ── Config persistence ────────────────────────────────────────────────────────
@@ -1135,6 +1165,149 @@ pub async fn kafka_fetch_messages(
         .collect();
 
     Ok(messages)
+}
+
+// ── Realtime consumer (anonymous; no consumer group, no offset commits) ───────
+// Long-polls every partition of a topic from a chosen start position and streams
+// each record to the frontend over a Channel. "Anonymous" = it doesn't join a
+// consumer group or commit offsets, so it never disturbs real consumers' lag.
+
+/// Start a realtime consumer over all partitions of `topic`.
+/// `from`: "latest" (only new messages, default) or "earliest" (from the start).
+/// Returns the consumer id; stop it with `kafka_consume_stop`.
+#[tauri::command]
+pub async fn kafka_consume_start(
+    app: AppHandle,
+    registry: tauri::State<'_, KafkaConsumerRegistry>,
+    config_id: String,
+    topic: String,
+    from: String,
+    on_message: Channel<KafkaConsumedMessage>,
+) -> Result<String, String> {
+    let config = find_config(&app, &config_id)?;
+
+    // Resolve the partition count from metadata (errors if the topic is missing).
+    let mut stream = open_kafka_stream(&config).await?;
+    let meta = wire_metadata(&mut stream, &[topic.as_str()]).await?;
+    let summary = meta
+        .into_iter()
+        .find(|t| t.name == topic)
+        .ok_or_else(|| format!("Topic '{}' not found", topic))?;
+    drop(stream);
+    let partition_count = summary.partition_count;
+    if partition_count <= 0 {
+        return Err(format!("Topic '{}' has no partitions", topic));
+    }
+
+    let client = make_client(&config).await?;
+    let from_latest = from != "earliest";
+
+    let id = Uuid::new_v4().to_string();
+    let (stop_tx, stop_rx) = watch::channel(false);
+    registry.inner.lock().unwrap().insert(id.clone(), stop_tx);
+
+    let reg = registry.inner.clone();
+    let id_task = id.clone();
+
+    tokio::spawn(async move {
+        // Keep the client alive for the consumer's lifetime; per-partition clients
+        // borrow its connection pool.
+        let client = client;
+        let mut handles = Vec::new();
+
+        for p in 0..partition_count {
+            let pc = match client
+                .partition_client(topic.as_str(), p, UnknownTopicHandling::Retry)
+                .await
+            {
+                Ok(pc) => pc,
+                Err(_) => continue,
+            };
+            let start = if from_latest {
+                pc.get_offset(OffsetAt::Latest).await.unwrap_or(0)
+            } else {
+                pc.get_offset(OffsetAt::Earliest).await.unwrap_or(0)
+            };
+
+            let mut rx = stop_rx.clone();
+            let chan = on_message.clone();
+            handles.push(tokio::spawn(async move {
+                let mut offset = start.max(0);
+                loop {
+                    tokio::select! {
+                        _ = rx.changed() => break,
+                        res = pc.fetch_records(offset, 1..(8 * 1024 * 1024), 1000) => match res {
+                            Ok((records, _high)) => {
+                                for ro in records {
+                                    offset = ro.offset + 1;
+                                    let (value, value_b64) = match ro.record.value {
+                                        Some(b) => (
+                                            String::from_utf8(b.clone()).ok(),
+                                            Some(base64::engine::general_purpose::STANDARD.encode(&b)),
+                                        ),
+                                        None => (None, None),
+                                    };
+                                    let key = ro.record.key.map(|b| {
+                                        String::from_utf8(b.clone())
+                                            .unwrap_or_else(|_| format!("<binary {} bytes>", b.len()))
+                                    });
+                                    let headers = ro
+                                        .record
+                                        .headers
+                                        .into_iter()
+                                        .map(|(k, v)| {
+                                            (
+                                                k,
+                                                String::from_utf8(v.clone())
+                                                    .unwrap_or_else(|_| format!("<binary {} bytes>", v.len())),
+                                            )
+                                        })
+                                        .collect();
+                                    let msg = KafkaConsumedMessage {
+                                        partition: p,
+                                        offset: ro.offset,
+                                        timestamp: ro.record.timestamp.to_rfc3339(),
+                                        key,
+                                        value,
+                                        value_b64,
+                                        headers,
+                                    };
+                                    if chan.send(msg).is_err() {
+                                        return; // frontend dropped the channel
+                                    }
+                                }
+                            }
+                            Err(_) => {
+                                // Brief backoff so a transient fetch error doesn't hot-loop.
+                                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                            }
+                        }
+                    }
+                }
+            }));
+        }
+
+        // Wait for the stop signal, then tear down the partition tasks.
+        let mut rx = stop_rx;
+        let _ = rx.changed().await;
+        for h in handles {
+            h.abort();
+        }
+        reg.lock().unwrap().remove(&id_task);
+    });
+
+    Ok(id)
+}
+
+#[tauri::command]
+pub async fn kafka_consume_stop(
+    registry: tauri::State<'_, KafkaConsumerRegistry>,
+    consumer_id: String,
+) -> Result<(), String> {
+    if let Some(tx) = registry.inner.lock().unwrap().remove(&consumer_id) {
+        let _ = tx.send(true);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

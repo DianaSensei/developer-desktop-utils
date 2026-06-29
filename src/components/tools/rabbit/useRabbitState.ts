@@ -27,10 +27,14 @@ export interface RabbitState {
   selectedExchange: string | null;
   rpcPrefill: RpcPrefill | null;
   consumerPrefill: ConsumerPrefill | null;
+  /** Queue of the consumer shown in the detail panel; null = the consumer list. */
+  consumeDetailQueue: string | null;
   showOverview: () => void;
   showConnections: () => void;
   showRpc: (prefill?: Omit<RpcPrefill, 'token'>) => void;
   showConsumers: (prefill?: Omit<ConsumerPrefill, 'token'>) => void;
+  /** Open one consumer's detail panel (from the list or the left-nav line). */
+  openConsumer: (queue: string) => void;
   showQueues: () => void;
   showExchanges: () => void;
   selectQueue: (name: string) => void;
@@ -47,6 +51,7 @@ export function useRabbitState(): RabbitState {
   const [selectedExchange, setSelectedExchange] = usePersistentState<string | null>('devtool:rabbit:selectedExchange', null);
   const [rpcPrefill, setRpcPrefill] = useState<RpcPrefill | null>(null);
   const [consumerPrefill, setConsumerPrefill] = useState<ConsumerPrefill | null>(null);
+  const [consumeDetailQueue, setConsumeDetailQueue] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = () => setRefreshKey((k) => k + 1);
@@ -78,10 +83,20 @@ export function useRabbitState(): RabbitState {
   };
 
   const showConsumers = (prefill?: Omit<ConsumerPrefill, 'token'>) => {
+    // Guard: callers sometimes wire this straight to onClick, passing an event.
+    const queue = typeof prefill?.queue === 'string' ? prefill.queue : undefined;
     setView('consumers');
     setSelectedQueue(null);
     setSelectedExchange(null);
-    setConsumerPrefill(prefill ? { ...prefill, token: Date.now() } : null);
+    setConsumeDetailQueue(null);
+    setConsumerPrefill(queue ? { queue, token: Date.now() } : null);
+  };
+
+  const openConsumer = (queue: string) => {
+    setView('consumers');
+    setSelectedQueue(null);
+    setSelectedExchange(null);
+    setConsumeDetailQueue(queue);
   };
 
   const showQueues = () => {
@@ -116,10 +131,12 @@ export function useRabbitState(): RabbitState {
     selectedExchange,
     rpcPrefill,
     consumerPrefill,
+    consumeDetailQueue,
     showOverview,
     showConnections,
     showRpc,
     showConsumers,
+    openConsumer,
     showQueues,
     showExchanges,
     selectQueue,

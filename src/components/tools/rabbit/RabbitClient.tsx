@@ -29,8 +29,8 @@ let cachedConnections: RabbitConnection[] | null = null;
 export function RabbitClient() {
   const {
     selectedConnId, setSelectedConnId,
-    view, selectedQueue, selectedExchange, rpcPrefill, consumerPrefill,
-    showOverview, showConnections, showRpc, showConsumers, showQueues, showExchanges, selectQueue, selectExchange,
+    view, selectedQueue, selectedExchange, rpcPrefill, consumerPrefill, consumeDetailQueue,
+    showOverview, showConnections, showRpc, showConsumers, openConsumer, showQueues, showExchanges, selectQueue, selectExchange,
     refreshKey, refresh,
   } = useRabbitState();
 
@@ -104,7 +104,8 @@ export function RabbitClient() {
           onShowOverview={showOverview}
           onShowConnections={showConnections}
           onShowRpc={() => showRpc()}
-          onShowConsumers={showConsumers}
+          onShowConsumers={() => showConsumers()}
+          onOpenConsumer={openConsumer}
           onShowQueues={showQueues}
           onShowExchanges={showExchanges}
         />
@@ -165,7 +166,15 @@ export function RabbitClient() {
         ) : effectiveView === 'connections' ? (
           <ConnectionsView conn={conn} refreshKey={refreshKey} onRefresh={refresh} />
         ) : effectiveView === 'consumers' ? (
-          <ConsumersView conn={conn} refreshKey={refreshKey} onRefresh={refresh} prefill={consumerPrefill} />
+          <ConsumersView
+            conn={conn}
+            refreshKey={refreshKey}
+            onRefresh={refresh}
+            prefill={consumerPrefill}
+            detailQueue={consumeDetailQueue}
+            onOpenConsumer={openConsumer}
+            onCloseDetail={() => showConsumers()}
+          />
         ) : effectiveView === 'rpc' ? (
           <RpcView conn={conn} prefill={rpcPrefill} />
         ) : (

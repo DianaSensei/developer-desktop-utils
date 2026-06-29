@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { kafkaApi, type GroupDetails, type Assignment } from './types';
 
@@ -9,6 +9,7 @@ interface GroupViewProps {
   refreshKey: number;
   onRefresh: () => void;
   onSelectTopic: (topic: string) => void;
+  onBack: () => void;
 }
 
 // Group assignments by topic, preserving the backend's topic/partition order.
@@ -30,7 +31,7 @@ const STATE_STYLES: Record<string, string> = {
   CompletingRebalance: 'text-yellow-600 bg-yellow-500/10',
 };
 
-export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTopic }: GroupViewProps) {
+export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTopic, onBack }: GroupViewProps) {
   const [data, setData] = useState<GroupDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -62,6 +63,9 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
         <div className="flex items-center gap-2 min-w-0">
+          <button onClick={onBack} className="text-muted-foreground hover:text-foreground shrink-0" title="Back to groups">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
           <span className="font-mono font-semibold text-sm truncate">{groupId}</span>
           {data && (
             <>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw, ChevronRight, Server } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, ChevronRight, Server, Radio, Send, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type TopicDetails } from './types';
@@ -7,7 +7,6 @@ import { PropertiesTab } from './PropertiesTab';
 import { MessagesTab } from './MessagesTab';
 import { ConfigTab } from './ConfigTab';
 import { ConsumersTab } from './ConsumersTab';
-import { ProduceTab } from './ProduceTab';
 import type { KafkaTab } from './useKafkaState';
 
 const TABS: { id: KafkaTab; label: string }[] = [
@@ -15,7 +14,6 @@ const TABS: { id: KafkaTab; label: string }[] = [
   { id: 'properties', label: 'Properties' },
   { id: 'config', label: 'Config' },
   { id: 'consumers', label: 'Consumers' },
-  { id: 'produce', label: 'Produce' },
 ];
 
 interface TopicViewProps {
@@ -27,6 +25,8 @@ interface TopicViewProps {
   onSelectTab: (tab: KafkaTab) => void;
   onRefresh: () => void;
   onSelectGroup: (groupId: string) => void;
+  onConsume: () => void;
+  onProduce: () => void;
   onBackToTopics?: () => void;
 }
 
@@ -39,8 +39,12 @@ export function TopicView({
   onSelectTab,
   onRefresh,
   onSelectGroup,
+  onConsume,
+  onProduce,
   onBackToTopics,
 }: TopicViewProps) {
+  // Tolerate a stale persisted tab (e.g. the removed 'produce').
+  const activeTab: KafkaTab = TABS.some((t) => t.id === selectedTab) ? selectedTab : 'data';
   const [data, setData] = useState<TopicDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -60,6 +64,9 @@ export function TopicView({
       {/* Header — breadcrumb: Broker › Topic › Tab */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
         <div className="flex items-center gap-1.5 min-w-0 text-sm">
+          <button onClick={onBackToTopics} className="text-muted-foreground hover:text-foreground shrink-0" title="Back to topics">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
           {brokerName && (
             <>
               <span className="flex items-center gap-1 text-muted-foreground shrink-0">
@@ -77,7 +84,7 @@ export function TopicView({
             {topic}
           </button>
           <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-          <span className="text-muted-foreground shrink-0">{TABS.find((t) => t.id === selectedTab)?.label}</span>
+          <span className="text-muted-foreground shrink-0">{TABS.find((t) => t.id === activeTab)?.label}</span>
           {data && (
             <span className="ml-2 text-xs text-muted-foreground shrink-0 hidden sm:inline">
               {data.partitions.length}p · RF {data.replicationFactor}
@@ -85,9 +92,18 @@ export function TopicView({
           )}
           {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />}
         </div>
-        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs rounded-lg shrink-0" onClick={onRefresh}>
-          <RefreshCw className="w-3 h-3" /> Refresh
-        </Button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Produce / Consume open the global panels pre-targeted at this topic. */}
+          <Button variant="outline" size="sm" className="h-8 gap-1 text-xs rounded-lg" onClick={onProduce} title="Produce a message to this topic">
+            <Send className="w-3 h-3" /> Produce
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-1 text-xs rounded-lg" onClick={onConsume} title="Watch this topic in realtime">
+            <Radio className="w-3 h-3" /> Consume
+          </Button>
+          <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs rounded-lg" onClick={onRefresh}>
+            <RefreshCw className="w-3 h-3" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Error */}
@@ -105,7 +121,7 @@ export function TopicView({
             key={tab.id}
             className={cn(
               'px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0',
-              selectedTab === tab.id
+              activeTab === tab.id
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
@@ -124,24 +140,21 @@ export function TopicView({
           </div>
         ) : data ? (
           <>
-            {selectedTab === 'properties' && (
+            {activeTab === 'properties' && (
               <div className="h-full overflow-y-auto">
                 <PropertiesTab details={data} />
               </div>
             )}
-            {selectedTab === 'data' && (
+            {activeTab === 'data' && (
               <MessagesTab brokerId={brokerId} topic={topic} partitions={data.partitions} />
             )}
-            {selectedTab === 'config' && (
+            {activeTab === 'config' && (
               <ConfigTab brokerId={brokerId} topic={topic} />
             )}
-            {selectedTab === 'consumers' && (
+            {activeTab === 'consumers' && (
               <div className="h-full overflow-y-auto">
                 <ConsumersTab brokerId={brokerId} topic={topic} onSelectGroup={onSelectGroup} />
               </div>
-            )}
-            {selectedTab === 'produce' && (
-              <ProduceTab brokerId={brokerId} topic={topic} partitions={data.partitions} />
             )}
           </>
         ) : null}

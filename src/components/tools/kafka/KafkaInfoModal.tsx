@@ -134,6 +134,13 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
                 note="The latest page loads automatically when you open a topic. No consumer group is created, no offset is committed, and existing consumers are not affected."
               />
               <Row
+                action="Consume (realtime)"
+                when="while a consumer is running"
+                calls="FetchRequest long-poll per partition (~1s waits)"
+                badge={{ label: 'Read', variant: 'read' }}
+                note="Anonymous: it does NOT join a consumer group or commit offsets, so real consumers' lag is untouched. Streams new messages (or from the earliest offset) over all partitions until you Stop or leave the tool; the value renders as JSON, plain text, or a hex dump and is searchable. Managed in the Consume panel."
+              />
+              <Row
                 action="Consumer groups list"
                 when="on broker select or Refresh"
                 calls="ListGroups v0 + DescribeGroups v0 (all groups)"

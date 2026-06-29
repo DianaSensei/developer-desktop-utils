@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Headphones, Play, Square, Loader2, AlertCircle, ChevronDown, ChevronRight, Check, RefreshCw, Trash, Search,
+  Headphones, Play, Pause, Square, Loader2, AlertCircle, ChevronDown, ChevronRight, Check, RefreshCw, Trash, Search, ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,10 @@ interface ConsumersViewProps {
   refreshKey: number;
   onRefresh: () => void;
   prefill?: ConsumerPrefill | null;
+  /** Queue of the consumer to show in detail; null = the consumer list. */
+  detailQueue: string | null;
+  onOpenConsumer: (queue: string) => void;
+  onCloseDetail: () => void;
 }
 
 const MODE_LABEL: Record<ConsumeAckMode, string> = {
@@ -32,8 +36,10 @@ const MODE_LABEL: Record<ConsumeAckMode, string> = {
   respond: 'Respond (reply)',
 };
 
-export function ConsumersView({ conn, refreshKey, onRefresh, prefill }: ConsumersViewProps) {
+export function ConsumersView({ conn, refreshKey, onRefresh, prefill, detailQueue, onOpenConsumer, onCloseDetail }: ConsumersViewProps) {
   const sessions = useConsumers().filter((s) => s.connId === conn.id);
+  const detail = detailQueue ? sessions.find((s) => s.queue === detailQueue) : undefined;
+
   // Queue choices: the broker's queue list (management) or the tracked names
   // (AMQP-only), with live counts from a passive declare.
   const known = useKnownNames(conn.id).queues;
@@ -54,6 +60,11 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill }: Consumer
     [conn.id, refreshKey, conn.amqpOnly, known.join(' ')],
   );
 
+  // Detail panel for a single consumer (when one is selected and still running).
+  if (detailQueue && detail) {
+    return <ConsumerDetail session={detail} onBack={onCloseDetail} />;
+  }
+
   return (
     <div className="tool-full-height">
       <div className="flex items-center justify-between px-5 py-3 border-b shrink-0 gap-3">
@@ -69,13 +80,17 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill }: Consumer
 
       <div className="tool-scrollable px-5 py-5">
         <div className="mx-auto w-full max-w-3xl space-y-5">
-          <StartConsumerForm conn={conn} queues={queues.data ?? []} sessions={sessions} prefill={prefill} />
+          <StartConsumerForm conn={conn} queues={queues.data ?? []} sessions={sessions} prefill={prefill} onStarted={onOpenConsumer} />
 
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Active consumers</h3>
             {sessions.length === 0
               ? <p className="text-sm text-muted-foreground">No consumers running. Start one above.</p>
-              : <div className="space-y-3">{sessions.map((s) => <ConsumerCard key={s.queue} session={s} />)}</div>}
+              : (
+                <div className="rounded-lg border divide-y divide-border/40 overflow-hidden">
+                  {sessions.map((s) => <ConsumerListRow key={s.queue} session={s} onOpen={() => onOpenConsumer(s.queue)} />)}
+                </div>
+              )}
           </div>
         </div>
       </div>
@@ -83,8 +98,37 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill }: Consumer
   );
 }
 
-function StartConsumerForm({ conn, queues, sessions, prefill }: {
-  conn: RabbitConnection; queues: QueueInfo[]; sessions: ConsumerSession[]; prefill?: ConsumerPrefill | null;
+/** Compact row in the consumer list — click to open its detail panel. */
+function ConsumerListRow({ session: s, onOpen }: { session: ConsumerSession; onOpen: () => void }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+      className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-muted/40"
+    >
+      <span className={cn('h-2 w-2 rounded-full shrink-0', s.paused ? 'bg-amber-500' : 'bg-emerald-500')} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
+      <span className="font-mono text-sm truncate">{s.queue}</span>
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide shrink-0">{MODE_LABEL[s.mode]}</span>
+      {s.paused && (
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 uppercase tracking-wide shrink-0">paused</span>
+      )}
+      <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
+        {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
+      </span>
+      <span onClick={(e) => e.stopPropagation()} className="shrink-0">
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" title="Stop consumer" onClick={() => consumerStore.stop(s.connId, s.queue)}>
+          <Square className="h-3 w-3" />
+        </Button>
+      </span>
+      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+    </div>
+  );
+}
+
+function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
+  conn: RabbitConnection; queues: QueueInfo[]; sessions: ConsumerSession[]; prefill?: ConsumerPrefill | null; onStarted: (queue: string) => void;
 }) {
   const [queue, setQueue] = useState('');
   const [mode, setMode] = useState<ConsumeAckMode>('peek');
@@ -120,10 +164,12 @@ function StartConsumerForm({ conn, queues, sessions, prefill }: {
 
   const doStart = async () => {
     setBusy(true);
+    const started = queue.trim();
     try {
       const reply = mode === 'respond' ? { echo, payload: replyPayload, contentType: replyContentType.trim() || undefined } : null;
-      await consumerStore.start(conn.id, queue.trim(), mode, prefetch, reply);
+      await consumerStore.start(conn.id, started, mode, prefetch, reply);
       setQueue('');
+      onStarted(started); // jump to the new consumer's detail panel
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
     } finally {
@@ -243,9 +289,12 @@ function StartConsumerForm({ conn, queues, sessions, prefill }: {
 
 const RENDER_CAP = 200; // rows actually rendered; search runs across the full buffer.
 
-function ConsumerCard({ session: s }: { session: ConsumerSession }) {
-  const [open, setOpen] = useState(false);
+type ValueFormat = 'json' | 'plain';
+
+/** Full-panel detail view for a single consumer: status, controls, search, messages. */
+function ConsumerDetail({ session: s, onBack }: { session: ConsumerSession; onBack: () => void }) {
   const [query, setQuery] = useState('');
+  const [format, setFormat] = useState<ValueFormat>('json');
 
   const q = query.trim().toLowerCase();
   const matches = q
@@ -260,74 +309,160 @@ function ConsumerCard({ session: s }: { session: ConsumerSession }) {
   const capped = s.received > buffered;
 
   return (
-    <div className="rounded-lg border bg-card/40 overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
-        <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" title={s.starting ? 'starting' : 'live'} />
-        <button className="flex items-center gap-1.5 min-w-0" onClick={() => setOpen((o) => !o)}>
-          {open ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-          <span className="font-mono text-sm truncate">{s.queue}</span>
-        </button>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide shrink-0">{MODE_LABEL[s.mode]}</span>
-        {s.mode === 'respond' && (
-          <span className="text-[10px] text-muted-foreground shrink-0">{s.reply?.echo ? 'echo' : 'static reply'}</span>
-        )}
-        <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0" title={capped ? `Keeping the most recent ${buffered.toLocaleString()} of ${s.received.toLocaleString()}` : undefined}>
-          {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
-        </span>
-        <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={() => consumerStore.clear(s.connId, s.queue)} disabled={s.received === 0}>
-          <Trash className="h-3 w-3" />
-        </Button>
-        <Button variant="destructive" size="sm" className="h-7 shrink-0" onClick={() => consumerStore.stop(s.connId, s.queue)}>
-          <Square className="h-3 w-3 mr-1" /> Stop
-        </Button>
+    <div className="tool-full-height">
+      {/* Header: back · queue · mode · controls */}
+      <div className="flex items-center justify-between px-5 py-3 border-b shrink-0 gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <button onClick={() => onBack()} className="text-muted-foreground hover:text-foreground shrink-0" title="Back to consumers">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <span className={cn('h-2 w-2 rounded-full shrink-0', s.paused ? 'bg-amber-500' : 'bg-emerald-500')} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
+          <div className="min-w-0">
+            <h2 className="font-semibold text-sm font-mono truncate">{s.queue}</h2>
+            <p className="text-[11px] text-muted-foreground">
+              {MODE_LABEL[s.mode]}
+              {s.mode === 'respond' && ` · ${s.reply?.echo ? 'echo' : 'static reply'}`}
+              {' · '}
+              {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
+              {capped && ` · keeping last ${buffered.toLocaleString()}`}
+              {s.paused && s.bufferedWhilePaused > 0 && ` · +${s.bufferedWhilePaused.toLocaleString()} buffered`}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline" size="sm"
+            title={s.paused ? 'Resume — apply buffered messages and follow live' : 'Pause — freeze the view to inspect (keeps buffering)'}
+            onClick={() => consumerStore.setPaused(s.connId, s.queue, !s.paused)}
+            disabled={s.starting}
+          >
+            {s.paused ? <Play className="h-3.5 w-3.5 mr-1.5" /> : <Pause className="h-3.5 w-3.5 mr-1.5" />}
+            {s.paused ? 'Resume' : 'Pause'}
+          </Button>
+          <Button variant="outline" size="sm" title="Clear buffer" onClick={() => consumerStore.clear(s.connId, s.queue)} disabled={s.received === 0}>
+            <Trash className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => { consumerStore.stop(s.connId, s.queue); onBack(); }}>
+            <Square className="h-3.5 w-3.5 mr-1.5" /> Stop
+          </Button>
+        </div>
       </div>
 
-      {open && (
-        <>
-          <div className="flex items-center gap-2 px-3 py-2 border-b">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search payload, routing key, exchange, correlation id…"
-                className="pl-8 h-8 text-xs"
-              />
+      {/* Search + value format */}
+      <div className="flex items-center gap-2 px-5 py-2.5 border-b shrink-0">
+        <div className="relative flex-1 min-w-0 max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search payload, routing key, exchange, correlation id…"
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
+        <Segmented<ValueFormat>
+          value={format}
+          onValueChange={setFormat}
+          size="sm"
+          options={[
+            { value: 'json', label: 'JSON' },
+            { value: 'plain', label: 'Plain' },
+          ]}
+        />
+        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums shrink-0">
+          {q ? `${matches.length.toLocaleString()} match${matches.length === 1 ? '' : 'es'}` : `${buffered.toLocaleString()} buffered`}
+          {capped && ' · capped'}
+        </span>
+      </div>
+
+      {/* Messages */}
+      <div className="tool-scrollable">
+        {shown.length === 0
+          ? <p className="px-5 py-4 text-sm text-muted-foreground">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
+          : (
+            <div className="divide-y divide-border/40">
+              {shown.map((m, i) => <MessageRow key={`${m.deliveryTag}-${i}`} m={m} format={format} />)}
+              {matches.length > shown.length && (
+                <p className="px-5 py-2 text-[11px] text-muted-foreground">
+                  Showing first {RENDER_CAP} of {matches.length.toLocaleString()}{q ? ' matches' : ''}. Narrow your search to see more.
+                </p>
+              )}
             </div>
-            <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
-              {q ? `${matches.length.toLocaleString()} match${matches.length === 1 ? '' : 'es'}` : `${buffered.toLocaleString()} buffered`}
-              {capped && ' · capped'}
-            </span>
+          )}
+      </div>
+    </div>
+  );
+}
+
+function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; format: ValueFormat }) {
+  const [expanded, setExpanded] = useState(false);
+  const headerEntries = Object.entries(m.headers ?? {});
+  const body = format === 'json' ? tryPretty(m.payload) : m.payload;
+  const preview = m.payload.replace(/\s+/g, ' ').trim() || '(empty)';
+
+  return (
+    <div>
+      {/* Compact, scannable row — click to expand the full payload. */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded((e) => !e)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((x) => !x); } }}
+        className="flex items-center gap-2 px-5 py-1.5 cursor-pointer hover:bg-muted/40"
+      >
+        {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+        <span className="text-[11px] font-mono text-muted-foreground truncate max-w-[12rem] shrink-0" title={`${m.exchange ? m.exchange + ' · ' : ''}${m.routingKey || '—'}`}>
+          {m.exchange ? `${m.exchange}/` : ''}{m.routingKey || '—'}
+        </span>
+        {m.correlationId && <span className="text-[10px] font-mono text-primary/80 truncate max-w-[8rem] shrink-0" title={`correlation id: ${m.correlationId}`}>corr {m.correlationId}</span>}
+        {m.redelivered && <span className="text-[10px] text-amber-500 shrink-0">redelivered</span>}
+        <span className="flex-1 min-w-0 font-mono text-xs text-foreground/80 truncate">{preview}</span>
+        {headerEntries.length > 0 && <span className="text-[10px] text-muted-foreground shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>}
+        <span onClick={(e) => e.stopPropagation()} className="shrink-0">
+          <CopyButton value={m.payload} iconClassName="h-3.5 w-3.5" />
+        </span>
+      </div>
+
+      {expanded && (
+        <div className="px-5 pb-3 pt-1 space-y-2.5 bg-muted/10 border-t border-border/30">
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-muted-foreground pt-1">
+            <span>exchange <span className="text-foreground">{m.exchange || '(default)'}</span></span>
+            <span>routing key <span className="text-foreground">{m.routingKey || '—'}</span></span>
+            {m.correlationId && <span>correlation id <span className="text-foreground">{m.correlationId}</span></span>}
+            {m.contentType && <span>content-type <span className="text-foreground">{m.contentType}</span></span>}
+            {m.messageId && <span>message id <span className="text-foreground">{m.messageId}</span></span>}
+            {m.redelivered && <span className="text-amber-500">redelivered</span>}
           </div>
 
-          {shown.length === 0
-            ? <p className="px-3 py-3 text-xs text-muted-foreground">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
-            : (
-              <div className="divide-y divide-border/40 max-h-96 overflow-y-auto">
-                {shown.map((m, i) => (
-                  <div key={`${m.deliveryTag}-${i}`} className="px-3 py-2">
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-0.5">
-                      <span className="font-mono truncate">
-                        {m.exchange ? `${m.exchange} · ` : ''}{m.routingKey || '—'}
-                        {m.correlationId ? ` · corr ${m.correlationId}` : ''}
-                        {m.redelivered && <span className="text-amber-500"> · redelivered</span>}
-                      </span>
-                      <CopyButton value={m.payload} iconClassName="h-3.5 w-3.5" />
-                    </div>
-                    <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{m.payload}</pre>
+          {headerEntries.length > 0 && (
+            <div>
+              <div className="text-[11px] font-medium text-muted-foreground mb-1">Headers</div>
+              <div className="rounded-md border divide-y divide-border/40 overflow-hidden">
+                {headerEntries.map(([k, v]) => (
+                  <div key={k} className="flex gap-3 px-2.5 py-1 text-[11px] font-mono">
+                    <span className="text-muted-foreground shrink-0">{k}</span>
+                    <span className="text-foreground break-all flex-1 min-w-0">{v}</span>
                   </div>
                 ))}
-                {matches.length > shown.length && (
-                  <p className="px-3 py-2 text-[11px] text-muted-foreground">
-                    Showing first {RENDER_CAP} of {matches.length.toLocaleString()}{q ? ' matches' : ''}. Narrow your search to see more.
-                  </p>
-                )}
               </div>
-            )}
-        </>
+            </div>
+          )}
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Payload</span>
+              <CopyButton value={m.payload} iconClassName="h-3.5 w-3.5" />
+            </div>
+            <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto rounded-md border bg-background px-2.5 py-2">{body}</pre>
+          </div>
+        </div>
       )}
     </div>
   );
+}
+
+/** Pretty-print JSON payloads; fall back to the raw string. */
+function tryPretty(payload: string): string {
+  try { return JSON.stringify(JSON.parse(payload), null, 2); } catch { return payload; }
 }
 
 /** Searchable queue picker that also accepts a typed (custom) queue name. */

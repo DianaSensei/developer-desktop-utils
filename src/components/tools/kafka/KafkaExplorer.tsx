@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Server, Info } from 'lucide-react';
 import { LeftPanel } from './LeftPanel';
+import { TopicListView } from './TopicListView';
+import { GroupListView } from './GroupListView';
 import { TopicView } from './TopicView';
 import { GroupView } from './GroupView';
+import { ConsumeView } from './ConsumeView';
+import { ProduceView } from './ProduceView';
 import { KafkaInfoModal } from './KafkaInfoModal';
 import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 import { useKafkaState } from './useKafkaState';
 import { kafkaApi } from './types';
+import { kafkaConsumerStore } from './kafkaConsumerStore';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 
@@ -18,15 +23,29 @@ export function KafkaExplorer() {
   const {
     selectedBrokerId,
     setSelectedBrokerId,
+    view,
     selectedTopic,
-    setSelectedTopic,
     selectedGroup,
-    setSelectedGroup,
     selectedTab,
     setSelectedTab,
+    consumePrefill,
+    producePrefill,
+    consumeDetailTopic,
+    showTopics,
+    showGroups,
+    showConsumers,
+    openConsumer,
+    showProduce,
+    selectTopic,
+    selectGroup,
     refreshKey,
     refresh,
   } = useKafkaState();
+
+  // Stop any realtime consumers when leaving the tool so nothing keeps running
+  // in the background. They persist across view switches within the tool (the
+  // store lives outside this component tree), but not after it unmounts.
+  useEffect(() => () => { kafkaConsumerStore.stopAll(); }, []);
 
   const [infoDismissed, setInfoDismissed] = usePersistentState('devtool:kafka:info-dismissed', false);
   const [showInfo, setShowInfo] = useState(!infoDismissed);
@@ -82,11 +101,12 @@ export function KafkaExplorer() {
         <LeftPanel
           selectedBrokerId={selectedBrokerId}
           onSelectBroker={setSelectedBrokerId}
-          selectedTopic={selectedTopic}
-          onSelectTopic={setSelectedTopic}
-          selectedGroup={selectedGroup}
-          onSelectGroup={setSelectedGroup}
-          refreshKey={refreshKey}
+          view={view}
+          onShowTopics={showTopics}
+          onShowGroups={showGroups}
+          onShowConsumers={showConsumers}
+          onOpenConsumer={openConsumer}
+          onShowProduce={showProduce}
         />
       </div>
 
@@ -111,7 +131,7 @@ export function KafkaExplorer() {
             <Server className="w-8 h-8 opacity-30" />
             <p className="text-sm">Add a broker to get started</p>
           </div>
-        ) : selectedTopic ? (
+        ) : view === 'topic' && selectedTopic != null ? (
           <TopicView
             brokerId={selectedBrokerId}
             brokerName={brokerName}
@@ -120,21 +140,36 @@ export function KafkaExplorer() {
             selectedTab={selectedTab}
             onSelectTab={setSelectedTab}
             onRefresh={refresh}
-            onSelectGroup={setSelectedGroup}
-            onBackToTopics={() => setSelectedTopic(null)}
+            onSelectGroup={selectGroup}
+            onConsume={() => showConsumers(selectedTopic)}
+            onProduce={() => showProduce(selectedTopic)}
+            onBackToTopics={showTopics}
           />
-        ) : selectedGroup ? (
+        ) : view === 'group' && selectedGroup != null ? (
           <GroupView
             brokerId={selectedBrokerId}
             groupId={selectedGroup}
             refreshKey={refreshKey}
             onRefresh={refresh}
-            onSelectTopic={setSelectedTopic}
+            onSelectTopic={selectTopic}
+            onBack={showGroups}
           />
+        ) : view === 'groups' ? (
+          <GroupListView brokerId={selectedBrokerId} refreshKey={refreshKey} onRefresh={refresh} onSelectGroup={selectGroup} />
+        ) : view === 'consume' ? (
+          <ConsumeView
+            brokerId={selectedBrokerId}
+            refreshKey={refreshKey}
+            onRefresh={refresh}
+            prefill={consumePrefill}
+            detailTopic={consumeDetailTopic}
+            onOpenConsumer={openConsumer}
+            onCloseDetail={showConsumers}
+          />
+        ) : view === 'produce' ? (
+          <ProduceView brokerId={selectedBrokerId} refreshKey={refreshKey} onRefresh={refresh} prefill={producePrefill} />
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-            <p className="text-sm">Select a topic or group from the left panel</p>
-          </div>
+          <TopicListView brokerId={selectedBrokerId} refreshKey={refreshKey} onRefresh={refresh} onSelectTopic={selectTopic} />
         )}
       </div>
 
