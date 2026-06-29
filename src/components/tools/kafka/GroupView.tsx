@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { ViewHeader } from '@/components/ui/view-header';
 import { kafkaApi, type GroupDetails, type Assignment } from './types';
 
 interface GroupViewProps {
@@ -23,12 +25,12 @@ function groupByTopic(assignments: Assignment[]): [string, Assignment[]][] {
   return [...byTopic.entries()];
 }
 
-const STATE_STYLES: Record<string, string> = {
-  Stable: 'text-green-600 bg-green-500/10',
-  Empty: 'text-muted-foreground bg-muted/40',
-  Dead: 'text-destructive bg-destructive/10',
-  PreparingRebalance: 'text-orange-600 bg-orange-500/10',
-  CompletingRebalance: 'text-yellow-600 bg-yellow-500/10',
+const STATE_DOT: Record<string, string> = {
+  Stable: 'bg-emerald-500',
+  Empty: 'bg-muted-foreground/40',
+  Dead: 'bg-destructive',
+  PreparingRebalance: 'bg-orange-500',
+  CompletingRebalance: 'bg-yellow-500',
 };
 
 export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTopic, onBack }: GroupViewProps) {
@@ -60,26 +62,22 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <button onClick={onBack} className="text-muted-foreground hover:text-foreground shrink-0" title="Back to groups">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <span className="font-mono font-semibold text-sm truncate">{groupId}</span>
-          {data && (
-            <>
-              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${STATE_STYLES[data.state] ?? 'text-muted-foreground bg-muted/40'}`}>
-                {data.state}
-              </span>
-              <span className="text-xs text-muted-foreground">{data.memberCount} member{data.memberCount !== 1 ? 's' : ''}</span>
-            </>
-          )}
-        </div>
-        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs rounded-lg" onClick={onRefresh}>
-          <RefreshCw className="w-3 h-3" /> Refresh
-        </Button>
-      </div>
+      <ViewHeader
+        icon={Users}
+        onBack={onBack}
+        title={<span className="font-mono">{groupId}</span>}
+        subtitle={data ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className={cn('h-1.5 w-1.5 rounded-full', STATE_DOT[data.state] ?? 'bg-muted-foreground/40')} />
+            {data.state} · {data.memberCount} member{data.memberCount !== 1 ? 's' : ''}
+          </span>
+        ) : 'Consumer group'}
+        actions={(
+          <Button variant="outline" size="sm" onClick={onRefresh}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
+          </Button>
+        )}
+      />
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto min-h-0">

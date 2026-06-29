@@ -76,8 +76,8 @@ export function LeftPanel(props: LeftPanelProps) {
         </div>
         {conn && (
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-mono truncate">
-              {conn.useTls ? 'https' : 'http'}://{conn.host}:{conn.port}
+            <span className="text-[11px] text-muted-foreground font-mono truncate" title={conn.amqpOnly ? 'AMQP endpoint' : 'Management endpoint'}>
+              {conn.amqpOnly ? `${conn.host}:${conn.amqpPort}` : `${conn.host}:${conn.port}`}
             </span>
             <div className="flex items-center gap-0.5 shrink-0">
               <button

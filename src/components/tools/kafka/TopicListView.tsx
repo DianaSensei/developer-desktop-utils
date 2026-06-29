@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
+import { ViewHeader } from '@/components/ui/view-header';
 import { kafkaApi, type TopicSummary } from './types';
 
 interface TopicListViewProps {
@@ -37,19 +38,17 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
 
   return (
     <div className="tool-full-height">
-      <div className="flex items-center justify-between px-5 py-3 border-b shrink-0 gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <List className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div className="min-w-0">
-            <h2 className="font-semibold text-sm">Topics</h2>
-            <p className="text-[11px] text-muted-foreground">{topics ? `${topics.length} topics` : 'Kafka cluster'}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New topic</Button>
-          <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
-        </div>
-      </div>
+      <ViewHeader
+        icon={List}
+        title="Topics"
+        subtitle={topics ? `${topics.length} topics` : 'Kafka cluster'}
+        actions={(
+          <>
+            <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New topic</Button>
+            <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+          </>
+        )}
+      />
 
       <div className="px-5 pt-3 shrink-0">
         <div className="relative max-w-sm">
@@ -69,21 +68,21 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
           rows.length === 0
             ? <p className="text-sm text-muted-foreground">{f ? 'No matching topics.' : 'No topics yet.'}</p>
             : (
-              <div className="overflow-x-auto rounded-lg border">
+              <div className="overflow-x-auto rounded-xl border border-border/50">
                 <table className="w-full text-xs">
-                  <thead className="bg-muted/30 border-b">
+                  <thead className="bg-muted/20 border-b border-border/50">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>
-                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">Partitions</th>
-                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">Replication</th>
+                      <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Name</th>
+                      <th className="px-3.5 py-2 text-right font-medium text-muted-foreground">Partitions</th>
+                      <th className="px-3.5 py-2 text-right font-medium text-muted-foreground">Replication</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/50">
+                  <tbody className="divide-y divide-border/40">
                     {rows.map((t) => (
-                      <tr key={t.name} className="hover:bg-muted/30 cursor-pointer" onClick={() => onSelectTopic(t.name)}>
-                        <td className="px-3 py-2 font-mono">{t.name}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{t.partitionCount}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{t.replicationFactor}</td>
+                      <tr key={t.name} className="hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => onSelectTopic(t.name)}>
+                        <td className="px-3.5 py-2.5 font-mono">{t.name}</td>
+                        <td className="px-3.5 py-2.5 text-right tabular-nums">{t.partitionCount}</td>
+                        <td className="px-3.5 py-2.5 text-right tabular-nums">{t.replicationFactor}</td>
                       </tr>
                     ))}
                   </tbody>
