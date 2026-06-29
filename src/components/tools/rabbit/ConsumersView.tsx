@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Headphones, Play, Square, Loader2, AlertCircle, ChevronDown, ChevronRight, Check, RefreshCw, Trash,
+  Headphones, Play, Square, Loader2, AlertCircle, ChevronDown, ChevronRight, Check, RefreshCw, Trash, Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -241,8 +241,24 @@ function StartConsumerForm({ conn, queues, sessions, prefill }: {
   );
 }
 
+const RENDER_CAP = 200; // rows actually rendered; search runs across the full buffer.
+
 function ConsumerCard({ session: s }: { session: ConsumerSession }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const q = query.trim().toLowerCase();
+  const matches = q
+    ? s.messages.filter((m) =>
+        m.payload.toLowerCase().includes(q)
+        || m.routingKey.toLowerCase().includes(q)
+        || (m.exchange ?? '').toLowerCase().includes(q)
+        || (m.correlationId ?? '').toLowerCase().includes(q))
+    : s.messages;
+  const shown = matches.slice(0, RENDER_CAP);
+  const buffered = s.messages.length;
+  const capped = s.received > buffered;
+
   return (
     <div className="rounded-lg border bg-card/40 overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
@@ -255,10 +271,10 @@ function ConsumerCard({ session: s }: { session: ConsumerSession }) {
         {s.mode === 'respond' && (
           <span className="text-[10px] text-muted-foreground shrink-0">{s.reply?.echo ? 'echo' : 'static reply'}</span>
         )}
-        <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
-          {s.starting ? 'starting…' : `${s.messages.length} received`}
+        <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0" title={capped ? `Keeping the most recent ${buffered.toLocaleString()} of ${s.received.toLocaleString()}` : undefined}>
+          {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
         </span>
-        <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={() => consumerStore.clear(s.connId, s.queue)} disabled={s.messages.length === 0}>
+        <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={() => consumerStore.clear(s.connId, s.queue)} disabled={s.received === 0}>
           <Trash className="h-3 w-3" />
         </Button>
         <Button variant="destructive" size="sm" className="h-7 shrink-0" onClick={() => consumerStore.stop(s.connId, s.queue)}>
@@ -267,25 +283,48 @@ function ConsumerCard({ session: s }: { session: ConsumerSession }) {
       </div>
 
       {open && (
-        s.messages.length === 0
-          ? <p className="px-3 py-3 text-xs text-muted-foreground">{s.starting ? 'Starting…' : 'Waiting for messages…'}</p>
-          : (
-            <div className="divide-y divide-border/40 max-h-96 overflow-y-auto">
-              {s.messages.slice(0, 100).map((m, i) => (
-                <div key={`${m.deliveryTag}-${i}`} className="px-3 py-2">
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-0.5">
-                    <span className="font-mono truncate">
-                      {m.exchange ? `${m.exchange} · ` : ''}{m.routingKey || '—'}
-                      {m.correlationId ? ` · corr ${m.correlationId}` : ''}
-                      {m.redelivered && <span className="text-amber-500"> · redelivered</span>}
-                    </span>
-                    <CopyButton value={m.payload} iconClassName="h-3.5 w-3.5" />
-                  </div>
-                  <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{m.payload}</pre>
-                </div>
-              ))}
+        <>
+          <div className="flex items-center gap-2 px-3 py-2 border-b">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search payload, routing key, exchange, correlation id…"
+                className="pl-8 h-8 text-xs"
+              />
             </div>
-          )
+            <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+              {q ? `${matches.length.toLocaleString()} match${matches.length === 1 ? '' : 'es'}` : `${buffered.toLocaleString()} buffered`}
+              {capped && ' · capped'}
+            </span>
+          </div>
+
+          {shown.length === 0
+            ? <p className="px-3 py-3 text-xs text-muted-foreground">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
+            : (
+              <div className="divide-y divide-border/40 max-h-96 overflow-y-auto">
+                {shown.map((m, i) => (
+                  <div key={`${m.deliveryTag}-${i}`} className="px-3 py-2">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-0.5">
+                      <span className="font-mono truncate">
+                        {m.exchange ? `${m.exchange} · ` : ''}{m.routingKey || '—'}
+                        {m.correlationId ? ` · corr ${m.correlationId}` : ''}
+                        {m.redelivered && <span className="text-amber-500"> · redelivered</span>}
+                      </span>
+                      <CopyButton value={m.payload} iconClassName="h-3.5 w-3.5" />
+                    </div>
+                    <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{m.payload}</pre>
+                  </div>
+                ))}
+                {matches.length > shown.length && (
+                  <p className="px-3 py-2 text-[11px] text-muted-foreground">
+                    Showing first {RENDER_CAP} of {matches.length.toLocaleString()}{q ? ' matches' : ''}. Narrow your search to see more.
+                  </p>
+                )}
+              </div>
+            )}
+        </>
       )}
     </div>
   );

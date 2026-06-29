@@ -151,7 +151,7 @@ export function LeftPanel(props: LeftPanelProps) {
               >
                 {s.queue}
               </button>
-              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{s.messages.length}</span>
+              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0" title={`${s.received.toLocaleString()} received`}>{s.received.toLocaleString()}</span>
               <button
                 className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Stop consumer"
