@@ -1,13 +1,18 @@
 import { invoke, Channel } from '@tauri-apps/api/core';
 
+export type SecurityProtocol = 'PLAINTEXT' | 'SSL' | 'SASL_PLAINTEXT' | 'SASL_SSL';
+export type SaslMechanism = 'PLAIN' | 'SCRAM-SHA-256' | 'SCRAM-SHA-512';
+
 export interface BrokerConfig {
   id: string;
   name: string;
   bootstrapServers: string;
-  saslMechanism?: string;
+  securityProtocol: SecurityProtocol;
+  saslMechanism?: SaslMechanism;
   saslUsername?: string;
   saslPassword?: string;
-  sslEnabled: boolean;
+  /** Custom/self-signed CA certificate (PEM). Empty = use the OS trust store. */
+  sslCaPem?: string | null;
 }
 
 export interface TopicSummary {

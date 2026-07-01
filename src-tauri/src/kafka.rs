@@ -1,4 +1,4 @@
-use rskafka::client::{ClientBuilder, partition::{Compression, OffsetAt, UnknownTopicHandling}};
+use rskafka::client::{ClientBuilder, Credentials, SaslConfig, partition::{Compression, OffsetAt, UnknownTopicHandling}};
 use rskafka::record::Record;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
@@ -6,11 +6,15 @@ use tauri::ipc::Channel;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::watch;
 use base64::Engine;
 use uuid::Uuid;
+use hmac::{Hmac, Mac};
+use sha2::{Digest, Sha256, Sha512};
+use pbkdf2::pbkdf2_hmac;
+use rustls_platform_verifier::ConfigVerifierExt;
 
 // ── Data types ────────────────────────────────────────────────────────────────
 
@@ -20,10 +24,62 @@ pub struct BrokerConfig {
     pub id: String,
     pub name: String,
     pub bootstrap_servers: String,
+    /// One of "PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL". Defaults to
+    /// "PLAINTEXT" for configs saved before this field existed.
+    #[serde(default = "default_security_protocol")]
+    pub security_protocol: String,
+    /// "PLAIN", "SCRAM-SHA-256", or "SCRAM-SHA-512". Only used when
+    /// `security_protocol` is one of the SASL_* variants.
+    #[serde(default)]
     pub sasl_mechanism: Option<String>,
+    #[serde(default)]
     pub sasl_username: Option<String>,
+    #[serde(default)]
     pub sasl_password: Option<String>,
-    pub ssl_enabled: bool,
+    /// Optional custom/self-signed CA certificate (PEM). When empty, the OS
+    /// trust store is used. Only relevant for SSL/SASL_SSL.
+    #[serde(default)]
+    pub ssl_ca_pem: Option<String>,
+}
+
+fn default_security_protocol() -> String {
+    "PLAINTEXT".to_string()
+}
+
+/// The four standard Kafka `security.protocol` values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SecurityProtocol {
+    Plaintext,
+    Ssl,
+    SaslPlaintext,
+    SaslSsl,
+}
+
+impl SecurityProtocol {
+    fn parse(s: &str) -> Result<Self, String> {
+        match s {
+            "PLAINTEXT" => Ok(Self::Plaintext),
+            "SSL" => Ok(Self::Ssl),
+            "SASL_PLAINTEXT" => Ok(Self::SaslPlaintext),
+            "SASL_SSL" => Ok(Self::SaslSsl),
+            other => Err(format!(
+                "Unsupported security protocol '{other}' \
+                 (expected PLAINTEXT, SSL, SASL_PLAINTEXT, or SASL_SSL)"
+            )),
+        }
+    }
+
+    fn uses_tls(self) -> bool {
+        matches!(self, Self::Ssl | Self::SaslSsl)
+    }
+
+    fn uses_sasl(self) -> bool {
+        matches!(self, Self::SaslPlaintext | Self::SaslSsl)
+    }
+}
+
+fn nonempty(s: &Option<String>) -> Option<&str> {
+    s.as_deref().map(str::trim).filter(|s| !s.is_empty())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,6 +240,63 @@ fn find_config(app: &AppHandle, config_id: &str) -> Result<BrokerConfig, String>
         .ok_or_else(|| format!("Broker config '{}' not found", config_id))
 }
 
+// ── TLS ───────────────────────────────────────────────────────────────────────
+
+/// rustls 0.23 needs a process-wide default `CryptoProvider` installed before
+/// building any `ClientConfig`. `rskafka`'s "transport-tls" feature installs
+/// one lazily on its own connection path, but the hand-rolled wire-protocol
+/// path below builds `rustls::ClientConfig` directly and may run first, so
+/// install it here too. Installing twice is harmless (`Once` + ignored error).
+fn ensure_crypto_provider() {
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
+/// Builds the rustls config used to wrap connections when `security_protocol`
+/// is SSL or SASL_SSL. With a custom CA PEM set, trust is limited to that CA
+/// (self-signed / private brokers). Otherwise the OS trust store is used.
+fn build_tls_config(config: &BrokerConfig) -> Result<Arc<rustls::ClientConfig>, String> {
+    ensure_crypto_provider();
+    let client_config = match nonempty(&config.ssl_ca_pem) {
+        Some(pem) => {
+            let mut roots = rustls::RootCertStore::empty();
+            let mut reader = std::io::BufReader::new(pem.as_bytes());
+            for cert in rustls_pemfile::certs(&mut reader) {
+                let cert = cert.map_err(|e| format!("Invalid CA certificate PEM: {e}"))?;
+                roots
+                    .add(cert)
+                    .map_err(|e| format!("Invalid CA certificate: {e}"))?;
+            }
+            if roots.is_empty() {
+                return Err("CA certificate PEM did not contain any certificates".into());
+            }
+            rustls::ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth()
+        }
+        None => rustls::ClientConfig::with_platform_verifier()
+            .map_err(|e| format!("Failed to initialize TLS trust store: {e}"))?,
+    };
+    Ok(Arc::new(client_config))
+}
+
+/// Wraps a plain TCP connection in TLS. `host` is the broker address without
+/// the port, used for SNI + certificate hostname verification.
+async fn wrap_tls(
+    stream: TcpStream,
+    host: &str,
+    tls_config: Arc<rustls::ClientConfig>,
+) -> Result<tokio_rustls::client::TlsStream<TcpStream>, String> {
+    let server_name = rustls::pki_types::ServerName::try_from(host.to_string())
+        .map_err(|e| format!("Invalid broker hostname '{host}' for TLS: {e}"))?;
+    tokio_rustls::TlsConnector::from(tls_config)
+        .connect(server_name, stream)
+        .await
+        .map_err(|e| format!("TLS handshake with {host} failed: {e}"))
+}
+
 // ── rskafka client ────────────────────────────────────────────────────────────
 
 fn parse_brokers(bootstrap_servers: &str) -> Vec<String> {
@@ -210,19 +323,47 @@ fn validate_create_topic(name: &str, num_partitions: i32, replication_factor: i1
     Ok(())
 }
 
+fn build_sasl_config(config: &BrokerConfig) -> Result<SaslConfig, String> {
+    let username = nonempty(&config.sasl_username)
+        .ok_or("SASL username is required for this security protocol")?
+        .to_string();
+    let password = config.sasl_password.clone().unwrap_or_default();
+    let credentials = Credentials { username, password };
+    match config.sasl_mechanism.as_deref().unwrap_or("PLAIN") {
+        "PLAIN" => Ok(SaslConfig::Plain(credentials)),
+        "SCRAM-SHA-256" => Ok(SaslConfig::ScramSha256(credentials)),
+        "SCRAM-SHA-512" => Ok(SaslConfig::ScramSha512(credentials)),
+        other => Err(format!("Unsupported SASL mechanism: {other}")),
+    }
+}
+
 async fn make_client(config: &BrokerConfig) -> Result<rskafka::client::Client, String> {
     let brokers = parse_brokers(&config.bootstrap_servers);
     if brokers.is_empty() {
         return Err("No broker addresses specified".to_string());
     }
-    ClientBuilder::new(brokers)
-        .build()
-        .await
-        .map_err(|e| e.to_string())
+    let protocol = SecurityProtocol::parse(&config.security_protocol)?;
+    let mut builder = ClientBuilder::new(brokers);
+    if protocol.uses_tls() {
+        builder = builder.tls_config(build_tls_config(config)?);
+    }
+    if protocol.uses_sasl() {
+        builder = builder.sasl_config(build_sasl_config(config)?);
+    }
+    builder.build().await.map_err(|e| e.to_string())
 }
 
 // ── Kafka wire protocol ───────────────────────────────────────────────────────
 // Used for operations not covered by rskafka: metadata, offsets, consumer groups, create topic.
+
+/// Marker trait so a single boxed trait object can carry either a plain
+/// `TcpStream` or a TLS-wrapped one through the rest of the wire-protocol code.
+trait AsyncStream: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncStream for T {}
+
+/// A connected, and (if configured) TLS-wrapped and SASL-authenticated,
+/// stream ready for Kafka requests.
+type KafkaStream = Box<dyn AsyncStream>;
 
 async fn connect_broker(addr: &str) -> Result<TcpStream, String> {
     tokio::time::timeout(
@@ -234,26 +375,58 @@ async fn connect_broker(addr: &str) -> Result<TcpStream, String> {
     .map_err(|e| format!("Failed to connect to {}: {}", addr, e))
 }
 
-/// Opens a TcpStream to the first address in bootstrap_servers that speaks Kafka protocol.
-/// Probes each address with a MetadataRequest so that non-Kafka ports (e.g. ZooKeeper)
-/// are skipped automatically instead of returning "early eof".
-async fn open_kafka_stream(config: &BrokerConfig) -> Result<TcpStream, String> {
+/// Connects to `addr`, wraps it in TLS if the broker config requires it, and
+/// completes the SASL handshake if required — in that order, since Kafka
+/// rejects every request except SaslHandshake/SaslAuthenticate until auth
+/// completes on a SASL-enabled listener.
+async fn connect_and_auth(
+    addr: &str,
+    config: &BrokerConfig,
+    protocol: SecurityProtocol,
+    tls_config: Option<&Arc<rustls::ClientConfig>>,
+) -> Result<KafkaStream, String> {
+    let tcp = connect_broker(addr).await?;
+    let mut stream: KafkaStream = match tls_config {
+        Some(cfg) => {
+            let host = addr.rsplit_once(':').map(|(h, _)| h).unwrap_or(addr);
+            Box::new(wrap_tls(tcp, host, cfg.clone()).await?)
+        }
+        None => Box::new(tcp),
+    };
+    if protocol.uses_sasl() {
+        sasl_authenticate(&mut stream, config).await?;
+    }
+    Ok(stream)
+}
+
+/// Opens a stream to the first address in bootstrap_servers that speaks Kafka protocol
+/// (and, if configured, accepts TLS/SASL auth). Probes each address with a
+/// MetadataRequest so that non-Kafka ports (e.g. ZooKeeper) are skipped
+/// automatically instead of returning "early eof".
+async fn open_kafka_stream(config: &BrokerConfig) -> Result<KafkaStream, String> {
     let brokers = parse_brokers(&config.bootstrap_servers);
     if brokers.is_empty() {
         return Err("No broker addresses specified".to_string());
     }
+    let protocol = SecurityProtocol::parse(&config.security_protocol)?;
+    let tls_config = if protocol.uses_tls() {
+        Some(build_tls_config(config)?)
+    } else {
+        None
+    };
     let mut errors: Vec<String> = Vec::new();
     for addr in &brokers {
-        match connect_broker(addr).await {
+        match connect_and_auth(addr, config, protocol, tls_config.as_ref()).await {
             Err(e) => { errors.push(format!("{addr}: {e}")); }
             Ok(mut probe) => {
                 match wire_metadata(&mut probe, &[]).await {
                     Ok(_) => {
-                        // Confirmed Kafka. Reuse this very connection for the command:
-                        // send_request read the probe's full framed response, so the
-                        // stream is at a clean message boundary. Reusing it (instead of
-                        // opening a second connection) halves the TCP connections every
-                        // read operation makes against the broker.
+                        // Confirmed Kafka (and authenticated, if required). Reuse this
+                        // very connection for the command: send_request read the
+                        // probe's full framed response, so the stream is at a clean
+                        // message boundary. Reusing it (instead of opening a second
+                        // connection) halves the TCP connections every read operation
+                        // makes against the broker.
                         return Ok(probe);
                     }
                     Err(e) => {
@@ -271,7 +444,7 @@ async fn open_kafka_stream(config: &BrokerConfig) -> Result<TcpStream, String> {
 }
 
 async fn send_request(
-    stream: &mut TcpStream,
+    stream: &mut KafkaStream,
     api_key: i16,
     api_version: i16,
     correlation_id: i32,
@@ -451,9 +624,217 @@ fn enc_i64(buf: &mut Vec<u8>, v: i64) {
     buf.extend_from_slice(&v.to_be_bytes());
 }
 
+fn enc_bytes(buf: &mut Vec<u8>, b: &[u8]) {
+    buf.extend_from_slice(&(b.len() as i32).to_be_bytes());
+    buf.extend_from_slice(b);
+}
+
+// ── SASL authentication ─────────────────────────────────────────────────────
+// Runs immediately after connecting (and TLS, if any). Per the Kafka wire
+// protocol, once a listener is SASL-enabled the broker rejects every request
+// except SaslHandshake/SaslAuthenticate until this completes.
+
+/// SaslHandshakeRequest v1 (API 17) negotiates the mechanism, then dispatches
+/// to the mechanism-specific SaslAuthenticate (API 36) exchange.
+async fn sasl_authenticate(stream: &mut KafkaStream, config: &BrokerConfig) -> Result<(), String> {
+    let mechanism = config.sasl_mechanism.as_deref().unwrap_or("PLAIN");
+    let username = nonempty(&config.sasl_username)
+        .ok_or("SASL username is required for this security protocol")?
+        .to_string();
+    let password = config.sasl_password.clone().unwrap_or_default();
+
+    let mut body = Vec::new();
+    enc_str(&mut body, mechanism);
+    let resp = send_request(stream, 17, 1, 100, &body).await?;
+    let mut d = Dec::new(&resp);
+    let err = d.i16()?;
+    if err != 0 {
+        let supported = d.array(|d| d.str()).unwrap_or_default();
+        return Err(format!(
+            "Broker rejected SASL mechanism '{mechanism}' (error {err}). Supported: {}",
+            supported.join(", ")
+        ));
+    }
+
+    match mechanism {
+        "PLAIN" => sasl_authenticate_plain(stream, &username, &password).await,
+        "SCRAM-SHA-256" => sasl_authenticate_scram(stream, &username, &password, ScramAlgo::Sha256).await,
+        "SCRAM-SHA-512" => sasl_authenticate_scram(stream, &username, &password, ScramAlgo::Sha512).await,
+        other => Err(format!("Unsupported SASL mechanism: {other}")),
+    }
+}
+
+/// SaslAuthenticateRequest/Response v0 (API 36) — one request/response pair
+/// carrying an opaque `auth_bytes` blob whose contents are mechanism-specific.
+async fn sasl_authenticate_exchange(
+    stream: &mut KafkaStream,
+    correlation_id: i32,
+    auth_bytes: &[u8],
+) -> Result<Vec<u8>, String> {
+    let mut body = Vec::new();
+    enc_bytes(&mut body, auth_bytes);
+    let resp = send_request(stream, 36, 0, correlation_id, &body).await?;
+    let mut d = Dec::new(&resp);
+    let err = d.i16()?;
+    let err_msg = d.nullable_str()?;
+    if err != 0 {
+        return Err(format!(
+            "SASL authentication failed: {}",
+            err_msg.unwrap_or_else(|| format!("error code {err}"))
+        ));
+    }
+    d.bytes()
+}
+
+async fn sasl_authenticate_plain(stream: &mut KafkaStream, username: &str, password: &str) -> Result<(), String> {
+    let mut msg = Vec::new();
+    msg.push(0u8); // authzid (empty)
+    msg.extend_from_slice(username.as_bytes());
+    msg.push(0u8);
+    msg.extend_from_slice(password.as_bytes());
+    sasl_authenticate_exchange(stream, 101, &msg).await?;
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum ScramAlgo {
+    Sha256,
+    Sha512,
+}
+
+impl ScramAlgo {
+    fn hash(self, data: &[u8]) -> Vec<u8> {
+        match self {
+            ScramAlgo::Sha256 => Sha256::digest(data).to_vec(),
+            ScramAlgo::Sha512 => Sha512::digest(data).to_vec(),
+        }
+    }
+
+    fn hmac(self, key: &[u8], data: &[u8]) -> Vec<u8> {
+        match self {
+            ScramAlgo::Sha256 => {
+                let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC accepts any key length");
+                mac.update(data);
+                mac.finalize().into_bytes().to_vec()
+            }
+            ScramAlgo::Sha512 => {
+                let mut mac = Hmac::<Sha512>::new_from_slice(key).expect("HMAC accepts any key length");
+                mac.update(data);
+                mac.finalize().into_bytes().to_vec()
+            }
+        }
+    }
+
+    fn pbkdf2(self, password: &[u8], salt: &[u8], iterations: u32) -> Vec<u8> {
+        match self {
+            ScramAlgo::Sha256 => {
+                let mut out = [0u8; 32];
+                pbkdf2_hmac::<Sha256>(password, salt, iterations, &mut out);
+                out.to_vec()
+            }
+            ScramAlgo::Sha512 => {
+                let mut out = [0u8; 64];
+                pbkdf2_hmac::<Sha512>(password, salt, iterations, &mut out);
+                out.to_vec()
+            }
+        }
+    }
+}
+
+fn xor_bytes(a: &[u8], b: &[u8]) -> Vec<u8> {
+    a.iter().zip(b.iter()).map(|(x, y)| x ^ y).collect()
+}
+
+/// Escapes `=` and `,` per RFC 5802 §5.1 (order matters: `=` first).
+fn scram_escape(s: &str) -> String {
+    s.replace('=', "=3D").replace(',', "=2C")
+}
+
+/// RFC 5802 SCRAM client, 2-message exchange over SaslAuthenticate.
+async fn sasl_authenticate_scram(
+    stream: &mut KafkaStream,
+    username: &str,
+    password: &str,
+    algo: ScramAlgo,
+) -> Result<(), String> {
+    // 32 hex chars from a v4 UUID: unpredictable and free of ',' / '='.
+    let client_nonce = Uuid::new_v4().simple().to_string();
+    let client_first_bare = format!("n={},r={}", scram_escape(username), client_nonce);
+    let client_first = format!("n,,{client_first_bare}");
+
+    let server_first_bytes = sasl_authenticate_exchange(stream, 101, client_first.as_bytes()).await?;
+    let server_first = String::from_utf8(server_first_bytes)
+        .map_err(|_| "Malformed SCRAM server-first-message (not UTF-8)".to_string())?;
+
+    let (client_final, expected_server_signature) =
+        scram_compute_final(password, &client_nonce, &client_first_bare, &server_first, algo)?;
+
+    let server_final_bytes = sasl_authenticate_exchange(stream, 102, client_final.as_bytes()).await?;
+    let server_final = String::from_utf8(server_final_bytes)
+        .map_err(|_| "Malformed SCRAM server-final-message (not UTF-8)".to_string())?;
+    let server_signature = server_final
+        .strip_prefix("v=")
+        .and_then(|b64| base64::engine::general_purpose::STANDARD.decode(b64).ok())
+        .ok_or("SCRAM server-final-message is missing its signature")?;
+    if server_signature != expected_server_signature {
+        return Err("SCRAM server signature verification failed (possible tampering)".into());
+    }
+    Ok(())
+}
+
+/// Pure SCRAM math (RFC 5802 §3): given the server-first-message and the
+/// client's own state, computes the client-final-message to send and the
+/// server signature we expect back. Split out from `sasl_authenticate_scram`
+/// so it can be exercised directly against RFC test vectors.
+fn scram_compute_final(
+    password: &str,
+    client_nonce: &str,
+    client_first_bare: &str,
+    server_first: &str,
+    algo: ScramAlgo,
+) -> Result<(String, Vec<u8>), String> {
+    let mut server_nonce = None;
+    let mut salt_b64 = None;
+    let mut iterations = None;
+    for part in server_first.split(',') {
+        if let Some(v) = part.strip_prefix("r=") {
+            server_nonce = Some(v.to_string());
+        } else if let Some(v) = part.strip_prefix("s=") {
+            salt_b64 = Some(v.to_string());
+        } else if let Some(v) = part.strip_prefix("i=") {
+            iterations = v.parse::<u32>().ok();
+        }
+    }
+    let server_nonce = server_nonce.ok_or("SCRAM server response is missing the nonce")?;
+    if !server_nonce.starts_with(client_nonce) {
+        return Err("SCRAM server nonce does not extend the client nonce (possible tampering)".into());
+    }
+    let salt = base64::engine::general_purpose::STANDARD
+        .decode(salt_b64.ok_or("SCRAM server response is missing the salt")?)
+        .map_err(|e| format!("Invalid SCRAM salt: {e}"))?;
+    let iterations = iterations.ok_or("SCRAM server response is missing the iteration count")?;
+
+    let salted_password = algo.pbkdf2(password.as_bytes(), &salt, iterations);
+    let client_key = algo.hmac(&salted_password, b"Client Key");
+    let stored_key = algo.hash(&client_key);
+    let client_final_without_proof = format!("c=biws,r={server_nonce}");
+    let auth_message = format!("{client_first_bare},{server_first},{client_final_without_proof}");
+    let client_signature = algo.hmac(&stored_key, auth_message.as_bytes());
+    let client_proof = xor_bytes(&client_key, &client_signature);
+    let client_final = format!(
+        "{client_final_without_proof},p={}",
+        base64::engine::general_purpose::STANDARD.encode(&client_proof)
+    );
+
+    let server_key = algo.hmac(&salted_password, b"Server Key");
+    let server_signature = algo.hmac(&server_key, auth_message.as_bytes());
+
+    Ok((client_final, server_signature))
+}
+
 // MetadataRequest v0 (API 3) — returns topics with partition/replica info
 async fn wire_metadata(
-    stream: &mut TcpStream,
+    stream: &mut KafkaStream,
     topics: &[&str],
 ) -> Result<Vec<TopicSummary>, String> {
     let mut body = Vec::new();
@@ -490,7 +871,7 @@ async fn wire_metadata(
 
 // ListOffsetsRequest v0 (API 2) — earliest (-2) or latest (-1)
 async fn wire_list_offsets(
-    stream: &mut TcpStream,
+    stream: &mut KafkaStream,
     topic: &str,
     partition_ids: &[i32],
     timestamp: i64, // -1 = latest, -2 = earliest
@@ -523,7 +904,7 @@ async fn wire_list_offsets(
 }
 
 // ListGroupsRequest v0 (API 16)
-async fn wire_list_groups(stream: &mut TcpStream) -> Result<Vec<GroupSummary>, String> {
+async fn wire_list_groups(stream: &mut KafkaStream) -> Result<Vec<GroupSummary>, String> {
     let resp = send_request(stream, 16, 0, 3, &[]).await?;
     let mut d = Dec::new(&resp);
     let _err = d.i16()?;
@@ -573,7 +954,7 @@ fn parse_member_assignment(bytes: &[u8]) -> Vec<(String, i32)> {
 
 // DescribeGroupsRequest v0 (API 15)
 async fn wire_describe_groups(
-    stream: &mut TcpStream,
+    stream: &mut KafkaStream,
     group_ids: &[&str],
 ) -> Result<Vec<(String, String, Vec<MemberWithAssignment>)>, String> {
     // returns (group_id, state, members)
@@ -613,7 +994,7 @@ async fn wire_describe_groups(
 // a single request — no need to enumerate cluster topics first. v2 adds a
 // trailing top-level error_code (consumed and ignored below).
 async fn wire_offset_fetch(
-    stream: &mut TcpStream,
+    stream: &mut KafkaStream,
     group_id: &str,
     topics: Option<&[(&str, Vec<i32>)]>,
 ) -> Result<Vec<(String, i32, i64)>, String> {
@@ -655,7 +1036,7 @@ async fn wire_offset_fetch(
 
 // DescribeConfigs v0 (API 32) — topic config entries (retention.ms, cleanup.policy, etc.)
 async fn wire_describe_configs(
-    stream: &mut TcpStream,
+    stream: &mut KafkaStream,
     topic: &str,
 ) -> Result<Vec<TopicConfig>, String> {
     let mut body = Vec::new();
@@ -1313,6 +1694,93 @@ pub async fn kafka_consume_stop(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── SecurityProtocol ──────────────────────────────────────────────────
+    #[test]
+    fn security_protocol_parses_the_four_standard_values() {
+        assert!(matches!(SecurityProtocol::parse("PLAINTEXT"), Ok(SecurityProtocol::Plaintext)));
+        assert!(matches!(SecurityProtocol::parse("SSL"), Ok(SecurityProtocol::Ssl)));
+        assert!(matches!(SecurityProtocol::parse("SASL_PLAINTEXT"), Ok(SecurityProtocol::SaslPlaintext)));
+        assert!(matches!(SecurityProtocol::parse("SASL_SSL"), Ok(SecurityProtocol::SaslSsl)));
+        assert!(SecurityProtocol::parse("garbage").is_err());
+    }
+
+    #[test]
+    fn security_protocol_tls_and_sasl_flags() {
+        assert!(!SecurityProtocol::Plaintext.uses_tls());
+        assert!(!SecurityProtocol::Plaintext.uses_sasl());
+        assert!(SecurityProtocol::Ssl.uses_tls());
+        assert!(!SecurityProtocol::Ssl.uses_sasl());
+        assert!(!SecurityProtocol::SaslPlaintext.uses_tls());
+        assert!(SecurityProtocol::SaslPlaintext.uses_sasl());
+        assert!(SecurityProtocol::SaslSsl.uses_tls());
+        assert!(SecurityProtocol::SaslSsl.uses_sasl());
+    }
+
+    // ── nonempty ─────────────────────────────────────────────────────────
+    #[test]
+    fn nonempty_trims_and_rejects_blank() {
+        assert_eq!(nonempty(&Some("  hi  ".to_string())), Some("hi"));
+        assert_eq!(nonempty(&Some("   ".to_string())), None);
+        assert_eq!(nonempty(&None), None);
+    }
+
+    // ── SCRAM ────────────────────────────────────────────────────────────
+    #[test]
+    fn scram_escape_orders_equals_before_comma() {
+        assert_eq!(scram_escape("a=b,c"), "a=3Db=2Cc");
+        assert_eq!(scram_escape("plain"), "plain");
+    }
+
+    #[test]
+    fn xor_bytes_matches_elementwise_xor() {
+        assert_eq!(xor_bytes(&[0b1010, 0b0011], &[0b0110, 0b0101]), vec![0b1100, 0b0110]);
+    }
+
+    // RFC 7677 §3 worked example for SCRAM-SHA-256 (username "user", password
+    // "pencil"). Confirms pbkdf2/hmac/hash wiring and message construction
+    // against a known-good exchange, including the returned server signature.
+    #[test]
+    fn scram_sha256_matches_rfc7677_vector() {
+        let client_nonce = "rOprNGfwEbeRWgbNEkqO";
+        let client_first_bare = format!("n={},r={}", scram_escape("user"), client_nonce);
+        assert_eq!(client_first_bare, "n=user,r=rOprNGfwEbeRWgbNEkqO");
+
+        let server_first = "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,\
+                             s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096";
+
+        let (client_final, server_signature) = scram_compute_final(
+            "pencil",
+            client_nonce,
+            &client_first_bare,
+            server_first,
+            ScramAlgo::Sha256,
+        )
+        .unwrap();
+
+        assert_eq!(
+            client_final,
+            "c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,\
+             p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ="
+        );
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD.encode(&server_signature),
+            "6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4="
+        );
+    }
+
+    #[test]
+    fn scram_compute_final_rejects_nonce_that_does_not_extend_clients() {
+        let err = scram_compute_final(
+            "pencil",
+            "client-nonce",
+            "n=user,r=client-nonce",
+            "r=someone-elses-nonce,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096",
+            ScramAlgo::Sha256,
+        )
+        .unwrap_err();
+        assert!(err.contains("tampering"));
+    }
 
     // ── parse_brokers ──────────────────────────────────────────────────────
     #[test]

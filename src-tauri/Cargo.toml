@@ -25,6 +25,12 @@ sha1 = "0.10"
 md-5 = "0.10"
 digest = "0.10"
 rskafka = { version = "0.6", features = ["transport-tls"] }
+rustls = "0.23"
+tokio-rustls = "0.26"
+rustls-pemfile = "2"
+rustls-platform-verifier = "0.7"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"

@@ -770,6 +770,8 @@ git push origin main --tags
 
 **Connect/Disconnect flow:** a broker must be explicitly connected (`handleConnect` in `KafkaExplorer.tsx`) before any views are accessible. `connectedBrokerId` is persisted in `localStorage` (`devtool:kafka:connectedBrokerId`). Connecting a new broker stops the previous broker's consumers (`kafkaConsumerStore.stopForBroker`). The right panel shows a `DisconnectedPanel` until connected.
 
+**Auth / TLS:** each `BrokerConfig` (`src-tauri/src/kafka.rs`) carries a `security_protocol` — `PLAINTEXT` (default), `SSL`, `SASL_PLAINTEXT`, or `SASL_SSL` — plus `sasl_mechanism` (`PLAIN`/`SCRAM-SHA-256`/`SCRAM-SHA-512`), `sasl_username`/`sasl_password`, and an optional `ssl_ca_pem` for self-signed CAs (OS trust store otherwise, via `rustls-platform-verifier`). This is applied on both Kafka connection paths: `make_client()` (rskafka, used by produce/consume/create/delete-topic) via `ClientBuilder::tls_config`/`sasl_config`, and the hand-rolled wire-protocol path (`open_kafka_stream` → `connect_and_auth`) which wraps the `TcpStream` in `tokio-rustls` and runs a manual SaslHandshake(17)/SaslAuthenticate(36) exchange (`sasl_authenticate*` in `kafka.rs`) before the first real request — required because SASL-enabled listeners reject everything else until auth completes. `BrokerForm.tsx` exposes a security-protocol `Select`, conditional SASL mechanism/username/password fields, and a collapsible "Advanced / TLS" CA-PEM textarea (same pattern as RabbitMQ's `ConnectionForm.tsx`).
+
 **Live consumers:** `kafkaConsumerStore.ts` (module-scope `Map`) manages streaming consumers via `kafka_consume_start` / `kafka_consume_stop` Rust commands. Tauri `Channel` pushes messages to the frontend. Store is outside the component tree so consumers survive view switches; `stopAll()` is called on tool unmount.
 
 **Input history:** `kafkaInputHistoryStore.ts` — per-broker history (localStorage, fields `'topic'|'key'`, cap 25, most-recent-first). `kafkaInputHistory.add/remove/get`, `useKafkaRecentMatches(brokerId, field, query)`. `RecentSuggestions.tsx` renders a "Recent" dropdown group with clock icon + hover × to remove.
@@ -908,6 +910,7 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 - `fast-xml-parser` — XML parse/serialize (Data Converter)
 - `js-yaml` — YAML parse/serialize
 - `rskafka` (Rust, v0.6) — Kafka client (via `rustls 0.23`)
+- `tokio-rustls` + `rustls-pemfile` + `rustls-platform-verifier` (Rust) — TLS for the hand-rolled Kafka wire-protocol path (SSL/SASL_SSL); `hmac` + `pbkdf2` + `sha2` back the SCRAM-SHA-256/512 SASL mechanisms
 - `lapin` (Rust, v4.x) — AMQP 0-9-1 client; TLS via `rustls-platform-verifier` (OS trust store) + optional CA PEM / PKCS#12 mTLS
 - `local-ip-address` + `hostname` (Rust) — back `local_network_info` for Network tool Local Network view
 - `netstat2` + `sysinfo` (Rust) — back `list_listening_ports` for Network tool Ports view
@@ -977,4 +980,4 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 
 ---
 
-*Last updated: 2026-06-30*
+*Last updated: 2026-07-01*

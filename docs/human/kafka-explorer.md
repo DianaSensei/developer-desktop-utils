@@ -14,7 +14,9 @@ The client identifies itself to brokers with the client ID **`devtool`**. You wi
 
 **No background polling.** Data loads automatically when you open a view — topic messages, the Consumers tab, group details — and refreshes only when you navigate or click Refresh. Nothing polls or holds a subscription open between actions.
 
-> ⚠ **Transport is plaintext.** Connections are unencrypted; **TLS/SSL and SASL authentication are not implemented** (the connection form does not collect credentials). Do not point Kafka Explorer at a broker that requires encryption or authentication.
+**Security protocol.** Each broker profile picks one of the four standard Kafka `security.protocol` values: `PLAINTEXT` (default, no auth, unencrypted), `SSL` (TLS only), `SASL_PLAINTEXT` (username/password, unencrypted), or `SASL_SSL` (username/password over TLS). SASL supports the `PLAIN`, `SCRAM-SHA-256`, and `SCRAM-SHA-512` mechanisms. TLS trusts the OS certificate store by default, or a pasted custom/self-signed CA certificate (PEM) when set on the broker profile. Credentials and any custom CA are stored in the same on-device `kafka-brokers.json` file as the rest of the broker profile.
+
+> ⚠ **`PLAINTEXT` connections are unencrypted with no authentication.** Only use it against brokers that don't require encryption or credentials — switch the broker's security protocol to `SSL` / `SASL_PLAINTEXT` / `SASL_SSL` otherwise.
 
 ---
 
