@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
+import { SplitPane } from '@/components/tools/apiclient/SplitPane';
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type Mode = 'beautify' | 'string' | 'minify';
@@ -551,65 +552,20 @@ export function JsonFormatter() {
     }
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="shrink-0 header-premium px-4 py-2.5">
-        <div className="flex flex-wrap items-center gap-3">
-          <Segmented
-            value={mode}
-            onValueChange={setMode}
-            options={[
-              { value: 'beautify', label: 'Beautify' },
-              { value: 'string', label: 'JSON String' },
-              { value: 'minify', label: 'Minify' },
-            ]}
-            aria-label="JSON mode"
-          />
+  const inputPanel = (
+    <div className="h-full border-b border-border flex flex-col">
+      <PaneHeader label="Input" hint={quickPasteHint} />
+      <Textarea
+        value={input}
+        onChange={(event) => setInput(event.target.value)}
+        placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
+        className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-xs p-4"
+      />
+    </div>
+  );
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Indent</span>
-            <Select value={indentKey} onValueChange={setIndentKey}>
-              <SelectTrigger className="h-8 w-[108px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2">2 spaces</SelectItem>
-                <SelectItem value="4">4 spaces</SelectItem>
-                <SelectItem value="tab">Tab</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Quotes</span>
-            <Select value={quote} onValueChange={setQuote}>
-              <SelectTrigger className="h-8 w-[112px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={'"'}>Double &quot;</SelectItem>
-                <SelectItem value={"'"}>Single &apos;</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button variant="outline" size="sm" className="ml-auto h-8 text-xs rounded-lg" onClick={() => setShowInput((v) => !v)}>
-            {showInput ? <EyeOff className="h-3 w-3 mr-1.5" /> : <Eye className="h-3 w-3 mr-1.5" />}
-            {showInput ? 'Hide input' : 'Show input'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Input panel (collapsible, fixed height) */}
-      {showInput && (
-        <div className="shrink-0 border-b border-border flex flex-col" style={{ height: '180px' }}>
-          <PaneHeader label="Input" hint={quickPasteHint} />
-          <Textarea
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
-            className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-xs p-4"
-          />
-        </div>
-      )}
-
+  const resultPanel = (
+    <div className="h-full min-h-0 flex flex-col">
       {/* Status bar */}
       {(parsed.error || parsed.value !== undefined) && (
         <div className="shrink-0 border-b border-border px-4 py-2">
@@ -736,6 +692,71 @@ export function JsonFormatter() {
           )}
         </div>
       )}
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="shrink-0 header-premium px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented
+            value={mode}
+            onValueChange={setMode}
+            options={[
+              { value: 'beautify', label: 'Beautify' },
+              { value: 'string', label: 'JSON String' },
+              { value: 'minify', label: 'Minify' },
+            ]}
+            aria-label="JSON mode"
+          />
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Indent</span>
+            <Select value={indentKey} onValueChange={setIndentKey}>
+              <SelectTrigger className="h-8 w-[108px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2">2 spaces</SelectItem>
+                <SelectItem value="4">4 spaces</SelectItem>
+                <SelectItem value="tab">Tab</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Quotes</span>
+            <Select value={quote} onValueChange={setQuote}>
+              <SelectTrigger className="h-8 w-[112px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={'"'}>Double &quot;</SelectItem>
+                <SelectItem value={"'"}>Single &apos;</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button variant="outline" size="sm" className="ml-auto h-8 text-xs rounded-lg" onClick={() => setShowInput((v) => !v)}>
+            {showInput ? <EyeOff className="h-3 w-3 mr-1.5" /> : <Eye className="h-3 w-3 mr-1.5" />}
+            {showInput ? 'Hide input' : 'Show input'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Input panel (collapsible, resizable) + result view */}
+      <div className="flex-1 min-h-0 flex flex-col">
+        {showInput ? (
+          <SplitPane
+            direction="vertical"
+            initialPercent={28}
+            minPercent={12}
+            maxPercent={70}
+            minPanePx={64}
+            first={inputPanel}
+            second={resultPanel}
+          />
+        ) : (
+          resultPanel
+        )}
+      </div>
     </div>
   );
 }
