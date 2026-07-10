@@ -7,14 +7,21 @@
     <title>DevTool - Developer Utilities</title>
     <!-- Critical theme bootstrap: runs before first paint so the window opens in
          the correct light/dark colour with no flash of unstyled / wrong-theme
-         content. Mirrors the logic in App.tsx (key: devtool-dark-mode). -->
+         content. Reads a plain-localStorage shadow copy of the 3-state theme
+         preference (`devtool-theme-shadow`, kept in sync by
+         setThemePreference() in src/lib/persistentStore.ts) because the real
+         source of truth lives in the async Tauri store, which isn't
+         available this early. If the shadow copy is missing/invalid or the
+         preference is 'system', fall back to the OS media query. -->
     <script>
       (function () {
         try {
-          var saved = localStorage.getItem('devtool-dark-mode');
-          var dark = saved !== null
-            ? saved === 'true'
-            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var saved = localStorage.getItem('devtool-theme-shadow');
+          var dark = saved === 'dark'
+            ? true
+            : saved === 'light'
+              ? false
+              : window.matchMedia('(prefers-color-scheme: dark)').matches;
           var root = document.documentElement;
           if (dark) root.classList.add('dark');
           root.style.colorScheme = dark ? 'dark' : 'light';

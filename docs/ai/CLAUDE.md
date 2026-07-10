@@ -617,7 +617,43 @@ const { status, updateInfo, updateAvailable, autoCheckEnabled, toggleAutoCheck, 
 ```
 
 ### Dark Mode
-`localStorage` key `devtool-dark-mode`. Class toggled on `<html>`. Managed in `App.tsx`.
+
+3-state theme preference (`'light' | 'dark' | 'system'`), stored in the Tauri
+store (not localStorage) under key `devtool-theme` as a raw string. Single
+source of truth — always read/write it through the two wrappers in
+`src/lib/persistentStore.ts`, never via `storageGet/storageSet('devtool-theme', ...)`
+directly:
+
+- `getThemePreference(): ThemePreference` — self-heals to `'system'` (and
+  persists the fix) if the stored value is missing/corrupt.
+- `setThemePreference(value)` — validates the enum, writes the Tauri store,
+  and mirrors the value into a plain `localStorage` key
+  (`devtool-theme-shadow`) for the anti-flash bootstrap below.
+
+**Anti-flash bootstrap**: the Tauri store is async, so it isn't readable
+before first paint. `index.html` has an inline `<script>` that runs before
+`main.tsx`/React and reads `devtool-theme-shadow` from plain `localStorage`
+(kept in sync by `setThemePreference`) to set the `dark` class / background
+color immediately. If the shadow value is `'system'` or missing, it falls
+back to `matchMedia('(prefers-color-scheme: dark)')`. `devtool-theme-shadow`
+is write-only from the rest of the app — only that bootstrap script reads it.
+
+**Resolution + live OS sync**: `AppContent` (`src/App.tsx`) holds
+`themePreference` state (init from `getThemePreference()`) and resolves it to
+an actual `isDark` boolean via the `useThemeSync` hook
+(`src/hooks/useThemeSync.ts`), which applies/removes the `dark` class on
+`<html>`. While preference is `'system'`, that hook subscribes to
+`matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ...)`
+so the app switches theme in real time if the OS theme changes while the app
+is open — the listener is added/removed exactly on entering/leaving
+`'system'` and on unmount.
+
+**Migration**: a one-time step in `initPersistentStore()`
+(`migrateThemeKey`, guarded by its own flag `__migratedThemeKey_v1`,
+independent of the general `__migratedFromLocalStorage` flag) maps the old
+boolean `devtool-dark-mode` key to the new enum (`'true'` → `'dark'`,
+`'false'` → `'light'`, missing/corrupt → `'system'`) and then deletes
+`devtool-dark-mode` outright — it is not kept for rollback.
 
 ### Sidebar Collapse
 `localStorage` key `devtool-sidebar-collapsed`. Width: `w-56` (224 px) ↔ `w-14` (56 px).

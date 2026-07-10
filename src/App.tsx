@@ -1,12 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, lazy, Suspense } from 'react';
 import { cn } from '@/lib/utils';
-import { storageGet, storageSet } from '@/lib/persistentStore';
+import { storageGet, storageSet, getThemePreference, setThemePreference, type ThemePreference } from '@/lib/persistentStore';
 import {
   Menu,
   X,
   Moon,
   Sun,
+  Monitor,
   Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
+import { useThemeSync, triggerThemeTransition } from '@/hooks/useThemeSync';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { Button } from '@/components/ui/button';
@@ -358,18 +360,31 @@ function NavScrollArea({
   );
 }
 
+const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+  { value: 'light', label: 'Light mode', icon: Sun },
+  { value: 'dark', label: 'Dark mode', icon: Moon },
+  { value: 'system', label: 'Match system', icon: Monitor },
+];
+
+// Compact single-button cycle order used by the mobile header toggle.
+const NEXT_THEME: Record<ThemePreference, ThemePreference> = {
+  light: 'dark',
+  dark: 'system',
+  system: 'light',
+};
+
 function Sidebar({
   isOpen,
   onClose,
-  isDark,
-  onToggleDark,
+  themePreference,
+  onThemeChange,
   isCollapsed,
   onToggleCollapse,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  isDark: boolean;
-  onToggleDark: () => void;
+  themePreference: ThemePreference;
+  onThemeChange: (value: ThemePreference) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }) {
@@ -542,30 +557,41 @@ function Sidebar({
             </span>
           </button>
 
-          {/* Dark / Light mode — icon reflects current mode */}
-          <button
-            onClick={onToggleDark}
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          {/* Theme preference — 3-state segmented control (Light / Dark / System) */}
+          <div
+            role="group"
+            aria-label="Theme"
             className={cn(
-              'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
-              isCollapsed ? 'justify-center' : 'gap-2.5'
+              'group relative flex items-center rounded-lg bg-muted/60 p-0.5',
+              isCollapsed ? 'w-full flex-col gap-0.5' : 'w-full'
             )}
           >
-            {isDark ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
-            {isCollapsed && (
-              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
-                {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              </span>
-            )}
-            <span
-              className={cn(
-                'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
-                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
-              )}
-            >
-              {isDark ? 'Light mode' : 'Dark mode'}
-            </span>
-          </button>
+            {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+              const active = themePreference === value;
+              return (
+                <button
+                  key={value}
+                  onClick={() => onThemeChange(value)}
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={active}
+                  className={cn(
+                    'relative flex flex-1 items-center justify-center rounded-md py-1.5 transition-colors',
+                    active
+                      ? 'bg-background text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  {isCollapsed && (
+                    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
+                      {label}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
           {/* Settings — always last */}
           <Link
@@ -616,45 +642,22 @@ function AppContent() {
     const saved = storageGet('devtool-sidebar-collapsed');
     return saved === 'true';
   });
-  const [isDark, setIsDark] = useState(() => {
-    const saved = storageGet('devtool-dark-mode');
-    if (saved !== null) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  useEffect(() => {
-    storageSet('devtool-dark-mode', isDark.toString());
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() =>
+    getThemePreference()
+  );
+  // Resolves `system` -> actual dark/light, applies the `dark` class to
+  // <html>, and (while preference === 'system') keeps it in sync in real
+  // time as the OS theme changes.
+  const isDark = useThemeSync(themePreference);
 
   useEffect(() => {
     storageSet('devtool-sidebar-collapsed', isCollapsed.toString());
   }, [isCollapsed]);
 
-  // Timer that clears the temporary `.theme-transition` class after a toggle.
-  const themeTransitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (themeTransitionTimer.current) clearTimeout(themeTransitionTimer.current);
-  }, []);
-
-  const toggleDark = () => {
-    // Animate the color swap, but only on an explicit user toggle and only when
-    // the user hasn't asked for reduced motion. The class is removed once the
-    // transition completes so it can never affect first paint or later interactions.
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reduceMotion) {
-      const root = document.documentElement;
-      root.classList.add('theme-transition');
-      if (themeTransitionTimer.current) clearTimeout(themeTransitionTimer.current);
-      themeTransitionTimer.current = setTimeout(() => {
-        root.classList.remove('theme-transition');
-      }, 260);
-    }
-    setIsDark((prev) => !prev);
+  const changeTheme = (value: ThemePreference) => {
+    triggerThemeTransition();
+    setThemePreference(value);
+    setThemePreferenceState(value);
   };
 
   const toggleCollapse = () => {
@@ -686,8 +689,8 @@ function AppContent() {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        isDark={isDark}
-        onToggleDark={toggleDark}
+        themePreference={themePreference}
+        onThemeChange={changeTheme}
         isCollapsed={isCollapsed}
         onToggleCollapse={toggleCollapse}
       />
@@ -728,8 +731,20 @@ function AppContent() {
                   <HelpCircle className="h-4 w-4" />
                 </Button>
               )}
-              <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={toggleDark} title={isDark ? 'Light mode' : 'Dark mode'}>
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden h-8 w-8"
+                onClick={() => changeTheme(NEXT_THEME[themePreference])}
+                title={`Theme: ${themePreference} (tap to cycle)`}
+              >
+                {themePreference === 'system' ? (
+                  <Monitor className="h-4 w-4" />
+                ) : isDark ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </div>
