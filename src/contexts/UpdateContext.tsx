@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAppConfig } from '@/contexts/AppConfigContext';
+import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 
 export type UpdateStatus =
   | 'idle'
@@ -47,7 +48,7 @@ const STORAGE_CHECK_HOUR = 'devtool-update-check-hour';
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function loadCheckHour(fallbackHour: number): number {
-  const raw = parseInt(localStorage.getItem(STORAGE_CHECK_HOUR) ?? '', 10);
+  const raw = parseInt(storageGet(STORAGE_CHECK_HOUR) ?? '', 10);
   return Number.isInteger(raw) && raw >= 0 && raw <= 23 ? raw : fallbackHour;
 }
 
@@ -69,7 +70,7 @@ function msUntilNextDailyCheck(hour: number): number {
 
 function loadPendingUpdate(): UpdateInfo | null {
   try {
-    const raw = localStorage.getItem(STORAGE_PENDING_UPDATE);
+    const raw = storageGet(STORAGE_PENDING_UPDATE);
     return raw ? (JSON.parse(raw) as UpdateInfo) : null;
   } catch {
     return null;
@@ -101,7 +102,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   // Set while a download is in flight; calling it aborts the wait (cancel or stall-timeout).
   const cancelInstallRef = useRef<((reason: string) => void) | null>(null);
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(() => {
-    const stored = localStorage.getItem(STORAGE_AUTO_CHECK);
+    const stored = storageGet(STORAGE_AUTO_CHECK);
     return stored === null ? true : stored === 'true'; // default on for fresh installs
   });
   const [checkHour, setCheckHourState] = useState<number>(() => loadCheckHour(config.updates.defaultCheckHour));
@@ -120,7 +121,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
 
   const setCheckHour = useCallback((hour: number) => {
     const h = Math.min(23, Math.max(0, Math.trunc(hour)));
-    localStorage.setItem(STORAGE_CHECK_HOUR, String(h));
+    storageSet(STORAGE_CHECK_HOUR, String(h));
     setCheckHourState(h);
   }, []);
 
@@ -137,7 +138,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     try {
       const { check } = await import('@tauri-apps/plugin-updater');
       const update = await check();
-      localStorage.setItem(STORAGE_LAST_CHECK, Date.now().toString());
+      storageSet(STORAGE_LAST_CHECK, Date.now().toString());
       // Only treat it as available if it's strictly newer than what's installed.
       // Guards against a stale/older manifest being offered as a "downgrade update".
       const cur = currentVersionRef.current;
@@ -145,7 +146,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
         const info = { version: update.version, body: update.body ?? '', date: update.date ?? '' };
         setUpdateInfo(info);
         setUpdateAvailable(true);
-        localStorage.setItem(STORAGE_PENDING_UPDATE, JSON.stringify(info));
+        storageSet(STORAGE_PENDING_UPDATE, JSON.stringify(info));
         setStatus('available');
         if (popDialog) setShowUpdateDialog(true);
         return info;
@@ -153,7 +154,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       // Confirmed up to date — clear the persisted badge.
       setUpdateInfo(null);
       setUpdateAvailable(false);
-      localStorage.removeItem(STORAGE_PENDING_UPDATE);
+      storageRemove(STORAGE_PENDING_UPDATE);
       setStatus('not-available');
       return null;
     } catch (e) {
@@ -188,7 +189,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     if (!isNewer(updateInfo.version, currentVersion)) {
       setUpdateInfo(null);
       setUpdateAvailable(false);
-      localStorage.removeItem(STORAGE_PENDING_UPDATE);
+      storageRemove(STORAGE_PENDING_UPDATE);
       setShowUpdateDialog(false);
       setStatus((s) => (s === 'available' ? 'not-available' : s));
     }
@@ -205,7 +206,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     //     and stop, so they review the new version before downloading
     //   • same version → proceed to download
     const staleMs = config.updates.recheckStaleMinutes * 60 * 1000;
-    const lastCheck = parseInt(localStorage.getItem(STORAGE_LAST_CHECK) ?? '0', 10);
+    const lastCheck = parseInt(storageGet(STORAGE_LAST_CHECK) ?? '0', 10);
     if (Date.now() - lastCheck > staleMs) {
       const prevVersion = updateInfo?.version;
       const fresh = await runCheck(false);
@@ -296,7 +297,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   const toggleAutoCheck = useCallback(() => {
     setAutoCheckEnabled((prev) => {
       const next = !prev;
-      localStorage.setItem(STORAGE_AUTO_CHECK, String(next));
+      storageSet(STORAGE_AUTO_CHECK, String(next));
       return next;
     });
   }, []);
@@ -305,7 +306,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isTauri || !autoCheckEnabled) return;
 
-    const lastCheck = parseInt(localStorage.getItem(STORAGE_LAST_CHECK) ?? '0', 10);
+    const lastCheck = parseInt(storageGet(STORAGE_LAST_CHECK) ?? '0', 10);
     if (lastCheck < lastDailyBoundary(checkHour)) {
       runCheck();
     }
@@ -330,7 +331,7 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     if (!isTauri || !autoCheckEnabled) return;
     function handleOnline() {
       if (statusRef.current === 'checking' || statusRef.current === 'downloading') return;
-      const lastCheck = parseInt(localStorage.getItem(STORAGE_LAST_CHECK) ?? '0', 10);
+      const lastCheck = parseInt(storageGet(STORAGE_LAST_CHECK) ?? '0', 10);
       if (statusRef.current === 'error' || lastCheck < lastDailyBoundary(checkHour)) {
         runCheck();
       }

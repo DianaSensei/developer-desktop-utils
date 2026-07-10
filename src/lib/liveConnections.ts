@@ -7,6 +7,7 @@
 // fresh launch before the tool's component has mounted.
 
 import { useSyncExternalStore } from 'react';
+import { storageGet } from '@/lib/persistentStore';
 
 const live = new Set<string>();
 const listeners = new Set<() => void>();
@@ -20,7 +21,7 @@ function emit() {
 function seed(featureId: string, storageKey: string) {
   try {
     // usePersistentState stores JSON; a non-empty connected id means "connected".
-    if (JSON.parse(localStorage.getItem(storageKey) ?? '""')) live.add(featureId);
+    if (JSON.parse(storageGet(storageKey) ?? '""')) live.add(featureId);
   } catch { /* ignore */ }
 }
 seed('rabbit-client', 'devtool:rabbit:connectedConnId');

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { dayStart, splitRunningAcrossDays, uid } from './time';
 
 // ---------------------------------------------------------------------------
@@ -176,7 +177,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     if (migrated.current) return;
     migrated.current = true;
     try {
-      if (localStorage.getItem('devtool:clockify:migrated')) return;
+      if (storageGet('devtool:clockify:migrated')) return;
 
       // normalize tasks loaded from the old key (add projectId if absent)
       setTasks((prev) =>
@@ -191,7 +192,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
       );
 
       // convert old time records → time entries (only if we have none yet)
-      const rawRecords = localStorage.getItem('devtool:tasks:records');
+      const rawRecords = storageGet('devtool:tasks:records');
       if (rawRecords) {
         const old = JSON.parse(rawRecords) as Array<{ id: string; taskId: string; start: number; end: number | null }>;
         if (old.length) {
@@ -215,7 +216,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
       // merge any newer default settings fields onto persisted settings
       setSettings((cur) => ({ ...DEFAULT_SETTINGS, ...cur }));
 
-      localStorage.setItem('devtool:clockify:migrated', '1');
+      storageSet('devtool:clockify:migrated', '1');
     } catch {
       // migration is best-effort
     }
@@ -230,14 +231,14 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
     if (purged.current) return;
     purged.current = true;
     try {
-      if (localStorage.getItem('devtool:clockify:purged-v2')) return;
+      if (storageGet('devtool:clockify:purged-v2')) return;
       for (const key of [
         'devtool:clockify:expenses',
         'devtool:clockify:schedule',
         'devtool:clockify:timeoff',
         'devtool:clockify:timeoff-policies',
       ]) {
-        localStorage.removeItem(key);
+        storageRemove(key);
       }
       const strip = <T extends object>(o: T): T => {
         if (!('billable' in o)) return o;
@@ -247,7 +248,7 @@ export function ClockifyProvider({ children }: { children: ReactNode }) {
       };
       setEntries((prev) => (prev.some((e) => 'billable' in e) ? prev.map(strip) : prev));
       setProjects((prev) => (prev.some((p) => 'billable' in p) ? prev.map(strip) : prev));
-      localStorage.setItem('devtool:clockify:purged-v2', '1');
+      storageSet('devtool:clockify:purged-v2', '1');
     } catch {
       // best-effort
     }

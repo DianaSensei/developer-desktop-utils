@@ -18,6 +18,8 @@
     "process:allow-restart",
     "updater:allow-check",
     "updater:allow-download-and-install",
+    "store:default",
+    "window-state:default",
     {
       "identifier": "http:default",
       "allow": [

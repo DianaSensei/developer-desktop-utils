@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { storageGet, storageSet } from '@/lib/persistentStore';
 
 interface FeatureSettings {
   [key: string]: boolean;
@@ -52,7 +53,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
 export function FeatureProvider({ children }: { children: ReactNode }) {
   const [features, setFeatures] = useState<FeatureSettings>(() => {
     try {
-      const saved = localStorage.getItem('devtool-features');
+      const saved = storageGet('devtool-features');
       if (!saved) return DEFAULT_FEATURES;
       // Merge: new tools get their DEFAULT value; existing user overrides are preserved
       return { ...DEFAULT_FEATURES, ...JSON.parse(saved) };
@@ -63,24 +64,24 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
 
   const [toolOrder, setToolOrder] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem(TOOL_ORDER_KEY);
+      const saved = storageGet(TOOL_ORDER_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
 
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem(FAVORITES_KEY);
+      const saved = storageGet(FAVORITES_KEY);
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
 
   useEffect(() => {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    storageSet(FAVORITES_KEY, JSON.stringify(favorites));
   }, [favorites]);
 
   useEffect(() => {
-    localStorage.setItem('devtool-features', JSON.stringify(features));
+    storageSet('devtool-features', JSON.stringify(features));
   }, [features]);
 
   const toggleFeature = (featureId: string) => {
@@ -100,7 +101,7 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
 
   const reorderTools = (order: string[]) => {
     setToolOrder(order);
-    localStorage.setItem(TOOL_ORDER_KEY, JSON.stringify(order));
+    storageSet(TOOL_ORDER_KEY, JSON.stringify(order));
   };
 
   // Most-recently-favorited goes first, so the top of the sidebar reflects the

@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, lazy, Suspense } from 'react';
 import { cn } from '@/lib/utils';
+import { storageGet, storageSet } from '@/lib/persistentStore';
 import {
   Menu,
   X,
@@ -612,17 +613,17 @@ function AppContent() {
   useDesktopChrome();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('devtool-sidebar-collapsed');
+    const saved = storageGet('devtool-sidebar-collapsed');
     return saved === 'true';
   });
   const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('devtool-dark-mode');
+    const saved = storageGet('devtool-dark-mode');
     if (saved !== null) return saved === 'true';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
   useEffect(() => {
-    localStorage.setItem('devtool-dark-mode', isDark.toString());
+    storageSet('devtool-dark-mode', isDark.toString());
     if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
@@ -631,7 +632,7 @@ function AppContent() {
   }, [isDark]);
 
   useEffect(() => {
-    localStorage.setItem('devtool-sidebar-collapsed', isCollapsed.toString());
+    storageSet('devtool-sidebar-collapsed', isCollapsed.toString());
   }, [isCollapsed]);
 
   // Timer that clears the temporary `.theme-transition` class after a toggle.

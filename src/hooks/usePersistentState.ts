@@ -1,4 +1,5 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
+import { flushPersistentStore, storageGet, storageSet } from '@/lib/persistentStore';
 
 interface Options {
   /**
@@ -23,7 +24,7 @@ export function usePersistentState<T>(key: string, initial: T | (() => T), optio
   const debounceMs = options?.debounceMs ?? 0;
   const [state, setState] = useState<T>(() => {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = storageGet(key);
       if (raw !== null) return JSON.parse(raw) as T;
     } catch {
       // ignore corrupt/blocked storage and fall back to the initial value
@@ -37,7 +38,7 @@ export function usePersistentState<T>(key: string, initial: T | (() => T), optio
 
   const write = useCallback(() => {
     try {
-      localStorage.setItem(key, JSON.stringify(stateRef.current));
+      storageSet(key, JSON.stringify(stateRef.current));
     } catch {
       // storage full or unavailable; nothing we can do
     }
@@ -60,11 +61,12 @@ export function usePersistentState<T>(key: string, initial: T | (() => T), optio
   // `beforeunload` is unreliable in desktop webviews (Tauri/WebKit), so we also
   // listen for `pagehide` and `visibilitychange→hidden`, which fire when the
   // window is closed, hidden, or the OS suspends the app — ensuring the latest
-  // edits reach localStorage before the process goes away.
+  // edits reach disk (via the persistent store's autoSave) before the process
+  // goes away.
   useEffect(() => {
     if (debounceMs <= 0) return;
-    const flush = () => write();
-    const onVisibility = () => { if (document.visibilityState === 'hidden') write(); };
+    const flush = () => { write(); void flushPersistentStore(); };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
     window.addEventListener('beforeunload', flush);
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', onVisibility);
@@ -72,7 +74,7 @@ export function usePersistentState<T>(key: string, initial: T | (() => T), optio
       window.removeEventListener('beforeunload', flush);
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', onVisibility);
-      write();
+      flush();
     };
   }, [debounceMs, write]);
 

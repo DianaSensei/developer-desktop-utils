@@ -7,6 +7,7 @@
 // mirroring `knownNamesStore`.
 
 import { useSyncExternalStore } from 'react';
+import { storageGet, storageSet } from '@/lib/persistentStore';
 
 const STORAGE_KEY = 'devtool:rabbit:inputHistory';
 const MAX = 25; // per field, per connection
@@ -21,7 +22,7 @@ let store: Store = load();
 
 function load(): Store {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageGet(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as Store) : {};
   } catch {
     return {};
@@ -29,7 +30,7 @@ function load(): Store {
 }
 
 function persist() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); } catch { /* ignore */ }
+  try { storageSet(STORAGE_KEY, JSON.stringify(store)); } catch { /* ignore */ }
 }
 
 function emit() {

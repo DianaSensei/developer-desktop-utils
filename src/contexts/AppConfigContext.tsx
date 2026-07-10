@@ -6,6 +6,7 @@ import {
   DEFAULT_APP_CONFIG,
   mergeConfig,
 } from '@/config/appConfig';
+import { storageGet, storageSet } from '@/lib/persistentStore';
 
 const STORAGE_KEY = 'devtool-app-config';
 
@@ -21,7 +22,7 @@ const AppConfigContext = createContext<AppConfigContextValue | null>(null);
 
 function load(): AppConfig {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageGet(STORAGE_KEY);
     return mergeConfig(raw ? JSON.parse(raw) : null);
   } catch {
     return mergeConfig(null);
@@ -34,7 +35,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
   const persist = useCallback((next: AppConfig) => {
     setConfig(next);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      storageSet(STORAGE_KEY, JSON.stringify(next));
     } catch {
       /* storage unavailable — keep in-memory value */
     }
@@ -48,7 +49,7 @@ export function AppConfigProvider({ children }: { children: React.ReactNode }) {
         [field.section]: { ...prev[field.section], [field.key]: clamped },
       };
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        storageSet(STORAGE_KEY, JSON.stringify(next));
       } catch {
         /* ignore */
       }
