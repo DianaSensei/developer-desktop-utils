@@ -121,11 +121,23 @@ export function Settings() {
   const [configOpen, setConfigOpen] = useState(false);
   const [permsOpen, setPermsOpen] = useState(true);
   const [currentVersion, setCurrentVersion] = useState('');
+  const [dataDir, setDataDir] = useState('');
 
   useEffect(() => {
     if (!isTauri) return;
     import('@tauri-apps/api/app').then(({ getVersion }) => getVersion()).then(setCurrentVersion).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isTauri) return;
+    import('@tauri-apps/api/path').then(({ appDataDir }) => appDataDir()).then(setDataDir).catch(() => {});
+  }, []);
+
+  const revealDataDir = useCallback(async () => {
+    if (!isTauri || !dataDir) return;
+    const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
+    await revealItemInDir(dataDir);
+  }, [dataDir]);
 
   const [displayTools, setDisplayTools] = useState(() => applySavedOrder(TOOL_DEFS, toolOrder));
 
@@ -546,6 +558,36 @@ export function Settings() {
             <p className="text-muted-foreground leading-relaxed">
               Everything runs on your device. Network access only happens when you ask for it, plus the daily check for app updates — no telemetry, analytics, or other data leaves your machine.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Data & Storage section */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">Data &amp; Storage</h2>
+        <div className="rounded-lg border divide-y">
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium">Where your data is stored</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed break-all">
+                {isTauri
+                  ? dataDir || 'Resolving…'
+                  : 'App data folder (available in the desktop app).'}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                All settings, tool history and workspaces are saved to a file on your device — not in the browser. Nothing leaves your machine.
+              </p>
+            </div>
+            {isTauri && (
+              <button
+                onClick={revealDataDir}
+                disabled={!dataDir}
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+                Show in folder
+              </button>
+            )}
           </div>
         </div>
       </section>
