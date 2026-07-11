@@ -433,6 +433,8 @@ function Sidebar({
   const favoriteCount = favNavTools.length;
   const settingsTool = allTools.find((t) => t.featureId === 'settings')!;
   const isSettingsActive = location.pathname === settingsTool.path;
+  const activeThemeOption = THEME_OPTIONS.find((o) => o.value === themePreference)!;
+  const ThemeIcon = activeThemeOption.icon;
 
   // Tools the user has hidden — surfaced as a hint so they know more exist.
   const disabledTools = allTools.filter((t) => t.featureId !== 'settings' && !isFeatureEnabled(t.featureId));
@@ -560,41 +562,31 @@ function Sidebar({
             </span>
           </button>
 
-          {/* Theme preference — 3-state segmented control (Light / Dark / System) */}
-          <div
-            role="group"
-            aria-label="Theme"
+          {/* Theme preference — single cycling toggle (Light → Dark → System),
+              styled to match the Collapse/Settings rows instead of a boxed segmented control */}
+          <button
+            onClick={() => onThemeChange(NEXT_THEME[themePreference])}
+            title={`Theme: ${activeThemeOption.label} (click to cycle)`}
             className={cn(
-              'group relative flex items-center rounded-lg bg-muted/60 p-0.5',
-              isCollapsed ? 'w-full flex-col gap-0.5' : 'w-full'
+              'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+              isCollapsed ? 'justify-center' : 'gap-2.5'
             )}
           >
-            {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
-              const active = themePreference === value;
-              return (
-                <button
-                  key={value}
-                  onClick={() => onThemeChange(value)}
-                  title={label}
-                  aria-label={label}
-                  aria-pressed={active}
-                  className={cn(
-                    'relative flex flex-1 items-center justify-center rounded-md py-1.5 transition-colors',
-                    active
-                      ? 'bg-background text-primary shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  {isCollapsed && (
-                    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
-                      {label}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+            <ThemeIcon className="h-4 w-4 shrink-0" />
+            {isCollapsed && (
+              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
+                {activeThemeOption.label}
+              </span>
+            )}
+            <span
+              className={cn(
+                'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
+              )}
+            >
+              {activeThemeOption.label}
+            </span>
+          </button>
 
           {/* Settings — always last */}
           <Link
