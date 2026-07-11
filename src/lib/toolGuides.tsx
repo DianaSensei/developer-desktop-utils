@@ -385,4 +385,23 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     know: ['The timer and all data persist locally; Pomodoro pauses and beeps after the configured interval; meeting notes and time entries share the same calendar.'],
     caveat: ['Local only (no cloud sync); desktop notifications need permission. Meeting-note Markdown is generated one-way from the form (no markdown-to-form editing).'],
   }),
+
+  settings: makeGuide({
+    use: [
+      <><strong className="text-foreground">Tools</strong> section: search, enable/disable individual tools, drag rows to reorder the sidebar, and star a tool to pin it near the top.</>,
+      <><strong className="text-foreground">Configuration</strong> section: tunable numbers (editor limits, generator defaults, Kafka/update timings) — changes save and apply immediately, no restart needed.</>,
+      <><strong className="text-foreground">Data & Storage</strong> section: see where your local data lives on disk and reveal it in Finder/Explorer.</>,
+      <><strong className="text-foreground">About</strong> section: current version, auto-update toggle/schedule, and the “Xem lại” button to reopen the welcome tour.</>,
+    ],
+    know: ['Everything here is stored locally on your device — nothing syncs to a server.'],
+  }),
+};
+
+// Manually-bumped content version per tool guide. Increment the number for a
+// tool when its guide entry above changes because the tool's behavior or
+// feature set changed — a user who already saw the guide will be shown it
+// again once, the next time they open that tool. Tools not listed default to
+// version 1 (their guide's initial version).
+export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
+  settings: 1,
 };

@@ -28,6 +28,12 @@ const VALID_THEME_VALUES: ThemePreference[] = ['light', 'dark', 'system'];
 let store: Store | null = null;
 const cache = new Map<string, string>();
 
+// Captured once, at the end of initPersistentStore — before any React provider
+// has mounted and had a chance to write its own defaults to the store. `true`
+// means the on-disk store was empty at boot, i.e. this is a brand-new install
+// rather than an existing user upgrading to a version that added a new key.
+let freshInstall = false;
+
 async function migrateFromLocalStorage(s: Store): Promise<void> {
   if (await s.get(MIGRATION_FLAG)) return;
 
@@ -82,7 +88,18 @@ export async function initPersistentStore(): Promise<void> {
     if (typeof value === 'string') cache.set(key, value);
   }
 
+  freshInstall = cache.size === 0;
+
   await migrateThemeKey(s);
+}
+
+// True only for a brand-new install (nothing was on disk at boot). False for
+// an existing user, even one upgrading to a version that ships new features —
+// use this to seed one-time defaults so upgrades don't retroactively trigger
+// "first run" behavior (e.g. onboarding, per-tool intro guides) for people
+// who already know the app.
+export function wasFreshInstall(): boolean {
+  return freshInstall;
 }
 
 export function storageGet(key: string): string | null {

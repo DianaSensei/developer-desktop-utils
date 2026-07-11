@@ -31,6 +31,9 @@ import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { MeetingsProvider } from '@/lib/meetings';
 import { UpdateDialog } from '@/components/UpdateDialog';
 import { ToolGuideModal } from '@/components/ToolGuideModal';
+import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
+import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
+import { useToolGuideTracking } from '@/hooks/useToolGuideTracking';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppLogo } from '@/components/AppLogo';
 
@@ -669,7 +672,35 @@ function AppContent() {
   const ActiveIcon = activeTool.icon;
   const isFullHeight = !!(activeTool as typeof allTools[0] & { fullHeight?: boolean }).fullHeight;
   const [guideOpen, setGuideOpen] = useState(false);
-  const showGuide = activeTool.featureId !== 'settings';
+  const [guideIsWhatsNew, setGuideIsWhatsNew] = useState(false);
+  const { shouldAutoShow, markSeen } = useToolGuideTracking();
+  const { show: onboardingShowing } = useOnboarding();
+
+  // Auto-open the guide once per tool version bump (or on a brand-new
+  // install, once per tool's first-ever visit) — see useToolGuideTracking.
+  // Deferred while the global onboarding dialog is up so the two don't stack.
+  useEffect(() => {
+    if (onboardingShowing) return;
+    if (shouldAutoShow(activeTool.featureId)) {
+      setGuideIsWhatsNew(true);
+      setGuideOpen(true);
+    }
+    // Re-run only when the active tool or the onboarding dialog's visibility changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool.featureId, onboardingShowing]);
+
+  const openGuideManually = () => {
+    setGuideIsWhatsNew(false);
+    setGuideOpen(true);
+  };
+
+  const handleGuideOpenChange = (open: boolean) => {
+    setGuideOpen(open);
+    if (!open) {
+      markSeen(activeTool.featureId);
+      setGuideIsWhatsNew(false);
+    }
+  };
 
   const routes = (
     <ErrorBoundary resetKey={location.pathname}>
@@ -719,18 +750,16 @@ function AppContent() {
             <div className="flex items-center gap-1">
               {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
               <div id="tool-header-actions" className="flex items-center gap-1" />
-              {showGuide && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground/70 hover:text-foreground"
-                  onClick={() => setGuideOpen(true)}
-                  title={`How to use ${activeTool.label}`}
-                  aria-label={`How to use ${activeTool.label}`}
-                >
-                  <HelpCircle className="h-4 w-4" />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground/70 hover:text-foreground"
+                onClick={openGuideManually}
+                title={`How to use ${activeTool.label}`}
+                aria-label={`How to use ${activeTool.label}`}
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -773,7 +802,8 @@ function AppContent() {
         label={activeTool.label}
         description={activeTool.description ?? ''}
         open={guideOpen}
-        onOpenChange={setGuideOpen}
+        onOpenChange={handleGuideOpenChange}
+        isWhatsNew={guideIsWhatsNew}
       />
     </div>
   );
@@ -783,14 +813,17 @@ function App() {
   return (
     <AppConfigProvider>
       <FeatureProvider>
-        <UpdateProvider>
-          <MeetingsProvider>
-            <Router>
-              <AppContent />
-              <UpdateDialog />
-            </Router>
-          </MeetingsProvider>
-        </UpdateProvider>
+        <OnboardingProvider>
+          <UpdateProvider>
+            <MeetingsProvider>
+              <Router>
+                <AppContent />
+                <UpdateDialog />
+                <OnboardingFlow />
+              </Router>
+            </MeetingsProvider>
+          </UpdateProvider>
+        </OnboardingProvider>
       </FeatureProvider>
     </AppConfigProvider>
   );

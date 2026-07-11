@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, Loader2, WifiOff, XCircle, ChevronDown,
-  Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles,
+  Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -15,6 +15,7 @@ import { useAppConfig } from '@/contexts/AppConfigContext';
 import { CONFIG_FIELDS, SECTION_LABELS, type ConfigSection } from '@/config/appConfig';
 import { useUpdate } from '@/contexts/UpdateContext';
 import { AppLogo } from '@/components/AppLogo';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
 /** Format an hour (0–23) as a friendly 12-hour label, e.g. 6 → "6:00 AM". */
 function formatHour(hour: number): string {
@@ -116,6 +117,7 @@ const APP_PERMISSIONS = [
 
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools, isFavorite, toggleFavorite } = useFeatures();
+  const { open: openOnboarding } = useOnboarding();
   const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall, openUpdateDialog } = useUpdate();
   const { config, setField, resetConfig } = useAppConfig();
   const [configOpen, setConfigOpen] = useState(false);
@@ -420,6 +422,19 @@ export function Settings() {
               <p className="font-semibold text-sm leading-none">DevTool</p>
               <p className="text-muted-foreground mt-1 text-[11px]">Developer utilities for your desktop</p>
             </div>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3 text-xs">
+            <div>
+              <p className="font-medium">Hướng dẫn giới thiệu</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Xem lại màn welcome và chọn lại nhóm tool quan tâm</p>
+            </div>
+            <button
+              onClick={openOnboarding}
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Compass className="h-3 w-3" />
+              Xem lại
+            </button>
           </div>
           {isTauri && (
             <div className="flex items-center justify-between px-4 py-3 text-xs">

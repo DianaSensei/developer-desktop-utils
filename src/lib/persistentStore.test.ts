@@ -134,3 +134,21 @@ describe('devtool-dark-mode -> devtool-theme migration (initPersistentStore)', (
     expect(mod.getThemePreference()).toBe('system');
   });
 });
+
+describe('wasFreshInstall', () => {
+  it('is true when the store was empty at boot', async () => {
+    fakeStoreData = {};
+    const mod = await import('./persistentStore');
+    await mod.initPersistentStore();
+
+    expect(mod.wasFreshInstall()).toBe(true);
+  });
+
+  it('is false when the store already had data at boot', async () => {
+    fakeStoreData = { 'devtool-theme': 'dark' };
+    const mod = await import('./persistentStore');
+    await mod.initPersistentStore();
+
+    expect(mod.wasFreshInstall()).toBe(false);
+  });
+});
