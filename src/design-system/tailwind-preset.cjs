@@ -106,10 +106,17 @@ module.exports = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: 0 },
         },
+        // Sliding sliver for indeterminate progress bars (work of unknown length,
+        // e.g. an HTTP request in flight).
+        'progress-indeterminate': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'progress-indeterminate': 'progress-indeterminate 1.1s ease-in-out infinite',
       },
     },
   },

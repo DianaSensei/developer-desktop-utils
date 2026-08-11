@@ -191,6 +191,12 @@ export interface Environment {
   collectionId?: string | null;
 }
 
+// Split of the total round-trip, so the Timeline tab can show where time went.
+export interface ResponseTimings {
+  ttfbMs: number;      // request sent → response headers received
+  downloadMs: number;  // headers received → body fully read
+}
+
 // Result of executing a request.
 export interface ApiResponse {
   status: number;
@@ -203,6 +209,11 @@ export interface ApiResponse {
   sizeBytes: number;
   url?: string;            // final URL actually fetched (after redirects)
   setCookies?: string[];   // raw Set-Cookie header values from the response
+  timings?: ResponseTimings;
+  // Base64 of the raw bytes, kept only for binary payloads (images, octet-stream,
+  // pdf, …) where decoding to text would corrupt them. Text responses omit it.
+  bodyBase64?: string;
+  binary?: boolean;        // true when the payload is not text
 }
 
 // A single past send (most-recent first), kept for the History tab.

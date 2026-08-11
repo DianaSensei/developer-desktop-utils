@@ -33,8 +33,19 @@ const MAX_HISTORY_BODY = 256 * 1024; // cap stored response bodies at 256 KB
 // drop binary file payloads from the request snapshot (filenames are kept).
 function trimHistoryEntry(entry: Omit<HistoryEntry, 'id' | 'at'>): Omit<HistoryEntry, 'id' | 'at'> {
   const out = { ...entry };
-  if (out.response && out.response.body.length > MAX_HISTORY_BODY) {
-    out.response = { ...out.response, body: out.response.body.slice(0, MAX_HISTORY_BODY) };
+  if (out.response) {
+    const r = out.response;
+    // `bodyBase64` holds the raw bytes of a binary response (up to 16 MB). It is
+    // useful in the live viewer but must never reach storage — fifty of those
+    // would blow the whole workspace past the storage quota.
+    const needsTrim = r.body.length > MAX_HISTORY_BODY || r.bodyBase64 !== undefined;
+    if (needsTrim) {
+      out.response = {
+        ...r,
+        body: r.body.length > MAX_HISTORY_BODY ? r.body.slice(0, MAX_HISTORY_BODY) : r.body,
+        bodyBase64: undefined,
+      };
+    }
   }
   if (out.request) {
     const r = out.request;

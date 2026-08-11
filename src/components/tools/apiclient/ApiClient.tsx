@@ -13,7 +13,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
 import { AddressBar } from './AddressBar';
-import { RequestPanel } from './RequestPanel';
+import { RequestPanel, type RequestPanelTab } from './RequestPanel';
 import { ResponsePanel } from './ResponsePanel';
 import { RequestTabs } from './RequestTabs';
 import { HistoryView } from './HistoryView';
@@ -44,7 +44,14 @@ export function ApiClient() {
   const { activeRequest } = store;
 
   const [runs, setRuns] = useState<Record<string, RunState>>({});
+  // Which builder tab (Params / Body / Script / …) each open request was left on,
+  // so switching between request tabs returns you to where you were working.
+  const [panelTabs, setPanelTabs] = useState<Record<string, RequestPanelTab>>({});
   const abortRefs = useRef<Map<string, AbortController>>(new Map());
+  // Monotonic per-request send counter. A response is only applied when its
+  // token is still the newest for that request, so a slow earlier send can never
+  // overwrite the result of the one the user is actually waiting on.
+  const runTokens = useRef<Map<string, number>>(new Map());
   const [envOpen, setEnvOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [cookiesOpen, setCookiesOpen] = useState(false);
@@ -53,6 +60,10 @@ export function ApiClient() {
   const [direction, setDirection] = usePersistentState<SplitDirection>(
     'devtool:apiclient:layout:v2', 'horizontal',
   );
+  // Split sizes are persisted per axis, so toggling the layout (or reopening the
+  // tool) restores the proportions the user set rather than resetting to 50/50.
+  const [splitH, setSplitH] = usePersistentState('devtool:apiclient:split:horizontal', 50);
+  const [splitV, setSplitV] = usePersistentState('devtool:apiclient:split:vertical', 50);
   const [sidebarWidth, setSidebarWidth] = usePersistentState(
     'devtool:apiclient:sidebarWidth', 288,
   );
@@ -68,20 +79,27 @@ export function ApiClient() {
     const startX = e.clientX;
     const startW = sidebarWidth;
     setResizing(true);
+    // Suppress text selection and cursor flicker for the duration of the drag.
+    document.body.style.setProperty('user-select', 'none');
+    document.body.style.setProperty('cursor', 'col-resize');
     const onMove = (ev: PointerEvent) =>
       setSidebarWidth(Math.min(500, Math.max(200, startW + (ev.clientX - startX))));
-    const onUp = () => {
+    const cleanup = () => {
+      document.body.style.removeProperty('user-select');
+      document.body.style.removeProperty('cursor');
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    function onUp() {
       setResizing(false);
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      cleanup();
       resizeCleanupRef.current = null;
-    };
-    resizeCleanupRef.current = () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
+    }
+    resizeCleanupRef.current = cleanup;
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   }, [sidebarWidth, setSidebarWidth]);
   // Session-scoped runtime variables (bru.setVar), cleared on app restart.
   const runtimeVarsRef = useRef<VarMap>({});
@@ -96,18 +114,44 @@ export function ApiClient() {
   }, []);
 
   // Migrate the previously-persisted active request into a tab on first load.
+  // Guarded by a ref rather than effect deps: `store` is a fresh object on every
+  // render, so a dependency on it re-ran this on every keystroke.
+  const migratedTab = useRef(false);
   useEffect(() => {
-    if (activeRequest && !store.openRequests.some((r) => r.id === activeRequest.id)) {
-      store.selectRequest(activeRequest.id);
-    }
-  }, [activeRequest, store]);
+    if (migratedTab.current) return;
+    migratedTab.current = true;
+    const id = store.activeRequestId;
+    if (id && !store.openRequests.some((r) => r.id === id)) store.selectRequest(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Drop per-tab run state (and remembered editor tab) for requests that are no
+  // longer open, so a long session doesn't accumulate every response it ever saw.
+  const openIdsKey = store.openRequests.map((r) => r.id).join(',');
+  useEffect(() => {
+    const open = new Set(openIdsKey ? openIdsKey.split(',') : []);
+    const prune = <T,>(prev: Record<string, T>): Record<string, T> => {
+      const keys = Object.keys(prev);
+      if (keys.every((k) => open.has(k))) return prev;
+      const next: Record<string, T> = {};
+      for (const k of keys) if (open.has(k)) next[k] = prev[k];
+      return next;
+    };
+    setRuns(prune);
+    setPanelTabs(prune);
+  }, [openIdsKey]);
 
   const patchRun = useCallback((id: string, patch: Partial<RunState>) => {
     setRuns((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY_RUN), ...patch } }));
   }, []);
 
-  // After a run, persist runtime/env-var changes and record a history entry.
-  const persistResult = useCallback((req: ApiRequest, result: Awaited<ReturnType<typeof executeRequest>>) => {
+  // After a run, persist runtime/env-var changes and (unless suppressed) record
+  // a history entry.
+  const persistResult = useCallback((
+    req: ApiRequest,
+    result: Awaited<ReturnType<typeof executeRequest>>,
+    recordHistory = true,
+  ) => {
     runtimeVarsRef.current = result.runtimeVars;
     setRuntimeVarsVersion((v) => v + 1);
     // Capture any Set-Cookie into the jar (scoped to the URL that returned them).
@@ -123,6 +167,7 @@ export function ApiClient() {
       }
       store.updateEnvironment(env.id, { variables });
     }
+    if (!recordHistory) return;
     store.addHistory({
       method: req.method, url: req.url,
       status: result.response?.status ?? 0,
@@ -137,23 +182,33 @@ export function ApiClient() {
   }, [store]);
 
   // Run one request (used by the Runner); resolves inherited scripts/auth per id.
-  const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap) => {
+  // Runner results are deliberately kept out of History: a 20-request × 5-iteration
+  // run would otherwise evict every manually-sent entry from the 50-entry log, and
+  // the Runner already keeps the full request/response for each of its runs.
+  const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal) => {
     const jar = store.cookiesEnabled ? store.cookies : [];
-    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, undefined, store.getInherited(req.id), jar, dataVars);
-    persistResult(req, result);
+    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars);
+    persistResult(req, result, false);
     return result;
   }, [store, persistResult]);
 
   const send = useCallback(async () => {
     if (!activeRequest) return;
     const id = activeRequest.id;
+    // Replace any send still running for this request rather than orphaning it.
+    abortRefs.current.get(id)?.abort();
     const controller = new AbortController();
     abortRefs.current.set(id, controller);
+    const token = (runTokens.current.get(id) ?? 0) + 1;
+    runTokens.current.set(id, token);
+    const isCurrent = () => runTokens.current.get(id) === token;
+
     patchRun(id, { sending: true, error: null });
     try {
       const jar = store.cookiesEnabled ? store.cookies : [];
       const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar);
       persistResult(activeRequest, result);
+      if (!isCurrent()) return;
       patchRun(id, {
         response: result.response,
         error: result.error,
@@ -161,14 +216,16 @@ export function ApiClient() {
         logs: result.logs,
       });
     } catch (e) {
+      if (!isCurrent()) return;
       if ((e as Error).name === 'AbortError') {
+        // Keep the previous response on screen; only note that this run stopped.
         patchRun(id, { error: 'Request cancelled.' });
       } else {
-        patchRun(id, { error: errToString(e), response: null });
+        patchRun(id, { error: errToString(e), response: null, tests: [], logs: [] });
       }
     } finally {
-      patchRun(id, { sending: false });
-      abortRefs.current.delete(id);
+      if (isCurrent()) patchRun(id, { sending: false });
+      if (abortRefs.current.get(id) === controller) abortRefs.current.delete(id);
     }
   }, [activeRequest, store, patchRun, persistResult]);
 
@@ -289,12 +346,16 @@ export function ApiClient() {
               <SplitPane
                 direction={direction}
                 minPanePx={direction === 'horizontal' ? 380 : 220}
+                percent={direction === 'horizontal' ? splitH : splitV}
+                onPercentChange={direction === 'horizontal' ? setSplitH : setSplitV}
                 first={
                   <RequestPanel
                     key={activeRequest.id}
                     request={activeRequest}
                     onChange={(patch) => store.updateRequest(activeRequest.id, patch)}
                     vars={varMap}
+                    tab={panelTabs[activeRequest.id] ?? 'params'}
+                    onTabChange={(t) => setPanelTabs((prev) => ({ ...prev, [activeRequest.id]: t }))}
                   />
                 }
                 second={

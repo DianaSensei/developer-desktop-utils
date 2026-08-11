@@ -39,15 +39,6 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
     onClose();
   };
 
-  const TabBtn = ({ id, label }: { id: typeof tab; label: string }) => (
-    <button
-      onClick={() => setTab(id)}
-      className={cn('border-b-2 py-2 text-xs font-medium transition-colors', tab === id ? 'border-amber-400 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
-    >
-      {label}
-    </button>
-  );
-
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-w-3xl flex-col gap-0 p-0">
@@ -58,8 +49,8 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
         </DialogHeader>
 
         <div className="flex items-center gap-4 border-b px-4">
-          <TabBtn id="scripts" label="Scripts" />
-          <TabBtn id="auth" label="Auth" />
+          <TabBtn id="scripts" label="Scripts" active={tab} onSelect={setTab} />
+          <TabBtn id="auth" label="Auth" active={tab} onSelect={setTab} />
         </div>
 
         {tab === 'scripts' ? (
@@ -91,5 +82,21 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Hoisted out of NodeSettingsDialog: a component declared inside render gets a
+// new identity on every keystroke in the script editors, so React remounts the
+// button and it loses focus mid-keyboard-navigation.
+function TabBtn({ id, label, active, onSelect }: {
+  id: 'scripts' | 'auth'; label: string; active: string; onSelect: (id: 'scripts' | 'auth') => void;
+}) {
+  return (
+    <button
+      onClick={() => onSelect(id)}
+      className={cn('border-b-2 py-2 text-xs font-medium transition-colors', active === id ? 'border-amber-400 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
+    >
+      {label}
+    </button>
   );
 }

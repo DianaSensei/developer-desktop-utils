@@ -2,10 +2,14 @@
 // Auth, Inherit, Basic, Bearer, API Key, and OAuth 2.0 (client-credentials /
 // password). Tokens/values accept {{variables}}.
 
+import { useEffect, useRef, useState } from 'react';
+import { Check, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VarInput } from './VarInput';
+import { clearOAuthTokenCache } from './request';
 import type { ApiKeyAuth, Auth, AuthType, OAuth2Auth, VarMap } from './types';
 
 const AUTH_TYPES: { id: AuthType; label: string }[] = [
@@ -18,18 +22,16 @@ const AUTH_TYPES: { id: AuthType; label: string }[] = [
   { id: 'oauth2', label: 'OAuth 2.0' },
 ];
 
-export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
-  auth: Auth; onChange: (a: Auth) => void; allowInherit?: boolean; vars?: VarMap;
+// A labelled text field that becomes {{variable}}-aware when `vars` is given.
+//
+// Declared at module scope on purpose: when this lived inside AuthEditor a fresh
+// function identity was created on every render, so React unmounted and remounted
+// the subtree on each keystroke — tearing down and rebuilding the CodeMirror
+// instance inside VarInput and dropping the caret after every character typed.
+function AuthField({ label, value, onValue, placeholder, vars }: {
+  label: string; value: string; onValue: (v: string) => void; placeholder?: string; vars?: VarMap;
 }) {
-  const set = (patch: Partial<Auth>) => onChange({ ...auth, ...patch });
-  const setApiKey = (patch: Partial<ApiKeyAuth>) => set({ apiKey: { ...auth.apiKey, ...patch } });
-  const setOAuth = (patch: Partial<OAuth2Auth>) => set({ oauth2: { ...auth.oauth2, ...patch } });
-  const types = allowInherit ? AUTH_TYPES : AUTH_TYPES.filter((t) => t.id !== 'inherit');
-
-  // A labelled text field that becomes {{variable}}-aware when `vars` is given.
-  const Field = ({ label, value, onValue, placeholder }: {
-    label: string; value: string; onValue: (v: string) => void; placeholder?: string;
-  }) => (
+  return (
     <div className="space-y-1.5">
       <Label className="text-xs">{label}</Label>
       {vars ? (
@@ -41,6 +43,25 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
       )}
     </div>
   );
+}
+
+export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
+  auth: Auth; onChange: (a: Auth) => void; allowInherit?: boolean; vars?: VarMap;
+}) {
+  const set = (patch: Partial<Auth>) => onChange({ ...auth, ...patch });
+  const setApiKey = (patch: Partial<ApiKeyAuth>) => set({ apiKey: { ...auth.apiKey, ...patch } });
+  const setOAuth = (patch: Partial<OAuth2Auth>) => set({ oauth2: { ...auth.oauth2, ...patch } });
+  const types = allowInherit ? AUTH_TYPES : AUTH_TYPES.filter((t) => t.id !== 'inherit');
+  const [tokenCleared, setTokenCleared] = useState(false);
+  const clearedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (clearedTimer.current) clearTimeout(clearedTimer.current); }, []);
+
+  const forgetToken = () => {
+    clearOAuthTokenCache();
+    setTokenCleared(true);
+    if (clearedTimer.current) clearTimeout(clearedTimer.current);
+    clearedTimer.current = setTimeout(() => setTokenCleared(false), 1500);
+  };
 
   return (
     <div className="max-w-lg space-y-3">
@@ -55,12 +76,12 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
       {auth.type === 'inherit' && <p className="py-4 text-center text-xs text-muted-foreground">Inherits auth from the parent folder or collection.</p>}
 
       {auth.type === 'bearer' && (
-        <Field label="Token" value={auth.token} onValue={(v) => set({ token: v })} placeholder="Token or {{var}}" />
+        <AuthField vars={vars} label="Token" value={auth.token} onValue={(v) => set({ token: v })} placeholder="Token or {{var}}" />
       )}
 
       {(auth.type === 'basic' || auth.type === 'digest') && (
         <div className="space-y-2">
-          <Field label="Username" value={auth.username} onValue={(v) => set({ username: v })} placeholder="Username or {{var}}" />
+          <AuthField vars={vars} label="Username" value={auth.username} onValue={(v) => set({ username: v })} placeholder="Username or {{var}}" />
           <div className="space-y-1.5">
             <Label className="text-xs">Password</Label>
             <Input type="password" value={auth.password} onChange={(e) => set({ password: e.target.value })} className="h-8 text-xs" placeholder="Password or {{var}}" />
@@ -73,8 +94,8 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
 
       {auth.type === 'apikey' && (
         <div className="space-y-2">
-          <Field label="Key" value={auth.apiKey.key} onValue={(v) => setApiKey({ key: v })} placeholder="X-API-Key" />
-          <Field label="Value" value={auth.apiKey.value} onValue={(v) => setApiKey({ value: v })} placeholder="Value or {{var}}" />
+          <AuthField vars={vars} label="Key" value={auth.apiKey.key} onValue={(v) => setApiKey({ key: v })} placeholder="X-API-Key" />
+          <AuthField vars={vars} label="Value" value={auth.apiKey.value} onValue={(v) => setApiKey({ value: v })} placeholder="Value or {{var}}" />
           <div className="space-y-1.5">
             <Label className="text-xs">Add to</Label>
             <Select value={auth.apiKey.placement} onValueChange={(v) => setApiKey({ placement: v as ApiKeyAuth['placement'] })}>
@@ -100,17 +121,32 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
               </SelectContent>
             </Select>
           </div>
-          <Field label="Access Token URL" value={auth.oauth2.tokenUrl} onValue={(v) => setOAuth({ tokenUrl: v })} placeholder="https://auth.example.com/oauth/token" />
-          <Field label="Client ID" value={auth.oauth2.clientId} onValue={(v) => setOAuth({ clientId: v })} />
-          <Field label="Client Secret" value={auth.oauth2.clientSecret} onValue={(v) => setOAuth({ clientSecret: v })} />
-          <Field label="Scope" value={auth.oauth2.scope} onValue={(v) => setOAuth({ scope: v })} placeholder="read write" />
+          <AuthField vars={vars} label="Access Token URL" value={auth.oauth2.tokenUrl} onValue={(v) => setOAuth({ tokenUrl: v })} placeholder="https://auth.example.com/oauth/token" />
+          <AuthField vars={vars} label="Client ID" value={auth.oauth2.clientId} onValue={(v) => setOAuth({ clientId: v })} />
+          <AuthField vars={vars} label="Client Secret" value={auth.oauth2.clientSecret} onValue={(v) => setOAuth({ clientSecret: v })} />
+          <AuthField vars={vars} label="Scope" value={auth.oauth2.scope} onValue={(v) => setOAuth({ scope: v })} placeholder="read write" />
           {auth.oauth2.grantType === 'password' && (
             <>
-              <Field label="Username" value={auth.oauth2.username} onValue={(v) => setOAuth({ username: v })} />
-              <Field label="Password" value={auth.oauth2.password} onValue={(v) => setOAuth({ password: v })} />
+              <AuthField vars={vars} label="Username" value={auth.oauth2.username} onValue={(v) => setOAuth({ username: v })} />
+              <AuthField vars={vars} label="Password" value={auth.oauth2.password} onValue={(v) => setOAuth({ password: v })} />
             </>
           )}
-          <p className="text-[11px] text-muted-foreground">The token is fetched fresh on each send and sent as a Bearer header.</p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[11px] text-muted-foreground">
+              The access token is fetched on the first send and reused until it expires, then sent as a Bearer header.
+              It is held in memory only — never written to disk.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 gap-1.5 text-[11px]"
+              onClick={forgetToken}
+            >
+              {tokenCleared ? <Check className="h-3 w-3 text-emerald-500" /> : <RotateCcw className="h-3 w-3" />}
+              {tokenCleared ? 'Cleared' : 'Clear token'}
+            </Button>
+          </div>
         </div>
       )}
     </div>

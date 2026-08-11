@@ -101,3 +101,28 @@ export async function saveTextFile(suggestedName: string, text: string): Promise
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// Save raw bytes (given as base64) to a file the user picks. Used for binary
+// responses — images, PDFs, archives — where the text path would corrupt them.
+export async function saveBinaryFile(suggestedName: string, base64: string): Promise<void> {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+  if (isTauri) {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const path = await save({ defaultPath: suggestedName });
+    if (!path) return;
+    const { writeFile } = await import('@tauri-apps/plugin-fs');
+    await writeFile(path, bytes);
+    return;
+  }
+
+  const blob = new Blob([bytes], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = suggestedName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
