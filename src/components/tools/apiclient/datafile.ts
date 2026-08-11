@@ -6,9 +6,44 @@ import type { VarMap } from './types';
 
 export type DataRow = VarMap;
 
+// Excel and many other exporters prefix UTF-8 files with a byte-order mark.
+// Left in place it becomes part of the first header, so `id` silently arrives as
+// `﻿id` and {{id}} never resolves.
+const stripBom = (text: string): string => (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+
+// Delimiters we recognise. Comma is the default; spreadsheets in locales that
+// use a comma decimal separator export semicolons, and tab-separated exports are
+// common enough to be worth handling.
+const DELIMITERS = [',', ';', '\t'] as const;
+export type Delimiter = (typeof DELIMITERS)[number];
+
+// Pick the delimiter by counting unquoted occurrences in the header line — the
+// one that splits it into the most fields wins.
+export function sniffDelimiter(text: string): Delimiter {
+  let headerLine = '';
+  let inQuotes = false;
+  for (const c of text) {
+    if (c === '"') inQuotes = !inQuotes;
+    if (c === '\n' && !inQuotes) break;
+    headerLine += c;
+  }
+  let best: Delimiter = ',';
+  let bestCount = 0;
+  for (const d of DELIMITERS) {
+    let count = 0;
+    let quoted = false;
+    for (const c of headerLine) {
+      if (c === '"') quoted = !quoted;
+      else if (c === d && !quoted) count++;
+    }
+    if (count > bestCount) { best = d; bestCount = count; }
+  }
+  return best;
+}
+
 // Parse a CSV string into objects keyed by the header row. Handles quoted
-// fields, embedded commas/quotes ("" → "), and CRLF/LF line endings.
-function parseCsv(text: string): DataRow[] {
+// fields, embedded delimiters/quotes ("" → "), and CRLF/LF line endings.
+function parseCsv(text: string, delimiter: Delimiter): DataRow[] {
   const rows: string[][] = [];
   let field = '';
   let row: string[] = [];
@@ -26,7 +61,7 @@ function parseCsv(text: string): DataRow[] {
       } else field += c;
     } else if (c === '"') {
       inQuotes = true;
-    } else if (c === ',') {
+    } else if (c === delimiter) {
       pushField();
     } else if (c === '\n') {
       pushRow();
@@ -71,23 +106,46 @@ function parseJsonRows(text: string): DataRow[] {
   });
 }
 
+// What a parsed data file provides, alongside the rows themselves.
+export interface ParsedDataFile {
+  rows: DataRow[];
+  format: 'csv' | 'json';
+  /** Only meaningful for CSV. */
+  delimiter?: Delimiter;
+  /** Column names in file order (JSON: key order of the first row). */
+  columns: string[];
+}
+
 // Parse a data file by extension (falls back to sniffing: '[' or '{' → JSON).
 // Throws a friendly error on malformed input.
-export function parseDataFile(name: string, text: string): DataRow[] {
+export function parseDataFile(name: string, raw: string): ParsedDataFile {
+  const text = stripBom(raw);
   const isJson = /\.json$/i.test(name) || /^\s*[[{]/.test(text);
   try {
-    const rows = isJson ? parseJsonRows(text) : parseCsv(text);
+    if (isJson) {
+      const rows = parseJsonRows(text);
+      if (rows.length === 0) throw new Error('No data rows found.');
+      return { rows, format: 'json', columns: dataColumns(rows) };
+    }
+    const delimiter = sniffDelimiter(text);
+    const rows = parseCsv(text, delimiter);
     if (rows.length === 0) throw new Error('No data rows found.');
-    return rows;
+    return { rows, format: 'csv', delimiter, columns: dataColumns(rows) };
   } catch (e) {
     throw new Error(`Couldn't parse ${isJson ? 'JSON' : 'CSV'} data file: ${(e as Error).message}`);
   }
 }
 
-// The set of variable names a data file provides (union of all row keys), for
-// display in the runner.
+// The set of variable names a data file provides (union of all row keys), in
+// first-seen order, for display in the runner.
 export function dataColumns(rows: DataRow[]): string[] {
   const set = new Set<string>();
   for (const r of rows) for (const k of Object.keys(r)) set.add(k);
   return [...set];
 }
+
+export const DELIMITER_LABEL: Record<Delimiter, string> = {
+  ',': 'comma',
+  ';': 'semicolon',
+  '\t': 'tab',
+};

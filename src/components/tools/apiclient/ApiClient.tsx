@@ -412,6 +412,7 @@ export function ApiClient() {
           title={runTarget.title}
           requests={runTarget.requests}
           runRequest={runRequest}
+          knownVars={Object.keys(varMap)}
           onClose={() => setRunTarget(null)}
         />
       )}

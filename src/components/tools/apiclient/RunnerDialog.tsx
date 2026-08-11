@@ -3,13 +3,17 @@
 //  • Setup: choose requests (reorder/select), set iterations / delay / parallel /
 //    tag filters, advanced options, and optionally bind a CSV or JSON data file
 //    ({{var}} per row).
-//  • Results: a summary dashboard, a progress bar, an iteration rail (for
-//    data/iterated runs), the executed sequence with pass/fail, and a drill-in
-//    showing the exact request and response for any run.
+//  • Results: a summary dashboard and status/timing breakdown, a progress bar,
+//    an iteration rail (for data/iterated runs), the executed sequence with
+//    pass/fail, and a drill-in showing the exact request and response for any
+//    run. Everything measured is exportable as a JSON report.
 //
 // Results are an ordered list of executions rather than a map keyed by request:
 // `setNextRequest` lets a request run more than once — or not at all — in a
 // single iteration, so the sequence is what actually happened, not the plan.
+//
+// Record shape and aggregation live in runnerStats.ts; sequencing rules in
+// runnerFlow.ts — both so they can be tested without a React tree.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -22,55 +26,34 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { methodColor } from './method-color';
-import { statusColor, substituteVars } from './request';
+import { formatBytes, statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
 import { pickDataFile, saveJsonFile } from './fileio';
-import { type DataRow, dataColumns, parseDataFile } from './datafile';
+import { DELIMITER_LABEL, type DataRow, type ParsedDataFile, parseDataFile } from './datafile';
+import { type ColumnMapping, collectVarTokens, mapColumns, missingColumns } from './varUsage';
 import type { ExecResult } from './engine';
-import { MAX_STEPS_PER_ITERATION, describeJump, nextStepIndex, type JumpRequest } from './runnerFlow';
-import type { ApiRequest, HttpMethod, TestResult, VarMap } from './types';
-
-interface RunDetail { request: ApiRequest; result: ExecResult; dataVars?: VarMap }
-
-// One executed request. `step` is its position in the iteration's actual
-// execution order, which is what makes a record unique when flow control causes
-// the same request to run twice.
-interface RunRecord {
-  key: string;
-  iter: number;
-  step: number;
-  requestId: string;
-  name: string;
-  method: HttpMethod;
-  url: string;
-  status: number;
-  ms: number;
-  passed: number;
-  total: number;
-  error?: string | null;
-  tests: TestResult[];
-  // Omitted when "Save responses" is off, so long runs don't hold every body.
-  detail?: RunDetail;
-  // Set when a script steered the run from this request.
-  jump?: JumpRequest;
-}
+import { MAX_STEPS_PER_ITERATION, describeJump, nextStepIndex } from './runnerFlow';
+import { type RunDetail, type RunRecord, isOk, summarize } from './runnerStats';
+import type { ApiRequest, HttpMethod, VarMap } from './types';
 
 interface Props {
   title: string;
   requests: ApiRequest[];
   runRequest: (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal) => Promise<ExecResult>;
+  // Variable names resolvable from the environment / session, so the data-file
+  // mapping only warns about tokens nothing can supply.
+  knownVars?: string[];
   open: boolean;
   onClose: () => void;
 }
 
-const isOk = (r: RunRecord) => !r.error && r.status >= 200 && r.status < 400 && r.passed === r.total;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const parseTags = (s: string): string[] =>
   s.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
 
 type ResultFilter = 'all' | 'passed' | 'failed';
 
-export function RunnerDialog({ title, requests, runRequest, open, onClose }: Props) {
+export function RunnerDialog({ title, requests, runRequest, knownVars = [], open, onClose }: Props) {
   const [phase, setPhase] = useState<'setup' | 'results'>('setup');
 
   // Run order (reorderable) and selection.
@@ -87,7 +70,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
   const [excludeTags, setExcludeTags] = useState('');
 
   // Data-driven runs: each row of the file binds variables for one iteration.
-  const [dataFile, setDataFile] = useState<{ name: string; rows: DataRow[] } | null>(null);
+  const [dataFile, setDataFile] = useState<{ name: string; parsed: ParsedDataFile } | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
 
   // Run state.
@@ -136,7 +119,20 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
     });
   }, [order, selected, includeTags, excludeTags]);
 
-  const iters = dataFile ? dataFile.rows.length : Math.max(1, Number(iterations) || 1);
+  const dataRows = dataFile?.parsed.rows;
+  const iters = dataRows ? dataRows.length : Math.max(1, Number(iterations) || 1);
+
+  // Which {{tokens}} the selected requests actually reference, so the data file
+  // can be shown as a mapping rather than a bare list of column names.
+  const usedVars = useMemo(() => collectVarTokens(effective), [effective]);
+  const columnMappings = useMemo(
+    () => (dataFile ? mapColumns(dataFile.parsed.columns, dataFile.parsed.rows, usedVars) : []),
+    [dataFile, usedVars],
+  );
+  const missingVars = useMemo(
+    () => missingColumns(usedVars, dataFile?.parsed.columns ?? [], new Set(knownVars)),
+    [usedVars, dataFile, knownVars],
+  );
   const delayMs = Math.max(0, Number(delay) || 0);
 
   const cancelledRef = useRef(false);
@@ -172,11 +168,18 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
         method: req.method,
         url: r.response?.url ?? req.url,
         status: r.response?.status ?? 0,
+        statusText: r.response?.statusText ?? '',
         ms: r.response?.timeMs ?? 0,
+        sizeBytes: r.response?.sizeBytes ?? 0,
+        ttfbMs: r.response?.timings?.ttfbMs,
+        downloadMs: r.response?.timings?.downloadMs,
+        at: Date.now(),
         passed,
         total: r.tests.length,
         error: r.error,
         tests: r.tests,
+        logs: r.logs,
+        dataVars,
         detail: saveResponses ? { request: req, result: r, dataVars } : undefined,
       };
       record.jump = describeJump(r.nextRequest, names);
@@ -189,9 +192,12 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
         name: req.name,
         method: req.method,
         url: req.url,
-        status: 0, ms: 0, passed: 0, total: 0,
+        status: 0, statusText: '', ms: 0, sizeBytes: 0, at: Date.now(),
+        passed: 0, total: 0,
         error: (e as Error).message,
         tests: [],
+        logs: [],
+        dataVars,
       };
     }
     setRecords((prev) => [...prev, record]);
@@ -217,7 +223,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
         startedIters = i + 1;
         // Follow the running iteration in the rail until the user picks one.
         if (followIterRef.current) setViewIter(i);
-        const dataVars = dataFile ? dataFile.rows[i] : undefined;
+        const dataVars = dataRows ? dataRows[i] : undefined;
 
         if (parallel) {
           // Flow control has no meaning when everything starts at once.
@@ -257,8 +263,8 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
     try {
       const picked = await pickDataFile();
       if (!picked) return;
-      const rows = parseDataFile(picked.name, picked.text);
-      setDataFile({ name: picked.name, rows });
+      const parsed = parseDataFile(picked.name, picked.text);
+      setDataFile({ name: picked.name, parsed });
       resetRun();
     } catch (e) {
       setDataFile(null);
@@ -300,42 +306,84 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
     return { ok: rows.filter(isOk).length, total: rows.length };
   };
 
-  // Overall summary across every run.
-  const totalRun = records.length;
-  const passedRun = records.filter(isOk).length;
-  const assertPass = records.reduce((s, r) => s + r.passed, 0);
-  const assertTotal = records.reduce((s, r) => s + r.total, 0);
+  // Overall statistics across every execution in the run.
+  const stats = useMemo(() => summarize(records), [records]);
+  const { total: totalRun, passed: passedRun, assertPassed: assertPass, assertTotal } = stats;
 
   const plannedCount = effective.length * iters;
-  const dataRow = dataFile ? dataFile.rows[viewIter] : undefined;
+  const dataRow = dataRows ? dataRows[viewIter] : undefined;
   const multiIter = ranIters > 1 || (running && iters > 1);
 
   const iterRecords = records.filter((r) => r.iter === viewIter);
   const shown = iterRecords.filter((r) => (filter === 'all' ? true : filter === 'passed' ? isOk(r) : !isOk(r)));
-  const failedCount = records.length - passedRun;
+  const failedCount = stats.failed;
 
   const exportResults = async () => {
     const report = {
       collection: title,
+      startedAt: startedAtRef.current ? new Date(startedAtRef.current).toISOString() : null,
       finishedAt: new Date().toISOString(),
       durationMs: elapsed,
-      iterations: ranIters,
+      options: {
+        iterations: iters,
+        delayMs,
+        parallel,
+        stopOnFailure,
+        saveResponses,
+        includeTags: parseTags(includeTags),
+        excludeTags: parseTags(excludeTags),
+        dataFile: dataFile
+          ? {
+              name: dataFile.name,
+              format: dataFile.parsed.format,
+              delimiter: dataFile.parsed.delimiter,
+              rows: dataFile.parsed.rows.length,
+              columns: columnMappings.map((m) => ({ column: m.column, variable: m.token, used: m.used })),
+              unresolvedVariables: missingVars,
+            }
+          : null,
+      },
       summary: {
-        requests: totalRun,
-        passed: passedRun,
-        failed: totalRun - passedRun,
-        assertions: { total: assertTotal, passed: assertPass, failed: assertTotal - assertPass },
+        iterations: { planned: iters, executed: ranIters },
+        requests: { executed: stats.total, passed: stats.passed, failed: stats.failed },
+        assertions: { total: stats.assertTotal, passed: stats.assertPassed, failed: stats.assertTotal - stats.assertPassed },
+        responseTimeMs: { average: stats.avgMs, min: stats.minMs, max: stats.maxMs, total: stats.sumMs },
+        totalDataBytes: stats.totalBytes,
+        statusCodes: stats.byStatus,
+        failures: records.filter((r) => !isOk(r)).map((r) => ({
+          iteration: r.iter + 1,
+          step: r.step + 1,
+          name: r.name,
+          status: r.status,
+          error: r.error ?? undefined,
+          failedTests: r.tests.filter((t) => !t.passed).map((t) => ({ name: t.name, error: t.error })),
+        })),
       },
       runs: records.map((r) => ({
         iteration: r.iter + 1,
         step: r.step + 1,
+        at: new Date(r.at).toISOString(),
         name: r.name,
         method: r.method,
         url: r.url,
         status: r.status,
+        statusText: r.statusText,
         timeMs: r.ms,
+        timings: r.ttfbMs === undefined ? undefined : { ttfbMs: r.ttfbMs, downloadMs: r.downloadMs },
+        sizeBytes: r.sizeBytes,
         error: r.error ?? undefined,
+        iterationData: r.dataVars,
+        nextRequest: r.jump ? { to: r.jump.to, resolved: !r.jump.missing } : undefined,
         tests: r.tests.map((t) => ({ name: t.name, passed: t.passed, error: t.error })),
+        console: r.logs.map((l) => ({ level: l.level, text: l.text })),
+        // Present only when the run kept responses.
+        response: r.detail?.result.response
+          ? {
+              headers: Object.fromEntries(r.detail.result.response.headers),
+              contentType: r.detail.result.response.contentType,
+              body: r.detail.result.response.body,
+            }
+          : undefined,
       })),
     };
     const safe = (title || 'run').replace(/[^\w.-]+/g, '-');
@@ -372,7 +420,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Iterations">
                     <Input
-                      value={dataFile ? String(dataFile.rows.length) : iterations}
+                      value={dataRows ? String(dataRows.length) : iterations}
                       onChange={(e) => setIterations(e.target.value)}
                       disabled={!!dataFile}
                       inputMode="numeric"
@@ -417,9 +465,20 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                         </button>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        {dataFile.rows.length} row{dataFile.rows.length === 1 ? '' : 's'} → {dataColumns(dataFile.rows).map((c) => `{{${c}}}`).join(', ') || 'no columns'}
+                        {dataFile.parsed.rows.length} row{dataFile.parsed.rows.length === 1 ? '' : 's'}
+                        {' · '}{dataFile.parsed.columns.length} column{dataFile.parsed.columns.length === 1 ? '' : 's'}
+                        {dataFile.parsed.format === 'csv' && dataFile.parsed.delimiter
+                          ? ` · ${DELIMITER_LABEL[dataFile.parsed.delimiter]}-separated`
+                          : ' · JSON'}
                       </p>
-                      <DataPreview rows={dataFile.rows} />
+                      <ColumnMappingTable mappings={columnMappings} />
+                      {missingVars.length > 0 && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                          Used by the run but not in this file or your environment:{' '}
+                          <span className="font-mono">{missingVars.map((v) => `{{${v}}}`).join(', ')}</span>
+                        </p>
+                      )}
+                      <DataPreview rows={dataFile.parsed.rows} columns={dataFile.parsed.columns} />
                     </div>
                   ) : (
                     <button
@@ -506,6 +565,8 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
               <Stat label="Failed" value={failedCount} tone={failedCount ? 'bad' : 'muted'} />
               <Stat label="Assertions" value={`${assertPass}/${assertTotal}`} tone={assertTotal && assertPass < assertTotal ? 'bad' : assertTotal ? 'ok' : 'muted'} />
               <Stat label="Duration" value={formatDuration(elapsed)} icon={<Clock className="h-3 w-3" />} />
+              <Stat label="Avg time" value={stats.total ? `${stats.avgMs} ms` : '—'} />
+              <Stat label="Data" value={formatBytes(stats.totalBytes)} />
               <div className="ml-auto flex items-center gap-2">
                 {running ? (
                   <Button onClick={stop} variant="destructive" size="sm" className="h-8 gap-1.5">
@@ -529,6 +590,31 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
               </div>
             </div>
 
+            {/* full breakdown of what the run measured */}
+            {totalRun > 0 && (
+              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+                <span className="flex flex-wrap items-center gap-x-2">
+                  <span className="font-medium text-foreground/70">Status</span>
+                  {Object.entries(stats.byStatus)
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .map(([code, count]) => (
+                      <span key={code} className="font-mono">
+                        <span className={code === 'error' ? 'text-destructive' : statusColor(Number(code))}>{code}</span>
+                        <span className="text-muted-foreground"> ×{count}</span>
+                      </span>
+                    ))}
+                </span>
+                <span>
+                  <span className="font-medium text-foreground/70">Response time</span>{' '}
+                  min {stats.minMs} ms · avg {stats.avgMs} ms · max {stats.maxMs} ms
+                </span>
+                <span>
+                  <span className="font-medium text-foreground/70">Iterations</span>{' '}
+                  {ranIters}/{iters}
+                </span>
+              </div>
+            )}
+
             {/* progress — fixed-height strip so the layout doesn't shift */}
             <div className="h-0.5 shrink-0 overflow-hidden bg-muted">
               {running && (
@@ -546,7 +632,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                   {Array.from({ length: Math.max(ranIters, running ? iters : 0) }, (_, i) => {
                     const s = iterStats(i);
                     const ok = s.total > 0 && s.ok === s.total;
-                    const row = dataFile?.rows[i];
+                    const row = dataRows?.[i];
                     const labelVals = row ? Object.values(row).slice(0, 2).join(', ') : '';
                     return (
                       <button
@@ -698,8 +784,8 @@ function formatDuration(ms: number): string {
 
 // ─── data preview ─────────────────────────────────────────────────────────────
 
-function DataPreview({ rows }: { rows: DataRow[] }) {
-  const cols = dataColumns(rows);
+function DataPreview({ rows, columns }: { rows: DataRow[]; columns: string[] }) {
+  const cols = columns;
   const shown = rows.slice(0, 20);
   return (
     <div className="max-h-40 overflow-auto rounded border">
@@ -842,5 +928,44 @@ function OptionRow({ label, hint, checked, onChange }: {
       </span>
       <Switch checked={checked} onCheckedChange={onChange} aria-label={label} className="shrink-0" />
     </label>
+  );
+}
+
+// ─── data-file column → variable mapping ──────────────────────────────────────
+
+// Shows what each column of the file binds to, with a sample of the value that
+// will be substituted and whether anything in the run actually uses it.
+function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
+  if (mappings.length === 0) {
+    return <p className="text-[11px] text-destructive">No columns found — is the header row present?</p>;
+  }
+  return (
+    <div className="overflow-hidden rounded border">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-x-2 border-b bg-muted/40 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span>Column</span>
+        <span>Variable</span>
+        <span />
+      </div>
+      <div className="max-h-44 overflow-y-auto">
+        {mappings.map((m) => (
+          <div key={m.column} className="grid grid-cols-[1fr_1fr_auto] items-center gap-x-2 border-b px-1.5 py-1 text-[10px] last:border-b-0">
+            <span className="truncate font-mono" title={m.column}>{m.column}</span>
+            <span className="min-w-0">
+              <span className="block truncate font-mono text-emerald-600 dark:text-emerald-400" title={m.token}>{m.token}</span>
+              {m.sample && (
+                <span className="block truncate text-muted-foreground" title={m.sample}>e.g. {m.sample}</span>
+              )}
+            </span>
+            {m.used ? (
+              <Check className="h-3 w-3 shrink-0 text-emerald-500" aria-label="Used by the run" />
+            ) : (
+              <span className="shrink-0 rounded bg-muted px-1 text-[9px] text-muted-foreground" title="No selected request references this variable">
+                unused
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
