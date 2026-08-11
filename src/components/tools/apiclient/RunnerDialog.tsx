@@ -1,15 +1,20 @@
 // Collection/folder Runner (Postman-style), organised as a Setup → Results flow:
 //
 //  • Setup: choose requests (reorder/select), set iterations / delay / parallel /
-//    tag filters, and optionally bind a CSV or JSON data file ({{var}} per row).
-//  • Results: a summary dashboard, an iteration rail (for data/iterated runs),
-//    a per-request pass/fail list, and a drill-in showing the exact request and
-//    response for any run.
+//    tag filters, advanced options, and optionally bind a CSV or JSON data file
+//    ({{var}} per row).
+//  • Results: a summary dashboard, a progress bar, an iteration rail (for
+//    data/iterated runs), the executed sequence with pass/fail, and a drill-in
+//    showing the exact request and response for any run.
+//
+// Results are an ordered list of executions rather than a map keyed by request:
+// `setNextRequest` lets a request run more than once — or not at all — in a
+// single iteration, so the sequence is what actually happened, not the plan.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Check, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, GripVertical,
-  ListChecks, Loader2, Play, RotateCcw, Settings2, Square, X,
+  Check, ChevronLeft, ChevronRight, Clock, CornerDownRight, Download, FileSpreadsheet,
+  GripVertical, ListChecks, Loader2, Play, RotateCcw, Settings2, Square, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,19 +24,35 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { methodColor } from './method-color';
 import { statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
-import { pickDataFile } from './fileio';
+import { pickDataFile, saveJsonFile } from './fileio';
 import { type DataRow, dataColumns, parseDataFile } from './datafile';
 import type { ExecResult } from './engine';
-import type { ApiRequest, VarMap } from './types';
+import { MAX_STEPS_PER_ITERATION, describeJump, nextStepIndex, type JumpRequest } from './runnerFlow';
+import type { ApiRequest, HttpMethod, TestResult, VarMap } from './types';
 
 interface RunDetail { request: ApiRequest; result: ExecResult; dataVars?: VarMap }
 
-interface RowResult {
+// One executed request. `step` is its position in the iteration's actual
+// execution order, which is what makes a record unique when flow control causes
+// the same request to run twice.
+interface RunRecord {
+  key: string;
+  iter: number;
+  step: number;
+  requestId: string;
+  name: string;
+  method: HttpMethod;
+  url: string;
   status: number;
   ms: number;
   passed: number;
   total: number;
   error?: string | null;
+  tests: TestResult[];
+  // Omitted when "Save responses" is off, so long runs don't hold every body.
+  detail?: RunDetail;
+  // Set when a script steered the run from this request.
+  jump?: JumpRequest;
 }
 
 interface Props {
@@ -42,11 +63,12 @@ interface Props {
   onClose: () => void;
 }
 
-const isOk = (r: RowResult) => !r.error && r.status >= 200 && r.status < 400 && r.passed === r.total;
+const isOk = (r: RunRecord) => !r.error && r.status >= 200 && r.status < 400 && r.passed === r.total;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const parseTags = (s: string): string[] =>
   s.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
-const keyOf = (iter: number, id: string) => `${iter}:${id}`;
+
+type ResultFilter = 'all' | 'passed' | 'failed';
 
 export function RunnerDialog({ title, requests, runRequest, open, onClose }: Props) {
   const [phase, setPhase] = useState<'setup' | 'results'>('setup');
@@ -59,6 +81,8 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
   const [delay, setDelay] = useState('');
   const [iterations, setIterations] = useState('1');
   const [parallel, setParallel] = useState(false);
+  const [stopOnFailure, setStopOnFailure] = useState(false);
+  const [saveResponses, setSaveResponses] = useState(true);
   const [includeTags, setIncludeTags] = useState('');
   const [excludeTags, setExcludeTags] = useState('');
 
@@ -66,19 +90,26 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
   const [dataFile, setDataFile] = useState<{ name: string; rows: DataRow[] } | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
 
-  // Run state (results/details keyed by iteration:requestId).
-  const [results, setResults] = useState<Record<string, RowResult>>({});
-  const [details, setDetails] = useState<Record<string, RunDetail>>({});
+  // Run state.
+  const [records, setRecords] = useState<RunRecord[]>([]);
   const [detailKey, setDetailKey] = useState<string | null>(null);
-  const [currentKey, setCurrentKey] = useState<string | null>(null);
+  const [current, setCurrent] = useState<{ iter: number; name: string; method: HttpMethod } | null>(null);
   const [viewIter, setViewIter] = useState(0);
   const [ranIters, setRanIters] = useState(0);
   const [running, setRunning] = useState(false);
+  const [filter, setFilter] = useState<ResultFilter>('all');
+  const [elapsed, setElapsed] = useState(0);
+  // Iterations stopped by the step ceiling (a setNextRequest cycle).
+  const [cappedIters, setCappedIters] = useState<Set<number>>(() => new Set());
+  const startedAtRef = useRef<number | null>(null);
+  // While true the results view tracks whichever iteration is running; clicking
+  // an iteration in the rail pins it there instead.
+  const followIterRef = useRef(true);
   const dragId = useRef<string | null>(null);
 
   const resetRun = () => {
-    setResults({}); setDetails({}); setDetailKey(null); setCurrentKey(null);
-    setViewIter(0); setRanIters(0);
+    setRecords([]); setDetailKey(null); setCurrent(null);
+    setViewIter(0); setRanIters(0); setElapsed(0); setFilter('all'); setCappedIters(new Set());
   };
 
   // Reset everything when the requests prop changes (a different node was run).
@@ -109,59 +140,116 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
   const delayMs = Math.max(0, Number(delay) || 0);
 
   const cancelledRef = useRef(false);
-  // Aborts the request currently in flight, so Stop (and closing the dialog)
-  // takes effect immediately rather than after the current send completes.
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => { cancelledRef.current = true; abortRef.current?.abort(); }, []);
 
-  const runOne = async (req: ApiRequest, iter: number, dataVars?: VarMap) => {
-    const key = keyOf(iter, req.id);
+  // Wall-clock timer while a run is in progress.
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      if (startedAtRef.current) setElapsed(Date.now() - startedAtRef.current);
+    }, 100);
+    return () => clearInterval(id);
+  }, [running]);
+
+  // Execute one request and record what happened. Returns the record so the
+  // driver can read the flow-control request out of it.
+  const runOne = async (
+    req: ApiRequest, iter: number, step: number, dataVars: VarMap | undefined,
+    names: string[],
+  ): Promise<RunRecord | null> => {
+    setCurrent({ iter, name: req.name, method: req.method });
+    let record: RunRecord;
     try {
       const r = await runRequest(req, dataVars, abortRef.current?.signal);
-      if (cancelledRef.current) return;
+      if (cancelledRef.current) return null;
       const passed = r.tests.filter((t) => t.passed).length;
-      const row: RowResult = { status: r.response?.status ?? 0, ms: r.response?.timeMs ?? 0, passed, total: r.tests.length, error: r.error };
-      setResults((m) => ({ ...m, [key]: row }));
-      setDetails((m) => ({ ...m, [key]: { request: req, result: r, dataVars } }));
+      record = {
+        key: `${iter}:${step}`,
+        iter, step,
+        requestId: req.id,
+        name: req.name,
+        method: req.method,
+        url: r.response?.url ?? req.url,
+        status: r.response?.status ?? 0,
+        ms: r.response?.timeMs ?? 0,
+        passed,
+        total: r.tests.length,
+        error: r.error,
+        tests: r.tests,
+        detail: saveResponses ? { request: req, result: r, dataVars } : undefined,
+      };
+      record.jump = describeJump(r.nextRequest, names);
     } catch (e) {
-      if (!cancelledRef.current) {
-        setResults((m) => ({ ...m, [key]: { status: 0, ms: 0, passed: 0, total: 0, error: (e as Error).message } }));
-      }
+      if (cancelledRef.current) return null;
+      record = {
+        key: `${iter}:${step}`,
+        iter, step,
+        requestId: req.id,
+        name: req.name,
+        method: req.method,
+        url: req.url,
+        status: 0, ms: 0, passed: 0, total: 0,
+        error: (e as Error).message,
+        tests: [],
+      };
     }
+    setRecords((prev) => [...prev, record]);
+    return record;
   };
 
   const run = async () => {
     cancelledRef.current = false;
     abortRef.current?.abort();
     abortRef.current = new AbortController();
+    startedAtRef.current = Date.now();
     setRunning(true); resetRun(); setPhase('results');
+
+    const plan = effective;
+    const names = plan.map((r) => r.name);
+    const capped = new Set<number>();
+    let startedIters = 0;
+    followIterRef.current = true;
+
     try {
       for (let i = 0; i < iters; i++) {
         if (cancelledRef.current) break;
+        startedIters = i + 1;
+        // Follow the running iteration in the rail until the user picks one.
+        if (followIterRef.current) setViewIter(i);
         const dataVars = dataFile ? dataFile.rows[i] : undefined;
+
         if (parallel) {
-          await Promise.all(effective.map((req) => runOne(req, i, dataVars)));
+          // Flow control has no meaning when everything starts at once.
+          await Promise.all(plan.map((req, step) => runOne(req, i, step, dataVars, names)));
         } else {
-          for (const req of effective) {
+          let index: number | null = 0;
+          let step = 0;
+          while (index !== null && step < MAX_STEPS_PER_ITERATION) {
             if (cancelledRef.current) break;
-            setCurrentKey(keyOf(i, req.id));
-            await runOne(req, i, dataVars);
-            if (delayMs > 0) await sleep(delayMs);
+            const record = await runOne(plan[index], i, step, dataVars, names);
+            if (!record) break;
+            step += 1;
+
+            if (stopOnFailure && !isOk(record)) { cancelledRef.current = true; break; }
+
+            index = nextStepIndex(index, record.jump, names);
+            if (index !== null && delayMs > 0) await sleep(delayMs);
           }
+          if (step >= MAX_STEPS_PER_ITERATION) capped.add(i);
         }
-        // Grow the iteration rail as the run progresses instead of only at the
-        // end, so a stopped run still shows the iterations that completed.
-        if (!cancelledRef.current) setRanIters(i + 1);
+
+        setRanIters(startedIters);
       }
     } finally {
-      // Always release the running flag. Previously a cancelled run left the
-      // spinner and the disabled "Run again" button on screen for good.
-      setCurrentKey(null);
+      setCurrent(null);
       setRunning(false);
+      setCappedIters(capped);
+      setRanIters(startedIters);
+      if (startedAtRef.current) setElapsed(Date.now() - startedAtRef.current);
     }
   };
 
-  // Stop the run and abort whatever is on the wire right now.
   const stop = () => { cancelledRef.current = true; abortRef.current?.abort(); };
 
   const loadData = async () => {
@@ -182,6 +270,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
     setOrder(requests);
     setSelected(new Set(requests.map((r) => r.id)));
     setDelay(''); setIterations('1'); setParallel(false); setIncludeTags(''); setExcludeTags('');
+    setStopOnFailure(false); setSaveResponses(true);
     setDataFile(null); setDataError(null);
     resetRun(); setPhase('setup');
   };
@@ -207,27 +296,51 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
   };
 
   const iterStats = (iter: number) => {
-    let ok = 0, total = 0;
-    for (const req of effective) {
-      const r = results[keyOf(iter, req.id)];
-      if (!r) continue;
-      total += 1;
-      if (isOk(r)) ok += 1;
-    }
-    return { ok, total };
+    const rows = records.filter((r) => r.iter === iter);
+    return { ok: rows.filter(isOk).length, total: rows.length };
   };
 
   // Overall summary across every run.
-  const all = Object.values(results);
-  const totalRun = all.length;
-  const passedRun = all.filter(isOk).length;
-  const assertPass = all.reduce((s, r) => s + r.passed, 0);
-  const assertTotal = all.reduce((s, r) => s + r.total, 0);
-  const totalMs = all.reduce((s, r) => s + r.ms, 0);
+  const totalRun = records.length;
+  const passedRun = records.filter(isOk).length;
+  const assertPass = records.reduce((s, r) => s + r.passed, 0);
+  const assertTotal = records.reduce((s, r) => s + r.total, 0);
 
-  const runCount = effective.length * iters;
+  const plannedCount = effective.length * iters;
   const dataRow = dataFile ? dataFile.rows[viewIter] : undefined;
-  const multiIter = ranIters > 1;
+  const multiIter = ranIters > 1 || (running && iters > 1);
+
+  const iterRecords = records.filter((r) => r.iter === viewIter);
+  const shown = iterRecords.filter((r) => (filter === 'all' ? true : filter === 'passed' ? isOk(r) : !isOk(r)));
+  const failedCount = records.length - passedRun;
+
+  const exportResults = async () => {
+    const report = {
+      collection: title,
+      finishedAt: new Date().toISOString(),
+      durationMs: elapsed,
+      iterations: ranIters,
+      summary: {
+        requests: totalRun,
+        passed: passedRun,
+        failed: totalRun - passedRun,
+        assertions: { total: assertTotal, passed: assertPass, failed: assertTotal - assertPass },
+      },
+      runs: records.map((r) => ({
+        iteration: r.iter + 1,
+        step: r.step + 1,
+        name: r.name,
+        method: r.method,
+        url: r.url,
+        status: r.status,
+        timeMs: r.ms,
+        error: r.error ?? undefined,
+        tests: r.tests.map((t) => ({ name: t.name, passed: t.passed, error: t.error })),
+      })),
+    };
+    const safe = (title || 'run').replace(/[^\w.-]+/g, '-');
+    await saveJsonFile(`${safe}.run-results.json`, JSON.stringify(report, null, 2));
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -271,10 +384,26 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                   </Field>
                 </div>
 
-                <label className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2">
-                  <span className="text-xs font-medium">Run in parallel</span>
-                  <Switch checked={parallel} onCheckedChange={setParallel} aria-label="Run in parallel" />
-                </label>
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Advanced</p>
+                  <OptionRow
+                    label="Stop run if an error occurs"
+                    checked={stopOnFailure}
+                    onChange={setStopOnFailure}
+                  />
+                  <OptionRow
+                    label="Save responses"
+                    hint="Keep each response so you can open it afterwards."
+                    checked={saveResponses}
+                    onChange={setSaveResponses}
+                  />
+                  <OptionRow
+                    label="Run in parallel"
+                    hint={parallel ? 'Flow control (setNextRequest) is ignored in parallel runs.' : undefined}
+                    checked={parallel}
+                    onChange={setParallel}
+                  />
+                </div>
 
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Data file</p>
@@ -356,8 +485,8 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
 
             {/* action bar */}
             <div className="flex shrink-0 items-center gap-3 border-t px-4 py-3">
-              <Button onClick={run} disabled={runCount === 0} className="h-9 gap-1.5 bg-amber-400 px-4 text-neutral-900 hover:bg-amber-500">
-                <Play className="h-4 w-4" /> Run {runCount} request{runCount === 1 ? '' : 's'}
+              <Button onClick={run} disabled={plannedCount === 0} className="h-9 gap-1.5 bg-amber-400 px-4 text-neutral-900 hover:bg-amber-500">
+                <Play className="h-4 w-4" /> Run {plannedCount} request{plannedCount === 1 ? '' : 's'}
               </Button>
               <span className="text-xs text-muted-foreground">
                 {effective.length} selected × {iters} iteration{iters === 1 ? '' : 's'}
@@ -372,30 +501,49 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
           <div className="flex min-h-0 flex-1 flex-col">
             {/* summary dashboard */}
             <div className="flex shrink-0 flex-wrap items-stretch gap-2 border-b p-3">
-              <Stat label="Requests" value={`${totalRun}${running ? ` / ${runCount}` : ''}`} />
+              <Stat label="Requests" value={`${totalRun}${running ? ` / ${plannedCount}` : ''}`} />
               <Stat label="Passed" value={passedRun} tone="ok" />
-              <Stat label="Failed" value={totalRun - passedRun} tone={totalRun - passedRun ? 'bad' : 'muted'} />
+              <Stat label="Failed" value={failedCount} tone={failedCount ? 'bad' : 'muted'} />
               <Stat label="Assertions" value={`${assertPass}/${assertTotal}`} tone={assertTotal && assertPass < assertTotal ? 'bad' : assertTotal ? 'ok' : 'muted'} />
-              <Stat label="Total time" value={`${totalMs} ms`} icon={<Clock className="h-3 w-3" />} />
+              <Stat label="Duration" value={formatDuration(elapsed)} icon={<Clock className="h-3 w-3" />} />
               <div className="ml-auto flex items-center gap-2">
-                {running && <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running…</span>}
                 {running ? (
                   <Button onClick={stop} variant="destructive" size="sm" className="h-8 gap-1.5">
                     <Square className="h-3.5 w-3.5" /> Stop
                   </Button>
                 ) : (
-                  <Button onClick={run} size="sm" className="h-8 gap-1.5 bg-amber-400 text-neutral-900 hover:bg-amber-500">
-                    <RotateCcw className="h-3.5 w-3.5" /> Run again
-                  </Button>
+                  <>
+                    <Button
+                      onClick={exportResults}
+                      disabled={totalRun === 0}
+                      variant="outline" size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Export
+                    </Button>
+                    <Button onClick={run} size="sm" className="h-8 gap-1.5 bg-amber-400 text-neutral-900 hover:bg-amber-500">
+                      <RotateCcw className="h-3.5 w-3.5" /> Run again
+                    </Button>
+                  </>
                 )}
               </div>
+            </div>
+
+            {/* progress — fixed-height strip so the layout doesn't shift */}
+            <div className="h-0.5 shrink-0 overflow-hidden bg-muted">
+              {running && (
+                <div
+                  className="h-full bg-amber-400 transition-[width] duration-200"
+                  style={{ width: `${plannedCount > 0 ? Math.min(100, (totalRun / plannedCount) * 100) : 0}%` }}
+                />
+              )}
             </div>
 
             <div className="flex min-h-0 flex-1">
               {/* iteration rail (data / multi-iteration runs) */}
               {multiIter && !detailKey && (
                 <div className="w-48 shrink-0 overflow-y-auto border-r">
-                  {Array.from({ length: ranIters }, (_, i) => {
+                  {Array.from({ length: Math.max(ranIters, running ? iters : 0) }, (_, i) => {
                     const s = iterStats(i);
                     const ok = s.total > 0 && s.ok === s.total;
                     const row = dataFile?.rows[i];
@@ -403,7 +551,7 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                     return (
                       <button
                         key={i}
-                        onClick={() => setViewIter(i)}
+                        onClick={() => { followIterRef.current = false; setViewIter(i); }}
                         className={cn('flex w-full items-center gap-2 border-b px-3 py-2 text-left text-xs transition-colors hover:bg-accent/50',
                           i === viewIter && 'bg-accent')}
                       >
@@ -422,8 +570,8 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
 
               {/* request results / detail */}
               <div className="flex min-w-0 flex-1 flex-col">
-                {detailKey && details[detailKey] ? (
-                  <RunDetailView entry={details[detailKey]} onBack={() => setDetailKey(null)} />
+                {detailKey && records.find((r) => r.key === detailKey)?.detail ? (
+                  <RunDetailView entry={records.find((r) => r.key === detailKey)!.detail!} onBack={() => setDetailKey(null)} />
                 ) : (
                   <>
                     {dataRow && Object.keys(dataRow).length > 0 && (
@@ -434,39 +582,47 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
                         ))}
                       </div>
                     )}
-                    <div className="min-h-0 flex-1 divide-y overflow-y-auto">
-                      {effective.map((req) => {
-                        const key = keyOf(viewIter, req.id);
-                        const r = results[key];
-                        const active = currentKey === key;
-                        const hasDetail = !!details[key];
-                        return (
+
+                    {iterRecords.length > 0 && (
+                      <div className="flex shrink-0 items-center gap-1 border-b px-3 py-1.5">
+                        {(['all', 'passed', 'failed'] as ResultFilter[]).map((f) => (
                           <button
-                            key={req.id}
-                            disabled={!hasDetail}
-                            onClick={() => hasDetail && setDetailKey(key)}
-                            className={cn('group flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs transition-colors',
-                              hasDetail ? 'cursor-pointer hover:bg-accent/50' : 'cursor-default')}
+                            key={f}
+                            onClick={() => setFilter(f)}
+                            className={cn('rounded px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
+                              filter === f ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')}
                           >
-                            <span className="w-5 shrink-0">
-                              {active ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                                : r ? (isOk(r) ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <X className="h-3.5 w-3.5 text-destructive" />)
-                                : <span className="block h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />}
-                            </span>
-                            <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(req.method))}>{req.method}</span>
-                            <span className="min-w-0 flex-1 truncate font-medium" title={req.url}>{req.name}</span>
-                            {r && (
-                              <>
-                                {r.total > 0 && <span className={cn('shrink-0', r.passed === r.total ? 'text-emerald-500' : 'text-destructive')}>{r.passed}/{r.total} tests</span>}
-                                <span className={cn('w-12 shrink-0 text-right font-semibold', r.error ? 'text-destructive' : statusColor(r.status))}>{r.error ? 'ERR' : r.status}</span>
-                                <span className="w-16 shrink-0 text-right text-muted-foreground">{r.ms} ms</span>
-                              </>
-                            )}
-                            {hasDetail && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground" />}
+                            {f}
                           </button>
-                        );
-                      })}
-                      {effective.length === 0 && <p className="px-4 py-6 text-center text-xs text-muted-foreground">No requests ran.</p>}
+                        ))}
+                        <span className="ml-auto text-[11px] text-muted-foreground">
+                          {shown.length} of {iterRecords.length}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="min-h-0 flex-1 divide-y overflow-y-auto">
+                      {shown.map((r) => (
+                        <RecordRow key={r.key} record={r} onOpen={() => r.detail && setDetailKey(r.key)} />
+                      ))}
+                      {running && current && current.iter === viewIter && (
+                        <div className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs">
+                          <span className="w-5 shrink-0"><Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /></span>
+                          <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(current.method))}>{current.method}</span>
+                          <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground">{current.name}</span>
+                        </div>
+                      )}
+                      {iterRecords.length === 0 && !running && (
+                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">No requests ran.</p>
+                      )}
+                      {iterRecords.length > 0 && shown.length === 0 && (
+                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">Nothing matches this filter.</p>
+                      )}
+                      {cappedIters.has(viewIter) && (
+                        <p className="px-3 py-2 text-[11px] text-destructive">
+                          Stopped after {MAX_STEPS_PER_ITERATION} requests — setNextRequest appears to loop.
+                        </p>
+                      )}
                     </div>
                   </>
                 )}
@@ -476,6 +632,43 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── one executed request ─────────────────────────────────────────────────────
+
+function RecordRow({ record: r, onOpen }: { record: RunRecord; onOpen: () => void }) {
+  const ok = isOk(r);
+  return (
+    <div>
+      <button
+        disabled={!r.detail}
+        onClick={onOpen}
+        className={cn('group flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs transition-colors',
+          r.detail ? 'cursor-pointer hover:bg-accent/50' : 'cursor-default')}
+      >
+        <span className="w-5 shrink-0">
+          {ok ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <X className="h-3.5 w-3.5 text-destructive" />}
+        </span>
+        <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(r.method))}>{r.method}</span>
+        <span className="min-w-0 flex-1 truncate font-medium" title={r.url}>{r.name}</span>
+        {r.total > 0 && <span className={cn('shrink-0', r.passed === r.total ? 'text-emerald-500' : 'text-destructive')}>{r.passed}/{r.total} tests</span>}
+        <span className={cn('w-12 shrink-0 text-right font-semibold', r.error ? 'text-destructive' : statusColor(r.status))}>{r.error ? 'ERR' : r.status}</span>
+        <span className="w-16 shrink-0 text-right text-muted-foreground">{r.ms} ms</span>
+        {r.detail && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground" />}
+      </button>
+      {r.jump && (
+        <p className={cn('flex items-center gap-1.5 px-3 pb-1.5 pl-10 text-[11px]',
+          r.jump.missing ? 'text-destructive' : 'text-muted-foreground')}>
+          <CornerDownRight className="h-3 w-3 shrink-0" />
+          {r.jump.to === null
+            ? 'Script ended the iteration here.'
+            : r.jump.missing
+              ? `Script asked for "${r.jump.to}", which isn't in this run — continued in order.`
+              : `Script jumped to "${r.jump.to}".`}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -493,6 +686,14 @@ function Stat({ label, value, tone = 'default', icon }: {
       <p className={cn('text-base font-semibold tabular-nums', toneCls)}>{value}</p>
     </div>
   );
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)} s`;
+  const m = Math.floor(s / 60);
+  return `${m}m ${Math.round(s - m * 60)}s`;
 }
 
 // ─── data preview ─────────────────────────────────────────────────────────────
@@ -627,5 +828,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
       {children}
     </div>
+  );
+}
+
+function OptionRow({ label, hint, checked, onChange }: {
+  label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-3 rounded-md border px-3 py-2">
+      <span className="min-w-0">
+        <span className="block text-xs font-medium">{label}</span>
+        {hint && <span className="mt-0.5 block text-[11px] text-muted-foreground">{hint}</span>}
+      </span>
+      <Switch checked={checked} onCheckedChange={onChange} aria-label={label} className="shrink-0" />
+    </label>
   );
 }

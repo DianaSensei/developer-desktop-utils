@@ -217,3 +217,26 @@ describe('executeRequest — script sandbox', () => {
     expect(calls).toBe(1);
   });
 });
+
+describe('executeRequest — flow control', () => {
+  it('surfaces setNextRequest on the result', async () => {
+    stubJson('{}');
+    const r = await executeRequest(
+      req({ script: { req: '', res: "bru.setNextRequest('Cleanup');" } }),
+      null, {},
+    );
+    expect(r.nextRequest).toBe('Cleanup');
+  });
+
+  it('surfaces null for an early end of iteration', async () => {
+    stubJson('{}');
+    const r = await executeRequest(req({ tests: 'bru.setNextRequest(null);' }), null, {});
+    expect(r.nextRequest).toBeNull();
+  });
+
+  it('leaves nextRequest undefined when no script asked', async () => {
+    stubJson('{}');
+    const r = await executeRequest(req({ tests: 'test("t", () => expect(1).to.equal(1));' }), null, {});
+    expect(r.nextRequest).toBeUndefined();
+  });
+});

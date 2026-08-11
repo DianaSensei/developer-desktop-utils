@@ -100,7 +100,9 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       </GuideSection>
       <GuideSection icon={Play} title="Runner">
         <p>Right-click a collection or folder → <strong className="text-foreground">Run</strong> to execute its requests in order, with iterations, a delay, parallel mode, and tag filters. Bind a CSV/JSON <strong className="text-foreground">data file</strong> to drive one iteration per row, with each column available as <Var>{'{{column}}'}</Var>.</p>
-        <p><strong className="text-foreground">Stop</strong> aborts the request in flight. Runner results stay in the Runner (drill into any run for its exact request and response) and don’t crowd out your History.</p>
+        <p><strong className="text-foreground">Flow control</strong>: call <Tok>bru.setNextRequest("Login")</Tok> (or <Tok>pm.execution.setNextRequest</Tok> / <Tok>postman.setNextRequest</Tok>) from a script to jump to another request by name, or pass <Tok>null</Tok> to end the iteration early. Jumps are shown under the row that made them, so retry loops and conditional paths are visible in the results.</p>
+        <p>Advanced options: <strong className="text-foreground">stop the run on the first failure</strong>, and turn off <strong className="text-foreground">save responses</strong> for long runs you don’t need to inspect afterwards.</p>
+        <p>Results show a live progress bar and duration, filter by passed/failed, and <strong className="text-foreground">Export</strong> to a JSON report. <strong className="text-foreground">Stop</strong> aborts the request in flight. Runner results stay in the Runner and don’t crowd out your History.</p>
       </GuideSection>
       <GuideSection icon={FolderTree} title="Organize, import & export">
         <p>Group requests into collections and folders in the left sidebar; open several in tabs — each remembers the tab you were working in. History records every send you make by hand.</p>
@@ -411,6 +413,6 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 // version 1 (their guide's initial version).
 export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   settings: 1,
-  // 2 — documents the expanded scripting API and the Runner section.
-  'api-client': 2,
+  // 3 — expanded scripting API, sandbox, and the Runner's flow control.
+  'api-client': 3,
 };

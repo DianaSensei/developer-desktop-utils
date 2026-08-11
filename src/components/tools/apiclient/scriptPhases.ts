@@ -16,7 +16,7 @@
 
 import {
   applyVars, evalAssertions, makeBru, makeReq, makeRes, runScript,
-  type ScriptRun, type VarStores,
+  type RunControl, type ScriptRun, type VarStores,
 } from './runtime';
 import type {
   ApiRequest, ApiResponse, Assertion, LogEntry, TestResult, VarDef, VarMap,
@@ -59,11 +59,14 @@ export interface PhaseOutput {
   logs: LogEntry[];
   // One entry per failing script, already labelled with which script it was.
   errors: string[];
+  // Runner flow control requested by a script, if any (see RunControl).
+  control: RunControl;
 }
 
 export async function runPhase(input: PhaseInput, signal?: AbortSignal): Promise<PhaseOutput> {
   const draft = input.draft;
-  const stores: VarStores = { ...input.stores, signal };
+  const control: RunControl = {};
+  const stores: VarStores = { ...input.stores, control, signal };
   const out: ScriptRun = { logs: [], tests: [], error: null };
   const errors: string[] = [];
 
@@ -85,6 +88,7 @@ export async function runPhase(input: PhaseInput, signal?: AbortSignal): Promise
     tests: out.tests,
     logs: out.logs,
     errors,
+    control,
   });
 
   const label = (base: string, i: number, total: number) => (total > 1 ? `${base} #${i + 1}` : base);

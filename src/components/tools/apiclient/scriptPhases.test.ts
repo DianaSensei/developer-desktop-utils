@@ -165,3 +165,64 @@ describe('abort signal', () => {
     expect(out.errors[0]).toContain('cancelled');
   });
 });
+
+describe('runner flow control', () => {
+  const post = (script: string, tests = '') => runPhase({
+    phase: 'post',
+    draft: newRequest(),
+    stores: stores(),
+    response: response(),
+    inherited: [],
+    vars: [],
+    script,
+    tests,
+    assertions: [],
+  });
+
+  it('reports nothing when no script asks for a jump', async () => {
+    const out = await post("bru.setVar('x', '1');");
+    expect(out.control.nextRequest).toBeUndefined();
+    expect('nextRequest' in out.control).toBe(false);
+  });
+
+  it('captures a named jump from bru.setNextRequest', async () => {
+    const out = await post("bru.setNextRequest('Login');");
+    expect(out.control.nextRequest).toBe('Login');
+  });
+
+  it('captures null as end-of-iteration', async () => {
+    const out = await post('bru.setNextRequest(null);');
+    expect(out.control.nextRequest).toBeNull();
+    expect('nextRequest' in out.control).toBe(true);
+  });
+
+  it('supports pm.execution.setNextRequest', async () => {
+    const out = await post("pm.execution.setNextRequest('Next One');");
+    expect(out.control.nextRequest).toBe('Next One');
+  });
+
+  it("supports Postman's legacy postman.setNextRequest", async () => {
+    const out = await post("postman.setNextRequest('Legacy');");
+    expect(out.control.nextRequest).toBe('Legacy');
+  });
+
+  it('lets a later script override an earlier jump', async () => {
+    const out = await post("bru.setNextRequest('First');", "bru.setNextRequest('Second');");
+    expect(out.control.nextRequest).toBe('Second');
+  });
+
+  it('is a no-op in the pre phase of a plain send', async () => {
+    const out = await runPhase({
+      phase: 'pre',
+      draft: newRequest(),
+      stores: stores(),
+      inherited: [],
+      vars: [],
+      script: "bru.setNextRequest('Somewhere'); bru.setVar('ran', 'yes');",
+    });
+    // The call is accepted (no crash) and recorded; a plain Send just ignores it.
+    expect(out.stores.runtime.ran).toBe('yes');
+    expect(out.errors).toEqual([]);
+    expect(out.control.nextRequest).toBe('Somewhere');
+  });
+});

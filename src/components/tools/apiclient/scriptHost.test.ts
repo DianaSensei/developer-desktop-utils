@@ -36,6 +36,7 @@ class FakeWorker {
         tests: [{ name: 'from worker', passed: true }],
         logs: [],
         errors: [],
+        control: {},
       };
       this.onmessage?.({ data: { type: 'done', id: msg.id, output } } as MessageEvent);
     });
