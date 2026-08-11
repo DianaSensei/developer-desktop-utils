@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, GripVertical,
-  ListChecks, Loader2, Play, RotateCcw, Settings2, X,
+  ListChecks, Loader2, Play, RotateCcw, Settings2, Square, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ interface RowResult {
 interface Props {
   title: string;
   requests: ApiRequest[];
-  runRequest: (req: ApiRequest, dataVars?: VarMap) => Promise<ExecResult>;
+  runRequest: (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal) => Promise<ExecResult>;
   open: boolean;
   onClose: () => void;
 }
@@ -109,12 +109,15 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
   const delayMs = Math.max(0, Number(delay) || 0);
 
   const cancelledRef = useRef(false);
-  useEffect(() => () => { cancelledRef.current = true; }, []);
+  // Aborts the request currently in flight, so Stop (and closing the dialog)
+  // takes effect immediately rather than after the current send completes.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { cancelledRef.current = true; abortRef.current?.abort(); }, []);
 
   const runOne = async (req: ApiRequest, iter: number, dataVars?: VarMap) => {
     const key = keyOf(iter, req.id);
     try {
-      const r = await runRequest(req, dataVars);
+      const r = await runRequest(req, dataVars, abortRef.current?.signal);
       if (cancelledRef.current) return;
       const passed = r.tests.filter((t) => t.passed).length;
       const row: RowResult = { status: r.response?.status ?? 0, ms: r.response?.timeMs ?? 0, passed, total: r.tests.length, error: r.error };
@@ -129,23 +132,37 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
 
   const run = async () => {
     cancelledRef.current = false;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     setRunning(true); resetRun(); setPhase('results');
-    for (let i = 0; i < iters; i++) {
-      if (cancelledRef.current) break;
-      const dataVars = dataFile ? dataFile.rows[i] : undefined;
-      if (parallel) {
-        await Promise.all(effective.map((req) => runOne(req, i, dataVars)));
-      } else {
-        for (const req of effective) {
-          if (cancelledRef.current) break;
-          setCurrentKey(keyOf(i, req.id));
-          await runOne(req, i, dataVars);
-          if (delayMs > 0) await sleep(delayMs);
+    try {
+      for (let i = 0; i < iters; i++) {
+        if (cancelledRef.current) break;
+        const dataVars = dataFile ? dataFile.rows[i] : undefined;
+        if (parallel) {
+          await Promise.all(effective.map((req) => runOne(req, i, dataVars)));
+        } else {
+          for (const req of effective) {
+            if (cancelledRef.current) break;
+            setCurrentKey(keyOf(i, req.id));
+            await runOne(req, i, dataVars);
+            if (delayMs > 0) await sleep(delayMs);
+          }
         }
+        // Grow the iteration rail as the run progresses instead of only at the
+        // end, so a stopped run still shows the iterations that completed.
+        if (!cancelledRef.current) setRanIters(i + 1);
       }
+    } finally {
+      // Always release the running flag. Previously a cancelled run left the
+      // spinner and the disabled "Run again" button on screen for good.
+      setCurrentKey(null);
+      setRunning(false);
     }
-    if (!cancelledRef.current) { setRanIters(iters); setCurrentKey(null); setRunning(false); }
   };
+
+  // Stop the run and abort whatever is on the wire right now.
+  const stop = () => { cancelledRef.current = true; abortRef.current?.abort(); };
 
   const loadData = async () => {
     setDataError(null);
@@ -362,9 +379,15 @@ export function RunnerDialog({ title, requests, runRequest, open, onClose }: Pro
               <Stat label="Total time" value={`${totalMs} ms`} icon={<Clock className="h-3 w-3" />} />
               <div className="ml-auto flex items-center gap-2">
                 {running && <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running…</span>}
-                <Button onClick={run} disabled={running} size="sm" className="h-8 gap-1.5 bg-amber-400 text-neutral-900 hover:bg-amber-500">
-                  <RotateCcw className="h-3.5 w-3.5" /> Run again
-                </Button>
+                {running ? (
+                  <Button onClick={stop} variant="destructive" size="sm" className="h-8 gap-1.5">
+                    <Square className="h-3.5 w-3.5" /> Stop
+                  </Button>
+                ) : (
+                  <Button onClick={run} size="sm" className="h-8 gap-1.5 bg-amber-400 text-neutral-900 hover:bg-amber-500">
+                    <RotateCcw className="h-3.5 w-3.5" /> Run again
+                  </Button>
+                )}
               </div>
             </div>
 

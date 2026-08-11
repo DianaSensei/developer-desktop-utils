@@ -2,10 +2,14 @@
 // status·time·size readout, a format dropdown (Bruno-style: Preview toggle +
 // JSON/HTML/XML/JavaScript and Raw/Hex/Base64), and copy / download / clear
 // actions. JSON bodies are pretty-printed; every view is copyable.
+//
+// While a request is in flight the previously-rendered response stays on screen
+// behind a progress bar rather than being replaced by a spinner — swapping the
+// whole pane out and back was the single biggest source of flicker in the tool.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
-  AlertCircle, Binary, Braces, Check, ChevronDown, ChevronsRight, Code2, Copy, Download, Eraser,
+  AlertCircle, Binary, Braces, Check, ChevronDown, Code2, Copy, Download, Eraser,
   FileCode, FileText, Filter, Hash, Loader2, MoreHorizontal, Send, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,21 +17,23 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { isMac } from '@/hooks/useQuickPaste';
+import { useDismissable } from '@/hooks/useDismissable';
 import type { ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
-import { saveTextFile } from './fileio';
+import { saveBinaryFile, saveTextFile } from './fileio';
 import { queryJson } from './jsonpath';
 import { ResponseViewer } from './ResponseViewer';
+import { ResponsiveTabBar, type TabDef } from './ResponsiveTabBar';
 
 type Kind = 'json' | 'html' | 'xml' | 'image' | 'text';
 type Format = 'json' | 'html' | 'xml' | 'javascript' | 'raw' | 'hex' | 'base64';
 
 function detectKind(r: ApiResponse): Kind {
   const ct = r.contentType.toLowerCase();
+  if (/image\//.test(ct)) return 'image';
   if (/json/.test(ct) || /^\s*[[{]/.test(r.body)) return 'json';
   if (/html/.test(ct)) return 'html';
   if (/xml/.test(ct)) return 'xml';
-  if (/image\//.test(ct)) return 'image';
   return 'text';
 }
 
@@ -72,56 +78,6 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   const [filter, setFilter] = useState('');
   const [showFilter, setShowFilter] = useState(false);
 
-  // Track header width so the tab strip can collapse into a » overflow menu when
-  // the right-side controls leave too little room (Bruno-style responsiveness).
-  const headerRef = useRef<HTMLDivElement>(null);
-  const [headerW, setHeaderW] = useState(Infinity);
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(([e]) => setHeaderW(e.contentRect.width));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // Measure each tab's intrinsic width (from a hidden row) and the right-group
-  // width so the strip collapses precisely — no clipping, status stays pinned.
-  const measureRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const tabWRef = useRef<Record<string, number>>({});
-  const [tabW, setTabW] = useState<Record<string, number>>({});
-  // Only re-measure when tab structure changes (new response, or test/log counts change
-  // which updates badge text). Using a ref for the previous widths avoids a stale closure
-  // while keeping the effect out of the render-on-every-update path.
-  useLayoutEffect(() => {
-    const prev = tabWRef.current;
-    let changed = false;
-    const next: Record<string, number> = {};
-    for (const id of Object.keys(measureRefs.current)) {
-      const el = measureRefs.current[id];
-      if (!el) continue;
-      next[id] = el.offsetWidth;
-      if (prev[id] !== next[id]) changed = true;
-    }
-    // On WebKitGTK the layout pass may not have completed when useLayoutEffect
-    // fires, so offsetWidth reads can return 0. Skip zero reads to keep the
-    // previous measurement (or the ?? 80 fallback) rather than collapsing all tabs.
-    if (Object.values(next).some((w) => w === 0)) return;
-    if (changed) {
-      tabWRef.current = next;
-      setTabW(next);
-    }
-  }, [response, tests.length, logs.length]);
-
-  const rightRef = useRef<HTMLDivElement>(null);
-  const [rightW, setRightW] = useState(0);
-  useEffect(() => {
-    const el = rightRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(([e]) => setRightW(e.contentRect.width));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   const big = !!response && response.body.length > LARGE_BODY;
 
   const pretty = useMemo(
@@ -130,13 +86,17 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   );
   const kind = useMemo(() => (response ? detectKind(response) : 'text'), [response]);
 
-  // Reset the view to the detected default whenever a new response arrives.
-  // Oversized bodies default to raw text to stay responsive.
+  // Reset the view only when the *shape* of the payload changes. Re-sending the
+  // same endpoint used to snap the format back to the default on every response,
+  // discarding a format the user had deliberately picked.
+  const lastShape = useRef<string | null>(null);
   useEffect(() => {
-    if (response) {
-      setFormat(response.body.length > LARGE_BODY ? 'raw' : KIND_FORMAT[detectKind(response)]);
-      setPreview(false);
-    }
+    if (!response) return;
+    const shape = `${detectKind(response)}|${response.body.length > LARGE_BODY}`;
+    if (lastShape.current === shape) return;
+    lastShape.current = shape;
+    setFormat(response.body.length > LARGE_BODY ? 'raw' : KIND_FORMAT[detectKind(response)]);
+    setPreview(detectKind(response) === 'image');
   }, [response]);
 
   // Apply the JSONPath filter to JSON bodies (the funnel box), if active/valid.
@@ -148,7 +108,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
     } catch {
       return { ok: false as const, text: '' };
     }
-  }, [response, kind, filter]);
+  }, [response, big, kind, filter]);
 
   const bodyText = useMemo(() => {
     if (!response) return '';
@@ -156,11 +116,15 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
     if (big && format === 'json') return response.body;
     switch (format) {
       case 'json': return pretty;
-      case 'hex': return hexDump(response.body);
-      case 'base64': return toBase64(response.body);
+      // Hex/Base64 read the preserved bytes for binary payloads — re-encoding
+      // the decoded text would dump U+FFFD runs instead of the real content.
+      case 'hex': return hexDump(
+        response.bodyBase64 ? base64ToBytes(response.bodyBase64) : new TextEncoder().encode(response.body),
+      );
+      case 'base64': return response.bodyBase64 ?? toBase64(response.body);
       default: return response.body;
     }
-  }, [response, format, pretty, filterResult]);
+  }, [response, big, format, pretty, filterResult]);
 
   const failed = tests.filter((t) => !t.passed).length;
 
@@ -174,22 +138,22 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
     copyTimer.current = setTimeout(() => setCopied(false), 1200);
   }, [tab, response, bodyText]);
 
-  const saveResponse = async () => {
+  const saveResponse = useCallback(async () => {
     if (!response) return;
-    const ext = kind === 'json' ? 'json' : kind === 'html' ? 'html' : kind === 'xml' ? 'xml' : 'txt';
-    await saveTextFile(`response.${ext}`, response.body);
-  };
+    // Binary payloads are saved from the preserved bytes; writing the decoded
+    // text would hand back a file full of replacement characters.
+    if (response.binary && response.bodyBase64) {
+      await saveBinaryFile(suggestedFileName(response), response.bodyBase64);
+      return;
+    }
+    await saveTextFile(suggestedFileName(response), response.body);
+  }, [response]);
 
-  if (sending) {
-    return (
-      <Centered>
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
-        <p className="text-xs text-muted-foreground">Sending request…</p>
-      </Centered>
-    );
-  }
-
-  if (!response && !error && tests.length === 0 && logs.length === 0) {
+  // Nothing has happened yet on this tab — show the keyboard-shortcut splash.
+  // Note this is deliberately *not* shown while `sending` with prior content:
+  // the previous response stays put and only the header reports progress.
+  const blank = !response && !error && tests.length === 0 && logs.length === 0;
+  if (blank && !sending) {
     const mod = isMac ? '⌘' : 'Ctrl';
     const shortcuts: [string, string][] = [
       ['Send Request', `${mod} + Enter`],
@@ -211,24 +175,20 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
       </Centered>
     );
   }
-
-  const TabBtn = ({ id, label, badge }: { id: Tab; label: string; badge?: React.ReactNode }) => (
-    <button
-      onClick={() => setTab(id)}
-      className={cn(
-        'relative -mb-px flex shrink-0 items-center gap-1 border-b-2 py-2 text-xs font-medium transition-colors',
-        tab === id ? 'border-amber-400 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-      )}
-    >
-      {label}{badge}
-    </button>
-  );
+  if (blank && sending) {
+    return (
+      <Centered>
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+        <p className="text-xs text-muted-foreground">Sending request…</p>
+      </Centered>
+    );
+  }
 
   // Tab definitions (only the relevant ones for the current response state).
-  const tabDefs: { id: Tab; label: string; badge?: React.ReactNode }[] = [
+  const tabDefs: TabDef[] = [
     { id: 'body', label: 'Response' },
-    ...(response ? [{ id: 'headers' as Tab, label: 'Headers', badge: <span className="text-[9px] text-muted-foreground">{response.headers.length}</span> }] : []),
-    ...(response ? [{ id: 'timeline' as Tab, label: 'Timeline' }] : []),
+    ...(response ? [{ id: 'headers', label: 'Headers', badge: <span className="text-[9px] text-muted-foreground">{response.headers.length}</span> }] : []),
+    ...(response ? [{ id: 'timeline', label: 'Timeline' }] : []),
     {
       id: 'tests', label: 'Tests',
       badge: tests.length > 0 ? (
@@ -239,99 +199,76 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
     },
     { id: 'console', label: 'Console', badge: logs.length > 0 ? <span className="text-[9px] text-muted-foreground">{logs.length}</span> : undefined },
   ];
+  // The active tab may vanish when a run ends without a response (Headers /
+  // Timeline only exist alongside one) — fall back rather than render nothing.
+  const activeTab: Tab = tabDefs.some((t) => t.id === tab) ? tab : 'body';
 
-  // Progressively drop trailing tabs into a » menu as the header narrows, using
-  // measured widths so the active tab is never clipped and the status group on
-  // the right stays pinned. Response and the active tab always stay inline.
-  const GAP = 16;     // gap-4 between tabs
-  const CHEV = 42;    // » button + its left margin
-  const PAD = 24;     // left padding + buffer before the right group
-  const wid = (id: string) => tabW[id] ?? 80;
-  const budget = headerW - rightW - PAD;
-  const totalAll = tabDefs.reduce((s, t) => s + wid(t.id) + GAP, 0);
-
-  let inlineTabs = tabDefs;
-  let overflowTabs: typeof tabDefs = [];
-  if (Number.isFinite(headerW) && rightW > 0 && totalAll > budget) {
-    const head: typeof tabDefs = [];
-    let used = 0;
-    for (const t of tabDefs) {
-      if (used + wid(t.id) + GAP + CHEV <= budget) { head.push(t); used += wid(t.id) + GAP; }
-      else break;
-    }
-    if (head.length === 0) head.push(tabDefs[0]);
-    let rest = tabDefs.filter((t) => !head.includes(t));
-    // Guarantee the active tab is visible: trim trailing inline tabs to make room.
-    if (rest.some((t) => t.id === tab)) {
-      const active = tabDefs.find((t) => t.id === tab)!;
-      let hw = head.reduce((s, t) => s + wid(t.id) + GAP, 0);
-      while (head.length > 1 && hw + wid(active.id) + GAP + CHEV > budget) {
-        hw -= wid(head.pop()!.id) + GAP;
-      }
-      head.push(active);
-      rest = tabDefs.filter((t) => !head.includes(t));
-    }
-    inlineTabs = head;
-    overflowTabs = rest;
-  }
+  const headerRight = (
+    <>
+      {response && activeTab === 'body' && (
+        <FormatDropdown format={format} onChange={setFormat} preview={preview} onPreview={setPreview} kind={kind} />
+      )}
+      {sending ? (
+        <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…
+        </span>
+      ) : response ? (
+        <>
+          <span className={cn('font-semibold', statusColor(response.status))}>{response.status} {response.statusText}</span>
+          <span className="text-muted-foreground">{response.timeMs} ms</span>
+          <span className="text-muted-foreground">{formatBytes(response.sizeBytes)}</span>
+        </>
+      ) : (
+        <span className="font-semibold text-destructive">No response</span>
+      )}
+      {response && activeTab === 'body' && kind === 'json' && !big && (
+        <button
+          onClick={() => setShowFilter((s) => !s)}
+          title="Filter (JSONPath)"
+          className={cn('rounded p-1 transition-colors hover:bg-accent hover:text-foreground', showFilter || filter ? 'text-amber-500' : 'text-muted-foreground')}
+        >
+          <Filter className="h-4 w-4" />
+        </button>
+      )}
+      {response && <ActionsMenu copied={copied} onCopy={copy} onSave={saveResponse} onClear={onClear} />}
+    </>
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* header: tabs left, format/status/actions pinned right */}
-      <div ref={headerRef} className="relative flex items-center border-b border-border px-3">
-        {/* hidden row used only to measure intrinsic tab widths */}
-        <div aria-hidden className="pointer-events-none invisible absolute left-0 top-0 flex items-center gap-4">
-          {tabDefs.map((t) => (
-            <button key={t.id} ref={(el) => { measureRefs.current[t.id] = el; }} className="flex shrink-0 items-center gap-1 py-2 text-xs font-medium">
-              {t.label}{t.badge}
-            </button>
-          ))}
-        </div>
+      <ResponsiveTabBar
+        tabs={tabDefs}
+        active={activeTab}
+        onSelect={(id) => setTab(id as Tab)}
+        right={headerRight}
+      />
 
-        <div className="flex min-w-0 items-center gap-4 overflow-hidden">
-          {inlineTabs.map((t) => <TabBtn key={t.id} id={t.id} label={t.label} badge={t.badge} />)}
-        </div>
-        {overflowTabs.length > 0 && <TabOverflow tabs={overflowTabs} onSelect={setTab} />}
-
-        <div ref={rightRef} className="ml-auto flex shrink-0 items-center gap-2.5 whitespace-nowrap pl-4 text-xs">
-          {response && tab === 'body' && (
-            <FormatDropdown format={format} onChange={setFormat} preview={preview} onPreview={setPreview} />
-          )}
-          {response ? (
-            <>
-              <span className={cn('font-semibold', statusColor(response.status))}>{response.status} {response.statusText}</span>
-              <span className="text-muted-foreground">{response.timeMs} ms</span>
-              <span className="text-muted-foreground">{formatBytes(response.sizeBytes)}</span>
-            </>
-          ) : (
-            <span className="font-semibold text-destructive">No response</span>
-          )}
-          {response && tab === 'body' && kind === 'json' && !big && (
-            <button
-              onClick={() => setShowFilter((s) => !s)}
-              title="Filter (JSONPath)"
-              className={cn('rounded p-1 transition-colors hover:bg-accent hover:text-foreground', showFilter || filter ? 'text-amber-500' : 'text-muted-foreground')}
-            >
-              <Filter className="h-4 w-4" />
-            </button>
-          )}
-          {response && (
-            <ActionsMenu copied={copied} onCopy={copy} onSave={saveResponse} onClear={onClear} />
-          )}
-        </div>
+      {/* In-flight indicator. Rendered in a fixed-height strip so switching
+          between sending and idle never shifts the content below it. */}
+      <div className="relative h-0.5 shrink-0 overflow-hidden" aria-hidden={!sending}>
+        {sending && (
+          <>
+            <div className="absolute inset-0 bg-amber-400/15" />
+            <div className="absolute inset-y-0 left-0 w-1/4 animate-progress-indeterminate bg-amber-400" />
+          </>
+        )}
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 border-b border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
+        <div className="flex max-h-28 shrink-0 items-start gap-2 overflow-auto border-b border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span className="break-words">{error}</span>
+          <span className="whitespace-pre-wrap break-words">{error}</span>
         </div>
       )}
 
-      {/* tab content */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {tab === 'body' && response && (
-          response.body ? (
+      {/* tab content — dimmed, not unmounted, while the next send is running */}
+      <div className={cn(
+        'flex min-h-0 flex-1 flex-col overflow-hidden transition-opacity duration-200',
+        sending && 'opacity-50',
+      )}>
+        {activeTab === 'body' && response && (
+          response.body || response.bodyBase64 ? (
             <>
               {big && (
                 <div className="flex shrink-0 items-center gap-2 border-b bg-amber-400/10 px-3 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
@@ -358,7 +295,10 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
             </>
           ) : <p className="p-3 text-xs text-muted-foreground">Empty response body.</p>
         )}
-        {tab === 'headers' && response && (
+        {activeTab === 'body' && !response && !error && (
+          <p className="p-3 text-xs text-muted-foreground">No response — see the Tests and Console tabs for what ran.</p>
+        )}
+        {activeTab === 'headers' && response && (
           <div className="min-h-0 flex-1 divide-y overflow-auto text-xs">
             {response.headers.map(([k, v], i) => (
               <div key={i} className="flex gap-3 px-3 py-1.5">
@@ -368,8 +308,8 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
             ))}
           </div>
         )}
-        {tab === 'timeline' && response && <Timeline response={response} />}
-        {tab === 'tests' && (
+        {activeTab === 'timeline' && response && <Timeline response={response} />}
+        {activeTab === 'tests' && (
           <div className="min-h-0 flex-1 overflow-auto">
             {tests.length === 0
               ? <p className="p-3 text-xs text-muted-foreground">No tests or assertions ran.</p>
@@ -390,7 +330,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
               )}
           </div>
         )}
-        {tab === 'console' && (
+        {activeTab === 'console' && (
           <div className="min-h-0 flex-1 overflow-auto">
             {logs.length === 0
               ? <p className="p-3 text-xs text-muted-foreground">No console output.</p>
@@ -415,6 +355,19 @@ const LOG_COLOR: Record<LogEntry['level'], string> = {
   error: 'text-destructive',
 };
 
+// Extension guessed from the response's content type, for the save dialog.
+function suggestedFileName(r: ApiResponse): string {
+  const ct = r.contentType.toLowerCase();
+  const known: [RegExp, string][] = [
+    [/json/, 'json'], [/html/, 'html'], [/xml/, 'xml'], [/csv/, 'csv'],
+    [/javascript/, 'js'], [/image\/png/, 'png'], [/image\/jpe?g/, 'jpg'],
+    [/image\/gif/, 'gif'], [/image\/webp/, 'webp'], [/image\/svg/, 'svg'],
+    [/pdf/, 'pdf'], [/zip/, 'zip'], [/text\//, 'txt'],
+  ];
+  const hit = known.find(([re]) => re.test(ct));
+  return `response.${hit ? hit[1] : r.binary ? 'bin' : 'txt'}`;
+}
+
 function Centered({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2">{children}</div>;
 }
@@ -425,61 +378,27 @@ function ActionsMenu({ copied, onCopy, onSave, onClear }: {
   copied: boolean; onCopy: () => void; onSave: () => void; onClear?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   const item = 'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent';
   return (
-    <div className="relative">
+    <div ref={ref} className="relative">
       <button onClick={() => setOpen((o) => !o)} title="More" className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
         <MoreHorizontal className="h-4 w-4" />
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-lg border border-border bg-popover p-1 shadow-md">
-            <button className={item} onClick={() => { onCopy(); setOpen(false); }}>
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />} Copy
+        <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-lg border border-border bg-popover p-1 shadow-md">
+          <button className={item} onClick={() => { onCopy(); setOpen(false); }}>
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />} Copy
+          </button>
+          <button className={item} onClick={() => { onSave(); setOpen(false); }}>
+            <Download className="h-3.5 w-3.5" /> Save response…
+          </button>
+          {onClear && (
+            <button className={item} onClick={() => { onClear(); setOpen(false); }}>
+              <Eraser className="h-3.5 w-3.5" /> Clear response
             </button>
-            <button className={item} onClick={() => { onSave(); setOpen(false); }}>
-              <Download className="h-3.5 w-3.5" /> Save response…
-            </button>
-            {onClear && (
-              <button className={item} onClick={() => { onClear(); setOpen(false); }}>
-                <Eraser className="h-3.5 w-3.5" /> Clear response
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// The » button shown when the tab strip is too narrow; lists the hidden tabs.
-function TabOverflow({ tabs, onSelect }: { tabs: { id: Tab; label: string; badge?: React.ReactNode }[]; onSelect: (id: Tab) => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative ml-3 shrink-0">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        title="More tabs"
-        className="-mb-px border-b-2 border-transparent py-2 text-muted-foreground hover:text-foreground"
-      >
-        <ChevronsRight className="h-4 w-4" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-popover p-1 shadow-md">
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => { onSelect(t.id); setOpen(false); }}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
-              >
-                {t.label}{t.badge}
-              </button>
-            ))}
-          </div>
-        </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -495,13 +414,34 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
       return <iframe title="Response preview" sandbox="" srcDoc={response.body} className="min-h-0 flex-1 border-0 bg-white dark:bg-neutral-900" />;
     }
     if (kind === 'image') {
-      const src = `data:${response.contentType};base64,${toBase64(response.body)}`;
+      // Use the preserved bytes; the decoded text copy of a PNG is not an image.
+      const b64 = response.bodyBase64;
+      if (!b64) {
+        return (
+          <div className="flex min-h-0 flex-1 items-center justify-center p-4 text-xs text-muted-foreground">
+            Image too large to preview.
+          </div>
+        );
+      }
       return (
         <div className="min-h-0 flex-1 overflow-auto bg-[#f6f6f6] p-4 dark:bg-neutral-900">
-          <img src={src} alt="Response" className="max-w-full" />
+          <img src={`data:${response.contentType};base64,${b64}`} alt="Response" className="max-w-full" />
         </div>
       );
     }
+  }
+  if (response.binary && format !== 'hex' && format !== 'base64') {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+        <Binary className="h-8 w-8 text-muted-foreground/30" />
+        <p className="text-xs text-muted-foreground">
+          Binary response ({response.contentType || 'unknown type'}, {formatBytes(response.sizeBytes)}).
+        </p>
+        <p className="text-[11px] text-muted-foreground/80">
+          Switch the format to Hex or Base64 to inspect it, or save it from the … menu.
+        </p>
+      </div>
+    );
   }
   return (
     <div className="flex flex-col min-h-0 flex-1">
@@ -513,6 +453,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
 // ─── timeline ─────────────────────────────────────────────────────────────────
 
 function Timeline({ response }: { response: ApiResponse }) {
+  const t = response.timings;
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-auto p-3 font-mono text-xs">
       <div>
@@ -521,22 +462,44 @@ function Timeline({ response }: { response: ApiResponse }) {
           <p key={i} className="break-words text-muted-foreground">&lt; {k}: {v}</p>
         ))}
       </div>
+      {t && (
+        <div className="space-y-1">
+          <TimingBar label="Waiting (TTFB)" ms={t.ttfbMs} total={response.timeMs} tone="bg-amber-400" />
+          <TimingBar label="Download" ms={t.downloadMs} total={response.timeMs} tone="bg-sky-500" />
+        </div>
+      )}
       <div className="space-y-0.5 text-muted-foreground">
         <p>Total time: <span className="text-foreground">{response.timeMs} ms</span></p>
         <p>Size: <span className="text-foreground">{formatBytes(response.sizeBytes)}</span></p>
         {response.contentType && <p>Content-Type: <span className="text-foreground">{response.contentType}</span></p>}
+        {response.url && <p className="break-all">URL: <span className="text-foreground">{response.url}</span></p>}
       </div>
+    </div>
+  );
+}
+
+function TimingBar({ label, ms, total, tone }: { label: string; ms: number; total: number; tone: string }) {
+  const pct = total > 0 ? Math.max(2, Math.round((ms / total) * 100)) : 0;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+      <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+        <span className={cn('block h-full rounded-full', tone)} style={{ width: `${pct}%` }} />
+      </span>
+      <span className="w-16 shrink-0 text-right text-foreground">{ms} ms</span>
     </div>
   );
 }
 
 // ─── format dropdown ({ } JSON ▾) ─────────────────────────────────────────────
 
-function FormatDropdown({ format, onChange, preview, onPreview }: {
-  format: Format; onChange: (f: Format) => void; preview: boolean; onPreview: (v: boolean) => void;
+function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
+  format: Format; onChange: (f: Format) => void; preview: boolean; onPreview: (v: boolean) => void; kind: Kind;
 }) {
   const [open, setOpen] = useState(false);
+  const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   const Icon = FORMAT_META[format].icon;
+  const canPreview = kind === 'html' || kind === 'image' || format === 'html';
 
   const Row = ({ id }: { id: Format }) => {
     const RowIcon = FORMAT_META[id].icon;
@@ -554,28 +517,25 @@ function FormatDropdown({ format, onChange, preview, onPreview }: {
   };
 
   return (
-    <div className="relative">
+    <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+        className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
       >
         <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-border bg-popover p-1.5 shadow-md">
-            <div className="flex items-center justify-between px-2 py-1.5 text-xs">
-              <span>Preview</span>
-              <Switch checked={preview} onCheckedChange={onPreview} aria-label="Preview" />
-            </div>
-            <div className="my-1 border-t border-border" />
-            {SYNTAX_FORMATS.map((f) => <Row key={f} id={f} />)}
-            <div className="my-1 border-t border-border" />
-            {ENCODING_FORMATS.map((f) => <Row key={f} id={f} />)}
+        <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-border bg-popover p-1.5 shadow-md">
+          <div className={cn('flex items-center justify-between px-2 py-1.5 text-xs', !canPreview && 'opacity-50')}>
+            <span>Preview</span>
+            <Switch checked={preview} onCheckedChange={onPreview} disabled={!canPreview} aria-label="Preview" />
           </div>
-        </>
+          <div className="my-1 border-t border-border" />
+          {SYNTAX_FORMATS.map((f) => <Row key={f} id={f} />)}
+          <div className="my-1 border-t border-border" />
+          {ENCODING_FORMATS.map((f) => <Row key={f} id={f} />)}
+        </div>
       )}
     </div>
   );
@@ -587,14 +547,30 @@ function toBase64(s: string): string {
   try { return btoa(unescape(encodeURIComponent(s))); } catch { return ''; }
 }
 
-function hexDump(s: string): string {
-  const bytes = new TextEncoder().encode(s.slice(0, 200_000));
+function base64ToBytes(b64: string): Uint8Array {
+  try {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return new Uint8Array();
+  }
+}
+
+const HEX_DUMP_LIMIT = 200_000;
+
+function hexDump(input: Uint8Array): string {
+  const bytes = input.subarray(0, HEX_DUMP_LIMIT);
   const lines: string[] = [];
   for (let i = 0; i < bytes.length; i += 16) {
     const chunk = bytes.slice(i, i + 16);
     const hex = Array.from(chunk).map((b) => b.toString(16).padStart(2, '0')).join(' ');
     const ascii = Array.from(chunk).map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : '.')).join('');
     lines.push(`${i.toString(16).padStart(8, '0')}  ${hex.padEnd(47)}  |${ascii}|`);
+  }
+  if (input.length > HEX_DUMP_LIMIT) {
+    lines.push(`… ${input.length - HEX_DUMP_LIMIT} more bytes not shown`);
   }
   return lines.join('\n');
 }

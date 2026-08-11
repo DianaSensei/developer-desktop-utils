@@ -8,6 +8,7 @@ import {
   Hexagon, type LucideIcon, Tag, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDismissable } from '@/hooks/useDismissable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,19 +28,23 @@ import {
   type KeyValue, type VarDef, type VarMap, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
 } from './types';
 
-type Tab = 'params' | 'headers' | 'body' | 'auth' | 'script' | 'vars' | 'assert' | 'tests' | 'settings';
+export type RequestPanelTab =
+  | 'params' | 'headers' | 'body' | 'auth' | 'script' | 'vars' | 'assert' | 'tests' | 'settings';
+type Tab = RequestPanelTab;
 
 interface Props {
   request: ApiRequest;
   onChange: (patch: Partial<ApiRequest>) => void;
   vars: VarMap;
+  // Controlled by the parent so each open request remembers the tab it was left
+  // on — the panel is remounted (keyed by request id) when tabs are switched.
+  tab: Tab;
+  onTabChange: (tab: Tab) => void;
 }
 
 const count = (n: number) => (n ? ` (${n})` : '');
 
-export function RequestPanel({ request, onChange, vars }: Props) {
-  const [tab, setTab] = useState<Tab>('params');
-
+export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Props) {
   const enabledParams = request.params.filter((p) => p.enabled && p.key).length;
   const enabledHeaders = request.headers.filter((h) => h.enabled && h.key).length;
 
@@ -65,7 +70,7 @@ export function RequestPanel({ request, onChange, vars }: Props) {
       <ResponsiveTabBar
         tabs={tabs}
         active={tab}
-        onSelect={(id) => setTab(id as Tab)}
+        onSelect={(id) => onTabChange(id as Tab)}
         right={tab === 'body' ? <BodyModeDropdown body={request.body} onChange={onChange} /> : undefined}
       />
 
@@ -460,42 +465,40 @@ const BODY_GROUPS: { label: string; items: { id: BodyMode; icon: LucideIcon }[] 
 // The grouped body-type selector that sits at the right of the request tab bar.
 function BodyModeDropdown({ body, onChange }: { body: ApiRequest['body']; onChange: (p: Partial<ApiRequest>) => void }) {
   const [open, setOpen] = useState(false);
+  const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   return (
-    <div className="relative">
+    <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 py-2 text-xs font-medium text-amber-500 hover:text-amber-400"
+        className="flex items-center gap-1.5 py-2 text-xs font-medium text-amber-500 transition-colors hover:text-amber-400"
       >
         {BODY_LABEL[body.mode]} <ChevronDown className="h-3.5 w-3.5" />
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-1 w-56 rounded-md border bg-popover p-1.5 shadow-md">
-            {BODY_GROUPS.map((group) => (
-              <div key={group.label} className="py-1">
-                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
-                {group.items.map(({ id, icon: Icon }) => {
-                  const active = body.mode === id;
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => { onChange({ body: { ...body, mode: id } }); setOpen(false); }}
-                      className={cn(
-                        'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs hover:bg-accent',
-                        active && 'bg-amber-400/10 text-amber-500',
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0" />
-                      <span className="flex-1">{BODY_LABEL[id]}</span>
-                      {active && <Check className="h-3.5 w-3.5 text-amber-500" />}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </>
+        <div className="absolute right-0 z-50 mt-1 w-56 rounded-md border bg-popover p-1.5 shadow-md">
+          {BODY_GROUPS.map((group) => (
+            <div key={group.label} className="py-1">
+              <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+              {group.items.map(({ id, icon: Icon }) => {
+                const active = body.mode === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => { onChange({ body: { ...body, mode: id } }); setOpen(false); }}
+                    className={cn(
+                      'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs hover:bg-accent',
+                      active && 'bg-amber-400/10 text-amber-500',
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex-1">{BODY_LABEL[id]}</span>
+                    {active && <Check className="h-3.5 w-3.5 text-amber-500" />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

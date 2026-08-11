@@ -93,10 +93,16 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       </GuideSection>
       <GuideSection icon={ShieldCheck} title="Scripts, tests & cookies">
         <p>Each request has pre-request and post-response scripts plus tests/assertions (Bruno-style <Tok>bru</Tok>/<Tok>req</Tok>/<Tok>res</Tok> API, with a Postman <Tok>pm.*</Tok> shim). Collection/folder scripts are inherited.</p>
+        <p>Scripts get <Tok>bru.setVar</Tok>/<Tok>getEnvVar</Tok>, <Tok>bru.interpolate()</Tok> to expand <Var>{'{{tokens}}'}</Var>, and <Tok>bru.sleep(ms)</Tok>. <Tok>req</Tok> can rewrite the URL, method, headers, query params, and per-request timeout/redirect settings before the send. Assertions use a chai subset — <Tok>expect().to.deep.equal</Tok>, <Tok>.oneOf</Tok>, <Tok>.closeTo</Tok>, <Tok>.keys</Tok>, <Tok>.throw</Tok> — or the named <Tok>assert.*</Tok> helpers.</p>
+        <p>A failing script names which one failed and the line it failed on, and the rest still run — so your tests report even when a post-response script throws.</p>
         <p>Set-Cookie responses are captured into a per-domain jar (toggle in the status bar) and re-sent automatically.</p>
       </GuideSection>
+      <GuideSection icon={Play} title="Runner">
+        <p>Right-click a collection or folder → <strong className="text-foreground">Run</strong> to execute its requests in order, with iterations, a delay, parallel mode, and tag filters. Bind a CSV/JSON <strong className="text-foreground">data file</strong> to drive one iteration per row, with each column available as <Var>{'{{column}}'}</Var>.</p>
+        <p><strong className="text-foreground">Stop</strong> aborts the request in flight. Runner results stay in the Runner (drill into any run for its exact request and response) and don’t crowd out your History.</p>
+      </GuideSection>
       <GuideSection icon={FolderTree} title="Organize, import & export">
-        <p>Group requests into collections and folders in the left sidebar; open several in tabs. History records every send.</p>
+        <p>Group requests into collections and folders in the left sidebar; open several in tabs — each remembers the tab you were working in. History records every send you make by hand.</p>
         <p>Import a <strong className="text-foreground">Postman v2.1</strong> collection or a <strong className="text-foreground">cURL</strong> command; export the collection or generate a code snippet with the <Tok>{'</>'}</Tok> button.</p>
       </GuideSection>
       <GuideSection icon={Keyboard} title="Shortcuts">
@@ -404,4 +410,6 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 // version 1 (their guide's initial version).
 export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   settings: 1,
+  // 2 — documents the expanded scripting API and the Runner section.
+  'api-client': 2,
 };

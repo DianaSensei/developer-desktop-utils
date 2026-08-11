@@ -162,16 +162,40 @@ function buildBody(req: ApiRequest, sub: Sub): BodyInit | undefined {
   }
 }
 
+// ─── OAuth2 ─────────────────────────────────────────────────────────────────
+
+// Access tokens are cached in memory (never persisted) for the lifetime of the
+// app session, keyed by the resolved grant parameters. Without this every send
+// pays for a full token round-trip, which both slows runs down and hammers the
+// authorization server. Tokens expire 30 s early to avoid edge-of-validity 401s.
+interface CachedToken { token: string; expiresAt: number }
+const tokenCache = new Map<string, CachedToken>();
+const TOKEN_SKEW_MS = 30_000;
+
+// Exposed so the UI can offer a "forget cached tokens" action.
+export function clearOAuthTokenCache(): void {
+  tokenCache.clear();
+}
+
 // Fetch an OAuth2 access token (client-credentials or password grant).
 async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal): Promise<string> {
   const url = sub(o.tokenUrl).trim();
   if (!url) throw new Error('OAuth2: token URL is required');
+
+  const clientId = sub(o.clientId);
+  const clientSecret = sub(o.clientSecret);
+  const scope = sub(o.scope);
+  const username = sub(o.username);
+  const cacheKey = JSON.stringify([url, o.grantType, clientId, clientSecret, scope, username]);
+  const hit = tokenCache.get(cacheKey);
+  if (hit && hit.expiresAt > Date.now()) return hit.token;
+
   const form = new URLSearchParams();
   form.set('grant_type', o.grantType);
-  if (o.clientId) form.set('client_id', sub(o.clientId));
-  if (o.clientSecret) form.set('client_secret', sub(o.clientSecret));
-  if (o.scope) form.set('scope', sub(o.scope));
-  if (o.grantType === 'password') { form.set('username', sub(o.username)); form.set('password', sub(o.password)); }
+  if (clientId) form.set('client_id', clientId);
+  if (clientSecret) form.set('client_secret', clientSecret);
+  if (scope) form.set('scope', scope);
+  if (o.grantType === 'password') { form.set('username', username); form.set('password', sub(o.password)); }
 
   const res = await netFetch(url, {
     method: 'POST',
@@ -179,12 +203,51 @@ async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal): P
     body: form.toString(),
     signal,
   });
-  const json = (await res.json()) as { access_token?: string; error?: string; error_description?: string };
-  if (!json.access_token) throw new Error(`OAuth2 token request failed: ${json.error_description || json.error || res.status}`);
+  const raw = await res.text();
+  let json: { access_token?: string; expires_in?: number; error?: string; error_description?: string };
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new Error(`OAuth2 token request failed (${res.status}): ${raw.slice(0, 200) || res.statusText}`);
+  }
+  if (!json.access_token) {
+    throw new Error(`OAuth2 token request failed: ${json.error_description || json.error || res.status}`);
+  }
+  // `expires_in` is seconds; fall back to a short cache window when absent.
+  const ttlMs = Number(json.expires_in) > 0 ? Number(json.expires_in) * 1000 : 60_000;
+  tokenCache.set(cacheKey, { token: json.access_token, expiresAt: Date.now() + Math.max(0, ttlMs - TOKEN_SKEW_MS) });
   return json.access_token;
 }
 
-const byteLength = (s: string): number => new TextEncoder().encode(s).length;
+// ─── response decoding ──────────────────────────────────────────────────────
+
+// Content types whose bytes must not be round-tripped through a text decoder —
+// doing so replaces every invalid UTF-8 sequence with U+FFFD and destroys the
+// payload (previously this silently corrupted image previews and downloads).
+const BINARY_CONTENT_TYPE =
+  /^(image|audio|video|font)\/|^application\/(octet-stream|pdf|zip|gzip|x-tar|x-7z|x-rar|wasm|vnd\.(ms-|openxmlformats))/i;
+
+// Above this size we skip the base64 copy: it would double the memory footprint
+// of an already-huge payload for no practical benefit in the viewer.
+const MAX_BASE64_BYTES = 16 * 1024 * 1024;
+
+function isBinaryPayload(contentType: string, bytes: Uint8Array): boolean {
+  if (BINARY_CONTENT_TYPE.test(contentType)) return true;
+  if (/text\/|json|xml|javascript|ecmascript|csv|x-www-form-urlencoded|graphql/i.test(contentType)) return false;
+  // Unlabelled payload: a NUL byte in the first KB means it isn't text.
+  const probe = bytes.subarray(0, 1024);
+  return probe.includes(0);
+}
+
+// Chunked so a multi-MB body doesn't blow the argument limit of fromCharCode.
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
 
 export async function sendRequest(
   req: ApiRequest,
@@ -202,10 +265,20 @@ export async function sendRequest(
   const timeout = req.settings?.timeout ?? 0;
   const timeoutCtl = timeout > 0 ? new AbortController() : null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // Detach the bridge listener once the send finishes, so a long-lived caller
+  // signal doesn't accumulate one listener per request.
+  let detachAbortBridge = () => {};
   if (timeoutCtl) {
     timer = setTimeout(() => timeoutCtl.abort(new DOMException('Request timed out', 'TimeoutError')), timeout);
-    signal?.addEventListener('abort', () => timeoutCtl.abort(), { once: true });
+    const forward = () => timeoutCtl.abort();
+    signal?.addEventListener('abort', forward, { once: true });
+    detachAbortBridge = () => signal?.removeEventListener('abort', forward);
   }
+  const clearTimers = () => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+    detachAbortBridge();
+  };
 
   const reqHeaders = buildHeaders(req, sub);
   // OAuth2: fetch an access token first, then send the request as Bearer.
@@ -232,6 +305,8 @@ export async function sendRequest(
 
   const start = performance.now();
   let res: Response;
+  let bytes: Uint8Array;
+  let headersAt: number;
   try {
     res = await netFetch(finalUrl, init);
     // Digest auth: the first send is unauthenticated; on a 401 challenge,
@@ -254,16 +329,26 @@ export async function sendRequest(
         res = await netFetch(finalUrl, retryInit);
       }
     }
+    headersAt = performance.now();
+    // Read the raw bytes rather than res.text(): a text decode would replace
+    // every invalid UTF-8 sequence in a binary payload with U+FFFD, so images
+    // and downloads could never be recovered afterwards. The timeout stays
+    // armed across the download — a server that stalls mid-body must still hit it.
+    bytes = new Uint8Array(await res.arrayBuffer());
   } catch (e) {
     if ((e as Error).name === 'TimeoutError' || (timeoutCtl?.signal.aborted && !signal?.aborted)) {
       throw new Error(`Request timed out after ${timeout} ms`);
     }
     throw e;
   } finally {
-    if (timer) clearTimeout(timer);
+    clearTimers();
   }
-  const text = await res.text();
-  const timeMs = Math.round(performance.now() - start);
+  const doneAt = performance.now();
+  const timeMs = Math.round(doneAt - start);
+  const timings = {
+    ttfbMs: Math.round(headersAt - start),
+    downloadMs: Math.round(doneAt - headersAt),
+  };
 
   const headers: [string, string][] = [];
   res.headers.forEach((value, key) => headers.push([key, value]));
@@ -281,8 +366,11 @@ export async function sendRequest(
   }
 
   const contentType = res.headers.get('content-type') ?? '';
-  const lengthHeader = res.headers.get('content-length');
-  const sizeBytes = lengthHeader ? Number(lengthHeader) : byteLength(text);
+  const binary = isBinaryPayload(contentType, bytes);
+  // The decoded byte count is the truth: content-length may describe the
+  // compressed transfer, which under-reports what the viewer actually shows.
+  const sizeBytes = bytes.byteLength;
+  const text = new TextDecoder('utf-8').decode(bytes);
 
   return {
     status: res.status,
@@ -292,9 +380,12 @@ export async function sendRequest(
     body: text,
     contentType,
     timeMs,
+    timings,
     sizeBytes,
     url: res.url || finalUrl,
     setCookies,
+    binary,
+    bodyBase64: binary && bytes.byteLength <= MAX_BASE64_BYTES ? bytesToBase64(bytes) : undefined,
   };
 }
 

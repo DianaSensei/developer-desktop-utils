@@ -68,6 +68,7 @@ export async function executeRequest(
     env: envToMap(env),
     envName: env?.name ?? null,
     data: dataVars,
+    signal,
   };
   const out: ScriptRun = { logs: [], tests: [], error: null };
 
@@ -78,17 +79,34 @@ export async function executeRequest(
   // runtime sets still win — matching Postman's variable resolution order.
   const varMap = (): VarMap => ({ ...stores.env, ...dataVars, ...stores.runtime });
 
+  // Errors are collected per script and tagged with which one failed —
+  // "Post-response script error" alone doesn't say whether the fault was in the
+  // request's own script, an inherited folder script, or the tests.
+  const errors: string[] = [];
+  const runLabeled = async (label: string, code: string, scope: Record<string, unknown>) => {
+    out.error = null;
+    await runScript(code, scope, out);
+    if (out.error) {
+      errors.push(`${label}: ${out.error}`);
+      out.error = null;
+      return false;
+    }
+    return true;
+  };
+  const joined = () => (errors.length ? errors.join('\n') : null);
+
   // 1. inherited pre-request scripts (collection → folders), then request's own
-  for (const code of inherited.pre) {
-    await runScript(code, { bru: makeBru(stores), req: makeReq(draft) }, out);
-    if (out.error) return finish(null, out, stores, envBefore, `Pre-request script error: ${out.error}`);
+  for (let i = 0; i < inherited.pre.length; i++) {
+    const label = inherited.pre.length > 1 ? `Inherited pre-request script #${i + 1}` : 'Inherited pre-request script';
+    if (!await runLabeled(label, inherited.pre[i], { bru: makeBru(stores), req: makeReq(draft) })) {
+      return finish(null, out, stores, envBefore, joined());
+    }
   }
 
   // 2. pre-request vars + script
   applyVars(request.vars.req, stores, { bru: makeBru(stores) });
-  await runScript(request.script.req, { bru: makeBru(stores), req: makeReq(draft) }, out);
-  if (out.error) {
-    return finish(null, out, stores, envBefore, `Pre-request script error: ${out.error}`);
+  if (!await runLabeled('Pre-request script', request.script.req, { bru: makeBru(stores), req: makeReq(draft) })) {
+    return finish(null, out, stores, envBefore, joined());
   }
 
   // 3. build & send
@@ -97,22 +115,26 @@ export async function executeRequest(
     response = await sendRequest(draft, varMap(), signal, cookieJar);
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
-    return finish(null, out, stores, envBefore, errToString(e));
+    errors.push(errToString(e));
+    return finish(null, out, stores, envBefore, joined());
   }
 
   // 4–6. post-response vars + script (request, then inherited inner→outer),
-  //       tests, then assertions
+  //       tests, then assertions.
+  // A failing script here does not stop the rest: the tests and assertions are
+  // usually the reason the request was sent, so they still run and report.
   const res = makeRes(response);
   const bru = makeBru(stores);
   applyVars(request.vars.res, stores, { res, bru });
-  await runScript(request.script.res, { bru, req: makeReq(draft), res }, out);
-  for (const code of inherited.post) {
-    await runScript(code, { bru, req: makeReq(draft), res }, out);
+  await runLabeled('Post-response script', request.script.res, { bru, req: makeReq(draft), res });
+  for (let i = 0; i < inherited.post.length; i++) {
+    const label = inherited.post.length > 1 ? `Inherited post-response script #${i + 1}` : 'Inherited post-response script';
+    await runLabeled(label, inherited.post[i], { bru, req: makeReq(draft), res });
   }
-  await runScript(request.tests, { bru, req: makeReq(draft), res }, out);
+  await runLabeled('Test script', request.tests, { bru, req: makeReq(draft), res });
   out.tests.push(...evalAssertions(request.assertions, { res, bru }));
 
-  return finish(response, out, stores, envBefore, out.error ? `Post-response script error: ${out.error}` : null);
+  return finish(response, out, stores, envBefore, joined());
 }
 
 function finish(
