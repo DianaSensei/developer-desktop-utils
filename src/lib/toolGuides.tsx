@@ -99,10 +99,12 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
         <p>Set-Cookie responses are captured into a per-domain jar (toggle in the status bar) and re-sent automatically.</p>
       </GuideSection>
       <GuideSection icon={Play} title="Runner">
-        <p>Right-click a collection or folder → <strong className="text-foreground">Run</strong> to execute its requests in order, with iterations, a delay, parallel mode, and tag filters. Bind a CSV/JSON <strong className="text-foreground">data file</strong> to drive one iteration per row, with each column available as <Var>{'{{column}}'}</Var>.</p>
+        <p>Right-click a collection or folder → <strong className="text-foreground">Run</strong> to execute its requests in order, with iterations, a delay, parallel mode, and tag filters.</p>
+        <p>Bind a CSV or JSON <strong className="text-foreground">data file</strong> to drive one iteration per row. CSV files may be comma-, semicolon-, or tab-separated (detected automatically) and may carry an Excel byte-order mark. The Runner shows each column beside the <Var>{'{{variable}}'}</Var> it binds and a sample value, marks columns no request references as <strong className="text-foreground">unused</strong>, and warns about variables the run needs that neither the file nor your environment supplies.</p>
         <p><strong className="text-foreground">Flow control</strong>: call <Tok>bru.setNextRequest("Login")</Tok> (or <Tok>pm.execution.setNextRequest</Tok> / <Tok>postman.setNextRequest</Tok>) from a script to jump to another request by name, or pass <Tok>null</Tok> to end the iteration early. Jumps are shown under the row that made them, so retry loops and conditional paths are visible in the results.</p>
         <p>Advanced options: <strong className="text-foreground">stop the run on the first failure</strong>, and turn off <strong className="text-foreground">save responses</strong> for long runs you don’t need to inspect afterwards.</p>
-        <p>Results show a live progress bar and duration, filter by passed/failed, and <strong className="text-foreground">Export</strong> to a JSON report. <strong className="text-foreground">Stop</strong> aborts the request in flight. Runner results stay in the Runner and don’t crowd out your History.</p>
+        <p>Results show a live progress bar, wall-clock duration, average response time, total data received, and a per-status-code breakdown with min/avg/max timing — collected for every execution even when responses aren’t saved. Filter by passed/failed, or <strong className="text-foreground">Export</strong> the whole run as a JSON report: options used, summary counts, timings, per-request tests, console output, iteration data, and response bodies when kept.</p>
+        <p><strong className="text-foreground">Stop</strong> aborts the request in flight. Runner results stay in the Runner and don’t crowd out your History.</p>
       </GuideSection>
       <GuideSection icon={FolderTree} title="Organize, import & export">
         <p>Group requests into collections and folders in the left sidebar; open several in tabs — each remembers the tab you were working in. History records every send you make by hand.</p>
@@ -413,6 +415,6 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 // version 1 (their guide's initial version).
 export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   settings: 1,
-  // 3 — expanded scripting API, sandbox, and the Runner's flow control.
-  'api-client': 3,
+  // 4 — data-file column mapping and the fuller run statistics.
+  'api-client': 4,
 };
