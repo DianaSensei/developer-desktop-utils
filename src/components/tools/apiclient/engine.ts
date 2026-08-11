@@ -22,6 +22,10 @@ export interface ExecResult {
   runtimeVars: VarMap;         // updated runtime vars
   envVars: VarMap;             // updated environment vars (to persist)
   envChanged: boolean;
+  // Flow control from setNextRequest: a request name to jump to, null to end
+  // the iteration, or undefined when no script asked for anything. Only the
+  // Runner acts on it — a single Send has no sequence to steer.
+  nextRequest?: string | null;
 }
 
 // Tauri rejects commands with a plain string (not an Error), so reading
@@ -82,12 +86,16 @@ export async function executeRequest(
   // Fold a completed phase back into the local state. A phase that overran its
   // timeout comes back as a single error and no results — the worker carrying
   // them had to be terminated to stop the runaway script.
+  let nextRequest: string | null | undefined;
   const absorb = (out: PhaseOutput) => {
     draft = out.draft;
     stores = out.stores;
     tests.push(...out.tests);
     logs.push(...out.logs);
     errors.push(...out.errors);
+    // A later phase's request wins, matching Postman: the last call to
+    // setNextRequest during a request is the one that takes effect.
+    if ('nextRequest' in out.control) nextRequest = out.control.nextRequest;
   };
 
   const runPhaseSafely = async (input: Parameters<typeof runPhaseSandboxed>[0], label: string) => {
@@ -114,6 +122,7 @@ export async function executeRequest(
     runtimeVars: stores.runtime,
     envVars: stores.env,
     envChanged: JSON.stringify(stores.env) !== envBefore,
+    nextRequest,
   });
 
   // 1–2. inherited pre-request scripts (collection → folders), the request's

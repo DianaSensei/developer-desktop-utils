@@ -344,11 +344,21 @@ export function makeReq(draft: ApiRequest) {
   };
 }
 
+// Runner flow control, set from a script via setNextRequest. `undefined` means
+// the script said nothing (continue in order); a string names the request to
+// jump to; `null` ends the current iteration.
+export interface RunControl {
+  nextRequest?: string | null;
+}
+
 export interface VarStores {
   runtime: VarMap;   // bru.setVar / getVar  (mutated in place)
   env: VarMap;       // bru.setEnvVar / getEnvVar (mutated in place)
   envName: string | null;
   data?: VarMap;     // current data-file row (read-only; data-driven runs)
+  // Mutated by setNextRequest; read by the Runner after the request finishes.
+  // Ignored for a single Send, where there is no sequence to steer.
+  control?: RunControl;
   // Aborts when the user cancels the send, so a sleeping script stops promptly
   // instead of running on after the request it belongs to is gone.
   signal?: AbortSignal;
@@ -372,6 +382,11 @@ export function makeBru(stores: VarStores) {
     // Expand {{tokens}} in a string exactly as the send pipeline would.
     interpolate: (text: string) => substituteVars(String(text ?? ''), allVars()),
     getVars: () => allVars(),
+    // Runner flow control: jump to another request by name, or pass null to end
+    // the iteration. Takes effect once the current request's scripts finish.
+    setNextRequest: (name: string | null) => {
+      if (stores.control) stores.control.nextRequest = name === null ? null : String(name);
+    },
     // Pause inside a script (rate limiting, polling). Rejects if the send is
     // cancelled so a long sleep can't outlive its request.
     sleep: (ms: number) => new Promise<void>((resolve, reject) => {
@@ -443,6 +458,9 @@ function makePm({ bru, req, res, expect, test }: PmDeps) {
     globals: variables,
     iterationData: bru ? { get: (k: string) => bru.getIterationData(k) } : undefined,
     request: req,
+    // Postman's current flow-control namespace. `skipRequest` isn't meaningful
+    // once a request is already executing, so only setNextRequest is mapped.
+    execution: bru ? { setNextRequest: (name: string | null) => bru.setNextRequest(name) } : undefined,
   };
   if (res) {
     const body = res.getBody();
@@ -575,12 +593,18 @@ export async function runScript(
   };
   // Postman compatibility shim — maps `pm.*` onto the same primitives so many
   // imported Postman scripts run without rewriting.
+  const bru = scope.bru as ReturnType<typeof makeBru> | undefined;
   globals.pm = makePm({
-    bru: scope.bru as ReturnType<typeof makeBru> | undefined,
+    bru,
     req: scope.req as ReturnType<typeof makeReq> | undefined,
     res: scope.res as ReturnType<typeof makeRes> | undefined,
     expect, test,
   });
+  // Postman's pre-pm global, still the form most collection scripts use for
+  // flow control: `postman.setNextRequest("Login")`.
+  globals.postman = {
+    setNextRequest: (name: string | null) => bru?.setNextRequest(name),
+  };
 
   const names = Object.keys(globals);
   let fn: (...args: unknown[]) => Promise<unknown>;
