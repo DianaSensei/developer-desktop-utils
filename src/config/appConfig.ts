@@ -37,6 +37,10 @@ export interface AppConfig {
     /** Maximum messages fetched in a single Kafka range/poll request. */
     maxFetchMessages: number;
   };
+  apiClient: {
+    /** Kill an API Client pre/post-request script that runs longer than this. */
+    scriptTimeoutMs: number;
+  };
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -56,6 +60,9 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
   kafka: {
     maxFetchMessages: 500,
+  },
+  apiClient: {
+    scriptTimeoutMs: 5000,
   },
 };
 
@@ -83,6 +90,7 @@ export const SECTION_LABELS: Record<ConfigSection, string> = {
   editor: 'Editor',
   generator: 'Generators',
   kafka: 'Kafka',
+  apiClient: 'API Client',
 };
 
 export const CONFIG_FIELDS: ConfigField[] = [
@@ -95,6 +103,7 @@ export const CONFIG_FIELDS: ConfigField[] = [
   { section: 'generator', key: 'maxTextCount', label: 'Max strings', description: 'Largest batch of random text strings generated at once.', min: 10, max: 100000, step: 10 },
   { section: 'generator', key: 'maxTextLength', label: 'Max string length', description: 'Maximum length of a single generated random string.', min: 16, max: 65536, step: 16 },
   { section: 'kafka', key: 'maxFetchMessages', label: 'Max fetch messages', description: 'Maximum messages fetched in one Kafka range/poll request.', min: 10, max: 100000, step: 10 },
+  { section: 'apiClient', key: 'scriptTimeoutMs', label: 'Script timeout', description: 'Stop a pre/post-request script that runs longer than this, so a runaway loop cannot hang the app.', min: 100, max: 120000, step: 100, unit: 'ms' },
 ];
 
 /** Deep-merge a (possibly partial / stale) stored config onto the defaults. */

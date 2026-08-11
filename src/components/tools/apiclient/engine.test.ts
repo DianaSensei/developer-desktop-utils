@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { executeRequest } from './engine';
+import { __setSandboxWorkerFactory } from './scriptHost';
 import { newRequest, type ApiRequest, type Environment } from './types';
 
 function stubJson(body: string, status = 200) {
@@ -162,5 +163,57 @@ describe('executeRequest — request mutation from scripts', () => {
     const original = req({ script: { req: "req.setUrl('https://other.test/y');", res: '' } });
     await executeRequest(original, null, {});
     expect(original.url).toBe('https://api.test/x');
+  });
+});
+
+describe('executeRequest — script sandbox', () => {
+  // A worker that never answers, to exercise the timeout path end to end.
+  class SilentWorker {
+    onmessage: ((e: MessageEvent) => void) | null = null;
+    onerror: ((e: unknown) => void) | null = null;
+    terminated = false;
+    postMessage() { /* never replies */ }
+    terminate() { this.terminated = true; }
+  }
+
+  afterEach(() => { __setSandboxWorkerFactory(null); });
+
+  it('does not start the sandbox for a request with no scripts, vars, or assertions', async () => {
+    stubJson('{}');
+    const factory = vi.fn(() => new SilentWorker() as unknown as Worker);
+    __setSandboxWorkerFactory(factory);
+
+    const r = await executeRequest(req(), null, {});
+    expect(r.response?.status).toBe(200);
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it('reports a script that overruns its timeout instead of hanging', async () => {
+    stubJson('{}');
+    __setSandboxWorkerFactory(() => new SilentWorker() as unknown as Worker);
+
+    const r = await executeRequest(
+      req({ script: { req: 'while (true) {}', res: '' } }),
+      null, {}, undefined, { pre: [], post: [] }, [], {},
+      20,
+    );
+    // The send is skipped: the request was never finished being built.
+    expect(r.response).toBeNull();
+    expect(r.error).toContain('timed out after 20 ms');
+  });
+
+  it('keeps the response when a post-response script times out', async () => {
+    stubJson('{"id":1}');
+    let calls = 0;
+    __setSandboxWorkerFactory(() => { calls++; return new SilentWorker() as unknown as Worker; });
+
+    const r = await executeRequest(
+      req({ tests: 'while (true) {}' }),
+      null, {}, undefined, { pre: [], post: [] }, [], {},
+      20,
+    );
+    expect(r.response?.status).toBe(200);
+    expect(r.error).toContain('timed out');
+    expect(calls).toBe(1);
   });
 });

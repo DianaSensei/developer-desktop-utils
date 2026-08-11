@@ -11,10 +11,8 @@ import type { ApiRequest, ApiResponse, Auth, Environment, LogEntry, TestResult, 
 import { newRequest } from './types';
 import { sendRequest } from './request';
 import type { Cookie } from './cookies';
-import {
-  type VarStores,
-  applyVars, evalAssertions, makeBru, makeReq, makeRes, runScript, type ScriptRun,
-} from './runtime';
+import type { PhaseOutput, PhaseStores } from './scriptPhases';
+import { DEFAULT_SCRIPT_TIMEOUT_MS, ScriptTimeoutError, runPhaseSandboxed } from './scriptHost';
 
 export interface ExecResult {
   response: ApiResponse | null;
@@ -58,55 +56,78 @@ export async function executeRequest(
   inherited: InheritedScripts = { pre: [], post: [] },
   cookieJar: Cookie[] = [],
   dataVars: VarMap = {},
+  scriptTimeoutMs: number = DEFAULT_SCRIPT_TIMEOUT_MS,
 ): Promise<ExecResult> {
   // Work on copies so a failed run never mutates stored state.
-  const draft = newRequest({ ...request });
+  let draft = newRequest({ ...request });
   // Resolve 'inherit' auth from the collection/folder chain.
   if (draft.auth.type === 'inherit') draft.auth = inherited.auth ?? { ...draft.auth, type: 'none' };
-  const stores: VarStores = {
+  let stores: PhaseStores = {
     runtime: { ...runtimeVarsIn },
     env: envToMap(env),
     envName: env?.name ?? null,
     data: dataVars,
-    signal,
   };
-  const out: ScriptRun = { logs: [], tests: [], error: null };
 
   const envBefore = JSON.stringify(stores.env);
+  const tests: TestResult[] = [];
+  const logs: LogEntry[] = [];
+  const errors: string[] = [];
 
   // Combined substitution map. Precedence: env < data-file row < runtime
   // (bru.setVar / local), so a data file overrides the environment but explicit
   // runtime sets still win — matching Postman's variable resolution order.
   const varMap = (): VarMap => ({ ...stores.env, ...dataVars, ...stores.runtime });
 
-  // Errors are collected per script and tagged with which one failed —
-  // "Post-response script error" alone doesn't say whether the fault was in the
-  // request's own script, an inherited folder script, or the tests.
-  const errors: string[] = [];
-  const runLabeled = async (label: string, code: string, scope: Record<string, unknown>) => {
-    out.error = null;
-    await runScript(code, scope, out);
-    if (out.error) {
-      errors.push(`${label}: ${out.error}`);
-      out.error = null;
+  // Fold a completed phase back into the local state. A phase that overran its
+  // timeout comes back as a single error and no results — the worker carrying
+  // them had to be terminated to stop the runaway script.
+  const absorb = (out: PhaseOutput) => {
+    draft = out.draft;
+    stores = out.stores;
+    tests.push(...out.tests);
+    logs.push(...out.logs);
+    errors.push(...out.errors);
+  };
+
+  const runPhaseSafely = async (input: Parameters<typeof runPhaseSandboxed>[0], label: string) => {
+    try {
+      absorb(await runPhaseSandboxed(input, scriptTimeoutMs, signal));
+      return true;
+    } catch (e) {
+      errors.push(e instanceof ScriptTimeoutError ? `${label}: ${e.message}` : `${label}: ${errToString(e)}`);
       return false;
     }
-    return true;
   };
-  const joined = () => (errors.length ? errors.join('\n') : null);
 
-  // 1. inherited pre-request scripts (collection → folders), then request's own
-  for (let i = 0; i < inherited.pre.length; i++) {
-    const label = inherited.pre.length > 1 ? `Inherited pre-request script #${i + 1}` : 'Inherited pre-request script';
-    if (!await runLabeled(label, inherited.pre[i], { bru: makeBru(stores), req: makeReq(draft) })) {
-      return finish(null, out, stores, envBefore, joined());
-    }
-  }
+  // Most requests have no scripts, vars, or assertions at all. Skipping the
+  // phase for those avoids both loading the sandbox worker bundle and paying a
+  // structured clone of the request/response on every single send.
+  const hasWork = (...parts: (string | unknown[])[]) =>
+    parts.some((p) => (typeof p === 'string' ? p.trim() !== '' : p.length > 0));
 
-  // 2. pre-request vars + script
-  applyVars(request.vars.req, stores, { bru: makeBru(stores) });
-  if (!await runLabeled('Pre-request script', request.script.req, { bru: makeBru(stores), req: makeReq(draft) })) {
-    return finish(null, out, stores, envBefore, joined());
+  const finish = (response: ApiResponse | null): ExecResult => ({
+    response,
+    tests,
+    logs,
+    error: errors.length ? errors.join('\n') : null,
+    runtimeVars: stores.runtime,
+    envVars: stores.env,
+    envChanged: JSON.stringify(stores.env) !== envBefore,
+  });
+
+  // 1–2. inherited pre-request scripts (collection → folders), the request's
+  //      own vars, then its pre-request script. Any failure cancels the send.
+  if (hasWork(request.script.req, request.vars.req, inherited.pre)) {
+    const preOk = await runPhaseSafely({
+      phase: 'pre',
+      draft,
+      stores,
+      inherited: inherited.pre,
+      vars: request.vars.req,
+      script: request.script.req,
+    }, 'Pre-request script');
+    if (!preOk || errors.length) return finish(null);
   }
 
   // 3. build & send
@@ -116,41 +137,28 @@ export async function executeRequest(
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
     errors.push(errToString(e));
-    return finish(null, out, stores, envBefore, joined());
+    return finish(null);
   }
 
   // 4–6. post-response vars + script (request, then inherited inner→outer),
-  //       tests, then assertions.
-  // A failing script here does not stop the rest: the tests and assertions are
-  // usually the reason the request was sent, so they still run and report.
-  const res = makeRes(response);
-  const bru = makeBru(stores);
-  applyVars(request.vars.res, stores, { res, bru });
-  await runLabeled('Post-response script', request.script.res, { bru, req: makeReq(draft), res });
-  for (let i = 0; i < inherited.post.length; i++) {
-    const label = inherited.post.length > 1 ? `Inherited post-response script #${i + 1}` : 'Inherited post-response script';
-    await runLabeled(label, inherited.post[i], { bru, req: makeReq(draft), res });
+  //      tests, then assertions. A failing script here does not stop the rest:
+  //      the tests are usually the reason the request was sent.
+  if (hasWork(request.script.res, request.tests, request.vars.res, request.assertions, inherited.post)) {
+    await runPhaseSafely({
+      phase: 'post',
+      draft,
+      stores,
+      // Binary bodies are kept as base64 for the viewer, but scripts only ever
+      // read the decoded `body`. Cloning a multi-megabyte base64 string into the
+      // worker on every send would cost far more than running the script does.
+      response: response.bodyBase64 ? { ...response, bodyBase64: undefined } : response,
+      inherited: inherited.post,
+      vars: request.vars.res,
+      script: request.script.res,
+      tests: request.tests,
+      assertions: request.assertions,
+    }, 'Post-response script');
   }
-  await runLabeled('Test script', request.tests, { bru, req: makeReq(draft), res });
-  out.tests.push(...evalAssertions(request.assertions, { res, bru }));
 
-  return finish(response, out, stores, envBefore, joined());
-}
-
-function finish(
-  response: ApiResponse | null,
-  out: ScriptRun,
-  stores: VarStores,
-  envBefore: string,
-  error: string | null,
-): ExecResult {
-  return {
-    response,
-    tests: out.tests,
-    logs: out.logs,
-    error,
-    runtimeVars: stores.runtime,
-    envVars: stores.env,
-    envChanged: JSON.stringify(stores.env) !== envBefore,
-  };
+  return finish(response);
 }

@@ -95,6 +95,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
         <p>Each request has pre-request and post-response scripts plus tests/assertions (Bruno-style <Tok>bru</Tok>/<Tok>req</Tok>/<Tok>res</Tok> API, with a Postman <Tok>pm.*</Tok> shim). Collection/folder scripts are inherited.</p>
         <p>Scripts get <Tok>bru.setVar</Tok>/<Tok>getEnvVar</Tok>, <Tok>bru.interpolate()</Tok> to expand <Var>{'{{tokens}}'}</Var>, and <Tok>bru.sleep(ms)</Tok>. <Tok>req</Tok> can rewrite the URL, method, headers, query params, and per-request timeout/redirect settings before the send. Assertions use a chai subset — <Tok>expect().to.deep.equal</Tok>, <Tok>.oneOf</Tok>, <Tok>.closeTo</Tok>, <Tok>.keys</Tok>, <Tok>.throw</Tok> — or the named <Tok>assert.*</Tok> helpers.</p>
         <p>A failing script names which one failed and the line it failed on, and the rest still run — so your tests report even when a post-response script throws.</p>
+        <p>Scripts run in a sandbox off the main thread, so a runaway loop can’t freeze the app — it’s stopped once it passes the script timeout (Settings → Configuration → API Client). That sandbox has no access to the app’s own window or storage.</p>
         <p>Set-Cookie responses are captured into a per-domain jar (toggle in the status bar) and re-sent automatically.</p>
       </GuideSection>
       <GuideSection icon={Play} title="Runner">

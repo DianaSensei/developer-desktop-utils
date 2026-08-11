@@ -8,6 +8,7 @@
 
 import type { ApiRequest, ApiResponse, KeyValue, OAuth2Auth, VarMap } from './types';
 import { newKeyValue } from './types';
+import { substituteVars } from './vars';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
 import { type Cookie, cookieHeader } from './cookies';
 
@@ -23,14 +24,9 @@ async function netFetch(input: string, init: RequestInit): Promise<Response> {
 
 // ─── variable substitution ──────────────────────────────────────────────────
 
-// Replace every {{name}} token using the supplied variable map. Unknown tokens
-// are left as-is so the user can see what didn't resolve.
-export function substituteVars(text: string, vars: VarMap): string {
-  if (!text) return text;
-  return text.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (whole, name: string) =>
-    name in vars ? vars[name] : whole,
-  );
-}
+// Lives in vars.ts (shared with the scripting sandbox); re-exported here so the
+// long-standing `from './request'` import sites keep working.
+export { substituteVars };
 
 const enabledPairs = (list: KeyValue[]): [string, string][] =>
   list.filter((kv) => kv.enabled && kv.key.trim()).map((kv) => [kv.key, kv.value]);

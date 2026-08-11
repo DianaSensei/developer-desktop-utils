@@ -24,6 +24,8 @@ import { RunnerDialog } from './RunnerDialog';
 import { CookieManager } from './CookieManager';
 import { useApiStore } from './store';
 import { executeRequest, errToString } from './engine';
+import { stopScriptSandbox } from './scriptHost';
+import { useAppConfig } from '@/contexts/AppConfigContext';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 
 export type SplitDirection = 'horizontal' | 'vertical';
@@ -42,6 +44,11 @@ const EMPTY_RUN: RunState = { response: null, error: null, sending: false, tests
 export function ApiClient() {
   const store = useApiStore();
   const { activeRequest } = store;
+  const { config } = useAppConfig();
+  // Read through a ref so the send/run callbacks don't churn when unrelated
+  // config values change.
+  const scriptTimeoutRef = useRef(config.apiClient.scriptTimeoutMs);
+  scriptTimeoutRef.current = config.apiClient.scriptTimeoutMs;
 
   const [runs, setRuns] = useState<Record<string, RunState>>({});
   // Which builder tab (Params / Body / Script / …) each open request was left on,
@@ -107,10 +114,13 @@ export function ApiClient() {
   // (the ref itself is invisible to React's memoization).
   const [runtimeVarsVersion, setRuntimeVarsVersion] = useState(0);
 
-  // Abort all in-flight requests when the component unmounts.
+  // Abort all in-flight requests when the component unmounts, and tear down the
+  // script sandbox so a stuck script can't keep a core busy after the user has
+  // navigated to another tool.
   useEffect(() => () => {
     abortRefs.current.forEach((ctrl) => ctrl.abort());
     abortRefs.current.clear();
+    stopScriptSandbox();
   }, []);
 
   // Migrate the previously-persisted active request into a tab on first load.
@@ -187,7 +197,7 @@ export function ApiClient() {
   // the Runner already keeps the full request/response for each of its runs.
   const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal) => {
     const jar = store.cookiesEnabled ? store.cookies : [];
-    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars);
+    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current);
     persistResult(req, result, false);
     return result;
   }, [store, persistResult]);
@@ -206,7 +216,7 @@ export function ApiClient() {
     patchRun(id, { sending: true, error: null });
     try {
       const jar = store.cookiesEnabled ? store.cookies : [];
-      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar);
+      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current);
       persistResult(activeRequest, result);
       if (!isCurrent()) return;
       patchRun(id, {
