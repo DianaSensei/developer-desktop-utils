@@ -10,7 +10,7 @@
 import type {
   ApiRequest, ApiResponse, Assertion, LogEntry, TestResult, VarDef, VarMap,
 } from './types';
-import { substituteVars } from './request';
+import { substituteVars } from './vars';
 import { requireModule } from './modules';
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as
