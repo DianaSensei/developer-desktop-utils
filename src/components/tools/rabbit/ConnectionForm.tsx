@@ -298,64 +298,60 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
             headerClassName="-mx-3 px-3"
             bodyClassName="-mx-3 border-t px-3 pb-3 pt-3 space-y-3"
           >
-            {(
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="rb-hb" className="text-xs">Heartbeat (s)</Label>
-                    <Input
-                      id="rb-hb" type="number" value={form.heartbeat ?? ''}
-                      onChange={(e) => set('heartbeat', e.target.value ? Number(e.target.value) : null)}
-                      placeholder="30" className="mt-1 font-mono text-xs h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="rb-cn" className="text-xs">Connection name</Label>
-                    <Input
-                      id="rb-cn" value={form.connectionName ?? ''}
-                      onChange={(e) => set('connectionName', e.target.value || null)}
-                      placeholder="devtool" className="mt-1 font-mono text-xs h-8"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="rb-vhost" className="text-xs">Virtual host</Label>
-                  <Input
-                    id="rb-vhost"
-                    value={form.vhost}
-                    onChange={(e) => set('vhost', e.target.value)}
-                    placeholder="/"
-                    className="mt-1 font-mono text-xs h-8"
-                  />
-                  <p className="text-[11px] text-muted-foreground mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Addresses field above for HA failover.</p>
-                </div>
-                <div>
-                  <Label htmlFor="rb-ca" className="text-xs">Trust CA certificate (PEM)</Label>
-                  <Textarea
-                    id="rb-ca" value={form.tlsCaPem ?? ''}
-                    onChange={(e) => set('tlsCaPem', e.target.value || null)}
-                    placeholder="-----BEGIN CERTIFICATE-----" className="mt-1 font-mono text-[11px] min-h-16"
-                  />
-                  <p className="text-[11px] text-muted-foreground mt-1">For self-signed / private brokers (amqps). The proper alternative to disabling verification.</p>
-                </div>
-                <div>
-                  <Label htmlFor="rb-p12" className="text-xs">Client identity — PKCS#12 (base64)</Label>
-                  <Textarea
-                    id="rb-p12" value={form.clientPkcs12B64 ?? ''}
-                    onChange={(e) => set('clientPkcs12B64', e.target.value || null)}
-                    placeholder="MII… (base64 of a .p12/.pfx for mutual TLS)" className="mt-1 font-mono text-[11px] min-h-16"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="rb-p12pw" className="text-xs">PKCS#12 password</Label>
-                  <Input
-                    id="rb-p12pw" type="password" value={form.clientPkcs12Password ?? ''}
-                    onChange={(e) => set('clientPkcs12Password', e.target.value || null)}
-                    className="mt-1 font-mono text-xs h-8"
-                  />
-                </div>
-              </>
-            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="rb-hb" className="text-xs">Heartbeat (s)</Label>
+                <Input
+                  id="rb-hb" type="number" value={form.heartbeat ?? ''}
+                  onChange={(e) => set('heartbeat', e.target.value ? Number(e.target.value) : null)}
+                  placeholder="30" className="mt-1 font-mono text-xs h-8"
+                />
+              </div>
+              <div>
+                <Label htmlFor="rb-cn" className="text-xs">Connection name</Label>
+                <Input
+                  id="rb-cn" value={form.connectionName ?? ''}
+                  onChange={(e) => set('connectionName', e.target.value || null)}
+                  placeholder="devtool" className="mt-1 font-mono text-xs h-8"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="rb-vhost" className="text-xs">Virtual host</Label>
+              <Input
+                id="rb-vhost"
+                value={form.vhost}
+                onChange={(e) => set('vhost', e.target.value)}
+                placeholder="/"
+                className="mt-1 font-mono text-xs h-8"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Addresses field above for HA failover.</p>
+            </div>
+            <div>
+              <Label htmlFor="rb-ca" className="text-xs">Trust CA certificate (PEM)</Label>
+              <Textarea
+                id="rb-ca" value={form.tlsCaPem ?? ''}
+                onChange={(e) => set('tlsCaPem', e.target.value || null)}
+                placeholder="-----BEGIN CERTIFICATE-----" className="mt-1 font-mono text-[11px] min-h-16"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">For self-signed / private brokers (amqps). The proper alternative to disabling verification.</p>
+            </div>
+            <div>
+              <Label htmlFor="rb-p12" className="text-xs">Client identity — PKCS#12 (base64)</Label>
+              <Textarea
+                id="rb-p12" value={form.clientPkcs12B64 ?? ''}
+                onChange={(e) => set('clientPkcs12B64', e.target.value || null)}
+                placeholder="MII… (base64 of a .p12/.pfx for mutual TLS)" className="mt-1 font-mono text-[11px] min-h-16"
+              />
+            </div>
+            <div>
+              <Label htmlFor="rb-p12pw" className="text-xs">PKCS#12 password</Label>
+              <Input
+                id="rb-p12pw" type="password" value={form.clientPkcs12Password ?? ''}
+                onChange={(e) => set('clientPkcs12Password', e.target.value || null)}
+                className="mt-1 font-mono text-xs h-8"
+              />
+            </div>
           </CollapsibleSection>
 
           <Callout tone="warning" size="sm" icon={Info}>

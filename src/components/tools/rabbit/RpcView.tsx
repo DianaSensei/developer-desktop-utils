@@ -336,42 +336,38 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
             headerClassName="-mx-3 px-3"
             bodyClassName="-mx-3 border-t px-3 pb-3 pt-3 space-y-3"
           >
-            {(
-              <>
-                {mode === 'send' && (
-                  <label className="flex items-center justify-between">
-                    <span className="text-xs font-medium">Persistent (delivery mode 2)</span>
-                    <Switch checked={persistent} onCheckedChange={(v) => { setPersistent(v); reset(); }} aria-label="Persistent" />
-                  </label>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Content type" value={contentType} onChange={setContentType} reset={reset} placeholder="application/json" />
-                  <div>
-                    <Label className="text-xs">Correlation ID</Label>
-                    <div className="mt-1 flex gap-1">
-                      <Input value={correlationId} onChange={(e) => { setCorrelationId(e.target.value); reset(); }} placeholder="(auto)" className="font-mono text-xs h-8" />
-                      <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Generate" onClick={() => { setCorrelationId(crypto.randomUUID()); reset(); }}>
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  {mode === 'send' && <>
-                    <Field label="Content encoding" value={contentEncoding} onChange={setContentEncoding} reset={reset} placeholder="utf-8 / gzip" />
-                    <Field label="Priority (0–255)" value={priority} onChange={setPriority} reset={reset} placeholder="(none)" />
-                    <Field label="Expiration (ms)" value={expiration} onChange={setExpiration} reset={reset} placeholder="60000" />
-                    <Field label="Reply to" value={replyTo} onChange={setReplyTo} reset={reset} placeholder="reply queue" />
-                    <Field label="Message ID" value={messageId} onChange={setMessageId} reset={reset} placeholder="(optional)" />
-                    <Field label="Type" value={type} onChange={setType} reset={reset} placeholder="(optional)" />
-                    <Field label="App ID" value={appId} onChange={setAppId} reset={reset} placeholder="(optional)" />
-                    <Field label="User ID" value={userId} onChange={setUserId} reset={reset} placeholder="must match login" />
-                  </>}
-                </div>
-                <div>
-                  <Label htmlFor="rpc-headers" className="text-xs">Headers (JSON object)</Label>
-                  <Textarea id="rpc-headers" value={headersText} onChange={(e) => { setHeadersText(e.target.value); reset(); }} placeholder={'{"__TypeId__": "com.example.MyRequest"}'} className="mt-1 font-mono text-xs min-h-16" />
-                </div>
-              </>
+            {mode === 'send' && (
+              <label className="flex items-center justify-between">
+                <span className="text-xs font-medium">Persistent (delivery mode 2)</span>
+                <Switch checked={persistent} onCheckedChange={(v) => { setPersistent(v); reset(); }} aria-label="Persistent" />
+              </label>
             )}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Content type" value={contentType} onChange={setContentType} reset={reset} placeholder="application/json" />
+              <div>
+                <Label className="text-xs">Correlation ID</Label>
+                <div className="mt-1 flex gap-1">
+                  <Input value={correlationId} onChange={(e) => { setCorrelationId(e.target.value); reset(); }} placeholder="(auto)" className="font-mono text-xs h-8" />
+                  <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Generate" onClick={() => { setCorrelationId(crypto.randomUUID()); reset(); }}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              {mode === 'send' && <>
+                <Field label="Content encoding" value={contentEncoding} onChange={setContentEncoding} reset={reset} placeholder="utf-8 / gzip" />
+                <Field label="Priority (0–255)" value={priority} onChange={setPriority} reset={reset} placeholder="(none)" />
+                <Field label="Expiration (ms)" value={expiration} onChange={setExpiration} reset={reset} placeholder="60000" />
+                <Field label="Reply to" value={replyTo} onChange={setReplyTo} reset={reset} placeholder="reply queue" />
+                <Field label="Message ID" value={messageId} onChange={setMessageId} reset={reset} placeholder="(optional)" />
+                <Field label="Type" value={type} onChange={setType} reset={reset} placeholder="(optional)" />
+                <Field label="App ID" value={appId} onChange={setAppId} reset={reset} placeholder="(optional)" />
+                <Field label="User ID" value={userId} onChange={setUserId} reset={reset} placeholder="must match login" />
+              </>}
+            </div>
+            <div>
+              <Label htmlFor="rpc-headers" className="text-xs">Headers (JSON object)</Label>
+              <Textarea id="rpc-headers" value={headersText} onChange={(e) => { setHeadersText(e.target.value); reset(); }} placeholder={'{"__TypeId__": "com.example.MyRequest"}'} className="mt-1 font-mono text-xs min-h-16" />
+            </div>
           </CollapsibleSection>
 
           {/* Action row */}
