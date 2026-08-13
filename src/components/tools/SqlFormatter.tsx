@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { EditorState, Compartment } from '@codemirror/state';
-import { tags } from '@lezer/highlight';
+import { useCodeTheme } from '@/components/ui/code-theme';
 import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
 import { Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -338,66 +337,6 @@ const jsLangWithMongo = [
   jsLang.language.data.of({ autocomplete: mongoCompletionSource }),
 ];
 
-const editorTheme = EditorView.theme({
-  '&': {
-    flex: '1 1 0',
-    minHeight: '0',
-    fontSize: '13px',
-    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-  },
-  '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { overflow: 'auto', minHeight: '0' },
-  '.cm-content': { caretColor: 'hsl(var(--foreground))', padding: '10px 0' },
-  '.cm-gutters': {
-    backgroundColor: 'hsl(var(--muted) / 0.4)',
-    color: 'hsl(var(--muted-foreground))',
-    border: 'none',
-    borderRight: '1px solid hsl(var(--border))',
-  },
-  '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 8px' },
-  '.cm-activeLineGutter': { backgroundColor: 'hsl(var(--primary) / 0.08)' },
-  '.cm-activeLine':       { backgroundColor: 'hsl(var(--primary) / 0.05)' },
-  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-    backgroundColor: 'hsl(var(--primary) / 0.2)',
-  },
-  '.cm-cursor': { borderLeftColor: 'hsl(var(--foreground))' },
-  '.cm-matchingBracket': {
-    backgroundColor: 'hsl(var(--primary) / 0.15)',
-    outline: '1px solid hsl(var(--primary) / 0.35)',
-  },
-  '.cm-tooltip': {
-    backgroundColor: 'hsl(var(--popover))',
-    border: '1px solid hsl(var(--border))',
-    borderRadius: '6px',
-    boxShadow: '0 4px 12px rgb(0 0 0 / 0.12)',
-  },
-  '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
-    backgroundColor: 'hsl(var(--accent))',
-    color: 'hsl(var(--accent-foreground))',
-  },
-  '.cm-completionLabel': { color: 'hsl(var(--foreground))' },
-  '.cm-completionDetail': { color: 'hsl(var(--muted-foreground))' },
-});
-
-// CSS vars auto-switch with .dark — no JS re-init needed for theme changes.
-const codeHighlight = HighlightStyle.define([
-  { tag: tags.keyword,               color: 'var(--sql-keyword)', fontWeight: '600' },
-  { tag: [tags.string, tags.regexp], color: 'var(--sql-string)' },
-  { tag: tags.comment,               color: 'var(--sql-comment)', fontStyle: 'italic' },
-  { tag: tags.number,                color: 'var(--sql-number)' },
-  { tag: tags.operator,              color: 'var(--sql-operator)' },
-  { tag: tags.punctuation,           color: 'var(--sql-operator)' },
-  // JS/MongoDB: method calls (.aggregate, .find) — purple
-  { tag: tags.function(tags.name),   color: 'var(--js-method)' },
-  { tag: tags.typeName,              color: 'var(--sql-type)' },
-  { tag: [tags.bool, tags.null],     color: 'var(--sql-keyword)', fontWeight: '600' },
-  // JS/MongoDB: object keys (field names, $operators) — amber
-  { tag: tags.propertyName,          color: 'var(--js-property)' },
-  // JS: variable names (db, collection) — plain foreground
-  { tag: tags.variableName,          color: 'hsl(var(--foreground))' },
-  // JS: defined variables (const db = ...) — teal, distinct from plain vars
-  { tag: tags.definition(tags.variableName), color: 'var(--sql-function)' },
-]);
 
 // ─── UI helpers ──────────────────────────────────────────────────────────────
 
@@ -439,6 +378,7 @@ export function SqlFormatter() {
   const viewRef           = useRef<EditorView | null>(null);
   const langConfRef       = useRef(new Compartment());
   const lastDispatchedRef = useRef<string | null>(null);
+  const theme = useCodeTheme(viewRef, { fontSize: '13px', contentPadding: '10px 0' });
 
   // Stable refs to avoid stale closures inside editor callbacks
   const modeRef       = useRef(mode);       modeRef.current       = mode;
@@ -459,8 +399,7 @@ export function SqlFormatter() {
           // Keep typed quotes straight (no macOS smart-quote substitution).
           EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
           langConfRef.current.of(modeRef.current === 'sql' ? sqlLang : jsLangWithMongo),
-          syntaxHighlighting(codeHighlight),
-          editorTheme,
+          theme.extension,
           EditorView.lineWrapping,
           EditorView.updateListener.of((upd) => {
             if (!upd.docChanged) return;

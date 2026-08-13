@@ -892,6 +892,17 @@ Editable CodeMirror 6 editor. Props: `value`, `onChange`, `language` (`'json'|'t
 ### `ResponseViewer` — `src/components/tools/apiclient/ResponseViewer.tsx`
 Read-only CodeMirror 6 viewer with JSON/text syntax highlight. Props: `value`, `language`. Used for RPC reply and Kafka/RabbitMQ consume message body.
 
+### CodeMirror theming — `src/components/ui/code-theme.ts`
+All four CodeMirror editors (`CodeEditor`, `ResponseViewer`, `VarInput`, `SqlFormatter`) share one theme and one syntax palette. **Never write a new `EditorView.theme()` or `HighlightStyle.define()` for a new editor** — use `useCodeTheme`:
+
+```tsx
+const viewRef = useRef<EditorView | null>(null);
+const theme = useCodeTheme(viewRef, { fontSize: '12px', gutter: 'flush', activeLine: false });
+// EditorState.create({ extensions: [basicSetup, theme.extension, …] })
+```
+
+Why the hook rather than a plain constant: CodeMirror chooses between its `&light` and `&dark` base rules from the flag passed to `EditorView.theme(spec, { dark })` — it cannot see the app's `.dark` class. A theme built without the flag pins the editor to CodeMirror's light base rules forever, so unstated surfaces (autocomplete tooltips, text-selection fill) stay light in dark mode. `useCodeTheme` supplies the flag and reconfigures a `Compartment` when the theme flips. Syntax colors live in `codeHighlight`, sourced from the `--sql-*` / `--js-*` tokens — add a tag there, and don't add fallback colors (the tokens are always defined).
+
 ---
 
 ## Dependencies Quick Reference

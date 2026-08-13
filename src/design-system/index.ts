@@ -58,6 +58,13 @@ export {
   type TrProps, type ThProps, type TdProps,
 } from '@/components/ui/data-table';
 
+// Code surfaces — the shared CodeMirror 6 look (theme, syntax palette, and the
+// hook that keeps a live editor in step with the app's light/dark switch).
+export {
+  codeTheme, codeThemeWithHighlight, codeHighlight, useCodeTheme, CODE_FONT,
+  type CodeThemeOptions,
+} from '@/components/ui/code-theme';
+
 // Layout scaffolding
 export { ToolSection, ToolLabel, ToolHint, ToolContent, Field, type FieldProps } from '@/components/ui/tool-section';
 export { ToolToolbar, ToolPanes, ToolPane, PaneHeader, type PaneHeaderProps } from '@/components/ui/tool-layout';

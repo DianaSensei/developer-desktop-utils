@@ -314,6 +314,24 @@ The second pass covered the things tools *show* rather than the things users cli
   </Field>
   ```
 
+### Code surfaces — one CodeMirror look
+
+Four editors use CodeMirror 6: the API Client's `CodeEditor` (scripts, tests, request bodies), its `ResponseViewer`, its `VarInput` URL bar, and the SQL Formatter. They share **one** theme and **one** syntax palette, both in `src/components/ui/code-theme.ts`.
+
+- **`useCodeTheme(viewRef, opts)`** — call it in the component, put the returned `extension` in the initial `EditorState`, and the editor is themed *and* stays correct when the user flips light/dark.
+  ```tsx
+  const viewRef = useRef<EditorView | null>(null);
+  const theme = useCodeTheme(viewRef, { fontSize: '12px', gutter: 'flush', activeLine: false });
+  // …then: EditorState.create({ extensions: [basicSetup, theme.extension, …] })
+  ```
+  `CodeThemeOptions`: `fontSize` · `contentPadding` · `gutter` (`panel` tinted + divider, or `flush` transparent for a viewer) · `activeLine` (off for read-only) · `fill` (off for a single-line field).
+
+- **`codeHighlight`** — the syntax palette, driven entirely by the `--sql-*` / `--js-*` tokens so light/dark swaps in CSS with no editor rebuild. Add a tag here rather than defining a second `HighlightStyle`, and **do not add hard-coded fallback colors** (`var(--sql-number, hsl(...))`) — the tokens are always defined, so a fallback is dead code that only lets the palettes drift apart again.
+
+**The `dark` flag matters.** CodeMirror picks between its own `&light` and `&dark` base rules from the flag passed to `EditorView.theme(spec, { dark })` — it cannot see the app's `.dark` class. An editor built without it is pinned to the light base theme, so anything the app spec doesn't restate stays light in dark mode (most visibly `&light .cm-tooltip { background: #f5f5f5 }` behind autocomplete, and `&light .cm-selectionBackground { background: #d9d9d9 }` behind selected text). `useCodeTheme` passes the flag and reconfigures a `Compartment` on every theme change — never build a bare `EditorView.theme()` for a new editor.
+
+A small purpose-specific overlay on top of the shared theme is fine (`varTheme` for `{{variable}}` pills, `singleLineTheme` for the URL bar). A second full theme is not.
+
 ---
 
 ## Usage guidelines
