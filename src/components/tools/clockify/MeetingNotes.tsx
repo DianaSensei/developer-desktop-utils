@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
-import { Plus, Search, Trash2, NotebookPen, Clock } from 'lucide-react';
+import { SearchInput } from '@/components/ui/search-input';
+import { Plus, Trash2, NotebookPen, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import {
@@ -64,15 +64,7 @@ export function MeetingNotes() {
           <Button onClick={createNew} size="sm" className="w-full gap-1.5">
             <Plus className="h-4 w-4" /> New note
           </Button>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search notes…"
-              className="h-8 pl-8 text-xs"
-            />
-          </div>
+          <SearchInput value={query} onChange={setQuery} placeholder="Search notes…" className="h-8 text-xs" />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
           {filtered.length === 0 ? (
