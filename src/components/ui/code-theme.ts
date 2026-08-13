@@ -150,7 +150,15 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       // Fold gutter: the default glyphs ("⌄"/"›") are tiny, low-contrast, and
       // have no click feedback — style them as a real toggle affordance
       // (comfortable target, hover fill) matching IconButton elsewhere.
-      '.cm-foldGutter .cm-gutterElement': { display: 'flex', alignItems: 'center' },
+      //
+      // `alignItems: 'flex-start'`, not 'center': a gutter element is as tall
+      // as the *entire* wrapped line it marks (matching `.cm-lineNumbers`, so
+      // the row numbers/markers stay aligned with the content next to them).
+      // When the line a fold starts on is long enough to wrap into several
+      // visual rows, centering the marker in that tall box strands it
+      // mid-paragraph, nowhere near the actual `{`/`[` on the first visual
+      // row — flex-start pins it there instead.
+      '.cm-foldGutter .cm-gutterElement': { display: 'flex', alignItems: 'flex-start' },
       '.cm-foldGutter span': {
         display: 'inline-flex',
         alignItems: 'center',
