@@ -146,7 +146,38 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
             border: 'none',
           },
       '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 8px' },
-      '.cm-foldGutter span': { color: 'hsl(var(--muted-foreground) / 0.7)' },
+
+      // Fold gutter: the default glyphs ("⌄"/"›") are tiny, low-contrast, and
+      // have no click feedback — style them as a real toggle affordance
+      // (comfortable target, hover fill) matching IconButton elsewhere.
+      '.cm-foldGutter .cm-gutterElement': { display: 'flex', alignItems: 'center' },
+      '.cm-foldGutter span': {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '15px',
+        height: '15px',
+        borderRadius: '4px',
+        color: 'hsl(var(--muted-foreground) / 0.75)',
+        transition: 'background-color 150ms, color 150ms',
+      },
+      '.cm-foldGutter span:hover': {
+        backgroundColor: 'hsl(var(--accent))',
+        color: 'hsl(var(--accent-foreground))',
+      },
+
+      // Folded-region placeholder ("{…}"). CodeMirror's base theme hard-codes
+      // light-only colors here (#eee/#ddd/#888) with no `dark` variant, so a
+      // folded region in dark mode was a bright unthemed chip — replace it
+      // with real tokens so it reads as part of the editor in both themes.
+      '.cm-foldPlaceholder': {
+        backgroundColor: 'hsl(var(--muted))',
+        border: '1px solid hsl(var(--border))',
+        color: 'hsl(var(--muted-foreground))',
+        borderRadius: '4px',
+        margin: '0 2px',
+        padding: '0 4px',
+      },
 
       '.cm-activeLine': { backgroundColor: activeLine ? 'hsl(var(--primary) / 0.05)' : 'transparent' },
       '.cm-activeLineGutter': { backgroundColor: activeLine ? 'hsl(var(--primary) / 0.08)' : 'transparent' },
