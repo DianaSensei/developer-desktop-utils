@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, X, Loader2, CheckCircle, AlertCircle, History, RotateCcw } from 'lucide-react';
+import { Plus, X, CheckCircle, AlertCircle, History, RotateCcw } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -331,7 +332,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         {/* Send + status */}
         <div className="flex items-center gap-3">
           <Button onClick={handleSend} disabled={sending} className="gap-1.5">
-            {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            {sending ? <Spinner size="sm" /> : null}
             {sending ? 'Sending…' : batch ? 'Send Batch' : 'Send Message'}
           </Button>
 

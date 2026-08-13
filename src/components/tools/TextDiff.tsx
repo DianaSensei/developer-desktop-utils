@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { PaneHeader } from '@/components/ui/tool-layout';
 import { Segmented } from '@/components/ui/segmented';
+import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
 import * as Diff from 'diff';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -259,16 +260,12 @@ export function TextDiff() {
 }
 
 function JsonChangeRow({ change }: { change: Change }) {
-  const badge =
-    change.kind === 'added'
-      ? { label: 'added', cls: 'bg-green-200 text-green-900 dark:bg-green-900/40 dark:text-green-200' }
-      : change.kind === 'removed'
-      ? { label: 'removed', cls: 'bg-red-200 text-red-900 dark:bg-red-900/40 dark:text-red-200' }
-      : { label: 'changed', cls: 'bg-amber-200 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200' };
+  const tone: BadgeTone =
+    change.kind === 'added' ? 'success' : change.kind === 'removed' ? 'danger' : 'warning';
 
   return (
     <div className="flex items-start gap-2 font-mono text-xs">
-      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${badge.cls}`}>{badge.label}</span>
+      <Badge tone={tone} uppercase>{change.kind}</Badge>
       <div className="min-w-0 flex-1">
         <span className="font-medium text-foreground">{change.path}</span>
         <span className="ml-2 break-all">

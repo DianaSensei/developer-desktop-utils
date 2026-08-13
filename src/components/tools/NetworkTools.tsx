@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -7,7 +8,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Globe, Search, Loader2, RefreshCw, MapPin, Wifi, Building2,
+  Globe, Search, RefreshCw, MapPin, Wifi, Building2,
   Network as NetworkIcon, ShieldCheck, ShieldAlert, CheckCircle2, XCircle,
   AlertCircle, Clock, Server, X, Router, Laptop, Plug, Star, Plus, ChevronUp, ChevronDown, Info,
 } from 'lucide-react';
@@ -262,7 +263,7 @@ function DnsView() {
             </SelectContent>
           </Select>
           <Button onClick={run} disabled={loading || !domain.trim()} className="h-9 gap-1.5">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            {loading ? <Spinner /> : <Search className="h-4 w-4" />}
             Lookup
           </Button>
         </>
@@ -346,7 +347,7 @@ function PropagationView() {
             </SelectContent>
           </Select>
           <Button onClick={run} disabled={loading || !domain.trim()} className="h-9 gap-1.5">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
             Check
           </Button>
         </>
@@ -445,7 +446,7 @@ function DnssecView() {
         <>
           <SearchInput value={domain} onChange={setDomain} onEnter={run} placeholder={`example.com — ${quickPasteHint}`} />
           <Button onClick={run} disabled={loading || !domain.trim()} className="h-9 gap-1.5">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            {loading ? <Spinner /> : <ShieldCheck className="h-4 w-4" />}
             Check
           </Button>
         </>
@@ -530,7 +531,7 @@ function MyIpView() {
       toolbar={
         <>
           <Button onClick={run} disabled={loading} className="h-9 gap-1.5">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
             {info ? 'Refresh' : 'Detect my public IP'}
           </Button>
           {info && (
@@ -592,7 +593,7 @@ function LocalNetworkView() {
       toolbar={
         <>
           <Button onClick={run} disabled={loading || !IS_TAURI} className="h-9 gap-1.5">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
             {info ? 'Refresh' : 'Detect local network'}
           </Button>
           {info?.hostname && (
@@ -1079,7 +1080,7 @@ function PortsView() {
       toolbar={
         <>
           <Button onClick={run} disabled={loading || !IS_TAURI} className="h-9 gap-1.5">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
             {entries ? 'Refresh' : 'Scan ports'}
           </Button>
           {!favOnly && (
@@ -1241,7 +1242,7 @@ function IpLookupView() {
         <>
           <SearchInput value={ip} onChange={setIp} onEnter={run} icon={MapPin} mono placeholder={`8.8.8.8 or 2606:4700:4700::1111 — ${quickPasteHint}`} />
           <Button onClick={run} disabled={loading || !ip.trim()} className="h-9 gap-1.5">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            {loading ? <Spinner /> : <Search className="h-4 w-4" />}
             Lookup
           </Button>
         </>

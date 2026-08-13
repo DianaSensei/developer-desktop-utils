@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
+import { AlertCircle, RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
+import { LoadingRow } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { kafkaApi, type GroupLag } from './types';
 
@@ -57,9 +58,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
 
   if (loading && !groups) {
     return (
-      <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" /> Scanning consumer groups…
-      </div>
+      <LoadingRow label="Scanning consumer groups…" className="justify-center px-4 py-8" />
     );
   }
 

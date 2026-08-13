@@ -1,4 +1,5 @@
-import { Download, Loader2, Sparkles } from 'lucide-react';
+import { Download, Sparkles } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Dialog,
   DialogContent,
@@ -58,7 +59,7 @@ export function UpdateDialog() {
           >
             {isDownloading ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Spinner size="sm" />
                 {downloadProgress != null ? `Installing… ${downloadProgress}%` : 'Installing…'}
               </>
             ) : (

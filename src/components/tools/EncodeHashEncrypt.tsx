@@ -13,6 +13,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import CryptoJS from 'crypto-js';
 import { cn } from '@/lib/utils';
+import { SectionLabel } from '@/components/ui/section-label';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
@@ -699,7 +700,7 @@ export function EncodeHashEncrypt() {
 
           {/* Results header with uppercase toggle */}
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Hash Results</p>
+            <SectionLabel size="sm">Hash Results</SectionLabel>
             <button
               type="button"
               onClick={() => setUpperHex((v) => !v)}

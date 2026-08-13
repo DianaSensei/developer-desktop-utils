@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 interface LoadingOverlayProps {
@@ -26,7 +26,7 @@ export function LoadingOverlay({
         className
       )}
     >
-      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <Spinner size="lg" className="text-primary" />
       {message && <p className="text-sm text-muted-foreground loading-text">{message}</p>}
     </div>
   );

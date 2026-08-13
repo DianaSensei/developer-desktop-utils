@@ -54,7 +54,8 @@ export { Stat, StatGrid, type StatProps, type StatGridProps, type StatTone, type
 // Data display
 export {
   DataTable, Thead, Tbody, Tr, Th, Td,
-  type DataTableProps, type TheadProps, type TrProps, type ThProps, type TdProps,
+  type DataTableProps, type DataTableDensity, type TheadProps, type TbodyProps,
+  type TrProps, type ThProps, type TdProps,
 } from '@/components/ui/data-table';
 
 // Layout scaffolding

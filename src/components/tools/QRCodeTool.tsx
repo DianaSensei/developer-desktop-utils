@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
-import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Loader2, ExternalLink, ClipboardPaste } from 'lucide-react';
+import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, ExternalLink, ClipboardPaste } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
@@ -466,7 +468,7 @@ function QrGenerator() {
           </div>
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <Callout tone="error" size="sm">{error}</Callout>}
 
         {dataUrl && (
           <div className="space-y-3">
@@ -611,7 +613,7 @@ function QrReader() {
         )}
       >
         {loading
-          ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          ? <Spinner size="lg" className="text-muted-foreground" />
           : <Upload className="h-6 w-6 text-muted-foreground" />}
         <p className="text-sm font-medium">Click to upload or drop a QR image</p>
         <p className="text-xs text-muted-foreground">PNG, JPG, GIF, or WebP</p>
@@ -625,7 +627,7 @@ function QrReader() {
         </button>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <Callout tone="error" size="sm">{error}</Callout>}
 
       {imageUrl && (
         <div className="flex justify-center rounded-lg border bg-background p-6 shadow-sm">

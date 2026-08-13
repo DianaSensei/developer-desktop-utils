@@ -18,8 +18,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check, ChevronLeft, ChevronRight, Clock, CornerDownRight, Download, FileSpreadsheet,
-  GripVertical, ListChecks, Loader2, Play, RotateCcw, Settings2, Square, X,
+  GripVertical, ListChecks, Play, RotateCcw, Settings2, Square, X,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Stat, type StatProps } from '@/components/ui/stat';
 import { Field } from '@/components/ui/tool-section';
+import { SectionLabel } from '@/components/ui/section-label';
 import { methodColor } from './method-color';
 import { formatBytes, statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
@@ -435,7 +437,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Advanced</p>
+                  <SectionLabel>Advanced</SectionLabel>
                   <OptionRow
                     label="Stop run if an error occurs"
                     checked={stopOnFailure}
@@ -456,7 +458,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Data file</p>
+                  <SectionLabel>Data file</SectionLabel>
                   {dataFile ? (
                     <div className="space-y-2 rounded-md border p-2">
                       <div className="flex items-center gap-2">
@@ -664,7 +666,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                   <>
                     {dataRow && Object.keys(dataRow).length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5 border-b bg-muted/20 px-3 py-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Data</span>
+                        <SectionLabel>Data</SectionLabel>
                         {Object.entries(dataRow).map(([k, v]) => (
                           <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"><span className="text-muted-foreground">{k}=</span>{v}</span>
                         ))}
@@ -695,7 +697,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       ))}
                       {running && current && current.iter === viewIter && (
                         <div className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs">
-                          <span className="w-5 shrink-0"><Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /></span>
+                          <span className="w-5 shrink-0"><Spinner size="sm" className="text-muted-foreground" /></span>
                           <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(current.method))}>{current.method}</span>
                           <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground">{current.name}</span>
                         </div>

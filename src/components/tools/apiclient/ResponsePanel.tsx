@@ -10,8 +10,9 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   AlertCircle, Binary, Braces, Check, ChevronDown, Code2, Copy, Download, Eraser,
-  FileCode, FileText, Filter, Hash, Loader2, MoreHorizontal, Send, X,
+  FileCode, FileText, Filter, Hash, MoreHorizontal, Send, X,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
 import { Input } from '@/components/ui/input';
@@ -179,7 +180,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   if (blank && sending) {
     return (
       <Centered>
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+        <Spinner size="lg" className="text-muted-foreground/60" />
         <p className="text-xs text-muted-foreground">Sending request…</p>
       </Centered>
     );
@@ -211,7 +212,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
       )}
       {sending ? (
         <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…
+          <Spinner size="sm" /> Sending…
         </span>
       ) : response ? (
         <>

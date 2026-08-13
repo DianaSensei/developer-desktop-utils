@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Play, Loader2, Trophy, ArrowDown, ArrowUp, Eraser, Check, Repeat, Timer } from 'lucide-react';
+import { Play, Trophy, ArrowDown, ArrowUp, Eraser, Check, Repeat, Timer } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -455,7 +456,7 @@ export function LuckyWheel() {
 
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button onClick={spin} disabled={spinning || choices.length < 2} size="lg" className="gap-2">
-            {spinning && !autoLeft ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            {spinning && !autoLeft ? <Spinner /> : <Play className="h-4 w-4" />}
             {spinning && !autoLeft ? 'Spinning…' : 'Spin'}
           </Button>
 
@@ -479,7 +480,7 @@ export function LuckyWheel() {
               variant="outline"
               className="h-8 gap-1.5"
             >
-              {spinning && autoLeft ? <Loader2 className="h-4 w-4 animate-spin" /> : <Repeat className="h-4 w-4" />}
+              {spinning && autoLeft ? <Spinner /> : <Repeat className="h-4 w-4" />}
               {spinning && autoLeft ? `Auto ${autoLeft} left` : 'Auto-spin'}
             </Button>
           </div>

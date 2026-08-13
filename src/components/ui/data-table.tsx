@@ -30,6 +30,22 @@ import { cn } from '@/lib/utils';
 
 type Align = 'left' | 'right' | 'center';
 
+/**
+ * Cell padding. `default` is the roomy list-view geometry; `compact` is for
+ * tables embedded in a panel or dialog (the runner's data preview, the regex
+ * match list) where a full-size row would dominate the surrounding UI.
+ */
+export type DataTableDensity = 'default' | 'compact';
+
+const DENSITY_CELL: Record<DataTableDensity, { head: string; body: string }> = {
+  default: { head: 'px-3.5 py-2', body: 'px-3.5 py-2.5' },
+  compact: { head: 'px-3 py-2', body: 'px-3 py-1.5' },
+};
+
+// Density travels by context so callers set it once on <DataTable> instead of
+// threading a prop through every <Th>/<Td>.
+const DensityContext = React.createContext<DataTableDensity>('default');
+
 const ALIGN_CLASS: Record<Align, string> = {
   left: 'text-left',
   right: 'text-right',
@@ -39,15 +55,18 @@ const ALIGN_CLASS: Record<Align, string> = {
 export interface DataTableProps extends React.TableHTMLAttributes<HTMLTableElement> {
   /** Classes for the scroll container that draws the border and radius. */
   containerClassName?: string;
+  density?: DataTableDensity;
 }
 
-export function DataTable({ className, containerClassName, children, ...props }: DataTableProps) {
+export function DataTable({ className, containerClassName, density = 'default', children, ...props }: DataTableProps) {
   return (
-    <div className={cn('overflow-x-auto rounded-xl border border-border/50', containerClassName)}>
-      <table className={cn('w-full text-xs', className)} {...props}>
-        {children}
-      </table>
-    </div>
+    <DensityContext.Provider value={density}>
+      <div className={cn('overflow-x-auto rounded-xl border border-border/50', containerClassName)}>
+        <table className={cn('w-full text-xs', className)} {...props}>
+          {children}
+        </table>
+      </div>
+    </DensityContext.Provider>
   );
 }
 
@@ -69,8 +88,18 @@ export function Thead({ sticky, className, ...props }: TheadProps) {
   );
 }
 
-export function Tbody({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className={cn('divide-y divide-border/40', className)} {...props} />;
+export interface TbodyProps extends React.HTMLAttributes<HTMLTableSectionElement> {
+  /** Alternating row tint instead of hairline separators — easier to scan wide rows. */
+  zebra?: boolean;
+}
+
+export function Tbody({ zebra, className, ...props }: TbodyProps) {
+  return (
+    <tbody
+      className={cn(zebra ? '[&>tr:nth-child(odd)]:bg-muted/20' : 'divide-y divide-border/40', className)}
+      {...props}
+    />
+  );
 }
 
 export interface TrProps extends React.HTMLAttributes<HTMLTableRowElement> {
@@ -98,9 +127,15 @@ export interface ThProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
 }
 
 export function Th({ align = 'left', className, ...props }: ThProps) {
+  const density = React.useContext(DensityContext);
   return (
     <th
-      className={cn('px-3.5 py-2 font-medium text-muted-foreground', ALIGN_CLASS[align], className)}
+      className={cn(
+        DENSITY_CELL[density].head,
+        'font-medium text-muted-foreground',
+        ALIGN_CLASS[align],
+        className,
+      )}
       {...props}
     />
   );
@@ -114,10 +149,11 @@ export interface TdProps extends React.TdHTMLAttributes<HTMLTableCellElement> {
 }
 
 export function Td({ align, mono, numeric, className, ...props }: TdProps) {
+  const density = React.useContext(DensityContext);
   return (
     <td
       className={cn(
-        'px-3.5 py-2.5',
+        DENSITY_CELL[density].body,
         ALIGN_CLASS[align ?? (numeric ? 'right' : 'left')],
         numeric && 'tabular-nums',
         mono && 'font-mono',

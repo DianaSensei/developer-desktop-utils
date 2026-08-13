@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { X, Info, Loader2, CheckCircle2 } from 'lucide-react';
+import { X, Info, CheckCircle2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Callout } from '@/components/ui/callout';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { EMPTY_CONNECTION, rabbitApi, type RabbitConnection } from './types';
@@ -369,7 +370,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
 
         <div className="flex justify-between gap-2 mt-6">
           <Button variant="outline" onClick={handleTest} disabled={testing || saving}>
-            {testing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Testing…</> : 'Test'}
+            {testing ? <><Spinner className="mr-1.5" />Testing…</> : 'Test'}
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
