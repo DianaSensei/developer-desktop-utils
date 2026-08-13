@@ -87,7 +87,7 @@ export function OverviewView({ conn, refreshKey, onRefresh }: OverviewViewProps)
             </div>
 
             <div>
-              <SectionLabel size="sm" className="mb-2">Message rates</SectionLabel>
+              <SectionLabel as="h3" size="sm" className="mb-2">Message rates</SectionLabel>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Stat label="Publish" value={formatRate(stats?.publish_details?.rate)} sub={`${formatNumber(stats?.publish)} total`} />
                 <Stat label="Deliver / get" value={formatRate(stats?.deliver_get_details?.rate)} sub={`${formatNumber(stats?.deliver_get)} total`} />
@@ -97,7 +97,7 @@ export function OverviewView({ conn, refreshKey, onRefresh }: OverviewViewProps)
             </div>
 
             <div>
-              <SectionLabel size="sm" className="mb-2">Totals</SectionLabel>
+              <SectionLabel as="h3" size="sm" className="mb-2">Totals</SectionLabel>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Stat label="Connections" value={formatNumber(totals?.connections)} />
                 <Stat label="Channels" value={formatNumber(totals?.channels)} />
@@ -108,7 +108,7 @@ export function OverviewView({ conn, refreshKey, onRefresh }: OverviewViewProps)
 
             {nodes.data && nodes.data.length > 0 && (
               <div>
-                <SectionLabel size="sm" className="mb-2">Nodes</SectionLabel>
+                <SectionLabel as="h3" size="sm" className="mb-2">Nodes</SectionLabel>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {nodes.data.map((n) => <NodeCard key={n.name} node={n} />)}
                 </div>

@@ -23,6 +23,12 @@ const SIZE_CLASS = {
 } as const;
 
 export interface SectionLabelProps extends React.HTMLAttributes<HTMLDivElement> {
+  /**
+   * Render as a real heading when the caption introduces a section a screen
+   * reader should be able to jump to. Defaults to a plain `div` — most of these
+   * label a control group, not a document section.
+   */
+  as?: 'div' | 'h2' | 'h3' | 'h4';
   size?: keyof typeof SIZE_CLASS;
   /** Trailing count chip — the "how many rows are under this heading" affordance. */
   count?: number;
@@ -33,6 +39,7 @@ export interface SectionLabelProps extends React.HTMLAttributes<HTMLDivElement> 
 }
 
 export function SectionLabel({
+  as: Tag = 'div',
   size = 'xs',
   count,
   rule,
@@ -42,7 +49,7 @@ export function SectionLabel({
   ...props
 }: SectionLabelProps) {
   return (
-    <div className={cn('flex items-center gap-2', className)} {...props}>
+    <Tag className={cn('flex items-center gap-2', className)} {...props}>
       <span className={cn('font-semibold uppercase tracking-wide text-muted-foreground', SIZE_CLASS[size])}>
         {children}
       </span>
@@ -51,6 +58,6 @@ export function SectionLabel({
       )}
       {rule && <span className="h-px flex-1 bg-border" />}
       {actions && <span className={cn('flex items-center gap-1', !rule && 'ml-auto')}>{actions}</span>}
-    </div>
+    </Tag>
   );
 }

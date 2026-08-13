@@ -168,14 +168,17 @@ import { Button, Card, Input, Select, Segmented, ToolSection, PaneHeader, cn } f
 ```
 
 **Primitives** (shadcn-style, Radix-based, in `src/components/ui/`, re-exported by `src/design-system/index.ts`):
-`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`, `StatusDot`, `ContextMenu` (+ `useContextMenu`), `ConfirmDialog`, `SearchInput`, `Tabs`.
+`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`, `StatusDot`, `ContextMenu` (+ `useContextMenu`), `ConfirmDialog`, `SearchInput`, `Tabs`, `Callout`, `Badge`, `Spinner` (+ `LoadingRow`), `SectionLabel`, `CollapsibleSection`, `Stat` (+ `StatGrid`).
+
+**Data display:**
+`DataTable`, `Thead`, `Tbody`, `Tr`, `Th`, `Td`.
 
 **Layout scaffolding:**
-`ToolSection`, `ToolLabel`, `ToolHint`, `ToolContent` (section structure) and `ToolToolbar`, `ToolPanes`, `ToolPane`, `PaneHeader` (toolbar + split-pane layouts).
+`ToolSection`, `ToolLabel`, `ToolHint`, `ToolContent`, `Field` (section + form structure) and `ToolToolbar`, `ToolPanes`, `ToolPane`, `PaneHeader` (toolbar + split-pane layouts).
 
 ### Interaction foundation — reuse before hand-rolling
 
-Three patterns kept getting reimplemented per-tool with small drifting variations. Use the shared version:
+These patterns kept getting reimplemented per-tool with small drifting variations. Use the shared version:
 
 - **`IconButton`** — the icon-only action button (`rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground`). Always pass `title` since there's no visible label.
   ```tsx
@@ -249,6 +252,67 @@ Three patterns kept getting reimplemented per-tool with small drifting variation
   />
   ```
   Uses `border-primary` for the active-tab underline by default (per the "reserve accent for the key action/state" color rule) — override via `className` if a tool has an established alternate accent.
+
+### Display foundation — one answer per pattern
+
+The second pass covered the things tools *show* rather than the things users click. Same rule: reach for these before writing the class string again.
+
+- **`Callout`** — the inline status banner (`tone`: `error` / `warning` / `success` / `info`). The single answer to "how does a view show an error". Sizes `sm` (11px, inside a panel) and `md` (14px, default). Pass `icon` to override the tone glyph or `icon={false}` to drop it; `title` for a bold first line; `actions` for a retry button. Do not hand-write `border-destructive/40 bg-destructive/10` again, and do not fall back to a bare `<p className="text-sm text-destructive">` — a failure should look the same in every tool.
+  ```tsx
+  {error && <Callout tone="error">{error}</Callout>}
+  <Callout tone="warning" size="sm" title="Credential storage">Profiles are saved on this device.</Callout>
+  ```
+  `Callout` is the always-rendered state of a value. For a transient, dismissable result banner tied to an action, `StatusMessage` still applies.
+- **`Badge`** — the small inline label: connection state, message count, mode chip, "beta". Two closed axes — `tone` (`neutral`/`success`/`warning`/`danger`/`info`/`accent`) and `variant` (`soft`/`solid`/`outline`) — plus `size` (`xs`/`sm`), `pill`, `mono`, and `uppercase` (which switches to the semibold state-chip look; leave it off for counts and free text).
+  ```tsx
+  <Badge tone="success" uppercase>running</Badge>
+  <Badge pill>{items.length}</Badge>
+  ```
+  A badge whose color encodes a domain value rather than a status (the API Client's per-HTTP-verb method chip) keeps its own color module — that's the one legitimate exception.
+- **`DataTable` / `Thead` / `Tbody` / `Tr` / `Th` / `Td`** — the dense read-only grid every "list of things from a server" view needs. Fixes the wrapper, header tint, row separators and cell padding in one place. `Th align="right"`, `Td numeric` (right + `tabular-nums`), `Td mono`, `Tr interactive` (hover + pointer), `Tbody zebra` (alternating tint instead of hairlines), `Thead sticky`, and `DataTable density="compact"` for tables embedded in a dialog or panel. Density travels by context, so set it once on `DataTable`.
+  ```tsx
+  <DataTable>
+    <Thead><Tr><Th>Name</Th><Th align="right">Ready</Th></Tr></Thead>
+    <Tbody>
+      {rows.map((r) => (
+        <Tr key={r.name} interactive onClick={() => open(r)}>
+          <Td mono>{r.name}</Td><Td numeric>{r.ready}</Td>
+        </Tr>
+      ))}
+    </Tbody>
+  </DataTable>
+  ```
+  These are deliberately thin styled elements, not a `columns`-config table: the views need badges, buttons and status dots inside cells far more than they need automatic rendering.
+- **`Stat` / `StatGrid`** — a labelled number. Three shapes: `card` (bordered tile in a dashboard grid, default), `compact` (smaller tile for a summary strip), `inline` (value + label on one baseline, for toolbars). `tone` colors the value; `mono` switches it to monospace-and-wrapping when the "number" is really an identifier (IP, hostname, node name); `sub` adds a secondary line; `action` docks a control (e.g. a `CopyButton`) at the right edge.
+  ```tsx
+  <StatGrid columns={4}>
+    <Stat label="Ready" value={formatNumber(q.messages_ready)} />
+    <Stat label="Failed" value={failed} tone={failed ? 'danger' : 'muted'} />
+  </StatGrid>
+  <Stat variant="inline" tone="success" label="unique" value={count} />
+  ```
+- **`Spinner` / `LoadingRow`** — the busy indicator, and the muted "⟳ Loading…" line a view shows while fetching. `Spinner` sizes `xs`/`sm`/`md`/`lg`; give it a `label` only when it stands alone with no adjacent text. The spin is intentionally not behind `motion-safe:` — a frozen spinner communicates nothing.
+  ```tsx
+  <Button disabled={busy}>{busy ? <Spinner size="sm" className="mr-1.5" /> : <Play className="h-3.5 w-3.5 mr-1.5" />} Start</Button>
+  {loading && <LoadingRow label="Loading topic details…" />}
+  ```
+- **`SectionLabel`** — the uppercase micro-caption above a group of controls or rows. `size` `xs` (default) / `sm`; `count` appends a count chip; `rule` extends a hairline to the right, turning it into a divider; `actions` docks controls at the right. Use this instead of picking a fresh combination of `text-[10px]`/`[11px]`/`xs` and `tracking-wide`/`wider`/`widest`.
+  ```tsx
+  <SectionLabel>Advanced</SectionLabel>
+  <SectionLabel rule count={items.length}>Interfaces</SectionLabel>
+  ```
+- **`CollapsibleSection`** — the disclosure: a header row that toggles a body. Controlled (`open` + `onOpenChange`) or uncontrolled (`defaultOpen`). `variant="bordered"` wraps it in a card outline, `eyebrow` makes the header an uppercase caption, `hint` adds a muted aside after the title, `actions` docks controls in the header. House behaviour is fixed here: **one chevron that rotates** — pointing right when closed, down when open — never an icon swap.
+  ```tsx
+  <CollapsibleSection variant="bordered" title="Advanced / TLS" hint="— vhost, heartbeat, CA" open={open} onOpenChange={setOpen}>
+    {fields}
+  </CollapsibleSection>
+  ```
+- **`Field`** — one labelled form control: label row (+ optional `actions`), the control, and an optional `hint` underneath. `error` replaces the hint in the destructive tone; `required` adds a muted asterisk. Pass `htmlFor` with a matching input `id` so clicking the label focuses the control.
+  ```tsx
+  <Field label="Timeout" hint="Per request, in milliseconds." htmlFor="timeout">
+    <Input id="timeout" value={timeout} onChange={...} />
+  </Field>
+  ```
 
 ---
 

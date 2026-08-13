@@ -918,7 +918,34 @@ import { IconButton, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, Dro
 - `SearchInput` — icon-in-input search box; wraps `Input`, don't reposition a `Search` icon by hand.
 - `Tabs` — horizontal tab strip that auto-collapses overflow into a `»` menu; use for any multi-tab view instead of a plain non-responsive tab row.
 
-Full usage examples are in [design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md#interaction-foundation--reuse-before-hand-rolling). These exist specifically because API Client, Kafka Explorer, RabbitMQ, and Mock Server had each hand-rolled their own version — new tool code should consume the shared one instead of adding a fifth copy.
+### Display foundation — reuse before hand-rolling
+
+The same rule for the things a tool *shows*. Never hand-write the class string for one of these:
+
+```tsx
+import { Callout, Badge, DataTable, Thead, Tbody, Tr, Th, Td, Stat, StatGrid, Spinner, LoadingRow, SectionLabel, CollapsibleSection, Field } from '@/design-system';
+```
+
+| Need | Use | Not |
+|---|---|---|
+| A view has an error / warning / success / info to show | `<Callout tone="error">{error}</Callout>` | `border-destructive/40 bg-destructive/10 …`, or a bare `<p className="text-sm text-destructive">` |
+| Small inline label: state, count, mode, type | `<Badge tone="success" uppercase>running</Badge>` · `<Badge pill>{n}</Badge>` | a fresh `rounded px-1.5 py-0.5 text-[10px]` span |
+| A list of rows from a server | `DataTable` + `Thead`/`Tbody`/`Tr`/`Th`/`Td` | a raw `<table>` with hand-typed cell padding |
+| A labelled number | `<Stat label="Ready" value={n} />` inside `<StatGrid>` | a private `Stat`/`StatCard` in the tool |
+| Busy indicator / "Loading…" placeholder | `<Spinner size="sm" />` · `<LoadingRow label="Loading topics…" />` | `<Loader2 className="h-4 w-4 animate-spin" />` |
+| Uppercase caption over a group | `<SectionLabel>Advanced</SectionLabel>` | another `text-[10px] font-semibold uppercase tracking-…` span |
+| A header that toggles a body open | `<CollapsibleSection title="Advanced" …>` | a `<button>` + chevron + `{open && …}` |
+| One labelled form control | `<Field label="Timeout" hint="…" htmlFor="t">` | `<Label className="text-xs">` + `<Input className="mt-1">` |
+
+Key details worth knowing before you use them:
+
+- **`Callout`** tones are `error` / `warning` / `success` / `info`; `size="sm"` (11px) for inside a panel, default `md` (14px). `title` adds a bold first line, `icon={false}` drops the glyph, `actions` docks a button. Distinct from `StatusMessage`, which is the transient, dismissable result banner.
+- **`Badge`** has two closed axes: `tone` (`neutral`/`success`/`warning`/`danger`/`info`/`accent`) and `variant` (`soft`/`solid`/`outline`), plus `size` (`xs`/`sm`), `pill`, `mono`, `uppercase`. Set `uppercase` for state chips, leave it off for counts.
+- **`DataTable`** — `Th align="right"`, `Td numeric` (right + `tabular-nums`), `Td mono`, `Tr interactive`, `Tbody zebra`, `Thead sticky`, and `DataTable density="compact"` for a table inside a dialog or panel (density travels by context — set it once on `DataTable`).
+- **`Stat`** — `variant` `card` (default) / `compact` / `inline`; `tone` colors the value; `mono` for identifier values (IP, hostname); `sub` for a secondary line; `action` for a docked `CopyButton`.
+- **`CollapsibleSection`** fixes the house behaviour: one chevron that **rotates** (right when closed, down when open), never an icon swap. `variant="bordered"`, `eyebrow`, `hint`, `actions`.
+
+Full usage examples are in [design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md#interaction-foundation--reuse-before-hand-rolling) and [Display foundation](../design/DESIGN-SYSTEM.md#display-foundation--one-answer-per-pattern). Both sets exist because API Client, Kafka Explorer, RabbitMQ, Mock Server and the single-file tools had each hand-rolled their own version — new tool code should consume the shared one instead of adding another copy.
 
 ### Most Used UI Components (direct path)
 ```tsx
@@ -1032,4 +1059,4 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 
 ---
 
-*Last updated: 2026-06-30*
+*Last updated: 2026-08-13*

@@ -68,7 +68,7 @@ export function ConsumeView({ brokerId, refreshKey, onRefresh, prefill, detailTo
           />
 
           <div>
-            <SectionLabel size="sm" className="mb-2">Active consumers</SectionLabel>
+            <SectionLabel as="h3" size="sm" className="mb-2">Active consumers</SectionLabel>
             {sessions.length === 0
               ? <p className="text-sm text-muted-foreground">No consumers running. Start one above to watch a topic in realtime.</p>
               : (

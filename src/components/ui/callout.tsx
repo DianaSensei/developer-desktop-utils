@@ -71,7 +71,10 @@ export function Callout({
   const Icon = icon === false ? null : (icon ?? TONE_ICON[tone]);
   return (
     <div
-      role={tone === 'error' ? 'alert' : 'status'}
+      // Only errors are announced. `info`/`warning` callouts are frequently
+      // static explanatory notes, and marking those as live regions would have
+      // a screen reader read them out on every render for no reason.
+      role={tone === 'error' ? 'alert' : undefined}
       className={cn(
         'flex items-start gap-2 rounded-md border',
         TONE_CLASS[tone],

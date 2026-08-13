@@ -91,7 +91,7 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill, detailQueu
           <StartConsumerForm conn={conn} queues={queues.data ?? []} sessions={sessions} prefill={prefill} onStarted={onOpenConsumer} />
 
           <div>
-            <SectionLabel size="sm" className="mb-2">Active consumers</SectionLabel>
+            <SectionLabel as="h3" size="sm" className="mb-2">Active consumers</SectionLabel>
             {sessions.length === 0
               ? <p className="text-sm text-muted-foreground">No consumers running. Start one above.</p>
               : (
