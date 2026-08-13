@@ -10,7 +10,7 @@
 import { useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Trash2 } from 'lucide-react';
 import { CodeEditor } from './CodeEditor';
 import { VarInput } from './VarInput';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
@@ -26,6 +26,9 @@ interface Props {
   // When provided, name/value cells become {{variable}}-aware (highlight +
   // autocomplete + hover). Omitted where vars don't apply (e.g. env editor).
   vars?: VarMap;
+  // Renders values as password fields with a per-row reveal toggle (the Vault).
+  // Mutually exclusive with `vars` — secrets aren't {{ }}-substitutable inputs.
+  masked?: boolean;
 }
 
 const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
@@ -39,12 +42,20 @@ export function KeyValueEditor({
   valueLabel = 'Value',
   bulkEdit = true,
   vars,
+  masked = false,
 }: Props) {
   const [bulk, setBulk] = useState(false);
   // Bulk mode keeps its own text so newlines/spacing survive while typing; rows
   // are parsed out of it in the background and committed via onChange.
   const [bulkText, setBulkText] = useState('');
   const ghostRef = useRef(newKeyValue());
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const toggleReveal = (id: string) =>
+    setRevealed((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   // Only the filled rows are "real"; the trailing ghost represents the next row.
   const realRows = rows.filter(isFilled);
@@ -154,6 +165,28 @@ export function KeyValueEditor({
                       vars={vars}
                       placeholder={valuePlaceholder}
                     />
+                  </div>
+                ) : masked ? (
+                  <div className={cn('flex h-9 items-center gap-0.5', disabled && 'opacity-40')}>
+                    <Input
+                      type={revealed.has(row.id) ? 'text' : 'password'}
+                      value={row.value}
+                      onChange={(e) => editRow(row.id, { value: e.target.value })}
+                      placeholder={valuePlaceholder}
+                      className="h-9 border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                    {!isGhost && (
+                      <button
+                        type="button"
+                        onClick={() => toggleReveal(row.id)}
+                        className="shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+                        title={revealed.has(row.id) ? 'Hide value' : 'Reveal value'}
+                      >
+                        {revealed.has(row.id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <Input
