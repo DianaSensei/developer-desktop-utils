@@ -88,7 +88,7 @@ export function RequestTabs({
             </button>
           </div>
         )}
-        <IconButton onClick={onNewRequest} title="New request" className="rounded-none hover:bg-background">
+        <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none px-2.5 hover:bg-background">
           <Plus className="h-4 w-4" />
         </IconButton>
       </div>
