@@ -24,7 +24,7 @@
 // a live editor in sync when the user flips the theme.
 
 import { EditorView } from '@codemirror/view';
-import { Compartment, type Extension } from '@codemirror/state';
+import { Compartment, Prec, type Extension } from '@codemirror/state';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { useEffect, useRef } from 'react';
@@ -56,6 +56,35 @@ export const codeHighlight = HighlightStyle.define([
   { tag: tags.variableName, color: 'hsl(var(--foreground))' },
   { tag: tags.definition(tags.variableName), color: 'var(--sql-function)' },
 ]);
+
+const SKIPPABLE_CLOSERS = new Set(['}', ']', ')']);
+
+/**
+ * CodeMirror's own bracket auto-close only "types over" a closing bracket
+ * that sits *immediately* after the caret. Press Enter right after an
+ * auto-inserted `{` — a near-universal habit while writing JSON/JS — and the
+ * closer lands on its own line below; typing `}` no longer finds it adjacent,
+ * so it inserts a second, duplicate closer instead of reusing the existing
+ * one (`{\n\n}` becomes `{\n}\n}` after typing `}`).
+ *
+ * This extension closes that gap: when the rest of the current line is blank
+ * and the next line's first non-blank character is the bracket just typed,
+ * the caret jumps past it instead of inserting anything. `Prec.highest` runs
+ * it before `closeBrackets`' own same-line handling, which it leaves alone.
+ */
+export const smartBracketSkip = Prec.highest(EditorView.inputHandler.of((view, from, to, insert) => {
+  if (from !== to || insert.length !== 1 || !SKIPPABLE_CLOSERS.has(insert)) return false;
+  const { state } = view;
+  const line = state.doc.lineAt(from);
+  if (state.doc.sliceString(from, line.to).trim() !== '') return false;
+  if (line.number >= state.doc.lines) return false;
+  const nextLine = state.doc.line(line.number + 1);
+  const nextText = state.doc.sliceString(nextLine.from, nextLine.to);
+  const leading = nextText.length - nextText.trimStart().length;
+  if (nextText[leading] !== insert) return false;
+  view.dispatch({ selection: { anchor: nextLine.from + leading + 1 }, scrollIntoView: true, userEvent: 'input.type' });
+  return true;
+}));
 
 export interface CodeThemeOptions {
   /** Default `12.5px`. */
