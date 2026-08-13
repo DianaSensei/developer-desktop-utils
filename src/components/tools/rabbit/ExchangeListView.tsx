@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, RefreshCw, AlertCircle, Search, Plus, Radio, X } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, Plus, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,7 @@ import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { knownNamesStore, useKnownNames } from './knownNamesStore';
 import { ViewHeader } from '@/components/ui/view-header';
+import { SearchInput } from '@/components/ui/search-input';
 
 interface ExchangeListViewProps {
   conn: RabbitConnection;
@@ -58,10 +59,7 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
       />
 
       <div className="px-5 pt-3 shrink-0">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search exchanges…" className="pl-8 h-8 text-sm" />
-        </div>
+        <SearchInput value={filter} onChange={setFilter} placeholder="Search exchanges…" className="h-8 text-sm" containerClassName="max-w-sm" />
       </div>
 
       <div className="tool-scrollable px-5 py-4">
