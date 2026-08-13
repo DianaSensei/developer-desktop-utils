@@ -36,6 +36,12 @@ export {
   type DropdownMenuProps, type DropdownMenuTriggerProps, type DropdownMenuContentProps, type DropdownMenuItemProps,
 } from '@/components/ui/dropdown-menu';
 export { SplitPane, type SplitPaneProps, type SplitPaneDirection } from '@/components/ui/split-pane';
+export { StatusDot, type StatusDotProps, type StatusDotTone } from '@/components/ui/status-dot';
+export {
+  ContextMenu, useContextMenu,
+  type ContextMenuProps, type ContextMenuEntry, type ContextMenuState,
+} from '@/components/ui/context-menu';
+export { ConfirmDialog, type ConfirmDialogProps } from '@/components/ui/confirm-dialog';
 
 // Layout scaffolding
 export { ToolSection, ToolLabel, ToolHint, ToolContent } from '@/components/ui/tool-section';

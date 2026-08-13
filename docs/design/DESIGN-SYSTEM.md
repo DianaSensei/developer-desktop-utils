@@ -168,7 +168,7 @@ import { Button, Card, Input, Select, Segmented, ToolSection, PaneHeader, cn } f
 ```
 
 **Primitives** (shadcn-style, Radix-based, in `src/components/ui/`, re-exported by `src/design-system/index.ts`):
-`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`.
+`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`, `StatusDot`, `ContextMenu` (+ `useContextMenu`), `ConfirmDialog`.
 
 **Layout scaffolding:**
 `ToolSection`, `ToolLabel`, `ToolHint`, `ToolContent` (section structure) and `ToolToolbar`, `ToolPanes`, `ToolPane`, `PaneHeader` (toolbar + split-pane layouts).
@@ -204,6 +204,33 @@ Three patterns kept getting reimplemented per-tool with small drifting variation
     minPanePx={320}
     first={<RequestPane />}
     second={<ResponsePane />}
+  />
+  ```
+- **`StatusDot`** — the connection/live/recording indicator dot (Kafka broker, RabbitMQ connection, environment selector, live consumer row, time-tracker running state). One place defines what each tone means; do not reach for a raw `<span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />` again.
+  ```tsx
+  <StatusDot tone={connected ? 'live' : 'idle'} title={connected ? 'connected' : 'not connected'} />
+  <StatusDot tone="recording" pulse size="xs" />
+  ```
+- **`ContextMenu` / `useContextMenu`** — right-click menu for tree/list rows (collections, connections, topics). Cursor-positioned sibling of `DropdownMenu`, same entry shape (`icon`, `label`, `onClick`, `danger`, `sep`).
+  ```tsx
+  const menu = useContextMenu();
+  <div onContextMenu={(e) => menu.open(e, [
+    { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: rename },
+    { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: remove },
+  ])}>
+    {row}
+  </div>
+  {menu.state && <ContextMenu state={menu.state} onClose={menu.close} />}
+  ```
+- **`ConfirmDialog`** — confirmation for any destructive/irreversible action (delete, purge, disconnect-and-lose-state). Every destructive action must go through this or an equivalent confirm step — see "Error prevention & recovery" above.
+  ```tsx
+  <ConfirmDialog
+    open={confirmOpen}
+    onOpenChange={setConfirmOpen}
+    title="Delete collection?"
+    description="This removes the collection and everything in it. This can't be undone."
+    confirmLabel="Delete"
+    onConfirm={() => store.deleteCollection(id)}
   />
   ```
 
