@@ -3,7 +3,7 @@ import { EditorView, basicSetup } from 'codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorState, Compartment } from '@codemirror/state';
-import { useCodeTheme } from '@/components/ui/code-theme';
+import { smartBracketSkip, useCodeTheme } from '@/components/ui/code-theme';
 import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
 import { Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -396,6 +396,7 @@ export function SqlFormatter() {
         doc: modeRef.current === 'sql' ? sqlInputRef.current : mongoInputRef.current,
         extensions: [
           basicSetup,
+          smartBracketSkip,
           // Keep typed quotes straight (no macOS smart-quote substitution).
           EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
           langConfRef.current.of(modeRef.current === 'sql' ? sqlLang : jsLangWithMongo),

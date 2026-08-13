@@ -10,7 +10,7 @@ import { sql } from '@codemirror/lang-sql';
 import { type LanguageSupport } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { cn } from '@/lib/utils';
-import { useCodeTheme } from '@/components/ui/code-theme';
+import { smartBracketSkip, useCodeTheme } from '@/components/ui/code-theme';
 import { varExtensions, varTheme } from './varSupport';
 
 const jsLang = javascript();
@@ -58,6 +58,7 @@ export function CodeEditor({ value, onChange, placeholder, className, vars, lang
         doc: value,
         extensions: [
           basicSetup,
+          smartBracketSkip,
           // Stop macOS/WebKit from substituting smart quotes / autocorrecting
           // code — a typed " must stay a straight ASCII quote (curly quotes
           // break JSON). No-op on Windows/Linux WebViews.
