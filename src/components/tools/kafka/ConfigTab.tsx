@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type TopicConfig } from './types';
 
@@ -34,18 +36,13 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 px-4 py-8 text-sm text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" /> Loading configuration…
-      </div>
+      <LoadingRow label="Loading configuration…" className="px-4 py-8" />
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-start gap-2 px-4 py-4 text-sm text-destructive">
-        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-        <span className="break-all">{error}</span>
-      </div>
+      <Callout tone="error" className="m-4">{error}</Callout>
     );
   }
 

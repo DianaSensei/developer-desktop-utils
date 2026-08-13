@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { X, Info, Loader2, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Info, Loader2, CheckCircle2 } from 'lucide-react';
+import { Callout } from '@/components/ui/callout';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { EMPTY_CONNECTION, rabbitApi, type RabbitConnection } from './types';
 import { rabbitMgmt } from './api';
 
@@ -286,18 +288,17 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
           </div>
 
           {/* Advanced / TLS */}
-          <div className="rounded-md border">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((s) => !s)}
-              className="w-full flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              {showAdvanced ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              Advanced / TLS
-              <span className="text-[11px] font-normal text-muted-foreground/70">— vhost, heartbeat, name, CA, client cert</span>
-            </button>
-            {showAdvanced && (
-              <div className="px-3 pb-3 space-y-3 border-t pt-3">
+          <CollapsibleSection
+            variant="bordered"
+            title="Advanced / TLS"
+            hint="— vhost, heartbeat, name, CA, client cert"
+            open={showAdvanced}
+            onOpenChange={setShowAdvanced}
+            headerClassName="-mx-3 px-3"
+            bodyClassName="-mx-3 border-t px-3 pb-3 pt-3 space-y-3"
+          >
+            {(
+              <>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="rb-hb" className="text-xs">Heartbeat (s)</Label>
@@ -352,25 +353,18 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                     className="mt-1 font-mono text-xs h-8"
                   />
                 </div>
-              </div>
+              </>
             )}
-          </div>
+          </CollapsibleSection>
 
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
-            <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-            <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-              Credentials are stored on this device. {amqpOnly
-                ? <>They're used only over AMQP ({form.useTls ? 'amqps' : 'amqp'}); no management API is contacted.</>
-                : <>They're used over AMQP and also sent as HTTP Basic auth to the management API.</>}
-            </p>
-          </div>
+          <Callout tone="warning" size="sm" icon={Info}>
+            Credentials are stored on this device. {amqpOnly
+              ? <>They're used only over AMQP ({form.useTls ? 'amqps' : 'amqp'}); no management API is contacted.</>
+              : <>They're used over AMQP and also sent as HTTP Basic auth to the management API.</>}
+          </Callout>
 
-          {error && <p className="text-sm text-destructive break-words">{error}</p>}
-          {tested === 'ok' && (
-            <p className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4" /> Connection successful
-            </p>
-          )}
+          {error && <Callout tone="error" size="sm">{error}</Callout>}
+          {tested === 'ok' && <Callout tone="success" size="sm" icon={CheckCircle2}>Connection successful</Callout>}
         </div>
 
         <div className="flex justify-between gap-2 mt-6">

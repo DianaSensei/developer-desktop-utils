@@ -1,9 +1,14 @@
 import { useState } from 'react';
-import { Loader2, RefreshCw, AlertCircle, Plus, Radio, X } from 'lucide-react';
+import { RefreshCw, Plus, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Callout } from '@/components/ui/callout';
+import { Spinner, LoadingRow } from '@/components/ui/spinner';
+import { Field } from '@/components/ui/tool-section';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select';
@@ -63,37 +68,31 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
       </div>
 
       <div className="tool-scrollable px-5 py-4">
-        {exchanges.loading && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>}
-        {exchanges.error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{exchanges.error}</span>
-          </div>
-        )}
+        {exchanges.loading && <LoadingRow />}
+        {exchanges.error && <Callout tone="error">{exchanges.error}</Callout>}
         {exchanges.data && (
           rows.length === 0
             ? <p className="text-sm text-muted-foreground">{f ? 'No matching exchanges.' : 'No exchanges.'}</p>
             : (
               <>
-                <div className="overflow-x-auto rounded-xl border border-border/50">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/20 border-b border-border/50">
-                      <tr>
-                        <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Name</th>
-                        <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Type</th>
-                        <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Durable</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/40">
-                      {shown.map((e) => (
-                        <tr key={e.name || '(default)'} className="hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => onSelectExchange(e.name)}>
-                          <td className="px-3.5 py-2.5 font-mono">{e.name || '(AMQP default)'}</td>
-                          <td className="px-3.5 py-2.5">{e.type ?? '—'}</td>
-                          <td className="px-3.5 py-2.5">{e.durable ? 'Yes' : 'No'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable>
+                  <Thead>
+                    <Tr>
+                      <Th>Name</Th>
+                      <Th>Type</Th>
+                      <Th>Durable</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {shown.map((e) => (
+                      <Tr key={e.name || '(default)'} interactive onClick={() => onSelectExchange(e.name)}>
+                        <Td mono>{e.name || '(AMQP default)'}</Td>
+                        <Td>{e.type ?? '—'}</Td>
+                        <Td>{e.durable ? 'Yes' : 'No'}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </DataTable>
                 {rows.length > shown.length && (
                   <p className="mt-2 text-[11px] text-muted-foreground">Showing first {LIST_RENDER_CAP} of {rows.length.toLocaleString()} — search to narrow.</p>
                 )}
@@ -142,7 +141,7 @@ function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
           <>
             <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New exchange</Button>
             <Button variant="outline" size="sm" onClick={onRefresh} disabled={info.loading}>
-              {info.loading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />} Refresh
+              {info.loading ? <Spinner size="sm" className="mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />} Refresh
             </Button>
           </>
         )}
@@ -165,50 +164,44 @@ function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
       </div>
 
       <div className="tool-scrollable px-5 py-4">
-        {info.error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive mb-3">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{info.error}</span>
-          </div>
-        )}
+        {info.error && <Callout tone="error" className="mb-3">{info.error}</Callout>}
         {names.length === 0
           ? <p className="text-sm text-muted-foreground">No exchanges tracked yet. Add one above or create a new exchange.</p>
           : (
-            <div className="overflow-x-auto rounded-xl border border-border/50">
-              <table className="w-full text-xs">
-                <thead className="bg-muted/20 border-b border-border/50">
-                  <tr>
-                    <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Name</th>
-                    <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Exists</th>
-                    <th className="px-3.5 py-2 w-8" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {names.map((name) => {
-                    const i = byName.get(name);
-                    return (
-                      <tr key={name} className="group hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => onSelectExchange(name)}>
-                        <td className="px-3.5 py-2.5 font-mono">{name}</td>
-                        <td className="px-3.5 py-2.5">
-                          {!i ? <span className="text-muted-foreground">—</span>
-                            : i.exists ? <span className="text-emerald-600 dark:text-emerald-400">yes</span>
-                            : i.error ? <span className="text-destructive" title={i.error}>error</span>
-                            : <span className="text-amber-600 dark:text-amber-400">not found</span>}
-                        </td>
-                        <td className="px-3.5 py-2.5 text-right">
-                          <button
-                            className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Stop tracking (does not delete the exchange)"
-                            onClick={(e) => { e.stopPropagation(); knownNamesStore.removeExchange(conn.id, name); }}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DataTable>
+              <Thead>
+                <Tr>
+                  <Th>Name</Th>
+                  <Th>Exists</Th>
+                  <Th className="w-8" />
+                </Tr>
+              </Thead>
+              <Tbody>
+                {names.map((name) => {
+                  const i = byName.get(name);
+                  return (
+                    <Tr key={name} interactive className="group" onClick={() => onSelectExchange(name)}>
+                      <Td mono>{name}</Td>
+                      <Td>
+                        {!i ? <Badge tone="neutral">—</Badge>
+                          : i.exists ? <Badge tone="success">yes</Badge>
+                          : i.error ? <Badge tone="danger" title={i.error}>error</Badge>
+                          : <Badge tone="warning">not found</Badge>}
+                      </Td>
+                      <Td align="right">
+                        <button
+                          className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Stop tracking (does not delete the exchange)"
+                          onClick={(e) => { e.stopPropagation(); knownNamesStore.removeExchange(conn.id, name); }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </Tbody>
+            </DataTable>
           )}
       </div>
 
@@ -264,29 +257,27 @@ export function CreateExchangeDialog({ open, onOpenChange, conn, onCreated }: {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div>
-            <Label htmlFor="rb-newex" className="text-xs">Name</Label>
+          <Field label="Name" htmlFor="rb-newex">
             <Input
               id="rb-newex" value={name}
               onChange={(e) => { setName(e.target.value); setError(null); }}
               onKeyDown={(e) => { if (e.key === 'Enter') create(); }}
-              placeholder="my.exchange" autoFocus className="mt-1 font-mono text-sm"
+              placeholder="my.exchange" autoFocus className="font-mono text-sm"
             />
-          </div>
-          <div>
-            <Label className="text-xs">Type</Label>
+          </Field>
+          <Field label="Type">
             <Select value={type} onValueChange={setType}>
-              <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {EXCHANGE_TYPES.map((t) => (<SelectItem key={t} value={t} className="text-sm">{t}</SelectItem>))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           <div className="flex items-center justify-between rounded-md border px-3 py-2">
             <Label className="cursor-pointer text-xs">Durable</Label>
             <Switch checked={durable} onCheckedChange={setDurable} aria-label="Durable" />
           </div>
-          {error && <p className="text-sm text-destructive break-words">{error}</p>}
+          {error && <Callout tone="error" size="sm">{error}</Callout>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

@@ -11,6 +11,9 @@ import {
   Network as NetworkIcon, ShieldCheck, ShieldAlert, CheckCircle2, XCircle,
   AlertCircle, Clock, Server, X, Router, Laptop, Plug, Star, Plus, ChevronUp, ChevronDown, Info,
 } from 'lucide-react';
+import { Callout } from '@/components/ui/callout';
+import { SectionLabel } from '@/components/ui/section-label';
+import { Stat, StatGrid } from '@/components/ui/stat';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -143,12 +146,7 @@ function MetaBar({ summary, onClear }: { summary: React.ReactNode; onClear: () =
 }
 
 function ErrorBox({ message }: { message: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
-      <AlertCircle className="h-4 w-4 shrink-0 mt-px" />
-      <span className="break-words">{message}</span>
-    </div>
-  );
+  return <Callout tone="error" size="sm">{message}</Callout>;
 }
 
 function Empty({ icon: Icon = Globe, children }: { icon?: typeof Globe; children: React.ReactNode }) {
@@ -199,34 +197,19 @@ function ViewShell({ toolbar, children }: { toolbar: React.ReactNode; children: 
   );
 }
 
-// Small uppercase section divider with an optional trailing count.
-function SectionLabel({ children, count }: { children: React.ReactNode; count?: number }) {
-  return (
-    <div className="flex items-center gap-2 px-0.5 pt-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">{children}</span>
-      {count != null && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{count}</span>}
-      <span className="h-px flex-1 bg-border" />
-    </div>
-  );
-}
-
 // Self-contained stat card — each is its own bordered box, so an odd number of
 // items just leaves clean background (no hollow grid cells).
 function StatCard({ icon: Icon, label, value }: { icon: typeof Globe; label: string; value: string }) {
   return (
-    <div className="group flex items-start gap-2.5 rounded-lg border bg-card px-3 py-2.5">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" />
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className="font-mono text-sm break-all leading-snug">{value}</p>
-      </div>
-      <CopyBtn value={value} />
-    </div>
+    <Stat
+      mono
+      icon={<Icon className="h-3.5 w-3.5 text-muted-foreground/70" />}
+      label={label}
+      value={value}
+      action={<CopyBtn value={value} />}
+      className="group bg-card"
+    />
   );
-}
-
-function StatGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{children}</div>;
 }
 
 // ─── DNS lookup view ────────────────────────────────────────────────────────
@@ -373,15 +356,14 @@ function PropagationView() {
         <div className="space-y-2">
           <MetaBar summary={`${type} across ${rows.length} resolvers`} onClear={clear} />
           {consistent !== null && (
-            <div className={cn(
-              'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium',
-              consistent
-                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400',
-            )}>
-              {consistent ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+            <Callout
+              tone={consistent ? 'success' : 'warning'}
+              size="sm"
+              icon={consistent ? CheckCircle2 : AlertCircle}
+              className="font-medium"
+            >
               {consistent ? 'Fully propagated — all resolvers agree.' : 'Not yet consistent — resolvers returned different answers.'}
-            </div>
+            </Callout>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
             {rows.map((r) => (
@@ -472,17 +454,15 @@ function DnssecView() {
       {error ? <ErrorBox message={error} /> : result ? (
         <div className="space-y-2">
           <MetaBar summary="DNSSEC chain" onClear={clear} />
-          <div className={cn(
-            'flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm font-medium',
-            result.validated
-              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-              : 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400',
-          )}>
-            {result.validated ? <ShieldCheck className="h-5 w-5 shrink-0" /> : <ShieldAlert className="h-5 w-5 shrink-0" />}
+          <Callout
+            tone={result.validated ? 'success' : 'warning'}
+            icon={result.validated ? ShieldCheck : ShieldAlert}
+            className="font-medium"
+          >
             {result.validated
               ? 'DNSSEC validated — the resolver authenticated this domain (AD flag set).'
               : 'No DNSSEC validation — domain is unsigned or the chain of trust is incomplete.'}
-          </div>
+          </Callout>
           {hasData ? (
             <div className="space-y-2">
               <div className="grid gap-2 lg:grid-cols-2">
@@ -632,7 +612,7 @@ function LocalNetworkView() {
 
           {info.interfaces.length > 0 && (
             <>
-              <SectionLabel count={info.interfaces.length}>Interfaces</SectionLabel>
+              <SectionLabel rule className="px-0.5 pt-1" count={info.interfaces.length}>Interfaces</SectionLabel>
               <div className="grid gap-1.5 lg:grid-cols-2">
                 {info.interfaces.map((iface, i) => (
                   <div

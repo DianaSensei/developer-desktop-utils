@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Users } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
+import { SectionLabel } from '@/components/ui/section-label';
 import { cn } from '@/lib/utils';
 import { ViewHeader } from '@/components/ui/view-header';
 import { kafkaApi, type GroupDetails, type Assignment } from './types';
@@ -82,16 +85,11 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
       {/* Content */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {loading && (
-          <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading group details…
-          </div>
+          <LoadingRow label="Loading group details…" className="px-4 py-6" />
         )}
 
         {!loading && error && (
-          <div className="flex items-start gap-2 px-4 py-4 text-sm text-destructive">
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span className="break-all">{error}</span>
-          </div>
+          <Callout tone="error" className="m-4">{error}</Callout>
         )}
 
         {!loading && !error && data && (
@@ -99,9 +97,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
             {/* Members */}
             {data.members.length > 0 && (
               <div className="border-b border-border/60">
-                <div className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground bg-muted/15">
-                  Members ({data.members.length})
-                </div>
+                <SectionLabel count={data.members.length} className="bg-muted/15 px-4 py-1.5">Members</SectionLabel>
                 <div className="divide-y divide-border/30">
                   {data.members.map((m) => (
                     <div key={m.memberId} className="px-4 py-1.5 flex items-center gap-3 text-xs min-w-0">

@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Loader2, RefreshCw, AlertCircle, Plus, List } from 'lucide-react';
+import { RefreshCw, Plus, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field } from '@/components/ui/tool-section';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { kafkaApi, type TopicSummary } from './types';
 
 interface TopicListViewProps {
@@ -56,36 +59,30 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
       </div>
 
       <div className="tool-scrollable px-5 py-4">
-        {loading && !topics && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>}
-        {error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span>
-          </div>
-        )}
+        {loading && !topics && <LoadingRow />}
+        {error && <Callout tone="error">{error}</Callout>}
         {topics && !error && (
           rows.length === 0
             ? <p className="text-sm text-muted-foreground">{f ? 'No matching topics.' : 'No topics yet.'}</p>
             : (
-              <div className="overflow-x-auto rounded-xl border border-border/50">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/20 border-b border-border/50">
-                    <tr>
-                      <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Name</th>
-                      <th className="px-3.5 py-2 text-right font-medium text-muted-foreground">Partitions</th>
-                      <th className="px-3.5 py-2 text-right font-medium text-muted-foreground">Replication</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {rows.map((t) => (
-                      <tr key={t.name} className="hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => onSelectTopic(t.name)}>
-                        <td className="px-3.5 py-2.5 font-mono">{t.name}</td>
-                        <td className="px-3.5 py-2.5 text-right tabular-nums">{t.partitionCount}</td>
-                        <td className="px-3.5 py-2.5 text-right tabular-nums">{t.replicationFactor}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable>
+                <Thead>
+                  <Tr>
+                    <Th>Name</Th>
+                    <Th align="right">Partitions</Th>
+                    <Th align="right">Replication</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {rows.map((t) => (
+                    <Tr key={t.name} interactive onClick={() => onSelectTopic(t.name)}>
+                      <Td mono>{t.name}</Td>
+                      <Td numeric>{t.partitionCount}</Td>
+                      <Td numeric>{t.replicationFactor}</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </DataTable>
             )
         )}
       </div>
@@ -137,26 +134,23 @@ function CreateTopicDialog({ open, onOpenChange, brokerId, onCreated }: {
           <DialogDescription>Create a topic on this cluster.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div>
-            <Label htmlFor="kf-newt" className="text-xs">Name</Label>
+          <Field label="Name" htmlFor="kf-newt">
             <Input
               id="kf-newt" value={name}
               onChange={(e) => { setName(e.target.value); setError(null); }}
               onKeyDown={(e) => { if (e.key === 'Enter') create(); }}
-              placeholder="my.topic" autoFocus className="mt-1 font-mono text-sm"
+              placeholder="my.topic" autoFocus className="font-mono text-sm"
             />
-          </div>
+          </Field>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="kf-parts" className="text-xs">Partitions</Label>
-              <Input id="kf-parts" type="number" min={1} value={partitions} onChange={(e) => setPartitions(e.target.value)} className="mt-1 h-9" />
-            </div>
-            <div>
-              <Label htmlFor="kf-rf" className="text-xs">Replication factor</Label>
-              <Input id="kf-rf" type="number" min={1} value={rf} onChange={(e) => setRf(e.target.value)} className="mt-1 h-9" />
-            </div>
+            <Field label="Partitions" htmlFor="kf-parts">
+              <Input id="kf-parts" type="number" min={1} value={partitions} onChange={(e) => setPartitions(e.target.value)} className="h-9" />
+            </Field>
+            <Field label="Replication factor" htmlFor="kf-rf">
+              <Input id="kf-rf" type="number" min={1} value={rf} onChange={(e) => setRf(e.target.value)} className="h-9" />
+            </Field>
           </div>
-          {error && <p className="text-sm text-destructive break-words">{error}</p>}
+          {error && <Callout tone="error" size="sm">{error}</Callout>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

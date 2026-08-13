@@ -1,6 +1,10 @@
-import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
+import { SectionLabel } from '@/components/ui/section-label';
+import { Stat } from '@/components/ui/stat';
 import type { RabbitConnection, Overview, NodeInfo } from './types';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
@@ -12,16 +16,6 @@ interface OverviewViewProps {
   onRefresh: () => void;
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="rounded-lg border bg-card/40 px-4 py-3">
-      <div className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</div>
-      <div className="text-xl font-semibold tabular-nums mt-1">{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground mt-0.5">{sub}</div>}
-    </div>
-  );
-}
-
 function NodeCard({ node }: { node: NodeInfo }) {
   const memPct = node.mem_used != null && node.mem_limit
     ? Math.min(100, Math.round((node.mem_used / node.mem_limit) * 100)) : null;
@@ -29,12 +23,9 @@ function NodeCard({ node }: { node: NodeInfo }) {
     <div className="rounded-lg border bg-card/40 px-4 py-3">
       <div className="flex items-center justify-between">
         <span className="font-mono text-sm truncate">{node.name}</span>
-        <span className={cn(
-          'text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase',
-          node.running ? 'bg-emerald-500/15 text-emerald-500' : 'bg-red-500/15 text-red-400',
-        )}>
+        <Badge tone={node.running ? 'success' : 'danger'} uppercase>
           {node.running ? 'Running' : 'Down'}
-        </span>
+        </Badge>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
         <span>Memory</span>
@@ -83,17 +74,8 @@ export function OverviewView({ conn, refreshKey, onRefresh }: OverviewViewProps)
       </div>
 
       <div className="tool-scrollable px-5 py-4 space-y-5">
-        {ov.loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-          </div>
-        )}
-        {ov.error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span className="break-words">{ov.error}</span>
-          </div>
-        )}
+        {ov.loading && <LoadingRow />}
+        {ov.error && <Callout tone="error">{ov.error}</Callout>}
 
         {o && (
           <>
@@ -105,7 +87,7 @@ export function OverviewView({ conn, refreshKey, onRefresh }: OverviewViewProps)
             </div>
 
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Message rates</h3>
+              <SectionLabel size="sm" className="mb-2">Message rates</SectionLabel>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Stat label="Publish" value={formatRate(stats?.publish_details?.rate)} sub={`${formatNumber(stats?.publish)} total`} />
                 <Stat label="Deliver / get" value={formatRate(stats?.deliver_get_details?.rate)} sub={`${formatNumber(stats?.deliver_get)} total`} />
@@ -115,7 +97,7 @@ export function OverviewView({ conn, refreshKey, onRefresh }: OverviewViewProps)
             </div>
 
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Totals</h3>
+              <SectionLabel size="sm" className="mb-2">Totals</SectionLabel>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Stat label="Connections" value={formatNumber(totals?.connections)} />
                 <Stat label="Channels" value={formatNumber(totals?.channels)} />
@@ -126,7 +108,7 @@ export function OverviewView({ conn, refreshKey, onRefresh }: OverviewViewProps)
 
             {nodes.data && nodes.data.length > 0 && (
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Nodes</h3>
+                <SectionLabel size="sm" className="mb-2">Nodes</SectionLabel>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {nodes.data.map((n) => <NodeCard key={n.name} node={n} />)}
                 </div>

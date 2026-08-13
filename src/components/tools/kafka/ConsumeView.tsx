@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Radio, Play, Pause, Square, Loader2, AlertCircle, ChevronDown, ChevronRight, Check, RefreshCw, Trash, ArrowLeft,
+  Radio, Play, Pause, Square, ChevronDown, ChevronRight, Check, RefreshCw, Trash, ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,10 @@ import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
 import { StatusDot } from '@/components/ui/status-dot';
 import { SearchInput } from '@/components/ui/search-input';
+import { Badge } from '@/components/ui/badge';
+import { Callout } from '@/components/ui/callout';
+import { Spinner } from '@/components/ui/spinner';
+import { SectionLabel } from '@/components/ui/section-label';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type ConsumeFrom, type KafkaConsumedMessage } from './types';
 import { kafkaConsumerStore, useKafkaConsumers, type KafkaConsumerSession } from './kafkaConsumerStore';
@@ -64,7 +68,7 @@ export function ConsumeView({ brokerId, refreshKey, onRefresh, prefill, detailTo
           />
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Active consumers</h3>
+            <SectionLabel size="sm" className="mb-2">Active consumers</SectionLabel>
             {sessions.length === 0
               ? <p className="text-sm text-muted-foreground">No consumers running. Start one above to watch a topic in realtime.</p>
               : (
@@ -91,11 +95,9 @@ function ConsumerListRow({ session: s, onOpen }: { session: KafkaConsumerSession
     >
       <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
       <span className="font-mono text-sm truncate">{s.topic}</span>
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide shrink-0">
-        {s.from === 'latest' ? 'new only' : 'from start'}
-      </span>
+      <Badge uppercase>{s.from === 'latest' ? 'new only' : 'from start'}</Badge>
       {s.paused && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 uppercase tracking-wide shrink-0">paused</span>
+        <Badge tone="warning" uppercase>paused</Badge>
       )}
       <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
         {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
@@ -183,16 +185,12 @@ function StartConsumerForm({ brokerId, refreshKey, sessions, prefill, onStarted 
 
       <div className="flex items-center gap-3">
         <Button size="sm" onClick={start} disabled={busy || !topic.trim() || alreadyRunning}>
-          {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1.5" />}
+          {busy ? <Spinner size="sm" className="mr-1.5" /> : <Play className="h-3.5 w-3.5 mr-1.5" />}
           Start consumer
         </Button>
         {alreadyRunning && <span className="text-[11px] text-amber-600 dark:text-amber-400">Already consuming this topic</span>}
       </div>
-      {error && (
-        <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span>
-        </div>
-      )}
+      {error && <Callout tone="error" size="sm">{error}</Callout>}
     </div>
   );
 }

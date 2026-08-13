@@ -25,6 +25,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Stat, type StatProps } from '@/components/ui/stat';
+import { Field } from '@/components/ui/tool-section';
 import { methodColor } from './method-color';
 import { formatBytes, statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
@@ -560,13 +562,13 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
           <div className="flex min-h-0 flex-1 flex-col">
             {/* summary dashboard */}
             <div className="flex shrink-0 flex-wrap items-stretch gap-2 border-b p-3">
-              <Stat label="Requests" value={`${totalRun}${running ? ` / ${plannedCount}` : ''}`} />
-              <Stat label="Passed" value={passedRun} tone="ok" />
-              <Stat label="Failed" value={failedCount} tone={failedCount ? 'bad' : 'muted'} />
-              <Stat label="Assertions" value={`${assertPass}/${assertTotal}`} tone={assertTotal && assertPass < assertTotal ? 'bad' : assertTotal ? 'ok' : 'muted'} />
-              <Stat label="Duration" value={formatDuration(elapsed)} icon={<Clock className="h-3 w-3" />} />
-              <Stat label="Avg time" value={stats.total ? `${stats.avgMs} ms` : '—'} />
-              <Stat label="Data" value={formatBytes(stats.totalBytes)} />
+              <RunStat label="Requests" value={`${totalRun}${running ? ` / ${plannedCount}` : ''}`} />
+              <RunStat label="Passed" value={passedRun} tone="success" />
+              <RunStat label="Failed" value={failedCount} tone={failedCount ? 'danger' : 'muted'} />
+              <RunStat label="Assertions" value={`${assertPass}/${assertTotal}`} tone={assertTotal && assertPass < assertTotal ? 'danger' : assertTotal ? 'success' : 'muted'} />
+              <RunStat label="Duration" value={formatDuration(elapsed)} icon={<Clock className="h-3 w-3" />} />
+              <RunStat label="Avg time" value={stats.total ? `${stats.avgMs} ms` : '—'} />
+              <RunStat label="Data" value={formatBytes(stats.totalBytes)} />
               <div className="ml-auto flex items-center gap-2">
                 {running ? (
                   <Button onClick={stop} variant="destructive" size="sm" className="h-8 gap-1.5">
@@ -758,22 +760,6 @@ function RecordRow({ record: r, onOpen }: { record: RunRecord; onOpen: () => voi
   );
 }
 
-// ─── summary stat card ────────────────────────────────────────────────────────
-
-function Stat({ label, value, tone = 'default', icon }: {
-  label: string; value: React.ReactNode; tone?: 'default' | 'ok' | 'bad' | 'muted'; icon?: React.ReactNode;
-}) {
-  const toneCls = tone === 'ok' ? 'text-emerald-600 dark:text-emerald-400'
-    : tone === 'bad' ? 'text-destructive'
-    : tone === 'muted' ? 'text-muted-foreground' : 'text-foreground';
-  return (
-    <div className="min-w-[5.5rem] rounded-md border bg-muted/20 px-3 py-1.5">
-      <p className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">{icon}{label}</p>
-      <p className={cn('text-base font-semibold tabular-nums', toneCls)}>{value}</p>
-    </div>
-  );
-}
-
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms} ms`;
   const s = ms / 1000;
@@ -908,14 +894,8 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
-      {children}
-    </div>
-  );
-}
+/** Runner summary tile — the shared compact Stat, used for the whole strip. */
+const RunStat = (props: Omit<StatProps, 'variant'>) => <Stat variant="compact" {...props} />;
 
 function OptionRow({ label, hint, checked, onChange }: {
   label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void;

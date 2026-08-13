@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Loader2, RefreshCw, AlertCircle, Users } from 'lucide-react';
+import { RefreshCw, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
-import { cn } from '@/lib/utils';
 import { ViewHeader } from '@/components/ui/view-header';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
+import { StatusDot, type StatusDotTone } from '@/components/ui/status-dot';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { kafkaApi, type GroupSummary } from './types';
 
-const STATE_DOT: Record<string, string> = {
-  Stable: 'bg-emerald-500',
-  Empty: 'bg-muted-foreground/40',
-  Dead: 'bg-destructive',
-  PreparingRebalance: 'bg-orange-500',
-  CompletingRebalance: 'bg-yellow-500',
+const STATE_TONE: Record<string, StatusDotTone> = {
+  Stable: 'live',
+  Empty: 'idle',
+  Dead: 'error',
+  PreparingRebalance: 'starting',
+  CompletingRebalance: 'starting',
 };
 
 interface GroupListViewProps {
@@ -53,41 +56,35 @@ export function GroupListView({ brokerId, refreshKey, onRefresh, onSelectGroup }
       </div>
 
       <div className="tool-scrollable px-5 py-4">
-        {loading && !groups && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>}
-        {error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span>
-          </div>
-        )}
+        {loading && !groups && <LoadingRow />}
+        {error && <Callout tone="error">{error}</Callout>}
         {groups && !error && (
           rows.length === 0
             ? <p className="text-sm text-muted-foreground">{f ? 'No matching groups.' : 'No consumer groups.'}</p>
             : (
-              <div className="overflow-x-auto rounded-xl border border-border/50">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/20 border-b border-border/50">
-                    <tr>
-                      <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Group</th>
-                      <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">State</th>
-                      <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Protocol</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {rows.map((g) => (
-                      <tr key={g.groupId} className="hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => onSelectGroup(g.groupId)}>
-                        <td className="px-3.5 py-2.5 font-mono">{g.groupId}</td>
-                        <td className="px-3.5 py-2.5">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className={cn('h-1.5 w-1.5 rounded-full', STATE_DOT[g.state] ?? 'bg-muted-foreground/40')} />
-                            {g.state || '—'}
-                          </span>
-                        </td>
-                        <td className="px-3.5 py-2.5 text-muted-foreground">{g.protocolType || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable>
+                <Thead>
+                  <Tr>
+                    <Th>Group</Th>
+                    <Th>State</Th>
+                    <Th>Protocol</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {rows.map((g) => (
+                    <Tr key={g.groupId} interactive onClick={() => onSelectGroup(g.groupId)}>
+                      <Td mono>{g.groupId}</Td>
+                      <Td>
+                        <span className="inline-flex items-center gap-1.5">
+                          <StatusDot tone={STATE_TONE[g.state] ?? 'idle'} size="xs" />
+                          {g.state || '—'}
+                        </span>
+                      </Td>
+                      <Td className="text-muted-foreground">{g.protocolType || '—'}</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </DataTable>
             )
         )}
       </div>
