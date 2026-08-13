@@ -1,16 +1,19 @@
 // A single-line input (CodeMirror) for fields that accept {{variables}}. It
 // highlights every {{name}} token — green when the variable is known, red when
 // it isn't — and pops an autocomplete list of known variables while the caret is
-// inside a {{ }}. Used by the URL bar; reusable for any var-aware field.
+// inside a {{ }}. Used by the URL bar; reusable for any var-aware field. Not a
+// "code editor" in the JsonEditor/JavaScriptEditor/etc. sense — no grammar, no
+// multi-line — so it stays a separate, narrower component rather than a mode
+// of the others.
 
 import { useEffect, useRef } from 'react';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { cn } from '@/lib/utils';
 import { useCodeTheme } from '@/components/ui/code-theme';
-import { varExtensions, varTheme } from './varSupport';
+import { varExtensions, varTheme } from '@/components/ui/var-support';
 
-interface Props {
+export interface InlineCodeFieldProps {
   value: string;
   onChange: (v: string) => void;
   vars: Record<string, string>;   // known variable name → current value
@@ -28,7 +31,7 @@ const singleLineTheme = EditorView.theme({
   '.cm-var, .cm-var-unknown': { fontSize: '11px' },
 });
 
-export function VarInput({ value, onChange, vars, placeholder, onEnter, className }: Props) {
+export function InlineCodeField({ value, onChange, vars, placeholder, onEnter, className }: InlineCodeFieldProps) {
   const ref = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   // Live refs so the editor (created once) always sees fresh callbacks/vars.

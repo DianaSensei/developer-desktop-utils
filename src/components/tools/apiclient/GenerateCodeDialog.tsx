@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ResponseViewer } from './ResponseViewer';
+import { CodeViewer } from '@/design-system';
 import { CODE_TARGETS, generateCode } from './codegen';
 import type { ApiRequest, VarMap } from './types';
 
@@ -87,7 +87,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
 
         {/* code preview */}
         <div className="relative min-h-0 flex-1 border-t">
-          <ResponseViewer value={code} language="text" />
+          <CodeViewer value={code} language="text" />
           <CopyButton
             value={() => code}
             title="Copy"

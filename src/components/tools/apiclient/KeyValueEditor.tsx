@@ -11,8 +11,7 @@ import { useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
-import { CodeEditor } from './CodeEditor';
-import { VarInput } from './VarInput';
+import { InlineCodeField, TextEditor } from '@/design-system';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
 
 interface Props {
@@ -108,7 +107,7 @@ export function KeyValueEditor({
             Key-Value Edit
           </button>
         </div>
-        <CodeEditor
+        <TextEditor
           value={bulkText}
           onChange={parseBulk}
           placeholder={`${keyPlaceholder}: ${valuePlaceholder}`}
@@ -159,7 +158,7 @@ export function KeyValueEditor({
               <div className="border-r px-1.5">
                 {vars ? (
                   <div className={cn('flex h-9 items-center', disabled && 'opacity-40')}>
-                    <VarInput
+                    <InlineCodeField
                       value={row.value}
                       onChange={(v) => editRow(row.id, { value: v })}
                       vars={vars}

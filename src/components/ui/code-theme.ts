@@ -1,4 +1,8 @@
-// The one CodeMirror 6 look for the whole app.
+// The one CodeMirror 6 look for the whole app. Consumed by the design
+// system's editor components (JsonEditor/JavaScriptEditor/SqlEditor/
+// TextEditor in code-editor.tsx, CodeViewer, InlineCodeField) plus
+// SqlFormatter's bespoke setup — nothing outside components/ui should build a
+// CodeMirror instance without going through these.
 //
 // Four editors had grown independently — the API Client's `CodeEditor`
 // (scripts, tests, request bodies), its `ResponseViewer`, its `VarInput` URL

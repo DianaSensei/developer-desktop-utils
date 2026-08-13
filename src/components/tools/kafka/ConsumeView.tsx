@@ -18,7 +18,7 @@ import { kafkaApi, type ConsumeFrom, type KafkaConsumedMessage } from './types';
 import { kafkaConsumerStore, useKafkaConsumers, type KafkaConsumerSession } from './kafkaConsumerStore';
 import { kafkaInputHistory, useKafkaRecentMatches } from './kafkaInputHistoryStore';
 import { RecentSuggestions } from './RecentSuggestions';
-import { ResponseViewer } from '@/components/tools/apiclient/ResponseViewer';
+import { CodeViewer } from '@/design-system';
 import type { TopicPrefill } from './useKafkaState';
 
 type ValueFormat = 'json' | 'plain' | 'hex';
@@ -361,7 +361,7 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
               <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto rounded-md border bg-background px-2.5 py-2">{formatValue(m, format)}</pre>
             ) : (
               <div className="flex h-64 rounded-md border bg-background overflow-hidden">
-                <ResponseViewer value={formatValue(m, format)} language={format === 'json' ? 'json' : 'text'} />
+                <CodeViewer value={formatValue(m, format)} language={format === 'json' ? 'json' : 'text'} />
               </div>
             )}
           </div>

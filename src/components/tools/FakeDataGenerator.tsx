@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CopyButton } from '@/components/ui/copy-button';
-import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
+import { CodeViewer } from '@/design-system';
 import { saveTextFile } from '@/components/tools/apiclient/fileio';
 import { Plus, X, Download, RefreshCw } from 'lucide-react';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -219,11 +219,8 @@ export function FakeDataGenerator() {
             </div>
           </div>
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
-            <CodeEditor
-              key={`out-${format}`}
+            <CodeViewer
               value={output}
-              onChange={() => {}}
-              readOnly
               language={format === 'json' ? 'json' : format === 'sql' ? 'sql' : 'text'}
             />
           </div>

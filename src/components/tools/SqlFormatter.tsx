@@ -5,7 +5,11 @@ import { indentWithTab } from '@codemirror/commands';
 import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorState, Compartment } from '@codemirror/state';
-import { smartBracketSkip, useCodeTheme } from '@/components/ui/code-theme';
+// Low-level primitives, not the JsonEditor/JavaScriptEditor/SqlEditor/TextEditor
+// components: this tool needs a runtime SQL<->Mongo(JS) language switch on one
+// persistent CodeMirror instance (via Compartment) plus custom $operator
+// completions, which doesn't fit the fixed-language component shapes.
+import { smartBracketSkip, useCodeTheme } from '@/design-system';
 import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
 import { Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

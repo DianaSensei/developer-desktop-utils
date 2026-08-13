@@ -17,10 +17,9 @@ import {
 } from '@/components/ui/select';
 import { Tabs } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
-import { CodeEditor } from './CodeEditor';
-import { VarInput } from './VarInput';
 import { AuthEditor } from './AuthEditor';
 import { urlWithParams } from './request';
 import {
@@ -101,7 +100,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
             <p className="text-[11px] text-muted-foreground">
               Post-response test script — use <code className="rounded bg-muted px-1">test()</code> and <code className="rounded bg-muted px-1">expect()</code> with <code className="rounded bg-muted px-1">res</code>, <code className="rounded bg-muted px-1">bru</code>.
             </p>
-            <CodeEditor
+            <JavaScriptEditor
               value={request.tests}
               onChange={(tests) => onChange({ tests })}
               placeholder={'test("status is 200", function () {\n  expect(res.getStatus()).to.equal(200);\n});'}
@@ -121,7 +120,7 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <Label className="text-xs">Pre-request <span className="font-normal text-muted-foreground">— runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
-        <CodeEditor
+        <JavaScriptEditor
           value={script.req}
           onChange={(v) => onChange({ script: { ...script, req: v } })}
           placeholder={"bru.setVar('ts', Date.now());\nreq.setHeader('X-Trace', 'abc');"}
@@ -129,7 +128,7 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <Label className="text-xs">Post-response <span className="font-normal text-muted-foreground">— runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
-        <CodeEditor
+        <JavaScriptEditor
           value={script.res}
           onChange={(v) => onChange({ script: { ...script, res: v } })}
           placeholder={"bru.setVar('token', res.getBody().token);"}
@@ -308,7 +307,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
           <div key={name} className="grid grid-cols-[1fr_1fr] border-b last:border-b-0">
             <div className="flex items-center border-r px-3 py-1 font-mono text-muted-foreground">:{name}</div>
             <div className="flex h-8 items-center px-2">
-              <VarInput
+              <InlineCodeField
                 value={valueOf(name)}
                 onChange={(v) => setValue(name, v)}
                 vars={vars}
@@ -528,19 +527,22 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex min-h-0 flex-[2] flex-col gap-1.5">
           <Label className="text-xs text-muted-foreground">Query</Label>
-          <CodeEditor value={g.query} onChange={(query) => setG({ query })} placeholder={'query {\n  field\n}'} vars={vars} />
+          <TextEditor value={g.query} onChange={(query) => setG({ query })} placeholder={'query {\n  field\n}'} vars={vars} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-1.5">
           <Label className="text-xs text-muted-foreground">Variables</Label>
-          <CodeEditor value={g.variables} onChange={(variables) => setG({ variables })} placeholder={'{\n  "id": 1\n}'} vars={vars} />
+          <JsonEditor value={g.variables} onChange={(variables) => setG({ variables })} placeholder={'{\n  "id": 1\n}'} vars={vars} />
         </div>
       </div>
     );
   }
-  // raw text modes (json / xml / text / sparql)
+  // raw text modes (json / xml / text / sparql) — only JSON gets its own
+  // editor (grammar + inline lint); the others have no CodeMirror language
+  // package, so they're plain text.
+  const RawEditor = body.mode === 'json' ? JsonEditor : TextEditor;
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      <CodeEditor
+      <RawEditor
         value={body.raw}
         onChange={(raw) => setBody({ raw })}
         placeholder={RAW_PLACEHOLDER[body.mode]}

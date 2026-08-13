@@ -58,10 +58,24 @@ export {
   type TrProps, type ThProps, type TdProps,
 } from '@/components/ui/data-table';
 
-// Code surfaces — the shared CodeMirror 6 look (theme, syntax palette, and the
+// Code editors — one purpose-built component per language, each with only
+// the features that make sense for it (JSON gets an inline linter; SQL/JS
+// don't). Pick the one matching your content instead of a `language` prop —
+// see code-editor.tsx for why. CodeViewer is the one read-only surface
+// (display-only, so no per-language behavior to gate). InlineCodeField is the
+// single-line {{variable}}-aware field (URL bars, key/value rows) — not a
+// "code editor" in this sense, no grammar, no multi-line.
+export { JsonEditor, JavaScriptEditor, SqlEditor, TextEditor, type CodeEditorProps } from '@/components/ui/code-editor';
+export { CodeViewer, type CodeViewerProps } from '@/components/ui/code-viewer';
+export { InlineCodeField, type InlineCodeFieldProps } from '@/components/ui/inline-code-field';
+
+// Code theme — the shared CodeMirror 6 look (theme, syntax palette, and the
 // hook that keeps a live editor in step with the app's light/dark switch).
+// Low-level: only reach for this building a bespoke editor (see
+// SqlFormatter's runtime SQL↔Mongo language switch) — everything else should
+// use the components above instead.
 export {
-  codeTheme, codeThemeWithHighlight, codeHighlight, useCodeTheme, CODE_FONT,
+  codeTheme, codeThemeWithHighlight, codeHighlight, useCodeTheme, smartBracketSkip, CODE_FONT,
   type CodeThemeOptions,
 } from '@/components/ui/code-theme';
 

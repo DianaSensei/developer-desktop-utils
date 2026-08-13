@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { ToolLabel, ToolHint } from '@/components/ui/tool-section';
-import { CodeEditor } from '../apiclient/CodeEditor';
+import { JsonEditor, TextEditor } from '@/design-system';
 import type { MockConfig } from './types';
 
 interface Props {
@@ -42,15 +42,11 @@ export function FallbackEditor({ config, onChange }: Props) {
 
       <div className="space-y-1.5">
         <span className="text-xs text-muted-foreground">Body</span>
-        <div className="overflow-hidden rounded-md border">
-          <CodeEditor
-            key={isJson ? 'json' : 'text'}
-            language={isJson ? 'json' : 'text'}
-            value={config.notFoundBody}
-            onChange={(notFoundBody) => onChange({ notFoundBody })}
-            placeholder="Fallback response body"
-          />
-        </div>
+        {isJson ? (
+          <JsonEditor value={config.notFoundBody} onChange={(notFoundBody) => onChange({ notFoundBody })} placeholder="Fallback response body" />
+        ) : (
+          <TextEditor value={config.notFoundBody} onChange={(notFoundBody) => onChange({ notFoundBody })} placeholder="Fallback response body" />
+        )}
         <ToolHint>
           Supports the same templates as stub bodies, e.g. <code>{'{{request.path}}'}</code>.
         </ToolHint>

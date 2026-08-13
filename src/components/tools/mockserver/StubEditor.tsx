@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ToolLabel, ToolHint } from '@/components/ui/tool-section';
-import { CodeEditor } from '../apiclient/CodeEditor';
+import { JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from '../apiclient/KeyValueEditor';
 import { newKeyValue, type KeyValue } from '../apiclient/types';
 import { MatcherEditor } from './MatcherEditor';
@@ -277,10 +277,8 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-hidden rounded-md border">
-                    <CodeEditor
-                      key={stub.bodyType}
-                      language={stub.bodyType === 'json' ? 'json' : 'text'}
+                  {stub.bodyType === 'json' ? (
+                    <JsonEditor
                       value={stub.body}
                       onChange={(body) => {
                         if (jsonError) setJsonError(false);
@@ -288,7 +286,16 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                       }}
                       placeholder="Response body"
                     />
-                  </div>
+                  ) : (
+                    <TextEditor
+                      value={stub.body}
+                      onChange={(body) => {
+                        if (jsonError) setJsonError(false);
+                        onChange({ body });
+                      }}
+                      placeholder="Response body"
+                    />
+                  )}
                   <ToolHint>
                     Templates: <code>{'{{path.id}}'}</code>, <code>{'{{request.query.x}}'}</code>,{' '}
                     <code>{'{{request.header.x}}'}</code>, <code>{'{{request.body}}'}</code>,{' '}
@@ -306,9 +313,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
               <code>headers</code>, <code>params</code>, <code>body</code>. Return a string (200 body) or a map{' '}
               <code>{'#{ status, headers, body }'}</code>.
             </ToolHint>
-            <div className="overflow-hidden rounded-md border">
-              <CodeEditor value={stub.script} onChange={(script) => onChange({ script })} placeholder="Rhai script" />
-            </div>
+            <JavaScriptEditor value={stub.script} onChange={(script) => onChange({ script })} placeholder="Rhai script" />
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={runTest} disabled={testing}>
                 <FlaskConical className="mr-1 h-3.5 w-3.5" />
