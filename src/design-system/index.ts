@@ -44,9 +44,21 @@ export {
 export { ConfirmDialog, type ConfirmDialogProps } from '@/components/ui/confirm-dialog';
 export { SearchInput, type SearchInputProps } from '@/components/ui/search-input';
 export { Tabs, type TabsProps, type TabDef } from '@/components/ui/tabs';
+export { Callout, type CalloutProps, type CalloutTone } from '@/components/ui/callout';
+export { Badge, type BadgeProps, type BadgeTone, type BadgeVariant } from '@/components/ui/badge';
+export { Spinner, LoadingRow, type SpinnerProps, type LoadingRowProps } from '@/components/ui/spinner';
+export { SectionLabel, type SectionLabelProps } from '@/components/ui/section-label';
+export { CollapsibleSection, type CollapsibleSectionProps } from '@/components/ui/collapsible-section';
+export { Stat, StatGrid, type StatProps, type StatGridProps, type StatTone, type StatVariant } from '@/components/ui/stat';
+
+// Data display
+export {
+  DataTable, Thead, Tbody, Tr, Th, Td,
+  type DataTableProps, type TheadProps, type TrProps, type ThProps, type TdProps,
+} from '@/components/ui/data-table';
 
 // Layout scaffolding
-export { ToolSection, ToolLabel, ToolHint, ToolContent } from '@/components/ui/tool-section';
+export { ToolSection, ToolLabel, ToolHint, ToolContent, Field, type FieldProps } from '@/components/ui/tool-section';
 export { ToolToolbar, ToolPanes, ToolPane, PaneHeader, type PaneHeaderProps } from '@/components/ui/tool-layout';
 
 // Utilities
