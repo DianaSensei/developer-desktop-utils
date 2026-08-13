@@ -16,8 +16,10 @@ import {
   type Environment,
   type Folder,
   type HistoryEntry,
+  type KeyValue,
   type RequestScript,
   type TreeItem,
+  type VarMap,
   newCollection,
   newEnvironment,
   newFolder,
@@ -247,6 +249,19 @@ export function useApiStore() {
   const [cookiesEnabled, setCookiesEnabled] = usePersistentState<boolean>(
     'devtool:apiclient:cookiesEnabled', true,
   );
+  // Local-only secret store, kept separate from environments (Postman's
+  // "Vault"). Never touched by import/export or collection scripts — only
+  // resolved into the actual outgoing request at send time (see engine.ts).
+  const [vault, setVault] = usePersistentState<KeyValue[]>(
+    'devtool:apiclient:vault', [], { debounceMs: 300 },
+  );
+
+  // Vault secrets namespaced as `vault.<key>` for {{ }} substitution.
+  const vaultVars = useMemo(() => {
+    const map: VarMap = {};
+    for (const v of vault) if (v.enabled && v.key) map[`vault.${v.key}`] = v.value;
+    return map;
+  }, [vault]);
 
   const activeEnv = useMemo(
     () => environments.find((e) => e.id === activeEnvId) ?? null,
@@ -544,6 +559,7 @@ export function useApiStore() {
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, updateRequest, setNodeScript, setNodeAuth,
     addEnvironment, updateEnvironment, deleteEnvironment,
+    vault, setVault, vaultVars,
     addHistory, clearHistory, getInherited,
     cookies, cookiesEnabled, setCookiesEnabled,
     captureCookies, upsertCookie, deleteCookie, clearDomainCookies, clearCookies,

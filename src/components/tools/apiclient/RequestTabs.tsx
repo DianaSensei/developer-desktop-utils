@@ -2,7 +2,7 @@
 // method-colored label and a close button. The right cluster holds the
 // environment selector, history, and the request/response layout toggle.
 
-import { Clock, Columns2, Plus, Rows2, Settings2, X } from 'lucide-react';
+import { Clock, Columns2, KeyRound, Plus, Rows2, Settings2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
@@ -18,6 +18,7 @@ interface Props {
   onToggleDirection: () => void;
   onNewRequest: () => void;
   onManageEnvironments: () => void;
+  onManageVault: () => void;
   historyActive: boolean;
   onSelectRequest: (id: string) => void;
   onOpenHistory: () => void;
@@ -37,7 +38,7 @@ function activeCollection(store: ApiStore): Collection | null {
 }
 
 export function RequestTabs({
-  store, direction, onToggleDirection, onNewRequest, onManageEnvironments,
+  store, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault,
   historyActive, onSelectRequest, onOpenHistory, onCloseHistory,
 }: Props) {
   const { openRequests, activeRequestId } = store;
@@ -118,6 +119,9 @@ export function RequestTabs({
         </Select>
         <button onClick={onManageEnvironments} title="Configure environments" className="rounded p-1.5 transition-colors hover:bg-background hover:text-foreground">
           <Settings2 className="h-4 w-4" />
+        </button>
+        <button onClick={onManageVault} title="Vault (local secrets)" className="rounded p-1.5 transition-colors hover:bg-background hover:text-foreground">
+          <KeyRound className="h-4 w-4" />
         </button>
         <span className="mx-0.5 h-5 w-px bg-border" />
         <button

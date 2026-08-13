@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { methodBg, methodColor } from './method-color';
 import { VarInput } from './VarInput';
 import { paramsFromUrl } from './request';
+import { parseCurl } from './curl';
 import { type ApiRequest, HTTP_METHODS } from './types';
 
 interface Props {
@@ -23,8 +24,33 @@ interface Props {
 export function AddressBar({ request, onChange, onSend, onCancel, sending, onGenerateCode, vars }: Props) {
   // Typing in the URL keeps the Params table in sync. Ignore echoes where the
   // value is unchanged (e.g. when a params edit rewrote the URL).
+  //
+  // Pasting a whole `curl ...` command is also handled here: the editor is
+  // single-line, so a multi-line command arrives with its `\<newline>`
+  // continuations already flattened to spaces by VarInput — restore the space
+  // curl.ts itself would have produced before handing it to the parser.
   const handleUrl = (url: string) => {
     if (url === request.url) return;
+    const trimmed = url.trim();
+    if (/^curl(\s|$)/i.test(trimmed)) {
+      try {
+        const parsed = parseCurl(trimmed.replace(/\\\s+/g, ' '));
+        if (parsed.url.trim()) {
+          onChange({
+            method: parsed.method,
+            url: parsed.url,
+            params: paramsFromUrl(parsed.url, []),
+            headers: parsed.headers,
+            body: parsed.body,
+            auth: parsed.auth,
+          });
+          return;
+        }
+      } catch {
+        // Not a parseable cURL command after all — fall through and treat the
+        // paste as a literal URL edit.
+      }
+    }
     onChange({ url, params: paramsFromUrl(url, request.params) });
   };
 

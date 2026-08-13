@@ -19,6 +19,7 @@ import { RequestTabs } from './RequestTabs';
 import { HistoryView } from './HistoryView';
 import { SplitPane } from './SplitPane';
 import { EnvironmentEditor } from './EnvironmentEditor';
+import { VaultManager } from './VaultManager';
 import { GenerateCodeDialog } from './GenerateCodeDialog';
 import { RunnerDialog } from './RunnerDialog';
 import { CookieManager } from './CookieManager';
@@ -60,6 +61,7 @@ export function ApiClient() {
   // overwrite the result of the one the user is actually waiting on.
   const runTokens = useRef<Map<string, number>>(new Map());
   const [envOpen, setEnvOpen] = useState(false);
+  const [vaultOpen, setVaultOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [cookiesOpen, setCookiesOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -197,7 +199,7 @@ export function ApiClient() {
   // the Runner already keeps the full request/response for each of its runs.
   const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal) => {
     const jar = store.cookiesEnabled ? store.cookies : [];
-    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current);
+    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars);
     persistResult(req, result, false);
     return result;
   }, [store, persistResult]);
@@ -216,7 +218,7 @@ export function ApiClient() {
     patchRun(id, { sending: true, error: null });
     try {
       const jar = store.cookiesEnabled ? store.cookies : [];
-      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current);
+      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current, store.vaultVars);
       persistResult(activeRequest, result);
       if (!isCurrent()) return;
       patchRun(id, {
@@ -304,10 +306,14 @@ export function ApiClient() {
     const map: VarMap = { ...runtimeVarsRef.current };
     if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) map[v.key] = v.value;
     if (activeRequest) for (const v of activeRequest.vars.req) if (v.name) map[v.name] = v.value;
+    // Vault secrets are recognized (for highlight/autocomplete) but their
+    // values stay masked in the UI — the real value only reaches the request
+    // that's actually sent (see engine.ts's own vault merge).
+    for (const v of store.vault) if (v.enabled && v.key) map[`vault.${v.key}`] = '••••••••';
     return map;
     // runtimeVarsVersion is intentionally a dep: the ref mutates invisibly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.activeEnv, activeRequest, runtimeVarsVersion]);
+  }, [store.activeEnv, store.vault, activeRequest, runtimeVarsVersion]);
 
   const run = activeRequest ? (runs[activeRequest.id] ?? EMPTY_RUN) : EMPTY_RUN;
 
@@ -335,6 +341,7 @@ export function ApiClient() {
             onToggleDirection={() => setDirection((d) => (d === 'horizontal' ? 'vertical' : 'horizontal'))}
             onNewRequest={newRequest}
             onManageEnvironments={() => setEnvOpen(true)}
+            onManageVault={() => setVaultOpen(true)}
             historyActive={showHistory}
             onSelectRequest={(id) => { setShowHistory(false); store.setActiveRequestId(id); }}
             onOpenHistory={() => setShowHistory(true)}
@@ -399,6 +406,7 @@ export function ApiClient() {
       />
 
       <EnvironmentEditor store={store} open={envOpen} onClose={() => setEnvOpen(false)} />
+      <VaultManager store={store} open={vaultOpen} onClose={() => setVaultOpen(false)} />
       <CookieManager store={store} open={cookiesOpen} onClose={() => setCookiesOpen(false)} />
       <GenerateCodeDialog
         open={codeOpen}
