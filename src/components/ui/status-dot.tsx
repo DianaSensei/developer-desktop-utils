@@ -17,11 +17,22 @@ const TONE_CLASS: Record<StatusDotTone, string> = {
   recording: 'bg-red-500',
 };
 
+// Soft ring shadow for the `glow` prop, one per tone that actually gets glowed
+// in practice (idle/error dots don't need the emphasis).
+const TONE_GLOW: Partial<Record<StatusDotTone, string>> = {
+  live: 'shadow-[0_0_0_3px_rgba(16,185,129,0.2)]',
+  recording: 'shadow-[0_0_0_3px_rgba(239,68,68,0.2)]',
+  starting: 'shadow-[0_0_0_3px_rgba(245,158,11,0.2)]',
+  paused: 'shadow-[0_0_0_3px_rgba(245,158,11,0.2)]',
+};
+
 export interface StatusDotProps {
   tone: StatusDotTone;
   /** Pulses the dot (used for "actively recording/streaming right now"). */
   pulse?: boolean;
-  size?: 'xs' | 'sm';
+  /** Adds a soft halo ring in the tone color — for a more prominent "this is the headline state" dot. */
+  glow?: boolean;
+  size?: 'xs' | 'sm' | 'md';
   className?: string;
   title?: string;
 }
@@ -34,14 +45,21 @@ export interface StatusDotProps {
  * slightly different color logic. Centralizing it here means a palette or
  * sizing change is one edit instead of an app-wide grep.
  */
-export function StatusDot({ tone, pulse, size = 'sm', className, title }: StatusDotProps) {
+const SIZE_CLASS: Record<NonNullable<StatusDotProps['size']>, string> = {
+  xs: 'h-1.5 w-1.5',
+  sm: 'h-2 w-2',
+  md: 'h-2.5 w-2.5',
+};
+
+export function StatusDot({ tone, pulse, glow, size = 'sm', className, title }: StatusDotProps) {
   return (
     <span
       title={title}
       className={cn(
         'inline-block shrink-0 rounded-full',
-        size === 'xs' ? 'h-1.5 w-1.5' : 'h-2 w-2',
+        SIZE_CLASS[size],
         TONE_CLASS[tone],
+        glow && TONE_GLOW[tone],
         pulse && 'motion-safe:animate-pulse',
         className,
       )}

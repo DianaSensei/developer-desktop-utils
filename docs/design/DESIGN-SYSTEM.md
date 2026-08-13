@@ -206,11 +206,13 @@ Three patterns kept getting reimplemented per-tool with small drifting variation
     second={<ResponsePane />}
   />
   ```
-- **`StatusDot`** — the connection/live/recording indicator dot (Kafka broker, RabbitMQ connection, environment selector, live consumer row, time-tracker running state). One place defines what each tone means; do not reach for a raw `<span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />` again.
+- **`StatusDot`** — the connection/live/recording indicator dot (Kafka broker, RabbitMQ connection, environment selector, live consumer row, time-tracker running state, Mock Server running state). One place defines what each tone means; do not reach for a raw `<span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />` again.
   ```tsx
   <StatusDot tone={connected ? 'live' : 'idle'} title={connected ? 'connected' : 'not connected'} />
   <StatusDot tone="recording" pulse size="xs" />
+  <StatusDot tone="live" size="md" glow />  {/* headline "server is running" state */}
   ```
+  `size`: `xs` (1.5) / `sm` (2, default) / `md` (2.5). `glow` adds a soft halo ring in the tone color for the one dot on screen that's the primary state indicator, not for list rows.
 - **`ContextMenu` / `useContextMenu`** — right-click menu for tree/list rows (collections, connections, topics). Cursor-positioned sibling of `DropdownMenu`, same entry shape (`icon`, `label`, `onClick`, `danger`, `sep`).
   ```tsx
   const menu = useContextMenu();
