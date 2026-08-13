@@ -4,7 +4,6 @@ import { Segmented } from '@/components/ui/segmented';
 import { PaneHeader } from '@/components/ui/tool-layout';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertCircle,
@@ -15,14 +14,14 @@ import {
   EyeOff,
   FileJson,
   FoldVertical,
-  Search,
   UnfoldVertical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SearchInput } from '@/components/ui/search-input';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { SplitPane } from '@/components/tools/apiclient/SplitPane';
+import { SplitPane } from '@/components/ui/split-pane';
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type Mode = 'beautify' | 'string' | 'minify';
@@ -587,15 +586,13 @@ export function JsonFormatter() {
       {parsed.value !== undefined && mode === 'beautify' && (
         <div className="shrink-0 border-b border-border px-4 py-2">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[160px]">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Find by key, value, or path…"
-                className="h-8 pl-8 text-xs rounded-lg"
-              />
-            </div>
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Find by key, value, or path…"
+              className="h-8 text-xs rounded-lg"
+              containerClassName="flex-1 min-w-[160px]"
+            />
             <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => setCollapsed(new Set())} title="Expand all">
               <UnfoldVertical className="h-3.5 w-3.5" />
             </Button>

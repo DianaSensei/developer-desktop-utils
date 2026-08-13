@@ -1,7 +1,13 @@
 // A horizontal tab strip that progressively collapses trailing tabs into a »
 // overflow menu as it runs out of room — using measured widths so the active tab
 // is never clipped. An optional `right` node is pinned to the right edge and the
-// tabs yield space to it (used by the response panel's status readout).
+// tabs yield space to it (e.g. a status readout or toolbar controls).
+//
+// Shared foundation: originally built for API Client's request/response panel
+// tabs; promoted here so any tool with a horizontal tab strip (Kafka topic
+// views, RabbitMQ queue/exchange views) gets the same collapse-to-overflow
+// behavior instead of a plain non-responsive tab row that clips at narrow
+// widths.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronsRight } from 'lucide-react';
@@ -14,22 +20,25 @@ export interface TabDef {
   badge?: ReactNode;
 }
 
-interface Props {
+export interface TabsProps {
   tabs: TabDef[];
   active: string;
   onSelect: (id: string) => void;
   right?: ReactNode;
   className?: string;
+  /** Active-tab underline + text color. Default 'border-primary text-foreground'
+   *  — override when a tool has an established alternate accent. */
+  activeClassName?: string;
 }
 
-export function ResponsiveTabBar({ tabs, active, onSelect, right, className }: Props) {
+export function Tabs({ tabs, active, onSelect, right, className, activeClassName }: TabsProps) {
   const headerRef = useRef<HTMLDivElement>(null);
   const headerWRef = useRef(0);
   const [headerW, setHeaderW] = useState(0);
 
   // Measure each tab's intrinsic width (hidden row) and the right group's width.
   // Use refs for previous values so the effect is only registered once and doesn't
-  // re-run on every render — same pattern as ResponsePanel's tab measurement fix.
+  // re-run on every render.
   const measureRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const tabWRef = useRef<Record<string, number>>({});
   const [tabW, setTabW] = useState<Record<string, number>>({});
@@ -138,7 +147,7 @@ export function ResponsiveTabBar({ tabs, active, onSelect, right, className }: P
 
       <div className="flex min-w-0 items-center gap-4 overflow-hidden">
         {inlineTabs.map((t) => (
-          <TabBtn key={t.id} def={t} active={t.id === active} onClick={() => onSelect(t.id)} />
+          <TabBtn key={t.id} def={t} active={t.id === active} activeClassName={activeClassName} onClick={() => onSelect(t.id)} />
         ))}
       </div>
       {overflowTabs.length > 0 && <TabOverflow tabs={overflowTabs} onSelect={onSelect} />}
@@ -151,14 +160,16 @@ export function ResponsiveTabBar({ tabs, active, onSelect, right, className }: P
   );
 }
 
-function TabBtn({ def, active, onClick }: { def: TabDef; active: boolean; onClick: () => void }) {
+function TabBtn({ def, active, activeClassName, onClick }: {
+  def: TabDef; active: boolean; activeClassName?: string; onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
       className={cn(
         'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-medium transition-colors',
         active
-          ? 'border-amber-400 text-foreground'
+          ? (activeClassName ?? 'border-primary text-foreground')
           : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
       )}
     >

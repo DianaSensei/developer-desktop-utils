@@ -5,13 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchInput } from '@/components/ui/search-input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
   ShieldCheck, Check, Plus, Trash2, Eye, EyeOff,
   RefreshCw, KeyRound, ChevronDown, ChevronUp, ArrowRight,
-  Upload, Download, QrCode, FileText, Search, X, Loader2, ClipboardPaste,
+  Upload, Download, QrCode, FileText, Loader2, ClipboardPaste,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -1017,23 +1018,13 @@ export function TwoFactorAuth() {
               </div>
             )}
             {accounts.length > 3 && (
-              <div className="relative ml-auto w-full sm:w-56">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search accounts…"
-                  className="h-7 pl-8 pr-7 text-xs"
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search accounts…"
+                className="h-7 text-xs"
+                containerClassName="ml-auto w-full sm:w-56"
+              />
             )}
           </div>
         )}

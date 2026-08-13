@@ -29,6 +29,21 @@ export { Segmented, type SegmentedProps, type SegmentedOption } from '@/componen
 export { CopyButton, type CopyButtonProps } from '@/components/ui/copy-button';
 export { EmptyState } from '@/components/ui/empty-state';
 export { DropZone, type DropZoneProps } from '@/components/ui/drop-zone';
+export { IconButton, type IconButtonProps } from '@/components/ui/icon-button';
+export {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator,
+  type DropdownMenuProps, type DropdownMenuTriggerProps, type DropdownMenuContentProps, type DropdownMenuItemProps,
+} from '@/components/ui/dropdown-menu';
+export { SplitPane, type SplitPaneProps, type SplitPaneDirection } from '@/components/ui/split-pane';
+export { StatusDot, type StatusDotProps, type StatusDotTone } from '@/components/ui/status-dot';
+export {
+  ContextMenu, useContextMenu,
+  type ContextMenuProps, type ContextMenuEntry, type ContextMenuState,
+} from '@/components/ui/context-menu';
+export { ConfirmDialog, type ConfirmDialogProps } from '@/components/ui/confirm-dialog';
+export { SearchInput, type SearchInputProps } from '@/components/ui/search-input';
+export { Tabs, type TabsProps, type TabDef } from '@/components/ui/tabs';
 
 // Layout scaffolding
 export { ToolSection, ToolLabel, ToolHint, ToolContent } from '@/components/ui/tool-section';

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select';
+import { IconButton } from '@/components/ui/icon-button';
+import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection } from './types';
 import { rabbitApi } from './types';
@@ -83,25 +85,19 @@ export function LeftPanel(props: LeftPanelProps) {
           <>
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 min-w-0">
-                <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', connected ? 'bg-emerald-500' : 'bg-muted-foreground/40')} title={connected ? 'connected' : 'not connected'} />
+                <StatusDot tone={connected ? 'live' : 'idle'} size="xs" title={connected ? 'connected' : 'not connected'} />
                 <span className="text-[11px] text-muted-foreground font-mono truncate" title={conn.amqpOnly ? 'AMQP endpoint' : 'Management endpoint'}>
                   {conn.amqpOnly ? `${conn.host}:${conn.amqpPort}` : `${conn.host}:${conn.port}`}
                   {conn.extraHosts?.length ? ` +${conn.extraHosts.length}` : ''}
                 </span>
               </span>
               <div className="flex items-center gap-0.5 shrink-0">
-                <button
-                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                  title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}
-                >
+                <IconButton size="sm" className="hover:bg-muted" title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}>
                   <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
-                  title="Remove this saved connection" onClick={() => setDeleteOpen(true)}
-                >
+                </IconButton>
+                <IconButton size="sm" className="hover:bg-muted hover:text-destructive" title="Remove this saved connection" onClick={() => setDeleteOpen(true)}>
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </IconButton>
               </div>
             </div>
             {connected ? (
@@ -165,7 +161,7 @@ export function LeftPanel(props: LeftPanelProps) {
               key={s.queue}
               className="group flex items-center gap-2 pl-3.5 pr-2 py-1 rounded-md text-xs hover:bg-muted/60"
             >
-              <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', s.paused ? 'bg-amber-500' : 'bg-emerald-500')} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
+              <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} size="xs" title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
               <button
                 className="flex-1 min-w-0 text-left font-mono truncate text-muted-foreground group-hover:text-foreground"
                 title={`${s.queue} (${s.mode})`}

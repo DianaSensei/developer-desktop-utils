@@ -4,14 +4,20 @@
 //
 // The size can either be left to the component (`initialPercent`) or owned by
 // the caller (`percent` + `onPercentChange`) so it can be persisted — remounting
-// the split (switching to History and back, reopening the tool) otherwise snaps
-// the panes back to 50/50 and loses the layout the user set up.
+// the split (switching views, reopening the tool) otherwise snaps the panes
+// back to 50/50 and loses the layout the user set up.
+//
+// Shared foundation: API Client, Kafka Explorer, RabbitMQ, and Mock Server each
+// used to hand-roll their own pointer-drag resize logic. Use this instead of
+// reimplementing clamp/ResizeObserver-reclamp/cursor-lock again.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-interface Props {
-  direction: 'horizontal' | 'vertical';
+export type SplitPaneDirection = 'horizontal' | 'vertical';
+
+export interface SplitPaneProps {
+  direction: SplitPaneDirection;
   first: React.ReactNode;
   second: React.ReactNode;
   // Controlled size. Omit both to let the split manage its own state.
@@ -23,6 +29,7 @@ interface Props {
   // Hard minimum size (px) each pane keeps while dragging, so content never gets
   // squeezed out of view.
   minPanePx?: number;
+  className?: string;
 }
 
 const DEFAULT_PERCENT = 50;
@@ -30,7 +37,8 @@ const DEFAULT_PERCENT = 50;
 export function SplitPane({
   direction, first, second, percent: percentProp, onPercentChange,
   initialPercent = DEFAULT_PERCENT, minPercent = 20, maxPercent = 80, minPanePx = 360,
-}: Props) {
+  className,
+}: SplitPaneProps) {
   const [dragging, setDragging] = useState(false);
   const [uncontrolled, setUncontrolled] = useState(initialPercent);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,7 +123,7 @@ export function SplitPane({
   }, [onPointerMove, stop, horizontal]);
 
   return (
-    <div ref={containerRef} className={cn('flex min-h-0 min-w-0 flex-1', horizontal ? 'flex-row' : 'flex-col')}>
+    <div ref={containerRef} className={cn('flex min-h-0 min-w-0 flex-1', horizontal ? 'flex-row' : 'flex-col', className)}>
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden" style={{ flexBasis: `${percent}%`, flexShrink: 0 }}>
         {first}
       </div>

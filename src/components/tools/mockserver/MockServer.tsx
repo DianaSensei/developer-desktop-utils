@@ -11,7 +11,8 @@ import { ToolToolbar } from '@/components/ui/tool-layout';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
-import { SplitPane } from '../apiclient/SplitPane';
+import { SplitPane } from '@/components/ui/split-pane';
+import { StatusDot } from '@/components/ui/status-dot';
 import { methodBadgeStyle } from '../apiclient/method-color';
 import type { HttpMethod } from '../apiclient/types';
 import { StubEditor } from './StubEditor';
@@ -246,12 +247,7 @@ export function MockServer() {
       {/* ── Server controls ─────────────────────────────────────────────── */}
       <ToolToolbar className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5">
-          <span
-            className={cn(
-              'h-2.5 w-2.5 rounded-full',
-              status.running ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]' : 'bg-muted-foreground/40',
-            )}
-          />
+          <StatusDot tone={status.running ? 'live' : 'idle'} size="md" glow={status.running} />
           <span className="text-xs font-medium">{status.running ? 'Running' : 'Stopped'}</span>
         </div>
 

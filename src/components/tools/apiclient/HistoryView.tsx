@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { methodColor } from './method-color';
 import { statusColor } from './request';
 import { ResponsePanel } from './ResponsePanel';
-import { SplitPane } from './SplitPane';
+import { SplitPane } from '@/components/ui/split-pane';
 import type { ApiStore } from './store';
 import type { HistoryEntry } from './types';
 

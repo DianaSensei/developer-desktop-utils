@@ -17,7 +17,7 @@ import { RequestPanel, type RequestPanelTab } from './RequestPanel';
 import { ResponsePanel } from './ResponsePanel';
 import { RequestTabs } from './RequestTabs';
 import { HistoryView } from './HistoryView';
-import { SplitPane } from './SplitPane';
+import { SplitPane } from '@/components/ui/split-pane';
 import { EnvironmentEditor } from './EnvironmentEditor';
 import { VaultManager } from './VaultManager';
 import { GenerateCodeDialog } from './GenerateCodeDialog';

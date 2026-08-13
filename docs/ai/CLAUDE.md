@@ -901,6 +901,25 @@ Read-only CodeMirror 6 viewer with JSON/text syntax highlight. Props: `value`, `
 import { Button, Card, Textarea, Select, CopyButton, ToolSection, ToolToolbar, ToolPanes, ToolPane, PaneHeader, cn } from '@/design-system';
 ```
 
+### Interaction foundation — reuse before hand-rolling
+
+Before writing a new icon-only button, popover menu, or resizable split, check whether it already exists:
+
+```tsx
+import { IconButton, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, SplitPane, StatusDot, ContextMenu, useContextMenu, ConfirmDialog, SearchInput, Tabs } from '@/design-system';
+```
+
+- `IconButton` — icon-only action button, always with a `title`.
+- `DropdownMenu` (+ `Trigger`/`Content`/`Item`/`Label`/`Separator`) — any "▾ opens a small action list" pattern. Dependency-free (built on `useDismissable`), not Radix.
+- `SplitPane` — any resizable two-pane layout (drag divider, persisted or self-managed percent).
+- `StatusDot` — connection/live/recording indicator dot (`tone`: `live`/`starting`/`paused`/`idle`/`error`/`recording`).
+- `ContextMenu` + `useContextMenu` — right-click menu for tree/list rows; same entry shape as `DropdownMenu`.
+- `ConfirmDialog` — confirmation for any destructive/irreversible action. Every delete/purge/disconnect-losing-state action must go through this.
+- `SearchInput` — icon-in-input search box; wraps `Input`, don't reposition a `Search` icon by hand.
+- `Tabs` — horizontal tab strip that auto-collapses overflow into a `»` menu; use for any multi-tab view instead of a plain non-responsive tab row.
+
+Full usage examples are in [design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md#interaction-foundation--reuse-before-hand-rolling). These exist specifically because API Client, Kafka Explorer, RabbitMQ, and Mock Server had each hand-rolled their own version — new tool code should consume the shared one instead of adding a fifth copy.
+
 ### Most Used UI Components (direct path)
 ```tsx
 import { Button } from '@/components/ui/button';

@@ -168,10 +168,87 @@ import { Button, Card, Input, Select, Segmented, ToolSection, PaneHeader, cn } f
 ```
 
 **Primitives** (shadcn-style, Radix-based, in `src/components/ui/`, re-exported by `src/design-system/index.ts`):
-`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`.
+`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`, `StatusDot`, `ContextMenu` (+ `useContextMenu`), `ConfirmDialog`, `SearchInput`, `Tabs`.
 
 **Layout scaffolding:**
 `ToolSection`, `ToolLabel`, `ToolHint`, `ToolContent` (section structure) and `ToolToolbar`, `ToolPanes`, `ToolPane`, `PaneHeader` (toolbar + split-pane layouts).
+
+### Interaction foundation — reuse before hand-rolling
+
+Three patterns kept getting reimplemented per-tool with small drifting variations. Use the shared version:
+
+- **`IconButton`** — the icon-only action button (`rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground`). Always pass `title` since there's no visible label.
+  ```tsx
+  <IconButton title="More" onClick={...}><MoreVertical className="h-4 w-4" /></IconButton>
+  ```
+- **`DropdownMenu` / `DropdownMenuTrigger` / `DropdownMenuContent` / `DropdownMenuItem` / `DropdownMenuLabel` / `DropdownMenuSeparator`** — any "▾ button that opens a small action list" (body-type picker, format picker, header "more" menu, per-row context actions). Dependency-free, built on `useDismissable` — do not hand-roll `open` state + an absolutely positioned `div` again.
+  ```tsx
+  <DropdownMenu>
+    <DropdownMenuTrigger className="flex items-center gap-1 text-xs">
+      Options <ChevronDown className="h-3.5 w-3.5" />
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuLabel>Export</DropdownMenuLabel>
+      <DropdownMenuItem icon={<Download className="h-3.5 w-3.5" />} onClick={handleExport}>Download</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem danger onClick={handleDelete}>Delete</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+  ```
+- **`SplitPane`** — any resizable two-pane layout (request/response split, sidebar/detail split). Handles pointer-drag resize, persisted-percent (controlled) or self-managed (uncontrolled), and reclamp-on-container-resize. Do not hand-roll pointer-drag divider logic again.
+  ```tsx
+  <SplitPane
+    direction="horizontal"
+    percent={splitPercent}
+    onPercentChange={setSplitPercent}
+    minPanePx={320}
+    first={<RequestPane />}
+    second={<ResponsePane />}
+  />
+  ```
+- **`StatusDot`** — the connection/live/recording indicator dot (Kafka broker, RabbitMQ connection, environment selector, live consumer row, time-tracker running state, Mock Server running state). One place defines what each tone means; do not reach for a raw `<span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />` again.
+  ```tsx
+  <StatusDot tone={connected ? 'live' : 'idle'} title={connected ? 'connected' : 'not connected'} />
+  <StatusDot tone="recording" pulse size="xs" />
+  <StatusDot tone="live" size="md" glow />  {/* headline "server is running" state */}
+  ```
+  `size`: `xs` (1.5) / `sm` (2, default) / `md` (2.5). `glow` adds a soft halo ring in the tone color for the one dot on screen that's the primary state indicator, not for list rows.
+- **`ContextMenu` / `useContextMenu`** — right-click menu for tree/list rows (collections, connections, topics). Cursor-positioned sibling of `DropdownMenu`, same entry shape (`icon`, `label`, `onClick`, `danger`, `sep`).
+  ```tsx
+  const menu = useContextMenu();
+  <div onContextMenu={(e) => menu.open(e, [
+    { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: rename },
+    { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: remove },
+  ])}>
+    {row}
+  </div>
+  {menu.state && <ContextMenu state={menu.state} onClose={menu.close} />}
+  ```
+- **`ConfirmDialog`** — confirmation for any destructive/irreversible action (delete, purge, disconnect-and-lose-state). Every destructive action must go through this or an equivalent confirm step — see "Error prevention & recovery" above.
+  ```tsx
+  <ConfirmDialog
+    open={confirmOpen}
+    onOpenChange={setConfirmOpen}
+    title="Delete collection?"
+    description="This removes the collection and everything in it. This can't be undone."
+    confirmLabel="Delete"
+    onConfirm={() => store.deleteCollection(id)}
+  />
+  ```
+- **`SearchInput`** — the icon-in-input search box (sidebar filters, list-view search, collection search). Wraps `Input`; do not reposition a `Search` icon by hand again.
+  ```tsx
+  <SearchInput value={query} onChange={setQuery} placeholder="Search exchanges…" />
+  ```
+- **`Tabs`** — horizontal tab strip that collapses overflow tabs into a `»` menu as it runs out of room (measures real widths, never clips the active tab). Use for any tool with more than a couple of horizontal view tabs (request/response panel tabs, per-item detail views).
+  ```tsx
+  <Tabs
+    tabs={[{ id: 'body', label: 'Response' }, { id: 'headers', label: 'Headers', badge: <Badge/> }]}
+    active={tab}
+    onSelect={setTab}
+    right={<StatusReadout />}
+  />
+  ```
+  Uses `border-primary` for the active-tab underline by default (per the "reserve accent for the key action/state" color rule) — override via `className` if a tool has an established alternate accent.
 
 ---
 

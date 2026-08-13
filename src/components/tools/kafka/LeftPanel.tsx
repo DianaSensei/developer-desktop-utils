@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select';
+import { IconButton } from '@/components/ui/icon-button';
+import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 import { BrokerForm } from './BrokerForm';
 import { kafkaApi, type BrokerConfig } from './types';
@@ -102,25 +104,23 @@ export function LeftPanel({
           <>
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 min-w-0">
-                <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', connected ? 'bg-emerald-500' : 'bg-muted-foreground/40')} title={connected ? 'connected' : 'not connected'} />
+                <StatusDot tone={connected ? 'live' : 'idle'} size="xs" title={connected ? 'connected' : 'not connected'} />
                 <span className="text-[11px] text-muted-foreground font-mono truncate" title={conn.bootstrapServers}>
                   {conn.bootstrapServers}
                 </span>
               </span>
               <div className="flex items-center gap-0.5 shrink-0">
-                <button
-                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
-                  title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}
-                >
+                <IconButton size="sm" className="hover:bg-muted" title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}>
                   <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  className={cn('p-1 rounded hover:bg-muted', removeArmed ? 'text-destructive' : 'text-muted-foreground hover:text-destructive')}
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  className={cn('hover:bg-muted hover:text-destructive', removeArmed && 'text-destructive')}
                   title={removeArmed ? 'Click again to remove' : 'Remove this saved broker'}
                   onClick={handleRemove}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </IconButton>
               </div>
             </div>
             {connected ? (
@@ -174,7 +174,7 @@ export function LeftPanel({
 
           {consumersExpanded && activeConsumers.map((s) => (
             <div key={s.topic} className="group flex items-center gap-2 pl-3.5 pr-2 py-1 rounded-md text-xs hover:bg-muted/60">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" title={s.starting ? 'starting' : 'live'} />
+              <StatusDot tone={s.starting ? 'starting' : 'live'} size="xs" title={s.starting ? 'starting' : 'live'} />
               <button
                 className="flex-1 min-w-0 text-left font-mono truncate text-muted-foreground group-hover:text-foreground"
                 title={`${s.topic} (${s.from === 'latest' ? 'new only' : 'from start'})`}

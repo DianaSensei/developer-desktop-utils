@@ -16,14 +16,15 @@ import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/lib/clipboard';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { IconButton } from '@/components/ui/icon-button';
 import { isMac } from '@/hooks/useQuickPaste';
-import { useDismissable } from '@/hooks/useDismissable';
+import { Tabs, type TabDef } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import type { ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
 import { saveBinaryFile, saveTextFile } from './fileio';
 import { queryJson } from './jsonpath';
 import { ResponseViewer } from './ResponseViewer';
-import { ResponsiveTabBar, type TabDef } from './ResponsiveTabBar';
 
 type Kind = 'json' | 'html' | 'xml' | 'image' | 'text';
 type Format = 'json' | 'html' | 'xml' | 'javascript' | 'raw' | 'hex' | 'base64';
@@ -222,13 +223,13 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
         <span className="font-semibold text-destructive">No response</span>
       )}
       {response && activeTab === 'body' && kind === 'json' && !big && (
-        <button
+        <IconButton
           onClick={() => setShowFilter((s) => !s)}
           title="Filter (JSONPath)"
-          className={cn('rounded p-1 transition-colors hover:bg-accent hover:text-foreground', showFilter || filter ? 'text-amber-500' : 'text-muted-foreground')}
+          className={cn(showFilter || filter ? 'text-amber-500' : undefined)}
         >
           <Filter className="h-4 w-4" />
-        </button>
+        </IconButton>
       )}
       {response && <ActionsMenu copied={copied} onCopy={copy} onSave={saveResponse} onClear={onClear} />}
     </>
@@ -237,10 +238,11 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* header: tabs left, format/status/actions pinned right */}
-      <ResponsiveTabBar
+      <Tabs
         tabs={tabDefs}
         active={activeTab}
         onSelect={(id) => setTab(id as Tab)}
+        activeClassName="border-amber-400 text-foreground"
         right={headerRight}
       />
 
@@ -377,30 +379,25 @@ function Centered({ children }: { children: React.ReactNode }) {
 function ActionsMenu({ copied, onCopy, onSave, onClear }: {
   copied: boolean; onCopy: () => void; onSave: () => void; onClear?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
-  const item = 'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent';
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} title="More" className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+    <DropdownMenu>
+      <DropdownMenuTrigger title="More" className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
         <MoreHorizontal className="h-4 w-4" />
-      </button>
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 min-w-[11rem] rounded-lg border border-border bg-popover p-1 shadow-md">
-          <button className={item} onClick={() => { onCopy(); setOpen(false); }}>
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />} Copy
-          </button>
-          <button className={item} onClick={() => { onSave(); setOpen(false); }}>
-            <Download className="h-3.5 w-3.5" /> Save response…
-          </button>
-          {onClear && (
-            <button className={item} onClick={() => { onClear(); setOpen(false); }}>
-              <Eraser className="h-3.5 w-3.5" /> Clear response
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[11rem]">
+        <DropdownMenuItem onClick={onCopy} icon={copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}>
+          Copy
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onSave} icon={<Download className="h-3.5 w-3.5" />}>
+          Save response…
+        </DropdownMenuItem>
+        {onClear && (
+          <DropdownMenuItem onClick={onClear} icon={<Eraser className="h-3.5 w-3.5" />}>
+            Clear response
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -496,8 +493,6 @@ function TimingBar({ label, ms, total, tone }: { label: string; ms: number; tota
 function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
   format: Format; onChange: (f: Format) => void; preview: boolean; onPreview: (v: boolean) => void; kind: Kind;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   const Icon = FORMAT_META[format].icon;
   const canPreview = kind === 'html' || kind === 'image' || format === 'html';
 
@@ -505,39 +500,36 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
     const RowIcon = FORMAT_META[id].icon;
     const active = format === id;
     return (
-      <button
-        onClick={() => { onChange(id); setOpen(false); }}
-        className={cn('flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs hover:bg-accent', active && 'bg-amber-400/10 text-amber-500')}
+      <DropdownMenuItem
+        onClick={() => onChange(id)}
+        className={cn(active && 'bg-amber-400/10 text-amber-500')}
+        icon={<RowIcon className="h-3.5 w-3.5 shrink-0" />}
       >
-        <RowIcon className="h-3.5 w-3.5 shrink-0" />
-        <span className="flex-1">{FORMAT_META[id].label}</span>
-        {active && <Check className="h-3.5 w-3.5 text-amber-500" />}
-      </button>
+        <span className="flex w-full items-center justify-between gap-2">
+          {FORMAT_META[id].label}
+          {active && <Check className="h-3.5 w-3.5 text-amber-500" />}
+        </span>
+      </DropdownMenuItem>
     );
   };
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
-      >
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground">
         <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
-      </button>
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-border bg-popover p-1.5 shadow-md">
-          <div className={cn('flex items-center justify-between px-2 py-1.5 text-xs', !canPreview && 'opacity-50')}>
-            <span>Preview</span>
-            <Switch checked={preview} onCheckedChange={onPreview} disabled={!canPreview} aria-label="Preview" />
-          </div>
-          <div className="my-1 border-t border-border" />
-          {SYNTAX_FORMATS.map((f) => <Row key={f} id={f} />)}
-          <div className="my-1 border-t border-border" />
-          {ENCODING_FORMATS.map((f) => <Row key={f} id={f} />)}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48 p-1.5">
+        <div className={cn('flex items-center justify-between px-2 py-1.5 text-xs', !canPreview && 'opacity-50')}>
+          <span>Preview</span>
+          <Switch checked={preview} onCheckedChange={onPreview} disabled={!canPreview} aria-label="Preview" />
         </div>
-      )}
-    </div>
+        <DropdownMenuSeparator />
+        {SYNTAX_FORMATS.map((f) => <Row key={f} id={f} />)}
+        <DropdownMenuSeparator />
+        {ENCODING_FORMATS.map((f) => <Row key={f} id={f} />)}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

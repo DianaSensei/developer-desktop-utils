@@ -8,7 +8,6 @@ import {
   Hexagon, type LucideIcon, Tag, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useDismissable } from '@/hooks/useDismissable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,11 +15,12 @@ import { Switch } from '@/components/ui/switch';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Tabs } from '@/components/ui/tabs';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
 import { CodeEditor } from './CodeEditor';
 import { VarInput } from './VarInput';
-import { ResponsiveTabBar } from './ResponsiveTabBar';
 import { AuthEditor } from './AuthEditor';
 import { urlWithParams } from './request';
 import {
@@ -67,10 +67,11 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       {/* tab bar — collapses into » when narrow */}
-      <ResponsiveTabBar
+      <Tabs
         tabs={tabs}
         active={tab}
         onSelect={(id) => onTabChange(id as Tab)}
+        activeClassName="border-amber-400 text-foreground"
         right={tab === 'body' ? <BodyModeDropdown body={request.body} onChange={onChange} /> : undefined}
       />
 
@@ -464,43 +465,35 @@ const BODY_GROUPS: { label: string; items: { id: BodyMode; icon: LucideIcon }[] 
 
 // The grouped body-type selector that sits at the right of the request tab bar.
 function BodyModeDropdown({ body, onChange }: { body: ApiRequest['body']; onChange: (p: Partial<ApiRequest>) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 py-2 text-xs font-medium text-amber-500 transition-colors hover:text-amber-400"
-      >
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center gap-1.5 py-2 text-xs font-medium text-amber-500 transition-colors hover:text-amber-400">
         {BODY_LABEL[body.mode]} <ChevronDown className="h-3.5 w-3.5" />
-      </button>
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 w-56 rounded-md border bg-popover p-1.5 shadow-md">
-          {BODY_GROUPS.map((group) => (
-            <div key={group.label} className="py-1">
-              <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
-              {group.items.map(({ id, icon: Icon }) => {
-                const active = body.mode === id;
-                return (
-                  <button
-                    key={id}
-                    onClick={() => { onChange({ body: { ...body, mode: id } }); setOpen(false); }}
-                    className={cn(
-                      'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs hover:bg-accent',
-                      active && 'bg-amber-400/10 text-amber-500',
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5 shrink-0" />
-                    <span className="flex-1">{BODY_LABEL[id]}</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 p-1.5">
+        {BODY_GROUPS.map((group) => (
+          <div key={group.label} className="py-1">
+            <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+            {group.items.map(({ id, icon: Icon }) => {
+              const active = body.mode === id;
+              return (
+                <DropdownMenuItem
+                  key={id}
+                  onClick={() => onChange({ body: { ...body, mode: id } })}
+                  className={cn(active && 'bg-amber-400/10 text-amber-500')}
+                  icon={<Icon className="h-3.5 w-3.5 shrink-0" />}
+                >
+                  <span className="flex w-full items-center justify-between gap-2">
+                    {BODY_LABEL[id]}
                     {active && <Check className="h-3.5 w-3.5 text-amber-500" />}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+                  </span>
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
