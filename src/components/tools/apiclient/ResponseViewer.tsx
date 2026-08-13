@@ -6,41 +6,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { EditorView, basicSetup, minimalSetup } from 'codemirror';
 import { lineNumbers } from '@codemirror/view';
 import { json } from '@codemirror/lang-json';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
-import { tags } from '@lezer/highlight';
-
-const editorTheme = EditorView.theme({
-  // Use flex: 1 instead of height: 100% — percentage heights don't resolve
-  // correctly through flex:1 parents on Windows WebView2 (Chromium), causing
-  // the gutter and content columns inside .cm-scroller to stack vertically.
-  '&': {
-    flex: '1 1 0',
-    minHeight: '0',
-    fontSize: '12.5px',
-    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-    backgroundColor: 'transparent',
-  },
-  '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { overflow: 'auto', minHeight: '0' },
-  '.cm-content': { padding: '6px 0' },
-  '.cm-gutters': {
-    backgroundColor: 'transparent',
-    color: 'hsl(var(--muted-foreground) / 0.5)',
-    border: 'none',
-  },
-  '.cm-activeLine': { backgroundColor: 'transparent' },
-  '.cm-activeLineGutter': { backgroundColor: 'transparent' },
-  '.cm-foldGutter span': { color: 'hsl(var(--muted-foreground) / 0.7)' },
-});
-
-const highlight = HighlightStyle.define([
-  { tag: tags.propertyName, color: 'var(--js-property, hsl(35 90% 55%))' },
-  { tag: [tags.string], color: 'var(--sql-string, hsl(140 45% 55%))' },
-  { tag: tags.number, color: 'var(--sql-number, hsl(210 90% 65%))' },
-  { tag: [tags.bool, tags.null], color: 'var(--sql-keyword, hsl(265 80% 65%))', fontWeight: '600' },
-  { tag: tags.punctuation, color: 'hsl(var(--muted-foreground))' },
-]);
+import { useCodeTheme } from '@/components/ui/code-theme';
 
 interface Props {
   value: string;
@@ -53,24 +20,26 @@ interface Props {
 export function ResponseViewer({ value, language, plain }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  // Read-only: no active-line tint, and the gutter sits flush on the pane
+  // rather than in its own tinted column.
+  const theme = useCodeTheme(viewRef, { gutter: 'flush', activeLine: false, contentPadding: '6px 0' });
 
   const extensions = useMemo(() => (plain
     ? [
         minimalSetup,
         lineNumbers(),
-        editorTheme,
+        theme.extension,
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
       ]
     : [
         basicSetup,
         ...(language === 'json' ? [json()] : []),
-        syntaxHighlighting(highlight),
-        editorTheme,
+        theme.extension,
         EditorView.lineWrapping,
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
-      ]), [language, plain]);
+      ]), [language, plain, theme.extension]);
 
   // Recreate the view when the language changes so the parser swaps cleanly.
   useEffect(() => {

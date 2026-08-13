@@ -7,52 +7,15 @@ import { EditorView, basicSetup } from 'codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
 import { sql } from '@codemirror/lang-sql';
-import { HighlightStyle, syntaxHighlighting, type LanguageSupport } from '@codemirror/language';
+import { type LanguageSupport } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
-import { tags } from '@lezer/highlight';
 import { cn } from '@/lib/utils';
+import { useCodeTheme } from '@/components/ui/code-theme';
 import { varExtensions, varTheme } from './varSupport';
 
 const jsLang = javascript();
 const jsonLang = json();
 const sqlLang = sql();
-
-const editorTheme = EditorView.theme({
-  // flex:1 (not height:100%) fills the parent in flex chains without an explicit pixel height.
-  '&': {
-    flex: '1 1 0',
-    minHeight: '0',
-    fontSize: '12px',
-    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-  },
-  '&.cm-focused': { outline: 'none' },
-  // minHeight:0 lets the scroller shrink inside a constrained flex container.
-  '.cm-scroller': { overflow: 'auto', minHeight: '0' },
-  '.cm-content': { caretColor: 'hsl(var(--foreground))', padding: '8px 0' },
-  '.cm-gutters': {
-    backgroundColor: 'hsl(var(--muted) / 0.4)',
-    color: 'hsl(var(--muted-foreground))',
-    border: 'none',
-    borderRight: '1px solid hsl(var(--border))',
-  },
-  '.cm-activeLineGutter': { backgroundColor: 'hsl(var(--primary) / 0.08)' },
-  '.cm-activeLine': { backgroundColor: 'hsl(var(--primary) / 0.05)' },
-  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-    backgroundColor: 'hsl(var(--primary) / 0.2)',
-  },
-  '.cm-cursor': { borderLeftColor: 'hsl(var(--foreground))' },
-});
-
-const codeHighlight = HighlightStyle.define([
-  { tag: tags.keyword, color: 'var(--sql-keyword, hsl(265 80% 60%))', fontWeight: '600' },
-  { tag: [tags.string, tags.regexp], color: 'var(--sql-string, hsl(140 50% 45%))' },
-  { tag: tags.comment, color: 'var(--sql-comment, hsl(var(--muted-foreground)))', fontStyle: 'italic' },
-  { tag: tags.number, color: 'var(--sql-number, hsl(25 80% 55%))' },
-  { tag: tags.function(tags.name), color: 'var(--js-method, hsl(265 70% 60%))' },
-  { tag: tags.propertyName, color: 'var(--js-property, hsl(35 90% 50%))' },
-  { tag: [tags.bool, tags.null], color: 'var(--sql-keyword, hsl(265 80% 60%))', fontWeight: '600' },
-  { tag: tags.definition(tags.variableName), color: 'var(--sql-function, hsl(180 50% 45%))' },
-]);
 
 interface Props {
   value: string;
@@ -86,6 +49,7 @@ export function CodeEditor({ value, onChange, placeholder, className, vars, lang
   const lang = useRef<LanguageSupport | null>(
     language === 'json' ? jsonLang : language === 'sql' ? sqlLang : language === 'text' ? null : jsLang,
   ).current;
+  const theme = useCodeTheme(viewRef, { fontSize: '12px', activeLine: !readOnly });
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -100,8 +64,7 @@ export function CodeEditor({ value, onChange, placeholder, className, vars, lang
           EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
           ...(lang ? [lang] : []),
           ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
-          syntaxHighlighting(codeHighlight),
-          editorTheme,
+          theme.extension,
           EditorView.lineWrapping,
           ...(hasVars ? [...varExtensions(() => varsRef.current ?? {}), varTheme] : []),
           EditorView.updateListener.of((upd) => {

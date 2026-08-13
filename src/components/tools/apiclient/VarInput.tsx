@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { cn } from '@/lib/utils';
+import { useCodeTheme } from '@/components/ui/code-theme';
 import { varExtensions, varTheme } from './varSupport';
 
 interface Props {
@@ -18,13 +19,11 @@ interface Props {
   className?: string;
 }
 
-const theme = EditorView.theme({
-  '&': { fontSize: '12px', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
-  '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { overflow: 'hidden', fontFamily: 'inherit' },
-  '.cm-content': { padding: '0', caretColor: 'hsl(var(--foreground))' },
+// Single-line specifics on top of the shared code theme: no flex fill, no
+// padding, and the scroller must not scroll (the field is one line).
+const singleLineTheme = EditorView.theme({
+  '.cm-scroller': { overflow: 'hidden' },
   '.cm-line': { padding: '0' },
-  '.cm-cursor': { borderLeftColor: 'hsl(var(--foreground))' },
   '.cm-placeholder': { color: 'hsl(var(--muted-foreground) / 0.6)' },
   '.cm-var, .cm-var-unknown': { fontSize: '11px' },
 });
@@ -38,6 +37,7 @@ export function VarInput({ value, onChange, vars, placeholder, onEnter, classNam
   const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   const onEnterRef = useRef(onEnter); onEnterRef.current = onEnter;
   const lastValue = useRef(value);
+  const theme = useCodeTheme(viewRef, { fontSize: '12px', contentPadding: '0', fill: false, activeLine: false });
 
   useEffect(() => {
     if (!ref.current) return;
@@ -63,7 +63,8 @@ export function VarInput({ value, onChange, vars, placeholder, onEnter, classNam
           ...varExtensions(() => varsRef.current),
           singleLine,
           cmPlaceholder(placeholder ?? ''),
-          theme,
+          theme.extension,
+          singleLineTheme,
           varTheme,
           keymap.of([{ key: 'Enter', run: () => { onEnterRef.current?.(); return true; } }]),
           EditorView.updateListener.of((u) => {

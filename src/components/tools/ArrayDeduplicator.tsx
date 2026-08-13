@@ -91,7 +91,22 @@ const count = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleS
 
 const AREA_CLASS =
   'flex-1 min-w-0 h-full resize-none outline-none bg-transparent text-foreground text-sm font-mono px-2.5 pb-2 placeholder:text-muted-foreground/60';
-const AREA_STYLE = { lineHeight: `${LINE_H}px`, paddingTop: `${AREA_PT}px` } as const;
+
+// `wrap="off"` is load-bearing, not cosmetic. The gutter next to these
+// textareas draws exactly one LINE_H-tall number per *logical* line, and the
+// centre scrollbar syncs the two panes by scroll offset. With the default soft
+// wrap, one long entry (a URL, a long id) occupies several visual rows while
+// the gutter still advances by one — so every number below it points at the
+// wrong line, and the two panes drift apart. Deduplicate is line-oriented
+// anyway: one item per line, scroll sideways for long ones.
+const AREA_WRAP = 'off' as const;
+const AREA_STYLE = {
+  lineHeight: `${LINE_H}px`,
+  paddingTop: `${AREA_PT}px`,
+  // Safari/WebKit honours `wrap="off"` but still needs the overflow hint to
+  // give the field a horizontal scroll range.
+  overflowX: 'auto',
+} as const;
 
 export function ArrayDeduplicator() {
   const [mode, setMode] = usePersistentState<DedupeMode>('devtool:deduplicate:mode', 'preserve');
@@ -452,6 +467,7 @@ export function ArrayDeduplicator() {
               onChange={(e) => onValueChange(e.target.value)}
               placeholder={`apple\nbanana\napple\norange — ${quickPasteHint}`}
               spellCheck={false}
+              wrap={AREA_WRAP}
               className={areaClass}
               style={AREA_STYLE}
             />
@@ -497,6 +513,7 @@ export function ArrayDeduplicator() {
               ref={outputRef}
               readOnly
               spellCheck={false}
+              wrap={AREA_WRAP}
               className={areaClass + ' cursor-default'}
               style={AREA_STYLE}
             />

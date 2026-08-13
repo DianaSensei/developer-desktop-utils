@@ -28,16 +28,8 @@ export const varTheme = EditorView.theme({
     borderRadius: '3px',
     padding: '0 1px',
   },
-  '.cm-tooltip.cm-tooltip-autocomplete': {
-    border: '1px solid hsl(var(--border))', borderRadius: '6px', backgroundColor: 'hsl(var(--popover))',
-    boxShadow: '0 4px 12px rgb(0 0 0 / 0.2)', overflow: 'hidden',
-  },
-  '.cm-tooltip-autocomplete ul li': { padding: '3px 8px', fontFamily: 'ui-monospace, monospace', fontSize: '12px', color: 'hsl(var(--foreground))' },
-  '.cm-tooltip-autocomplete ul li[aria-selected]': { backgroundColor: 'hsl(var(--accent))', color: 'hsl(var(--accent-foreground))' },
-  '.cm-tooltip.cm-tooltip-hover': {
-    border: '1px solid hsl(var(--border))', borderRadius: '6px', backgroundColor: 'hsl(var(--popover))',
-    boxShadow: '0 4px 12px rgb(0 0 0 / 0.2)',
-  },
+  // Tooltip/autocomplete chrome now comes from the shared `codeTheme`; only the
+  // var-specific bits live here.
   '.cm-vartip': { display: 'flex', flexDirection: 'column', gap: '2px', padding: '6px 8px', maxWidth: '340px' },
   '.cm-vartip-name': { fontSize: '10px', color: 'hsl(var(--muted-foreground))', fontFamily: 'ui-monospace, monospace' },
   '.cm-vartip-val': { fontSize: '12px', color: 'hsl(var(--foreground))', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-all', whiteSpace: 'pre-wrap' },
