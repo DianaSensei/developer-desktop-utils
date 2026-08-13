@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
+import { keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
 import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorState, Compartment } from '@codemirror/state';
@@ -395,6 +397,9 @@ export function SqlFormatter() {
       state: EditorState.create({
         doc: modeRef.current === 'sql' ? sqlInputRef.current : mongoInputRef.current,
         extensions: [
+          // Tab/Shift-Tab indent and dedent instead of moving focus off the
+          // editor — must precede `basicSetup` to take precedence.
+          keymap.of([indentWithTab]),
           basicSetup,
           smartBracketSkip,
           // Keep typed quotes straight (no macOS smart-quote substitution).

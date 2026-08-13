@@ -4,6 +4,8 @@
 
 import { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
+import { keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
 import { sql } from '@codemirror/lang-sql';
@@ -57,6 +59,12 @@ export function CodeEditor({ value, onChange, placeholder, className, vars, lang
       state: EditorState.create({
         doc: value,
         extensions: [
+          // Tab/Shift-Tab indent and dedent instead of leaving the editor to
+          // move focus to the next element — must precede `basicSetup` to
+          // take precedence over its keymaps. Read-only editors fall through
+          // to the browser default (indentMore/Less no-op when readOnly), so
+          // Tab still moves focus away from an output-only viewer.
+          keymap.of([indentWithTab]),
           basicSetup,
           smartBracketSkip,
           // Stop macOS/WebKit from substituting smart quotes / autocorrecting
