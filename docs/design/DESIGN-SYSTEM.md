@@ -168,10 +168,44 @@ import { Button, Card, Input, Select, Segmented, ToolSection, PaneHeader, cn } f
 ```
 
 **Primitives** (shadcn-style, Radix-based, in `src/components/ui/`, re-exported by `src/design-system/index.ts`):
-`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`.
+`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`.
 
 **Layout scaffolding:**
 `ToolSection`, `ToolLabel`, `ToolHint`, `ToolContent` (section structure) and `ToolToolbar`, `ToolPanes`, `ToolPane`, `PaneHeader` (toolbar + split-pane layouts).
+
+### Interaction foundation — reuse before hand-rolling
+
+Three patterns kept getting reimplemented per-tool with small drifting variations. Use the shared version:
+
+- **`IconButton`** — the icon-only action button (`rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground`). Always pass `title` since there's no visible label.
+  ```tsx
+  <IconButton title="More" onClick={...}><MoreVertical className="h-4 w-4" /></IconButton>
+  ```
+- **`DropdownMenu` / `DropdownMenuTrigger` / `DropdownMenuContent` / `DropdownMenuItem` / `DropdownMenuLabel` / `DropdownMenuSeparator`** — any "▾ button that opens a small action list" (body-type picker, format picker, header "more" menu, per-row context actions). Dependency-free, built on `useDismissable` — do not hand-roll `open` state + an absolutely positioned `div` again.
+  ```tsx
+  <DropdownMenu>
+    <DropdownMenuTrigger className="flex items-center gap-1 text-xs">
+      Options <ChevronDown className="h-3.5 w-3.5" />
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuLabel>Export</DropdownMenuLabel>
+      <DropdownMenuItem icon={<Download className="h-3.5 w-3.5" />} onClick={handleExport}>Download</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem danger onClick={handleDelete}>Delete</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+  ```
+- **`SplitPane`** — any resizable two-pane layout (request/response split, sidebar/detail split). Handles pointer-drag resize, persisted-percent (controlled) or self-managed (uncontrolled), and reclamp-on-container-resize. Do not hand-roll pointer-drag divider logic again.
+  ```tsx
+  <SplitPane
+    direction="horizontal"
+    percent={splitPercent}
+    onPercentChange={setSplitPercent}
+    minPanePx={320}
+    first={<RequestPane />}
+    second={<ResponsePane />}
+  />
+  ```
 
 ---
 

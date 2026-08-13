@@ -29,6 +29,13 @@ export { Segmented, type SegmentedProps, type SegmentedOption } from '@/componen
 export { CopyButton, type CopyButtonProps } from '@/components/ui/copy-button';
 export { EmptyState } from '@/components/ui/empty-state';
 export { DropZone, type DropZoneProps } from '@/components/ui/drop-zone';
+export { IconButton, type IconButtonProps } from '@/components/ui/icon-button';
+export {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator,
+  type DropdownMenuProps, type DropdownMenuTriggerProps, type DropdownMenuContentProps, type DropdownMenuItemProps,
+} from '@/components/ui/dropdown-menu';
+export { SplitPane, type SplitPaneProps, type SplitPaneDirection } from '@/components/ui/split-pane';
 
 // Layout scaffolding
 export { ToolSection, ToolLabel, ToolHint, ToolContent } from '@/components/ui/tool-section';

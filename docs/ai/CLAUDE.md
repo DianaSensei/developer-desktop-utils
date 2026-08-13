@@ -901,6 +901,20 @@ Read-only CodeMirror 6 viewer with JSON/text syntax highlight. Props: `value`, `
 import { Button, Card, Textarea, Select, CopyButton, ToolSection, ToolToolbar, ToolPanes, ToolPane, PaneHeader, cn } from '@/design-system';
 ```
 
+### Interaction foundation — reuse before hand-rolling
+
+Before writing a new icon-only button, popover menu, or resizable split, check whether it already exists:
+
+```tsx
+import { IconButton, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, SplitPane } from '@/design-system';
+```
+
+- `IconButton` — icon-only action button, always with a `title`.
+- `DropdownMenu` (+ `Trigger`/`Content`/`Item`/`Label`/`Separator`) — any "▾ opens a small action list" pattern. Dependency-free (built on `useDismissable`), not Radix.
+- `SplitPane` — any resizable two-pane layout (drag divider, persisted or self-managed percent).
+
+Full usage examples are in [design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md#interaction-foundation--reuse-before-hand-rolling). These exist specifically because API Client, Kafka Explorer, RabbitMQ, and Mock Server had each hand-rolled their own version — new tool code should consume the shared one instead of adding a fifth copy.
+
 ### Most Used UI Components (direct path)
 ```tsx
 import { Button } from '@/components/ui/button';
