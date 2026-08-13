@@ -6,11 +6,13 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
-import { Eye, EyeOff, Fingerprint, Check, X, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Fingerprint, Check, X } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 
@@ -173,11 +175,11 @@ export function PasswordHash() {
             </ToolSection>
 
             <Button onClick={() => void runHash()} disabled={!password || busy} size="sm" className="gap-1.5">
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Fingerprint className="h-3.5 w-3.5" />}
+              {busy ? <Spinner size="sm" /> : <Fingerprint className="h-3.5 w-3.5" />}
               {busy ? 'Hashing…' : 'Hash password'}
             </Button>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <Callout tone="error" size="sm">{error}</Callout>}
 
             {hashOut && (
               <ToolSection>
@@ -223,11 +225,11 @@ export function PasswordHash() {
             </ToolSection>
 
             <Button onClick={() => void runVerify()} disabled={!password || !verifyHash.trim() || busy} size="sm" className="gap-1.5">
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              {busy ? <Spinner size="sm" /> : <Check className="h-3.5 w-3.5" />}
               {busy ? 'Verifying…' : 'Verify'}
             </Button>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <Callout tone="error" size="sm">{error}</Callout>}
 
             {verifyResult !== null && (
               <div className={cn(

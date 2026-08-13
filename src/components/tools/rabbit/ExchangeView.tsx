@@ -1,9 +1,10 @@
-import {
-  Loader2, RefreshCw, AlertCircle, Send, Radio,
-} from 'lucide-react';
+import { RefreshCw, Send, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
 import { ViewHeader } from '@/components/ui/view-header';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RabbitConnection, ExchangeInfo, BindingInfo, ExchangeAmqpInfo } from './types';
 import { rabbitApi } from './types';
@@ -75,8 +76,8 @@ export function ExchangeView({ conn, exchangeName, refreshKey, onRefresh, onBack
 
 function MgmtOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConnection; exchangeName: string; refreshKey: number }) {
   const { data: ex, loading, error } = useRabbitData<ExchangeInfo>(() => rabbitMgmt.exchange(conn, exchangeName), [conn.id, exchangeName, refreshKey]);
-  if (loading) return <Loading />;
-  if (error) return <ErrorBox message={error} />;
+  if (loading) return <LoadingRow />;
+  if (error) return <Callout tone="error">{error}</Callout>;
   if (!ex) return null;
   const s = ex.message_stats;
   return (
@@ -95,8 +96,8 @@ function MgmtOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
 /** AMQP-only overview: a passive declare can only confirm existence. */
 function AmqpOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConnection; exchangeName: string; refreshKey: number }) {
   const { data, loading, error } = useRabbitData<ExchangeAmqpInfo[]>(() => rabbitApi.amqpExchangesInfo(conn.id, [exchangeName]), [conn.id, exchangeName, refreshKey]);
-  if (loading) return <Loading />;
-  if (error) return <ErrorBox message={error} />;
+  if (loading) return <LoadingRow />;
+  if (error) return <Callout tone="error">{error}</Callout>;
   const i = data?.[0];
   if (!i) return null;
   return (
@@ -109,7 +110,7 @@ function AmqpOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
             : <span className="text-amber-600 dark:text-amber-400">No</span>}
         </dd>
       </dl>
-      {i.error && <ErrorBox message={i.error} />}
+      {i.error && <Callout tone="error">{i.error}</Callout>}
       <p className="text-[11px] text-muted-foreground">
         AMQP-only mode: type, durability and bindings require the management API and aren't queryable over AMQP. Use New exchange to declare one.
       </p>
@@ -150,48 +151,30 @@ function MgmtBindingsTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
           onBind={async (dest, key) => { await rabbitMgmt.createBinding(conn, exchangeName, 'q', dest, key); b.reload(); }}
         />
       )}
-      {b.loading ? <Loading />
-        : b.error ? <ErrorBox message={b.error} />
+      {b.loading ? <LoadingRow />
+        : b.error ? <Callout tone="error">{b.error}</Callout>
         : !b.data || b.data.length === 0 ? <p className="text-sm text-muted-foreground">No bindings from this exchange.</p>
         : (
-          <div className="overflow-x-auto rounded-xl border border-border/50">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/20 border-b border-border/50">
-                <tr>
-                  <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Destination</th>
-                  <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Type</th>
-                  <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Routing key</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {b.data.map((x, i) => (
-                  <tr key={i} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-3.5 py-2.5 font-mono">{x.destination}</td>
-                    <td className="px-3.5 py-2.5">{x.destination_type}</td>
-                    <td className="px-3.5 py-2.5 font-mono">{x.routing_key || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable>
+            <Thead>
+              <Tr>
+                <Th>Destination</Th>
+                <Th>Type</Th>
+                <Th>Routing key</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {b.data.map((x, i) => (
+                <Tr key={i} className="hover:bg-muted/40">
+                  <Td mono>{x.destination}</Td>
+                  <Td>{x.destination_type}</Td>
+                  <Td mono>{x.routing_key || '—'}</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </DataTable>
         )}
     </div>
   );
 }
 
-function Loading() {
-  return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-      <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-    </div>
-  );
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-      <span className="break-words">{message}</span>
-    </div>
-  );
-}

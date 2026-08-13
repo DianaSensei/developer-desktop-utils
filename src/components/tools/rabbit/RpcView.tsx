@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Repeat, Loader2, AlertCircle, AlertTriangle, RefreshCw, Send, CheckCircle2, ChevronDown, ChevronRight, Timer, Check, X } from 'lucide-react';
+import { Repeat, AlertTriangle, RefreshCw, Send, CheckCircle2, Timer, Check, X } from 'lucide-react';
+import { Callout } from '@/components/ui/callout';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -324,55 +327,48 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
           )}
 
           {/* Message options (collapsible) */}
-          <div className="rounded-lg border">
-            <button
-              type="button"
-              onClick={() => setShowOptions((s) => !s)}
-              className="w-full flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              {showOptions ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-              Message options
-              <span className="text-[11px] font-normal text-muted-foreground/70">
-                {mode === 'send' ? '— properties, headers' : '— content type, correlation id, headers'}
-              </span>
-            </button>
-            {showOptions && (
-              <div className="px-3 pb-3 space-y-3 border-t pt-3">
-                {mode === 'send' && (
-                  <label className="flex items-center justify-between">
-                    <span className="text-xs font-medium">Persistent (delivery mode 2)</span>
-                    <Switch checked={persistent} onCheckedChange={(v) => { setPersistent(v); reset(); }} aria-label="Persistent" />
-                  </label>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Content type" value={contentType} onChange={setContentType} reset={reset} placeholder="application/json" />
-                  <div>
-                    <Label className="text-xs">Correlation ID</Label>
-                    <div className="mt-1 flex gap-1">
-                      <Input value={correlationId} onChange={(e) => { setCorrelationId(e.target.value); reset(); }} placeholder="(auto)" className="font-mono text-xs h-8" />
-                      <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Generate" onClick={() => { setCorrelationId(crypto.randomUUID()); reset(); }}>
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  {mode === 'send' && <>
-                    <Field label="Content encoding" value={contentEncoding} onChange={setContentEncoding} reset={reset} placeholder="utf-8 / gzip" />
-                    <Field label="Priority (0–255)" value={priority} onChange={setPriority} reset={reset} placeholder="(none)" />
-                    <Field label="Expiration (ms)" value={expiration} onChange={setExpiration} reset={reset} placeholder="60000" />
-                    <Field label="Reply to" value={replyTo} onChange={setReplyTo} reset={reset} placeholder="reply queue" />
-                    <Field label="Message ID" value={messageId} onChange={setMessageId} reset={reset} placeholder="(optional)" />
-                    <Field label="Type" value={type} onChange={setType} reset={reset} placeholder="(optional)" />
-                    <Field label="App ID" value={appId} onChange={setAppId} reset={reset} placeholder="(optional)" />
-                    <Field label="User ID" value={userId} onChange={setUserId} reset={reset} placeholder="must match login" />
-                  </>}
-                </div>
-                <div>
-                  <Label htmlFor="rpc-headers" className="text-xs">Headers (JSON object)</Label>
-                  <Textarea id="rpc-headers" value={headersText} onChange={(e) => { setHeadersText(e.target.value); reset(); }} placeholder={'{"__TypeId__": "com.example.MyRequest"}'} className="mt-1 font-mono text-xs min-h-16" />
+          <CollapsibleSection
+            variant="bordered"
+            title="Message options"
+            hint={mode === 'send' ? '— properties, headers' : '— content type, correlation id, headers'}
+            open={showOptions}
+            onOpenChange={setShowOptions}
+            headerClassName="-mx-3 px-3"
+            bodyClassName="-mx-3 border-t px-3 pb-3 pt-3 space-y-3"
+          >
+            {mode === 'send' && (
+              <label className="flex items-center justify-between">
+                <span className="text-xs font-medium">Persistent (delivery mode 2)</span>
+                <Switch checked={persistent} onCheckedChange={(v) => { setPersistent(v); reset(); }} aria-label="Persistent" />
+              </label>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Content type" value={contentType} onChange={setContentType} reset={reset} placeholder="application/json" />
+              <div>
+                <Label className="text-xs">Correlation ID</Label>
+                <div className="mt-1 flex gap-1">
+                  <Input value={correlationId} onChange={(e) => { setCorrelationId(e.target.value); reset(); }} placeholder="(auto)" className="font-mono text-xs h-8" />
+                  <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Generate" onClick={() => { setCorrelationId(crypto.randomUUID()); reset(); }}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
-            )}
-          </div>
+              {mode === 'send' && <>
+                <Field label="Content encoding" value={contentEncoding} onChange={setContentEncoding} reset={reset} placeholder="utf-8 / gzip" />
+                <Field label="Priority (0–255)" value={priority} onChange={setPriority} reset={reset} placeholder="(none)" />
+                <Field label="Expiration (ms)" value={expiration} onChange={setExpiration} reset={reset} placeholder="60000" />
+                <Field label="Reply to" value={replyTo} onChange={setReplyTo} reset={reset} placeholder="reply queue" />
+                <Field label="Message ID" value={messageId} onChange={setMessageId} reset={reset} placeholder="(optional)" />
+                <Field label="Type" value={type} onChange={setType} reset={reset} placeholder="(optional)" />
+                <Field label="App ID" value={appId} onChange={setAppId} reset={reset} placeholder="(optional)" />
+                <Field label="User ID" value={userId} onChange={setUserId} reset={reset} placeholder="must match login" />
+              </>}
+            </div>
+            <div>
+              <Label htmlFor="rpc-headers" className="text-xs">Headers (JSON object)</Label>
+              <Textarea id="rpc-headers" value={headersText} onChange={(e) => { setHeadersText(e.target.value); reset(); }} placeholder={'{"__TypeId__": "com.example.MyRequest"}'} className="mt-1 font-mono text-xs min-h-16" />
+            </div>
+          </CollapsibleSection>
 
           {/* Action row */}
           <div className="flex items-center gap-3 flex-wrap">
@@ -389,7 +385,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
                 <Button variant="outline" onClick={cancel}><X className="h-4 w-4 mr-1.5" /> Cancel</Button>
               )}
               <Button onClick={send} disabled={sending || !payload}>
-                {sending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
+                {sending ? <Spinner className="mr-1.5" /> : <Send className="h-4 w-4 mr-1.5" />}
                 {sending ? (mode === 'send' ? 'Sending…' : 'Awaiting reply…') : (mode === 'send' ? 'Publish' : 'Send & await reply')}
               </Button>
             </div>
@@ -418,12 +414,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
             </div>
           )}
 
-          {error && (
-            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span className="break-words">{error}</span>
-            </div>
-          )}
+          {error && <Callout tone="error">{error}</Callout>}
 
           {reply && (
             <div className="rounded-lg border bg-card/40 overflow-hidden">

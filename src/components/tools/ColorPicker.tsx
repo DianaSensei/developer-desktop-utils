@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { ColorPicker as ColorField } from '@/components/ui/color-picker';
+import { SectionLabel } from '@/components/ui/section-label';
 import {
   Copy, Check, Pipette, Image as ImageIcon, Download, SlidersHorizontal, HelpCircle, ArrowLeftRight,
 } from 'lucide-react';
@@ -448,7 +450,7 @@ export function ColorPicker() {
               {/* Column headers */}
               <span />
               <div className="flex items-center justify-between gap-1 px-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Selected</span>
+                <SectionLabel>Selected</SectionLabel>
                 <ColorField
                   value={color}
                   onChange={setColor}
@@ -522,7 +524,7 @@ export function ColorPicker() {
             <Button onClick={pickFromScreen} variant="outline" className="w-full gap-2">
               <Pipette className="h-4 w-4" /> Pick from Screen
             </Button>
-            {eyeError && <p className="text-xs text-destructive">{eyeError}</p>}
+            {eyeError && <Callout tone="error" size="sm">{eyeError}</Callout>}
           </div>
         </div>
 

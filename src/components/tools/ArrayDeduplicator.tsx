@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronsDown, ChevronsUp, Loader2, X } from 'lucide-react';
+import { ChevronsDown, ChevronsUp, X } from 'lucide-react';
+import { Stat } from '@/components/ui/stat';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -84,16 +86,8 @@ function LineNumbers({
   );
 }
 
-function Stat({ value, label, color }: { value: number | null; label: string; color?: string }) {
-  return (
-    <div className="flex items-baseline gap-1">
-      <span className={cn('text-base font-bold tabular-nums leading-none', color ?? 'text-foreground')}>
-        {value === null ? '—' : value.toLocaleString()}
-      </span>
-      <span className="text-xs text-muted-foreground">{label}</span>
-    </div>
-  );
-}
+/** Toolbar stat value: thousands-separated, or an em dash before the first run. */
+const count = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString());
 
 const AREA_CLASS =
   'flex-1 min-w-0 h-full resize-none outline-none bg-transparent text-foreground text-sm font-mono px-2.5 pb-2 placeholder:text-muted-foreground/60';
@@ -422,12 +416,12 @@ export function ArrayDeduplicator() {
         />
 
         <div className="ml-auto flex items-center gap-5">
-          {isProcessing && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-          <Stat value={stats?.original ?? null} label="original" />
+          {isProcessing && <Spinner size="sm" className="text-muted-foreground" />}
+          <Stat variant="inline" label="original" value={count(stats?.original)} />
           <div className="w-px h-4 bg-border" />
-          <Stat value={stats?.unique ?? null} label="unique" color="text-green-600 dark:text-green-400" />
+          <Stat variant="inline" tone="success" label="unique" value={count(stats?.unique)} />
           <div className="w-px h-4 bg-border" />
-          <Stat value={stats?.removed ?? null} label="removed" color="text-red-500 dark:text-red-400" />
+          <Stat variant="inline" tone="danger" label="removed" value={count(stats?.removed)} />
         </div>
       </div>
 

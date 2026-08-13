@@ -4,6 +4,7 @@ import {
   ChevronUp, ChevronDown, Upload, FileJson, Ban,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -363,7 +364,7 @@ export function MockServer() {
             spellCheck={false}
             className="h-56 w-full resize-none rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           />
-          {importError && <p className="text-xs text-destructive">{importError}</p>}
+          {importError && <Callout tone="error" size="sm">{importError}</Callout>}
           <DialogFooter>
             <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(false)}>
               Cancel

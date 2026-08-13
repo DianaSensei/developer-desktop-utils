@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Square, Trash2, Plus, ChevronRight, Coffee, Timer as TimerIcon, Search, Download, SlidersHorizontal, Check, Pencil, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { DatePicker } from '@/components/ui/date-picker';
 import { TimePicker } from '@/components/ui/time-picker';
 import { cn } from '@/lib/utils';
@@ -852,8 +853,8 @@ export function TimeTracker() {
                         return t ? <TagChip key={id} name={t.name} /> : null;
                       })}
                       {g.hasSub
-                        ? <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{g.subgroups.length} sub</span>
-                        : <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{g.recs.length}</span>}
+                        ? <Badge pill>{g.subgroups.length} sub</Badge>
+                        : <Badge pill>{g.recs.length}</Badge>}
                       {isRunning && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />}
                     </button>
                   )}
@@ -890,7 +891,7 @@ export function TimeTracker() {
                                 <button onClick={() => toggleExpand(subKey)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                                   <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', subOpen && 'rotate-90')} />
                                   <span className="truncate text-sm">{sg.name}</span>
-                                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{sg.recs.length}</span>
+                                  <Badge pill>{sg.recs.length}</Badge>
                                   {sg.running && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />}
                                 </button>
                                 <span className={cn('shrink-0 font-mono text-xs tabular-nums', sg.running && 'text-red-500')}>{fmtTotal(subTotal)}</span>
@@ -924,7 +925,7 @@ export function TimeTracker() {
                                 <button onClick={() => toggleExpand(subKey)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                                   <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', subOpen && 'rotate-90')} />
                                   <span className="truncate text-sm italic text-muted-foreground">General</span>
-                                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{g.directRecs.length}</span>
+                                  <Badge pill>{g.directRecs.length}</Badge>
                                   {directRunning && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />}
                                 </button>
                                 <span className={cn('shrink-0 font-mono text-xs tabular-nums', directRunning && 'text-red-500')}>{fmtTotal(directTotal)}</span>

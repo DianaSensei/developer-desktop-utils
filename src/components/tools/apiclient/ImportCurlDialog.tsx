@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { Textarea } from '@/components/ui/textarea';
 import { parseCurl } from './curl';
 import type { ApiStore } from './store';
@@ -41,7 +42,7 @@ export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; op
             spellCheck={false}
             autoFocus
           />
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <Callout tone="error" size="sm">{error}</Callout>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
             <Button size="sm" onClick={handleImport} disabled={!text.trim()}>Import</Button>

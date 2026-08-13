@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Server, Info, Plug, Loader2, AlertCircle } from 'lucide-react';
+import { Server, Info, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
+import { Spinner } from '@/components/ui/spinner';
 import { LeftPanel } from './LeftPanel';
 import { TopicListView } from './TopicListView';
 import { GroupListView } from './GroupListView';
@@ -243,14 +245,10 @@ function DisconnectedPanel({ name, connecting, error, onConnect }: {
       </div>
       {name && <p className="text-sm font-medium">{name}</p>}
       <Button onClick={onConnect} disabled={connecting}>
-        {connecting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plug className="h-4 w-4 mr-1.5" />}
+        {connecting ? <Spinner className="mr-1.5" /> : <Plug className="h-4 w-4 mr-1.5" />}
         {connecting ? 'Connecting…' : 'Connect'}
       </Button>
-      {error && (
-        <div className="flex items-start gap-2 max-w-md rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive text-left">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span>
-        </div>
-      )}
+      {error && <Callout tone="error" className="max-w-md text-left">{error}</Callout>}
     </div>
   );
 }

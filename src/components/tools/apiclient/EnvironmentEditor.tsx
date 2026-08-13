@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SectionLabel } from '@/components/ui/section-label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IconButton } from '@/components/ui/icon-button';
@@ -118,7 +119,7 @@ function Section({ title, onAdd, disabled, children }: {
   return (
     <div className="mb-2">
       <div className="flex items-center justify-between px-3 py-1">
-        <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</span>
+        <SectionLabel className="min-w-0 truncate">{title}</SectionLabel>
         <IconButton size="sm" onClick={onAdd} disabled={disabled} title={`New ${title} environment`} className="h-6 w-6">
           <Plus className="h-3.5 w-3.5" />
         </IconButton>

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { X, Info } from 'lucide-react';
+import { Callout } from '@/components/ui/callout';
 import type { BrokerConfig } from './types';
 
 interface BrokerFormProps {
@@ -92,14 +93,11 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
             <p className="text-xs text-muted-foreground mt-1">Kafka broker ports only — not ZooKeeper (2181)</p>
           </div>
 
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
-            <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-            <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-              Connections are <span className="font-medium">plaintext</span>. TLS/SSL and SASL
-              authentication are not yet supported — don't point this at a broker that requires
-              encryption or credentials.
-            </p>
-          </div>
+          <Callout tone="warning" size="sm" icon={Info}>
+            Connections are <span className="font-medium">plaintext</span>. TLS/SSL and SASL
+            authentication are not yet supported — don't point this at a broker that requires
+            encryption or credentials.
+          </Callout>
 
           {error && (
             <p className="text-sm text-destructive">{error}</p>

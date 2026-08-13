@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, RefreshCw, ChevronRight, Server, Radio, Send, ArrowLeft } from 'lucide-react';
+import { AlertCircle, RefreshCw, ChevronRight, Server, Radio, Send, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LoadingRow, Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type TopicDetails } from './types';
 import { PropertiesTab } from './PropertiesTab';
@@ -90,7 +91,7 @@ export function TopicView({
               {data.partitions.length}p · RF {data.replicationFactor}
             </span>
           )}
-          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />}
+          {loading && <Spinner size="sm" className="text-muted-foreground" />}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Produce / Consume open the global panels pre-targeted at this topic. */}
@@ -135,9 +136,7 @@ export function TopicView({
       {/* Tab content */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {loading && !data ? (
-          <div className="flex items-center gap-2 px-4 py-8 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" /> Loading topic details…
-          </div>
+          <LoadingRow label="Loading topic details…" className="px-4 py-8" />
         ) : data ? (
           <>
             {activeTab === 'properties' && (

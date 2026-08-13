@@ -3,9 +3,10 @@ import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
 import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
-  RefreshCw, Download, CheckCircle2, AlertCircle, Loader2, WifiOff, XCircle, ChevronDown,
+  RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -497,7 +498,7 @@ export function Settings() {
               {isTauri && (
                 updateStatus === 'downloading' ? (
                   <span className="flex items-center gap-1.5 text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Spinner size="xs" />
                     Downloading…
                     {downloadProgress != null && (
                       <>
@@ -521,7 +522,7 @@ export function Settings() {
                   </span>
                 ) : updateStatus === 'checking' ? (
                   <span className="flex items-center gap-1 text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Spinner size="xs" />
                     Checking…
                   </span>
                 ) : updateAvailable ? (

@@ -6,14 +6,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchInput } from '@/components/ui/search-input';
+import { Badge, type BadgeTone } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
   ShieldCheck, Check, Plus, Trash2, Eye, EyeOff,
   RefreshCw, KeyRound, ChevronDown, ChevronUp, ArrowRight,
-  Upload, Download, QrCode, FileText, Loader2, ClipboardPaste,
+  Upload, Download, QrCode, FileText, ClipboardPaste,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { base32Decode, parseOtpImport, type ParsedOtp } from '@/lib/otpauth';
@@ -188,9 +190,9 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
 
   const isTotp = account.type === 'totp';
   const accentClass = isTotp ? 'border-l-emerald-500' : 'border-l-indigo-500';
-  const typePillClass = isTotp
-    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20'
-    : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-1 ring-indigo-500/20';
+  // HOTP's indigo has no tone equivalent: it reads as "the other kind", not as a
+  // status, so the accent tone is the closest thing the palette offers.
+  const typeTone: BadgeTone = isTotp ? 'success' : 'accent';
 
   return (
     <div className={cn('border border-l-4 rounded-lg bg-card overflow-hidden flex flex-col', accentClass)}>
@@ -209,9 +211,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
             <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">{account.issuer}</p>
           )}
         </div>
-        <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0', typePillClass)}>
-          {account.type}
-        </span>
+        <Badge tone={typeTone} size="sm" uppercase pill>{account.type}</Badge>
       </div>
 
       {/* ── Code ── */}
@@ -742,7 +742,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
           )}
         >
           {busy ? (
-            <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+            <Spinner size="lg" className="text-muted-foreground" />
           ) : (
             <div className="flex items-center gap-2 text-muted-foreground">
               <QrCode className="h-6 w-6" />

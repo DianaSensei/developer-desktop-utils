@@ -1,24 +1,17 @@
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Callout } from '@/components/ui/callout';
+import { SectionLabel } from '@/components/ui/section-label';
 
 interface RabbitInfoModalProps {
   onClose: () => void;
   onDismissPermanently: () => void;
 }
 
-function Badge({ label, variant }: { label: string; variant: 'read' | 'write' | 'destructive' }) {
-  return (
-    <span className={cn(
-      'inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0',
-      variant === 'read' && 'bg-sky-500/15 text-sky-400',
-      variant === 'write' && 'bg-amber-500/15 text-amber-400',
-      variant === 'destructive' && 'bg-red-500/15 text-red-400',
-    )}>
-      {label}
-    </span>
-  );
-}
+const BADGE_TONE: Record<'read' | 'write' | 'destructive', BadgeTone> = {
+  read: 'info', write: 'warning', destructive: 'danger',
+};
 
 function Row({ action, when, calls, badge, note }: {
   action: string;
@@ -30,7 +23,7 @@ function Row({ action, when, calls, badge, note }: {
   return (
     <div className="py-2.5 border-b border-border/30 last:border-0">
       <div className="flex items-start gap-2.5">
-        <Badge label={badge.label} variant={badge.variant} />
+        <Badge tone={BADGE_TONE[badge.variant]} uppercase>{badge.label}</Badge>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="text-xs font-semibold text-foreground">{action}</span>
@@ -92,16 +85,15 @@ export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoMod
             (AMQP can't enumerate them).
           </p>
 
-          <p className="text-[11px] leading-relaxed mb-4 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
-            <span className="font-semibold">Credential storage.</span>{' '}
+          <Callout tone="warning" size="sm" title="Credential storage" className="mb-4">
             Connection profiles (including the password) are saved on this device in
             <span className="font-mono"> rabbit-connections.json</span> in the app data directory.
             Use TLS (HTTPS) for any non-local broker.
-          </p>
+          </Callout>
 
           <div className="rounded-lg border border-border/50 overflow-hidden mb-4">
             <div className="px-3 py-2 bg-muted/20 border-b border-border/40">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Operations</span>
+              <SectionLabel>Operations</SectionLabel>
             </div>
             <div className="px-3 divide-y divide-border/20">
               <Row action="Test / Overview" when="on connect or Refresh" calls="GET /api/overview, /api/nodes" badge={{ label: 'Read', variant: 'read' }} />

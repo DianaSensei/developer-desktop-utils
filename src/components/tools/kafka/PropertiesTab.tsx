@@ -1,3 +1,4 @@
+import { SectionLabel } from '@/components/ui/section-label';
 import type { TopicDetails } from './types';
 
 interface PropertiesTabProps {
@@ -25,9 +26,7 @@ export function PropertiesTab({ details }: PropertiesTabProps) {
     <div className="p-5 space-y-6 overflow-y-auto h-full">
       {/* General */}
       <section>
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 border-b pb-1">
-          General
-        </h3>
+        <SectionLabel as="h3" size="sm" className="mb-3 border-b pb-1">General</SectionLabel>
         <div className="grid gap-x-8 gap-y-0.5 items-start" style={{ gridTemplateColumns: '11rem 1fr' }}>
           <Row label="Topic Name" value={details.name} />
           <Row label="Partitions" value={String(details.partitions.length)} />
@@ -37,9 +36,7 @@ export function PropertiesTab({ details }: PropertiesTabProps) {
 
       {/* Messages */}
       <section>
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 border-b pb-1">
-          Messages
-        </h3>
+        <SectionLabel as="h3" size="sm" className="mb-3 border-b pb-1">Messages</SectionLabel>
         <div className="grid gap-x-8 gap-y-0.5 items-start" style={{ gridTemplateColumns: '11rem 1fr' }}>
           <span className="text-sm text-muted-foreground py-1.5">Total messages</span>
           <span className="font-mono text-sm py-1.5">{totalMessages.toLocaleString()}</span>
@@ -51,9 +48,7 @@ export function PropertiesTab({ details }: PropertiesTabProps) {
 
       {/* Partitions detail */}
       <section>
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 border-b pb-1">
-          Partition Offsets
-        </h3>
+        <SectionLabel as="h3" size="sm" className="mb-3 border-b pb-1">Partition Offsets</SectionLabel>
         <div className="rounded-lg border border-border overflow-hidden">
           <div className="grid text-xs font-medium text-muted-foreground bg-muted/10 px-3 py-2 border-b border-border"
             style={{ gridTemplateColumns: '3rem 1fr 1fr 1fr' }}>

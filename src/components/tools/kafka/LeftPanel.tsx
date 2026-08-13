@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  Plus, Pencil, Trash2, List, Users, Radio, Send, Square, ChevronRight, ChevronDown, Plug, PlugZap, Loader2,
-} from 'lucide-react';
+  Plus, Pencil, Trash2, List, Users, Radio, Send, Square, ChevronRight, ChevronDown, Plug, PlugZap, } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
@@ -129,7 +129,7 @@ export function LeftPanel({
               </Button>
             ) : (
               <Button size="sm" className="w-full h-7 text-xs" onClick={onConnect} disabled={connecting}>
-                {connecting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5 mr-1.5" />}
+                {connecting ? <Spinner size="sm" className="mr-1.5" /> : <PlugZap className="h-3.5 w-3.5 mr-1.5" />}
                 {connecting ? 'Connecting…' : 'Connect'}
               </Button>
             )}

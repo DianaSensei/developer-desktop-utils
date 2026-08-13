@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateTimePanel } from '@/components/ui/date-time-panel';
 import {
-  RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
+  RotateCcw, ChevronLeft, ChevronRight,
   Calendar, Info, Timer,
 } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -20,6 +20,7 @@ import {
 } from 'date-fns';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { cn } from '@/lib/utils';
 
 // ─── constants ────────────────────────────────────────────────────────────
@@ -306,23 +307,6 @@ function CopyValue({ value, dim = false }: { value: string; dim?: boolean }) {
           iconClassName="h-3 w-3"
         />
       )}
-    </div>
-  );
-}
-
-function Section({ title, icon, open, onToggle, children }: {
-  title: string; icon?: React.ReactNode; open: boolean; onToggle: () => void; children: React.ReactNode;
-}) {
-  return (
-    <div className="border border-border rounded-lg px-3">
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center justify-between py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <span className="flex items-center gap-1.5">{icon}{title}</span>
-        {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-      </button>
-      {open && <div className="pb-2">{children}</div>}
     </div>
   );
 }
@@ -633,7 +617,7 @@ export function DateTimeTool() {
         </div>
 
         {/* ── Formats ── */}
-        <Section title="Formats" open={showFormats} onToggle={() => setShowFormats(!showFormats)}>
+        <CollapsibleSection variant="bordered" eyebrow title="Formats" open={showFormats} onOpenChange={setShowFormats}>
           <div className="grid grid-cols-2 gap-x-4">
             {FORMAT_ROWS.map((row) => {
               const showDual = row.tzSensitive && tzsDiffer;
@@ -699,10 +683,10 @@ export function DateTimeTool() {
               );
             })()}
           </div>
-        </Section>
+        </CollapsibleSection>
 
         {/* ── Boundaries ── */}
-        <Section title="Boundaries" open={showBoundaries} onToggle={() => setShowBoundaries(!showBoundaries)}>
+        <CollapsibleSection variant="bordered" eyebrow title="Boundaries" open={showBoundaries} onOpenChange={setShowBoundaries}>
           <div className="pt-1">
             <div className="grid grid-cols-[4rem_1fr_1fr] gap-2 pb-1">
               <span />
@@ -747,10 +731,10 @@ export function DateTimeTool() {
               );
             })}
           </div>
-        </Section>
+        </CollapsibleSection>
 
         {/* ── Time Diff ── */}
-        <Section title="Time Difference" icon={<Timer className="h-3.5 w-3.5" />} open={showDiff} onToggle={() => setShowDiff(!showDiff)}>
+        <CollapsibleSection variant="bordered" eyebrow title="Time Difference" icon={<Timer className="h-3.5 w-3.5" />} open={showDiff} onOpenChange={setShowDiff}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               {([['From', diffA, setDiffA], ['To', diffB, setDiffB]] as const).map(([lbl, val, set]) => (
@@ -814,7 +798,7 @@ export function DateTimeTool() {
               <p className="text-xs text-muted-foreground">Enter two dates above to calculate the difference.</p>
             )}
           </div>
-        </Section>
+        </CollapsibleSection>
 
       </div>
     </div>

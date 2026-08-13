@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import {
-  Loader2, RefreshCw, AlertCircle, Send, Headphones, Inbox,
-} from 'lucide-react';
+import { RefreshCw, Send, Headphones, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { ViewHeader } from '@/components/ui/view-header';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
+import { Stat } from '@/components/ui/stat';
+import { Field } from '@/components/ui/tool-section';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RabbitConnection, QueueInfo, BindingInfo, QueueAmqpInfo } from './types';
 import { rabbitApi } from './types';
@@ -92,8 +94,8 @@ export function QueueView({ conn, queueName, refreshKey, onRefresh, onBack, onPu
 
 function MgmtOverviewTab({ conn, queueName, refreshKey }: { conn: RabbitConnection; queueName: string; refreshKey: number }) {
   const { data: q, loading, error } = useRabbitData<QueueInfo>(() => rabbitMgmt.queue(conn, queueName), [conn.id, queueName, refreshKey]);
-  if (loading) return <Loading />;
-  if (error) return <ErrorBox message={error} />;
+  if (loading) return <LoadingRow />;
+  if (error) return <Callout tone="error">{error}</Callout>;
   if (!q) return null;
 
   const s = q.message_stats;
@@ -124,8 +126,8 @@ function MgmtOverviewTab({ conn, queueName, refreshKey }: { conn: RabbitConnecti
 /** AMQP-only overview: a passive declare gives existence + ready/consumer counts only. */
 function AmqpOverviewTab({ conn, queueName, refreshKey }: { conn: RabbitConnection; queueName: string; refreshKey: number }) {
   const { data, loading, error } = useRabbitData<QueueAmqpInfo[]>(() => rabbitApi.amqpQueuesInfo(conn.id, [queueName]), [conn.id, queueName, refreshKey]);
-  if (loading) return <Loading />;
-  if (error) return <ErrorBox message={error} />;
+  if (loading) return <LoadingRow />;
+  if (error) return <Callout tone="error">{error}</Callout>;
   const i = data?.[0];
   if (!i) return null;
 
@@ -133,8 +135,8 @@ function AmqpOverviewTab({ conn, queueName, refreshKey }: { conn: RabbitConnecti
     return (
       <div className="space-y-3">
         {i.error
-          ? <ErrorBox message={i.error} />
-          : <p className="text-sm text-amber-600 dark:text-amber-400">Queue <span className="font-mono">{queueName}</span> does not exist on the broker.</p>}
+          ? <Callout tone="error">{i.error}</Callout>
+          : <Callout tone="warning">Queue <span className="font-mono">{queueName}</span> does not exist on the broker.</Callout>}
         <p className="text-[11px] text-muted-foreground">Use New queue to declare it, or Publish/Consume to work with it once it exists.</p>
       </div>
     );
@@ -185,28 +187,26 @@ function MgmtBindingsTab({ conn, queueName, refreshKey }: { conn: RabbitConnecti
         sourcePlaceholder="my.exchange"
         onBind={async (source, key) => { await rabbitMgmt.createBinding(conn, source, 'q', queueName, key); b.reload(); }}
       />
-      {b.loading ? <Loading />
-        : b.error ? <ErrorBox message={b.error} />
+      {b.loading ? <LoadingRow />
+        : b.error ? <Callout tone="error">{b.error}</Callout>
         : !b.data || b.data.length === 0 ? <p className="text-sm text-muted-foreground">No bindings.</p>
         : (
-          <div className="overflow-x-auto rounded-xl border border-border/50">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/20 border-b border-border/50">
-                <tr>
-                  <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Source exchange</th>
-                  <th className="px-3.5 py-2 text-left font-medium text-muted-foreground">Routing key</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {b.data.map((x, i) => (
-                  <tr key={i} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-3.5 py-2.5 font-mono">{x.source || '(default)'}</td>
-                    <td className="px-3.5 py-2.5 font-mono">{x.routing_key || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable>
+            <Thead>
+              <Tr>
+                <Th>Source exchange</Th>
+                <Th>Routing key</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {b.data.map((x, i) => (
+                <Tr key={i} className="hover:bg-muted/40">
+                  <Td mono>{x.source || '(default)'}</Td>
+                  <Td mono>{x.routing_key || '—'}</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </DataTable>
         )}
     </div>
   );
@@ -240,45 +240,16 @@ export function NewBindingForm({ sourceLabel, sourcePlaceholder, onBind }: {
   return (
     <div className="rounded-lg border p-3 space-y-2">
       <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <Label className="text-xs">{sourceLabel}</Label>
-          <Input value={source} onChange={(e) => { setSource(e.target.value); setError(null); }} placeholder={sourcePlaceholder} className="mt-1 font-mono text-xs h-8" />
-        </div>
-        <div className="flex-1">
-          <Label className="text-xs">Routing key</Label>
-          <Input value={routingKey} onChange={(e) => setRoutingKey(e.target.value)} placeholder="(optional)" className="mt-1 font-mono text-xs h-8" />
-        </div>
+        <Field label={sourceLabel} className="flex-1">
+          <Input value={source} onChange={(e) => { setSource(e.target.value); setError(null); }} placeholder={sourcePlaceholder} className="font-mono text-xs h-8" />
+        </Field>
+        <Field label="Routing key" className="flex-1">
+          <Input value={routingKey} onChange={(e) => setRoutingKey(e.target.value)} placeholder="(optional)" className="font-mono text-xs h-8" />
+        </Field>
         <Button size="sm" onClick={bind} disabled={busy}>{busy ? 'Binding…' : 'Bind'}</Button>
       </div>
-      {error && <p className="text-xs text-destructive break-words">{error}</p>}
+      {error && <Callout tone="error" size="sm">{error}</Callout>}
     </div>
   );
 }
 
-// ── Shared bits ───────────────────────────────────────────────────────────────
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border bg-card/40 px-4 py-3">
-      <div className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</div>
-      <div className="text-xl font-semibold tabular-nums mt-1">{value}</div>
-    </div>
-  );
-}
-
-function Loading() {
-  return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-      <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-    </div>
-  );
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
-      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-      <span className="break-words">{message}</span>
-    </div>
-  );
-}

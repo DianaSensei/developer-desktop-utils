@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Send, Loader2, AlertCircle, Check, RefreshCw } from 'lucide-react';
+import { Send, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -78,12 +80,8 @@ export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: Produc
           <div>
             <Label className="text-xs">Topic</Label>
             <TopicCombobox brokerId={brokerId} value={topic} topics={topics} onChange={setTopic} />
-            {loading && <p className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> Loading partitions…</p>}
-            {error && (
-              <div className="mt-2 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span>
-              </div>
-            )}
+            {loading && <LoadingRow label="Loading partitions…" size="sm" className="mt-1" />}
+            {error && <Callout tone="error" size="sm" className="mt-2">{error}</Callout>}
           </div>
 
           {details

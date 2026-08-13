@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Layers } from 'lucide-react';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -496,28 +497,26 @@ export function RegexTester() {
                     </p>
                   </div>
                   {/* Flat match list as a simple table when no groups */}
-                  <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-xs font-mono border-collapse">
-                      <thead>
-                        <tr className="border-b border-border bg-muted/30">
-                          <th className="text-left px-3 py-2 text-muted-foreground font-medium whitespace-nowrap">#</th>
-                          <th className="text-left px-3 py-2 text-muted-foreground font-medium whitespace-nowrap">Pos</th>
-                          <th className="text-left px-3 py-2 text-muted-foreground font-medium whitespace-nowrap">Len</th>
-                          <th className="text-left px-3 py-2 text-muted-foreground font-medium whitespace-nowrap">Match</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.matches.map((m, idx) => (
-                          <tr key={idx} className={cn('border-b border-border/50', idx % 2 === 0 && 'bg-muted/10')}>
-                            <td className="px-3 py-1.5 text-muted-foreground">{idx + 1}</td>
-                            <td className="px-3 py-1.5 text-muted-foreground">{m.index}</td>
-                            <td className="px-3 py-1.5 text-muted-foreground">{m[0].length}</td>
-                            <td className="px-3 py-1.5 text-foreground max-w-[300px] truncate" title={m[0]}>{m[0]}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable density="compact" className="font-mono">
+                    <Thead>
+                      <Tr>
+                        <Th className="whitespace-nowrap">#</Th>
+                        <Th className="whitespace-nowrap">Pos</Th>
+                        <Th className="whitespace-nowrap">Len</Th>
+                        <Th className="whitespace-nowrap">Match</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody zebra>
+                      {result.matches.map((m, idx) => (
+                        <Tr key={idx}>
+                          <Td className="text-muted-foreground">{idx + 1}</Td>
+                          <Td className="text-muted-foreground">{m.index}</Td>
+                          <Td className="text-muted-foreground">{m[0].length}</Td>
+                          <Td className="max-w-[300px] truncate" title={m[0]}>{m[0]}</Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </DataTable>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -538,36 +537,34 @@ export function RegexTester() {
                       iconClassName="h-2.5 w-2.5"
                     />
                   </div>
-                  <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-xs font-mono border-collapse">
-                      <thead>
-                        <tr className="border-b border-border bg-muted/30">
-                          <th className="text-left px-3 py-2 text-muted-foreground font-medium whitespace-nowrap">#</th>
-                          <th className="text-left px-3 py-2 text-muted-foreground font-medium whitespace-nowrap">Pos</th>
-                          <th className="text-left px-3 py-2 text-muted-foreground font-medium whitespace-nowrap">Match</th>
-                          {result.matches[0].slice(1).map((_, gIdx) => (
-                            <th key={gIdx} className="text-left px-3 py-2 text-muted-foreground font-medium whitespace-nowrap">
-                              {groupNames[gIdx] ? `<${groupNames[gIdx]}>` : `Group ${gIdx + 1}`}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.matches.map((m, idx) => (
-                          <tr key={idx} className={cn('border-b border-border/50', idx % 2 === 0 && 'bg-muted/10')}>
-                            <td className="px-3 py-1.5 text-muted-foreground">{idx + 1}</td>
-                            <td className="px-3 py-1.5 text-muted-foreground">{m.index}</td>
-                            <td className="px-3 py-1.5 text-foreground max-w-[180px] truncate" title={m[0]}>{m[0]}</td>
-                            {m.slice(1).map((g, gIdx) => (
-                              <td key={gIdx} className="px-3 py-1.5 text-foreground max-w-[160px] truncate" title={g ?? ''}>
-                                {g !== undefined ? g : <span className="text-muted-foreground/40">—</span>}
-                              </td>
-                            ))}
-                          </tr>
+                  <DataTable density="compact" className="font-mono">
+                    <Thead>
+                      <Tr>
+                        <Th className="whitespace-nowrap">#</Th>
+                        <Th className="whitespace-nowrap">Pos</Th>
+                        <Th className="whitespace-nowrap">Match</Th>
+                        {result.matches[0].slice(1).map((_, gIdx) => (
+                          <Th key={gIdx} className="whitespace-nowrap">
+                            {groupNames[gIdx] ? `<${groupNames[gIdx]}>` : `Group ${gIdx + 1}`}
+                          </Th>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      </Tr>
+                    </Thead>
+                    <Tbody zebra>
+                      {result.matches.map((m, idx) => (
+                        <Tr key={idx}>
+                          <Td className="text-muted-foreground">{idx + 1}</Td>
+                          <Td className="text-muted-foreground">{m.index}</Td>
+                          <Td className="max-w-[180px] truncate" title={m[0]}>{m[0]}</Td>
+                          {m.slice(1).map((g, gIdx) => (
+                            <Td key={gIdx} className="max-w-[160px] truncate" title={g ?? ''}>
+                              {g !== undefined ? g : <span className="text-muted-foreground/40">—</span>}
+                            </Td>
+                          ))}
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </DataTable>
                 </div>
               )
             )}

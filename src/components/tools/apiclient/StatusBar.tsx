@@ -2,6 +2,7 @@
 // Keeps chrome minimal; only includes actions the user can actually trigger.
 
 import { Cookie, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export function StatusBar({ onSearch, onCookies, cookieCount }: {
   onSearch: () => void;
@@ -27,9 +28,7 @@ export function StatusBar({ onSearch, onCookies, cookieCount }: {
         >
           <Cookie className="h-3 w-3" /> Cookies
           {cookieCount > 0 && (
-            <span className="ml-0.5 rounded-full bg-amber-400/20 px-1.5 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
-              {cookieCount}
-            </span>
+            <Badge tone="warning" pill className="ml-0.5">{cookieCount}</Badge>
           )}
         </button>
       </div>

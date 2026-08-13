@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Headphones, Play, Pause, Square, Loader2, AlertCircle, ChevronDown, ChevronRight, Check, RefreshCw, Trash, ArrowLeft,
+  Headphones, Play, Pause, Square, ChevronDown, ChevronRight, Check, RefreshCw, Trash, ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,10 @@ import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
 import { StatusDot } from '@/components/ui/status-dot';
 import { SearchInput } from '@/components/ui/search-input';
+import { Badge } from '@/components/ui/badge';
+import { Callout } from '@/components/ui/callout';
+import { Spinner } from '@/components/ui/spinner';
+import { SectionLabel } from '@/components/ui/section-label';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection, QueueInfo, ConsumeAckMode } from './types';
 import { rabbitApi } from './types';
@@ -87,7 +91,7 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill, detailQueu
           <StartConsumerForm conn={conn} queues={queues.data ?? []} sessions={sessions} prefill={prefill} onStarted={onOpenConsumer} />
 
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Active consumers</h3>
+            <SectionLabel as="h3" size="sm" className="mb-2">Active consumers</SectionLabel>
             {sessions.length === 0
               ? <p className="text-sm text-muted-foreground">No consumers running. Start one above.</p>
               : (
@@ -114,9 +118,9 @@ function ConsumerListRow({ session: s, onOpen }: { session: ConsumerSession; onO
     >
       <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
       <span className="font-mono text-sm truncate">{s.queue}</span>
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide shrink-0">{MODE_LABEL[s.mode]}</span>
+      <Badge uppercase>{MODE_LABEL[s.mode]}</Badge>
       {s.paused && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 uppercase tracking-wide shrink-0">paused</span>
+        <Badge tone="warning" uppercase>paused</Badge>
       )}
       <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
         {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
@@ -230,8 +234,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
       </div>
 
       {existingConsumers > 0 && !alreadyRunning && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
-          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+        <Callout tone="warning" size="sm">
           <span className="break-words">
             This queue already has {existingConsumers} consumer{existingConsumers > 1 ? 's' : ''}. RabbitMQ delivers each
             message to only one consumer, so this one will take a share of them.
@@ -241,7 +244,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
                 ? ' In consume mode the messages it receives are acked (removed) and will not reach the others.'
                 : ' Requests it handles will be answered by this tool instead of the existing consumers.'}
           </span>
-        </div>
+        </Callout>
       )}
 
       {mode === 'respond' && (
@@ -268,16 +271,12 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
 
       <div className="flex items-center gap-3">
         <Button size="sm" onClick={requestStart} disabled={busy || !queue.trim() || alreadyRunning}>
-          {busy ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Play className="h-3.5 w-3.5 mr-1.5" />}
+          {busy ? <Spinner size="sm" className="mr-1.5" /> : <Play className="h-3.5 w-3.5 mr-1.5" />}
           Start consumer
         </Button>
         {alreadyRunning && <span className="text-[11px] text-amber-600 dark:text-amber-400">Already consuming this queue</span>}
       </div>
-      {error && (
-        <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span className="break-words">{error}</span>
-        </div>
-      )}
+      {error && <Callout tone="error" size="sm">{error}</Callout>}
 
       <ConfirmDialog
         open={confirmOpen}
