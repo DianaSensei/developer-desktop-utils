@@ -109,6 +109,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <GuideSection icon={FolderTree} title="Organize, import & export">
         <p>Group requests into collections and folders in the left sidebar; open several in tabs — each remembers the tab you were working in. History records every send you make by hand.</p>
         <p>Import a <strong className="text-foreground">Postman v2.1</strong> collection or a <strong className="text-foreground">cURL</strong> command; export the collection or generate a code snippet with the <Tok>{'</>'}</Tok> button.</p>
+        <p>If an imported collection carries <strong className="text-foreground">scripts</strong>, they’d run the next time you press Send — so the import pauses and shows you each one and its source. Choose <strong className="text-foreground">Import without scripts</strong> to keep the requests and drop the executable parts, or import them as-is if you trust the source.</p>
       </GuideSection>
       <GuideSection icon={Keyboard} title="Shortcuts">
         <p><Key>{mod}</Key>+<Key>↵</Key> send · <Key>{mod}</Key>+<Key>B</Key> new request · <Key>{mod}</Key>+<Key>E</Key> environments · <Key>{mod}</Key>+<Key>W</Key> close tab</p>
@@ -415,6 +416,6 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 // version 1 (their guide's initial version).
 export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   settings: 1,
-  // 4 — data-file column mapping and the fuller run statistics.
-  'api-client': 4,
+  // 5 — script review when importing a collection.
+  'api-client': 5,
 };

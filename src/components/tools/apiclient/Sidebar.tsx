@@ -27,6 +27,8 @@ import { Input } from '@/components/ui/input';
 import type { ApiStore } from './store';
 import { type ApiRequest, type Auth, type Collection, type Folder, type RequestScript, type TreeItem, newAuth, normalizeRequest } from './types';
 import { importPostman, exportPostman } from './postman';
+import { type ScriptFinding, findScripts, stripScripts } from './collectionScripts';
+import { ImportReviewDialog } from './ImportReviewDialog';
 import { pickJsonFile, saveJsonFile } from './fileio';
 import { methodBadgeStyle } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
@@ -98,6 +100,8 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   const [settings, setSettings] = useState<NodeSettingsTarget | null>(null);
   const [headerMenu, setHeaderMenu] = useState(false);
   const [curlOpen, setCurlOpen] = useState(false);
+  // Set while the user decides what to do about an import that carries scripts.
+  const [pendingImport, setPendingImport] = useState<{ collection: Collection; findings: ScriptFinding[] } | null>(null);
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null);
@@ -117,13 +121,22 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     setDropTarget(null);
   }, [dragId, dropTarget]);
 
+  // Importing a collection that carries scripts is a decision to run someone
+  // else's code on the next Send, so it goes through a review step instead of
+  // landing silently. Script-free collections import as before.
   const handleImport = async () => {
     setError(null);
     setHeaderMenu(false);
     try {
       const text = await pickJsonFile();
       if (!text) return;
-      store.importCollection(importPostman(text));
+      const collection = importPostman(text);
+      const findings = findScripts(collection);
+      if (findings.length === 0) {
+        store.importCollection(collection);
+        return;
+      }
+      setPendingImport({ collection, findings });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -209,6 +222,16 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       )}
       {ctx && <ContextMenu x={ctx.x} y={ctx.y} entries={ctx.entries} onClose={() => setCtx(null)} />}
       <ImportCurlDialog store={store} open={curlOpen} onClose={() => setCurlOpen(false)} />
+      {pendingImport && (
+        <ImportReviewDialog
+          open
+          collectionName={pendingImport.collection.name}
+          findings={pendingImport.findings}
+          onImportWithScripts={() => { store.importCollection(pendingImport.collection); setPendingImport(null); }}
+          onImportWithoutScripts={() => { store.importCollection(stripScripts(pendingImport.collection)); setPendingImport(null); }}
+          onCancel={() => setPendingImport(null)}
+        />
+      )}
     </div>
   );
 }
