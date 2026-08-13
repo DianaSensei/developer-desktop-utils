@@ -11,7 +11,7 @@ import { ToolToolbar } from '@/components/ui/tool-layout';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
-import { SplitPane } from '../apiclient/SplitPane';
+import { SplitPane } from '@/components/ui/split-pane';
 import { methodBadgeStyle } from '../apiclient/method-color';
 import type { HttpMethod } from '../apiclient/types';
 import { StubEditor } from './StubEditor';

@@ -26,9 +26,12 @@ export interface TabsProps {
   onSelect: (id: string) => void;
   right?: ReactNode;
   className?: string;
+  /** Active-tab underline + text color. Default 'border-primary text-foreground'
+   *  — override when a tool has an established alternate accent. */
+  activeClassName?: string;
 }
 
-export function Tabs({ tabs, active, onSelect, right, className }: TabsProps) {
+export function Tabs({ tabs, active, onSelect, right, className, activeClassName }: TabsProps) {
   const headerRef = useRef<HTMLDivElement>(null);
   const headerWRef = useRef(0);
   const [headerW, setHeaderW] = useState(0);
@@ -144,7 +147,7 @@ export function Tabs({ tabs, active, onSelect, right, className }: TabsProps) {
 
       <div className="flex min-w-0 items-center gap-4 overflow-hidden">
         {inlineTabs.map((t) => (
-          <TabBtn key={t.id} def={t} active={t.id === active} onClick={() => onSelect(t.id)} />
+          <TabBtn key={t.id} def={t} active={t.id === active} activeClassName={activeClassName} onClick={() => onSelect(t.id)} />
         ))}
       </div>
       {overflowTabs.length > 0 && <TabOverflow tabs={overflowTabs} onSelect={onSelect} />}
@@ -157,14 +160,16 @@ export function Tabs({ tabs, active, onSelect, right, className }: TabsProps) {
   );
 }
 
-function TabBtn({ def, active, onClick }: { def: TabDef; active: boolean; onClick: () => void }) {
+function TabBtn({ def, active, activeClassName, onClick }: {
+  def: TabDef; active: boolean; activeClassName?: string; onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
       className={cn(
         'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-medium transition-colors',
         active
-          ? 'border-primary text-foreground'
+          ? (activeClassName ?? 'border-primary text-foreground')
           : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
       )}
     >

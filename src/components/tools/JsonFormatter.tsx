@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { SplitPane } from '@/components/tools/apiclient/SplitPane';
+import { SplitPane } from '@/components/ui/split-pane';
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type Mode = 'beautify' | 'string' | 'minify';

@@ -7,6 +7,8 @@ import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { IconButton } from '@/components/ui/icon-button';
+import { StatusDot } from '@/components/ui/status-dot';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { KeyValueEditor } from './KeyValueEditor';
 import type { ApiStore } from './store';
@@ -117,14 +119,9 @@ function Section({ title, onAdd, disabled, children }: {
     <div className="mb-2">
       <div className="flex items-center justify-between px-3 py-1">
         <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</span>
-        <button
-          onClick={onAdd}
-          disabled={disabled}
-          title={`New ${title} environment`}
-          className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
-        >
+        <IconButton size="sm" onClick={onAdd} disabled={disabled} title={`New ${title} environment`} className="h-6 w-6">
           <Plus className="h-3.5 w-3.5" />
-        </button>
+        </IconButton>
       </div>
       {children}
     </div>
@@ -142,7 +139,7 @@ function EnvRow({ env, active, selected, onClick }: {
         selected && 'bg-accent',
       )}
     >
-      {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />}
+      {active && <StatusDot tone="live" size="xs" />}
       <span className="truncate">{env.name}</span>
     </button>
   );

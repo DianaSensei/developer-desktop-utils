@@ -4,6 +4,7 @@
 import { Code2, Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { methodBg, methodColor } from './method-color';
 import { VarInput } from './VarInput';
@@ -91,13 +92,9 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         </div>
 
         {/* Code generator */}
-        <button
-          onClick={onGenerateCode}
-          title="Generate Code"
-          className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
+        <IconButton onClick={onGenerateCode} title="Generate Code">
           <Code2 className="h-4 w-4" />
-        </button>
+        </IconButton>
 
         {/* Send / Cancel */}
         {sending ? (

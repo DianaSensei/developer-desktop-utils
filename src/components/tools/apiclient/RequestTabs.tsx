@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { IconButton } from '@/components/ui/icon-button';
 import { methodColor } from './method-color';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
@@ -45,8 +46,6 @@ export function RequestTabs({
   const collection = activeCollection(store);
   const globalEnvs = store.environments.filter((e) => !e.collectionId);
   const collectionEnvs = store.environments.filter((e) => e.collectionId === store.activeCollectionId);
-
-  const iconBtn = 'flex shrink-0 items-center px-2.5 transition-colors hover:bg-background hover:text-foreground';
 
   return (
     <div className="flex items-stretch border-b border-border bg-muted/10">
@@ -89,9 +88,9 @@ export function RequestTabs({
             </button>
           </div>
         )}
-        <button onClick={onNewRequest} title="New request" className={cn(iconBtn, 'text-muted-foreground')}>
+        <IconButton onClick={onNewRequest} title="New request" className="rounded-none hover:bg-background">
           <Plus className="h-4 w-4" />
-        </button>
+        </IconButton>
       </div>
 
       {/* right cluster: environment · history · layout */}
@@ -117,27 +116,27 @@ export function RequestTabs({
             )}
           </SelectContent>
         </Select>
-        <button onClick={onManageEnvironments} title="Configure environments" className="rounded p-1.5 transition-colors hover:bg-background hover:text-foreground">
+        <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-background">
           <Settings2 className="h-4 w-4" />
-        </button>
-        <button onClick={onManageVault} title="Vault (local secrets)" className="rounded p-1.5 transition-colors hover:bg-background hover:text-foreground">
+        </IconButton>
+        <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-background">
           <KeyRound className="h-4 w-4" />
-        </button>
+        </IconButton>
         <span className="mx-0.5 h-5 w-px bg-border" />
-        <button
+        <IconButton
           onClick={onOpenHistory}
           title="History"
-          className={cn('rounded p-1.5 transition-colors hover:bg-background hover:text-foreground', historyActive && 'text-amber-500')}
+          className={cn('hover:bg-background', historyActive && 'text-amber-500')}
         >
           <Clock className="h-4 w-4" />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           onClick={onToggleDirection}
           title={direction === 'horizontal' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
-          className="rounded-lg p-1.5 transition-colors hover:bg-background hover:text-foreground"
+          className="hover:bg-background"
         >
           {direction === 'horizontal' ? <Rows2 className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}
-        </button>
+        </IconButton>
       </div>
     </div>
   );
