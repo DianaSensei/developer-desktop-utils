@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { VarInput } from './VarInput';
+import { InlineCodeField } from '@/design-system';
 import { clearOAuthTokenCache } from './request';
 import type { ApiKeyAuth, Auth, AuthType, OAuth2Auth, VarMap } from './types';
 
@@ -27,7 +27,7 @@ const AUTH_TYPES: { id: AuthType; label: string }[] = [
 // Declared at module scope on purpose: when this lived inside AuthEditor a fresh
 // function identity was created on every render, so React unmounted and remounted
 // the subtree on each keystroke — tearing down and rebuilding the CodeMirror
-// instance inside VarInput and dropping the caret after every character typed.
+// instance inside InlineCodeField and dropping the caret after every character typed.
 function AuthField({ label, value, onValue, placeholder, vars }: {
   label: string; value: string; onValue: (v: string) => void; placeholder?: string; vars?: VarMap;
 }) {
@@ -36,7 +36,7 @@ function AuthField({ label, value, onValue, placeholder, vars }: {
       <Label className="text-xs">{label}</Label>
       {vars ? (
         <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40">
-          <VarInput value={value} onChange={onValue} vars={vars} placeholder={placeholder} />
+          <InlineCodeField value={value} onChange={onValue} vars={vars} placeholder={placeholder} />
         </div>
       ) : (
         <Input className="h-8 font-mono text-xs" spellCheck={false} value={value} onChange={(e) => onValue(e.target.value)} placeholder={placeholder} />

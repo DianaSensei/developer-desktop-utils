@@ -8,7 +8,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { kafkaApi, type PartitionInfo, type BatchRecord } from './types';
-import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
+import { JsonEditor, TextEditor } from '@/design-system';
 import { produceDraft, type ProduceHeader as Header } from './produceDraft';
 import { kafkaInputHistory } from './kafkaInputHistoryStore';
 
@@ -318,15 +318,21 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
               An array of strings or <span className="font-mono">{'{ value, key?, headers? }'}</span> objects — produced to one partition.
             </p>
           )}
-          {/* key on format so CodeMirror swaps grammar cleanly (language is fixed at mount). */}
-          <CodeEditor
-            key={valueFormat}
-            value={value}
-            onChange={setValue}
-            language={valueFormat === 'json' ? 'json' : 'text'}
-            placeholder={batch ? '[\n  "first message",\n  { "key": "k2", "value": "second" }\n]' : '{"key": "value"}'}
-            className="min-h-40"
-          />
+          {valueFormat === 'json' ? (
+            <JsonEditor
+              value={value}
+              onChange={setValue}
+              placeholder={batch ? '[\n  "first message",\n  { "key": "k2", "value": "second" }\n]' : '{"key": "value"}'}
+              className="min-h-40"
+            />
+          ) : (
+            <TextEditor
+              value={value}
+              onChange={setValue}
+              placeholder={batch ? '[\n  "first message",\n  { "key": "k2", "value": "second" }\n]' : '{"key": "value"}'}
+              className="min-h-40"
+            />
+          )}
         </div>
 
         {/* Send + status */}

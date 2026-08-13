@@ -9,7 +9,7 @@ import { ArrowLeftRight, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
+import { CodeViewer, JsonEditor, TextEditor } from '@/design-system';
 import { saveTextFile } from '@/components/tools/apiclient/fileio';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
@@ -159,8 +159,8 @@ export function DataConverter() {
     void saveTextFile(`converted.${ext}`, output);
   };
 
-  const langFor = (fmt: Format) => (fmt === 'json' ? 'json' : 'text');
   const showXmlOpts = to === 'xml';
+  const SourceEditor = from === 'json' ? JsonEditor : TextEditor;
 
   return (
     <div className="flex flex-col h-full">
@@ -231,11 +231,9 @@ export function DataConverter() {
             <span>Source · {FORMATS.find((f) => f.value === from)?.label}</span>
           </div>
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
-            <CodeEditor
-              key={`src-${from}`}
+            <SourceEditor
               value={input}
               onChange={setInput}
-              language={langFor(from)}
               placeholder={PLACEHOLDERS[from]}
             />
           </div>
@@ -266,12 +264,9 @@ export function DataConverter() {
                 <span className="break-words font-mono leading-relaxed">{error}</span>
               </div>
             ) : (
-              <CodeEditor
-                key={`out-${to}`}
+              <CodeViewer
                 value={output}
-                onChange={() => {}}
-                readOnly
-                language={langFor(to)}
+                language={to === 'json' ? 'json' : 'text'}
                 placeholder="Converted output appears here…"
               />
             )}

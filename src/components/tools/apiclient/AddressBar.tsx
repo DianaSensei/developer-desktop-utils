@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { methodBg, methodColor } from './method-color';
-import { VarInput } from './VarInput';
+import { InlineCodeField } from '@/design-system';
 import { paramsFromUrl } from './request';
 import { parseCurl } from './curl';
 import { type ApiRequest, HTTP_METHODS } from './types';
@@ -28,7 +28,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
   //
   // Pasting a whole `curl ...` command is also handled here: the editor is
   // single-line, so a multi-line command arrives with its `\<newline>`
-  // continuations already flattened to spaces by VarInput — restore the space
+  // continuations already flattened to spaces by InlineCodeField — restore the space
   // curl.ts itself would have produced before handing it to the parser.
   const handleUrl = (url: string) => {
     if (url === request.url) return;
@@ -82,7 +82,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         <span className="h-5 w-px shrink-0 bg-border" />
 
         <div className="flex h-9 min-w-0 flex-1 items-center px-3">
-          <VarInput
+          <InlineCodeField
             value={request.url}
             onChange={handleUrl}
             vars={vars}

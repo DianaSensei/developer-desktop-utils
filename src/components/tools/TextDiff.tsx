@@ -3,7 +3,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PaneHeader } from '@/components/ui/tool-layout';
 import { Segmented } from '@/components/ui/segmented';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
-import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
+import { JsonEditor } from '@/design-system';
 import * as Diff from 'diff';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
@@ -156,9 +156,8 @@ export function TextDiff() {
           <PaneHeader label="Original" />
           {mode === 'json' ? (
             <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
-              <CodeEditor
+              <JsonEditor
                 key="json-1"
-                language="json"
                 value={text1}
                 onChange={setText1}
                 onBlur={(v) => setText1(fmtJson(v))}
@@ -179,9 +178,8 @@ export function TextDiff() {
           <PaneHeader label="Modified" />
           {mode === 'json' ? (
             <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
-              <CodeEditor
+              <JsonEditor
                 key="json-2"
-                language="json"
                 value={text2}
                 onChange={setText2}
                 onBlur={(v) => setText2(fmtJson(v))}

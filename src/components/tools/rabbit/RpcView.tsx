@@ -10,11 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
-// Read-only CodeMirror viewer (line numbers, folding, JSON/plain highlighting) —
-// reused so the reply renders like a code editor.
-import { ResponseViewer } from '@/components/tools/apiclient/ResponseViewer';
-// Editable CodeMirror editor for the request payload (same highlighting).
-import { CodeEditor } from '@/components/tools/apiclient/CodeEditor';
+// Read-only viewer for the reply, editable JSON/plain surface for the request
+// payload — the design system's shared code editors.
+import { CodeViewer, JsonEditor, TextEditor } from '@/design-system';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection, RpcReply, PublishOutcome, MessageProperties, ExchangeInfo, QueueInfo, BindingInfo } from './types';
@@ -295,15 +293,21 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
                 />
               </div>
             </div>
-            {/* key on format so CodeMirror swaps grammar cleanly (language is fixed at mount). */}
-            <CodeEditor
-              key={payloadFormat}
-              value={payload}
-              onChange={(v) => { setPayload(v); reset(); }}
-              language={payloadFormat === 'json' ? 'json' : 'text'}
-              placeholder={'{"hello": "world"}'}
-              className="min-h-40"
-            />
+            {payloadFormat === 'json' ? (
+              <JsonEditor
+                value={payload}
+                onChange={(v) => { setPayload(v); reset(); }}
+                placeholder={'{"hello": "world"}'}
+                className="min-h-40"
+              />
+            ) : (
+              <TextEditor
+                value={payload}
+                onChange={(v) => { setPayload(v); reset(); }}
+                placeholder={'{"hello": "world"}'}
+                className="min-h-40"
+              />
+            )}
           </div>
 
           {/* Delivery toggles (publish only) */}
@@ -438,7 +442,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
                 </div>
               </div>
               <div className="flex h-72 flex-col">
-                <ResponseViewer value={replyText} language={replyFormat === 'json' ? 'json' : 'text'} />
+                <CodeViewer value={replyText} language={replyFormat === 'json' ? 'json' : 'text'} />
               </div>
             </div>
           )}

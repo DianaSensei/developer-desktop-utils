@@ -25,7 +25,7 @@ import type { ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
 import { saveBinaryFile, saveTextFile } from './fileio';
 import { queryJson } from './jsonpath';
-import { ResponseViewer } from './ResponseViewer';
+import { CodeViewer } from '@/design-system';
 
 type Kind = 'json' | 'html' | 'xml' | 'image' | 'text';
 type Format = 'json' | 'html' | 'xml' | 'javascript' | 'raw' | 'hex' | 'base64';
@@ -443,7 +443,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
   }
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      <ResponseViewer value={text} language={!plain && format === 'json' ? 'json' : 'text'} plain={plain} />
+      <CodeViewer value={text} language={!plain && format === 'json' ? 'json' : 'text'} plain={plain} />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CodeEditor } from './CodeEditor';
+import { JavaScriptEditor } from '@/design-system';
 import { AuthEditor } from './AuthEditor';
 import { type Auth, type RequestScript, type VarMap, newAuth } from './types';
 
@@ -60,11 +60,11 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
             </p>
             <div className="flex h-44 flex-col gap-1.5">
               <Label className="text-xs">Pre-request</Label>
-              <CodeEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setVar('base', 'https://api.example.com');"} />
+              <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setVar('base', 'https://api.example.com');"} />
             </div>
             <div className="flex h-44 flex-col gap-1.5">
               <Label className="text-xs">Post-response</Label>
-              <CodeEditor value={script.res} onChange={(res) => setScript((s) => ({ ...s, res }))} placeholder={"console.log('done', res.getStatus());"} />
+              <JavaScriptEditor value={script.res} onChange={(res) => setScript((s) => ({ ...s, res }))} placeholder={"console.log('done', res.getStatus());"} />
             </div>
           </div>
         ) : (
