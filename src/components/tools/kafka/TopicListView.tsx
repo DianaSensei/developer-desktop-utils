@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, RefreshCw, AlertCircle, Search, Plus, List } from 'lucide-react';
+import { Loader2, RefreshCw, AlertCircle, Plus, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +7,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { ViewHeader } from '@/components/ui/view-header';
+import { SearchInput } from '@/components/ui/search-input';
 import { kafkaApi, type TopicSummary } from './types';
 
 interface TopicListViewProps {
@@ -51,10 +52,7 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
       />
 
       <div className="px-5 pt-3 shrink-0">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search topics…" className="pl-8 h-8 text-sm" />
-        </div>
+        <SearchInput value={filter} onChange={setFilter} placeholder="Search topics…" className="h-8 text-sm" containerClassName="max-w-sm" />
       </div>
 
       <div className="tool-scrollable px-5 py-4">

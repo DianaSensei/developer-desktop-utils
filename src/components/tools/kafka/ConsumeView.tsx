@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Radio, Play, Pause, Square, Loader2, AlertCircle, ChevronDown, ChevronRight, Check, RefreshCw, Trash, Search, ArrowLeft,
+  Radio, Play, Pause, Square, Loader2, AlertCircle, ChevronDown, ChevronRight, Check, RefreshCw, Trash, ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
+import { StatusDot } from '@/components/ui/status-dot';
+import { SearchInput } from '@/components/ui/search-input';
 import { cn } from '@/lib/utils';
 import { kafkaApi, type ConsumeFrom, type KafkaConsumedMessage } from './types';
 import { kafkaConsumerStore, useKafkaConsumers, type KafkaConsumerSession } from './kafkaConsumerStore';
@@ -87,7 +89,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: KafkaConsumerSession
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
       className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-muted/40"
     >
-      <span className={cn('h-2 w-2 rounded-full shrink-0', s.paused ? 'bg-amber-500' : 'bg-emerald-500')} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
+      <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
       <span className="font-mono text-sm truncate">{s.topic}</span>
       <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide shrink-0">
         {s.from === 'latest' ? 'new only' : 'from start'}
@@ -220,7 +222,7 @@ function ConsumerDetail({ session: s, onBack }: { session: KafkaConsumerSession;
           <button onClick={() => onBack()} className="text-muted-foreground hover:text-foreground shrink-0" title="Back to consumers">
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <span className={cn('h-2 w-2 rounded-full shrink-0', s.paused ? 'bg-amber-500' : 'bg-emerald-500')} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
+          <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
           <div className="min-w-0">
             <h2 className="font-semibold text-sm font-mono truncate">{s.topic}</h2>
             <p className="text-[11px] text-muted-foreground">
@@ -253,15 +255,13 @@ function ConsumerDetail({ session: s, onBack }: { session: KafkaConsumerSession;
 
       {/* Search + value format */}
       <div className="flex items-center gap-2 px-5 py-2.5 border-b shrink-0">
-        <div className="relative flex-1 min-w-0 max-w-md">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search value, key, partition, offset…"
-            className="pl-8 h-8 text-xs"
-          />
-        </div>
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder="Search value, key, partition, offset…"
+          className="h-8 text-xs"
+          containerClassName="flex-1 min-w-0 max-w-md"
+        />
         <Segmented<ValueFormat>
           value={format}
           onValueChange={setFormat}
