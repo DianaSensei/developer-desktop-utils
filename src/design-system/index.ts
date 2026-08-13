@@ -42,6 +42,8 @@ export {
   type ContextMenuProps, type ContextMenuEntry, type ContextMenuState,
 } from '@/components/ui/context-menu';
 export { ConfirmDialog, type ConfirmDialogProps } from '@/components/ui/confirm-dialog';
+export { SearchInput, type SearchInputProps } from '@/components/ui/search-input';
+export { Tabs, type TabsProps, type TabDef } from '@/components/ui/tabs';
 
 // Layout scaffolding
 export { ToolSection, ToolLabel, ToolHint, ToolContent } from '@/components/ui/tool-section';

@@ -168,7 +168,7 @@ import { Button, Card, Input, Select, Segmented, ToolSection, PaneHeader, cn } f
 ```
 
 **Primitives** (shadcn-style, Radix-based, in `src/components/ui/`, re-exported by `src/design-system/index.ts`):
-`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`, `StatusDot`, `ContextMenu` (+ `useContextMenu`), `ConfirmDialog`.
+`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`, `StatusDot`, `ContextMenu` (+ `useContextMenu`), `ConfirmDialog`, `SearchInput`, `Tabs`.
 
 **Layout scaffolding:**
 `ToolSection`, `ToolLabel`, `ToolHint`, `ToolContent` (section structure) and `ToolToolbar`, `ToolPanes`, `ToolPane`, `PaneHeader` (toolbar + split-pane layouts).
@@ -233,6 +233,20 @@ Three patterns kept getting reimplemented per-tool with small drifting variation
     onConfirm={() => store.deleteCollection(id)}
   />
   ```
+- **`SearchInput`** — the icon-in-input search box (sidebar filters, list-view search, collection search). Wraps `Input`; do not reposition a `Search` icon by hand again.
+  ```tsx
+  <SearchInput value={query} onChange={setQuery} placeholder="Search exchanges…" />
+  ```
+- **`Tabs`** — horizontal tab strip that collapses overflow tabs into a `»` menu as it runs out of room (measures real widths, never clips the active tab). Use for any tool with more than a couple of horizontal view tabs (request/response panel tabs, per-item detail views).
+  ```tsx
+  <Tabs
+    tabs={[{ id: 'body', label: 'Response' }, { id: 'headers', label: 'Headers', badge: <Badge/> }]}
+    active={tab}
+    onSelect={setTab}
+    right={<StatusReadout />}
+  />
+  ```
+  Uses `border-primary` for the active-tab underline by default (per the "reserve accent for the key action/state" color rule) — override via `className` if a tool has an established alternate accent.
 
 ---
 
