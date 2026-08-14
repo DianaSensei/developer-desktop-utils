@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { paramsFromUrl, sendRequest, substituteVars, urlWithParams } from './request';
-import { newKeyValue, newRequest, type ApiRequest } from './types';
+import { authQueryParam, paramsFromUrl, sendRequest, substituteVars, urlWithParams } from './request';
+import { newAuth, newKeyValue, newRequest, type ApiRequest } from './types';
 
 // A minimal stand-in for the parts of `Response` that sendRequest reads.
 function fakeResponse(bytes: Uint8Array, headers: Record<string, string>, init: { status?: number; statusText?: string; url?: string } = {}) {
@@ -151,5 +151,22 @@ describe('substituteVars', () => {
 
   it('tolerates whitespace inside the braces', () => {
     expect(substituteVars('{{ name }}', { name: 'x' })).toBe('x');
+  });
+});
+
+describe('authQueryParam', () => {
+  it('returns null when auth is not an api-key-in-query', () => {
+    expect(authQueryParam(req())).toBeNull();
+    expect(authQueryParam(req({ auth: { ...newAuth(), type: 'apikey', apiKey: { key: 'k', value: 'v', placement: 'header' } } }))).toBeNull();
+  });
+
+  it('returns null when the key is blank', () => {
+    const auth = { ...newAuth(), type: 'apikey' as const, apiKey: { key: '  ', value: 'v', placement: 'query' as const } };
+    expect(authQueryParam(req({ auth }))).toBeNull();
+  });
+
+  it('surfaces the key/value when auth places the api key in the query', () => {
+    const auth = { ...newAuth(), type: 'apikey' as const, apiKey: { key: 'apiKey', value: 'secret-1', placement: 'query' as const } };
+    expect(authQueryParam(req({ auth }))).toEqual({ key: 'apiKey', value: 'secret-1' });
   });
 });

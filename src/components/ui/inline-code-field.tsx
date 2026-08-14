@@ -12,6 +12,7 @@ import { EditorState } from '@codemirror/state';
 import { cn } from '@/lib/utils';
 import { useCodeTheme } from '@/components/ui/code-theme';
 import { varExtensions, varTheme } from '@/components/ui/var-support';
+import { pathParamExtensions, pathParamTheme } from '@/components/ui/path-param-support';
 
 export interface InlineCodeFieldProps {
   value: string;
@@ -20,6 +21,10 @@ export interface InlineCodeFieldProps {
   placeholder?: string;
   onEnter?: () => void;
   className?: string;
+  // Also highlights `:name` path-param placeholders (a separate mechanism
+  // from {{var}}, distinct color) — pass the current pathParams table as a
+  // name → value map. Only the address bar needs this.
+  pathParamValues?: Record<string, string>;
 }
 
 // Single-line specifics on top of the shared code theme: no flex fill, no
@@ -31,12 +36,18 @@ const singleLineTheme = EditorView.theme({
   '.cm-var, .cm-var-unknown': { fontSize: '11px' },
 });
 
-export function InlineCodeField({ value, onChange, vars, placeholder, onEnter, className }: InlineCodeFieldProps) {
+export function InlineCodeField({ value, onChange, vars, placeholder, onEnter, className, pathParamValues }: InlineCodeFieldProps) {
   const ref = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   // Live refs so the editor (created once) always sees fresh callbacks/vars.
   const varsRef = useRef(vars);
   varsRef.current = vars;
+  const pathParamValuesRef = useRef(pathParamValues ?? {});
+  pathParamValuesRef.current = pathParamValues ?? {};
+  // Whether path-param highlighting was requested is decided once, at mount —
+  // call sites pass it consistently (only the address bar does), so this never
+  // needs to change after the editor is created.
+  const highlightPathParams = useRef(pathParamValues !== undefined).current;
   const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   const onEnterRef = useRef(onEnter); onEnterRef.current = onEnter;
   const lastValue = useRef(value);
@@ -64,11 +75,13 @@ export function InlineCodeField({ value, onChange, vars, placeholder, onEnter, c
         doc: value,
         extensions: [
           ...varExtensions(() => varsRef.current),
+          ...(highlightPathParams ? pathParamExtensions(() => pathParamValuesRef.current) : []),
           singleLine,
           cmPlaceholder(placeholder ?? ''),
           theme.extension,
           singleLineTheme,
           varTheme,
+          ...(highlightPathParams ? [pathParamTheme] : []),
           keymap.of([{ key: 'Enter', run: () => { onEnterRef.current?.(); return true; } }]),
           EditorView.updateListener.of((u) => {
             if (!u.docChanged) return;
@@ -96,6 +109,12 @@ export function InlineCodeField({ value, onChange, vars, placeholder, onEnter, c
   useEffect(() => {
     viewRef.current?.dispatch({});
   }, [vars]);
+
+  // Refresh path-param highlighting/tooltip values when the pathParams table changes.
+  useEffect(() => {
+    if (highlightPathParams) viewRef.current?.dispatch({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathParamValues]);
 
   return <div ref={ref} className={cn('min-w-0 flex-1', className)} />;
 }
