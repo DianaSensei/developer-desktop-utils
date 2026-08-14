@@ -5,11 +5,12 @@ import { indentWithTab } from '@codemirror/commands';
 import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorState, Compartment } from '@codemirror/state';
+import { lintGutter } from '@codemirror/lint';
 // Low-level primitives, not the JsonEditor/JavaScriptEditor/SqlEditor/TextEditor
 // components: this tool needs a runtime SQL<->Mongo(JS) language switch on one
 // persistent CodeMirror instance (via Compartment) plus custom $operator
 // completions, which doesn't fit the fixed-language component shapes.
-import { smartBracketSkip, useCodeTheme } from '@/design-system';
+import { smartBracketSkip, useCodeTheme, syntaxErrorLinter } from '@/design-system';
 import type { CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
 import { Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -406,6 +407,11 @@ export function SqlFormatter() {
           keymap.of([indentWithTab]),
           basicSetup,
           smartBracketSkip,
+          // Neither SQL nor the Mongo/JS mode has a real linter package — flag
+          // whatever the active grammar already marks unparseable, same as
+          // JavaScriptEditor/SqlEditor in code-editor.tsx.
+          syntaxErrorLinter(),
+          lintGutter(),
           // Keep typed quotes straight (no macOS smart-quote substitution).
           EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
           langConfRef.current.of(modeRef.current === 'sql' ? sqlLang : jsLangWithMongo),

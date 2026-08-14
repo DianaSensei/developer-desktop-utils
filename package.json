@@ -13,11 +13,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/lang-sql": "^6.10.0",
+    "@codemirror/lint": "^6.9.7",
     "@codemirror/merge": "^6.12.2",
     "@faker-js/faker": "^10.5.0",
     "@fontsource-variable/inter": "^5.2.8",

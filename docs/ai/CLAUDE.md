@@ -903,6 +903,33 @@ const theme = useCodeTheme(viewRef, { fontSize: '12px', gutter: 'flush', activeL
 
 Why the hook rather than a plain constant: CodeMirror chooses between its `&light` and `&dark` base rules from the flag passed to `EditorView.theme(spec, { dark })` — it cannot see the app's `.dark` class. A theme built without the flag pins the editor to CodeMirror's light base rules forever, so unstated surfaces (autocomplete tooltips, text-selection fill) stay light in dark mode. `useCodeTheme` supplies the flag and reconfigures a `Compartment` when the theme flips. Syntax colors live in `codeHighlight`, sourced from the `--sql-*` / `--js-*` tokens — add a tag there, and don't add fallback colors (the tokens are always defined).
 
+### CodeMirror `basicSetup` already includes more than it looks like
+
+`codemirror`'s `basicSetup` (used by every editor in this app, editable or bespoke) silently bundles keybindings that are easy to assume are missing and re-add — check before binding a key basicSetup already owns:
+
+| Shortcut | Command | From |
+|---|---|---|
+| `Mod-/` | toggle line comment | `defaultKeymap` |
+| `Mod-d` | select next occurrence (multi-cursor) | `searchKeymap` |
+| `Alt-↑` / `Alt-↓` | move line up/down | `defaultKeymap` |
+| `Shift-Alt-↑` / `Shift-Alt-↓` | duplicate line up/down | `defaultKeymap` |
+| `Mod-Alt-↑` / `Mod-Alt-↓` | add cursor above/below | `defaultKeymap` |
+| `Shift-Mod-k` | delete line | `defaultKeymap` |
+| `Shift-Mod-\` | jump to matching bracket | `defaultKeymap` |
+| `Mod-f` | open CodeMirror's own search panel | `searchKeymap` |
+| — | bracket matching highlight, bracket auto-close, fold gutter | `bracketMatching()`, `closeBrackets()`, `foldGutter()` |
+
+Because `Alt-↑`/`Alt-↓` are taken, the Diff tool's chunk-navigation (`DiffMergeView.tsx`) uses `F7` / `Shift-F7` instead (matching VS Code's diff editor) — don't reuse `Alt-↑`/`Alt-↓` for a new per-editor command; it'll lose to `moveLineUp`/`moveLineDown` (bound earlier in the same extensions array).
+
+`useDesktopChrome`'s global blocks on `⌘F`/`⌘[`/`⌘]` don't actually break the CodeMirror bindings above that share those keys — CodeMirror's listener is on the focused editor DOM (target phase), which always runs before `useDesktopChrome`'s `window`-level bubble-phase listener, so the editor's own handling already completed by the time the global one fires.
+
+### Completion & lint beyond the language grammar
+
+- `JsonEditor`/`SqlEditor` — `jsonParseLinter()` / a generic syntax-error linter (`src/components/ui/syntax-lint.ts`, flags whatever the lezer parser already marks as an error node — cheap, approximate, no real linter package needed).
+- `JavaScriptEditor` — **no** linter by default, because it also renders Mock Server's Rhai scripts (JS-like highlighting only; a JS-grammar linter would flag valid Rhai as broken). Pass `extraExtensions` to opt in per call site.
+- ApiClient's pre-request/post-response/test script editors pass `extraExtensions={scriptApiExtensions}` (`src/components/tools/apiclient/scriptCompletion.ts`) — bru/pm/req/res/assert/console autocomplete plus the syntax-error linter, since those scripts really do run as JavaScript. Built on `scopeCompletionSource` from `@codemirror/lang-javascript` against a hand-maintained plain-object shape of the real runtime API (kept in sync with `runtime.ts` by hand); the fluent `expect(x).to.be.true` chain is out of reach since it resolves through a function call, which the path walker doesn't follow.
+- `{{variable}}` completion/highlight/hover (`src/components/ui/var-support.ts`) is a separate, older mechanism (URL bar, key/value tables, request body) — unrelated to the two above.
+
 ---
 
 ## Dependencies Quick Reference
@@ -1005,6 +1032,7 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 - `local-ip-address` + `hostname` (Rust) — back `local_network_info` for Network tool Local Network view
 - `netstat2` + `sysinfo` (Rust) — back `list_listening_ports` for Network tool Ports view
 - `@codemirror/merge` — side-by-side diff/merge view (Diff tool's `DiffMergeView`)
+- `@codemirror/lint` + `@codemirror/autocomplete` — imported directly for `syntax-lint.ts`'s generic error linter and ApiClient's `scriptCompletion.ts`, in addition to what `codemirror`'s `basicSetup` already wires up
 - `qrcode` — QR generation
 - `jsqr` — QR image decoding
 - `react-markdown` — markdown rendering

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JavaScriptEditor } from '@/design-system';
 import { AuthEditor } from './AuthEditor';
+import { scriptApiExtensions } from './scriptCompletion';
 import { type Auth, type RequestScript, type VarMap, newAuth } from './types';
 
 export interface NodeSettingsTarget {
@@ -60,11 +61,11 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
             </p>
             <div className="flex h-44 flex-col gap-1.5">
               <Label className="text-xs">Pre-request</Label>
-              <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setVar('base', 'https://api.example.com');"} />
+              <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setVar('base', 'https://api.example.com');"} extraExtensions={scriptApiExtensions} />
             </div>
             <div className="flex h-44 flex-col gap-1.5">
               <Label className="text-xs">Post-response</Label>
-              <JavaScriptEditor value={script.res} onChange={(res) => setScript((s) => ({ ...s, res }))} placeholder={"console.log('done', res.getStatus());"} />
+              <JavaScriptEditor value={script.res} onChange={(res) => setScript((s) => ({ ...s, res }))} placeholder={"console.log('done', res.getStatus());"} extraExtensions={scriptApiExtensions} />
             </div>
           </div>
         ) : (

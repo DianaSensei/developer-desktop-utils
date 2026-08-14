@@ -66,9 +66,12 @@ function summarize(view: MergeView): DiffStats {
   return { added, removed, chunks: view.chunks.length };
 }
 
+// F7 / Shift-F7, matching VS Code's diff editor — not Alt-ArrowDown/Up, which
+// `basicSetup`'s `defaultKeymap` already binds to moveLineDown/moveLineUp
+// (and would win, since it's listed first in `baseExtensions` below).
 const chunkNavKeymap = keymap.of([
-  { key: 'Alt-ArrowDown', run: goToNextChunk },
-  { key: 'Alt-ArrowUp', run: goToPreviousChunk },
+  { key: 'F7', run: goToNextChunk },
+  { key: 'Shift-F7', run: goToPreviousChunk },
 ]);
 
 // Reused across both sides and every mount, same as JsonEditor's module-scope
