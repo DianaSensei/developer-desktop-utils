@@ -375,7 +375,7 @@ A Postman/Bruno-style HTTP request workbench: organize requests into collections
 
 **What leaves the machine:** exactly the HTTP request you build and click **Send** on — to whatever URL you type. Nothing is sent in the background; there is no polling and no telemetry. Variables in the active environment (`{{var}}`) are substituted into the outgoing request locally before it is sent.
 
-**Storage:** collections, environments (including any tokens/passwords you store as variables or auth values), and the last 50 sends of history persist in `localStorage` under `devtool:apiclient:*`. This is local to your machine and not encrypted — treat it like any local config file.
+**Storage:** collections (which can carry shared **Collection Variables** in addition to per-request settings), environments (including any tokens/passwords you store as variables or auth values), the Vault, and the last 50 sends of history persist locally under `devtool:apiclient:*`. This is local to your machine and not encrypted — treat it like any local config file. Any environment variable can be marked **secret** (the lock icon next to it): its value is masked in the editor, left out of generated code snippets and the {{ }} hover tooltip, and — like the Vault — scrubbed from a history entry's response if a server happens to echo it back. Marking a value secret does not encrypt it at rest; it only keeps it out of places it doesn't need to be shown.
 
 **Scripting (Bruno-style):** each request can have a pre-request script, a post-response script, a test script, declarative variable extractions, and declarative assertions. Collections and folders can also carry pre/post scripts that are **inherited** by every request inside them (edit via the collection ⋮ menu → Scripts, or a folder's `</>` action) — pre-request runs collection → folder → request, post-response unwinds in reverse. Scripts are JavaScript with a curated API in scope:
 
@@ -388,7 +388,7 @@ A Postman/Bruno-style HTTP request workbench: organize requests into collections
 
 **Scripts execute in a sandboxed Web Worker**, off the main thread. The worker has the `bru`/`req`/`res`/`pm` API and the bundled `require` libraries, and **nothing else**: no DOM, no `localStorage`, and no Tauri IPC — so a script cannot reach the file system, the clipboard, or the shell. A script that never returns is killed once it passes the **script timeout** (Settings → Configuration → API Client, default 5 s), so a runaway loop cannot freeze the app. Scripts never run on their own — only as part of a Send you initiate. `console.log` output and test results appear in the response panel. Runtime variables set via `bru.setVar` are session-only and cleared on app restart; `bru.setEnvVar` writes persist to the active environment in `localStorage`.
 
-> **What a script can still do:** read every variable in scope — including tokens you keep in an environment — and make its own network calls. That is unavoidable for a scripting feature that has to authenticate requests, so treat a script the way you would treat any code you run: know where it came from.
+> **What a script can still do:** read every variable in scope — including tokens you keep in an environment — and make its own network calls. That is unavoidable for a scripting feature that has to authenticate requests, so treat a script the way you would treat any code you run: know where it came from. As a heads-up (not a guardrail), any script editor shows a warning banner the moment its text calls `fetch`/`XMLHttpRequest`/`WebSocket` directly — whether you just imported it or typed it yourself.
 
 **Postman compatibility:** import reads Postman Collection **v2.1** JSON (folders, requests, headers, query, body, bearer/basic auth, and pre-request/test scripts); export writes the same format. Postman scripts use the `pm.*` API — the script text is preserved on import so you can adapt it to Bruno's `bru`/`req`/`res` API. Import/export use the native file picker (desktop) or browser file input/download (web).
 
@@ -441,4 +441,4 @@ A TOTP / HOTP one-time-password generator — the same codes a phone authenticat
 
 ---
 
-*Last updated: 2026-06-30*
+*Last updated: 2026-08-14*

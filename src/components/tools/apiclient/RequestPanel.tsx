@@ -17,11 +17,13 @@ import {
 } from '@/components/ui/select';
 import { Tabs } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { Callout } from '@/components/ui/callout';
 import { InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
 import { AuthEditor } from './AuthEditor';
 import { scriptApiExtensions } from './scriptCompletion';
+import { scriptCallsNetwork } from './collectionScripts';
 import { urlWithParams } from './request';
 import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
@@ -107,6 +109,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
               placeholder={'test("status is 200", function () {\n  expect(res.getStatus()).to.equal(200);\n});'}
               extraExtensions={scriptApiExtensions}
             />
+            {scriptCallsNetwork(request.tests) && <NetworkCallNotice />}
           </div>
         )}
       </div>
@@ -115,6 +118,17 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
 }
 
 // ─── scripts ──────────────────────────────────────────────────────────────────
+
+// Non-blocking heads-up shown under a script editor when its text calls
+// fetch/XMLHttpRequest/WebSocket directly — see scriptCallsNetwork.
+function NetworkCallNotice() {
+  return (
+    <Callout tone="warning" size="sm">
+      This script can make its own network request, separate from the Send button — review it
+      before running scripts from a source you don't fully trust.
+    </Callout>
+  );
+}
 
 function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
   const { script } = request;
@@ -128,6 +142,7 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           placeholder={"bru.setVar('ts', Date.now());\nreq.setHeader('X-Trace', 'abc');"}
           extraExtensions={scriptApiExtensions}
         />
+        {scriptCallsNetwork(script.req) && <NetworkCallNotice />}
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <Label className="text-xs">Post-response <span className="font-normal text-muted-foreground">— runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
@@ -137,6 +152,7 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           placeholder={"bru.setVar('token', res.getBody().token);"}
           extraExtensions={scriptApiExtensions}
         />
+        {scriptCallsNetwork(script.res) && <NetworkCallNotice />}
       </div>
     </div>
   );

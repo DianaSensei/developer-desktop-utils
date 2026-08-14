@@ -188,8 +188,10 @@ export function ApiClient() {
     }
     if (!recordHistory) return;
     // Values that must never be persisted in plaintext if the server happened
-    // to echo them back in the response (see redactText in store.ts).
-    const sensitiveValues = Object.values(store.vaultVars);
+    // to echo them back in the response (see redactText in store.ts). Secret-
+    // flagged environment variables get the same treatment as vault values.
+    const secretEnvValues = (store.activeEnv?.variables ?? []).filter((v) => v.secret && v.value).map((v) => v.value);
+    const sensitiveValues = [...Object.values(store.vaultVars), ...secretEnvValues];
     store.addHistory({
       method: req.method, url: req.url,
       status: result.response?.status ?? 0,
@@ -303,11 +305,14 @@ export function ApiClient() {
   }, []);
 
   // Merged variable map (collection + environment + session runtime vars) for
-  // code generation.
+  // code generation. Secret-flagged environment variables are masked here too
+  // — a generated snippet is exactly the kind of thing that gets pasted into a
+  // chat or a doc, so it must not carry the real value any more than the
+  // Vault's entries do.
   const codeVars = useCallback((): VarMap => {
     const env = store.activeEnv;
     const vars: VarMap = { ...store.activeCollectionVars, ...runtimeVarsRef.current };
-    if (env) for (const v of env.variables) if (v.enabled && v.key) vars[v.key] = v.value;
+    if (env) for (const v of env.variables) if (v.enabled && v.key) vars[v.key] = v.secret ? '••••••••' : v.value;
     return vars;
   }, [store.activeEnv, store.activeCollectionVars]);
 
@@ -315,11 +320,12 @@ export function ApiClient() {
   // and hover-value tooltips in inputs.
   const varMap = useMemo(() => {
     const map: VarMap = { ...store.activeCollectionVars, ...runtimeVarsRef.current };
-    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) map[v.key] = v.value;
+    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
     if (activeRequest) for (const v of activeRequest.vars.req) if (v.name) map[v.name] = v.value;
-    // Vault secrets are recognized (for highlight/autocomplete) but their
-    // values stay masked in the UI — the real value only reaches the request
-    // that's actually sent (see engine.ts's own vault merge).
+    // Vault secrets and secret-flagged environment variables are recognized
+    // (for highlight/autocomplete) but their values stay masked in the UI —
+    // the real value only reaches the request that's actually sent (see
+    // engine.ts's own vault merge, and the env spread above).
     for (const v of store.vault) if (v.enabled && v.key) map[`vault.${v.key}`] = '••••••••';
     return map;
     // runtimeVarsVersion is intentionally a dep: the ref mutates invisibly.

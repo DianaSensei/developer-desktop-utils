@@ -183,9 +183,13 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   onChange={(variables) => store.updateEnvironment(selected.id, { variables })}
                   keyPlaceholder="Variable"
                   valuePlaceholder="Value"
+                  masked={(row) => !!row.secret}
+                  secretToggle
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Reference a variable anywhere with <code className="rounded bg-muted px-1">{'{{name}}'}</code>.
+                  Reference a variable anywhere with <code className="rounded bg-muted px-1">{'{{name}}'}</code>.{' '}
+                  Click the lock icon to mark a value secret — it stays masked here and is left out of
+                  generated code, exports, and history the same way the Vault is.
                 </p>
               </div>
             ) : (

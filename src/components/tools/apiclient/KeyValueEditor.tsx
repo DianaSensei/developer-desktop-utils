@@ -10,7 +10,7 @@
 import { useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
 import { InlineCodeField, TextEditor } from '@/design-system';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
 
@@ -25,9 +25,16 @@ interface Props {
   // When provided, name/value cells become {{variable}}-aware (highlight +
   // autocomplete + hover). Omitted where vars don't apply (e.g. env editor).
   vars?: VarMap;
-  // Renders values as password fields with a per-row reveal toggle (the Vault).
+  // Renders values as password fields with a per-row reveal toggle. `true`
+  // masks every row (the Vault, where every entry is inherently a secret); a
+  // predicate masks only the rows it returns true for (environment variables,
+  // where secrecy is opt-in per row via `secretToggle` below).
   // Mutually exclusive with `vars` — secrets aren't {{ }}-substitutable inputs.
-  masked?: boolean;
+  masked?: boolean | ((row: KeyValue) => boolean);
+  // Adds a per-row lock toggle that flips `row.secret`, so a value can be
+  // marked secret (masked here, and excluded from codegen/export/history the
+  // same way the Vault already is) without moving it out of its environment.
+  secretToggle?: boolean;
 }
 
 const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
@@ -42,7 +49,9 @@ export function KeyValueEditor({
   bulkEdit = true,
   vars,
   masked = false,
+  secretToggle = false,
 }: Props) {
+  const isMasked = (row: KeyValue) => (typeof masked === 'function' ? masked(row) : masked);
   const [bulk, setBulk] = useState(false);
   // Bulk mode keeps its own text so newlines/spacing survive while typing; rows
   // are parsed out of it in the background and committed via onChange.
@@ -116,22 +125,26 @@ export function KeyValueEditor({
     );
   }
 
+  const gridCols = secretToggle ? 'grid-cols-[1rem_1fr_1fr_2rem_2rem]' : 'grid-cols-[1rem_1fr_1fr_2rem]';
+
   return (
     <div className="space-y-1.5">
       <div className="overflow-hidden rounded-md border text-xs">
         {/* Header row */}
-        <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+        <div className={cn('grid border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>
+          {secretToggle && <div />}
           <div />
         </div>
 
         {displayRows.map((row) => {
           const isGhost = row.id === ghost.id;
           const disabled = !isGhost && !row.enabled;
+          const secret = isMasked(row);
           return (
-            <div key={row.id} className="group grid grid-cols-[1rem_1fr_1fr_2rem] border-b last:border-b-0 hover:bg-muted/20 transition-colors">
+            <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-muted/20 transition-colors', gridCols)}>
               {/* Enable/disable toggle dot */}
               <div className="flex items-center justify-center">
                 <button
@@ -165,7 +178,7 @@ export function KeyValueEditor({
                       placeholder={valuePlaceholder}
                     />
                   </div>
-                ) : masked ? (
+                ) : secret ? (
                   <div className={cn('flex h-9 items-center gap-0.5', disabled && 'opacity-40')}>
                     <Input
                       type={revealed.has(row.id) ? 'text' : 'password'}
@@ -197,6 +210,24 @@ export function KeyValueEditor({
                   />
                 )}
               </div>
+              {/* Secret toggle */}
+              {secretToggle && (
+                <div className="flex items-center justify-center">
+                  {!isGhost && (
+                    <button
+                      type="button"
+                      onClick={() => editRow(row.id, { secret: !row.secret })}
+                      className={cn(
+                        'rounded p-1 transition-colors',
+                        row.secret ? 'text-amber-500 hover:text-amber-400' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-foreground',
+                      )}
+                      title={row.secret ? 'Marked as secret — masked here and excluded from generated code/export' : 'Mark as secret'}
+                    >
+                      {row.secret ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+                    </button>
+                  )}
+                </div>
+              )}
               {/* Delete */}
               <div className="flex items-center justify-center">
                 {!isGhost && (

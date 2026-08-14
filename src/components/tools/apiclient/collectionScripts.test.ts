@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findScripts, stripScripts } from './collectionScripts';
+import { findScripts, scriptCallsNetwork, stripScripts } from './collectionScripts';
 import { importPostman } from './postman';
 import { newCollection, newFolder, newRequest, type Collection } from './types';
 
@@ -141,5 +141,25 @@ describe('an imported Postman collection', () => {
     if (item.type !== 'request') throw new Error('expected a request');
     expect(item.url).toBe('https://vendor.test/token');
     expect(item.method).toBe('GET');
+  });
+});
+
+describe('scriptCallsNetwork', () => {
+  it('flags a direct fetch() call', () => {
+    expect(scriptCallsNetwork('fetch("https://evil.test", { method: "POST" });')).toBe(true);
+  });
+
+  it('flags XMLHttpRequest and WebSocket', () => {
+    expect(scriptCallsNetwork('const x = new XMLHttpRequest();')).toBe(true);
+    expect(scriptCallsNetwork('const ws = new WebSocket("wss://evil.test");')).toBe(true);
+  });
+
+  it('ignores scripts with no network call', () => {
+    expect(scriptCallsNetwork('bru.setVar("x", 1);\nreq.setHeader("X-Trace", "abc");')).toBe(false);
+    expect(scriptCallsNetwork('')).toBe(false);
+  });
+
+  it('does not flag "fetch" used as a plain identifier, not a call', () => {
+    expect(scriptCallsNetwork('const fetchCount = 1;')).toBe(false);
   });
 });
