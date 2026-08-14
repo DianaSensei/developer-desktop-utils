@@ -32,6 +32,23 @@ export function describeJump(
   return names.includes(next) ? { to: next } : { to: next, missing: true };
 }
 
+// Names shared by more than one request in the planned run. `setNextRequest`
+// (Postman-compatible by design — see the header comment) resolves by name
+// via `names.indexOf`, always landing on the *first* match, so a duplicate
+// makes any jump to that name ambiguous: a script author aiming for the
+// second "Login" request would silently land on the first one instead.
+// Surfaced so the Runner can warn about it before a run starts, rather than
+// a script's jump landing on the wrong request mid-run with no explanation.
+export function findDuplicateNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const name of names) {
+    if (seen.has(name)) duplicates.add(name);
+    else seen.add(name);
+  }
+  return [...duplicates];
+}
+
 // Where the iteration goes after the request at `currentIndex`.
 // Returns null when the iteration should end.
 export function nextStepIndex(

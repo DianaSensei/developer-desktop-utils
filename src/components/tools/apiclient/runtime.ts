@@ -407,7 +407,7 @@ export interface ScriptRun {
   error: string | null;
 }
 
-function makeConsole(logs: LogEntry[]) {
+export function makeConsole(logs: LogEntry[]) {
   const push = (level: LogEntry['level']) => (...args: unknown[]) =>
     logs.push({ level, text: args.map((a) => (typeof a === 'string' ? a : safeStringify(a))).join(' ') });
   const log = push('log');
@@ -435,7 +435,7 @@ interface PmDeps {
 
 // Maps Postman's `pm` API onto our bru/req/res primitives. Collection/global
 // variables don't have separate stores here, so they alias the runtime vars.
-function makePm({ bru, req, res, expect, test }: PmDeps) {
+export function makePm({ bru, req, res, expect, test }: PmDeps) {
   const varBag = (get: (k: string) => unknown, set: (k: string, v: unknown) => void) => ({
     get, set,
     has: (k: string) => get(k) !== undefined,
@@ -514,7 +514,7 @@ function makePm({ bru, req, res, expect, test }: PmDeps) {
 
 // Chai-style `assert`: callable, with the common named assertions attached so
 // scripts written against Postman/Bruno's assert API don't hit `is not a function`.
-function makeAssert() {
+export function makeAssert() {
   const fail = (message: string) => { throw new Error(message); };
   const ok = (cond: unknown, message = 'assertion failed') => { if (!cond) fail(message); };
   const show = (v: unknown) => { try { return JSON.stringify(v); } catch { return String(v); } };

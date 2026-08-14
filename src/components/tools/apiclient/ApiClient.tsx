@@ -406,6 +406,7 @@ export function ApiClient() {
                     tests={run.tests}
                     logs={run.logs}
                     onClear={() => setRuns((prev) => ({ ...prev, [activeRequest.id]: EMPTY_RUN }))}
+                    onJumpToTab={(t) => setPanelTabs((prev) => ({ ...prev, [activeRequest.id]: t }))}
                   />
                 }
               />

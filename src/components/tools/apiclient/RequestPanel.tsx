@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Braces, Check, ChevronDown, Code2, Database, File, FileText, FormInput,
-  Hexagon, type LucideIcon, Tag, Trash2, X,
+  Hexagon, type LucideIcon, Sparkles, Tag, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import { MultipartEditor } from './MultipartEditor';
 import { AuthEditor } from './AuthEditor';
 import { scriptApiExtensions } from './scriptCompletion';
 import { scriptCallsNetwork } from './collectionScripts';
+import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet, type ScriptSnippet } from './scriptSnippets';
 import { authQueryParam, buildUrl, urlWithParams } from './request';
 import { substituteVars } from './vars';
 import {
@@ -103,9 +104,12 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}
         {tab === 'tests' && (
           <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
-            <p className="text-[11px] text-muted-foreground">
-              Post-response test script — use <code className="rounded bg-muted px-1">test()</code> and <code className="rounded bg-muted px-1">expect()</code> with <code className="rounded bg-muted px-1">res</code>, <code className="rounded bg-muted px-1">bru</code>.
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground">
+                Post-response test script — use <code className="rounded bg-muted px-1">test()</code> and <code className="rounded bg-muted px-1">expect()</code> with <code className="rounded bg-muted px-1">res</code>, <code className="rounded bg-muted px-1">bru</code>.
+              </p>
+              <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ tests: appendSnippet(request.tests, s) })} />
+            </div>
             <JavaScriptEditor
               value={request.tests}
               onChange={(tests) => onChange({ tests })}
@@ -133,12 +137,32 @@ function NetworkCallNotice() {
   );
 }
 
+// One-click snippet menu, appended to the script's current text — see
+// scriptSnippets.ts for why this appends rather than inserting at the cursor.
+function SnippetMenu({ snippets, onInsert }: { snippets: ScriptSnippet[]; onInsert: (s: ScriptSnippet) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+        <Sparkles className="h-3 w-3" /> Snippet
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {snippets.map((s) => (
+          <DropdownMenuItem key={s.label} onClick={() => onInsert(s)}>{s.label}</DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
   const { script } = request;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-        <Label className="text-xs">Pre-request <span className="font-normal text-muted-foreground">— runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-xs">Pre-request <span className="font-normal text-muted-foreground">— runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
+          <SnippetMenu snippets={PRE_REQUEST_SNIPPETS} onInsert={(s) => onChange({ script: { ...script, req: appendSnippet(script.req, s) } })} />
+        </div>
         <JavaScriptEditor
           value={script.req}
           onChange={(v) => onChange({ script: { ...script, req: v } })}
@@ -148,7 +172,10 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         {scriptCallsNetwork(script.req) && <NetworkCallNotice />}
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-        <Label className="text-xs">Post-response <span className="font-normal text-muted-foreground">— runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-xs">Post-response <span className="font-normal text-muted-foreground">— runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
+          <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ script: { ...script, res: appendSnippet(script.res, s) } })} />
+        </div>
         <JavaScriptEditor
           value={script.res}
           onChange={(v) => onChange({ script: { ...script, res: v } })}

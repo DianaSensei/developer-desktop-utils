@@ -29,6 +29,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Stat, type StatProps } from '@/components/ui/stat';
 import { Field } from '@/components/ui/tool-section';
 import { SectionLabel } from '@/components/ui/section-label';
+import { Callout } from '@/components/ui/callout';
 import { methodColor } from './method-color';
 import { formatBytes, statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
@@ -36,7 +37,7 @@ import { pickDataFile, saveJsonFile } from './fileio';
 import { DELIMITER_LABEL, type DataRow, type ParsedDataFile, parseDataFile } from './datafile';
 import { type ColumnMapping, collectVarTokens, mapColumns, missingColumns } from './varUsage';
 import type { ExecResult } from './engine';
-import { MAX_STEPS_PER_ITERATION, describeJump, nextStepIndex } from './runnerFlow';
+import { MAX_STEPS_PER_ITERATION, describeJump, findDuplicateNames, nextStepIndex } from './runnerFlow';
 import { type RunDetail, type RunRecord, isOk, summarize } from './runnerStats';
 import type { ApiRequest, HttpMethod, VarMap } from './types';
 
@@ -137,6 +138,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
     () => missingColumns(usedVars, dataFile?.parsed.columns ?? [], new Set(knownVars)),
     [usedVars, dataFile, knownVars],
   );
+  // Ambiguous setNextRequest('name') targets within this run — see
+  // findDuplicateNames. Checked against `effective` (the actual planned run,
+  // after selection/tag filters), not the full request list, since a filtered-
+  // out duplicate can never be ambiguous.
+  const duplicateNames = useMemo(() => findDuplicateNames(effective.map((r) => r.name)), [effective]);
   const delayMs = Math.max(0, Number(delay) || 0);
 
   const cancelledRef = useRef(false);
@@ -545,6 +551,17 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                 </div>
               </div>
             </div>
+
+            {duplicateNames.length > 0 && (
+              <div className="shrink-0 border-t px-4 py-2">
+                <Callout tone="warning" size="sm">
+                  Duplicate request name{duplicateNames.length === 1 ? '' : 's'} in this run:{' '}
+                  <span className="font-mono">{duplicateNames.join(', ')}</span>. A script's{' '}
+                  <code className="rounded bg-muted px-1">setNextRequest(name)</code> always jumps to the
+                  first match — rename one to make a flow-control jump to it unambiguous.
+                </Callout>
+              </div>
+            )}
 
             {/* action bar */}
             <div className="flex shrink-0 items-center gap-3 border-t px-4 py-3">

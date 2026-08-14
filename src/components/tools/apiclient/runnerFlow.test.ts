@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeJump, nextStepIndex } from './runnerFlow';
+import { describeJump, findDuplicateNames, nextStepIndex } from './runnerFlow';
 
 const names = ['Login', 'Fetch User', 'Cleanup'];
 
@@ -18,6 +18,28 @@ describe('describeJump', () => {
 
   it('flags a name that is not in the run', () => {
     expect(describeJump('Typo', names)).toEqual({ to: 'Typo', missing: true });
+  });
+});
+
+describe('findDuplicateNames', () => {
+  it('returns an empty list when every name is unique', () => {
+    expect(findDuplicateNames(names)).toEqual([]);
+  });
+
+  it('finds a name repeated exactly twice', () => {
+    expect(findDuplicateNames(['Login', 'Fetch User', 'Login'])).toEqual(['Login']);
+  });
+
+  it('reports a name only once even if repeated more than twice', () => {
+    expect(findDuplicateNames(['Login', 'Login', 'Login'])).toEqual(['Login']);
+  });
+
+  it('finds multiple distinct duplicates', () => {
+    expect(findDuplicateNames(['A', 'B', 'A', 'B', 'C']).sort()).toEqual(['A', 'B']);
+  });
+
+  it('returns an empty list for an empty run', () => {
+    expect(findDuplicateNames([])).toEqual([]);
   });
 });
 
