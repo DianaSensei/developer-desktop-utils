@@ -22,6 +22,10 @@ export interface KeyValue {
   fileName?: string;        // multipart file: original name
   fileType?: string;        // multipart file: MIME type
   fileContent?: string;     // multipart file: base64-encoded bytes
+  // Environment variables only: masks the value in the editor and excludes it
+  // from generated code / cURL export / history the same way the Vault is
+  // (see KeyValueEditor's `secretToggle` and ApiClient.tsx's codeVars()).
+  secret?: boolean;
 }
 
 export type BodyMode =

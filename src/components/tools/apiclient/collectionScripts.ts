@@ -64,3 +64,20 @@ function stripItems(items: TreeItem[]): TreeItem[] {
 export function stripScripts(collection: Collection): Collection {
   return { ...collection, script: { req: '', res: '' }, items: stripItems(collection.items) };
 }
+
+// A conservative, best-effort scan for direct network calls in a script's
+// source text. Scripts run as real JavaScript (see runtime.ts) with an
+// unrestricted `fetch`/`XMLHttpRequest`/`WebSocket` — separate from the app's
+// own Send pipeline — so a script can read a variable (an environment token,
+// say) and ship it anywhere. This is not a parser and is not a security
+// boundary: it's a plain-text pattern match meant to surface the same "this
+// script can talk to the network" heads-up whether the script arrived via a
+// collection import (see ImportReviewDialog) or was typed/pasted directly
+// into a script editor. False negatives (an obfuscated call) and false
+// positives (the word appearing in a comment or string) are both acceptable
+// for an advisory warning.
+const NETWORK_CALL_PATTERN = /\b(fetch|XMLHttpRequest|WebSocket)\s*\(/;
+
+export function scriptCallsNetwork(code: string): boolean {
+  return NETWORK_CALL_PATTERN.test(code);
+}

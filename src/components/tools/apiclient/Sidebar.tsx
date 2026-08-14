@@ -152,9 +152,11 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   const confirmDelete = useCallback((opts: PendingDelete) => setPendingDelete(opts), []);
 
   // Environment variables, for {{var}} highlighting in collection/folder auth.
+  // Secret-flagged variables stay masked here too — same rule as everywhere
+  // else a value only ever needs to be recognized, not displayed.
   const envVars = useMemo(() => {
     const m: Record<string, string> = {};
-    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) m[v.key] = v.value;
+    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) m[v.key] = v.secret ? '••••••••' : v.value;
     return m;
   }, [store.activeEnv]);
 

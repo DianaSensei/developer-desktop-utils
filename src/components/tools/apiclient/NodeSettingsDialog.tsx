@@ -7,9 +7,11 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Callout } from '@/components/ui/callout';
 import { JavaScriptEditor } from '@/design-system';
 import { AuthEditor } from './AuthEditor';
 import { scriptApiExtensions } from './scriptCompletion';
+import { scriptCallsNetwork } from './collectionScripts';
 import { type Auth, type RequestScript, type VarMap, newAuth } from './types';
 
 export interface NodeSettingsTarget {
@@ -62,10 +64,22 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
             <div className="flex h-44 flex-col gap-1.5">
               <Label className="text-xs">Pre-request</Label>
               <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setVar('base', 'https://api.example.com');"} extraExtensions={scriptApiExtensions} />
+              {scriptCallsNetwork(script.req) && (
+                <Callout tone="warning" size="sm">
+                  This script can make its own network request, separate from the Send button — review
+                  it before running scripts from a source you don't fully trust.
+                </Callout>
+              )}
             </div>
             <div className="flex h-44 flex-col gap-1.5">
               <Label className="text-xs">Post-response</Label>
               <JavaScriptEditor value={script.res} onChange={(res) => setScript((s) => ({ ...s, res }))} placeholder={"console.log('done', res.getStatus());"} extraExtensions={scriptApiExtensions} />
+              {scriptCallsNetwork(script.res) && (
+                <Callout tone="warning" size="sm">
+                  This script can make its own network request, separate from the Send button — review
+                  it before running scripts from a source you don't fully trust.
+                </Callout>
+              )}
             </div>
           </div>
         ) : (
