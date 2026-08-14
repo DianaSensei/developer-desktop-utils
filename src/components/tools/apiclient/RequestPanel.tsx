@@ -290,7 +290,9 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
 
   if (names.length === 0) return null;
 
-  const valueOf = (name: string) => request.pathParams.find((p) => p.key === name)?.value ?? '';
+  const rowOf = (name: string) => request.pathParams.find((p) => p.key === name);
+  const valueOf = (name: string) => rowOf(name)?.value ?? '';
+  const enabledOf = (name: string) => rowOf(name)?.enabled ?? true;
   const setValue = (name: string, value: string) => {
     const exists = request.pathParams.some((p) => p.key === name);
     const next = exists
@@ -298,28 +300,50 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
       : [...request.pathParams, newKeyValue(name, value)];
     onChange({ pathParams: next });
   };
+  const toggleEnabled = (name: string) => {
+    const exists = request.pathParams.some((p) => p.key === name);
+    const next = exists
+      ? request.pathParams.map((p) => (p.key === name ? { ...p, enabled: !p.enabled } : p))
+      : [...request.pathParams, { ...newKeyValue(name, ''), enabled: false }];
+    onChange({ pathParams: next });
+  };
 
   return (
     <div className="space-y-2">
       <Label className="text-xs text-muted-foreground">Path</Label>
       <div className="overflow-hidden rounded-md border text-xs">
-        <div className="grid grid-cols-[1fr_1fr] border-b bg-muted/30 font-semibold">
+        <div className="grid grid-cols-[1rem_1fr_1fr] border-b bg-muted/30 font-semibold">
+          <div />
           <div className="border-r px-3 py-1.5">Name</div>
           <div className="px-3 py-1.5">Value</div>
         </div>
-        {names.map((name) => (
-          <div key={name} className="grid grid-cols-[1fr_1fr] border-b last:border-b-0">
-            <div className="flex items-center border-r px-3 py-1 font-mono text-muted-foreground">:{name}</div>
-            <div className="flex h-8 items-center px-2">
-              <InlineCodeField
-                value={valueOf(name)}
-                onChange={(v) => setValue(name, v)}
-                vars={vars}
-                placeholder="Value"
-              />
+        {names.map((name) => {
+          const enabled = enabledOf(name);
+          return (
+            <div key={name} className="grid grid-cols-[1rem_1fr_1fr] border-b last:border-b-0">
+              <div className="flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => toggleEnabled(name)}
+                  className={cn(
+                    'h-2 w-2 shrink-0 rounded-full transition-colors',
+                    enabled ? 'bg-amber-400' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50',
+                  )}
+                  title={enabled ? 'Disable' : 'Enable'}
+                />
+              </div>
+              <div className={cn('flex items-center border-r px-3 py-1 font-mono text-muted-foreground', !enabled && 'opacity-40 line-through')}>:{name}</div>
+              <div className="flex h-8 items-center px-2">
+                <InlineCodeField
+                  value={valueOf(name)}
+                  onChange={(v) => setValue(name, v)}
+                  vars={vars}
+                  placeholder="Value"
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

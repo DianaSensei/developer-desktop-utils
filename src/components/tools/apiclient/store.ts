@@ -30,10 +30,36 @@ import {
 
 const MAX_HISTORY = 50;
 const MAX_HISTORY_BODY = 256 * 1024; // cap stored response bodies at 256 KB
+const REDACTED_PLACEHOLDER = '••••••••';
+// Values shorter than this are too likely to collide with ordinary response
+// text (e.g. a one-character vault entry) to redact safely.
+const MIN_REDACTABLE_LENGTH = 4;
+
+// Best-effort scrub of literal secret values from response text. The request
+// snapshot in a HistoryEntry is always the pre-substitution original (still
+// holding literal `{{...}}` tokens, never the resolved secret), but the
+// response is the real one the server sent back — if a vault/secret-flagged
+// value happens to be echoed by the server (a redirect Location, a debug
+// endpoint, an error message), it would otherwise sit in plaintext History
+// across restarts. This can only catch exact, unencoded matches — a
+// transformed/encoded echo won't be caught — so it's a mitigation, not a
+// guarantee.
+function redactText(text: string, sensitiveValues: string[]): string {
+  let out = text;
+  for (const v of sensitiveValues) {
+    if (v.length >= MIN_REDACTABLE_LENGTH) out = out.split(v).join(REDACTED_PLACEHOLDER);
+  }
+  return out;
+}
 
 // Keep history entries lean in localStorage: truncate huge response bodies and
 // drop binary file payloads from the request snapshot (filenames are kept).
-function trimHistoryEntry(entry: Omit<HistoryEntry, 'id' | 'at'>): Omit<HistoryEntry, 'id' | 'at'> {
+// `sensitiveValues` are the literal vault/secret values in scope for this send
+// (see redactText above) — pass [] to skip redaction entirely.
+function trimHistoryEntry(
+  entry: Omit<HistoryEntry, 'id' | 'at'>,
+  sensitiveValues: string[] = [],
+): Omit<HistoryEntry, 'id' | 'at'> {
   const out = { ...entry };
   if (out.response) {
     const r = out.response;
@@ -41,11 +67,17 @@ function trimHistoryEntry(entry: Omit<HistoryEntry, 'id' | 'at'>): Omit<HistoryE
     // useful in the live viewer but must never reach storage — fifty of those
     // would blow the whole workspace past the storage quota.
     const needsTrim = r.body.length > MAX_HISTORY_BODY || r.bodyBase64 !== undefined;
-    if (needsTrim) {
+    const needsRedact = sensitiveValues.length > 0;
+    if (needsTrim || needsRedact) {
+      const body = r.body.length > MAX_HISTORY_BODY ? r.body.slice(0, MAX_HISTORY_BODY) : r.body;
       out.response = {
         ...r,
-        body: r.body.length > MAX_HISTORY_BODY ? r.body.slice(0, MAX_HISTORY_BODY) : r.body,
+        body: needsRedact ? redactText(body, sensitiveValues) : body,
         bodyBase64: undefined,
+        headers: needsRedact
+          ? r.headers.map(([k, v]) => [k, redactText(v, sensitiveValues)] as [string, string])
+          : r.headers,
+        url: needsRedact && r.url ? redactText(r.url, sensitiveValues) : r.url,
       };
     }
   }
@@ -263,11 +295,6 @@ export function useApiStore() {
     return map;
   }, [vault]);
 
-  const activeEnv = useMemo(
-    () => environments.find((e) => e.id === activeEnvId) ?? null,
-    [environments, activeEnvId],
-  );
-
   // Normalizes on read so requests saved before scripting existed never crash
   // the editor (missing script/vars/assertions/tests are backfilled).
   const lookupRequest = useCallback((id: string): ApiRequest | null => {
@@ -292,6 +319,19 @@ export function useApiStore() {
     }
     return collections[0]?.id ?? null;
   }, [collections, activeRequestId]);
+
+  const selectedEnv = useMemo(
+    () => environments.find((e) => e.id === activeEnvId) ?? null,
+    [environments, activeEnvId],
+  );
+
+  // A collection-scoped environment left selected while working in a
+  // *different* collection would silently apply the wrong variables (or
+  // wrongly appear applied at all) — nothing else in the app clears
+  // `activeEnvId` on collection switch, so treat it as inactive here instead.
+  // Global environments (collectionId null/undefined) are unaffected.
+  const activeEnvMismatched = !!selectedEnv?.collectionId && selectedEnv.collectionId !== activeCollectionId;
+  const activeEnv = activeEnvMismatched ? null : selectedEnv;
 
   // Open tabs resolved to live requests, dropping any that were deleted.
   const openRequests = useMemo(
@@ -516,8 +556,8 @@ export function useApiStore() {
 
   // — history —
 
-  const addHistory = useCallback((entry: Omit<HistoryEntry, 'id' | 'at'>) => {
-    const lean = trimHistoryEntry(entry);
+  const addHistory = useCallback((entry: Omit<HistoryEntry, 'id' | 'at'>, sensitiveValues: string[] = []) => {
+    const lean = trimHistoryEntry(entry, sensitiveValues);
     setHistory((prev) => [{ ...lean, id: uid(), at: Date.now() }, ...prev].slice(0, MAX_HISTORY));
   }, [setHistory]);
 
@@ -553,7 +593,7 @@ export function useApiStore() {
   const clearCookies = useCallback(() => setCookies([]), [setCookies]);
 
   return {
-    collections, environments, activeEnvId, activeEnv, history, activeCollectionId,
+    collections, environments, activeEnvId, activeEnv, activeEnvMismatched, selectedEnv, history, activeCollectionId,
     activeRequestId, activeRequest, openRequests, inheritedScripts,
     setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,

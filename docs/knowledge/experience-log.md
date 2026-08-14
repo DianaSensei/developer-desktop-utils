@@ -1,5 +1,42 @@
 # Experience log
 
+## [2026-08-14] api-client — sandbox worker "degraded" state was permanent for the whole session
+- Nguyên nhân: `scriptHost.ts`'s `getWorker()` cached `workerUsable = false` forever after a
+  single `Worker` construction/load failure (a transient bundling hiccup, a CSP block, a
+  browser quirk — anything, one-shot). Every script after that point — including a genuine
+  infinite loop — ran unsandboxed on the main thread with no timeout/interrupt for the rest
+  of the session, since a synchronous loop can only be stopped by `Worker.terminate()`.
+- Số lần thử: 1/5
+- Kết quả: Đã fix
+- Cách fix: added a 30s reprobe window (`REPROBE_INTERVAL_MS`) — `workerUsable === false` is
+  now re-checked periodically instead of being final; `getWorker()` retries construction once
+  the window elapses. Also exposed `isScriptSandboxDegraded()`/`subscribeSandboxStatus()` so
+  the UI (`StatusBar.tsx`) can show a visible warning while running unsandboxed, instead of the
+  degradation being silent.
+- Bài học chung: any "if X fails once, disable the safety mechanism for the rest of the
+  session" pattern is a latent single-point-of-failure — a one-time construction/load failure
+  is not evidence the resource will never work again. Prefer a bounded retry/reprobe window,
+  and if the safety mechanism can't be restored, at least surface that fact in the UI rather
+  than letting the degradation be invisible.
+
+## [2026-08-14] api-client — activeEnvId not scoped to the active collection could silently apply the wrong (or no) variables
+- Nguyên nhân: `store.ts` kept a single global `activeEnvId`; nothing cleared or re-validated
+  it when the user switched to a request in a different collection, so a collection-A-scoped
+  environment could stay "active" while sending requests in collection B — `executeRequest`
+  would happily substitute {{}} tokens from an environment that had nothing to do with the
+  request being sent, with no indication in the UI that anything was off.
+- Số lần thử: 1/5
+- Kết quả: Đã fix
+- Cách fix: `store.ts`'s `activeEnv` memo now resolves to `null` (not the mismatched
+  environment) whenever the selected environment is scoped to a collection different from
+  `activeCollectionId`; the raw selection (`activeEnvId`/`selectedEnv`) is preserved so the UI
+  can still show it. `RequestTabs.tsx` surfaces this as a warning icon + an "Inactive here"
+  group in the environment picker instead of leaving the mismatch invisible.
+- Bài học chung: when a single piece of global state (like "the active X") interacts with a
+  second piece of state that can independently change scope (like "the active collection"),
+  always ask what happens when they drift apart — silently keeping the stale selection "active"
+  and never re-validating it against the new scope is an easy, easy-to-miss trap.
+
 ## [2026-07-11] onboarding-flow — 2 dialog tự mở chồng nhau ở lần cài mới
 - Nguyên nhân: `OnboardingFlow` (global, tự hiện cho user mới) và `ToolGuideModal` per-tool
   "what's new" (tự hiện khi mở 1 tool lần đầu) đều lắng nghe điều kiện độc lập nhau. Với
