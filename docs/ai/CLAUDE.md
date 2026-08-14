@@ -789,7 +789,7 @@ git push origin main --tags
 | `color-picker` | Color Picker | ❌ | HEX/RGB/HSL/CMYK, image eyedropper |
 | `jwt` | JWT Debugger | ❌ | Decode headers + payloads |
 | `regex` | Regex Tester | ❌ | Live match highlighting, Web Worker |
-| `diff` | Diff | ❌ | Word-level text diff, structural JSON diff |
+| `diff` | Diff | ❌ | CodeMirror merge view (live diff, revert chunks), structural JSON diff |
 | `markdown` | Markdown | ❌ | Live preview, GFM |
 | `deduplicate` | Deduplicate | ❌ | Remove duplicate lines, Web Worker |
 | `kafka-explorer` | Kafka Explorer | ❌ | Topics, partitions, consumer groups, live produce/consume |
@@ -1004,7 +1004,7 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 - `lapin` (Rust, v4.x) — AMQP 0-9-1 client; TLS via `rustls-platform-verifier` (OS trust store) + optional CA PEM / PKCS#12 mTLS
 - `local-ip-address` + `hostname` (Rust) — back `local_network_info` for Network tool Local Network view
 - `netstat2` + `sysinfo` (Rust) — back `list_listening_ports` for Network tool Ports view
-- `diff` — text diffing
+- `@codemirror/merge` — side-by-side diff/merge view (Diff tool's `DiffMergeView`)
 - `qrcode` — QR generation
 - `jsqr` — QR image decoding
 - `react-markdown` — markdown rendering

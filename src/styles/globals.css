@@ -49,6 +49,61 @@
     text-rendering: auto;
   }
 
+  /* ── @codemirror/merge chrome (Diff tool) ──────────────────────────────
+     `.cm-mergeView` sizes itself via natural flow + its own overflow-y:auto
+     (not the flex .cm-editor pattern documented above), so give it flex
+     sizing directly rather than the usual height:100% trap. The color rules
+     below replace the package's hardcoded hex defaults with the app's own
+     red/green scale (matching Badge's success/danger tones) so the diff reads
+     as part of DevTool rather than an embedded third-party widget. `!important`
+     is needed because CodeMirror injects its own theme as a runtime <style>
+     that lands after this stylesheet, at equal selector specificity. */
+  .diff-merge-view {
+    /* Tailwind's emerald-500 in raw H S% L% (no hex-in-CSS-function support),
+       matching Badge's tone="success" so "added" reads the same color
+       everywhere in the app. */
+    --diff-added: 160 84% 39%;
+  }
+  .diff-merge-view .cm-mergeView {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .diff-merge-view .cm-merge-a .cm-changedLine,
+  .diff-merge-view .cm-deletedChunk {
+    background-color: hsl(var(--destructive) / 0.08) !important;
+  }
+  .diff-merge-view .cm-merge-b .cm-changedLine {
+    background-color: hsl(var(--diff-added) / 0.08) !important;
+  }
+  .diff-merge-view .cm-merge-a .cm-changedText,
+  .diff-merge-view .cm-deletedChunk .cm-deletedText {
+    background: linear-gradient(hsl(var(--destructive) / 0.5), hsl(var(--destructive) / 0.5)) bottom / 100% 2px no-repeat !important;
+  }
+  .diff-merge-view .cm-merge-b .cm-changedText {
+    background: linear-gradient(hsl(var(--diff-added) / 0.6), hsl(var(--diff-added) / 0.6)) bottom / 100% 2px no-repeat !important;
+  }
+  .diff-merge-view .cm-changedLineGutter,
+  .diff-merge-view .cm-deletedLineGutter {
+    background: hsl(var(--destructive)) !important;
+  }
+  .diff-merge-view .cm-merge-b .cm-changedLineGutter {
+    background: hsl(var(--diff-added)) !important;
+  }
+  .diff-merge-view .cm-collapsedLines {
+    color: hsl(var(--muted-foreground)) !important;
+    background: hsl(var(--muted) / 0.6) !important;
+  }
+  .diff-merge-view .cm-merge-revert button {
+    color: hsl(var(--muted-foreground));
+    border-radius: 4px;
+    transition: background-color 150ms, color 150ms;
+  }
+  .diff-merge-view .cm-merge-revert button:hover {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
   /* Inputs and buttons don't inherit the font by default in some webviews */
   button,
   input,
