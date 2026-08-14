@@ -180,6 +180,10 @@ export interface Collection {
   collapsed?: boolean;
   script?: RequestScript;   // inherited by all requests
   auth?: Auth;              // inherited by requests with 'inherit' auth
+  // Shared defaults for every request in the collection, regardless of which
+  // environment is active. Lower precedence than the environment — see
+  // engine.ts's varMap() — so an environment value still overrides it.
+  variables?: KeyValue[];
 }
 
 export interface Environment {
@@ -302,6 +306,10 @@ export function newCollection(name = 'New Collection'): Collection {
   return { id: uid(), name, items: [] };
 }
 
-export function newEnvironment(name = 'New Environment', collectionId: string | null = null): Environment {
-  return { id: uid(), name, variables: [], collectionId };
+export function newEnvironment(
+  name = 'New Environment',
+  collectionId: string | null = null,
+  variables: KeyValue[] = [],
+): Environment {
+  return { id: uid(), name, variables, collectionId };
 }

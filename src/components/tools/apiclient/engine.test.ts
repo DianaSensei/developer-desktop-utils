@@ -114,6 +114,37 @@ describe('executeRequest — variables', () => {
     expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://data.test/runtime');
   });
 
+  it('lets a collection variable apply when nothing else overrides it', async () => {
+    const spy = stubJson('{}');
+    await executeRequest(
+      req({ url: 'https://{{host}}/x' }),
+      null, {}, undefined, { pre: [], post: [] }, [], {}, undefined, {},
+      { host: 'collection.test' },
+    );
+    expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://collection.test/x');
+  });
+
+  it('lets the environment override a collection variable of the same name', async () => {
+    const spy = stubJson('{}');
+    await executeRequest(
+      req({ url: 'https://{{host}}/x' }),
+      env({ host: 'env.test' }), {}, undefined, { pre: [], post: [] }, [], {}, undefined, {},
+      { host: 'collection.test' },
+    );
+    expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://env.test/x');
+  });
+
+  it('lets vault still take lowest precedence under a collection variable', async () => {
+    const spy = stubJson('{}');
+    await executeRequest(
+      req({ url: 'https://{{host}}/x' }),
+      null, {}, undefined, { pre: [], post: [] }, [], {}, undefined,
+      { host: 'vault.test' },
+      { host: 'collection.test' },
+    );
+    expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://collection.test/x');
+  });
+
   it('exposes declarative post-response vars to later scripts', async () => {
     stubJson('{"id":42}');
     const r = await executeRequest(

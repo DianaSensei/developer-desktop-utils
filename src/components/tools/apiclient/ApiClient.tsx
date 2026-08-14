@@ -23,6 +23,7 @@ import { VaultManager } from './VaultManager';
 import { GenerateCodeDialog } from './GenerateCodeDialog';
 import { RunnerDialog } from './RunnerDialog';
 import { CookieManager } from './CookieManager';
+import { RuntimeVarsInspector } from './RuntimeVarsInspector';
 import { useApiStore } from './store';
 import { executeRequest, errToString } from './engine';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
@@ -64,6 +65,7 @@ export function ApiClient() {
   const [vaultOpen, setVaultOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [cookiesOpen, setCookiesOpen] = useState(false);
+  const [runtimeVarsOpen, setRuntimeVarsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [runTarget, setRunTarget] = useState<{ title: string; requests: ApiRequest[] } | null>(null);
   const [direction, setDirection] = usePersistentState<SplitDirection>(
@@ -207,7 +209,7 @@ export function ApiClient() {
   // the Runner already keeps the full request/response for each of its runs.
   const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal) => {
     const jar = store.cookiesEnabled ? store.cookies : [];
-    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars);
+    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars, store.getCollectionVars(req.id));
     persistResult(req, result, false);
     return result;
   }, [store, persistResult]);
@@ -226,7 +228,7 @@ export function ApiClient() {
     patchRun(id, { sending: true, error: null });
     try {
       const jar = store.cookiesEnabled ? store.cookies : [];
-      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current, store.vaultVars);
+      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current, store.vaultVars, store.activeCollectionVars);
       persistResult(activeRequest, result);
       if (!isCurrent()) return;
       patchRun(id, {
@@ -300,18 +302,19 @@ export function ApiClient() {
     setRunTarget({ title, requests });
   }, []);
 
-  // Merged variable map (environment + session runtime vars) for code generation.
+  // Merged variable map (collection + environment + session runtime vars) for
+  // code generation.
   const codeVars = useCallback((): VarMap => {
     const env = store.activeEnv;
-    const vars: VarMap = { ...runtimeVarsRef.current };
+    const vars: VarMap = { ...store.activeCollectionVars, ...runtimeVarsRef.current };
     if (env) for (const v of env.variables) if (v.enabled && v.key) vars[v.key] = v.value;
     return vars;
-  }, [store.activeEnv]);
+  }, [store.activeEnv, store.activeCollectionVars]);
 
   // Known variables (name → current value) for {{ }} highlighting, autocomplete,
   // and hover-value tooltips in inputs.
   const varMap = useMemo(() => {
-    const map: VarMap = { ...runtimeVarsRef.current };
+    const map: VarMap = { ...store.activeCollectionVars, ...runtimeVarsRef.current };
     if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) map[v.key] = v.value;
     if (activeRequest) for (const v of activeRequest.vars.req) if (v.name) map[v.name] = v.value;
     // Vault secrets are recognized (for highlight/autocomplete) but their
@@ -321,7 +324,13 @@ export function ApiClient() {
     return map;
     // runtimeVarsVersion is intentionally a dep: the ref mutates invisibly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.activeEnv, store.vault, activeRequest, runtimeVarsVersion]);
+  }, [store.activeEnv, store.activeCollectionVars, store.vault, activeRequest, runtimeVarsVersion]);
+
+  // Runtime vars only (bru.setVar / declarative Vars tab), for the standalone
+  // inspector — unlike `varMap` above, this excludes collection/env/vault so
+  // it shows exactly what a script could read back with bru.getVar/getVars.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const runtimeVars = useMemo(() => ({ ...runtimeVarsRef.current }), [runtimeVarsVersion]);
 
   const run = activeRequest ? (runs[activeRequest.id] ?? EMPTY_RUN) : EMPTY_RUN;
 
@@ -411,12 +420,15 @@ export function ApiClient() {
         onSearch={() => searchInputRef.current?.focus()}
         onCookies={() => setCookiesOpen(true)}
         cookieCount={store.cookies.length}
+        onRuntimeVars={() => setRuntimeVarsOpen(true)}
+        runtimeVarCount={Object.keys(runtimeVars).length}
         sandboxDegraded={sandboxDegraded}
       />
 
       <EnvironmentEditor store={store} open={envOpen} onClose={() => setEnvOpen(false)} />
       <VaultManager store={store} open={vaultOpen} onClose={() => setVaultOpen(false)} />
       <CookieManager store={store} open={cookiesOpen} onClose={() => setCookiesOpen(false)} />
+      <RuntimeVarsInspector vars={runtimeVars} open={runtimeVarsOpen} onClose={() => setRuntimeVarsOpen(false)} />
       <GenerateCodeDialog
         open={codeOpen}
         onClose={() => setCodeOpen(false)}
