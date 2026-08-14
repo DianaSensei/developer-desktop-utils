@@ -2,7 +2,7 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { PaneHeader } from '@/components/ui/tool-layout';
-import { Textarea } from '@/components/ui/textarea';
+import { CodeViewer, JsonSyntaxEditor } from '@/design-system';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -20,7 +20,6 @@ import { cn } from '@/lib/utils';
 import { SearchInput } from '@/components/ui/search-input';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useInputHistory } from '@/hooks/useInputHistory';
 import { SplitPane } from '@/components/ui/split-pane';
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -448,14 +447,13 @@ export function JsonFormatter() {
   const [hoveredContainer, setHoveredContainer] = useState('');
 
   useQuickPaste((text) => setInput(normalizeSmartQuotes(text)));
-  useInputHistory(input, setInput);
 
   const indent = INDENT_OPTIONS[indentKey] ?? INDENT_OPTIONS['2'];
   const forceExpand = query.trim().length > 0;
   const lowerQuery = query.trim().toLowerCase();
 
   // Parsing + flattening + serialization all key off the raw input and run on
-  // every keystroke. Defer the input so the textarea stays responsive while
+  // every keystroke. Defer the input so the editor stays responsive while
   // parsing a large document; the derived views update at low priority.
   const deferredInput = useDeferredValue(input);
   const parsed = useMemo<{ value: JsonValue | undefined; error: string }>(() => {
@@ -554,12 +552,13 @@ export function JsonFormatter() {
   const inputPanel = (
     <div className="h-full border-b border-border flex flex-col">
       <PaneHeader label="Input" hint={quickPasteHint} />
-      <Textarea
-        value={input}
-        onChange={(event) => setInput(event.target.value)}
-        placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
-        className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-xs p-4"
-      />
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
+        <JsonSyntaxEditor
+          value={input}
+          onChange={setInput}
+          placeholder={'{"key": "value"}  or  "{\\"key\\": \\"value\\"}"'}
+        />
+      </div>
     </div>
   );
 
@@ -657,11 +656,9 @@ export function JsonFormatter() {
               label={mode === 'string' ? 'JSON String' : 'Minified'}
               action={<CopyButton value={() => outputText} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />}
             />
-            <Textarea
-              value={outputText}
-              readOnly
-              className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-xs p-4"
-            />
+            <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
+              <CodeViewer value={outputText} language="json" />
+            </div>
           </>
         )}
 

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { TextEditor } from '@/design-system';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchInput } from '@/components/ui/search-input';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -771,13 +771,11 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
               <ClipboardPaste className="h-3 w-3" /> Paste
             </Button>
           </div>
-          <Textarea
+          <TextEditor
             value={rawText}
-            onChange={(e) => { setRawText(e.target.value); setFileError(''); }}
-            placeholder="otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP&issuer=Example
-otpauth-migration://offline?data=…"
-            className="h-20 text-[11px] font-mono resize-none"
-            spellCheck={false}
+            onChange={(v) => { setRawText(v); setFileError(''); }}
+            placeholder={'otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP&issuer=Example\notpauth-migration://offline?data=…'}
+            className="h-20"
           />
           {fileError && <p className="text-[11px] text-destructive">{fileError}</p>}
         </div>

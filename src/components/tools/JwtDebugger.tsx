@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { PaneHeader } from '@/components/ui/tool-layout';
+import { CodeViewer } from '@/design-system';
 import { Shield } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -53,19 +54,15 @@ export function JwtDebugger() {
           <>
             <div className="space-y-2">
               <div className="text-xs font-semibold text-primary uppercase tracking-wider">Header</div>
-              <Textarea
-                value={decoded.header}
-                readOnly
-                className="min-h-[100px] font-mono text-sm bg-primary/[0.06] dark:bg-primary/[0.10] border-primary/20 rounded-lg focus-visible:ring-primary/20"
-              />
+              <div className="flex min-h-[100px] flex-col overflow-hidden rounded-lg border border-primary/20 bg-primary/[0.06] dark:bg-primary/[0.10]">
+                <CodeViewer value={decoded.header} language="json" />
+              </div>
             </div>
             <div className="space-y-2">
               <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Payload</div>
-              <Textarea
-                value={decoded.payload}
-                readOnly
-                className="min-h-[180px] font-mono text-sm bg-purple-50/70 dark:bg-purple-950/20 border-purple-200/50 dark:border-purple-900/40 rounded-lg focus-visible:ring-purple-500/20"
-              />
+              <div className="flex min-h-[180px] flex-col overflow-hidden rounded-lg border border-purple-200/50 bg-purple-50/70 dark:border-purple-900/40 dark:bg-purple-950/20">
+                <CodeViewer value={decoded.payload} language="json" />
+              </div>
             </div>
             <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/40 rounded-lg">
               <p className="text-xs text-amber-800 dark:text-amber-300">

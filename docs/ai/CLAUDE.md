@@ -1008,6 +1008,7 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 - `qrcode` — QR generation
 - `jsqr` — QR image decoding
 - `react-markdown` — markdown rendering
+- `@codemirror/lang-markdown` — markdown syntax highlighting (Markdown tool's source pane)
 - `@faker-js/faker` — fake data generation
 - `date-fns` — date formatting
 - `lodash` — utility functions

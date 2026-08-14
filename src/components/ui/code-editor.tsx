@@ -32,6 +32,15 @@ export function JsonEditor(props: CodeEditorProps) {
   return <CodeSurface {...props} lang={jsonLang} extraExtensions={jsonLint} />;
 }
 
+/** JSON syntax highlighting without the strict inline linter — for surfaces
+ *  that accept a JSON *superset* (comments, trailing commas, unquoted keys)
+ *  and validate it themselves. `jsonParseLinter` only understands strict
+ *  JSON, so pairing it with a lenient parser would flag input the tool
+ *  itself considers valid. Used by the JSON Formatter's raw input. */
+export function JsonSyntaxEditor(props: CodeEditorProps) {
+  return <CodeSurface {...props} lang={jsonLang} />;
+}
+
 /** JavaScript editing — pre/post-request scripts, tests. */
 export function JavaScriptEditor(props: CodeEditorProps) {
   return <CodeSurface {...props} lang={jsLang} />;

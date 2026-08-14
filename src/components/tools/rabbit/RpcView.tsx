@@ -6,7 +6,6 @@ import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -369,8 +368,13 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
               </>}
             </div>
             <div>
-              <Label htmlFor="rpc-headers" className="text-xs">Headers (JSON object)</Label>
-              <Textarea id="rpc-headers" value={headersText} onChange={(e) => { setHeadersText(e.target.value); reset(); }} placeholder={'{"__TypeId__": "com.example.MyRequest"}'} className="mt-1 font-mono text-xs min-h-16" />
+              <Label className="text-xs">Headers (JSON object)</Label>
+              <JsonEditor
+                value={headersText}
+                onChange={(v) => { setHeadersText(v); reset(); }}
+                placeholder={'{"__TypeId__": "com.example.MyRequest"}'}
+                className="mt-1 min-h-16"
+              />
             </div>
           </CollapsibleSection>
 

@@ -65,7 +65,7 @@ export {
 // (display-only, so no per-language behavior to gate). InlineCodeField is the
 // single-line {{variable}}-aware field (URL bars, key/value rows) — not a
 // "code editor" in this sense, no grammar, no multi-line.
-export { JsonEditor, JavaScriptEditor, SqlEditor, TextEditor, type CodeEditorProps } from '@/components/ui/code-editor';
+export { JsonEditor, JsonSyntaxEditor, JavaScriptEditor, SqlEditor, TextEditor, type CodeEditorProps } from '@/components/ui/code-editor';
 export { CodeViewer, type CodeViewerProps } from '@/components/ui/code-viewer';
 export { InlineCodeField, type InlineCodeFieldProps } from '@/components/ui/inline-code-field';
 
