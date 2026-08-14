@@ -1047,6 +1047,35 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 
 ---
 
+## Knowledge Log — mandatory
+
+Any session that debugs a non-obvious bug, uncovers a gotcha, or makes a
+design/architecture decision worth remembering **must** write it down before
+finishing the task — don't rely on conversation history or session memory;
+the next agent (possibly a future you, with none of this context) starts
+cold and will otherwise re-discover the same thing the hard way, or worse,
+re-break it.
+
+- **`docs/knowledge/experience-log.md`** — append-only log of debugging/
+  troubleshooting experience: a bug found, its root cause, the fix, and —
+  the actual point of the log — a **general lesson** stated broadly enough to
+  prevent the same *class* of mistake next time, not just this one instance.
+  One `## [YYYY-MM-DD] <area> — <short problem>` entry per item; match the
+  structure of the existing entries in that file exactly (root cause /
+  attempt count / outcome / fix / general lesson).
+- **`docs/decisions/<topic>.md`** — one file per non-trivial design decision
+  (a new subsystem, a chosen approach among real alternatives, a flow with
+  several interacting parts): the approach chosen, why, and known risk /
+  follow-up work. See `onboarding-flow.md` for the template and depth
+  expected — a flow diagram where one clarifies the design is welcome.
+
+These are two different documents for two different kinds of memory — don't
+conflate them. Append new knowledge-log entries to the existing file; start a
+fresh file per topic under `docs/decisions/`. Write for the next reader, not
+for wrapping up the current conversation — a decision or fix that isn't
+written here effectively didn't happen, as far as future work on this repo
+is concerned.
+
 ## Docs
 
 | File | Contents |
@@ -1056,6 +1085,8 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 | [TOOLS.md](../human/TOOLS.md) | Per-tool transparency: system access, permissions, storage, risk |
 | [kafka-explorer.md](../human/kafka-explorer.md) | Kafka Explorer — full operation-level Kafka API reference |
 | [design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md) | Design system — tokens, utilities, components, accessibility |
+| [knowledge/experience-log.md](../knowledge/experience-log.md) | Debugging/troubleshooting experience log — append new entries here (see Knowledge Log above) |
+| [decisions/](../decisions/) | One file per non-trivial design/architecture decision — see Knowledge Log above |
 
 ---
 
