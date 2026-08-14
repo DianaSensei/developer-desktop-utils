@@ -5,7 +5,9 @@ import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
+  RotateCw, HardDrive, LayoutGrid, Cog,
 } from 'lucide-react';
+import { getAppPermissionGroups } from '@/lib/appPermissions';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import {
@@ -68,53 +70,20 @@ function GitHubIcon({ className }: { className?: string }) {
   );
 }
 
-const APP_PERMISSIONS = [
-  {
-    Icon: Clipboard,
-    name: 'Clipboard',
-    scope: 'System clipboard only',
-    reasons: [
-      { text: 'Read text you\'ve copied for quick paste', tool: 'All tools' },
-      { text: 'Write tool output to your clipboard', tool: 'All tools' },
-      { text: 'Read and write images for paste/copy', tool: 'Image ↔ Base64 · QR Code' },
-    ],
-  },
-  {
-    Icon: FolderOpen,
-    name: 'File System',
-    scope: 'AppData folder + app resources only',
-    reasons: [
-      { text: 'Read files to hash them', tool: 'Checksum' },
-      { text: 'Read and convert image files', tool: 'Image ↔ Base64' },
-      { text: 'Save broker configs to app data', tool: 'Kafka Explorer' },
-    ],
-  },
-  {
-    Icon: FolderClosed,
-    name: 'File Dialogs',
-    scope: 'Triggered by you only',
-    reasons: [
-      { text: 'Open file picker to browse for files', tool: 'Checksum, Image ↔ Base64' },
-      { text: 'Save dialog to export generated files', tool: 'QR Code' },
-      { text: 'Import / export Postman collections', tool: 'API Client' },
-    ],
-  },
-  {
-    Icon: Globe,
-    name: 'Network',
-    scope: 'Brokers you add + URLs you send to + a local HTTP listener you start + DNS/IP services you query + update check',
-    reasons: [
-      { text: 'Connect to Kafka brokers you configure', tool: 'Kafka Explorer' },
-      { text: 'Send HTTP requests to URLs you enter', tool: 'API Client' },
-      { text: 'Open a local HTTP listener on a port you choose (127.0.0.1, or 0.0.0.0 to expose on your LAN); responses can run sandboxed Rhai scripts with no file or network access', tool: 'Mock Server' },
-      { text: 'Run DNS record, propagation & DNSSEC lookups', tool: 'Network Tools' },
-      { text: 'Look up public IP & geolocation', tool: 'Network Tools' },
-      { text: 'Read this machine\'s local network info', tool: 'Network Tools' },
-      { text: 'List local listening ports and the owning process (read locally — nothing is sent)', tool: 'Network Tools' },
-      { text: 'Check GitHub for app updates', tool: 'Auto-update' },
-    ],
-  },
-];
+const PERMISSION_NAMESPACE_ICONS: Record<string, typeof Clipboard> = {
+  'clipboard-manager': Clipboard,
+  fs: FolderOpen,
+  dialog: FolderClosed,
+  opener: Compass,
+  http: Globe,
+  core: Shield,
+  process: RotateCw,
+  updater: RefreshCw,
+  store: HardDrive,
+  'window-state': LayoutGrid,
+};
+
+const APP_PERMISSION_GROUPS = getAppPermissionGroups();
 
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools, isFavorite, toggleFavorite } = useFeatures();
@@ -383,7 +352,7 @@ export function Settings() {
         {permsOpen && (
         <>
         <p className="text-[11px] text-muted-foreground -mt-1">
-          DevTool cannot access your files outside the listed scope. Network access is limited to Kafka brokers you configure, DNS/IP lookups you run in Network Tools, and the app update check — no telemetry or analytics.
+          Generated directly from src-tauri/capabilities/default.json — every permission the app can request is listed below, grouped by plugin, with its exact declaration.
         </p>
         {!isTauri && (
           <p className="text-[11px] text-amber-500 dark:text-amber-400">
@@ -391,23 +360,42 @@ export function Settings() {
           </p>
         )}
         <div className="rounded-lg border divide-y">
-          {APP_PERMISSIONS.map(({ Icon, name, reasons }) => (
-            <div key={name} className="flex items-start gap-3 px-4 py-3">
-              <Icon className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
-              <div className="flex-1 min-w-0 space-y-1.5">
-                <p className="text-xs font-medium">{name}</p>
-                <ul className="space-y-1">
-                  {reasons.map((r) => (
-                    <li key={r.text} className="flex items-baseline gap-2 text-[11px] text-muted-foreground leading-relaxed">
-                      <span className="mt-px text-muted-foreground/40">•</span>
-                      <span className="flex-1">{r.text}</span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground/60">{r.tool}</span>
-                    </li>
-                  ))}
-                </ul>
+          {APP_PERMISSION_GROUPS.map(({ namespace, name, permissions }) => {
+            const Icon = PERMISSION_NAMESPACE_ICONS[namespace] ?? Cog;
+            return (
+              <div key={namespace} className="flex items-start gap-3 px-4 py-3">
+                <Icon className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <p className="text-xs font-medium">
+                    {name} <span className="font-mono text-muted-foreground/60">{namespace}</span>
+                  </p>
+                  <ul className="space-y-1.5">
+                    {permissions.map((p) => (
+                      <li key={p.identifier} className="text-[11px] leading-relaxed">
+                        <div className="flex items-baseline gap-2">
+                          <span className="mt-px text-muted-foreground/40">•</span>
+                          <code className="flex-1 min-w-0 truncate font-mono text-muted-foreground/80">{p.identifier}</code>
+                        </div>
+                        {p.description && (
+                          <p className="pl-4 text-muted-foreground">{p.description}</p>
+                        )}
+                        {p.allowUrls && p.allowUrls.length > 0 && (
+                          <ul className="pl-4 mt-0.5 space-y-0.5">
+                            {p.allowUrls.map((url) => (
+                              <li key={url} className="flex items-baseline gap-2">
+                                <span className="mt-px text-muted-foreground/30">–</span>
+                                <code className="font-mono text-muted-foreground/70 break-all">{url}</code>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         </>
         )}
