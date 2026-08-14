@@ -26,6 +26,36 @@ import { formatBytes, prettyBody, statusColor } from './request';
 import { saveBinaryFile, saveTextFile } from './fileio';
 import { queryJson } from './jsonpath';
 import { CodeViewer } from '@/design-system';
+import type { RequestPanelTab } from './RequestPanel';
+
+// Labels scriptPhases.ts attaches to a request's *own* scripts (as opposed to
+// an inherited collection/folder script, which has no single tab of its own
+// to jump to) — mapped to the RequestPanel tab that holds that script.
+const SCRIPT_LABEL_TAB: Record<string, RequestPanelTab> = {
+  'Pre-request script': 'script',
+  'Post-response script': 'script',
+  'Test script': 'tests',
+};
+
+export interface ParsedScriptError {
+  label: string;
+  message: string;
+  jumpTab?: RequestPanelTab;
+}
+
+// engine.ts joins every failed phase into one `\n`-separated string, each
+// line already `${label}: ${message}` (see scriptPhases.ts's `run()`) — a
+// transport failure is the one exception, pushed with no label at all.
+// Splits that back into individual, attributable entries instead of one
+// undifferentiated block of text.
+export function parseScriptErrors(error: string): ParsedScriptError[] {
+  return error.split('\n').map((line) => {
+    const idx = line.indexOf(': ');
+    if (idx === -1) return { label: '', message: line };
+    const label = line.slice(0, idx);
+    return { label, message: line.slice(idx + 2), jumpTab: SCRIPT_LABEL_TAB[label] };
+  });
+}
 
 type Kind = 'json' | 'html' | 'xml' | 'image' | 'text';
 type Format = 'json' | 'html' | 'xml' | 'javascript' | 'raw' | 'hex' | 'base64';
@@ -66,11 +96,14 @@ interface Props {
   tests: TestResult[];
   logs: LogEntry[];
   onClear?: () => void;
+  // Switches the request builder to the tab holding the script that failed
+  // (only own-request scripts map to one — see parseScriptErrors above).
+  onJumpToTab?: (tab: RequestPanelTab) => void;
 }
 
 type Tab = 'body' | 'headers' | 'timeline' | 'tests' | 'console';
 
-export function ResponsePanel({ response, sending, error, tests, logs, onClear }: Props) {
+export function ResponsePanel({ response, sending, error, tests, logs, onClear, onJumpToTab }: Props) {
   const [tab, setTab] = useState<Tab>('body');
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -259,9 +292,24 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear }
       </div>
 
       {error && (
-        <div className="flex max-h-28 shrink-0 items-start gap-2 overflow-auto border-b border-destructive/20 bg-destructive/8 px-3 py-2 text-xs text-destructive">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span className="whitespace-pre-wrap break-words">{error}</span>
+        <div className="flex max-h-40 shrink-0 flex-col divide-y divide-destructive/20 overflow-auto border-b border-destructive/20">
+          {parseScriptErrors(error).map((e, i) => (
+            <div key={i} className="flex items-start gap-2 bg-destructive/8 px-3 py-2 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+                {e.label && <span className="font-semibold">{e.label}: </span>}
+                {e.message}
+              </span>
+              {e.jumpTab && onJumpToTab && (
+                <button
+                  onClick={() => onJumpToTab!(e.jumpTab!)}
+                  className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium underline-offset-2 hover:underline"
+                >
+                  Open script
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

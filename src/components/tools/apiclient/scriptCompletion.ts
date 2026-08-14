@@ -106,6 +106,14 @@ const scriptScope = ns({
   console: consoleShape,
 });
 
+// Exposed only for scriptCompletion.test.ts's parity guard, which asserts
+// every real method on runtime.ts's makeBru/makeReq/makeRes/makePm/makeAssert/
+// makeConsole is present here — so a future runtime.ts change can't silently
+// go stale in autocomplete without a failing test flagging it.
+export const scriptCompletionShapes = {
+  bru: bruShape, req: reqShape, res: resShape, pm: pmShape, assert: assertShape, console: consoleShape,
+};
+
 const scriptApiCompletion = javascriptLanguage.data.of({
   autocomplete: scopeCompletionSource(scriptScope),
 });
