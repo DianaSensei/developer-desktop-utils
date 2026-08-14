@@ -383,7 +383,7 @@ A Postman/Bruno-style HTTP request workbench: organize requests into collections
 - `req` — read/modify the outgoing request (`getUrl`/`setUrl`, `setHeader`, `setBody`, …)
 - `res` — read the response (`getStatus`, `getBody`, `getHeader`, `responseTime`, …)
 - `expect` / `test` / `assert` / `console`
-- `require(...)` — a small set of bundled libraries: `lodash`, `crypto-js`, `uuid`
+- `require(...)` — a small set of bundled libraries: `lodash`, `crypto-js`, `uuid`, `jwt-decode`, `dayjs`
 - `pm` — a Postman compatibility shim (`pm.environment`, `pm.variables`, `pm.response`, `pm.test`, `pm.expect`, …) so many imported Postman scripts run without rewriting
 
 **Scripts execute in a sandboxed Web Worker**, off the main thread. The worker has the `bru`/`req`/`res`/`pm` API and the bundled `require` libraries, and **nothing else**: no DOM, no `localStorage`, and no Tauri IPC — so a script cannot reach the file system, the clipboard, or the shell. A script that never returns is killed once it passes the **script timeout** (Settings → Configuration → API Client, default 5 s), so a runaway loop cannot freeze the app. Scripts never run on their own — only as part of a Send you initiate. `console.log` output and test results appear in the response panel. Runtime variables set via `bru.setVar` are session-only and cleared on app restart; `bru.setEnvVar` writes persist to the active environment in `localStorage`.
