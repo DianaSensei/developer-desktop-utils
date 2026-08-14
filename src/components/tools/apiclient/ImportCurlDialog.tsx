@@ -1,16 +1,25 @@
 // Paste a cURL command to create a request (Bruno's "Import cURL").
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
-import { Textarea } from '@/components/ui/textarea';
+import { TextEditor } from '@/design-system';
 import { parseCurl } from './curl';
 import type { ApiStore } from './store';
 
 export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; open: boolean; onClose: () => void }) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const editorWrapRef = useRef<HTMLDivElement>(null);
+
+  // CodeSurface doesn't expose an autoFocus prop (unlike the plain <textarea>
+  // this replaced) — focus the CodeMirror content div directly once the
+  // dialog has mounted it, so pasting a command still works immediately.
+  useEffect(() => {
+    if (!open) return;
+    editorWrapRef.current?.querySelector<HTMLElement>('.cm-content')?.focus();
+  }, [open]);
 
   const handleImport = () => {
     setError(null);
@@ -34,14 +43,14 @@ export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; op
           <DialogTitle>Import cURL</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 p-4">
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={"curl -X POST https://api.example.com/login \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"user\":\"me\"}'"}
-            className="min-h-[180px] font-mono text-xs"
-            spellCheck={false}
-            autoFocus
-          />
+          <div ref={editorWrapRef}>
+            <TextEditor
+              value={text}
+              onChange={setText}
+              placeholder={"curl -X POST https://api.example.com/login \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"user\":\"me\"}'"}
+              className="min-h-[180px]"
+            />
+          </div>
           {error && <Callout tone="error" size="sm">{error}</Callout>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>

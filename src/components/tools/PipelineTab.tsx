@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
+import { JsonEditor } from '@/design-system';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Plus, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
@@ -491,17 +492,13 @@ function JsonInputSection({
 
   return (
     <div className="space-y-3">
-      {/* ── JSON textarea ── */}
+      {/* ── JSON editor ── */}
       <div className="relative">
-        <Textarea
+        <JsonEditor
           value={jsonText}
-          onChange={(e) => handleJsonChange(e.target.value)}
+          onChange={handleJsonChange}
           placeholder={'Paste JSON here\n\n{ "amount": "50000", "orderId": "abc", ... }'}
-          className={cn(
-            'min-h-[110px] font-mono text-xs resize-y leading-relaxed',
-            jsonError && jsonText.trim() && 'border-amber-400/60'
-          )}
-          spellCheck={false}
+          className={cn('min-h-[110px]', jsonError && jsonText.trim() && 'border-amber-400/60')}
         />
         {/* Validity badge */}
         {jsonText.trim() && (

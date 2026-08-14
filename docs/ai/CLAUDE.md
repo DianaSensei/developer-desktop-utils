@@ -789,7 +789,7 @@ git push origin main --tags
 | `color-picker` | Color Picker | ❌ | HEX/RGB/HSL/CMYK, image eyedropper |
 | `jwt` | JWT Debugger | ❌ | Decode headers + payloads |
 | `regex` | Regex Tester | ❌ | Live match highlighting, Web Worker |
-| `diff` | Diff | ❌ | Word-level text diff, structural JSON diff |
+| `diff` | Diff | ❌ | CodeMirror merge view (live diff, revert chunks), structural JSON diff |
 | `markdown` | Markdown | ❌ | Live preview, GFM |
 | `deduplicate` | Deduplicate | ❌ | Remove duplicate lines, Web Worker |
 | `kafka-explorer` | Kafka Explorer | ❌ | Topics, partitions, consumer groups, live produce/consume |
@@ -903,6 +903,33 @@ const theme = useCodeTheme(viewRef, { fontSize: '12px', gutter: 'flush', activeL
 
 Why the hook rather than a plain constant: CodeMirror chooses between its `&light` and `&dark` base rules from the flag passed to `EditorView.theme(spec, { dark })` — it cannot see the app's `.dark` class. A theme built without the flag pins the editor to CodeMirror's light base rules forever, so unstated surfaces (autocomplete tooltips, text-selection fill) stay light in dark mode. `useCodeTheme` supplies the flag and reconfigures a `Compartment` when the theme flips. Syntax colors live in `codeHighlight`, sourced from the `--sql-*` / `--js-*` tokens — add a tag there, and don't add fallback colors (the tokens are always defined).
 
+### CodeMirror `basicSetup` already includes more than it looks like
+
+`codemirror`'s `basicSetup` (used by every editor in this app, editable or bespoke) silently bundles keybindings that are easy to assume are missing and re-add — check before binding a key basicSetup already owns:
+
+| Shortcut | Command | From |
+|---|---|---|
+| `Mod-/` | toggle line comment | `defaultKeymap` |
+| `Mod-d` | select next occurrence (multi-cursor) | `searchKeymap` |
+| `Alt-↑` / `Alt-↓` | move line up/down | `defaultKeymap` |
+| `Shift-Alt-↑` / `Shift-Alt-↓` | duplicate line up/down | `defaultKeymap` |
+| `Mod-Alt-↑` / `Mod-Alt-↓` | add cursor above/below | `defaultKeymap` |
+| `Shift-Mod-k` | delete line | `defaultKeymap` |
+| `Shift-Mod-\` | jump to matching bracket | `defaultKeymap` |
+| `Mod-f` | open CodeMirror's own search panel | `searchKeymap` |
+| — | bracket matching highlight, bracket auto-close, fold gutter | `bracketMatching()`, `closeBrackets()`, `foldGutter()` |
+
+Because `Alt-↑`/`Alt-↓` are taken, the Diff tool's chunk-navigation (`DiffMergeView.tsx`) uses `F7` / `Shift-F7` instead (matching VS Code's diff editor) — don't reuse `Alt-↑`/`Alt-↓` for a new per-editor command; it'll lose to `moveLineUp`/`moveLineDown` (bound earlier in the same extensions array).
+
+`useDesktopChrome`'s global blocks on `⌘F`/`⌘[`/`⌘]` don't actually break the CodeMirror bindings above that share those keys — CodeMirror's listener is on the focused editor DOM (target phase), which always runs before `useDesktopChrome`'s `window`-level bubble-phase listener, so the editor's own handling already completed by the time the global one fires.
+
+### Completion & lint beyond the language grammar
+
+- `JsonEditor`/`SqlEditor` — `jsonParseLinter()` / a generic syntax-error linter (`src/components/ui/syntax-lint.ts`, flags whatever the lezer parser already marks as an error node — cheap, approximate, no real linter package needed).
+- `JavaScriptEditor` — **no** linter by default, because it also renders Mock Server's Rhai scripts (JS-like highlighting only; a JS-grammar linter would flag valid Rhai as broken). Pass `extraExtensions` to opt in per call site.
+- ApiClient's pre-request/post-response/test script editors pass `extraExtensions={scriptApiExtensions}` (`src/components/tools/apiclient/scriptCompletion.ts`) — bru/pm/req/res/assert/console autocomplete plus the syntax-error linter, since those scripts really do run as JavaScript. Built on `scopeCompletionSource` from `@codemirror/lang-javascript` against a hand-maintained plain-object shape of the real runtime API (kept in sync with `runtime.ts` by hand); the fluent `expect(x).to.be.true` chain is out of reach since it resolves through a function call, which the path walker doesn't follow.
+- `{{variable}}` completion/highlight/hover (`src/components/ui/var-support.ts`) is a separate, older mechanism (URL bar, key/value tables, request body) — unrelated to the two above.
+
 ---
 
 ## Dependencies Quick Reference
@@ -1004,10 +1031,12 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 - `lapin` (Rust, v4.x) — AMQP 0-9-1 client; TLS via `rustls-platform-verifier` (OS trust store) + optional CA PEM / PKCS#12 mTLS
 - `local-ip-address` + `hostname` (Rust) — back `local_network_info` for Network tool Local Network view
 - `netstat2` + `sysinfo` (Rust) — back `list_listening_ports` for Network tool Ports view
-- `diff` — text diffing
+- `@codemirror/merge` — side-by-side diff/merge view (Diff tool's `DiffMergeView`)
+- `@codemirror/lint` + `@codemirror/autocomplete` — imported directly for `syntax-lint.ts`'s generic error linter and ApiClient's `scriptCompletion.ts`, in addition to what `codemirror`'s `basicSetup` already wires up
 - `qrcode` — QR generation
 - `jsqr` — QR image decoding
 - `react-markdown` — markdown rendering
+- `@codemirror/lang-markdown` — markdown syntax highlighting (Markdown tool's source pane)
 - `@faker-js/faker` — fake data generation
 - `date-fns` — date formatting
 - `lodash` — utility functions
@@ -1018,6 +1047,35 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 
 ---
 
+## Knowledge Log — mandatory
+
+Any session that debugs a non-obvious bug, uncovers a gotcha, or makes a
+design/architecture decision worth remembering **must** write it down before
+finishing the task — don't rely on conversation history or session memory;
+the next agent (possibly a future you, with none of this context) starts
+cold and will otherwise re-discover the same thing the hard way, or worse,
+re-break it.
+
+- **`docs/knowledge/experience-log.md`** — append-only log of debugging/
+  troubleshooting experience: a bug found, its root cause, the fix, and —
+  the actual point of the log — a **general lesson** stated broadly enough to
+  prevent the same *class* of mistake next time, not just this one instance.
+  One `## [YYYY-MM-DD] <area> — <short problem>` entry per item; match the
+  structure of the existing entries in that file exactly (root cause /
+  attempt count / outcome / fix / general lesson).
+- **`docs/decisions/<topic>.md`** — one file per non-trivial design decision
+  (a new subsystem, a chosen approach among real alternatives, a flow with
+  several interacting parts): the approach chosen, why, and known risk /
+  follow-up work. See `onboarding-flow.md` for the template and depth
+  expected — a flow diagram where one clarifies the design is welcome.
+
+These are two different documents for two different kinds of memory — don't
+conflate them. Append new knowledge-log entries to the existing file; start a
+fresh file per topic under `docs/decisions/`. Write for the next reader, not
+for wrapping up the current conversation — a decision or fix that isn't
+written here effectively didn't happen, as far as future work on this repo
+is concerned.
+
 ## Docs
 
 | File | Contents |
@@ -1027,6 +1085,8 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 | [TOOLS.md](../human/TOOLS.md) | Per-tool transparency: system access, permissions, storage, risk |
 | [kafka-explorer.md](../human/kafka-explorer.md) | Kafka Explorer — full operation-level Kafka API reference |
 | [design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md) | Design system — tokens, utilities, components, accessibility |
+| [knowledge/experience-log.md](../knowledge/experience-log.md) | Debugging/troubleshooting experience log — append new entries here (see Knowledge Log above) |
+| [decisions/](../decisions/) | One file per non-trivial design/architecture decision — see Knowledge Log above |
 
 ---
 

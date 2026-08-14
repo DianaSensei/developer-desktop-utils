@@ -52,7 +52,7 @@ const DataConverter = lazy(() => named(import('@/components/tools/DataConverter'
 const JwtDebugger = lazy(() => named(import('@/components/tools/JwtDebugger'), 'JwtDebugger'));
 const RegexTester = lazy(() => named(import('@/components/tools/RegexTester'), 'RegexTester'));
 const Generator = lazy(() => named(import('@/components/tools/Generator'), 'Generator'));
-const TextDiff = lazy(() => named(import('@/components/tools/TextDiff'), 'TextDiff'));
+const TextDiff = lazy(() => named(import('@/components/tools/diff/TextDiff'), 'TextDiff'));
 const QRCodeTool = lazy(() => named(import('@/components/tools/QRCodeTool'), 'QRCodeTool'));
 const MarkdownPreview = lazy(() => named(import('@/components/tools/MarkdownPreview'), 'MarkdownPreview'));
 const ArrayDeduplicator = lazy(() => named(import('@/components/tools/ArrayDeduplicator'), 'ArrayDeduplicator'));

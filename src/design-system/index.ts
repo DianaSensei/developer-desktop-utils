@@ -59,13 +59,18 @@ export {
 } from '@/components/ui/data-table';
 
 // Code editors — one purpose-built component per language, each with only
-// the features that make sense for it (JSON gets an inline linter; SQL/JS
-// don't). Pick the one matching your content instead of a `language` prop —
-// see code-editor.tsx for why. CodeViewer is the one read-only surface
-// (display-only, so no per-language behavior to gate). InlineCodeField is the
-// single-line {{variable}}-aware field (URL bars, key/value rows) — not a
-// "code editor" in this sense, no grammar, no multi-line.
-export { JsonEditor, JavaScriptEditor, SqlEditor, TextEditor, type CodeEditorProps } from '@/components/ui/code-editor';
+// the features that make sense for it (JSON gets `jsonParseLinter`'s precise
+// whole-document check; JS/SQL get the cheaper syntax-error-node linter, since
+// neither has a real linter package). Pick the one matching your content
+// instead of a `language` prop — see code-editor.tsx for why. CodeViewer is
+// the one read-only surface (display-only, so no per-language behavior to
+// gate). InlineCodeField is the single-line {{variable}}-aware field (URL
+// bars, key/value rows) — not a "code editor" in this sense, no grammar, no
+// multi-line.
+export {
+  JsonEditor, JsonSyntaxEditor, JavaScriptEditor, SqlEditor, TextEditor,
+  type CodeEditorProps, type JavaScriptEditorProps,
+} from '@/components/ui/code-editor';
 export { CodeViewer, type CodeViewerProps } from '@/components/ui/code-viewer';
 export { InlineCodeField, type InlineCodeFieldProps } from '@/components/ui/inline-code-field';
 
@@ -78,6 +83,7 @@ export {
   codeTheme, codeThemeWithHighlight, codeHighlight, useCodeTheme, smartBracketSkip, CODE_FONT,
   type CodeThemeOptions,
 } from '@/components/ui/code-theme';
+export { syntaxErrorLinter } from '@/components/ui/syntax-lint';
 
 // Layout scaffolding
 export { ToolSection, ToolLabel, ToolHint, ToolContent, Field, type FieldProps } from '@/components/ui/tool-section';

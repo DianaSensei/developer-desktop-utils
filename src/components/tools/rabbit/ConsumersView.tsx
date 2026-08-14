@@ -5,7 +5,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Segmented } from '@/components/ui/segmented';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -15,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
 import { SectionLabel } from '@/components/ui/section-label';
+import { TextEditor } from '@/design-system';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection, QueueInfo, ConsumeAckMode } from './types';
 import { rabbitApi } from './types';
@@ -259,7 +259,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
           {!echo && (
             <div>
               <Label className="text-xs">Reply payload</Label>
-              <Textarea value={replyPayload} onChange={(e) => setReplyPayload(e.target.value)} placeholder='{"status":"ok"}' className="mt-1 font-mono text-xs min-h-20" />
+              <TextEditor value={replyPayload} onChange={setReplyPayload} placeholder='{"status":"ok"}' className="mt-1 min-h-20" />
             </div>
           )}
           <div>

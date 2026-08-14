@@ -268,12 +268,16 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 
   diff: makeGuide({
     use: [
-      'Paste the original on the left and the modified version on the right.',
-      'Text mode: word-level diff renders below — red = removed, green = added.',
-      'JSON mode: a syntax-highlighted editor that auto-formats each side (on paste and when you click away); changes are listed by path as added / removed / changed (old → new).',
+      'Paste (or type into) the original on the left and the modified version on the right — both panes stay editable.',
+      'Changes highlight inline as you type, with unchanged lines vertically aligned between the two sides so they stay in sync while scrolling.',
+      <>Click the <Tok>⇝</Tok> arrow next to a changed chunk to revert it — copies that chunk from Original into Modified.</>,
+      'JSON mode also auto-formats each side (on paste and on blur) and lists logical changes by key/index path below the diff, ignoring formatting and key order.',
     ],
-    know: ['Both modes update live as you type; JSON mode reports differences by key/index path, ignoring formatting and key order.'],
-    caveat: ['Text mode has no line/character or unified-diff export; JSON mode needs valid JSON on both sides (parse errors show in the result panel). Panes don’t scroll in sync.'],
+    know: [
+      'Fold unchanged lines with the collapse toggle to jump straight to the changes; F7 / Shift+F7 jump between chunks from the keyboard.',
+      'The +/− count in the toolbar reflects changed lines in the visual diff, not the structural JSON change list below it.',
+    ],
+    caveat: ['The structural JSON diff needs valid JSON on both sides (parse errors show inline) and skips itself on very large input — the line diff above still works regardless of size.'],
   }),
 
   qrcode: makeGuide({

@@ -1,5 +1,7 @@
 // Purpose-built code editors — one per language, each with only the features
-// that make sense for it (e.g. JSON gets an inline linter; SQL/JS don't).
+// that make sense for it (e.g. JSON gets `jsonParseLinter`'s precise
+// whole-document check; SQL/JS get the cheaper syntax-error-node linter,
+// since neither has a real linter package — see syntax-lint.ts).
 // Every tool that needs an editable code surface picks one of these instead
 // of reaching into CodeMirror or a `language` prop — swapping the engine
 // later, or adding a language-specific feature, touches this file only.
@@ -17,12 +19,18 @@ import { javascript } from '@codemirror/lang-javascript';
 import { json, jsonParseLinter } from '@codemirror/lang-json';
 import { sql } from '@codemirror/lang-sql';
 import { linter, lintGutter } from '@codemirror/lint';
+import type { Extension } from '@codemirror/state';
 import { CodeSurface, type CodeSurfaceProps } from '@/components/ui/code-editor-base';
+import { syntaxErrorLinter } from '@/components/ui/syntax-lint';
 
 const jsonLang = json();
 const jsLang = javascript();
 const sqlLang = sql();
 const jsonLint = [linter(jsonParseLinter()), lintGutter()];
+// JS/SQL have no dedicated linter package (unlike JSON) — flag whatever the
+// grammar itself already marks unparseable, which is still a real win over
+// nothing (unclosed strings/brackets, stray tokens).
+const syntaxLint = [syntaxErrorLinter(), lintGutter()];
 
 export interface CodeEditorProps extends CodeSurfaceProps {}
 
@@ -32,16 +40,39 @@ export function JsonEditor(props: CodeEditorProps) {
   return <CodeSurface {...props} lang={jsonLang} extraExtensions={jsonLint} />;
 }
 
-/** JavaScript editing — pre/post-request scripts, tests. */
-export function JavaScriptEditor(props: CodeEditorProps) {
-  return <CodeSurface {...props} lang={jsLang} />;
+/** JSON syntax highlighting without the strict inline linter — for surfaces
+ *  that accept a JSON *superset* (comments, trailing commas, unquoted keys)
+ *  and validate it themselves. `jsonParseLinter` only understands strict
+ *  JSON, so pairing it with a lenient parser would flag input the tool
+ *  itself considers valid. Used by the JSON Formatter's raw input. */
+export function JsonSyntaxEditor(props: CodeEditorProps) {
+  return <CodeSurface {...props} lang={jsonLang} />;
+}
+
+export interface JavaScriptEditorProps extends CodeEditorProps {
+  /** Extra extensions layered onto the base JS editor — e.g. ApiClient's
+   *  bru/pm/req/res completion source plus its syntax-error lint gutter (see
+   *  `scriptApiExtensions` in scriptCompletion.ts). Not baked in here because
+   *  `JavaScriptEditor` also renders Mock Server's Rhai scripts, which merely
+   *  borrow JS highlighting — a JS-grammar syntax linter would flag valid
+   *  Rhai as an error the moment its syntax diverges from JS's, and the
+   *  bru/pm/req/res completions are meaningless there. Omit for a plain JS
+   *  (or Rhai-via-JS-highlighting) editor. */
+  extraExtensions?: Extension[];
+}
+
+/** JavaScript editing — pre/post-request scripts, tests, Mock Server's Rhai
+ *  scripts (JS-like enough for useful highlighting; no Rhai grammar package
+ *  exists). */
+export function JavaScriptEditor({ extraExtensions = [], ...props }: JavaScriptEditorProps) {
+  return <CodeSurface {...props} lang={jsLang} extraExtensions={extraExtensions} />;
 }
 
 /** SQL editing (SQL Formatter uses its own bespoke setup for the SQL↔Mongo
  *  runtime language switch; this is for tools that just need a plain SQL
  *  surface, e.g. read-only SQL output). */
 export function SqlEditor(props: CodeEditorProps) {
-  return <CodeSurface {...props} lang={sqlLang} />;
+  return <CodeSurface {...props} lang={sqlLang} extraExtensions={syntaxLint} />;
 }
 
 /** No grammar — plain text, arbitrary formats (CSV, YAML, raw bodies, Rhai

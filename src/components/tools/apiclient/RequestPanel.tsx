@@ -21,6 +21,7 @@ import { InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/des
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
 import { AuthEditor } from './AuthEditor';
+import { scriptApiExtensions } from './scriptCompletion';
 import { urlWithParams } from './request';
 import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
@@ -104,6 +105,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
               value={request.tests}
               onChange={(tests) => onChange({ tests })}
               placeholder={'test("status is 200", function () {\n  expect(res.getStatus()).to.equal(200);\n});'}
+              extraExtensions={scriptApiExtensions}
             />
           </div>
         )}
@@ -124,6 +126,7 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           value={script.req}
           onChange={(v) => onChange({ script: { ...script, req: v } })}
           placeholder={"bru.setVar('ts', Date.now());\nreq.setHeader('X-Trace', 'abc');"}
+          extraExtensions={scriptApiExtensions}
         />
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
@@ -132,6 +135,7 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           value={script.res}
           onChange={(v) => onChange({ script: { ...script, res: v } })}
           placeholder={"bru.setVar('token', res.getBody().token);"}
+          extraExtensions={scriptApiExtensions}
         />
       </div>
     </div>
