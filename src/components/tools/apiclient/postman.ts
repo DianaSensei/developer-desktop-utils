@@ -25,7 +25,13 @@ import {
 // ─── loose types for the incoming JSON ──────────────────────────────────────
 
 interface PmKeyValue { key?: string; value?: string; disabled?: boolean }
-interface PmUrl { raw?: string; query?: PmKeyValue[] }
+// `variable` is Postman's path-variable array — its own convention is `:name`
+// directly in `raw`, paired with `{key, value}` entries here. Some other
+// tools (often OpenAPI-derived) instead write `{name}` in `raw` for the same
+// purpose; rewriteBraceStylePathParams below normalizes that on import so
+// this app's engine (which only understands `:name`) sees one consistent
+// syntax either way.
+interface PmUrl { raw?: string; query?: PmKeyValue[]; variable?: PmKeyValue[] }
 interface PmBody {
   mode?: string;
   raw?: string;
@@ -140,6 +146,22 @@ function rawUrl(url?: PmUrl | string): string {
   return url.raw ?? '';
 }
 
+// Rewrites literal `{name}` (single-brace) occurrences of a declared path
+// variable to `:name`, without touching `{{...}}` tokens (ordinary {{var}}
+// substitution, never a path variable) — done by masking them out first
+// rather than a regex lookbehind, since WKWebView (macOS's WebView engine)
+// didn't support lookbehind assertions until Safari 16.4.
+function rewriteBraceStylePathParams(raw: string, names: string[]): string {
+  if (!names.length || !raw.includes('{')) return raw;
+  const placeholders: string[] = [];
+  let masked = raw.replace(/\{\{[^{}]*\}\}/g, (m) => {
+    placeholders.push(m);
+    return ` ${placeholders.length - 1} `;
+  });
+  for (const name of names) masked = masked.split(`{${name}}`).join(`:${name}`);
+  return masked.replace(/ (\d+) /g, (_m, i: string) => placeholders[Number(i)]);
+}
+
 const execText = (e?: PmEvent): string => {
   const exec = e?.script?.exec;
   if (!exec) return '';
@@ -154,14 +176,16 @@ function importRequest(item: PmItem): ApiRequest {
   // adapted to Bruno's `bru`/`req`/`res` API after import.
   const preReq = execText(item.event?.find((e) => e.listen === 'prerequest'));
   const test = execText(item.event?.find((e) => e.listen === 'test'));
+  const pathParams = mapKv(url?.variable);
+  const normalizedUrl = rewriteBraceStylePathParams(rawUrl(r.url), pathParams.map((p) => p.key));
   return {
     type: 'request',
     id: uid(),
     name: item.name ?? 'Request',
     method: (HTTP_METHODS as readonly string[]).includes(method) ? (method as HttpMethod) : 'GET',
-    url: rawUrl(r.url),
+    url: normalizedUrl,
     params: mapKv(url?.query),
-    pathParams: [],
+    pathParams,
     headers: mapKv(r.header),
     body: importBody(r.body),
     auth: importAuth(r.auth ?? item.auth),
@@ -294,7 +318,11 @@ function exportRequest(req: ApiRequest): PmItem {
     request: {
       method: req.method,
       header: exportKv(req.headers),
-      url: { raw: req.url, query: req.params.length ? exportKv(req.params) : undefined },
+      url: {
+        raw: req.url,
+        query: req.params.length ? exportKv(req.params) : undefined,
+        variable: req.pathParams.length ? exportKv(req.pathParams) : undefined,
+      },
       body: exportBody(req.body),
       auth: exportAuth(req.auth),
     },

@@ -7,10 +7,11 @@
 // input the user is typing in is never remounted when it materializes — focus is
 // preserved. A "Bulk Edit" toggle swaps the table for a `key: value` textarea.
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
+import { Callout } from '@/components/ui/callout';
 import { InlineCodeField, TextEditor } from '@/design-system';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
 
@@ -35,9 +36,19 @@ interface Props {
   // marked secret (masked here, and excluded from codegen/export/history the
   // same way the Vault already is) without moving it out of its environment.
   secretToggle?: boolean;
+  // Shows a hint when two enabled rows share a key. `'params'` explains that
+  // both are sent (URLSearchParams.append keeps duplicates); `'headers'`
+  // explains that only the last one wins (a plain object assignment) — real
+  // HTTP semantics, not a bug, so this only makes the divergence visible.
+  duplicateKeyHint?: 'params' | 'headers';
 }
 
 const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
+
+const DUPLICATE_KEY_TEXT: Record<'params' | 'headers', string> = {
+  params: 'Both values are sent — repeated query params are all included.',
+  headers: 'Only the last value is sent — a repeated header name overwrites earlier ones.',
+};
 
 export function KeyValueEditor({
   rows,
@@ -50,6 +61,7 @@ export function KeyValueEditor({
   vars,
   masked = false,
   secretToggle = false,
+  duplicateKeyHint,
 }: Props) {
   const isMasked = (row: KeyValue) => (typeof masked === 'function' ? masked(row) : masked);
   const [bulk, setBulk] = useState(false);
@@ -69,6 +81,17 @@ export function KeyValueEditor({
   const realRows = rows.filter(isFilled);
   const ghost = ghostRef.current;
   const displayRows = [...realRows, ghost];
+
+  const hasDuplicateKeys = useMemo(() => {
+    if (!duplicateKeyHint) return false;
+    const seen = new Set<string>();
+    for (const r of realRows) {
+      if (!r.enabled || !r.key) continue;
+      if (seen.has(r.key)) return true;
+      seen.add(r.key);
+    }
+    return false;
+  }, [realRows, duplicateKeyHint]);
 
   const editRow = (id: string, patch: Partial<KeyValue>) => {
     if (id === ghost.id) {
@@ -245,6 +268,10 @@ export function KeyValueEditor({
           );
         })}
       </div>
+
+      {hasDuplicateKeys && duplicateKeyHint && (
+        <Callout tone="info" size="sm">Duplicate name — {DUPLICATE_KEY_TEXT[duplicateKeyHint]}</Callout>
+      )}
 
       {bulkEdit && (
         <div className="flex justify-end">

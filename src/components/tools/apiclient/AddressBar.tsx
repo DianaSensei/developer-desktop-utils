@@ -23,6 +23,9 @@ interface Props {
 }
 
 export function AddressBar({ request, onChange, onSend, onCancel, sending, onGenerateCode, vars }: Props) {
+  const pathParamValues: Record<string, string> = {};
+  for (const p of request.pathParams) if (p.enabled && p.key) pathParamValues[p.key] = p.value;
+
   // Typing in the URL keeps the Params table in sync. Ignore echoes where the
   // value is unchanged (e.g. when a params edit rewrote the URL).
   //
@@ -86,6 +89,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
             value={request.url}
             onChange={handleUrl}
             vars={vars}
+            pathParamValues={pathParamValues}
             onEnter={onSend}
             placeholder="https://api.example.com/users/{{id}}"
           />

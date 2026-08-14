@@ -2,7 +2,7 @@
 // URL + Send bar lives above the split (see AddressBar). Edits are written
 // straight back to the store so the request is always saved (Postman autosave).
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Braces, Check, ChevronDown, Code2, Database, File, FileText, FormInput,
   Hexagon, type LucideIcon, Tag, Trash2, X,
@@ -24,7 +24,8 @@ import { MultipartEditor } from './MultipartEditor';
 import { AuthEditor } from './AuthEditor';
 import { scriptApiExtensions } from './scriptCompletion';
 import { scriptCallsNetwork } from './collectionScripts';
-import { urlWithParams } from './request';
+import { authQueryParam, buildUrl, urlWithParams } from './request';
+import { substituteVars } from './vars';
 import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
   type KeyValue, type VarDef, type VarMap, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
@@ -81,16 +82,18 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {tab === 'params' && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+            <ResolvedUrlPreview request={request} vars={vars} />
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Query</Label>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
-              <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params, url: urlWithParams(request.url, params) })} vars={vars} />
+              <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params, url: urlWithParams(request.url, params) })} vars={vars} duplicateKeyHint="params" />
+              <AuthQueryParamRow request={request} />
             </div>
             <PathParamsEditor request={request} onChange={onChange} vars={vars} />
           </div>
         )}
         {tab === 'headers' && (
-          <div className="min-h-0 flex-1 overflow-y-auto p-3"><KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} /></div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3"><KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} duplicateKeyHint="headers" /></div>
         )}
         {tab === 'body' && <div className="flex min-h-0 flex-1 flex-col p-3"><BodyEditor request={request} onChange={onChange} vars={vars} /></div>}
         {tab === 'auth' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} vars={vars} /></div>}
@@ -292,6 +295,58 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
   );
 }
 
+// ─── resolved URL preview ──────────────────────────────────────────────────────
+
+// Read-only preview of the exact URL that will be sent — path params and query
+// params (including the derived auth-as-query-param row) merged in, {{var}}
+// substituted, and encoded per the request's "URL Encoding" setting. Makes
+// that setting's effect visible instead of only showing up in the actual send.
+function ResolvedUrlPreview({ request, vars }: { request: ApiRequest; vars: VarMap }) {
+  const resolved = useMemo(
+    () => buildUrl(request, (s) => substituteVars(s, vars)),
+    [request, vars],
+  );
+  if (!resolved) return null;
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">Resolved URL</Label>
+      <div className="overflow-x-auto rounded-md border bg-muted/20 px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
+        <span className="whitespace-nowrap">{resolved}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── auth-as-query-param ────────────────────────────────────────────────────────
+
+// The API-key auth entry, when placed as a query param (Auth tab), is folded
+// into the outgoing query string at send time without ever appearing in the
+// params table — shown here as a derived, read-only row so it isn't invisible.
+function AuthQueryParamRow({ request }: { request: ApiRequest }) {
+  const derived = authQueryParam(request);
+  if (!derived) return null;
+  return (
+    <div className="overflow-hidden rounded-md border text-xs">
+      <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+        <div />
+        <div className="border-r px-3 py-1.5">From Auth (query)</div>
+        <div className="px-3 py-1.5" />
+        <div />
+      </div>
+      <div className="grid grid-cols-[1rem_1fr_1fr_2rem]">
+        <div className="flex items-center justify-center">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" title="Sent, derived from the Auth tab" />
+        </div>
+        <div className="flex h-9 items-center border-r px-2.5 font-mono text-muted-foreground">{derived.key}</div>
+        <div className="flex h-9 items-center px-2.5 font-mono text-muted-foreground">
+          {derived.value || <span className="opacity-50">(empty)</span>}
+        </div>
+        <div />
+      </div>
+    </div>
+  );
+}
+
 // ─── path params ──────────────────────────────────────────────────────────────
 
 function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void; vars: VarMap }) {
@@ -303,6 +358,16 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
     while ((m = re.exec(request.url))) if (!found.includes(m[1])) found.push(m[1]);
     return found;
   }, [request.url]);
+
+  // Drop pathParams rows whose :name no longer appears in the URL — otherwise
+  // a renamed/removed placeholder leaves a stale row behind forever (it just
+  // stops rendering, unlike query params, which paramsFromUrl already
+  // reconciles the same way on every URL edit).
+  useEffect(() => {
+    if (request.pathParams.every((p) => names.includes(p.key))) return;
+    onChange({ pathParams: request.pathParams.filter((p) => names.includes(p.key)) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [names, request.pathParams]);
 
   if (names.length === 0) return null;
 

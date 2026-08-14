@@ -33,10 +33,22 @@ const enabledPairs = (list: KeyValue[]): [string, string][] =>
 
 type Sub = (s: string) => string;
 
+// The API-key auth entry, when placed as a query param, isn't part of
+// `req.params` — buildUrl below folds it into the outgoing query string
+// silently. Exposed so the Params tab can show it as a derived, read-only row
+// instead of leaving it invisible until send time.
+export function authQueryParam(req: ApiRequest): { key: string; value: string } | null {
+  const { auth } = req;
+  if (auth.type === 'apikey' && auth.apiKey.placement === 'query' && auth.apiKey.key.trim()) {
+    return { key: auth.apiKey.key, value: auth.apiKey.value };
+  }
+  return null;
+}
+
 // Build the final URL: substitute vars, then append enabled query params.
 // When the request's URL-encoding setting is off, params are appended raw so the
 // user keeps full control of the query string (Bruno's "URL Encoding" toggle).
-function buildUrl(req: ApiRequest, sub: Sub): string {
+export function buildUrl(req: ApiRequest, sub: Sub): string {
   let base = sub(req.url).trim();
 
   // Substitute :placeholders in the path (only after a '/', so ports like :8080
