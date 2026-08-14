@@ -3,15 +3,20 @@
 // variables are substituted into URLs, headers, body, and auth at send time.
 
 import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Download, Layers, Plus, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IconButton } from '@/components/ui/icon-button';
 import { StatusDot } from '@/components/ui/status-dot';
+import { Callout } from '@/components/ui/callout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { KeyValueEditor } from './KeyValueEditor';
+import { pickJsonFile, saveJsonFile } from './fileio';
+import { exportEnvironmentNative, exportEnvironmentPostman, importEnvironment as parseEnvironmentFile } from './environments-io';
+import type { Environment } from './types';
 import type { ApiStore } from './store';
 
 interface Props {
@@ -20,50 +25,120 @@ interface Props {
   onClose: () => void;
 }
 
+// The list on the left can have either an environment or the active
+// collection's shared "Collection Variables" bag selected.
+type Selection = { kind: 'env'; id: string } | { kind: 'collectionVars' } | null;
+
 export function EnvironmentEditor({ store, open, onClose }: Props) {
   const { environments } = store;
-  const [selectedId, setSelectedId] = useState<string | null>(environments[0]?.id ?? null);
+  const [selection, setSelection] = useState<Selection>(
+    environments[0] ? { kind: 'env', id: environments[0].id } : null,
+  );
+  const [error, setError] = useState<string | null>(null);
 
   // Keep a valid selection as environments are added/removed.
   useEffect(() => {
-    if (selectedId && environments.some((e) => e.id === selectedId)) return;
-    setSelectedId(environments[0]?.id ?? null);
-  }, [environments, selectedId]);
+    if (selection?.kind === 'collectionVars') return;
+    if (selection?.kind === 'env' && environments.some((e) => e.id === selection.id)) return;
+    setSelection(environments[0] ? { kind: 'env', id: environments[0].id } : null);
+  }, [environments, selection]);
 
-  const selected = environments.find((e) => e.id === selectedId) ?? null;
+  const selected = selection?.kind === 'env' ? environments.find((e) => e.id === selection.id) ?? null : null;
   const activeCollection = store.collections.find((c) => c.id === store.activeCollectionId) ?? null;
   const collectionEnvs = environments.filter((e) => e.collectionId === store.activeCollectionId);
   const globalEnvs = environments.filter((e) => !e.collectionId);
 
+  const handleImport = async () => {
+    setError(null);
+    try {
+      const text = await pickJsonFile();
+      if (!text) return;
+      const env = parseEnvironmentFile(text);
+      const id = store.importEnvironment(env);
+      setSelection({ kind: 'env', id });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const handleExport = async (env: Environment, format: 'postman' | 'native') => {
+    setError(null);
+    try {
+      const json = format === 'postman' ? exportEnvironmentPostman(env) : exportEnvironmentNative(env);
+      const suffix = format === 'postman' ? '.postman_environment.json' : '.environment.json';
+      await saveJsonFile(`${env.name || 'environment'}${suffix}`, json);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl gap-0 p-0">
-        <DialogHeader className="border-b px-4 py-3">
+        <DialogHeader className="flex-row items-center justify-between border-b px-4 py-3">
           <DialogTitle>Environments</DialogTitle>
+          <IconButton onClick={handleImport} title="Import environment (Postman or this app's export)" className="mr-6">
+            <Upload className="h-4 w-4" />
+          </IconButton>
         </DialogHeader>
+        {error && <Callout tone="error" size="sm" className="mx-4 mt-3">{error}</Callout>}
 
         <div className="flex h-[26rem]">
           {/* list — grouped by scope */}
           <div className="flex w-56 shrink-0 flex-col overflow-y-auto border-r py-1">
+            {activeCollection && (
+              <div className="mb-2">
+                <button
+                  onClick={() => setSelection({ kind: 'collectionVars' })}
+                  className={cn(
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent/60',
+                    selection?.kind === 'collectionVars' && 'bg-accent',
+                  )}
+                >
+                  <Layers className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <span className="truncate">Collection Variables</span>
+                </button>
+              </div>
+            )}
             <Section
               title={activeCollection?.name ?? 'Collection'}
               disabled={!store.activeCollectionId}
-              onAdd={() => setSelectedId(store.addEnvironment(store.activeCollectionId))}
+              onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(store.activeCollectionId) })}
             >
               {collectionEnvs.map((e) => (
-                <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selectedId === e.id} onClick={() => setSelectedId(e.id)} />
+                <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
               ))}
             </Section>
-            <Section title="Global" onAdd={() => setSelectedId(store.addEnvironment(null))}>
+            <Section title="Global" onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(null) })}>
               {globalEnvs.map((e) => (
-                <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selectedId === e.id} onClick={() => setSelectedId(e.id)} />
+                <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
               ))}
             </Section>
           </div>
 
           {/* editor */}
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
-            {selected ? (
+            {selection?.kind === 'collectionVars' && activeCollection ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    {activeCollection.name}
+                  </span>
+                  <span className="text-sm font-medium">Collection Variables</span>
+                </div>
+                <KeyValueEditor
+                  rows={activeCollection.variables ?? []}
+                  onChange={(variables) => store.setCollectionVariables(activeCollection.id, variables)}
+                  keyPlaceholder="Variable"
+                  valuePlaceholder="Value"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Shared defaults for every request in this collection, regardless of which
+                  environment is active. An environment variable with the same name still
+                  overrides it.
+                </p>
+              </div>
+            ) : selected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -81,6 +156,18 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   >
                     {store.activeEnvId === selected.id ? 'Active' : 'Set active'}
                   </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      title="Export environment"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <Download className="h-4 w-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExport(selected, 'postman')}>Export (Postman)</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport(selected, 'native')}>Export (DevTool)</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button
                     variant="ghost"
                     size="icon"

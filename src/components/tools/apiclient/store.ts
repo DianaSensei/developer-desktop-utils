@@ -250,6 +250,20 @@ function collectInherited(collections: Collection[], id: string): InheritedScrip
   return { pre: [], post: [], auth: null };
 }
 
+// The owning collection's shared variable defaults for a request, looked up by
+// request id (not the "active collection") so this stays correct for requests
+// run from the Runner, which may not belong to whatever collection happens to
+// be focused in the sidebar.
+function collectCollectionVars(collections: Collection[], id: string): VarMap {
+  for (const c of collections) {
+    if (!findFolderPath(c.items, id, [])) continue;
+    const map: VarMap = {};
+    for (const v of c.variables ?? []) if (v.enabled && v.key) map[v.key] = v.value;
+    return map;
+  }
+  return {};
+}
+
 // ─── store hook ─────────────────────────────────────────────────────────────
 
 export function useApiStore() {
@@ -446,12 +460,28 @@ export function useApiStore() {
     }));
   }, [setCollections]);
 
+  const setCollectionVariables = useCallback((collectionId: string, variables: KeyValue[]) => {
+    setCollections((prev) => prev.map((c) => (c.id === collectionId ? { ...c, variables } : c)));
+  }, [setCollections]);
+
   // Inherited scripts/auth for any request id (used by the Runner).
   const getInherited = useCallback((id: string) => collectInherited(collections, id), [collections]);
 
   // Inherited (collection + folder) scripts for the request currently active.
   const inheritedScripts = useMemo(
     () => (activeRequestId ? collectInherited(collections, activeRequestId) : { pre: [], post: [], auth: null }),
+    [collections, activeRequestId],
+  );
+
+  // Collection variables for any request id (used by the Runner).
+  const getCollectionVars = useCallback(
+    (id: string) => collectCollectionVars(collections, id),
+    [collections],
+  );
+
+  // Collection variables for the request currently active.
+  const activeCollectionVars = useMemo(
+    () => (activeRequestId ? collectCollectionVars(collections, activeRequestId) : {}),
     [collections, activeRequestId],
   );
 
@@ -545,6 +575,14 @@ export function useApiStore() {
     return e.id;
   }, [setEnvironments]);
 
+  // Adds an already-built Environment (e.g. from environments-io.ts's
+  // importEnvironment) as a new entry, keeping its id — the caller is
+  // responsible for generating a fresh one so this can't collide.
+  const importEnvironment = useCallback((env: Environment) => {
+    setEnvironments((prev) => [...prev, env]);
+    return env.id;
+  }, [setEnvironments]);
+
   const updateEnvironment = useCallback((id: string, patch: Partial<Environment>) => {
     setEnvironments((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   }, [setEnvironments]);
@@ -594,13 +632,14 @@ export function useApiStore() {
 
   return {
     collections, environments, activeEnvId, activeEnv, activeEnvMismatched, selectedEnv, history, activeCollectionId,
-    activeRequestId, activeRequest, openRequests, inheritedScripts,
+    activeRequestId, activeRequest, openRequests, inheritedScripts, activeCollectionVars,
     setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, updateRequest, setNodeScript, setNodeAuth,
-    addEnvironment, updateEnvironment, deleteEnvironment,
+    setCollectionVariables,
+    addEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
     vault, setVault, vaultVars,
-    addHistory, clearHistory, getInherited,
+    addHistory, clearHistory, getInherited, getCollectionVars,
     cookies, cookiesEnabled, setCookiesEnabled,
     captureCookies, upsertCookie, deleteCookie, clearDomainCookies, clearCookies,
   };

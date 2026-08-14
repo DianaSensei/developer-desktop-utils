@@ -115,3 +115,82 @@ describe('useApiStore — addHistory secret redaction', () => {
     expect(result.current.history[0].response?.body).toBe('ok');
   });
 });
+
+describe('useApiStore — collection variables', () => {
+  it('resolves the owning collection variables for a request id, not the "active" collection', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    act(() => result.current.setCollectionVariables(firstCollectionId, [
+      { id: 'v1', key: 'host', value: 'first.test', enabled: true },
+    ]));
+    act(() => result.current.setCollectionVariables(secondCollectionId, [
+      { id: 'v2', key: 'host', value: 'second.test', enabled: true },
+    ]));
+
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(firstCollectionId, 'request'); });
+
+    let otherRequestId = '';
+    act(() => { otherRequestId = result.current.addItem(secondCollectionId, 'request'); });
+    // Make the *second* collection "active" by selecting a request that lives
+    // there — getCollectionVars for the first request must still resolve to
+    // the first collection's variables, not whichever collection is active.
+    act(() => result.current.selectRequest(otherRequestId));
+
+    expect(result.current.activeCollectionId).toBe(secondCollectionId);
+    expect(result.current.getCollectionVars(requestId)).toEqual({ host: 'first.test' });
+  });
+
+  it('excludes disabled or empty-key rows from the resolved map', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    act(() => result.current.setCollectionVariables(collectionId, [
+      { id: 'v1', key: 'host', value: 'api.test', enabled: true },
+      { id: 'v2', key: 'off', value: 'x', enabled: false },
+      { id: 'v3', key: '', value: 'y', enabled: true },
+    ]));
+
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(collectionId, 'request'); });
+    expect(result.current.getCollectionVars(requestId)).toEqual({ host: 'api.test' });
+  });
+
+  it('tracks activeCollectionVars for the currently active request', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(collectionId, 'request'); });
+    act(() => result.current.selectRequest(requestId));
+    act(() => result.current.setCollectionVariables(collectionId, [
+      { id: 'v1', key: 'version', value: 'v2', enabled: true },
+    ]));
+
+    expect(result.current.activeCollectionVars).toEqual({ version: 'v2' });
+  });
+});
+
+describe('useApiStore — importEnvironment', () => {
+  it('appends an already-built Environment and it becomes selectable', async () => {
+    const { useApiStore } = await import('./store');
+    const { newEnvironment, newKeyValue } = await import('./types');
+    const { result } = renderHook(() => useApiStore());
+
+    const env = newEnvironment('Imported', null, [{ ...newKeyValue('host', 'imported.test'), enabled: true }]);
+    let id = '';
+    act(() => { id = result.current.importEnvironment(env); });
+
+    expect(id).toBe(env.id);
+    expect(result.current.environments.some((e) => e.id === env.id)).toBe(true);
+    act(() => result.current.setActiveEnvId(env.id));
+    expect(result.current.activeEnv?.variables[0]).toMatchObject({ key: 'host', value: 'imported.test' });
+  });
+});

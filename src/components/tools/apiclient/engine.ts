@@ -62,6 +62,7 @@ export async function executeRequest(
   dataVars: VarMap = {},
   scriptTimeoutMs: number = DEFAULT_SCRIPT_TIMEOUT_MS,
   vault: VarMap = {},
+  collectionVars: VarMap = {},
 ): Promise<ExecResult> {
   // Work on copies so a failed run never mutates stored state.
   let draft = newRequest({ ...request });
@@ -79,12 +80,16 @@ export async function executeRequest(
   const logs: LogEntry[] = [];
   const errors: string[] = [];
 
-  // Combined substitution map. Precedence: vault < env < data-file row < runtime
-  // (bru.setVar / local), so a data file overrides the environment but explicit
-  // runtime sets still win — matching Postman's variable resolution order.
-  // Vault secrets are namespaced (`vault.<key>`) and merged only here, at send
-  // time — they never enter `stores.env`, so scripts can't read or persist them.
-  const varMap = (): VarMap => ({ ...vault, ...stores.env, ...dataVars, ...stores.runtime });
+  // Combined substitution map. Precedence: vault < collection < env < data-file
+  // row < runtime (bru.setVar / local) — a collection variable is a shared
+  // default that the environment (and everything after it) can still override,
+  // and a data file overrides the environment but explicit runtime sets still
+  // win — matching Postman's variable resolution order. Vault secrets are
+  // namespaced (`vault.<key>`) and merged only here, at send time — they never
+  // enter `stores.env`, so scripts can't read or persist them.
+  const varMap = (): VarMap => (
+    { ...vault, ...collectionVars, ...stores.env, ...dataVars, ...stores.runtime }
+  );
 
   // Fold a completed phase back into the local state. A phase that overran its
   // timeout comes back as a single error and no results — the worker carrying
