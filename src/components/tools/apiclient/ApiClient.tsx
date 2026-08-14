@@ -25,7 +25,7 @@ import { RunnerDialog } from './RunnerDialog';
 import { CookieManager } from './CookieManager';
 import { useApiStore } from './store';
 import { executeRequest, errToString } from './engine';
-import { stopScriptSandbox } from './scriptHost';
+import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 
@@ -125,6 +125,11 @@ export function ApiClient() {
     stopScriptSandbox();
   }, []);
 
+  // Reflects whether the script sandbox worker is currently unavailable (scripts
+  // then run unsandboxed on the main thread, with no timeout/interrupt).
+  const [sandboxDegraded, setSandboxDegraded] = useState(isScriptSandboxDegraded);
+  useEffect(() => subscribeSandboxStatus(setSandboxDegraded), []);
+
   // Migrate the previously-persisted active request into a tab on first load.
   // Guarded by a ref rather than effect deps: `store` is a fresh object on every
   // render, so a dependency on it re-ran this on every keystroke.
@@ -180,6 +185,9 @@ export function ApiClient() {
       store.updateEnvironment(env.id, { variables });
     }
     if (!recordHistory) return;
+    // Values that must never be persisted in plaintext if the server happened
+    // to echo them back in the response (see redactText in store.ts).
+    const sensitiveValues = Object.values(store.vaultVars);
     store.addHistory({
       method: req.method, url: req.url,
       status: result.response?.status ?? 0,
@@ -190,7 +198,7 @@ export function ApiClient() {
       response: result.response,
       tests: result.tests,
       logs: result.logs,
-    });
+    }, sensitiveValues);
   }, [store]);
 
   // Run one request (used by the Runner); resolves inherited scripts/auth per id.
@@ -403,6 +411,7 @@ export function ApiClient() {
         onSearch={() => searchInputRef.current?.focus()}
         onCookies={() => setCookiesOpen(true)}
         cookieCount={store.cookies.length}
+        sandboxDegraded={sandboxDegraded}
       />
 
       <EnvironmentEditor store={store} open={envOpen} onClose={() => setEnvOpen(false)} />

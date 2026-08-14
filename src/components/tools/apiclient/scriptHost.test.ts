@@ -64,6 +64,29 @@ describe('runPhaseSandboxed — fallback', () => {
     const out = await runPhaseSandboxed(prePhase('bru.setVar("y", "2");'));
     expect(out.stores.runtime.y).toBe('2');
   });
+
+  it('keeps falling back within the reprobe window, then retries construction once it elapses', async () => {
+    vi.useFakeTimers();
+    let attempts = 0;
+    __setSandboxWorkerFactory(() => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('boom');
+      return new FakeWorker('reply') as unknown as Worker;
+    });
+
+    await runPhaseSandboxed(prePhase('// a'));
+    expect(attempts).toBe(1);
+
+    // Still inside the 30s reprobe window: no retry, stays on the fallback.
+    await runPhaseSandboxed(prePhase('// b'));
+    expect(attempts).toBe(1);
+
+    vi.advanceTimersByTime(30_001);
+
+    const out = await runPhaseSandboxed(prePhase('// c'));
+    expect(attempts).toBe(2);
+    expect(out.tests).toEqual([{ name: 'from worker', passed: true }]);
+  });
 });
 
 describe('runPhaseSandboxed — worker path', () => {

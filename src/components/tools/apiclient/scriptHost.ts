@@ -14,6 +14,11 @@ import { runPhase, type PhaseInput, type PhaseOutput } from './scriptPhases';
 import type { OutMessage } from './scriptSandbox.worker';
 
 export const DEFAULT_SCRIPT_TIMEOUT_MS = 5000;
+// A worker that fails to load once is very likely a transient bundling/CSP
+// hiccup, not a permanent platform limitation — give it another chance after
+// this long instead of running every script unsandboxed for the rest of the
+// session.
+const REPROBE_INTERVAL_MS = 30_000;
 
 interface Pending {
   resolve: (out: PhaseOutput) => void;
@@ -21,13 +26,43 @@ interface Pending {
 }
 
 let worker: Worker | null = null;
-// Null until we've tried; false once we know workers aren't usable here.
+// Null until we've tried; false once we know workers aren't usable here (see
+// REPROBE_INTERVAL_MS above — "false" is re-checked periodically, not final).
 let workerUsable: boolean | null = null;
+let unusableAt: number | null = null;
 let nextId = 1;
 const pending = new Map<number, Pending>();
 
 type WorkerFactory = () => Worker;
 let workerFactory: WorkerFactory | null = null;
+
+type SandboxStatusListener = (degraded: boolean) => void;
+const statusListeners = new Set<SandboxStatusListener>();
+
+/** True while scripts are running unsandboxed on the main thread (no timeout/interrupt). */
+export function isScriptSandboxDegraded(): boolean {
+  return workerUsable === false;
+}
+
+/** Notified whenever the sandbox flips between usable and degraded. */
+export function subscribeSandboxStatus(listener: SandboxStatusListener): () => void {
+  statusListeners.add(listener);
+  return () => { statusListeners.delete(listener); };
+}
+
+function markUsable() {
+  const wasDegraded = workerUsable === false;
+  workerUsable = true;
+  unusableAt = null;
+  if (wasDegraded) for (const l of statusListeners) l(false);
+}
+
+function markUnusable() {
+  const wasUsable = workerUsable !== false;
+  workerUsable = false;
+  unusableAt = Date.now();
+  if (wasUsable) for (const l of statusListeners) l(true);
+}
 
 /**
  * Test seam: substitute the sandbox worker so the timeout/abort plumbing can be
@@ -38,6 +73,7 @@ export function __setSandboxWorkerFactory(factory: WorkerFactory | null): void {
   disposeWorker();
   workerFactory = factory;
   workerUsable = null;
+  unusableAt = null;
 }
 
 function disposeWorker() {
@@ -49,10 +85,14 @@ function disposeWorker() {
 }
 
 function getWorker(): Worker | null {
-  if (workerUsable === false) return null;
   if (worker) return worker;
+  if (workerUsable === false) {
+    // Keep falling back immediately until the reprobe window elapses, so one
+    // bad load doesn't retry-storm on every single script run.
+    if (unusableAt !== null && Date.now() - unusableAt < REPROBE_INTERVAL_MS) return null;
+  }
   if (!workerFactory && typeof Worker === 'undefined') {
-    workerUsable = false;
+    markUnusable();
     return null;
   }
   try {
@@ -68,16 +108,16 @@ function getWorker(): Worker | null {
       else p.reject(new Error(msg.message));
     };
     w.onerror = () => {
-      // A load/parse failure in the worker bundle: fall back for the rest of
-      // the session rather than failing every request from here on.
-      workerUsable = false;
+      // A load/parse failure in the worker bundle: fall back until the next
+      // reprobe window instead of failing every request from here on.
+      markUnusable();
       disposeWorker();
     };
     worker = w;
-    workerUsable = true;
+    markUsable();
     return w;
   } catch {
-    workerUsable = false;
+    markUnusable();
     return null;
   }
 }
