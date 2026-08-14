@@ -52,9 +52,13 @@ base64 = "0.21"
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 
+# Thin LTO + parallel codegen units trade a little binary size/runtime perf
+# for much faster release builds (fat LTO + codegen-units=1 serializes all
+# codegen onto a single thread, which is very slow with heavy async deps
+# like tokio/rskafka/axum/lapin in the dependency tree).
 [profile.release]
 opt-level = "z"
-lto = true
-codegen-units = 1
+lto = "thin"
+codegen-units = 16
 strip = true
 panic = "abort"
