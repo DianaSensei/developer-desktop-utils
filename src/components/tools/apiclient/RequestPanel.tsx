@@ -25,15 +25,14 @@ import { AuthEditor } from './AuthEditor';
 import { scriptApiExtensions } from './scriptCompletion';
 import { scriptCallsNetwork } from './collectionScripts';
 import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet, type ScriptSnippet } from './scriptSnippets';
-import { authQueryParam, buildUrl, urlWithParams } from './request';
-import { substituteVars } from './vars';
+import { authQueryParam, urlWithParams } from './request';
 import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
   type KeyValue, type VarDef, type VarMap, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
 } from './types';
 
 export type RequestPanelTab =
-  | 'params' | 'headers' | 'body' | 'auth' | 'script' | 'vars' | 'assert' | 'tests' | 'settings';
+  | 'params' | 'headers' | 'body' | 'auth' | 'script' | 'vars' | 'tests' | 'settings';
 type Tab = RequestPanelTab;
 
 interface Props {
@@ -63,8 +62,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
     { id: 'auth', label: `Auth${request.auth.type !== 'none' ? ' •' : ''}` },
     { id: 'vars', label: `Vars${hasVars ? ' •' : ''}` },
     { id: 'script', label: `Script${hasScript ? ' •' : ''}` },
-    { id: 'assert', label: `Assert${count(enabledAsserts)}` },
-    { id: 'tests', label: `Tests${request.tests.trim() ? ' •' : ''}` },
+    { id: 'tests', label: `Tests${count(enabledAsserts)}${request.tests.trim() ? ' •' : ''}` },
     { id: 'settings', label: 'Settings' },
   ];
 
@@ -83,7 +81,6 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {tab === 'params' && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-            <ResolvedUrlPreview request={request} vars={vars} />
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Query</Label>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
@@ -100,23 +97,29 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'auth' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} vars={vars} /></div>}
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
         {tab === 'vars' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><VarsEditor request={request} onChange={onChange} /></div>}
-        {tab === 'assert' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><AssertEditor request={request} onChange={onChange} /></div>}
         {tab === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}
         {tab === 'tests' && (
-          <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] text-muted-foreground">
-                Post-response test script — use <code className="rounded bg-muted px-1">test()</code> and <code className="rounded bg-muted px-1">expect()</code> with <code className="rounded bg-muted px-1">res</code>, <code className="rounded bg-muted px-1">bru</code>.
-              </p>
-              <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ tests: appendSnippet(request.tests, s) })} />
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+            <div className="shrink-0 space-y-1.5">
+              <Label className="text-xs">Assertions</Label>
+              <AssertEditor request={request} onChange={onChange} />
             </div>
-            <JavaScriptEditor
-              value={request.tests}
-              onChange={(tests) => onChange({ tests })}
-              placeholder={'test("status is 200", function () {\n  expect(res.getStatus()).to.equal(200);\n});'}
-              extraExtensions={scriptApiExtensions}
-            />
-            {scriptCallsNetwork(request.tests) && <NetworkCallNotice />}
+            <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">Test Script</Label>
+                <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ tests: appendSnippet(request.tests, s) })} />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Post-response — use <code className="rounded bg-muted px-1">test()</code> and <code className="rounded bg-muted px-1">expect()</code> with <code className="rounded bg-muted px-1">res</code>, <code className="rounded bg-muted px-1">bru</code>.
+              </p>
+              <JavaScriptEditor
+                value={request.tests}
+                onChange={(tests) => onChange({ tests })}
+                placeholder={'test("status is 200", function () {\n  expect(res.getStatus()).to.equal(200);\n});'}
+                extraExtensions={scriptApiExtensions}
+              />
+              {scriptCallsNetwork(request.tests) && <NetworkCallNotice />}
+            </div>
           </div>
         )}
       </div>
@@ -160,9 +163,12 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <Label className="text-xs">Pre-request <span className="font-normal text-muted-foreground">— runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
+          <Label className="text-xs">Pre-request</Label>
           <SnippetMenu snippets={PRE_REQUEST_SNIPPETS} onInsert={(s) => onChange({ script: { ...script, req: appendSnippet(script.req, s) } })} />
         </div>
+        <p className="text-[11px] text-muted-foreground">
+          Runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars.
+        </p>
         <JavaScriptEditor
           value={script.req}
           onChange={(v) => onChange({ script: { ...script, req: v } })}
@@ -173,9 +179,12 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <Label className="text-xs">Post-response <span className="font-normal text-muted-foreground">— runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars</span></Label>
+          <Label className="text-xs">Post-response</Label>
           <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ script: { ...script, res: appendSnippet(script.res, s) } })} />
         </div>
+        <p className="text-[11px] text-muted-foreground">
+          Runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars.
+        </p>
         <JavaScriptEditor
           value={script.res}
           onChange={(v) => onChange({ script: { ...script, res: v } })}
@@ -261,7 +270,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         const isGhost = a.id === ghost.id;
         const unary = UNARY_ASSERT_OPERATORS.includes(a.operator);
         return (
-          <div key={a.id} className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b last:border-b-0">
+          <div key={a.id} className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/40">
             {/* expr cell with enable checkbox */}
             <div className="flex items-center gap-1.5 border-r px-2">
               <button
@@ -318,28 +327,6 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           </div>
         );
       })}
-    </div>
-  );
-}
-
-// ─── resolved URL preview ──────────────────────────────────────────────────────
-
-// Read-only preview of the exact URL that will be sent — path params and query
-// params (including the derived auth-as-query-param row) merged in, {{var}}
-// substituted, and encoded per the request's "URL Encoding" setting. Makes
-// that setting's effect visible instead of only showing up in the actual send.
-function ResolvedUrlPreview({ request, vars }: { request: ApiRequest; vars: VarMap }) {
-  const resolved = useMemo(
-    () => buildUrl(request, (s) => substituteVars(s, vars)),
-    [request, vars],
-  );
-  if (!resolved) return null;
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">Resolved URL</Label>
-      <div className="overflow-x-auto rounded-md border bg-muted/20 px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
-        <span className="whitespace-nowrap">{resolved}</span>
-      </div>
     </div>
   );
 }
@@ -428,7 +415,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
         {names.map((name) => {
           const enabled = enabledOf(name);
           return (
-            <div key={name} className="grid grid-cols-[1rem_1fr_1fr] border-b last:border-b-0">
+            <div key={name} className="grid grid-cols-[1rem_1fr_1fr] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/40">
               <div className="flex items-center justify-center">
                 <button
                   type="button"

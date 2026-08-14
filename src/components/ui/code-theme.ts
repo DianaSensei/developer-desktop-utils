@@ -135,7 +135,11 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       '&.cm-focused': { outline: 'none' },
       '.cm-scroller': { overflow: 'auto', minHeight: '0', fontFamily: 'inherit' },
       '.cm-content': { caretColor: 'hsl(var(--foreground))', padding: contentPadding },
-      '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--foreground))' },
+      '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--foreground))', borderLeftWidth: '1.5px' },
+      // CodeMirror's own placeholder decoration — renders inline in the real
+      // document flow (respects the gutter, wraps multi-line text correctly),
+      // unlike a hand-rolled absolutely-positioned overlay.
+      '.cm-placeholder': { color: 'hsl(var(--muted-foreground) / 0.55)', fontStyle: 'normal' },
 
       '.cm-gutters': gutter === 'panel'
         ? {
