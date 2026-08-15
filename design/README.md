@@ -96,15 +96,16 @@ trong quá trình làm; xem bảng cuối `reference/ANALYSIS.md`.
 
 ---
 
-## Việc còn dở
+## Mặt chữ — đã chốt
 
-**Mặt chữ chưa chốt.** Đề xuất **Be Vietnam Pro + IBM Plex Mono** dựa trên lý lẽ.
-G1 đã nạp cả Be Vietnam Pro lẫn Inter và dựng trang so sánh trong app tại
-**`/type-specimen`** — sáu bài kiểm tra, đổi font tại chỗ, chữ ở đúng cỡ 11–15px
-mà app dùng nhiều nhất. Chạy `npm run tauri:dev`, chọn, rồi xoá font thua cuộc
-cùng `src/design-system/TypeSpecimen.tsx` và route của nó.
+**Be Vietnam Pro** (sans) + **IBM Plex Mono**, chọn sau khi so trực tiếp với Inter
+trong đúng webview của app, ở đúng cỡ chữ app dùng. Trang so sánh đã hoàn thành
+nhiệm vụ và bị xoá.
 
-Trang mẫu tĩnh vẫn chạy bằng font hệ thống — nó không nạp được webfont.
+Không có bản variable trên fontsource nên nạp ba trọng lượng rời (400/500/600);
+subset `vietnamese` chứa dấu chồng hai tầng mà subset latin không có.
+
+Trang mẫu tĩnh vẫn chạy bằng font hệ thống — nó không nạp webfont.
 
 ---
 
