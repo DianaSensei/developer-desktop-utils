@@ -417,28 +417,34 @@ function Sidebar({
       />
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-premium transition-all duration-300 ease-in-out flex flex-col',
+          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-premium transition-[width,transform] duration-300 ease-in-out flex flex-col',
           isCollapsed ? 'w-14' : 'w-56',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        {/* Header */}
+        {/* Header — logo luôn đứng yên một chỗ, chỉ nhãn "DevTool" giãn/co
+            (cùng kiểu max-width+opacity với nhãn nav bên dưới, xem chú thích ở
+            đó) nên logo không nhảy cỡ 32→30px lúc collapse/expand như trước,
+            và chữ trượt mượt theo thay vì biến mất/hiện ra đột ngột. Bỏ dòng
+            phụ "N tools" — không phải thông tin cần thấy mỗi lần mở app, và
+            bỏ nó cho chữ "DevTool" canh đúng giữa logo theo chiều dọc thay vì
+            bị đẩy lệch lên bởi dòng phụ bên dưới. */}
         <div className={cn(
-          'flex shrink-0 items-center border-b border-border',
-          isCollapsed ? 'justify-center py-3 px-2' : 'justify-between px-3 py-3'
+          'flex shrink-0 items-center border-b border-border py-2.5',
+          isCollapsed ? 'justify-center px-2' : 'justify-between px-3'
         )}>
-          {isCollapsed ? (
-            <AppLogo size={32} />
-          ) : (
-            <div className="flex items-center gap-2.5 min-w-0">
-              <AppLogo size={30} />
-              <div>
-                <h1 className="text-sm font-semibold leading-none">DevTool</h1>
-                <p className="mt-1 text-[11px] text-muted-foreground">{allNavTools.length} tools</p>
-              </div>
-            </div>
-          )}
-          <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={onClose} title="Close menu">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <AppLogo size={30} />
+            <h1
+              className={cn(
+                'whitespace-nowrap overflow-hidden text-sm font-semibold leading-none transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'
+              )}
+            >
+              DevTool
+            </h1>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 lg:hidden" onClick={onClose} title="Close menu">
             <X className="h-4 w-4" />
           </Button>
         </div>
