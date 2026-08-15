@@ -10,7 +10,10 @@ design/
 ├── COMPONENTS.md           Spec 7 nhóm component
 ├── tokens.css            ★ NGUỒN SỰ THẬT — CSS thuần
 ├── tailwind-preset.cjs     Ánh xạ token → utility Tailwind
-├── preview/index.html    ★ Trang mẫu SỐNG — mở trực tiếp bằng browser
+├── baseline.json           Ngưỡng vi phạm thiết kế, chỉ được giảm
+├── preview/
+│   ├── index.html        ★ Trang mẫu SỐNG — mở trực tiếp bằng browser
+│   └── build-standalone.mjs  Dựng bản một-file (xem cuối trang)
 └── reference/ANALYSIS.md   Vì sao hệ này thành ra như vậy
 ```
 
@@ -95,6 +98,39 @@ trong quá trình làm; xem bảng cuối `reference/ANALYSIS.md`.
 
 ## Việc còn dở
 
-**Mặt chữ chưa được kiểm chứng thật.** Trang mẫu chạy bằng font hệ thống. Đề xuất
-**Be Vietnam Pro + IBM Plex Mono** dựa trên lý lẽ, chưa dựa trên quan sát. Phải dựng
-specimen thật trong app và duyệt trước khi khoá — bốn bài kiểm tra ở `TOKENS.md`.
+**Mặt chữ chưa chốt.** Đề xuất **Be Vietnam Pro + IBM Plex Mono** dựa trên lý lẽ.
+G1 đã nạp cả Be Vietnam Pro lẫn Inter và dựng trang so sánh trong app tại
+**`/type-specimen`** — sáu bài kiểm tra, đổi font tại chỗ, chữ ở đúng cỡ 11–15px
+mà app dùng nhiều nhất. Chạy `npm run tauri:dev`, chọn, rồi xoá font thua cuộc
+cùng `src/design-system/TypeSpecimen.tsx` và route của nó.
+
+Trang mẫu tĩnh vẫn chạy bằng font hệ thống — nó không nạp được webfont.
+
+---
+
+## Rào chắn tự động
+
+Ba test canh cho kit khỏi mục ruỗng:
+
+| Test | Canh gì |
+|---|---|
+| `src/design-system/designKit.test.ts` | `tokens.css` sạch cú pháp Tailwind · mọi kênh `-c` có bản `hsl()` · **không màu trạng thái nào dẫn xuất từ accent** · mọi tone cách `--ok`/`--bad` ≥ 45 · swatch trang mẫu khớp preset |
+| `src/design-system/guard.test.ts` | Ngưỡng trong `baseline.json` — vi phạm tăng thì đỏ, giảm mà quên hạ ngưỡng cũng đỏ |
+
+Cả hai chạy sẵn trong `npm test`.
+
+---
+
+## Bản dùng một mình
+
+`preview/index.html` link tới `../tokens.css` — đó là điều khiến nó không thể trôi
+lệch khỏi app. Đổi lại, nó chỉ chạy đúng khi nằm cạnh `tokens.css`.
+
+Cần một file duy nhất (gửi cho ai đó, đăng lên Artifact, mở từ USB):
+
+```bash
+node design/preview/build-standalone.mjs   # → preview/standalone.html
+```
+
+`standalone.html` được **sinh ra** — đừng sửa tay. Sửa `index.html` hoặc
+`tokens.css` rồi chạy lại.

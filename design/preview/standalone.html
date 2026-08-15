@@ -1,0 +1,1290 @@
+<title>Hệ Thiết Kế DevTool</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Token dùng CHUNG với app. Sửa giá trị ở design/tokens.css, không sửa ở đây. -->
+<style>
+/* ↓↓↓ Nội tuyến từ design/tokens.css — KHÔNG sửa ở đây ↓↓↓ */
+/* ============================================================================
+   DevTool Design Kit — TOKENS (nguồn sự thật duy nhất)
+   ----------------------------------------------------------------------------
+   CSS THUẦN. Không @layer, không @apply, không cú pháp Tailwind.
+   Vì vậy file này dùng được ở CẢ HAI nơi:
+
+     1. Trang mẫu tĩnh   →  <link rel="stylesheet" href="design/tokens.css">
+     2. App qua Tailwind →  @import "../../design/tokens.css";  (đầu tokens.css của app)
+
+   Đó là điều khiến trang mẫu KHÔNG THỂ trôi lệch khỏi app: cả hai đọc chung
+   một bộ giá trị. Sửa màu, bo góc, chiều cao control → sửa ở đây, chỉ ở đây.
+
+   ── Nguyên tắc kiến trúc quan trọng nhất ──────────────────────────────────
+   Accent khai báo bằng BA BIẾN RỜI (--a-h / --a-s / --a-l), không phải một mã
+   hex. Mọi biến thể accent — sáng hơn, nhuộm nhạt, mực đậm, viền, vòng focus —
+   đều tính ra bằng hsl(). Thêm một tone mới = thêm ba con số, không sửa gì khác.
+
+   Đổi lại, có một luật không được phá: MÀU TRẠNG THÁI LÀ HỆ RIÊNG, cố định,
+   không dẫn xuất từ accent. Nếu "hợp lệ" mà dùng accent thì khi đổi tone sang
+   đỏ, thẻ báo thành công sẽ hoá đỏ. Xem design/RULES.md.
+   ========================================================================== */
+
+:root {
+  /* ── Accent: ba kênh rời — mặc định azure ─────────────────────────────── */
+  --a-h: 218;
+  --a-s: 76%;
+  --a-l: 48%;
+
+  /* ── Biến KÊNH (không có hsl() bọc ngoài) ─────────────────────────────
+     Vì sao cần: Tailwind chỉ chèn được `<alpha-value>` vào màu dạng kênh.
+     Nếu token là màu hoàn chỉnh thì `bg-acc/20` mất tác dụng — mà repo dùng
+     bổ ngữ alpha rất nhiều. Nên mỗi màu có hai dạng:
+
+        --acc-c  = "218 76% 48%"          → cho preset Tailwind (có alpha)
+        --acc    = hsl(var(--acc-c))      → cho CSS thuần (tiện đọc)
+
+     Bản tối định nghĩa lại `-c`, nên cả hai dạng tự đúng theo theme. */
+  --acc-c:        var(--a-h) var(--a-s) var(--a-l);
+  --acc-hi-c:     var(--a-h) var(--a-s) calc(var(--a-l) + 7%);
+  --acc-tint-c:   var(--a-h) calc(var(--a-s) - 8%) 95%;
+  --acc-tint-2-c: var(--a-h) calc(var(--a-s) - 12%) 90%;
+  --acc-ink-c:    var(--a-h) calc(var(--a-s) + 6%) 34%;
+  --acc-edge-c:   var(--a-h) 44% 84%;
+
+  --acc:        hsl(var(--acc-c));
+  --acc-hi:     hsl(var(--acc-hi-c));
+  --acc-tint:   hsl(var(--acc-tint-c));
+  --acc-tint-2: hsl(var(--acc-tint-2-c));
+  --acc-ink:    hsl(var(--acc-ink-c));
+  --acc-edge:   hsl(var(--acc-edge-c));
+  --acc-ring:   hsl(var(--acc-c) / .22);
+  --acc-fg-c:   0 0% 100%;
+  --acc-fg:     hsl(var(--acc-fg-c));
+
+  /* ── Nền: xám NGẢ SẮC accent, không xám trung tính ────────────────────
+     Xám trung tính là thứ làm giao diện trông rẻ. Mọi bề mặt ở đây đều mang
+     một chút sắc của accent, nên khi đổi tone cả trang đổi theo, kể cả nền. */
+  --bg-c:     var(--a-h) 22% 96%;
+  --bg-2-c:   var(--a-h) 18% 92%;
+  --card-c:   0 0% 100%;
+  --sunk-c:   var(--a-h) 24% 97%;
+  --chrome-c: var(--a-h) 26% 98.5%;
+
+  --bg:     hsl(var(--bg-c));
+  --bg-2:   hsl(var(--bg-2-c));
+  --card:   hsl(var(--card-c));
+  --sunk:   hsl(var(--sunk-c));
+  --chrome: hsl(var(--chrome-c));
+
+  --fg-c:        var(--a-h) 24% 11%;
+  --fg-mute-c:   var(--a-h) 12% 42%;
+  --fg-faint-c:  var(--a-h) 12% 58%;
+  --line-c:      var(--a-h) 22% 88%;
+  --line-soft-c: var(--a-h) 24% 93%;
+
+  --fg:        hsl(var(--fg-c));
+  --fg-mute:   hsl(var(--fg-mute-c));
+  --fg-faint:  hsl(var(--fg-faint-c));
+  --line:      hsl(var(--line-c));
+  --line-soft: hsl(var(--line-soft-c));
+
+  /* ── Trạng thái: HỆ RIÊNG, độc lập accent, KHÔNG đổi khi swap tone ──── */
+  --ok-c: 154.5 69.2% 28.0%;        --ok-tint-c: 145.7 38.9% 92.9%;   --ok-edge-c: 147.1 38.2% 78.4%;
+  --warn-c: 36.4 79.2% 30.2%;       --warn-tint-c: 40.0 78.9% 92.5%;  --warn-edge-c: 38.3 61.0% 76.9%;
+  --bad-c: 2.7 60.5% 43.7%;         --bad-tint-c: 3.5 73.9% 95.5%;    --bad-edge-c: 3.5 63.0% 84.1%;
+  --info-c: 211.3 71.4% 38.4%;      --info-tint-c: 211.6 70.4% 94.7%;  --info-edge-c: 209.5 64.7% 83.3%;
+
+  --ok:   hsl(var(--ok-c));    --ok-tint:   hsl(var(--ok-tint-c));    --ok-edge:   hsl(var(--ok-edge-c));
+  --warn: hsl(var(--warn-c));  --warn-tint: hsl(var(--warn-tint-c));  --warn-edge: hsl(var(--warn-edge-c));
+  --bad:  hsl(var(--bad-c));   --bad-tint:  hsl(var(--bad-tint-c));   --bad-edge:  hsl(var(--bad-edge-c));
+  --info: hsl(var(--info-c));  --info-tint: hsl(var(--info-tint-c));  --info-edge: hsl(var(--info-edge-c));
+
+  /* ── Bóng: ngả sắc accent, không phải đen thuần ───────────────────────
+     Chỉ ba bậc. Một tầng nổi dùng --sh; lồng sâu hơn dùng viền, không bóng. */
+  --sh-sm: 0 1px 2px hsl(var(--a-h) 30% 20% / .06);
+  --sh:    0 1px 2px hsl(var(--a-h) 30% 20% / .06), 0 8px 20px -12px hsl(var(--a-h) 30% 20% / .22);
+  --sh-lg: 0 2px 4px hsl(var(--a-h) 30% 20% / .07), 0 18px 36px -18px hsl(var(--a-h) 30% 20% / .30);
+
+  /* ── Bo góc: thang RỜI NHAU ───────────────────────────────────────────
+     Thang cũ (--radius: 1rem → sm/md/lg = 12/14/16px) có ba bậc mà mắt không
+     phân biệt được, nên vô dụng. Thang này cách nhau đủ xa để có ý nghĩa. */
+  --r-xs:   6px;   /* chip, keycap, nút nhỏ */
+  --r-sm:  10px;   /* input, nút, ô nhỏ trong thẻ */
+  --r-md:  14px;   /* thẻ thường, dải nhuộm */
+  --r-lg:  18px;   /* panel, khung tool */
+  --r-xl:  24px;   /* modal, sheet */
+  --r-full: 999px;
+
+  /* ── Chiều cao control: MỘT giá trị, không ba ─────────────────────────
+     Repo hiện trộn h-7 (28px) / h-8 (32px) / h-9 (36px) → mọi hàng control
+     đều lệch nhau vài pixel. Chỉ còn hai bậc. */
+  --h:    34px;
+  --h-lg: 40px;
+
+  /* ── Mặt chữ ──────────────────────────────────────────────────────────
+     `mono` chưa từng được khai báo trong preset Tailwind của repo, dù
+     `font-mono` dùng 356 lần → rơi về Courier New trên Windows/Linux.
+     Danh sách dự phòng ở đây đảm bảo có chữ đơn cách thật trên cả ba nền.
+
+     Be Vietnam Pro chỉ có bản TĨNH trên fontsource (không có bản variable),
+     nên app nạp ba trọng lượng rời: 400 / 500 / 600, subset latin + vietnamese. */
+  --sans: "Be Vietnam Pro", system-ui, -apple-system,
+          "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+          Consolas, "Liberation Mono", monospace;
+
+  /* ── Chuyển động: một nhịp duy nhất ───────────────────────────────────
+     Rê chuột đổi nền/viền — KHÔNG đổi vị trí. Không hover-lift. */
+  --ease-out-soft: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring:   cubic-bezier(.34, 1.45, .64, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 340ms;
+
+  color-scheme: light;
+}
+
+/* ============================================================================
+   TỐI — `.dark` khớp với darkMode: ['class'] của Tailwind.
+   Chỉ định nghĩa lại token, không định nghĩa lại component.
+   Chú ý: màu trạng thái ở đây là bản sáng hơn cho nền tối, nhưng vẫn giữ
+   ĐÚNG tông nghĩa (ok vẫn xanh lá, bad vẫn đỏ) — không ngả về accent.
+   ========================================================================== */
+.dark {
+  /* Chỉ định nghĩa lại biến KÊNH — dạng hsl() ở :root tự đúng theo. */
+  --acc-c:        var(--a-h) calc(var(--a-s) - 8%) 68%;
+  --acc-hi-c:     var(--a-h) calc(var(--a-s) - 8%) 74%;
+  --acc-tint-c:   var(--a-h) 40% 22%;
+  --acc-tint-2-c: var(--a-h) 38% 27%;
+  --acc-ink-c:    var(--a-h) 60% 76%;
+  --acc-edge-c:   var(--a-h) 34% 32%;
+  --acc-ring:     hsl(var(--a-h) 70% 62% / .3);
+  --acc-fg-c:     var(--a-h) 60% 10%;
+
+  --bg-c:     var(--a-h) 18% 9%;
+  --bg-2-c:   var(--a-h) 18% 12%;
+  --card-c:   var(--a-h) 16% 14%;
+  --sunk-c:   var(--a-h) 18% 11%;
+  --chrome-c: var(--a-h) 16% 17%;
+
+  --fg-c:        var(--a-h) 14% 93%;
+  --fg-mute-c:   var(--a-h) 10% 63%;
+  --fg-faint-c:  var(--a-h) 10% 48%;
+  --line-c:      var(--a-h) 14% 24%;
+  --line-soft-c: var(--a-h) 14% 19%;
+
+  /* Bản tối KHÔNG phải bản sáng đảo ngược — mỗi tông chọn lại cho nền tối,
+     nhưng giữ ĐÚNG hue nghĩa (ok vẫn xanh lá, bad vẫn đỏ). */
+--ok-c: 148.4 42.2% 55.9%;        --ok-tint-c: 151.3 39.0% 11.6%;   --ok-edge-c: 152.5 38.7% 24.3%;
+  --warn-c: 36.3 60.4% 61.4%;       --warn-tint-c: 37.5 38.7% 12.2%;  --warn-edge-c: 38.9 44.9% 24.9%;
+  --bad-c: 4.0 59.5% 70.0%;         --bad-tint-c: 5.5 32.4% 13.3%;    --bad-edge-c: 4.7 37.2% 26.9%;
+  --info-c: 212.1 73.1% 69.4%;      --info-tint-c: 214.6 39.4% 12.9%;  --info-edge-c: 211.2 37.7% 27.1%;
+
+  --sh-sm: 0 1px 2px rgb(0 0 0 / .45);
+  --sh:    0 1px 2px rgb(0 0 0 / .45), 0 10px 24px -14px rgb(0 0 0 / .8);
+  --sh-lg: 0 2px 6px rgb(0 0 0 / .5),  0 20px 40px -20px rgb(0 0 0 / .9);
+
+  color-scheme: dark;
+}
+
+/* ============================================================================
+   PRESET TONE — thêm tone mới = thêm BA CON SỐ, không sửa gì khác.
+   Đặt data-accent trên <html> (hoặc bất kỳ container nào).
+   ========================================================================== */
+[data-accent="azure"]   { --a-h: 218; --a-s: 76%; --a-l: 48%; }
+[data-accent="petrol"]  { --a-h: 190; --a-s: 68%; --a-l: 36%; }
+/* Xanh lá ngả VÀNG, không phải xanh lá thuần: --ok nằm ở hue ~155. Bản đầu
+   ("forest", h152) chỉ cách --ok 18 đơn vị RGB — accent và "hợp lệ" gần như
+   cùng một màu. h96 đẩy khoảng cách lên 61. */
+[data-accent="moss"]    { --a-h:  96; --a-s: 40%; --a-l: 28%; }
+[data-accent="iris"]    { --a-h: 258; --a-s: 62%; --a-l: 56%; }
+/* Oxblood phải TỐI và NGẢ TÍA, không được là đỏ tươi: --bad nằm ở hue ~3.
+   Bản đầu (h2 s58 l42) cho ra rgb(169,49,45) — cách màu lỗi rgb(179,50,44)
+   đúng 10 đơn vị, tức là mắt thường không phân biệt được nút chính với báo lỗi.
+   Bản này cách 80. Bất kỳ tone đỏ nào thêm sau cũng phải qua phép đo đó. */
+[data-accent="oxblood"] { --a-h: 355; --a-s: 38%; --a-l: 28%; }
+[data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 44%; }
+
+/* ============================================================================
+   NỀN MÔI TRƯỜNG — gradient pastel.
+   Đây là chỗ DUY NHẤT gradient được phép. Không bao giờ trên nút, không bao
+   giờ sau chữ cần đọc. Đặt class .dk-bg lên phần tử nền toàn trang.
+   ========================================================================== */
+.env-bg { position: relative; }
+.env-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 700px at 12% -8%,  hsl(var(--a-h) 62% 88% / .55), transparent 62%),
+    radial-gradient(900px  600px at 92%  4%,  hsl(calc(var(--a-h) + 58) 60% 88% / .45), transparent 60%),
+    radial-gradient(1000px 800px at 50% 108%, hsl(calc(var(--a-h) - 42) 58% 90% / .40), transparent 64%);
+}
+.dark .env-bg::before,
+.env-bg.dark::before { opacity: .16; }
+
+/* ============================================================================
+   Tôn trọng "giảm chuyển động" của hệ điều hành.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+</style>
+
+<style>
+/* ════════════════════════════════════════════════════════════
+   DevTool — hệ thiết kế vòng 4
+   Accent định nghĩa bằng 3 kênh HSL rời để mọi biến thể tự sinh.
+   Đổi --a-h/--a-s/--a-l là toàn bộ giao diện đổi theo.
+   ════════════════════════════════════════════════════════════ */
+
+
+
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);
+  font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;
+  letter-spacing:-.005em;position:relative;min-height:100%;
+}
+/* nền môi trường — gradient pastel, KHÔNG BAO GIỜ lên nút hay sau chữ đọc được */
+
+
+.mono{font-family:var(--mono)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.prose{max-width:68ch}
+
+.eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--fg-faint);display:flex;align-items:center;gap:12px;margin:0 0 20px;
+}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+h1{font-size:clamp(32px,5vw,50px);line-height:1.07;letter-spacing:-.03em;font-weight:600;margin:0 0 20px;text-wrap:balance;max-width:15ch}
+h2{font-size:clamp(22px,3vw,30px);line-height:1.16;letter-spacing:-.022em;font-weight:600;margin:0 0 12px;text-wrap:balance}
+h3{font-size:17px;font-weight:600;letter-spacing:-.012em;margin:0 0 8px}
+.lede{font-size:17px;color:var(--fg-mute);margin:0}
+
+/* ── thanh điều khiển ── */
+.tools{
+  position:sticky;top:0;z-index:80;
+  background:hsl(var(--a-h) 26% 98% / .82);backdrop-filter:blur(16px) saturate(180%);
+  -webkit-backdrop-filter:blur(16px) saturate(180%);
+  border-bottom:1px solid var(--line);padding:10px 0;
+}
+.board.dark .tools{background:hsl(var(--a-h) 18% 11% / .85)}
+.tools .wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.tgroup{display:flex;align-items:center;gap:9px}
+.tlabel{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-faint)}
+.swatches{display:flex;gap:6px}
+.sw{
+  width:24px;height:24px;border-radius:var(--r-full);border:2px solid transparent;
+  cursor:pointer;padding:0;outline-offset:2px;
+  box-shadow:inset 0 0 0 1px hsl(0 0% 0% / .12);
+}
+.sw[aria-pressed="true"]{border-color:var(--fg)}
+.sw:focus-visible{outline:2px solid var(--acc)}
+.mini{display:flex;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;background:var(--card)}
+.mini button{font:inherit;font-size:12.5px;padding:5px 13px;border:0;background:transparent;color:var(--fg-mute);cursor:pointer}
+.mini button+button{border-left:1px solid var(--line)}
+.mini button[aria-pressed="true"]{background:var(--acc);color:var(--acc-fg)}
+.mini button:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+
+.sec{padding:62px 0;border-bottom:1px solid var(--line)}
+.sec-intro{max-width:70ch;color:var(--fg-mute);margin:0 0 34px}
+.sec-intro em{color:var(--fg);font-style:normal;font-weight:500}
+.mast{padding:66px 0 46px;border-bottom:1px solid var(--line)}
+
+/* ── so sánh ── */
+.pair{display:grid;gap:20px;margin-bottom:14px}
+@media(min-width:840px){.pair{grid-template-columns:1fr 1fr;gap:28px}}
+.cell{display:flex;flex-direction:column;gap:10px;min-width:0}
+.cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.cap.no{color:var(--bad)} .cap.yes{color:var(--ok)}
+.stage{
+  border:1px solid var(--line);border-radius:var(--r-lg);padding:22px;background:var(--card);
+  box-shadow:var(--sh-sm);display:flex;flex-direction:column;gap:14px;align-items:flex-start;
+  min-height:120px;justify-content:center;
+}
+.stage.row{flex-direction:row;flex-wrap:wrap;align-items:center;gap:11px}
+.stage.flush{padding:0;overflow:hidden}
+.why{font-size:13.5px;color:var(--fg-mute);margin:0}
+.why b{color:var(--fg);font-weight:500}
+.block{margin-bottom:48px}.block:last-child{margin-bottom:0}
+.block-head{margin-bottom:16px}
+.block-head p{margin:0;color:var(--fg-mute);font-size:14.5px;max-width:70ch}
+
+/* ════ PRIMITIVES ════ */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;height:var(--h);padding:0 14px;
+  border-radius:var(--r-sm);border:1px solid transparent;background:var(--card);color:var(--fg);
+  font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;
+  transition:background .15s ease,border-color .15s ease,color .15s ease;
+}
+.btn svg{width:15px;height:15px;flex:none}
+.btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--acc-ring)}
+/* solid — hành động chính, một cái mỗi màn */
+.btn.solid{background:var(--acc);color:var(--acc-fg);box-shadow:var(--sh-sm)}
+.btn.solid:hover{background:var(--acc-hi)}
+/* tinted — mảnh còn thiếu ở vòng 3 */
+.btn.tint{background:var(--acc-tint);color:var(--acc-ink);border-color:transparent}
+.btn.tint:hover{background:var(--acc-tint-2)}
+.btn.tint.ok{background:var(--ok-tint);color:var(--ok)}
+.btn.tint.bad{background:var(--bad-tint);color:var(--bad)}
+.btn.outline{border-color:var(--line);background:var(--card);box-shadow:var(--sh-sm)}
+.btn.outline:hover{border-color:var(--acc-edge);background:var(--chrome)}
+.btn.ghost{background:transparent;color:var(--fg-mute)}
+.btn.ghost:hover{background:var(--sunk);color:var(--fg)}
+/* phím tắt nội tuyến trong nút */
+.btn .sc{
+  font-family:var(--mono);font-size:11px;opacity:.72;margin-left:2px;
+  padding-left:8px;border-left:1px solid currentColor;line-height:1;
+  border-left-color:color-mix(in srgb,currentColor 26%,transparent);
+}
+/* nút vòng 3 — nhạt nhoà */
+.btn-v3{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:8px;
+  border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit;font-size:13px;font-weight:500}
+.btn-v3.p{background:var(--acc);color:var(--acc-fg);border-color:transparent}
+
+/* keycap */
+.kc{
+  display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;
+  border-radius:var(--r-xs);border:1px solid var(--line);border-bottom-width:2px;
+  background:var(--chrome);color:var(--fg-mute);font-family:var(--mono);font-size:11px;line-height:1;
+}
+
+/* tag phân loại — tối đa 2 loại trong một danh sách */
+.ctag{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+.ctag.c1{color:var(--fg-faint)}
+.ctag.c2{color:var(--warn)}
+
+/* chip trạng thái — gọn, đọc tức thì */
+.chip{
+  display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:var(--r-full);
+  font-size:12px;font-weight:500;border:1px solid transparent;
+}
+.chip svg{width:12px;height:12px}
+.chip.ok{background:var(--ok-tint);color:var(--ok);border-color:var(--ok-edge)}
+.chip.bad{background:var(--bad-tint);color:var(--bad);border-color:var(--bad-edge)}
+.chip.neutral{background:var(--sunk);color:var(--fg-mute);border-color:var(--line)}
+.chip .pip{width:6px;height:6px;border-radius:50%;background:currentColor}
+.count{
+  display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-full);
+  background:var(--sunk);border:1px solid var(--line);color:var(--fg-mute);
+  font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums;
+}
+
+/* ── dải giải thích trong thẻ ── */
+.band{
+  display:flex;gap:12px;padding:13px 15px;background:var(--info-tint);
+  border-top:1px solid var(--info-edge);align-items:flex-start;
+}
+.band.okb{background:var(--ok-tint);border-top-color:var(--ok-edge)}
+.band .bi{
+  width:30px;height:30px;flex:none;border-radius:var(--r-sm);display:grid;place-items:center;
+  border:1.5px solid var(--info);color:var(--info);font-family:var(--mono);font-size:12px;font-weight:600;
+  background:var(--card);
+}
+.band.okb .bi{border-color:var(--ok);color:var(--ok)}
+.band .bt{font-size:13.5px;color:var(--fg);margin:0 0 9px;line-height:1.55}
+.exrow{display:flex;flex-wrap:wrap;gap:8px}
+.ex{
+  display:inline-flex;align-items:center;gap:8px;padding:5px 11px 5px 6px;border-radius:var(--r-full);
+  background:var(--card);border:1px solid var(--line);font-size:12.5px;box-shadow:var(--sh-sm);
+}
+.ex .box{
+  display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:22px;padding:0 6px;
+  border-radius:var(--r-xs);border:1px solid var(--line);background:var(--sunk);
+  font-family:var(--mono);font-size:11px;color:var(--fg-mute);
+}
+.ex .ar{color:var(--fg-faint)}
+
+/* thẻ cảnh báo vòng 3 */
+.alert-v3{width:100%;padding:15px;border-radius:12px;background:var(--ok-tint);border:1px solid var(--ok-edge);
+  display:flex;gap:11px;align-items:flex-start;color:var(--ok);font-size:13.5px}
+
+/* ── panel & dòng ── */
+.panel{width:100%;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);
+  box-shadow:var(--sh);overflow:hidden}
+.ph{display:flex;align-items:center;gap:10px;padding:10px 15px;border-bottom:1px solid var(--line-soft);background:var(--chrome)}
+.ph .t{font-size:13.5px;font-weight:600}
+.ph .r{margin-left:auto;display:flex;align-items:center;gap:9px}
+
+/* dòng 4 tầng — Sony Color Lab */
+.prow{padding:13px 15px;border-bottom:1px solid var(--line-soft)}
+.prow:last-child{border-bottom:0}
+.prow .top{display:flex;align-items:baseline;gap:10px}
+.prow .lb{font-size:15px;font-weight:500}
+.prow .q{
+  width:16px;height:16px;border-radius:var(--r-full);border:1px solid var(--line);
+  display:inline-grid;place-items:center;font-size:10px;color:var(--fg-faint);
+  font-family:var(--mono);cursor:help;flex:none;align-self:center;
+}
+.prow .vl{margin-left:auto;font-size:15px;font-weight:600;font-family:var(--mono);
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.prow .vl.acc{color:var(--acc-ink)}
+.prow .vl.bad{color:var(--bad)}
+.prow .ct{margin:5px 0 3px}
+.prow .ds{font-size:13px;color:var(--fg-mute);margin:0;line-height:1.5}
+
+/* dòng vòng 3 — nghèo nàn */
+.tbl3{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl3 th{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--fg-faint);font-weight:500;text-align:left;padding:7px 12px;border-bottom:1px solid var(--line)}
+.tbl3 td{padding:8px 12px;border-bottom:1px solid var(--line-soft)}
+.tbl3 td.n{font-family:var(--mono);text-align:right;color:var(--fg-mute);font-variant-numeric:tabular-nums}
+
+/* bảng dữ liệu vòng 4 */
+.dt{width:100%;border-collapse:collapse;font-size:13px}
+.dt th{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--fg-faint);font-weight:600;text-align:left;padding:9px 15px;
+  border-bottom:1px solid var(--line);background:var(--chrome)}
+.dt td{padding:10px 15px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+.dt tr:last-child td{border-bottom:0}
+.dt .nm{font-family:var(--mono);font-size:12.5px}
+.dt .sub{display:block;font-size:11.5px;color:var(--fg-faint);margin-top:2px;font-family:var(--sans)}
+.dt .num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-weight:500}
+.meter{display:flex;align-items:center;gap:9px;justify-content:flex-end}
+.meter .tr{width:56px;height:5px;border-radius:3px;background:var(--sunk);overflow:hidden;flex:none;border:1px solid var(--line-soft)}
+.meter .tr i{display:block;height:100%;background:var(--acc);border-radius:3px}
+
+/* ── segmented ── */
+.segx{position:relative;display:inline-flex;padding:4px;border-radius:var(--r-md);
+  background:var(--sunk);border:1px solid var(--line);gap:0;box-shadow:inset 0 1px 2px hsl(var(--a-h) 30% 20% / .05)}
+.segx > span{position:relative;z-index:1;padding:0 15px;height:calc(var(--h) - 8px);display:inline-flex;
+  align-items:center;gap:7px;font-size:13px;color:var(--fg-mute);border-radius:var(--r-xs);
+  transition:color .18s ease;cursor:pointer;white-space:nowrap}
+.segx > span .n{font-family:var(--mono);font-size:10.5px;opacity:.6}
+.segx > span.on{color:var(--acc-fg);font-weight:600}
+.segx > span.on .n{opacity:.85}
+.segx .thumb{position:absolute;z-index:0;top:4px;bottom:4px;left:4px;width:80px;
+  border-radius:var(--r-xs);background:var(--acc);box-shadow:var(--sh-sm)}
+.pager{display:inline-flex;align-items:center;gap:8px;height:26px;padding:0 10px;border-radius:var(--r-full);
+  background:var(--sunk);border:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--fg-mute)}
+/* segmented vòng 3 */
+.seg3{display:inline-flex;padding:3px;border-radius:8px;background:var(--sunk);border:1px solid var(--line-soft)}
+.seg3 span{padding:0 13px;height:26px;display:inline-flex;align-items:center;font-size:12.5px;color:var(--fg-mute);border-radius:6px}
+.seg3 span.on{background:var(--card);color:var(--fg);box-shadow:var(--sh-sm)}
+
+/* ── field ── */
+.field{
+  display:flex;align-items:stretch;height:var(--h);border-radius:var(--r-sm);border:1px solid var(--line);
+  background:var(--card);box-shadow:var(--sh-sm);overflow:hidden;width:100%;max-width:400px;
+  transition:border-color .15s ease,box-shadow .15s ease;
+}
+.field:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-ring)}
+.field .gut{
+  display:inline-flex;align-items:center;gap:5px;padding:0 10px;background:var(--sunk);
+  border-right:1px solid var(--line-soft);font-family:var(--mono);font-size:11px;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--fg-mute);cursor:pointer;white-space:nowrap;
+}
+.field .gut::after{content:"▾";font-size:8px;opacity:.6}
+.field input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font:inherit;
+  font-family:var(--mono);font-size:13px;padding:0 11px;outline:none}
+.field .tail{display:inline-flex;align-items:center;padding:0 10px;color:var(--fg-faint);
+  font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-nums;border-left:1px solid var(--line-soft)}
+.field.bad{border-color:var(--bad)}
+.field-v3{display:flex;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--card);
+  overflow:hidden;width:100%;max-width:400px}
+.field-v3 .g{display:flex;align-items:center;padding:0 9px;background:var(--sunk);
+  border-right:1px solid var(--line-soft);font-family:var(--mono);font-size:10.5px;text-transform:uppercase;color:var(--fg-faint)}
+.field-v3 input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font-family:var(--mono);font-size:12.5px;padding:0 10px;outline:none}
+
+/* ── palette 2 cột ── */
+.pal{width:100%;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);box-shadow:var(--sh-lg);overflow:hidden}
+.pal .top{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line-soft)}
+.pal .top svg{width:16px;height:16px;color:var(--fg-faint);flex:none}
+.pal .top .q{font-family:var(--mono);font-size:13.5px;color:var(--fg)}
+.pal .cols{display:grid;grid-template-columns:1fr;min-height:190px}
+@media(min-width:620px){.pal .cols{grid-template-columns:1.1fr 1fr}}
+.pal .lst{padding:6px;border-right:1px solid var(--line-soft)}
+.pal .g{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--fg-faint);padding:9px 10px 5px}
+.pal .r{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-sm);font-size:13px;color:var(--fg-mute);cursor:pointer}
+.pal .r .ic{width:26px;height:26px;border-radius:var(--r-xs);display:grid;place-items:center;
+  background:var(--sunk);border:1px solid var(--line);color:var(--fg-mute);flex:none}
+.pal .r .ic svg{width:13px;height:13px}
+.pal .r.on{background:var(--acc-tint);color:var(--fg)}
+.pal .r.on .ic{background:var(--acc);border-color:transparent;color:var(--acc-fg)}
+.pal .r .rs{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--fg-faint);white-space:nowrap}
+.pal .prev{padding:15px;display:flex;flex-direction:column;gap:9px}
+.pal .prev .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--fg-faint)}
+.pal .prev pre{margin:0;font-family:var(--mono);font-size:11.5px;line-height:1.7;color:var(--fg);
+  background:var(--sunk);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:10px 12px;overflow-x:auto}
+.pal .foot{display:flex;gap:16px;padding:9px 15px;border-top:1px solid var(--line-soft);background:var(--chrome);flex-wrap:wrap}
+.pal .foot span{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--fg-mute)}
+.k{color:var(--acc-ink)}.s{color:var(--ok)}.n2{color:var(--warn)}.p{color:var(--fg-faint)}
+
+/* ── empty ── */
+.empty{width:100%;padding:24px;border-radius:var(--r-md);border:1px dashed var(--line);
+  background:var(--sunk);display:flex;flex-direction:column;gap:13px;align-items:flex-start}
+.empty h4{margin:0;font-size:14px;font-weight:600}
+.empty ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px;font-size:13px;color:var(--fg-mute)}
+.empty li{display:flex;align-items:center;gap:10px}
+
+/* ── vai trò màu ── */
+.roles{display:grid;gap:14px;margin-top:8px}
+@media(min-width:700px){.roles{grid-template-columns:1fr 1fr}}
+.role{display:flex;gap:13px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card)}
+.role .dot{width:34px;height:34px;border-radius:var(--r-sm);flex:none;border:1px solid hsl(0 0% 0% / .08)}
+.role b{display:block;font-size:14px;font-weight:600;margin-bottom:2px}
+.role p{margin:0;font-size:13px;color:var(--fg-mute)}
+
+/* ── type rig ── */
+.rig{display:grid;gap:16px}
+@media(min-width:760px){.rig{grid-template-columns:1fr 1fr}}
+.rigbox{border:1px solid var(--line);border-radius:var(--r-md);background:var(--card);padding:16px;overflow-x:auto}
+.rigbox .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--fg-faint);margin-bottom:9px}
+.rigbox .big{font-size:26px;line-height:1.35;letter-spacing:-.01em;white-space:nowrap}
+.rigbox .bigm{font-family:var(--mono);font-size:24px;line-height:1.4;white-space:nowrap}
+.cand{display:grid;gap:12px;margin-top:20px}
+@media(min-width:760px){.cand{grid-template-columns:1fr 1fr}}
+.cd{border:1px solid var(--line);border-radius:var(--r-md);background:var(--card);padding:15px 17px}
+.cd b{display:block;font-size:15px;margin-bottom:3px}
+.cd .m{font-family:var(--mono);font-size:10.5px;color:var(--fg-faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+.cd p{margin:0;font-size:13px;color:var(--fg-mute)}
+
+/* ── dòng cấu hình: một dòng, nhiều loại điều khiển ── */
+.srow{display:flex;align-items:center;gap:13px;padding:13px 15px;border-bottom:1px solid var(--line-soft)}
+.srow:last-child{border-bottom:0}
+.srow .si{
+  width:34px;height:34px;flex:none;border-radius:var(--r-sm);display:grid;place-items:center;
+  border:1px solid var(--line);background:var(--sunk);color:var(--fg-mute);
+}
+.srow .si svg{width:16px;height:16px}
+.srow .sb{min-width:0;flex:1}
+.srow .sb b{display:block;font-size:14px;font-weight:600;letter-spacing:-.008em}
+.srow .sb span{display:block;font-size:12.5px;color:var(--fg-mute);margin-top:1px}
+.srow .sc2{margin-left:auto;flex:none;display:flex;align-items:center;gap:9px}
+.chev{color:var(--fg-faint);font-size:16px;line-height:1}
+
+/* toggle — trạng thái, luôn xanh lá, không theo accent */
+.tg{width:42px;height:24px;border-radius:var(--r-full);background:var(--line);position:relative;
+  border:0;cursor:pointer;padding:0;transition:background .18s ease;flex:none}
+.tg i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 2px rgb(0 0 0 / .3);transition:transform .18s cubic-bezier(.22,1,.36,1)}
+.tg[aria-checked="true"]{background:var(--ok)}
+.tg[aria-checked="true"] i{transform:translateX(18px)}
+.tg:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* nút hành động nhỏ trong dòng — không cạnh tranh với CTA chính */
+.btn.mini{height:28px;padding:0 12px;font-size:12.5px;border:1px solid var(--acc);
+  background:transparent;color:var(--acc-ink);border-radius:var(--r-xs)}
+.btn.mini:hover{background:var(--acc-tint)}
+/* chip đổ xuống — bộ chọn gọn */
+.drop{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:var(--r-xs);
+  border:1px solid var(--line);background:var(--card);color:var(--fg);font-size:12.5px;
+  box-shadow:var(--sh-sm);cursor:pointer;font-family:inherit}
+.drop::before{content:"⌄";font-size:11px;color:var(--fg-faint);line-height:0;margin-top:-3px}
+.drop:hover{border-color:var(--acc-edge)}
+
+/* thông báo viền — nhẹ hơn dải nhuộm, dùng cho việc chờ xử lý */
+.notice{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:var(--r-md);
+  border:1px solid var(--warn-edge);background:transparent;width:100%}
+.notice .nt{font-size:13.5px}
+.notice .nl{font-size:12.5px;color:var(--warn);font-weight:500}
+.notice .dotw{width:6px;height:6px;border-radius:50%;background:var(--warn);flex:none}
+
+/* ── never ── */
+.never{display:grid;gap:14px;margin-top:8px}
+@media(min-width:760px){.never{grid-template-columns:1fr 1fr}}
+.nv{display:flex;gap:12px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card)}
+.nv .x{font-family:var(--mono);font-size:15px;line-height:1.5;flex:none}
+.nv.no .x{color:var(--bad)} .nv.ok2 .x{color:var(--ok)}
+.nv p{margin:0;font-size:13.5px;color:var(--fg-mute)}
+.nv b{color:var(--fg);font-weight:600;display:block;font-size:14px;margin-bottom:2px}
+
+.close{padding:62px 0 96px}
+.rec{border:1px solid var(--acc-edge);background:var(--acc-tint);border-radius:var(--r-lg);padding:24px;max-width:72ch}
+.rec p{margin:0 0 12px;color:var(--fg-mute);font-size:14.5px}
+.rec p:last-child{margin:0}
+.rec b{color:var(--fg);font-weight:600}
+.note{margin-top:26px;font-size:13px;color:var(--fg-faint);max-width:68ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<svg style="display:none" aria-hidden="true">
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-brace" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 4 14 8-14 8z"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.4h.01"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h14l-4-4M21 16H7l4 4"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+</svg>
+
+<div class="board env-bg" data-spec="light">
+
+<div class="tools">
+  <div class="wrap">
+    <div class="tgroup">
+      <span class="tlabel t" data-vi="Tone chủ đạo" data-en="Accent">Tone chủ đạo</span>
+      <div class="swatches" role="group" aria-label="Chọn tone chủ đạo">
+        <button class="sw" data-h="218" data-s="76%" data-l="48%" style="background:hsl(218 76% 48%)" aria-pressed="true" title="Azure"></button>
+        <button class="sw" data-h="190" data-s="68%" data-l="36%" style="background:hsl(190 68% 36%)" aria-pressed="false" title="Petrol"></button>
+        <button class="sw" data-h="96" data-s="40%" data-l="28%" style="background:hsl(96 40% 28%)" aria-pressed="false" title="Moss"></button>
+        <button class="sw" data-h="258" data-s="62%" data-l="56%" style="background:hsl(258 62% 56%)" aria-pressed="false" title="Iris"></button>
+        <button class="sw" data-h="355" data-s="38%" data-l="28%" style="background:hsl(355 38% 28%)" aria-pressed="false" title="Oxblood"></button>
+        <button class="sw" data-h="34" data-s="78%" data-l="44%" style="background:hsl(34 78% 44%)" aria-pressed="false" title="Amber"></button>
+      </div>
+    </div>
+    <div class="tgroup">
+      <span class="tlabel">Theme</span>
+      <div class="mini" role="group" aria-label="Chế độ sáng tối">
+        <button id="bL" aria-pressed="true">Sáng</button><button id="bD" aria-pressed="false">Tối</button>
+      </div>
+    </div>
+    <div class="tgroup">
+      <span class="tlabel">Lang</span>
+      <div class="mini" role="group" aria-label="Ngôn ngữ giao diện">
+        <button id="bVI" aria-pressed="true">VI</button><button id="bEN" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<header class="mast">
+  <div class="wrap">
+    <p class="eyebrow">Vòng bốn · Hệ thiết kế</p>
+    <h1>Hệ thiết kế DevTool</h1>
+    <p class="lede prose">
+      Trang này <em>chính là</em> đề xuất — không phải mock. Mọi thứ bạn thấy đều lấy màu từ ba kênh HSL
+      của tone chủ đạo. Đổi swatch ở thanh trên, cả trang đổi theo, và <em>không một màu trạng thái nào
+      thay đổi</em>. Nút VI/EN đổi ngôn ngữ để bạn thấy layout chịu được độ dài tiếng Việt.
+    </p>
+  </div>
+</header>
+
+<!-- ══════ MÀU ══════ -->
+<section class="sec">
+  <div class="wrap">
+    <p class="eyebrow">Nền tảng · Màu</p>
+    <h2>Accent đổi được vì nó không mang nghĩa trạng thái</h2>
+    <p class="sec-intro">
+      Bài học lớn nhất từ MoMo: hồng là điều hướng, xanh lá là bật, xanh dương là liên kết —
+      tách bạch tuyệt đối. Vì accent chỉ dùng cho <em>điều hướng và hành động chính</em>,
+      đổi nó không phá vỡ ngữ nghĩa nào. Đây là điều kiện kỹ thuật cho yêu cầu
+      "tone màu thay đổi tuỳ chiến lược".
+    </p>
+
+    <div class="roles">
+      <div class="role"><span class="dot" style="background:var(--acc)"></span>
+        <div><b class="t" data-vi="Tone chủ đạo — đổi được" data-en="Accent — swappable">Tone chủ đạo — đổi được</b>
+        <p class="t" data-vi="Điều hướng, tool đang mở, hành động chính, tiêu điểm bàn phím. Không bao giờ mang nghĩa trạng thái." data-en="Navigation, active tool, primary action, keyboard focus. Never carries state meaning.">Điều hướng, tool đang mở, hành động chính, tiêu điểm bàn phím. Không bao giờ mang nghĩa trạng thái.</p></div></div>
+      <div class="role"><span class="dot" style="background:var(--ok)"></span>
+        <div><b class="t" data-vi="Xanh lá — cố định" data-en="Green — fixed">Xanh lá — cố định</b>
+        <p class="t" data-vi="Hợp lệ, đã kết nối, đã lưu. Không đổi khi swap accent." data-en="Valid, connected, saved. Unchanged when the accent swaps.">Hợp lệ, đã kết nối, đã lưu. Không đổi khi swap accent.</p></div></div>
+      <div class="role"><span class="dot" style="background:var(--bad)"></span>
+        <div><b class="t" data-vi="Đỏ — cố định" data-en="Red — fixed">Đỏ — cố định</b>
+        <p class="t" data-vi="Lỗi, mất kết nối, hành động phá huỷ." data-en="Error, disconnected, destructive action.">Lỗi, mất kết nối, hành động phá huỷ.</p></div></div>
+      <div class="role"><span class="dot" style="background:var(--warn)"></span>
+        <div><b class="t" data-vi="Hổ phách — cố định" data-en="Amber — fixed">Hổ phách — cố định</b>
+        <p class="t" data-vi="Cảnh báo, giá trị bất thường, sắp hết hạn." data-en="Warning, anomalous value, expiring soon.">Cảnh báo, giá trị bất thường, sắp hết hạn.</p></div></div>
+    </div>
+
+    <p class="why" style="margin-top:18px;max-width:70ch">
+      <b>Cách hiện thực:</b> accent khai báo bằng ba biến rời <code class="mono">--a-h / --a-s / --a-l</code>.
+      Mọi biến thể — nền nhuộm, viền, ring tiêu điểm, cả xám ngả sắc của nền và đường kẻ — đều
+      <code class="mono">hsl()</code> tính từ ba biến đó. Không có mã hex nào bị viết cứng, nên thêm một tone
+      mới chỉ là thêm ba số.
+    </p>
+  </div>
+</section>
+
+<!-- ══════ CHỮ ══════ -->
+<section class="sec">
+  <div class="wrap">
+    <p class="eyebrow">Nền tảng · Chữ</p>
+    <h2>Bộ kiểm tra mặt chữ</h2>
+    <p class="sec-intro">
+      Bạn chốt <em>sans + mono, không serif</em>, và phải đẹp cả tiếng Việt lẫn tiếng Anh, không quá mảnh
+      không quá dày, phân biệt rõ ký tự giống nhau. Đây là bốn bài kiểm tra mà mọi ứng viên phải qua —
+      dựng bằng font hệ thống, vì trang web không nạp được font ngoài.
+    </p>
+
+    <div class="rig">
+      <div class="rigbox">
+        <div class="lab">1 · Chồng dấu tiếng Việt</div>
+        <div class="big">Ệ Ộ Ỡ Ữ ắ ằ ẵ ặ ế ệ ỗ ợ ữ ự</div>
+      </div>
+      <div class="rigbox">
+        <div class="lab">2 · Dấu không được chạm chữ</div>
+        <div class="big">Tuyệt · Nghĩ · Quyển · Hưởng</div>
+      </div>
+      <div class="rigbox">
+        <div class="lab">3 · Ký tự dễ nhầm — mono</div>
+        <div class="bigm">0O o · 1lI i · rn m · 5S · 8B · ;:</div>
+      </div>
+      <div class="rigbox">
+        <div class="lab">4 · Dữ liệu thật, số tabular</div>
+        <div class="bigm">1 284 · 40 917 · 0x4a6f · a1b2</div>
+      </div>
+    </div>
+
+    <div class="cand">
+      <div class="cd"><div class="m">Giao diện</div><b>Be Vietnam Pro</b>
+        <p>Vẽ riêng cho tiếng Việt — dấu rời rạc, không chồng ở cỡ nhỏ. Có đủ 9 độ đậm, dùng 400/500/600. Latin sạch, hợp cả tiếng Anh. OFL.</p></div>
+      <div class="cd"><div class="m">Giao diện — phương án 2</div><b>Public Sans</b>
+        <p>Trung tính hơn, độ đậm cân, hỗ trợ tiếng Việt đầy đủ. Ít cá tính hơn Be Vietnam Pro nhưng an toàn hơn ở cỡ 11–13px. OFL.</p></div>
+      <div class="cd"><div class="m">Dữ liệu</div><b>IBM Plex Mono</b>
+        <p>0 có gạch chéo, 1 có chân, l có đuôi — ba ký tự dễ nhầm nhất đều phân biệt được. Có tiếng Việt. Không phải JetBrains Mono ai cũng dùng. OFL.</p></div>
+      <div class="cd"><div class="m">Dữ liệu — phương án 2</div><b>Geist Mono</b>
+        <p>Hình học hơn, hiện đại hơn, nét đều. Hỗ trợ tiếng Việt yếu hơn Plex — chỉ chọn nếu mono không bao giờ phải hiển thị tiếng Việt.</p></div>
+    </div>
+
+    <p class="why" style="margin-top:16px;max-width:70ch">
+      <b>Đề xuất:</b> <b>Be Vietnam Pro + IBM Plex Mono</b>, đóng gói cùng app qua <code class="mono">@fontsource</code>
+      nên không phụ thuộc mạng và giống hệt trên macOS, Windows, Linux. Tôi sẽ dựng specimen thật ngay trong
+      app ở giai đoạn 1 để bạn xem trước khi khoá.
+    </p>
+  </div>
+</section>
+
+<!-- ══════ COMPONENT ══════ -->
+<section class="sec">
+  <div class="wrap">
+    <p class="eyebrow">Component · Sửa theo 6 lời chê</p>
+    <h2>Từ tẻ nhạt sang có sức sống</h2>
+    <p class="sec-intro">
+      Mỗi mục đặt cạnh nhau bản vòng 3 bạn chê và bản vòng 4. Không mục nào thêm hiệu ứng —
+      thay đổi đến từ <em>cấu trúc</em> và <em>một biến thể màu còn thiếu</em>.
+    </p>
+
+    <!-- 1 NÚT -->
+    <div class="block">
+      <div class="block-head">
+        <h3 class="t" data-vi="1 · Nút — bổ sung biến thể nền nhuộm" data-en="1 · Buttons — the tinted variant">1 · Nút — bổ sung biến thể nền nhuộm</h3>
+        <p>Vòng 3 chỉ có đặc / viền / ghost, nên chỉ còn hai thái cực: chói hoặc vô hình.
+           Larme cho lời giải: <em>nền nhuộm nhạt, chữ đậm cùng tông, phím tắt nằm luôn trong nút</em>.</p>
+      </div>
+      <div class="pair">
+        <div class="cell">
+          <span class="cap no">✕ Vòng 3</span>
+          <div class="stage row">
+            <span class="btn-v3 p">Chạy</span><span class="btn-v3">Sao chép</span><span class="btn-v3">Đặt lại</span>
+          </div>
+          <p class="why">Một nút đặc, còn lại là viền xám. <b>Không có bậc trung gian.</b></p>
+        </div>
+        <div class="cell">
+          <span class="cap yes">✓ Vòng 4 — rê chuột và tab thử</span>
+          <div class="stage row">
+            <button class="btn solid"><svg><use href="#i-play"/></svg><span class="t" data-vi="Chạy" data-en="Run">Chạy</span><span class="sc">⌘↵</span></button>
+            <button class="btn tint"><svg><use href="#i-copy"/></svg><span class="t" data-vi="Sao chép" data-en="Copy">Sao chép</span><span class="sc">⌘C</span></button>
+            <button class="btn outline"><span class="t" data-vi="Nhập tệp" data-en="Import">Nhập tệp</span></button>
+            <button class="btn ghost"><span class="t" data-vi="Đặt lại" data-en="Reset">Đặt lại</span></button>
+          </div>
+          <p class="why">Bốn bậc rõ ràng. <b>Phím tắt nằm trong nút</b>, ngăn bằng vạch mảnh — app tự dạy người dùng bỏ chuột.</p>
+        </div>
+      </div>
+      <div class="stage row" style="margin-top:14px">
+        <span class="tlabel t" data-vi="Nhuộm theo nghĩa:" data-en="Tinted by meaning:">Nhuộm theo nghĩa:</span>
+        <button class="btn tint ok"><svg><use href="#i-check"/></svg><span class="t" data-vi="Chấp nhận" data-en="Accept">Chấp nhận</span></button>
+        <button class="btn tint bad"><span class="t" data-vi="Xoá kết nối" data-en="Delete connection">Xoá kết nối</span></button>
+        <span class="why" style="margin-left:auto"><b>Cùng một hình dạng</b>, chỉ đổi tông — không phải một component mới.</span>
+      </div>
+    </div>
+
+    <!-- 2 TRẠNG THÁI -->
+    <div class="block">
+      <div class="block-head">
+        <h3 class="t" data-vi="2 · Trạng thái — chip gọn + dải giải thích trong thẻ" data-en="2 · Status — compact chip + in-card band">2 · Trạng thái — chip gọn + dải giải thích trong thẻ</h3>
+        <p>Bạn nói đúng cả hai phía: thẻ cảnh báo rời tốn chỗ, vạch 2px thì khó bắt.
+           Lời giải là <em>hai tầng</em>: chip ở thanh tiêu đề để liếc là thấy, và dải nhuộm màu
+           trong thẻ khi cần nói thêm — cả hai đều nằm trong panel, không đẩy layout.</p>
+      </div>
+      <div class="pair">
+        <div class="cell">
+          <span class="cap no">✕ Vòng 3 — thẻ rời và vạch 2px</span>
+          <div class="stage">
+            <div class="alert-v3"><svg style="width:16px;height:16px;flex:none;margin-top:2px"><use href="#i-check"/></svg>
+              <div><b>Valid JSON</b><br>Your JSON is well-formed and ready to use.</div></div>
+            <div style="width:100%;height:2px;background:var(--ok);border-radius:2px"></div>
+            <p class="why" style="margin:0">Một cái tốn cả khối, một cái gần như vô hình.</p>
+          </div>
+        </div>
+        <div class="cell">
+          <span class="cap yes">✓ Vòng 4 — chip + dải, không đẩy layout</span>
+          <div class="stage flush">
+            <div class="panel" style="box-shadow:none;border:0;border-radius:0">
+              <div class="ph"><span class="t t2" data-vi="Kết quả" data-en="Output">Kết quả</span>
+                <span class="r">
+                  <span class="count">148 B</span>
+                  <span class="chip ok"><svg><use href="#i-check"/></svg><span class="t" data-vi="Hợp lệ" data-en="Valid">Hợp lệ</span></span>
+                </span></div>
+              <div style="padding:12px 15px;font-family:var(--mono);font-size:11.5px;line-height:1.75;white-space:pre"><span class="p">{</span>
+  <span class="k">"service"</span>: <span class="s">"payments-api"</span>,
+  <span class="k">"replicas"</span>: <span class="n2">3</span>
+<span class="p">}</span></div>
+            </div>
+          </div>
+          <p class="why">Chip <b>đọc được trong một cái liếc</b>, tốn đúng chiều cao đã có sẵn của thanh tiêu đề.</p>
+        </div>
+      </div>
+
+      <div class="pair" style="margin-top:16px">
+        <div class="cell">
+          <span class="cap yes">✓ Khi lỗi — cùng chỗ, cùng chiều cao</span>
+          <div class="stage flush">
+            <div class="panel" style="box-shadow:none;border:0;border-radius:0">
+              <div class="ph"><span class="t" data-vi="Kết quả" data-en="Output">Kết quả</span>
+                <span class="r"><span class="count">84 B</span>
+                  <span class="chip bad"><svg><use href="#i-alert"/></svg><span class="t" data-vi="Lỗi cú pháp" data-en="Syntax error">Lỗi cú pháp</span></span></span></div>
+              <div style="padding:12px 15px;font-family:var(--mono);font-size:11.5px;line-height:1.75;white-space:pre"><span class="p">{</span>
+  <span class="k">"service"</span>: <span class="s">"payments-api"</span>,
+<span class="p">}</span></div>
+              <div class="band"><span class="bi">!</span>
+                <div><p class="bt t" data-vi="Dấu phẩy thừa trước dấu đóng ngoặc, ở ký tự 84. JSON không cho phép dấu phẩy cuối như JavaScript." data-en="Trailing comma before the closing brace, at character 84. JSON does not allow trailing commas the way JavaScript does.">Dấu phẩy thừa trước dấu đóng ngoặc, ở ký tự 84. JSON không cho phép dấu phẩy cuối như JavaScript.</p>
+                  <div class="exrow">
+                    <span class="ex"><span class="box">, }</span><span class="ar">→</span><span class="t" data-vi="bỏ dấu phẩy" data-en="drop the comma">bỏ dấu phẩy</span></span>
+                    <span class="ex"><span class="box">⌘.</span><span class="ar">→</span><span class="t" data-vi="sửa tự động" data-en="auto-fix">sửa tự động</span></span>
+                  </div></div></div>
+            </div>
+          </div>
+          <p class="why">Dải chỉ hiện <b>khi có gì đáng nói</b>, và kèm chip ví dụ để sửa được ngay.</p>
+        </div>
+        <div class="cell">
+          <span class="cap yes">✓ Dải cũng dùng để dạy, không chỉ báo lỗi</span>
+          <div class="stage flush">
+            <div class="panel" style="box-shadow:none;border:0;border-radius:0">
+              <div class="ph"><span class="t" data-vi="Chuyển đổi chữ hoa" data-en="Case transform">Chuyển đổi chữ hoa</span>
+                <span class="r"><span class="count">12</span></span></div>
+              <div class="band okb"><span class="bi">Aa</span>
+                <div><p class="bt t" data-vi="Đặt một lần. Gõ chữ hoa thì kết quả cũng viết hoa theo." data-en="Set once. Type in caps and the result follows in caps.">Đặt một lần. Gõ chữ hoa thì kết quả cũng viết hoa theo.</p>
+                  <div class="exrow">
+                    <span class="ex"><span class="box">vn</span><span class="ar">→</span>việt nam</span>
+                    <span class="ex"><span class="box">Vn</span><span class="ar">→</span>Việt nam</span>
+                    <span class="ex"><span class="box">VN</span><span class="ar">→</span>VIỆT NAM</span>
+                  </div></div></div>
+            </div>
+          </div>
+          <p class="why">Cùng một component, tông xanh lá. <b>Một thứ để học, không phải hai.</b></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 BẢNG -->
+    <div class="block">
+      <div class="block-head">
+        <h3 class="t" data-vi="3 · Dòng dữ liệu — bốn tầng thay vì hai cột" data-en="3 · Data rows — four tiers, not two columns">3 · Dòng dữ liệu — bốn tầng thay vì hai cột</h3>
+        <p>Sony Color Lab cho công thức chữa bệnh nghèo nàn: nhãn kèm <code class="mono">?</code>,
+           giá trị canh phải <em>có trọng lượng thị giác</em>, tag phân loại có màu theo nghĩa,
+           rồi một câu giải thích bằng tiếng người. Nhiều dòng chung một thẻ, ngăn bằng hairline.</p>
+      </div>
+      <div class="pair">
+        <div class="cell">
+          <span class="cap no">✕ Vòng 3</span>
+          <div class="stage flush">
+            <table class="tbl3">
+              <tr><th>Tham số</th><th style="text-align:right">Giá trị</th></tr>
+              <tr><td>Black Level</td><td class="n">-7</td></tr>
+              <tr><td>Gamma</td><td class="n">Cine1</td></tr>
+              <tr><td>Saturation</td><td class="n">+25</td></tr>
+            </table>
+          </div>
+          <p class="why">Đúng nhưng câm. <b>Không cho biết tham số làm gì.</b></p>
+        </div>
+        <div class="cell">
+          <span class="cap yes">✓ Vòng 4</span>
+          <div class="stage flush">
+            <div>
+              <div class="prow"><div class="top"><span class="lb">Black Level</span><span class="q">?</span><span class="vl">−7</span></div>
+                <div class="ct"><span class="ctag c1 t" data-vi="Tương phản" data-en="Contrast">Tương phản</span></div>
+                <p class="ds t" data-vi="Vùng tối sâu hơn một chút — tương phản chặt ở dải tối" data-en="Shadows deepened slightly — tighter contrast in dark tones">Vùng tối sâu hơn một chút — tương phản chặt ở dải tối</p></div>
+              <div class="prow"><div class="top"><span class="lb">Gamma</span><span class="q">?</span><span class="vl acc">Cine1</span></div>
+                <div class="ct"><span class="ctag c1 t" data-vi="Tương phản" data-en="Contrast">Tương phản</span></div>
+                <p class="ds t" data-vi="Đường cong phim, vùng tối được nâng — dịu, giàu chuyển sắc" data-en="Film curve with lifted shadows — subdued, gradation-rich">Đường cong phim, vùng tối được nâng — dịu, giàu chuyển sắc</p></div>
+              <div class="prow"><div class="top"><span class="lb">Saturation</span><span class="q">?</span><span class="vl">+25</span></div>
+                <div class="ct"><span class="ctag c2 t" data-vi="Màu sắc" data-en="Colour">Màu sắc</span></div>
+                <p class="ds t" data-vi="Màu bị đẩy mạnh — rực, tác động cao" data-en="Colour pushed hard — vivid, high-impact hues">Màu bị đẩy mạnh — rực, tác động cao</p></div>
+            </div>
+          </div>
+          <p class="why">Giá trị có trọng lượng, tag phân màu theo nhóm, câu giải thích làm dòng <b>có tiếng nói</b>.</p>
+        </div>
+      </div>
+
+      <div class="block-head" style="margin-top:24px;margin-bottom:12px">
+        <p><b class="t" data-vi="Biến thể cho bảng lớn" data-en="Variant for large tables">Biến thể cho bảng lớn</b> —
+           Kafka, RabbitMQ, timesheet cần mật độ cao hơn, nên rút còn hai tầng cộng thanh tỉ lệ và chip trạng thái.</p>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="t" data-vi="Chủ đề" data-en="Topics">Chủ đề</span><span class="count">3</span>
+          <span class="r"><button class="btn tint" style="height:28px;font-size:12.5px"><span class="t" data-vi="Làm mới" data-en="Refresh">Làm mới</span><span class="sc">⌘R</span></button></span></div>
+        <table class="dt">
+          <tr><th class="t" data-vi="Chủ đề" data-en="Topic">Chủ đề</th><th style="text-align:right" class="t" data-vi="Bản tin" data-en="Messages">Bản tin</th><th style="text-align:right">Lag</th><th style="text-align:right" class="t" data-vi="Trạng thái" data-en="State">Trạng thái</th></tr>
+          <tr><td><span class="nm">orders</span><span class="sub t" data-vi="6 phân vùng · 3 bản sao" data-en="6 partitions · 3 replicas">6 phân vùng · 3 bản sao</span></td>
+            <td><div class="meter"><span class="num">1 284</span><span class="tr"><i style="width:34%"></i></span></div></td>
+            <td class="num">0</td><td style="text-align:right"><span class="chip ok"><span class="pip"></span><span class="t" data-vi="Ổn" data-en="Healthy">Ổn</span></span></td></tr>
+          <tr><td><span class="nm">payments-retry</span><span class="sub t" data-vi="2 phân vùng · 3 bản sao" data-en="2 partitions · 3 replicas">2 phân vùng · 3 bản sao</span></td>
+            <td><div class="meter"><span class="num">96</span><span class="tr"><i style="width:3%"></i></span></div></td>
+            <td class="num" style="color:var(--bad)">412</td><td style="text-align:right"><span class="chip bad"><span class="pip"></span><span class="t" data-vi="Tồn đọng" data-en="Backlog">Tồn đọng</span></span></td></tr>
+          <tr><td><span class="nm">audit-log</span><span class="sub t" data-vi="12 phân vùng · 2 bản sao" data-en="12 partitions · 2 replicas">12 phân vùng · 2 bản sao</span></td>
+            <td><div class="meter"><span class="num">40 917</span><span class="tr"><i style="width:100%"></i></span></div></td>
+            <td class="num">0</td><td style="text-align:right"><span class="chip ok"><span class="pip"></span><span class="t" data-vi="Ổn" data-en="Healthy">Ổn</span></span></td></tr>
+        </table>
+      </div>
+      <p class="why" style="margin-top:10px">Dòng phụ, thanh tỉ lệ và chip trạng thái — <b>ba thứ nhỏ, đủ để bảng thôi câm</b>, mà vẫn chỉ một màu accent.</p>
+    </div>
+
+    <!-- 4 Ô NHẬP -->
+    <div class="block">
+      <div class="block-head">
+        <h3 class="t" data-vi="4 · Ô nhập — quy tắc chống tràn" data-en="4 · Input — the overflow rule">4 · Ô nhập — quy tắc chống tràn</h3>
+        <p>Bạn duyệt ý tưởng máng định dạng nhưng lo thừa thông tin và tràn layout. Quy tắc:
+           <em>trong ô chỉ được có tối đa hai phụ kiện</em> — máng trái và một chỉ số phải.
+           Mọi thứ khác xuống dải bên dưới.</p>
+      </div>
+      <div class="pair">
+        <div class="cell">
+          <span class="cap no">✕ Vòng 3</span>
+          <div class="stage">
+            <div class="field-v3"><span class="g">hex</span><input value="4a6f686e" spellcheck="false" aria-label="hex"></div>
+          </div>
+          <p class="why">Đúng ý tưởng nhưng <b>chưa có gì để nhìn</b>, và không có quy tắc khi thông tin nhiều.</p>
+        </div>
+        <div class="cell">
+          <span class="cap yes">✓ Vòng 4 — bấm vào máng, tab vào ô</span>
+          <div class="stage" style="align-items:stretch">
+            <label class="field"><span class="gut">hex</span>
+              <input value="4a6f686e 20446f65" spellcheck="false" aria-label="hex"><span class="tail">16 B</span></label>
+            <div class="exrow">
+              <span class="ex"><span class="box">utf-8</span><span class="ar">→</span>John Doe</span>
+              <span class="ex"><span class="box">b64</span><span class="ar">→</span>Sm9obiBEb2U=</span>
+            </div>
+          </div>
+          <p class="why">Máng đổi định dạng, đuôi là chỉ số. <b>Kết quả các định dạng khác nằm ở chip bên dưới</b> — ô không bao giờ tràn.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 SEGMENTED -->
+    <div class="block">
+      <div class="block-head">
+        <h3 class="t" data-vi="5 · Bộ chuyển chế độ — con trượt đặc, có số thứ tự" data-en="5 · Mode switch — solid thumb, numbered">5 · Bộ chuyển chế độ — con trượt đặc, có số thứ tự</h3>
+        <p>Vòng 3 con trượt là thẻ trắng trên nền xám — gần như vô hình. Larme dùng
+           <em>nền đặc màu accent</em> cho mục đang chọn, kèm số để bấm nhanh bằng bàn phím.</p>
+      </div>
+      <div class="pair">
+        <div class="cell">
+          <span class="cap no">✕ Vòng 3</span>
+          <div class="stage row"><div class="seg3"><span class="on">Encode</span><span>Decode</span><span>Hash</span></div></div>
+          <p class="why">Thẻ trắng trên xám nhạt — <b>tương phản gần bằng không</b>.</p>
+        </div>
+        <div class="cell">
+          <span class="cap yes">✓ Vòng 4 — bấm thử</span>
+          <div class="stage row">
+            <div class="segx"><span class="thumb"></span>
+              <span class="on"><span class="n">1</span>Encode</span><span><span class="n">2</span>Decode</span><span><span class="n">3</span>Hash</span></div>
+            <span class="pager">‹ 1/3 ›</span>
+          </div>
+          <p class="why">Đang chọn thì rõ ràng. <b>Số cho bấm phím 1–3</b>, và pager cho biết còn chế độ khác.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 PALETTE -->
+    <div class="block">
+      <div class="block-head">
+        <h3 class="t" data-vi="6 · Command palette ⌘K — hai cột, có thanh chân" data-en="6 · Command palette ⌘K — two columns with a footer">6 · Command palette ⌘K — hai cột, có thanh chân</h3>
+        <p>Lấy đúng hình dạng panel Clipboard của Larme: danh sách bên trái, xem trước bên phải,
+           thanh chân keycap bên dưới. Palette <em>nói ra lý do nó đoán</em>, để tin được mà không phải kiểm tra lại.</p>
+      </div>
+      <div class="pal">
+        <div class="top"><svg><use href="#i-search"/></svg><span class="q">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…</span>
+          <span style="margin-left:auto"><span class="count t" data-vi="4 gợi ý" data-en="4 matches">4 gợi ý</span></span></div>
+        <div class="cols">
+          <div class="lst">
+            <div class="g t" data-vi="Đoán từ clipboard" data-en="From clipboard">Đoán từ clipboard</div>
+            <div class="r on"><span class="ic"><svg><use href="#i-lock"/></svg></span>
+              <span class="t" data-vi="Giải mã JWT này" data-en="Decode this JWT">Giải mã JWT này</span>
+              <span class="rs t" data-vi="3 đoạn base64" data-en="3 base64 segments">3 đoạn base64</span></div>
+            <div class="r"><span class="ic"><svg><use href="#i-brace"/></svg></span>
+              <span class="t" data-vi="Xem như JSON" data-en="View as JSON">Xem như JSON</span>
+              <span class="rs t" data-vi="đoạn đầu là JSON" data-en="first segment is JSON">đoạn đầu là JSON</span></div>
+            <div class="r"><span class="ic"><svg><use href="#i-clock"/></svg></span>
+              <span class="t" data-vi="Kiểm tra hạn token" data-en="Check token expiry">Kiểm tra hạn token</span>
+              <span class="rs">exp</span></div>
+            <div class="g t" data-vi="Công cụ" data-en="Tools">Công cụ</div>
+            <div class="r"><span class="ic"><svg><use href="#i-swap"/></svg></span>
+              <span class="t" data-vi="Chuyển đổi dữ liệu" data-en="Data Converter">Chuyển đổi dữ liệu</span><span class="rs">⌘2</span></div>
+          </div>
+          <div class="prev">
+            <span class="lab t" data-vi="Xem trước" data-en="Preview">Xem trước</span>
+            <pre><span class="p">{</span>
+  <span class="k">"alg"</span>: <span class="s">"HS256"</span>,
+  <span class="k">"typ"</span>: <span class="s">"JWT"</span>
+<span class="p">}</span></pre>
+            <span class="chip ok" style="align-self:flex-start"><svg><use href="#i-check"/></svg><span class="t" data-vi="Chữ ký hợp lệ" data-en="Signature valid">Chữ ký hợp lệ</span></span>
+          </div>
+        </div>
+        <div class="foot">
+          <span><span class="kc">↑↓</span><span class="t" data-vi="Di chuyển" data-en="Move">Di chuyển</span></span>
+          <span><span class="kc">↵</span><span class="t" data-vi="Chạy" data-en="Run">Chạy</span></span>
+          <span><span class="kc">⌘C</span><span class="t" data-vi="Chép kết quả" data-en="Copy result">Chép kết quả</span></span>
+          <span><span class="kc">esc</span><span class="t" data-vi="Đóng" data-en="Close">Đóng</span></span>
+        </div>
+      </div>
+
+      <div class="block-head" style="margin-top:26px;margin-bottom:12px">
+        <p><b class="t" data-vi="Màn hình trống dùng lại đúng thanh chân đó" data-en="Empty states reuse that same footer">Màn hình trống dùng lại đúng thanh chân đó</b></p>
+      </div>
+      <div class="empty">
+        <h4 class="t" data-vi="Chưa có gì để định dạng" data-en="Nothing to format yet">Chưa có gì để định dạng</h4>
+        <ul>
+          <li><span class="kc">⌘V</span><span class="t" data-vi="dán từ clipboard" data-en="paste from clipboard">dán từ clipboard</span></li>
+          <li><span class="kc">⌘O</span><span class="t" data-vi="mở tệp .json" data-en="open a .json file">mở tệp .json</span></li>
+          <li><span class="kc">⌘K</span><span class="t" data-vi="tìm việc khác cần làm" data-en="find something else to do">tìm việc khác cần làm</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ 7 · DÒNG CẤU HÌNH ══════ -->
+<section class="sec">
+  <div class="wrap">
+    <p class="eyebrow">Bổ sung sau đợt tham khảo thứ ba</p>
+    <h2>Một dòng, năm loại điều khiển</h2>
+    <p class="sec-intro">
+      Đây là pattern tôi còn thiếu hẳn. Màn hình <em>Cài đặt tài khoản</em> của MoMo dùng
+      <em>đúng một hình dạng dòng</em> — icon, tiêu đề, mô tả — nhưng phần điều khiển bên phải
+      thay đổi theo việc dòng đó làm gì. Năm loại, không loại nào cần một component mới.
+      DevTool cần chính xác thứ này cho trang Settings và bảng cấu hình của mọi tool.
+    </p>
+
+    <div class="panel">
+      <div class="ph"><span class="t" data-vi="Kết nối & bảo mật" data-en="Connection & security">Kết nối &amp; bảo mật</span></div>
+
+      <div class="srow">
+        <span class="si"><svg><use href="#i-lock"/></svg></span>
+        <span class="sb"><b class="t" data-vi="Khoá lưu trữ kết nối" data-en="Connection vault key">Khoá lưu trữ kết nối</b>
+          <span class="t" data-vi="Mã hoá mật khẩu Kafka và RabbitMQ trên máy" data-en="Encrypts Kafka and RabbitMQ passwords on this machine">Mã hoá mật khẩu Kafka và RabbitMQ trên máy</span></span>
+        <span class="sc2"><span class="chev">›</span></span>
+      </div>
+
+      <div class="srow">
+        <span class="si"><svg><use href="#i-check"/></svg></span>
+        <span class="sb"><b class="t" data-vi="Tự động kiểm tra bản cập nhật" data-en="Check for updates automatically">Tự động kiểm tra bản cập nhật</b>
+          <span class="t" data-vi="Kết nối mạng mỗi 24 giờ" data-en="Reaches the network every 24 hours">Kết nối mạng mỗi 24 giờ</span></span>
+        <span class="sc2"><button class="tg" role="switch" aria-checked="true" aria-label="Tự động kiểm tra bản cập nhật"><i></i></button></span>
+      </div>
+
+      <div class="srow">
+        <span class="si"><svg><use href="#i-brace"/></svg></span>
+        <span class="sb"><b class="t" data-vi="Máy chủ giả lập" data-en="Mock server">Máy chủ giả lập</b>
+          <span class="t" data-vi="Đang lắng nghe ở cổng 8787" data-en="Listening on port 8787">Đang lắng nghe ở cổng 8787</span></span>
+        <span class="sc2"><span class="chip ok"><span class="pip"></span><span class="t" data-vi="Đang chạy" data-en="Running">Đang chạy</span></span></span>
+      </div>
+
+      <div class="srow">
+        <span class="si"><svg><use href="#i-swap"/></svg></span>
+        <span class="sb"><b class="t" data-vi="Bộ sưu tập Postman" data-en="Postman collection">Bộ sưu tập Postman</b>
+          <span class="t" data-vi="Tệp nguồn đã đổi từ lần nhập cuối" data-en="Source file changed since the last import">Tệp nguồn đã đổi từ lần nhập cuối</span></span>
+        <span class="sc2"><button class="btn mini t" data-vi="Nhập lại" data-en="Re-import">Nhập lại</button></span>
+      </div>
+
+      <div class="srow">
+        <span class="si"><svg><use href="#i-clock"/></svg></span>
+        <span class="sb"><b class="t" data-vi="Múi giờ hiển thị" data-en="Display timezone">Múi giờ hiển thị</b>
+          <span class="t" data-vi="Áp dụng cho mọi dấu thời gian trong app" data-en="Applies to every timestamp in the app">Áp dụng cho mọi dấu thời gian trong app</span></span>
+        <span class="sc2"><button class="drop">Asia/Ho_Chi_Minh</button></span>
+      </div>
+    </div>
+
+    <p class="why" style="margin-top:12px;max-width:72ch">
+      Năm dòng, năm loại điều khiển: <b>chevron</b> mở màn khác · <b>toggle</b> bật tắt ·
+      <b>chip trạng thái</b> chỉ đọc · <b>nút viền nhỏ</b> cho hành động một lần ·
+      <b>chip đổ xuống</b> cho lựa chọn. Chú ý toggle bật là <b>xanh lá, không phải màu accent</b> —
+      đổi tone ở thanh trên, nó vẫn xanh.
+    </p>
+
+    <div class="block" style="margin-top:34px">
+      <div class="block-head">
+        <h3 class="t" data-vi="Thông báo viền — bậc nhẹ nhất của trạng thái" data-en="Outlined notice — the lightest state weight">Thông báo viền — bậc nhẹ nhất của trạng thái</h3>
+        <p>MoMo dùng thẻ <em>chỉ có viền cam</em>, không nền, cho việc đang chờ xử lý.
+           Nhẹ hơn dải nhuộm, nặng hơn chip. Giờ hệ trạng thái có đủ ba bậc.</p>
+      </div>
+      <div class="stage" style="align-items:stretch;gap:12px">
+        <span class="notice"><span class="dotw"></span>
+          <span class="nt"><span class="nl t" data-vi="Đang chờ · " data-en="Pending · ">Đang chờ · </span><span class="t" data-vi="2 consumer chưa đóng khi thoát tool lần trước" data-en="2 consumers were left open when the tool last closed">2 consumer chưa đóng khi thoát tool lần trước</span></span>
+          <span style="margin-left:auto"><button class="btn ghost" style="height:26px;font-size:12.5px"><span class="t" data-vi="Đóng hết" data-en="Close all">Đóng hết</span></button></span>
+        </span>
+        <p class="why" style="margin:0"><b class="t" data-vi="Ba bậc trạng thái:" data-en="Three state weights:">Ba bậc trạng thái:</b>
+          <span class="chip ok" style="vertical-align:middle"><span class="pip"></span>chip</span> để liếc ·
+          <span style="border:1px solid var(--warn-edge);border-radius:var(--r-xs);padding:2px 8px;font-size:12px">viền</span> cho việc chờ ·
+          <span style="background:var(--info-tint);border-radius:var(--r-xs);padding:2px 8px;font-size:12px;color:var(--info)">dải nhuộm</span> khi cần giải thích.</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-head">
+        <h3 class="t" data-vi="Sửa lại quy tắc lồng thẻ" data-en="Revising the nesting rule">Sửa lại quy tắc lồng thẻ</h3>
+        <p>Tôi đã cấm "thẻ lồng trong thẻ". MoMo lồng liên tục — hộp tài khoản trong thẻ trắng —
+           và đọc vẫn rất rõ. Quy tắc đúng phải là về <em>độ nổi</em>, không phải về số tầng.</p>
+      </div>
+      <div class="pair">
+        <div class="cell">
+          <span class="cap no t" data-vi="✕ Sai — hai tầng cùng đổ bóng" data-en="✕ Wrong — two shadowed layers">✕ Sai — hai tầng cùng đổ bóng</span>
+          <div class="stage" style="background:var(--bg)">
+            <div class="panel" style="padding:14px">
+              <div class="panel" style="padding:12px 14px;box-shadow:var(--sh)">
+                <b style="font-size:13.5px">orders</b>
+                <span style="display:block;font-size:12.5px;color:var(--fg-mute)">6 phân vùng</span>
+              </div>
+            </div>
+          </div>
+          <p class="why">Hai bóng chồng nhau — mắt không biết tầng nào nổi hơn.</p>
+        </div>
+        <div class="cell">
+          <span class="cap yes t" data-vi="✓ Đúng — một tầng nổi, tầng trong chỉ có viền" data-en="✓ Right — one raised layer, hairlines inside">✓ Đúng — một tầng nổi, tầng trong chỉ có viền</span>
+          <div class="stage" style="background:var(--bg)">
+            <div class="panel" style="padding:14px;display:flex;flex-direction:column;gap:9px">
+              <div style="border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;display:flex;align-items:center">
+                <div><b style="font-size:13.5px">orders</b>
+                  <span style="display:block;font-size:12.5px;color:var(--fg-mute)">6 phân vùng</span></div>
+                <span class="num" style="margin-left:auto;font-family:var(--mono);font-weight:600">1 284</span>
+              </div>
+              <div style="border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;display:flex;align-items:center">
+                <div><b style="font-size:13.5px">audit-log</b>
+                  <span style="display:block;font-size:12.5px;color:var(--fg-mute)">12 phân vùng</span></div>
+                <span class="num" style="margin-left:auto;font-family:var(--mono);font-weight:600">40 917</span>
+              </div>
+            </div>
+          </div>
+          <p class="why"><b>Chỉ một bóng.</b> Tầng trong tách bằng viền mảnh — nhóm được mà không loạn.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ NEVER ══════ -->
+<section class="sec">
+  <div class="wrap">
+    <p class="eyebrow">Ràng buộc — đã sửa theo phản hồi</p>
+    <h2>Được phép và không bao giờ</h2>
+    <p class="sec-intro">
+      Danh sách này vào <em>docs/design/DESIGN-SYSTEM.md</em> và vào skill review của repo.
+      Ba dòng đầu là những điều tôi đã cấm sai ở vòng 3.
+    </p>
+    <div class="never">
+      <div class="nv ok2"><span class="x">✓</span><p><b class="t" data-vi="Gradient ở nền môi trường" data-en="Gradient as ambient ground">Gradient ở nền môi trường</b><span class="t" data-vi="Đúng như nền trang này. Cấm trên nút và sau chữ đọc được." data-en="Exactly like this page's ground. Never on buttons or behind readable text.">Đúng như nền trang này. Cấm trên nút và sau chữ đọc được.</span></p></div>
+      <div class="nv ok2"><span class="x">✓</span><p><b class="t" data-vi="Bo góc và màu trên nút" data-en="Radius and colour on buttons">Bo góc và màu trên nút</b><span class="t" data-vi="Hoàn toàn bình thường. Ràng buộc duy nhất là màu phải theo nghĩa." data-en="Entirely normal. The only constraint is that colour must follow meaning.">Hoàn toàn bình thường. Ràng buộc duy nhất là màu phải theo nghĩa.</span></p></div>
+      <div class="nv ok2"><span class="x">✓</span><p><b class="t" data-vi="Bo góc lớn cho thẻ" data-en="Large radius on cards">Bo góc lớn cho thẻ</b><span class="t" data-vi="14–24px, miễn là bán kính trong = ngoài − đệm." data-en="14–24px, as long as inner radius = outer − padding.">14–24px, miễn là bán kính trong = ngoài − đệm.</span></p></div>
+      <div class="nv no"><span class="x">✕</span><p><b class="t" data-vi="Accent mang nghĩa trạng thái" data-en="Accent carrying state meaning">Accent mang nghĩa trạng thái</b><span class="t" data-vi="Phá vỡ khả năng đổi tone. Trạng thái dùng hệ màu riêng cố định." data-en="Breaks accent swapping. State uses its own fixed palette.">Phá vỡ khả năng đổi tone. Trạng thái dùng hệ màu riêng cố định.</span></p></div>
+      <div class="nv no"><span class="x">✕</span><p><b class="t" data-vi="Quá hai tag phân loại một danh sách" data-en="More than two category tags per list">Quá hai tag phân loại một danh sách</b><span class="t" data-vi="Ba màu tag trở lên là bắt đầu rối." data-en="Three or more tag colours starts to muddle.">Ba màu tag trở lên là bắt đầu rối.</span></p></div>
+      <div class="nv no"><span class="x">✕</span><p><b class="t" data-vi="Emoji thay icon" data-en="Emoji instead of icons">Emoji thay icon</b><span class="t" data-vi="Một bộ icon duy nhất, nét 2px." data-en="One icon set, 2px stroke.">Một bộ icon duy nhất, nét 2px.</span></p></div>
+      <div class="nv no"><span class="x">✕</span><p><b class="t" data-vi="Hai tầng cùng đổ bóng" data-en="Two shadowed layers">Hai tầng cùng đổ bóng</b><span class="t" data-vi="Lồng nhóm thì được — nhưng chỉ một tầng được nổi. Tầng trong dùng viền mảnh." data-en="Nesting groups is fine — but only one layer may be raised. Inner layers use hairlines.">Lồng nhóm thì được — nhưng chỉ một tầng được nổi. Tầng trong dùng viền mảnh.</span></p></div>
+      <div class="nv ok2"><span class="x">✓</span><p><b class="t" data-vi="Một dòng, nhiều loại điều khiển" data-en="One row, many controls">Một dòng, nhiều loại điều khiển</b><span class="t" data-vi="Chevron, toggle, chip, nút viền nhỏ, chip đổ xuống — cùng một hình dạng dòng." data-en="Chevron, toggle, chip, mini outlined button, dropdown — one row shape.">Chevron, toggle, chip, nút viền nhỏ, chip đổ xuống — cùng một hình dạng dòng.</span></p></div>
+      <div class="nv no"><span class="x">✕</span><p><b class="t" data-vi="Nhấc phần tử khi rê chuột" data-en="Lifting elements on hover">Nhấc phần tử khi rê chuột</b><span class="t" data-vi="Rê chuột đổi nền hoặc viền, không đổi vị trí." data-en="Hover changes fill or border, never position.">Rê chuột đổi nền hoặc viền, không đổi vị trí.</span></p></div>
+      <div class="nv no"><span class="x">✕</span><p><b class="t" data-vi="Màu Tailwind thô" data-en="Raw Tailwind colours">Màu Tailwind thô</b><span class="t" data-vi="508 chỗ đang vi phạm. Chỉ dùng token; lint chặn phần còn lại." data-en="508 violations today. Tokens only; lint blocks the rest.">508 chỗ đang vi phạm. Chỉ dùng token; lint chặn phần còn lại.</span></p></div>
+      <div class="nv no"><span class="x">✕</span><p><b class="t" data-vi="Chữ dưới 11px" data-en="Text below 11px">Chữ dưới 11px</b><span class="t" data-vi="Hiện có 8px và 9px. Thang mới dừng ở 11px." data-en="8px and 9px exist today. The new scale stops at 11px.">Hiện có 8px và 9px. Thang mới dừng ở 11px.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="close">
+  <div class="wrap">
+    <p class="eyebrow">Việc tiếp theo</p>
+    <div class="rec">
+      <p>
+        Nếu bạn duyệt bộ này, tôi viết kế hoạch refactor bốn giai đoạn:
+        <b>G1 nền tảng</b> — token accent ba kênh HSL, hai mặt chữ, thang bo góc, xoá ~150 dòng CSS chết,
+        lint chặn màu thô. <b>G2 app shell + ⌘K</b>. <b>G3 di cư 24 tool theo đợt</b>, gộp còn ~13 nhóm
+        có tab con, kèm hạ tầng song ngữ. <b>G4 dọn dẹp + tài liệu</b>.
+      </p>
+      <p>
+        Ba thứ tôi dựng thật trước tiên trong app chạy được, không phải mock:
+        <b>chip trạng thái + dải giải thích</b>, <b>nút nền nhuộm có phím tắt nội tuyến</b>,
+        và <b>⌘K hai cột</b>. Ba thứ này chạm vào gần như mọi tool — sai sớm thì rẻ.
+      </p>
+    </div>
+    <p class="note">
+      Trang này dùng font hệ thống vì Artifact chặn font từ CDN — mặt chữ thật sẽ được đóng gói trong app.
+      Mọi thứ khác đều là HTML/CSS thật ở đúng kích thước sẽ ship: bấm, rê chuột, tab, đổi tone, đổi ngôn ngữ.
+    </p>
+  </div>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var board=document.querySelector('.board'),root=document.documentElement;
+
+  /* ── tone chủ đạo: đổi 3 kênh HSL, mọi thứ khác tự tính ── */
+  document.querySelectorAll('.sw').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.sw').forEach(function(o){o.setAttribute('aria-pressed','false')});
+      b.setAttribute('aria-pressed','true');
+      root.style.setProperty('--a-h',b.dataset.h);
+      root.style.setProperty('--a-s',b.dataset.s);
+      root.style.setProperty('--a-l',b.dataset.l);
+    });
+  });
+
+  /* ── sáng / tối ── */
+  var L=document.getElementById('bL'),D=document.getElementById('bD');
+  function theme(m){
+    board.dataset.spec=m;
+    board.classList.toggle('dark',m==='dark');
+    L.setAttribute('aria-pressed',String(m==='light'));
+    D.setAttribute('aria-pressed',String(m==='dark'));
+  }
+  L.addEventListener('click',function(){theme('light')});
+  D.addEventListener('click',function(){theme('dark')});
+
+  /* ── song ngữ: chứng minh layout chịu được độ dài tiếng Việt ── */
+  var VI=document.getElementById('bVI'),EN=document.getElementById('bEN');
+  function lang(l){
+    document.querySelectorAll('.t').forEach(function(el){
+      var v=el.dataset[l]; if(v!==undefined) el.textContent=v;
+    });
+    VI.setAttribute('aria-pressed',String(l==='vi'));
+    EN.setAttribute('aria-pressed',String(l==='en'));
+    document.documentElement.lang = l==='vi' ? 'vi' : 'en';
+    sizeThumbs();
+  }
+  VI.addEventListener('click',function(){lang('vi')});
+  EN.addEventListener('click',function(){lang('en')});
+
+  /* ── con trượt bộ chuyển chế độ ── */
+  function sizeThumbs(){
+    document.querySelectorAll('.segx').forEach(function(sx){
+      var on=sx.querySelector('span.on'),th=sx.querySelector('.thumb');
+      if(!on||!th) return;
+      th.style.width=on.offsetWidth+'px';
+      th.style.transform='translateX('+(on.offsetLeft-4)+'px)';
+    });
+  }
+  document.querySelectorAll('.segx').forEach(function(sx){
+    var items=sx.querySelectorAll('span:not(.thumb):not(.n)'),th=sx.querySelector('.thumb');
+    items.forEach(function(el){
+      el.addEventListener('click',function(){
+        items.forEach(function(i){i.classList.remove('on')});
+        el.classList.add('on');
+        sizeThumbs();
+      });
+    });
+  });
+  requestAnimationFrame(function(){
+    document.querySelectorAll('.segx .thumb').forEach(function(t){
+      t.style.transition='transform .24s cubic-bezier(.22,1,.36,1),width .24s cubic-bezier(.22,1,.36,1)';
+    });
+    sizeThumbs();
+  });
+  window.addEventListener('resize',sizeThumbs);
+
+  /* ── toggle: trạng thái, luôn xanh lá, không theo accent ── */
+  document.querySelectorAll('.tg').forEach(function(t){
+    t.addEventListener('click',function(){
+      t.setAttribute('aria-checked', t.getAttribute('aria-checked')==='true' ? 'false' : 'true');
+    });
+  });
+})();
+</script>
