@@ -183,11 +183,14 @@ export function TextTransformer() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Options toolbar */}
+      {/* Options toolbar — chiều cao 32px trên MỌI control ở đây (không phải
+          mức nghỉ 34px mặc định) là chủ ý: đây là toolbar dày đặc (xem lời chú
+          trong button.tsx size="sm"), một hàng nhiều control ngang nhau cần
+          cùng một chiều cao nhỏ hơn mức nghỉ, không phải bỏ sót. */}
       <ToolToolbar>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
-            <SelectTrigger className="h-8 w-52 text-xs rounded-lg">
+            <SelectTrigger className="h-8 w-52 text-xs rounded-sm">
               <SelectValue placeholder="Select transform" />
             </SelectTrigger>
             <SelectContent>
@@ -206,7 +209,7 @@ export function TextTransformer() {
                 aria-pressed={removeLineWhitespace}
                 onClick={() => setRemoveLineWhitespace((v) => !v)}
                 className={cn(
-                  'h-8 text-xs rounded-lg',
+                  'h-8 text-xs rounded-sm',
                   removeLineWhitespace &&
                     'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
                 )}
@@ -219,7 +222,7 @@ export function TextTransformer() {
                   value={removeChars}
                   onChange={(e) => setRemoveChars(e.target.value)}
                   placeholder="e.g. ,.;!?"
-                  className="h-8 w-32 font-mono text-xs rounded-lg"
+                  className="h-8 w-32 font-mono text-xs rounded-sm"
                 />
               </div>
             </>
@@ -232,7 +235,7 @@ export function TextTransformer() {
                 value={delimiters}
                 onChange={(e) => setDelimiters(e.target.value)}
                 placeholder=",;"
-                className="h-8 w-24 font-mono text-xs rounded-lg"
+                className="h-8 w-24 font-mono text-xs rounded-sm"
               />
             </div>
           )}

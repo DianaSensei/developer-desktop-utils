@@ -353,11 +353,13 @@ function collectContainerPaths(value: JsonValue, path = '$', acc: string[] = [])
   return acc;
 }
 
+// Cú pháp JSON — tái dùng đúng hue của SQL cho cùng khái niệm (chuỗi/số/kiểu),
+// nên "chuỗi" luôn cùng một xanh lá dù đang ở JSON hay SQL. Xem tokens.css.
 const TYPE_CLASS: Record<string, string> = {
-  string: 'text-green-600 dark:text-green-400',
-  number: 'text-amber-600 dark:text-amber-400',
-  boolean: 'text-purple-600 dark:text-purple-400',
-  null: 'text-rose-500 dark:text-rose-400',
+  string: 'text-[var(--sql-string)]',
+  number: 'text-[var(--sql-number)]',
+  boolean: 'text-[var(--sql-type)]',
+  null: 'text-[var(--json-null)]',
 };
 
 // --- Flattened line model for the beautify view ----------------------------
@@ -574,7 +576,7 @@ export function JsonFormatter() {
             </div>
           ) : (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
+              <CheckCircle2 className="h-4 w-4 text-ok" />
               <span className="text-xs">Valid JSON</span>
             </div>
           )}
@@ -589,20 +591,20 @@ export function JsonFormatter() {
               value={query}
               onChange={setQuery}
               placeholder="Find by key, value, or path…"
-              className="h-8 text-xs rounded-lg"
+              className="h-8 text-xs rounded-sm"
               containerClassName="flex-1 min-w-[160px]"
             />
-            <Button variant="outline" size="sm" className="h-8 rounded-lg" onClick={() => setCollapsed(new Set())} title="Expand all">
+            <Button variant="outline" size="sm" className="h-8 rounded-sm" onClick={() => setCollapsed(new Set())} title="Expand all">
               <UnfoldVertical className="h-3.5 w-3.5" />
             </Button>
             <Button
-              variant="outline" size="sm" className="h-8 rounded-lg"
+              variant="outline" size="sm" className="h-8 rounded-sm"
               onClick={() => setCollapsed(new Set(containerPaths.filter((path) => path !== '$')))}
               title="Collapse all"
             >
               <FoldVertical className="h-3.5 w-3.5" />
             </Button>
-            <CopyButton value={() => beautified} label="Copy" variant="outline" size="sm" className="h-8 text-xs rounded-lg" iconClassName="h-3.5 w-3.5" />
+            <CopyButton value={() => beautified} label="Copy" variant="outline" size="sm" className="h-8 text-xs rounded-sm" iconClassName="h-3.5 w-3.5" />
           </div>
         </div>
       )}
@@ -634,10 +636,10 @@ export function JsonFormatter() {
                     <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-muted-foreground">
                       {isToggle && (line.kind === 'open' ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)}
                     </span>
-                    <span className={cn('whitespace-pre rounded-sm px-0.5', isSelected && 'bg-foreground/10', isMatch && 'bg-yellow-200/70 dark:bg-yellow-500/25')}>
+                    <span className={cn('whitespace-pre rounded-sm px-0.5', isSelected && 'bg-foreground/10', isMatch && 'bg-warn/25')}>
                       {line.name !== undefined && (
                         <>
-                          <span className="text-sky-600 dark:text-sky-400">{quoteText(line.name, quote)}</span>
+                          <span className="text-[var(--json-key)]">{quoteText(line.name, quote)}</span>
                           <span className="text-muted-foreground">: </span>
                         </>
                       )}
@@ -668,7 +670,7 @@ export function JsonFormatter() {
             <FileJson className="h-12 w-12 text-muted-foreground/30" />
             <p className="text-sm">Paste JSON to get started</p>
             {!showInput && (
-              <Button variant="outline" size="sm" className="h-8 text-xs rounded-lg" onClick={() => setShowInput(true)}>
+              <Button variant="outline" size="sm" className="h-8 text-xs rounded-sm" onClick={() => setShowInput(true)}>
                 <Eye className="h-3 w-3 mr-1.5" />Show input
               </Button>
             )}
@@ -708,7 +710,7 @@ export function JsonFormatter() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Indent</span>
             <Select value={indentKey} onValueChange={setIndentKey}>
-              <SelectTrigger className="h-8 w-[108px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[108px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="2">2 spaces</SelectItem>
                 <SelectItem value="4">4 spaces</SelectItem>
@@ -720,7 +722,7 @@ export function JsonFormatter() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Quotes</span>
             <Select value={quote} onValueChange={setQuote}>
-              <SelectTrigger className="h-8 w-[112px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[112px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={'"'}>Double &quot;</SelectItem>
                 <SelectItem value={"'"}>Single &apos;</SelectItem>
@@ -728,7 +730,7 @@ export function JsonFormatter() {
             </Select>
           </div>
 
-          <Button variant="outline" size="sm" className="ml-auto h-8 text-xs rounded-lg" onClick={() => setShowInput((v) => !v)}>
+          <Button variant="outline" size="sm" className="ml-auto h-8 text-xs rounded-sm" onClick={() => setShowInput((v) => !v)}>
             {showInput ? <EyeOff className="h-3 w-3 mr-1.5" /> : <Eye className="h-3 w-3 mr-1.5" />}
             {showInput ? 'Hide input' : 'Show input'}
           </Button>

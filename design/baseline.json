@@ -1,13 +1,13 @@
 {
   "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
   "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
-  "_phase": "Hạ ở G3b (⌘K + i18n).",
+  "_phase": "Hạ ở G4 đợt 4.1 (Text · JSON&Data · Time).",
   "limits": {
-    "rawColors": 512,
-    "tinyText": 158,
+    "rawColors": 424,
+    "tinyText": 136,
     "mixedControlHeights": 352,
     "premiumUtilities": 42,
     "hoverLift": 0,
-    "handRolledTooltip": 5
+    "handRolledTooltip": 4
   }
 }

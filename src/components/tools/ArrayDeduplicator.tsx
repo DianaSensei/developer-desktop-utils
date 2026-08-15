@@ -454,7 +454,7 @@ export function ArrayDeduplicator() {
               <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Jump to bottom" disabled={!hasInput} onClick={handleScrollBottom}>
                 <ChevronsDown className="h-3.5 w-3.5" />
               </Button>
-              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 hover:text-red-500" title="Clear input" disabled={!hasInput} onClick={handleClear}>
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 hover:text-bad" title="Clear input" disabled={!hasInput} onClick={handleClear}>
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>

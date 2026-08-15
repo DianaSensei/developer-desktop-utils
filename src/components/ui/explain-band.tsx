@@ -69,10 +69,13 @@ export function ExplainBand({ tone, title, children, examples, className }: Expl
       // Lỗi phải được đọc lên ngay; các tông khác chỉ cần thông báo lịch sự.
       role={tone === 'bad' ? 'alert' : 'status'}
     >
-      <p className="text-[13px] leading-relaxed text-foreground">
+      {/* div, không phải p: một số chỗ gọi cần thêm dòng lỗi/cảnh báo phụ bên
+          dưới câu giải thích chính (xem CronGenerator) — nội dung khối bên
+          trong p sẽ bị trình duyệt tự đóng thẻ p sớm, làm rối DOM. */}
+      <div className="text-[13px] leading-relaxed text-foreground">
         {title && <span className={cn('font-semibold', t.title)}>{title} · </span>}
         {children}
-      </p>
+      </div>
       {examples && examples.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {examples.map((ex) =>

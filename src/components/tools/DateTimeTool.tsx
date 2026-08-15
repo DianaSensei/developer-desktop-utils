@@ -152,33 +152,28 @@ function humanReadableDuration(a: Date, b: Date): string {
   return parts.length ? parts.join(', ') : '0 seconds';
 }
 
-const UNIT_COLORS = [
-  'text-violet-500 dark:text-violet-400',   // years
-  'text-blue-500 dark:text-blue-400',       // months
-  'text-sky-500 dark:text-sky-400',         // days
-  'text-amber-500 dark:text-amber-400',     // hours
-  'text-orange-500 dark:text-orange-400',   // minutes
-  'text-rose-500 dark:text-rose-400',       // seconds
-] as const;
-
+// Bản cũ tô mỗi đơn vị một màu cầu vồng (years=tím, months=xanh dương,
+// days=sky…) dù chữ "years"/"months" đã tự nói lên đơn vị, và dấu `·` đã ngăn
+// cách rõ ràng. Màu không thêm thông tin nào — chỉ trọng lượng (bold+mono) +
+// dấu ngăn là đủ, đúng nguyên tắc "hierarchy qua weight/size, không phải màu".
 function DurationParts({ a, b }: { a: Date; b: Date }) {
   const [earlier, later] = a <= b ? [a, b] : [b, a];
   const dur = intervalToDuration({ start: earlier, end: later });
   const parts = [
-    dur.years   && { text: `${dur.years} ${dur.years !== 1 ? 'years' : 'year'}`,     color: UNIT_COLORS[0] },
-    dur.months  && { text: `${dur.months} ${dur.months !== 1 ? 'months' : 'month'}`, color: UNIT_COLORS[1] },
-    dur.days    && { text: `${dur.days} ${dur.days !== 1 ? 'days' : 'day'}`,         color: UNIT_COLORS[2] },
-    dur.hours   && { text: `${dur.hours} ${dur.hours !== 1 ? 'hours' : 'hour'}`,     color: UNIT_COLORS[3] },
-    dur.minutes && { text: `${dur.minutes} ${dur.minutes !== 1 ? 'minutes' : 'minute'}`, color: UNIT_COLORS[4] },
-    dur.seconds && { text: `${dur.seconds} ${dur.seconds !== 1 ? 'seconds' : 'second'}`, color: UNIT_COLORS[5] },
-  ].filter(Boolean) as { text: string; color: string }[];
+    dur.years   && `${dur.years} ${dur.years !== 1 ? 'years' : 'year'}`,
+    dur.months  && `${dur.months} ${dur.months !== 1 ? 'months' : 'month'}`,
+    dur.days    && `${dur.days} ${dur.days !== 1 ? 'days' : 'day'}`,
+    dur.hours   && `${dur.hours} ${dur.hours !== 1 ? 'hours' : 'hour'}`,
+    dur.minutes && `${dur.minutes} ${dur.minutes !== 1 ? 'minutes' : 'minute'}`,
+    dur.seconds && `${dur.seconds} ${dur.seconds !== 1 ? 'seconds' : 'second'}`,
+  ].filter(Boolean) as string[];
 
-  if (!parts.length) return <span className={UNIT_COLORS[5]}>0 sec</span>;
+  if (!parts.length) return <span className="font-semibold font-mono">0 sec</span>;
   return (
     <>
-      {parts.map((p, i) => (
+      {parts.map((text, i) => (
         <span key={i}>
-          <span className={cn('font-semibold font-mono', p.color)}>{p.text}</span>
+          <span className="font-semibold font-mono">{text}</span>
           {i < parts.length - 1 && <span className="text-muted-foreground/50 mx-0.5">·</span>}
         </span>
       ))}
@@ -287,7 +282,7 @@ function InfoTip({ text }: { text: string }) {
       <Info className="h-2.5 w-2.5 text-muted-foreground/40 hover:text-muted-foreground cursor-help transition-colors" />
       <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50
         hidden group-hover/tip:block w-52 rounded-md border bg-popover px-2.5 py-2
-        text-[10px] leading-relaxed text-popover-foreground shadow-md">
+        text-[11px] leading-relaxed text-popover-foreground shadow-md">
         {text}
         <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-border" />
       </span>
@@ -318,7 +313,7 @@ function TzSelect({ label, value, onChange, availableTzs }: {
     <div className="flex items-center gap-2 flex-1">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="flex-1 h-8 text-xs rounded-lg">
+        <SelectTrigger className="flex-1 h-8 text-xs rounded-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -542,7 +537,7 @@ export function DateTimeTool() {
             <div className="flex items-center gap-2">
               <Label className="text-xs">Date / Time</Label>
               {isLive && (
-                <span className="flex items-center gap-1 text-[10px] text-primary font-medium">
+                <span className="flex items-center gap-1 text-[11px] text-primary font-medium">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                   LIVE
                 </span>
@@ -593,14 +588,18 @@ export function DateTimeTool() {
           )}
         </div>
 
-        {/* Timezone selectors */}
+        {/* Timezone selectors — nhãn "input tz" dùng text-info, "output tz" dùng
+            text-warn TRONG SUỐT component này. Không phải thông báo lỗi/cảnh báo —
+            tái dùng hai hue sẵn có (gần đúng sky/amber của bản gốc) làm cặp phân
+            biệt input/output nhất quán qua toàn bộ bảng Formats bên dưới, thay vì
+            thêm hai token --tz-in/--tz-out gần trùng hue với info/warn. */}
         <div className="flex items-start gap-3">
           <div className="flex-1 space-y-0.5">
             <TzSelect label="Input TZ" value={inputTz} onChange={setInputTz} availableTzs={availableTzs} />
             {tzsDiffer && parsedDate && (
-              <p className="text-[10px] font-mono text-muted-foreground">
+              <p className="text-[11px] font-mono text-muted-foreground">
                 {formatInTz(parsedDate, inputTz, 'yyyy-MM-dd HH:mm:ss')}{' '}
-                <span className="text-sky-500 dark:text-sky-400">{getLocalTzLabel(inputTz)}</span>
+                <span className="text-info">{getLocalTzLabel(inputTz)}</span>
               </p>
             )}
           </div>
@@ -608,9 +607,9 @@ export function DateTimeTool() {
           <div className="flex-1 space-y-0.5">
             <TzSelect label="Output TZ" value={outputTz} onChange={setOutputTz} availableTzs={availableTzs} />
             {tzsDiffer && parsedDate && (
-              <p className="text-[10px] font-mono text-muted-foreground">
+              <p className="text-[11px] font-mono text-muted-foreground">
                 {formatInTz(parsedDate, outputTz, 'yyyy-MM-dd HH:mm:ss')}{' '}
-                <span className="text-amber-500 dark:text-amber-400">{getLocalTzLabel(outputTz)}</span>
+                <span className="text-warn">{getLocalTzLabel(outputTz)}</span>
               </p>
             )}
           </div>
@@ -627,17 +626,17 @@ export function DateTimeTool() {
               return (
                 <div key={row.label} className="py-1.5 space-y-0.5 border-b last:border-b-0 [&:nth-last-child(2)]:border-b-0">
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground">{row.label}</span>
+                    <span className="text-[11px] text-muted-foreground">{row.label}</span>
                     <InfoTip text={row.description} />
                   </div>
                   {showDual ? (
                     <>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] w-10 shrink-0 text-sky-500 dark:text-sky-400">{getLocalTzLabel(inputTz) || 'In'}</span>
+                        <span className="text-[11px] w-10 shrink-0 text-info">{getLocalTzLabel(inputTz) || 'In'}</span>
                         <CopyValue value={inVal} dim={!parsedDate} />
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] w-10 shrink-0 text-amber-500 dark:text-amber-400">{getLocalTzLabel(outputTz) || 'Out'}</span>
+                        <span className="text-[11px] w-10 shrink-0 text-warn">{getLocalTzLabel(outputTz) || 'Out'}</span>
                         <CopyValue value={outVal} dim={!parsedDate} />
                       </div>
                     </>
@@ -651,28 +650,28 @@ export function DateTimeTool() {
           {/* Custom format */}
           <div className="border-t mt-0.5 pt-2 space-y-0.5">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground shrink-0 w-10">Custom</span>
+              <span className="text-[11px] text-muted-foreground shrink-0 w-10">Custom</span>
               <Input
                 value={customFmt}
                 onChange={(e) => setCustomFmt(e.target.value)}
                 placeholder="date-fns format, e.g. HH:mm:ss.SSS"
-                className="h-6 text-[10px] font-mono py-0"
+                className="h-6 text-[11px] font-mono py-0"
               />
             </div>
             {customFmt.trim() && parsedDate && (() => {
               const inVal  = tryFormatInTz(parsedDate, inputTz,  customFmt);
               const outVal = tryFormatInTz(parsedDate, outputTz, customFmt);
               if (inVal === null) return (
-                <p className="text-[10px] text-destructive pl-12">invalid format string</p>
+                <p className="text-[11px] text-destructive pl-12">invalid format string</p>
               );
               return tzsDiffer ? (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] w-10 shrink-0 text-sky-500 dark:text-sky-400">{getLocalTzLabel(inputTz) || 'In'}</span>
+                    <span className="text-[11px] w-10 shrink-0 text-info">{getLocalTzLabel(inputTz) || 'In'}</span>
                     <CopyValue value={inVal} />
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] w-10 shrink-0 text-amber-500 dark:text-amber-400">{getLocalTzLabel(outputTz) || 'Out'}</span>
+                    <span className="text-[11px] w-10 shrink-0 text-warn">{getLocalTzLabel(outputTz) || 'Out'}</span>
                     <CopyValue value={outVal ?? inVal} />
                   </div>
                 </>
@@ -690,8 +689,8 @@ export function DateTimeTool() {
           <div className="pt-1">
             <div className="grid grid-cols-[4rem_1fr_1fr] gap-2 pb-1">
               <span />
-              <span className="text-[10px] font-medium text-muted-foreground">Start</span>
-              <span className="text-[10px] font-medium text-muted-foreground">End</span>
+              <span className="text-[11px] font-medium text-muted-foreground">Start</span>
+              <span className="text-[11px] font-medium text-muted-foreground">End</span>
             </div>
             {BOUNDARY_PAIRS.map(([label, startFn, endFn]) => {
               // Compute boundary in the inputTz context
@@ -710,12 +709,12 @@ export function DateTimeTool() {
                       <CopyButton value={inStr} variant="ghost" className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" iconClassName="h-2.5 w-2.5" />
                     </div>
                     {tzsDiffer && inStr !== outStr && (
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        {outStr}{' '}(<span className="text-amber-500 dark:text-amber-400">{getLocalTzLabel(outputTz)}</span>)
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {outStr}{' '}(<span className="text-warn">{getLocalTzLabel(outputTz)}</span>)
                       </span>
                     )}
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-[10px] text-muted-foreground">{ts}</span>
+                      <span className="font-mono text-[11px] text-muted-foreground">{ts}</span>
                       <CopyButton value={String(ts)} variant="ghost" className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" iconClassName="h-2.5 w-2.5" />
                     </div>
                   </div>
@@ -743,7 +742,7 @@ export function DateTimeTool() {
                     <Label className="text-xs text-muted-foreground">{lbl}</Label>
                     <button
                       onClick={() => set(formatInTz(new Date(), inputTz, "yyyy-MM-dd'T'HH:mm:ss"))}
-                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                      className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                     >
                       now
                     </button>
@@ -762,23 +761,23 @@ export function DateTimeTool() {
                   <div className="rounded-lg border border-border px-3 py-2.5 space-y-2.5">
                     {/* Timeline visual */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold text-foreground shrink-0">From</span>
+                      <span className="text-[11px] font-semibold text-foreground shrink-0">From</span>
                       <div className="flex flex-1 items-center gap-1.5 min-w-0">
-                        <div className={cn('h-0.5 flex-1 rounded-full', isForward ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-red-500 dark:bg-red-400')} />
+                        <div className={cn('h-0.5 flex-1 rounded-full', isForward ? 'bg-ok' : 'bg-bad')} />
                         <span className="shrink-0 text-xs"><DurationParts a={aDate} b={bDate} /></span>
-                        <div className={cn('h-0.5 flex-1 rounded-full', isForward ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-red-500 dark:bg-red-400')} />
+                        <div className={cn('h-0.5 flex-1 rounded-full', isForward ? 'bg-ok' : 'bg-bad')} />
                       </div>
-                      <div className={cn('flex items-center gap-0.5 shrink-0', isForward ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>
+                      <div className={cn('flex items-center gap-0.5 shrink-0', isForward ? 'text-ok' : 'text-bad')}>
                         {isForward ? <ChevronRight className="h-4 w-4 stroke-[2.5]" /> : <ChevronLeft className="h-4 w-4 stroke-[2.5]" />}
-                        <span className="text-[10px] font-semibold text-foreground">To</span>
+                        <span className="text-[11px] font-semibold text-foreground">To</span>
                       </div>
                     </div>
                     {/* Plain-language explanation */}
-                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
                       {isForward ? (
-                        <>The first date is <span className="font-semibold text-foreground">{duration}</span> <span className="font-semibold text-emerald-600 dark:text-emerald-400">earlier</span> than the second.</>
+                        <>The first date is <span className="font-semibold text-foreground">{duration}</span> <span className="font-semibold text-ok">earlier</span> than the second.</>
                       ) : (
-                        <>The first date is <span className="font-semibold text-foreground">{duration}</span> <span className="font-semibold text-red-600 dark:text-red-400">later</span> than the second.</>
+                        <>The first date is <span className="font-semibold text-foreground">{duration}</span> <span className="font-semibold text-bad">later</span> than the second.</>
                       )}
                     </p>
                   </div>
@@ -787,7 +786,7 @@ export function DateTimeTool() {
                       .filter(([, val]) => val !== 0)
                       .map(([label, val]) => (
                         <div key={label} className="flex flex-col py-1.5 border-b [&:nth-last-child(-n+2)]:border-b-0">
-                          <span className="text-[10px] text-muted-foreground">{label}</span>
+                          <span className="text-[11px] text-muted-foreground">{label}</span>
                           <CopyValue value={val.toLocaleString()} />
                         </div>
                       ))}
