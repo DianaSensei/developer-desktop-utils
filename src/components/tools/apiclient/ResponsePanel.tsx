@@ -227,7 +227,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
     {
       id: 'tests', label: 'Tests',
       badge: tests.length > 0 ? (
-        <span className={cn('rounded px-1 text-[10px]', failed ? 'bg-destructive/15 text-destructive' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')}>
+        <span className={cn('rounded px-1 text-[11px]', failed ? 'bg-bad-tint text-bad' : 'bg-ok-tint text-ok')}>
           {tests.length - failed}/{tests.length}
         </span>
       ) : undefined,
@@ -260,7 +260,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         <IconButton
           onClick={() => setShowFilter((s) => !s)}
           title="Filter (JSONPath)"
-          className={cn(showFilter || filter ? 'text-amber-500' : undefined)}
+          className={cn(showFilter || filter ? 'text-acc-ink' : undefined)}
         >
           <Filter className="h-4 w-4" />
         </IconButton>
@@ -276,7 +276,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         tabs={tabDefs}
         active={activeTab}
         onSelect={(id) => setTab(id as Tab)}
-        activeClassName="border-amber-400 text-foreground"
+        activeClassName="border-acc text-foreground"
         right={headerRight}
       />
 
@@ -285,8 +285,8 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       <div className="relative h-0.5 shrink-0 overflow-hidden" aria-hidden={!sending}>
         {sending && (
           <>
-            <div className="absolute inset-0 bg-amber-400/15" />
-            <div className="absolute inset-y-0 left-0 w-1/4 animate-progress-indeterminate bg-amber-400" />
+            <div className="absolute inset-0 bg-acc/15" />
+            <div className="absolute inset-y-0 left-0 w-1/4 animate-progress-indeterminate bg-acc" />
           </>
         )}
       </div>
@@ -322,7 +322,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           response.body || response.bodyBase64 ? (
             <>
               {big && (
-                <div className="flex shrink-0 items-center gap-2 border-b bg-amber-400/10 px-3 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                <div className="flex shrink-0 items-center gap-2 border-b bg-warn-tint px-3 py-1.5 text-[11px] text-warn">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   Large response ({formatBytes(response.sizeBytes)}) shown as raw text for performance.
                 </div>
@@ -339,7 +339,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                     spellCheck={false}
                     autoFocus
                   />
-                  {filter && filterResult && !filterResult.ok && <span className="shrink-0 text-[10px] text-destructive">invalid</span>}
+                  {filter && filterResult && !filterResult.ok && <span className="shrink-0 text-[11px] text-destructive">invalid</span>}
                   {filter && <button onClick={() => setFilter('')} title="Clear" className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
                 </div>
               )}
@@ -369,7 +369,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                   {tests.map((t, i) => (
                     <div key={i} className="flex items-start gap-2 px-3 py-1.5">
                       {t.passed
-                        ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                        ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" />
                         : <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />}
                       <div className="min-w-0">
                         <span className={cn('break-words', !t.passed && 'text-foreground')}>{t.name}</span>
@@ -401,8 +401,8 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
 
 const LOG_COLOR: Record<LogEntry['level'], string> = {
   log: '',
-  info: 'text-blue-600 dark:text-blue-400',
-  warn: 'text-amber-600 dark:text-amber-400',
+  info: 'text-info',
+  warn: 'text-warn',
   error: 'text-destructive',
 };
 
@@ -434,7 +434,7 @@ function ActionsMenu({ copied, onCopy, onSave, onClear }: {
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[11rem]">
-        <DropdownMenuItem onClick={onCopy} icon={copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}>
+        <DropdownMenuItem onClick={onCopy} icon={copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}>
           Copy
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onSave} icon={<Download className="h-3.5 w-3.5" />}>
@@ -457,7 +457,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
 }) {
   if (preview) {
     if (kind === 'html' || format === 'html') {
-      return <iframe title="Response preview" sandbox="" srcDoc={response.body} className="min-h-0 flex-1 border-0 bg-white dark:bg-neutral-900" />;
+      return <iframe title="Response preview" sandbox="" srcDoc={response.body} className="min-h-0 flex-1 border-0 bg-white dark:bg-[hsl(var(--bg-c))]" />;
     }
     if (kind === 'image') {
       // Use the preserved bytes; the decoded text copy of a PNG is not an image.
@@ -470,7 +470,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
         );
       }
       return (
-        <div className="min-h-0 flex-1 overflow-auto bg-[#f6f6f6] p-4 dark:bg-neutral-900">
+        <div className="min-h-0 flex-1 overflow-auto bg-sunk p-4">
           <img src={`data:${response.contentType};base64,${b64}`} alt="Response" className="max-w-full" />
         </div>
       );
@@ -510,8 +510,8 @@ function Timeline({ response }: { response: ApiResponse }) {
       </div>
       {t && (
         <div className="space-y-1">
-          <TimingBar label="Waiting (TTFB)" ms={t.ttfbMs} total={response.timeMs} tone="bg-amber-400" />
-          <TimingBar label="Download" ms={t.downloadMs} total={response.timeMs} tone="bg-sky-500" />
+          <TimingBar label="Waiting (TTFB)" ms={t.ttfbMs} total={response.timeMs} tone="bg-[hsl(var(--cat-1-c)/0.85)]" />
+          <TimingBar label="Download" ms={t.downloadMs} total={response.timeMs} tone="bg-[hsl(var(--cat-2-c)/0.85)]" />
         </div>
       )}
       <div className="space-y-0.5 text-muted-foreground">
@@ -551,12 +551,12 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
     return (
       <DropdownMenuItem
         onClick={() => onChange(id)}
-        className={cn(active && 'bg-amber-400/10 text-amber-500')}
+        className={cn(active && 'bg-acc-tint text-acc-ink')}
         icon={<RowIcon className="h-3.5 w-3.5 shrink-0" />}
       >
         <span className="flex w-full items-center justify-between gap-2">
           {FORMAT_META[id].label}
-          {active && <Check className="h-3.5 w-3.5 text-amber-500" />}
+          {active && <Check className="h-3.5 w-3.5 text-acc-ink" />}
         </span>
       </DropdownMenuItem>
     );
@@ -564,7 +564,7 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground">
+      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground">
         <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
       </DropdownMenuTrigger>

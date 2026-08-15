@@ -46,7 +46,7 @@ export function ImportReviewDialog({
       <DialogContent className="flex max-h-[80vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b px-4 py-3">
           <DialogTitle className="flex items-center gap-2 text-sm">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-warn" />
             This collection contains scripts
           </DialogTitle>
         </DialogHeader>
@@ -79,10 +79,10 @@ export function ImportReviewDialog({
                   <span className="min-w-0 flex-1 truncate font-medium" title={f.path || collectionName}>
                     {f.path || collectionName}
                   </span>
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                     {KIND_LABEL[f.kind]}
                   </span>
-                  <span className="w-16 shrink-0 text-right text-[10px] text-muted-foreground">
+                  <span className="w-16 shrink-0 text-right text-[11px] text-muted-foreground">
                     {f.code.split('\n').length} lines
                   </span>
                 </button>

@@ -170,7 +170,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
               className="h-7 shrink-0 gap-1.5 text-[11px]"
               onClick={forgetToken}
             >
-              {tokenCleared ? <Check className="h-3 w-3 text-emerald-500" /> : <RotateCcw className="h-3 w-3" />}
+              {tokenCleared ? <Check className="h-3 w-3 text-ok" /> : <RotateCcw className="h-3 w-3" />}
               {tokenCleared ? 'Cleared' : 'Clear token'}
             </Button>
           </div>

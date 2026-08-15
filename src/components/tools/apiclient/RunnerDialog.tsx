@@ -420,7 +420,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
       <DialogContent className="flex h-[82vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="flex h-14 shrink-0 flex-row items-center border-b px-4">
           <DialogTitle className="flex w-full items-center gap-2 pr-10">
-            <Play className="h-4 w-4 shrink-0 text-amber-500" />
+            <Play className="h-4 w-4 shrink-0 text-acc-ink" />
             <span className="shrink-0 text-sm font-semibold">Runner</span>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
             <span className="min-w-0 truncate text-sm font-normal text-muted-foreground">{title}</span>
@@ -483,7 +483,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                   {dataFile ? (
                     <div className="space-y-2 rounded-md border p-2">
                       <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                        <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 text-ok" />
                         <span className="min-w-0 flex-1 truncate text-xs font-medium" title={dataFile.name}>{dataFile.name}</span>
                         <button onClick={() => { setDataFile(null); resetRun(); }} title="Remove" className="rounded p-0.5 text-muted-foreground/60 hover:text-destructive">
                           <X className="h-3.5 w-3.5" />
@@ -498,7 +498,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       </p>
                       <ColumnMappingTable mappings={columnMappings} />
                       {missingVars.length > 0 && (
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                        <p className="text-[11px] text-warn">
                           Used by the run but not in this file or your environment:{' '}
                           <span className="font-mono">{missingVars.map((v) => `{{${v}}}`).join(', ')}</span>
                         </p>
@@ -531,7 +531,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center justify-between border-b px-4 py-2.5 text-xs">
                   <span className="flex items-center gap-1.5 font-medium"><ListChecks className="h-3.5 w-3.5" /> Requests <span className="text-muted-foreground">· {selected.size}/{order.length}</span></span>
-                  <button onClick={toggleAll} className="font-medium text-amber-500 hover:underline">
+                  <button onClick={toggleAll} className="font-medium text-acc-ink hover:underline">
                     {allSelected ? 'Deselect all' : 'Select all'}
                   </button>
                 </div>
@@ -552,13 +552,13 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground/30 group-hover:text-muted-foreground/60" />
                         <span
                           className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                            checked ? 'border-amber-400 bg-amber-400 text-neutral-900' : 'border-input')}
+                            checked ? 'border-acc bg-acc text-acc-fg' : 'border-input')}
                         >
                           {checked && <Check className="h-3 w-3" />}
                         </span>
                         <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(req.method))}>{req.method}</span>
                         <span className="min-w-0 flex-1 truncate" title={req.url}>{req.name}</span>
-                        {filteredOut && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">filtered</span>}
+                        {filteredOut && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">filtered</span>}
                       </div>
                     );
                   })}
@@ -580,7 +580,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
 
             {/* action bar */}
             <div className="flex shrink-0 items-center gap-3 border-t px-4 py-3">
-              <Button onClick={run} disabled={plannedCount === 0} className="h-9 gap-1.5 bg-amber-400 px-4 text-neutral-900 hover:bg-amber-500">
+              <Button onClick={run} disabled={plannedCount === 0} className="h-9 gap-1.5 px-4">
                 <Play className="h-4 w-4" /> Run {plannedCount} request{plannedCount === 1 ? '' : 's'}
               </Button>
               <span className="text-xs text-muted-foreground">
@@ -618,7 +618,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                     >
                       <Download className="h-3.5 w-3.5" /> Export
                     </Button>
-                    <Button onClick={run} size="sm" className="h-8 gap-1.5 bg-amber-400 text-neutral-900 hover:bg-amber-500">
+                    <Button onClick={run} size="sm" className="h-8 gap-1.5">
                       <RotateCcw className="h-3.5 w-3.5" /> Run again
                     </Button>
                   </>
@@ -635,7 +635,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                     .sort((a, b) => a[0].localeCompare(b[0]))
                     .map(([code, count]) => (
                       <span key={code} className="font-mono">
-                        <span className={code === 'error' ? 'text-destructive' : statusColor(Number(code))}>{code}</span>
+                        <span className={code === 'error' ? 'text-bad' : statusColor(Number(code))}>{code}</span>
                         <span className="text-muted-foreground"> ×{count}</span>
                       </span>
                     ))}
@@ -655,7 +655,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
             <div className="h-0.5 shrink-0 overflow-hidden bg-muted">
               {running && (
                 <div
-                  className="h-full bg-amber-400 transition-[width] duration-200"
+                  className="h-full bg-acc transition-[width] duration-200"
                   style={{ width: `${plannedCount > 0 ? Math.min(100, (totalRun / plannedCount) * 100) : 0}%` }}
                 />
               )}
@@ -678,12 +678,12 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                           i === viewIter && 'bg-accent')}
                       >
                         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full',
-                          s.total === 0 ? 'bg-muted-foreground/30' : ok ? 'bg-emerald-500' : 'bg-destructive')} />
+                          s.total === 0 ? 'bg-muted-foreground/30' : ok ? 'bg-ok' : 'bg-bad')} />
                         <span className="min-w-0 flex-1">
                           <span className="block font-medium">Iteration {i + 1}</span>
-                          {labelVals && <span className="block truncate text-[10px] text-muted-foreground" title={labelVals}>{labelVals}</span>}
+                          {labelVals && <span className="block truncate text-[11px] text-muted-foreground" title={labelVals}>{labelVals}</span>}
                         </span>
-                        {s.total > 0 && <span className={cn('shrink-0 text-[10px]', ok ? 'text-emerald-500' : 'text-destructive')}>{s.ok}/{s.total}</span>}
+                        {s.total > 0 && <span className={cn('shrink-0 text-[11px]', ok ? 'text-ok' : 'text-bad')}>{s.ok}/{s.total}</span>}
                       </button>
                     );
                   })}
@@ -700,7 +700,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       <div className="flex flex-wrap items-center gap-1.5 border-b bg-muted/20 px-3 py-2">
                         <SectionLabel>Data</SectionLabel>
                         {Object.entries(dataRow).map(([k, v]) => (
-                          <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"><span className="text-muted-foreground">{k}=</span>{v}</span>
+                          <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"><span className="text-muted-foreground">{k}=</span>{v}</span>
                         ))}
                       </div>
                     )}
@@ -770,12 +770,12 @@ function RecordRow({ record: r, onOpen }: { record: RunRecord; onOpen: () => voi
           r.detail ? 'cursor-pointer hover:bg-accent/50' : 'cursor-default')}
       >
         <span className="w-5 shrink-0">
-          {ok ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <X className="h-3.5 w-3.5 text-destructive" />}
+          {ok ? <Check className="h-3.5 w-3.5 text-ok" /> : <X className="h-3.5 w-3.5 text-bad" />}
         </span>
         <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(r.method))}>{r.method}</span>
         <span className="min-w-0 flex-1 truncate font-medium" title={r.url}>{r.name}</span>
-        {r.total > 0 && <span className={cn('shrink-0', r.passed === r.total ? 'text-emerald-500' : 'text-destructive')}>{r.passed}/{r.total} tests</span>}
-        <span className={cn('w-12 shrink-0 text-right font-semibold', r.error ? 'text-destructive' : statusColor(r.status))}>{r.error ? 'ERR' : r.status}</span>
+        {r.total > 0 && <span className={cn('shrink-0', r.passed === r.total ? 'text-ok' : 'text-bad')}>{r.passed}/{r.total} tests</span>}
+        <span className={cn('w-12 shrink-0 text-right font-semibold', r.error ? 'text-bad' : statusColor(r.status))}>{r.error ? 'ERR' : r.status}</span>
         <span className="w-16 shrink-0 text-right text-muted-foreground">{r.ms} ms</span>
         {r.detail && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground" />}
       </button>
@@ -809,7 +809,7 @@ function DataPreview({ rows, columns }: { rows: DataRow[]; columns: string[] }) 
   const shown = rows.slice(0, 20);
   return (
     <div className="max-h-40 overflow-auto rounded border">
-      <table className="w-full border-collapse text-[10px]">
+      <table className="w-full border-collapse text-[11px]">
         <thead className="sticky top-0 bg-muted/60">
           <tr>
             <th className="border-b px-1.5 py-1 text-left font-semibold text-muted-foreground">#</th>
@@ -825,7 +825,7 @@ function DataPreview({ rows, columns }: { rows: DataRow[]; columns: string[] }) 
           ))}
         </tbody>
       </table>
-      {rows.length > shown.length && <p className="px-1.5 py-1 text-[10px] text-muted-foreground">+{rows.length - shown.length} more…</p>}
+      {rows.length > shown.length && <p className="px-1.5 py-1 text-[11px] text-muted-foreground">+{rows.length - shown.length} more…</p>}
     </div>
   );
 }
@@ -877,7 +877,7 @@ function DetailTab({ id, active, onClick, children }: {
     <button
       onClick={() => onClick(id)}
       className={cn('-mb-px border-b-2 py-2 text-xs font-medium transition-colors',
-        active === id ? 'border-amber-400 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
+        active === id ? 'border-acc text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
     >
       {children}
     </button>
@@ -901,7 +901,7 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
           <p className="mb-1 font-semibold text-muted-foreground">Iteration data</p>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(dataVars).map(([k, v]) => (
-              <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"><span className="text-muted-foreground">{k}=</span>{v}</span>
+              <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"><span className="text-muted-foreground">{k}=</span>{v}</span>
             ))}
           </div>
         </div>
@@ -955,23 +955,23 @@ function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
   }
   return (
     <div className="overflow-hidden rounded border">
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-x-2 border-b bg-muted/40 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-x-2 border-b bg-muted/40 px-1.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         <span>Column</span>
         <span>Variable</span>
         <span />
       </div>
       <div className="max-h-44 overflow-y-auto">
         {mappings.map((m) => (
-          <div key={m.column} className="grid grid-cols-[1fr_1fr_auto] items-center gap-x-2 border-b px-1.5 py-1 text-[10px] last:border-b-0">
+          <div key={m.column} className="grid grid-cols-[1fr_1fr_auto] items-center gap-x-2 border-b px-1.5 py-1 text-[11px] last:border-b-0">
             <span className="truncate font-mono" title={m.column}>{m.column}</span>
             <span className="min-w-0">
-              <span className="block truncate font-mono text-emerald-600 dark:text-emerald-400" title={m.token}>{m.token}</span>
+              <span className="block truncate font-mono text-ok" title={m.token}>{m.token}</span>
               {m.sample && (
                 <span className="block truncate text-muted-foreground" title={m.sample}>e.g. {m.sample}</span>
               )}
             </span>
             {m.used ? (
-              <Check className="h-3 w-3 shrink-0 text-emerald-500" aria-label="Used by the run" />
+              <Check className="h-3 w-3 shrink-0 text-ok" aria-label="Used by the run" />
             ) : (
               <span className="shrink-0 rounded bg-muted px-1 text-[9px] text-muted-foreground" title="No selected request references this variable">
                 unused

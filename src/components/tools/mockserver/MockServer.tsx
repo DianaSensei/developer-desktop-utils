@@ -180,12 +180,12 @@ export function MockServer() {
               !s.enabled && 'opacity-50',
             )}
           >
-            <span className={cn('w-11 shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold', badgeClass(s.method))}>
+            <span className={cn('w-11 shrink-0 rounded px-1 py-0.5 text-center text-[11px] font-semibold', badgeClass(s.method))}>
               {s.method}
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium">{s.name || '(unnamed)'}</div>
-              <div className="truncate font-mono text-[10px] text-muted-foreground">{s.path}</div>
+              <div className="truncate font-mono text-[11px] text-muted-foreground">{s.path}</div>
             </div>
             <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
               <IconBtn label="Move up" title="Move up" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveStub(s.id, -1); }}>
@@ -228,7 +228,7 @@ export function MockServer() {
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium">No-match response</div>
-          <div className="truncate font-mono text-[10px] text-muted-foreground">default · {config.notFoundStatus}</div>
+          <div className="truncate font-mono text-[11px] text-muted-foreground">default · {config.notFoundStatus}</div>
         </div>
       </button>
     </div>
@@ -289,7 +289,7 @@ export function MockServer() {
         </div>
 
         {config.host === '0.0.0.0' && (
-          <span className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
+          <span className="flex items-center gap-1 text-[11px] text-warn">
             <AlertTriangle className="h-3.5 w-3.5" />
             Exposed to your local network
           </span>
