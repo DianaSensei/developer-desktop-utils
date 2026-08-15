@@ -698,58 +698,50 @@ function AppContent() {
               >
                 <ActiveIcon className="h-4 w-4 text-primary" />
               </div>
-              {/* Tên nhóm + tab con từng XẾP CHỒNG hai dòng — chữ nhỏ, pill nhỏ,
-                  co cụm ở góc trái trong khi cả thanh header thừa hàng trăm px
-                  trống bên phải. Giờ nằm CHUNG MỘT DÒNG với tiêu đề, cao bằng ô
-                  icon (h-ctl) và pill đủ lớn để bấm thoải mái (px-3.5, text-sm) —
-                  tận dụng chiều ngang sẵn có thay vì nén mọi thứ vào một góc. */}
-              <div
-                key={`${activeTool.path}-label`}
-                className="flex min-w-0 items-center gap-3 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
-              >
-                <h2 className="shrink-0 text-sm font-semibold leading-none text-foreground sm:text-base">
-                  {activeGroupTabs.length > 1 ? activeGroup!.label : activeTool.label}
+              {/* Tên NHÓM ("Generate") không nói cái gì đang mở — tab con đã liệt
+                  kê đúng thứ đó rồi ("Generator" đang bật). Giữ cả hai là lặp:
+                  một chữ chung chung phía trước, một chữ cụ thể phía sau. Nên
+                  khi nhóm còn ≥2 tool, tablist chính là tiêu đề — bỏ hẳn hàng
+                  chữ tên nhóm. `aria-label` vẫn giữ tên nhóm cho trình đọc màn
+                  hình dù không hiện ra bằng mắt. Chỉ tool đứng riêng (không
+                  thuộc nhóm nào, hoặc nhóm chỉ còn 1 tool bật) mới cần <h2>. */}
+              {activeGroupTabs.length > 1 ? (
+                <div
+                  key={`${activeTool.path}-tabs`}
+                  role="tablist"
+                  aria-label={activeGroup!.label}
+                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+                >
+                  {activeGroupTabs.map((def) => {
+                      const p = toolPath(def.id);
+                      const on = p === location.pathname;
+                      return (
+                        <Link
+                          key={def.id}
+                          to={p}
+                          role="tab"
+                          aria-selected={on}
+                          className={cn(
+                            'inline-flex h-full items-center whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
+                            on
+                              ? 'bg-acc font-semibold text-acc-fg shadow-soft'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {def.label}
+                        </Link>
+                      );
+                    })}
+                </div>
+              ) : (
+                <h2
+                  key={`${activeTool.path}-label`}
+                  className="min-w-0 truncate text-sm font-semibold leading-none text-foreground motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200 sm:text-base"
+                >
+                  {activeTool.label}
                 </h2>
-                {/* Chỉ hiện tablist khi còn ≥2 tool BẬT trong nhóm. Trước đây lọc
-                    isFeatureEnabled ngay trong .map() nhưng vẫn luôn dựng khung
-                    tablist trước — tắt bớt tool trong nhóm 2 cái thì còn đúng 1
-                    pill, trông y hệt một nút bấm được nhưng bấm vào chẳng đổi gì
-                    vì nó đã là route đang đứng.
-
-                    Nền đặc màu accent cho mục đang chọn (`bg-acc text-acc-fg`),
-                    đặt trong máng lõm (`bg-sunk`) — cùng ngôn ngữ với `Segmented`,
-                    tránh lỗi tương phản gần-như-vô-hình của nền nhuộm nhạt trước
-                    đây. */}
-                {activeGroupTabs.length > 1 && (
-                  <div
-                    role="tablist"
-                    aria-label={activeGroup!.label}
-                    className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1"
-                  >
-                    {activeGroupTabs.map((def) => {
-                        const p = toolPath(def.id);
-                        const on = p === location.pathname;
-                        return (
-                          <Link
-                            key={def.id}
-                            to={p}
-                            role="tab"
-                            aria-selected={on}
-                            className={cn(
-                              'inline-flex h-full items-center whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
-                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
-                              on
-                                ? 'bg-acc font-semibold text-acc-fg shadow-soft'
-                                : 'text-muted-foreground hover:text-foreground',
-                            )}
-                          >
-                            {def.label}
-                          </Link>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
             <div className="flex items-center gap-1">
               {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
