@@ -39,16 +39,14 @@ interface Account {
 
 // ─── Avatar helpers ───────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = [
-  'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-lime-500',
-  'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500',
-  'bg-blue-500', 'bg-violet-500', 'bg-purple-500', 'bg-pink-500',
-];
-
-function avatarColor(name: string): string {
+// Màu avatar suy từ HASH CỦA TÊN, không phải bảng 12 class cố định: cùng một
+// tài khoản luôn ra cùng màu, và số màu phân biệt được là 360 thay vì 12.
+// Đây là màu ĐỊNH DANH (như avatar GitHub) — không mang nghĩa tốt/xấu, nên
+// xoay hue tự do là đúng. Độ bão hoà/sáng cố định để chữ trắng luôn đọc được.
+function avatarStyle(name: string): { backgroundColor: string } {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  return { backgroundColor: `hsl(${Math.abs(h) % 360} 52% 42%)` };
 }
 
 function initials(name: string): string {
@@ -199,10 +197,10 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
 
       {/* ── Header ── */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
-        <div className={cn(
-          'w-9 h-9 rounded-lg flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none',
-          avatarColor(account.name),
-        )}>
+        <div
+          className="w-9 h-9 rounded-md flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none"
+          style={avatarStyle(account.name)}
+        >
           {initials(account.name)}
         </div>
         <div className="flex-1 min-w-0">
@@ -248,7 +246,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       {/* ── Progress bar (TOTP only) ── */}
       {isTotp && !error && (() => {
         const pct = (remaining / account.period) * 100;
-        const barColor = remaining <= 5 ? 'bg-red-500' : remaining <= 10 ? 'bg-amber-500' : 'bg-emerald-500';
+        const barColor = remaining <= 5 ? 'bg-bad' : remaining <= 10 ? 'bg-warn' : 'bg-ok';
         return (
           <div className="h-[3px] w-full bg-muted shrink-0">
             <div
@@ -264,7 +262,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
         <div className="px-4 py-2 border-t bg-muted/30 shrink-0">
           <Button
             variant="ghost" size="sm"
-            className="h-7 w-full text-xs gap-1.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10"
+            className="h-7 w-full text-xs gap-1.5 text-acc-ink hover:bg-acc-tint"
             onClick={() => onCounterIncrement(account.id)}
           >
             <RefreshCw className="h-3 w-3" />
@@ -280,7 +278,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
           {([account.algorithm, `${account.digits} digits`, isTotp ? `${account.period}s` : null] as (string | null)[])
             .filter(Boolean)
             .map((tag) => (
-              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
+              <span key={tag} className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
                 {tag}
               </span>
             ))}
@@ -345,7 +343,7 @@ function LivePreview({ secret, type, period, digits, algorithm, counter }: {
   return (
     <div className={cn(
       'flex items-center gap-2 px-3 py-2 rounded-md text-xs',
-      err ? 'bg-destructive/10 text-destructive' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+      err ? 'bg-bad-tint text-bad' : 'bg-ok-tint text-ok',
     )}>
       {err ? (
         <span>Invalid Base32 secret</span>
@@ -423,8 +421,8 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
                 'px-3 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-all duration-150',
                 type === t
                   ? t === 'totp'
-                    ? 'bg-emerald-500 text-white shadow-sm'
-                    : 'bg-indigo-500 text-white shadow-sm'
+                    ? 'bg-[var(--cat-4)] text-white shadow-sm'
+                    : 'bg-[var(--cat-3)] text-white shadow-sm'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -559,7 +557,7 @@ function InfoPanel() {
     <div className="rounded-lg border bg-muted/30 p-4 text-xs space-y-3 text-muted-foreground leading-relaxed">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-4)]">
             TOTP — Time-based (RFC 6238)
           </p>
           <p>
@@ -569,7 +567,7 @@ function InfoPanel() {
           </p>
         </div>
         <div className="space-y-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-3)]">
             HOTP — Counter-based (RFC 4226)
           </p>
           <p>
@@ -806,21 +804,21 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
                     )}>
                       {checked && <Check className="h-3 w-3 text-primary-foreground" />}
                     </span>
-                    <div className={cn(
-                      'w-7 h-7 rounded-md flex items-center justify-center text-white text-[10px] font-bold shrink-0',
-                      avatarColor(entry.name),
-                    )}>
+                    <div
+                      className="w-7 h-7 rounded-sm flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                      style={avatarStyle(entry.name)}
+                    >
                       {initials(entry.name)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">{entry.name}</p>
-                      {entry.issuer && <p className="text-[10px] text-muted-foreground truncate">{entry.issuer}</p>}
+                      {entry.issuer && <p className="text-[11px] text-muted-foreground truncate">{entry.issuer}</p>}
                     </div>
                     <span className={cn(
-                      'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0',
+                      'text-[11px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0',
                       entry.type === 'totp'
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+                        ? 'bg-[hsl(var(--cat-4-c)/0.12)] text-[var(--cat-4)]'
+                        : 'bg-[hsl(var(--cat-3-c)/0.12)] text-[var(--cat-3)]',
                     )}>
                       {entry.type}
                     </span>
@@ -926,7 +924,7 @@ export function TwoFactorAuth() {
         {/* ── Toolbar ── */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0" />
+            <ShieldCheck className="h-5 w-5 text-ok shrink-0" />
             <div>
               <h2 className="text-sm font-semibold leading-tight">2FA Authenticator</h2>
               <p className="text-[11px] text-muted-foreground">TOTP · HOTP · SHA-1/256/512 · 6 or 8 digits</p>
@@ -973,7 +971,7 @@ export function TwoFactorAuth() {
 
         {/* ── Notice ── */}
         {notice && (
-          <div className="flex items-center gap-2 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-3 py-2 text-xs ring-1 ring-emerald-500/20">
+          <div className="flex items-center gap-2 rounded-md bg-ok-tint text-ok px-3 py-2 text-xs ring-1 ring-ok-edge">
             <Check className="h-3.5 w-3.5 shrink-0" />
             <span>{notice}</span>
           </div>

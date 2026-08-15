@@ -274,7 +274,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
           {busy ? <Spinner size="sm" className="mr-1.5" /> : <Play className="h-3.5 w-3.5 mr-1.5" />}
           Start consumer
         </Button>
-        {alreadyRunning && <span className="text-[11px] text-amber-600 dark:text-amber-400">Already consuming this queue</span>}
+        {alreadyRunning && <span className="text-[11px] text-warn">Already consuming this queue</span>}
       </div>
       {error && <Callout tone="error" size="sm">{error}</Callout>}
 
@@ -415,10 +415,10 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
         <span className="text-[11px] font-mono text-muted-foreground truncate max-w-[12rem] shrink-0" title={`${m.exchange ? m.exchange + ' · ' : ''}${m.routingKey || '—'}`}>
           {m.exchange ? `${m.exchange}/` : ''}{m.routingKey || '—'}
         </span>
-        {m.correlationId && <span className="text-[10px] font-mono text-primary/80 truncate max-w-[8rem] shrink-0" title={`correlation id: ${m.correlationId}`}>corr {m.correlationId}</span>}
-        {m.redelivered && <span className="text-[10px] text-amber-500 shrink-0">redelivered</span>}
+        {m.correlationId && <span className="text-[11px] font-mono text-primary/80 truncate max-w-[8rem] shrink-0" title={`correlation id: ${m.correlationId}`}>corr {m.correlationId}</span>}
+        {m.redelivered && <span className="text-[11px] text-warn shrink-0">redelivered</span>}
         <span className="flex-1 min-w-0 font-mono text-xs text-foreground/80 truncate">{preview}</span>
-        {headerEntries.length > 0 && <span className="text-[10px] text-muted-foreground shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>}
+        {headerEntries.length > 0 && <span className="text-[11px] text-muted-foreground shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>}
         <span onClick={(e) => e.stopPropagation()} className="shrink-0">
           <CopyButton value={m.payload} iconClassName="h-3.5 w-3.5" />
         </span>
@@ -432,7 +432,7 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
             {m.correlationId && <span>correlation id <span className="text-foreground">{m.correlationId}</span></span>}
             {m.contentType && <span>content-type <span className="text-foreground">{m.contentType}</span></span>}
             {m.messageId && <span>message id <span className="text-foreground">{m.messageId}</span></span>}
-            {m.redelivered && <span className="text-amber-500">redelivered</span>}
+            {m.redelivered && <span className="text-warn">redelivered</span>}
           </div>
 
           {headerEntries.length > 0 && (

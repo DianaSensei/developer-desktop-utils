@@ -29,14 +29,14 @@ export function MeetingDialog({ meetingId, onClose }: { meetingId: string; onClo
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-red-500 hover:bg-red-500/10 hover:text-red-500"
+            className="gap-1.5 text-bad hover:bg-bad/10 hover:text-bad"
             onClick={() => { deleteMeeting(meeting.id); onClose(); }}
           >
             <Trash2 className="h-4 w-4" /> Delete
           </Button>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="gap-1.5" onClick={copyMarkdown}>
-              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+              {copied ? <Check className="h-4 w-4 text-ok" /> : <Copy className="h-4 w-4" />}
               {copied ? 'Copied' : 'Copy markdown'}
             </Button>
             <Button size="sm" onClick={onClose}>Done</Button>

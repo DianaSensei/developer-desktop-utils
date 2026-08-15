@@ -188,7 +188,7 @@ function StartConsumerForm({ brokerId, refreshKey, sessions, prefill, onStarted 
           {busy ? <Spinner size="sm" className="mr-1.5" /> : <Play className="h-3.5 w-3.5 mr-1.5" />}
           Start consumer
         </Button>
-        {alreadyRunning && <span className="text-[11px] text-amber-600 dark:text-amber-400">Already consuming this topic</span>}
+        {alreadyRunning && <span className="text-[11px] text-warn">Already consuming this topic</span>}
       </div>
       {error && <Callout tone="error" size="sm">{error}</Callout>}
     </div>
@@ -310,15 +310,15 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
         className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted/40"
       >
         {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 w-[5.5rem]" title={m.timestamp}>{fmtTime(m.timestamp)}</span>
-        <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0">p{m.partition}</span>
-        <span className="text-[10px] font-mono text-muted-foreground tabular-nums shrink-0 w-14">@{m.offset}</span>
+        <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 w-[5.5rem]" title={m.timestamp}>{fmtTime(m.timestamp)}</span>
+        <span className="text-[11px] font-mono px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0">p{m.partition}</span>
+        <span className="text-[11px] font-mono text-muted-foreground tabular-nums shrink-0 w-14">@{m.offset}</span>
         {m.key != null && m.key !== '' && (
           <span className="text-[11px] font-mono text-primary/80 truncate max-w-[9rem] shrink-0" title={`key: ${m.key}`}>{m.key}</span>
         )}
         <span className="flex-1 min-w-0 font-mono text-xs text-foreground/80 truncate">{previewValue(m, format)}</span>
         {headerEntries.length > 0 && (
-          <span className="text-[10px] text-muted-foreground shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>
+          <span className="text-[11px] text-muted-foreground shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>
         )}
         <span onClick={(e) => e.stopPropagation()} className="shrink-0">
           <CopyButton value={m.value ?? ''} iconClassName="h-3.5 w-3.5" />

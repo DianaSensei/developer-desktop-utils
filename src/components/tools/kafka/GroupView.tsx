@@ -29,11 +29,11 @@ function groupByTopic(assignments: Assignment[]): [string, Assignment[]][] {
 }
 
 const STATE_DOT: Record<string, string> = {
-  Stable: 'bg-emerald-500',
+  Stable: 'bg-ok',
   Empty: 'bg-muted-foreground/40',
   Dead: 'bg-destructive',
-  PreparingRebalance: 'bg-orange-500',
-  CompletingRebalance: 'bg-yellow-500',
+  PreparingRebalance: 'bg-warn',
+  CompletingRebalance: 'bg-warn',
 };
 
 export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTopic, onBack }: GroupViewProps) {
@@ -138,7 +138,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                       <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                         {parts.length} part{parts.length !== 1 ? 's' : ''}
                       </span>
-                      <span className={`text-xs font-mono tabular-nums w-24 text-right shrink-0 ${hasLag ? 'text-orange-500' : 'text-green-600'}`}>
+                      <span className={`text-xs font-mono tabular-nums w-24 text-right shrink-0 ${hasLag ? 'text-warn' : 'text-ok'}`}>
                         lag {totalLag.toLocaleString()}
                       </span>
                     </div>
@@ -158,8 +158,8 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                           const lagColor = a.lag < 0
                             ? 'text-muted-foreground'
                             : a.lag === 0
-                            ? 'text-green-600'
-                            : 'text-orange-500';
+                            ? 'text-ok'
+                            : 'text-warn';
                           const latest = a.lag >= 0 && a.committedOffset >= 0
                             ? a.committedOffset + a.lag
                             : -1;

@@ -563,7 +563,7 @@ function Sidebar({
             <span className="relative shrink-0">
               <SettingsIcon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
               {updateAvailable && (
-                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-background" />
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-ok ring-1 ring-background" />
               )}
             </span>
             {isCollapsed && (

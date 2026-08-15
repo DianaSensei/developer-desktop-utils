@@ -235,7 +235,7 @@ export function PasswordHash() {
               <div className={cn(
                 'flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium',
                 verifyResult
-                  ? 'border-green-500/30 bg-green-500/8 text-green-600 dark:text-green-400'
+                  ? 'border-ok-edge bg-ok-tint text-ok'
                   : 'border-destructive/30 bg-destructive/8 text-destructive',
               )}>
                 {verifyResult ? <><Check className="h-4 w-4" /> Match — the password matches this hash.</> : <><X className="h-4 w-4" /> No match.</>}

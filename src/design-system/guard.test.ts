@@ -37,6 +37,23 @@ function sourceFiles(dir = SRC, out: string[] = []): string[] {
 
 const FILES = sourceFiles();
 
+/**
+ * Bỏ comment trước khi đếm.
+ *
+ * Không có bước này, guard đếm cả chữ nghĩa: một dòng giải thích *vì sao* đã bỏ
+ * `text-green-500` bị tính là một lần dùng `text-green-500`. Nó đã bắt nhầm hai
+ * lần trong đợt di cư và bắt phải viết vòng vo để né chính công cụ của mình —
+ * dấu hiệu rõ ràng là công cụ sai, không phải câu chữ sai.
+ *
+ * Đủ dùng cho TS/TSX/CSS ở repo này: chuỗi có chứa `//` (URL trong import) rất
+ * hiếm và không chứa mẫu vi phạm nào, nên bỏ sót ở đó là vô hại.
+ */
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')  // khối /* … */ và JSX {/* … */}
+    .replace(/(^|[^:])\/\/.*$/gm, '$1'); // dòng // …, chừa lại "https://"
+}
+
 interface Rule {
   key: keyof typeof baseline.limits;
   label: string;
@@ -90,7 +107,7 @@ function count(rule: Rule) {
   let total = 0;
   const byFile: Array<[string, number]> = [];
   for (const file of FILES) {
-    const hits = readFileSync(file, 'utf-8').match(rule.pattern)?.length ?? 0;
+    const hits = stripComments(readFileSync(file, 'utf-8')).match(rule.pattern)?.length ?? 0;
     if (hits > 0) {
       total += hits;
       byFile.push([relative(SRC, file), hits]);

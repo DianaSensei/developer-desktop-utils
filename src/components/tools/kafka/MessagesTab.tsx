@@ -109,7 +109,7 @@ function CopyBtn({ text, className }: { text: string; className?: string }) {
 function SectionHead({ title, aside }: { title: string; aside?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between px-3 py-1.5 bg-muted/15 border-b border-border/40">
-      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
         {title}
       </span>
       {aside}
@@ -200,12 +200,14 @@ function tokenizeJson(s: string): JTok[] {
   return out;
 }
 
+// Dùng chung token với cây JSON của JsonFormatter — cùng khái niệm thì cùng
+// màu ở mọi nơi trong app. Xem --json-*/--sql-* trong design-system/tokens.css.
 const TOK_CLS: Record<JTok['t'], string> = {
-  key:   'text-sky-400',
-  str:   'text-emerald-400',
-  num:   'text-amber-400',
-  bool:  'text-violet-400',
-  null:  'text-rose-400',
+  key:   'text-[var(--json-key)]',
+  str:   'text-[var(--sql-string)]',
+  num:   'text-[var(--sql-number)]',
+  bool:  'text-[var(--sql-type)]',
+  null:  'text-[var(--json-null)]',
   punct: 'text-muted-foreground/70',
   ws:    '',
 };
@@ -223,7 +225,7 @@ function JsonHighlight({ raw }: { raw: string }) {
     return (
       <div>
         <pre className="px-3 py-2.5 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed">{raw}</pre>
-        <p className="px-3 pb-2 text-[10px] text-muted-foreground/40 italic">Not valid JSON</p>
+        <p className="px-3 pb-2 text-[11px] text-muted-foreground/40 italic">Not valid JSON</p>
       </div>
     );
   }
@@ -760,7 +762,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           )}
           disabled={!fetched}
         />
-        {regexError && <span className="text-[10px] text-destructive shrink-0">invalid regex</span>}
+        {regexError && <span className="text-[11px] text-destructive shrink-0">invalid regex</span>}
         <button
           title={useRegex ? 'Regex mode on' : 'Use regular expression'}
           aria-pressed={useRegex}
@@ -782,9 +784,9 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         )}
         {fetched && sorted.length > 0 && (
           <div className="flex items-center gap-1 shrink-0 border-l border-border/50 pl-2 ml-1">
-            <span className="text-[10px] text-muted-foreground/70 hidden sm:inline">Export</span>
-            <CopyButton value={() => messagesToJson(sorted)} label="JSON" variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" iconClassName="h-3 w-3" />
-            <CopyButton value={() => messagesToCsv(sorted)} label="CSV" variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" iconClassName="h-3 w-3" />
+            <span className="text-[11px] text-muted-foreground/70 hidden sm:inline">Export</span>
+            <CopyButton value={() => messagesToJson(sorted)} label="JSON" variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" iconClassName="h-3 w-3" />
+            <CopyButton value={() => messagesToCsv(sorted)} label="CSV" variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" iconClassName="h-3 w-3" />
           </div>
         )}
       </div>

@@ -66,9 +66,9 @@ function SuiteInner() {
         {running && tab !== 'tracker' && (
           <button
             onClick={() => setTab('tracker')}
-            className="flex shrink-0 items-center gap-1.5 rounded-md bg-red-500/10 px-2 py-1 text-xs font-medium text-red-500"
+            className="flex shrink-0 items-center gap-1.5 rounded-sm bg-[hsl(var(--live-c)/0.10)] px-2 py-1 text-xs font-medium text-[var(--live)]"
           >
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--live)]" />
             <span className="font-mono tabular-nums">{fmtTimer(now - running.start)}</span>
             <span className="max-w-[120px] truncate">{running.description || runningProject?.name || 'Tracking'}</span>
             <Square
@@ -120,10 +120,10 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
           {projects.map((p) => (
             <div key={p.id} className={cn('flex items-center gap-2 px-2.5 py-2', p.archived && 'opacity-50')}>
               <ColorMenu color={p.color} onPick={(c) => updateProject(p.id, { color: c })} />
-              <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-8 flex-1 text-sm rounded-lg" />
+              <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-8 flex-1 text-sm rounded-sm" />
               <button
                 onClick={() => updateProject(p.id, { archived: !p.archived })}
-                className="text-[10px] text-muted-foreground hover:text-foreground"
+                className="text-[11px] text-muted-foreground hover:text-foreground"
               >
                 {p.archived ? 'restore' : 'archive'}
               </button>

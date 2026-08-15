@@ -123,7 +123,7 @@ export function KafkaExplorer() {
         <button
           onClick={() => setShowInfo(true)}
           title="How Kafka Explorer accesses your cluster"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-sm text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
         >
           <Info className="h-4 w-4" />
         </button>

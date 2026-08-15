@@ -22,7 +22,7 @@ export function UpdateDialog() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-emerald-500" />
+            <Sparkles className="h-4 w-4 text-ok" />
             Update available
           </DialogTitle>
           <DialogDescription>

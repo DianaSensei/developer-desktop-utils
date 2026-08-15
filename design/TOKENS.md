@@ -116,6 +116,12 @@ với **miền của app này**, không phải với ngôn ngữ thiết kế:
 | `--sql-*`, `--js-*` | Tô sáng cú pháp trong editor |
 | `--json-key`, `--json-null` | Cây JSON — phần SQL không có khái niệm tương đương |
 | `--method-get/post/put/patch/delete` | Nhãn HTTP method khắp API Client |
+| `--live` | "Đang ghi / đang chạy": đồng hồ Time Tracker, vạch giờ hiện tại, chấm live |
+
+**`--live` tồn tại để đỏ không mất nghĩa.** Nút ghi đỏ là quy ước ở mọi phần mềm,
+nhưng nếu nó dùng chung `--bad` thì một đồng hồ đang chạy và một lỗi thật sẽ cùng
+màu — và đỏ thôi báo hiệu "có gì đó sai". `--live` ngả cam hơn `--bad` để phân
+biệt được khi đứng gần nhau. `StatusDot tone="recording"` cũng dùng nó.
 
 Điểm chung: đây là **kiến thức người dùng mang sẵn tới**, không phải lựa chọn
 thẩm mỹ. Postman, Insomnia và Bruno đều tô xanh-GET / đỏ-DELETE; đổi đi là bắt

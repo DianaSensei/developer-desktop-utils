@@ -1,12 +1,12 @@
 {
   "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
   "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
-  "_phase": "Hạ ở G4 đợt 4.3 (API Client · Mock Server · Network).",
+  "_phase": "Hạ ở G4 đợt 4.4 — kết thúc G4. Guard giờ bỏ comment trước khi đếm.",
   "limits": {
-    "rawColors": 163,
-    "tinyText": 70,
-    "mixedControlHeights": 352,
-    "premiumUtilities": 42,
+    "rawColors": 0,
+    "tinyText": 30,
+    "mixedControlHeights": 351,
+    "premiumUtilities": 40,
     "hoverLift": 0,
     "handRolledTooltip": 3
   }

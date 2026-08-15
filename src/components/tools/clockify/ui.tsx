@@ -415,7 +415,7 @@ export function ConfirmButton({
       }}
       className={cn(
         'transition-colors',
-        armed ? 'text-red-500' : 'text-muted-foreground hover:text-red-500',
+        armed ? 'text-bad' : 'text-muted-foreground hover:text-bad',
         className
       )}
     >

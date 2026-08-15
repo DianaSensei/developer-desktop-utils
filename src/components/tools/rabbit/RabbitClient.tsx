@@ -122,7 +122,7 @@ export function RabbitClient() {
         <button
           onClick={() => setShowInfo(true)}
           title="How the RabbitMQ Client accesses your broker"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-sm text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
         >
           <Info className="h-4 w-4" />
         </button>

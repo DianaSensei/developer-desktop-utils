@@ -18,7 +18,7 @@ export function GuideSection({
   return (
     <section className="space-y-1.5">
       <h3 className="flex items-center gap-2 text-xs font-semibold text-foreground">
-        <Icon className={cn('h-3.5 w-3.5', tone === 'caveat' ? 'text-amber-500' : 'text-primary')} />
+        <Icon className={cn('h-3.5 w-3.5', tone === 'caveat' ? 'text-warn' : 'text-acc-ink')} />
         {title}
       </h3>
       <div className="space-y-1 pl-5 text-[12px] leading-relaxed text-muted-foreground">{children}</div>
@@ -27,19 +27,19 @@ export function GuideSection({
 }
 
 function Key({ children }: { children: ReactNode }) {
-  return <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px] text-foreground">{children}</kbd>;
+  return <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">{children}</kbd>;
 }
 function Tok({ children }: { children: ReactNode }) {
   return <code className="rounded bg-muted px-1 text-[11px] text-foreground">{children}</code>;
 }
 function Var({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-emerald-500/12 px-1 text-[11px] text-emerald-600 dark:text-emerald-400">{children}</code>;
+  return <code className="rounded-xs bg-ok-tint px-1 text-[11px] text-ok">{children}</code>;
 }
 
 // Compact bullet list under a section heading.
 function List({ items, tone }: { items: ReactNode[]; tone?: 'caveat' }) {
   return (
-    <ul className={cn('list-disc space-y-1 pl-4', tone === 'caveat' && 'marker:text-amber-500')}>
+    <ul className={cn('list-disc space-y-1 pl-4', tone === 'caveat' && 'marker:text-warn')}>
       {items.map((it, i) => <li key={i}>{it}</li>)}
     </ul>
   );
@@ -84,7 +84,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
         <p>In the desktop app requests go through Rust, so there’s no browser CORS restriction — you can call any API.</p>
       </GuideSection>
       <GuideSection icon={Braces} title="Variables">
-        <p>Use <Var>{'{{name}}'}</Var> anywhere — URL, query, headers, body, or auth. A token turns <span className="text-emerald-600 dark:text-emerald-400">green</span> when it resolves in the current context and <span className="text-red-500">red</span> when it doesn’t; hover to see its value.</p>
+        <p>Use <Var>{'{{name}}'}</Var> anywhere — URL, query, headers, body, or auth. A token turns <span className="text-ok">green</span> when it resolves in the current context and <span className="text-bad">red</span> when it doesn’t; hover to see its value.</p>
         <p>Define variables in an <strong className="text-foreground">Environment</strong> (top-right dropdown) and select it to activate. Scripts can set session variables with <Tok>bru.setVar()</Tok>.</p>
       </GuideSection>
       <GuideSection icon={Code2} title="Body & auth">

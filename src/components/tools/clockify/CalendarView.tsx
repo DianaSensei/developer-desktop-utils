@@ -218,7 +218,7 @@ export function CalendarView() {
   };
 
   const nowMin = (now - dayStart(now)) / MS_MIN;
-  const totalColor = (ms: number) => (targetMs > 0 && ms >= targetMs ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground');
+  const totalColor = (ms: number) => (targetMs > 0 && ms >= targetMs ? 'text-ok' : 'text-muted-foreground');
 
   return (
     <div className="flex h-full flex-col">
@@ -272,11 +272,11 @@ export function CalendarView() {
           const today = sameDay(d, now);
           return (
             <div key={d} className="flex flex-1 flex-col items-center gap-0.5 py-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{weekdayShort(d)}</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{weekdayShort(d)}</span>
               <span className={cn('flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-sm font-semibold', today ? 'bg-primary text-primary-foreground' : 'text-foreground')}>
                 {new Date(d).getDate()}
               </span>
-              <span className={cn('font-mono text-[10px] tabular-nums', total > 0 ? totalColor(total) : 'text-transparent')}>
+              <span className={cn('font-mono text-[11px] tabular-nums', total > 0 ? totalColor(total) : 'text-transparent')}>
                 {total > 0 ? fmtTotal(total) : '0m'}
               </span>
             </div>
@@ -290,7 +290,7 @@ export function CalendarView() {
           {/* hour axis */}
           <div className="relative w-12 shrink-0">
             {Array.from({ length: 24 }, (_, h) => (
-              <div key={h} className="absolute right-1 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground" style={{ top: h * HOUR_PX }}>
+              <div key={h} className="absolute right-1 -translate-y-1/2 text-[11px] tabular-nums text-muted-foreground" style={{ top: h * HOUR_PX }}>
                 {h > 0 ? `${pad(h)}:00` : ''}
               </div>
             ))}
@@ -326,8 +326,8 @@ export function CalendarView() {
 
                 {/* current-time line */}
                 {isToday && (
-                  <div className="pointer-events-none absolute left-0 right-0 z-20 border-t-2 border-red-500" style={{ top: (nowMin / 60) * HOUR_PX }}>
-                    <span className="absolute -left-1 -top-[5px] h-2.5 w-2.5 rounded-full bg-red-500" />
+                  <div className="pointer-events-none absolute left-0 right-0 z-20 border-t-2 border-[var(--live)]" style={{ top: (nowMin / 60) * HOUR_PX }}>
+                    <span className="absolute -left-1 -top-[5px] h-2.5 w-2.5 rounded-full bg-[var(--live)]" />
                   </div>
                 )}
 
@@ -361,16 +361,16 @@ export function CalendarView() {
                         key={`m-${b.id}`}
                         data-block
                         onClick={(ev) => { ev.stopPropagation(); setEditingMeetingId(mt.id); }}
-                        className="group absolute z-30 flex flex-col overflow-hidden rounded-lg border border-indigo-400/60 bg-indigo-500/15 py-1 pl-2.5 pr-1.5 text-left text-[11px] leading-tight text-indigo-700 shadow-sm backdrop-blur-[1px] transition duration-100 hover:shadow-md hover:brightness-[1.03] dark:bg-indigo-500/25 dark:text-indigo-100"
+                        className="group absolute z-30 flex flex-col overflow-hidden rounded-sm border border-[hsl(var(--cat-3-c)/0.55)] bg-[hsl(var(--cat-3-c)/0.15)] py-1 pl-2.5 pr-1.5 text-left text-[11px] leading-tight text-foreground shadow-sm backdrop-blur-[1px] transition duration-100 hover:shadow-md hover:brightness-[1.03]"
                         style={posStyle}
                       >
-                        <span className="absolute inset-y-0 left-0 w-1 bg-indigo-500" />
+                        <span className="absolute inset-y-0 left-0 w-1 bg-[var(--cat-3)]" />
                         <div className="flex items-center gap-1 font-semibold">
                           <Users className="h-3 w-3 shrink-0" />
                           <span className="truncate">{mt.title || 'Meeting'}</span>
                         </div>
                         {height > 34 && (
-                          <div className="truncate text-[10px] font-medium opacity-80">{timeOfDay(mt.start, false)} – {timeOfDay(mt.end, false)}</div>
+                          <div className="truncate text-[11px] font-medium opacity-80">{timeOfDay(mt.start, false)} – {timeOfDay(mt.end, false)}</div>
                         )}
                       </button>
                     );
@@ -407,7 +407,7 @@ export function CalendarView() {
                       )}
                       <div className="truncate font-semibold">{e.description || project?.name || 'Untitled'}</div>
                       {!compact && (
-                        <div className="truncate text-[10px] font-medium opacity-80">
+                        <div className="truncate text-[11px] font-medium opacity-80">
                           {timeOfDay(d + b.startMin * MS_MIN, false)} – {running ? 'now' : timeOfDay(d + b.endMin * MS_MIN, false)}
                           {project && e.description && <span className="opacity-70"> · {project.name}</span>}
                         </div>
@@ -493,7 +493,7 @@ function EntryEditor({
           <TagPicker value={entry.tagIds} onChange={(ids) => onChange({ tagIds: ids })} />
         </div>
         <div className="flex justify-between border-t pt-3">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-red-500 hover:bg-red-500/10 hover:text-red-500" onClick={onDelete}>
+          <Button variant="ghost" size="sm" className="gap-1.5 text-bad hover:bg-bad/10 hover:text-bad" onClick={onDelete}>
             <Trash2 className="h-4 w-4" /> Delete
           </Button>
           <Button size="sm" onClick={onClose}>Done</Button>

@@ -93,7 +93,7 @@ export function MeetingNotes() {
                     role="button"
                     tabIndex={-1}
                     onClick={(e) => { e.stopPropagation(); remove(m.id); }}
-                    className="mt-0.5 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                    className="mt-0.5 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-bad group-hover:opacity-100"
                     title="Delete note"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -131,7 +131,7 @@ export function MeetingNotes() {
               <button
                 type="button"
                 onClick={() => remove(selected.id)}
-                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+                className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-bad/10 hover:text-bad"
                 title="Delete note"
               >
                 <Trash2 className="h-3.5 w-3.5" />

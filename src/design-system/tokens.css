@@ -105,6 +105,14 @@
     --method-put:    hsl(var(--method-put-c));
     --method-patch:  hsl(var(--method-patch-c));
     --method-delete: hsl(var(--method-delete-c));
+
+    /* ── "Đang ghi / đang chạy" ──────────────────────────────────────────
+       Cũng là quy ước: nút ghi, badge live, vạch giờ hiện tại đều đỏ ở mọi
+       phần mềm. KHÔNG dùng --bad cho việc này — nếu dùng, đồng hồ đang chạy
+       và một lỗi thật sẽ cùng màu, và đỏ mất nghĩa "có gì đó sai".
+       Hơi ngả cam so với --bad để phân biệt được khi đứng gần nhau. */
+    --live-c: 8 78% 50%;
+    --live: hsl(var(--live-c));
   }
 
   .dark {
@@ -128,6 +136,7 @@
     --method-put-c:    212 82% 68%;
     --method-patch-c:  272 62% 72%;
     --method-delete-c:   4 70% 68%;
+    --live-c:            8 82% 62%;
   }
 
   ::selection {
