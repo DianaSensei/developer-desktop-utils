@@ -5,9 +5,10 @@
 // tool works fully offline.
 
 import { useEffect, useState } from 'react';
-import { ArrowLeftRight, Download, AlertCircle } from 'lucide-react';
+import { ArrowLeftRight, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
+import { ExplainBand } from '@/components/ui/explain-band';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CodeViewer, JsonEditor, TextEditor } from '@/design-system';
 import { saveTextFile } from '@/components/tools/apiclient/fileio';
@@ -170,7 +171,7 @@ export function DataConverter() {
           {/* From → To */}
           <div className="flex items-center gap-2">
             <Select value={from} onValueChange={(v) => setFrom(v as Format)}>
-              <SelectTrigger className="h-8 w-[104px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[104px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {FORMATS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
               </SelectContent>
@@ -180,12 +181,12 @@ export function DataConverter() {
               size="icon"
               onClick={handleSwap}
               title="Swap directions"
-              className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
             >
               <ArrowLeftRight className="h-4 w-4" />
             </Button>
             <Select value={to} onValueChange={(v) => setTo(v as Format)}>
-              <SelectTrigger className="h-8 w-[104px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[104px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {FORMATS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
               </SelectContent>
@@ -198,7 +199,7 @@ export function DataConverter() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Indent</span>
             <Select value={indent} onValueChange={(v) => setIndent(v as '2' | '4')}>
-              <SelectTrigger className="h-8 w-[88px] text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[88px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="2">2 spaces</SelectItem>
                 <SelectItem value="4">4 spaces</SelectItem>
@@ -259,9 +260,10 @@ export function DataConverter() {
           </div>
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
             {error ? (
-              <div className="flex flex-1 items-start gap-2 overflow-auto rounded-md border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-600 dark:text-red-400">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span className="break-words font-mono leading-relaxed">{error}</span>
+              <div className="flex-1 overflow-auto">
+                <ExplainBand tone="bad" title="Conversion error" className="font-mono">
+                  {error}
+                </ExplainBand>
               </div>
             ) : (
               <CodeViewer

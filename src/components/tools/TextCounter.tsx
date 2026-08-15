@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { PaneHeader } from '@/components/ui/tool-layout';
+import { Stat, StatGrid } from '@/components/ui/stat';
 import { Check, X } from 'lucide-react';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -124,13 +125,6 @@ export function TextCounter() {
   useQuickPaste((pasted) => setText(pasted));
   useInputHistory(text, setText);
 
-  const Stat = ({ label, value, color = 'text-foreground' }: { label: string; value: number | string; color?: string }) => (
-    <div className="flex flex-col items-center justify-center p-3 rounded-lg border border-border bg-card/50 hover:bg-card/80 transition-colors">
-      <div className={`text-lg font-bold ${color}`}>{value}</div>
-      <div className="text-xs text-muted-foreground mt-1 text-center leading-tight">{label}</div>
-    </div>
-  );
-
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left: textarea input */}
@@ -146,25 +140,35 @@ export function TextCounter() {
 
       {/* Right: stats scrollable */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <Stat label="Characters" value={stats.characters} color="text-blue-600 dark:text-blue-400" />
-          <Stat label="No spaces" value={stats.charactersNoSpaces} color="text-purple-600 dark:text-purple-400" />
-          <Stat label="Words" value={stats.words} color="text-green-600 dark:text-green-400" />
-          <Stat label="Lines" value={stats.lines} color="text-orange-600 dark:text-orange-400" />
-          <Stat label="Paragraphs" value={stats.paragraphs} color="text-pink-600 dark:text-pink-400" />
-          <Stat label="Sentences" value={stats.sentences} color="text-cyan-600 dark:text-cyan-400" />
-          <Stat label="Reading time" value={`${stats.readingTime} min`} color="text-indigo-600 dark:text-indigo-400" />
-          <Stat label="Avg word length" value={stats.words > 0 ? (stats.charactersNoSpaces / stats.words).toFixed(1) : '0'} color="text-teal-600 dark:text-teal-400" />
-        </div>
+        {/*
+          Bản cũ tô mỗi ô một màu cầu vồng (xanh dương/tím/xanh lá/cam/hồng…) dù
+          không ô nào mang NGHĨA khác ô nào — "Characters" không "đúng" hơn
+          "Words". Màu trang trí kiểu đó là đúng thứ design/RULES.md cấm: màu
+          phải mang nghĩa trạng thái/tương tác. Tất cả về `tone="default"`.
+        */}
+        <StatGrid columns={4}>
+          <Stat variant="compact" label="Characters" value={stats.characters} />
+          <Stat variant="compact" label="No spaces" value={stats.charactersNoSpaces} />
+          <Stat variant="compact" label="Words" value={stats.words} />
+          <Stat variant="compact" label="Lines" value={stats.lines} />
+          <Stat variant="compact" label="Paragraphs" value={stats.paragraphs} />
+          <Stat variant="compact" label="Sentences" value={stats.sentences} />
+          <Stat variant="compact" label="Reading time" value={`${stats.readingTime} min`} />
+          <Stat
+            variant="compact"
+            label="Avg word length"
+            value={stats.words > 0 ? (stats.charactersNoSpaces / stats.words).toFixed(1) : '0'}
+          />
+        </StatGrid>
 
         <div className="border-t border-border pt-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Byte Size</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-            <Stat label="UTF-8 bytes" value={stats.utf8Bytes} color="text-blue-600 dark:text-blue-400" />
-            <Stat label="UTF-16 bytes" value={stats.utf16Bytes} color="text-purple-600 dark:text-purple-400" />
-            <Stat label="UTF-32 bytes" value={stats.utf32Bytes} color="text-pink-600 dark:text-pink-400" />
-            <Stat label="Code points" value={stats.codePoints} color="text-green-600 dark:text-green-400" />
-          </div>
+          <StatGrid columns={4} className="mb-4">
+            <Stat variant="compact" label="UTF-8 bytes" value={stats.utf8Bytes} />
+            <Stat variant="compact" label="UTF-16 bytes" value={stats.utf16Bytes} />
+            <Stat variant="compact" label="UTF-32 bytes" value={stats.utf32Bytes} />
+            <Stat variant="compact" label="Code points" value={stats.codePoints} />
+          </StatGrid>
           <p className="text-xs text-muted-foreground mb-2">
             Smallest encoding: <span className="font-mono text-foreground">{smallestEncoding}</span>
           </p>
@@ -172,12 +176,12 @@ export function TextCounter() {
             {encodingSupport.map((enc) => (
               <li key={enc.name} className="flex items-center gap-2">
                 {enc.fits ? (
-                  <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-ok shrink-0" />
                 ) : (
-                  <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+                  <X className="h-3.5 w-3.5 text-bad shrink-0" />
                 )}
                 <span className={enc.fits ? 'text-foreground text-xs' : 'text-muted-foreground line-through text-xs'}>{enc.name}</span>
-                <span className="ml-auto font-mono text-[10px] text-muted-foreground">{enc.detail}</span>
+                <span className="ml-auto font-mono text-[11px] text-muted-foreground">{enc.detail}</span>
               </li>
             ))}
           </ul>

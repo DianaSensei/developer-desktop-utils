@@ -4,12 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, CheckCircle2, HelpCircle, Lightbulb, RotateCcw } from 'lucide-react';
+import { HelpCircle, Lightbulb, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { CopyButton } from '@/components/ui/copy-button';
+import { ExplainBand } from '@/components/ui/explain-band';
+import { Tooltip } from '@/components/ui/tooltip';
 
 type CronMode = 'linux' | 'quartz' | 'spring';
 type FieldKey = 'seconds' | 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek' | 'year';
@@ -614,16 +616,15 @@ export function CronGenerator() {
           }))}
           aria-label="Cron flavor"
         />
-        <button
-          type="button"
-          aria-label={`${mode} cron rule`}
-          className="group relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
-        >
-          <HelpCircle className="h-4 w-4" />
-          <span className="pointer-events-none absolute left-0 top-full z-50 mt-2 hidden w-72 rounded-md border bg-popover px-2.5 py-2 text-left text-xs font-normal leading-relaxed text-popover-foreground shadow-md group-hover:block group-focus-visible:block">
-            {modeRuleTooltip(mode)}
-          </span>
-        </button>
+        <Tooltip label={`${mode} cron rule`} description={modeRuleTooltip(mode)} side="bottom" width={288}>
+          <button
+            type="button"
+            aria-label={`${mode} cron rule`}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -643,7 +644,7 @@ export function CronGenerator() {
               value={expression}
               onChange={(event) => updateExpression(event.target.value)}
               placeholder={mode === 'linux' ? '*/5 * * * *' : '0 */5 * ? * *'}
-              className="font-mono h-8 rounded-lg border-b border-border"
+              className="font-mono h-8 rounded-sm border-b border-border"
             />
             <CopyButton
               value={() => normalizeExpression(expression)}
@@ -688,7 +689,7 @@ export function CronGenerator() {
                     <SelectTrigger
                       aria-label={`${rule.label} suggestions`}
                       title="Suggestions"
-                      className="group relative h-8 w-9 flex-none justify-center px-0 text-muted-foreground hover:text-foreground [&>span]:hidden [&>svg:last-child]:hidden"
+                      className="group relative h-8 w-9 flex-none justify-center rounded-sm px-0 text-muted-foreground hover:text-foreground [&>span]:hidden [&>svg:last-child]:hidden"
                     >
                       <Lightbulb className="h-4 w-4" />
                       <SelectValue className="sr-only" placeholder="Suggestions" />
@@ -724,40 +725,35 @@ export function CronGenerator() {
           </div>
         </div>
 
-        <div
-          className={cn(
-            'space-y-2 rounded-lg border px-3 py-3',
+        {/*
+          Bản cũ: viền/nền dùng border-primary/bg-accent (tức là ACCENT, đổi
+          theo tone chủ đạo) trong khi icon lại cứng text-green-500 — đúng lỗi
+          trộn hai hệ màu mà design/RULES.md cảnh báo. Đổi tone chủ đạo sang đỏ
+          thì cả khối "hợp lệ" sẽ nhuộm đỏ trong khi icon vẫn xanh lá. ExplainBand
+          lấy màu từ hệ trạng thái cố định nên không còn lệch được nữa.
+        */}
+        <ExplainBand
+          tone={analysis.errors.length > 0 ? 'bad' : 'ok'}
+          title={
             analysis.errors.length > 0
-              ? 'border-destructive/25 bg-destructive/10'
-              : 'border-primary/25 bg-accent/45'
-          )}
+              ? 'Invalid expression'
+              : mode === 'spring'
+                ? 'Valid Spring @Scheduled'
+                : `Valid ${mode} cron`
+          }
         >
-          <div className="flex items-center gap-2 text-sm font-medium">
-            {analysis.errors.length > 0 ? (
-              <AlertCircle className="h-4 w-4 text-destructive" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
-            )}
-            <span>
-              {analysis.errors.length > 0
-                ? 'Invalid expression'
-                : mode === 'spring'
-                  ? 'Valid Spring @Scheduled'
-                  : `Valid ${mode} cron`}
-            </span>
-          </div>
-          <p className="text-sm text-foreground">{explanation}</p>
+          {explanation}
           {analysis.errors.map((error) => (
-            <p key={error} className="text-xs text-destructive">
+            <span key={error} className="mt-1 block text-bad">
               {error}
-            </p>
+            </span>
           ))}
           {analysis.warnings.map((warning) => (
-            <p key={warning} className="text-xs text-muted-foreground">
+            <span key={warning} className="mt-1 block text-muted-foreground">
               {warning}
-            </p>
+            </span>
           ))}
-        </div>
+        </ExplainBand>
       </div>
       </div>
     </div>
