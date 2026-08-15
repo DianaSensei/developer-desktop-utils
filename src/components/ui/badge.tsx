@@ -17,31 +17,37 @@ import { cn } from '@/lib/utils';
 export type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'accent';
 export type BadgeVariant = 'soft' | 'solid' | 'outline';
 
+// Mỗi tông lấy từ hệ trạng thái của design kit, không phải bảng màu Tailwind.
+// Nhờ vậy chúng tự đúng ở cả sáng lẫn tối (không cần cặp `dark:` thủ công) và
+// KHÔNG đổi khi đổi tone accent — xem design/RULES.md.
 const SOFT: Record<BadgeTone, string> = {
   neutral: 'bg-muted text-muted-foreground',
-  success: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-  warning: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  danger: 'bg-destructive/15 text-destructive',
-  info: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
-  accent: 'bg-primary/15 text-primary',
+  success: 'bg-ok-tint text-ok',
+  warning: 'bg-warn-tint text-warn',
+  danger: 'bg-bad-tint text-bad',
+  info: 'bg-info-tint text-info',
+  accent: 'bg-acc-tint text-acc-ink',
 };
 
 const SOLID: Record<BadgeTone, string> = {
   neutral: 'bg-muted-foreground text-background',
-  success: 'bg-emerald-500 text-white',
-  warning: 'bg-amber-500 text-white',
-  danger: 'bg-destructive text-destructive-foreground',
-  info: 'bg-sky-500 text-white',
-  accent: 'bg-primary text-primary-foreground',
+  // `text-background` chứ không phải `text-white`: ở theme tối các tông trạng
+  // thái là bản SÁNG, nên chữ trắng sẽ chìm. Nền của app đảo theo theme nên chữ
+  // luôn tương phản ở cả hai.
+  success: 'bg-ok text-background',
+  warning: 'bg-warn text-background',
+  danger: 'bg-bad text-background',
+  info: 'bg-info text-background',
+  accent: 'bg-acc text-acc-fg',
 };
 
 const OUTLINE: Record<BadgeTone, string> = {
   neutral: 'border border-border text-muted-foreground',
-  success: 'border border-emerald-500/40 text-emerald-600 dark:text-emerald-400',
-  warning: 'border border-amber-500/40 text-amber-600 dark:text-amber-400',
-  danger: 'border border-destructive/40 text-destructive',
-  info: 'border border-sky-500/40 text-sky-600 dark:text-sky-400',
-  accent: 'border border-primary/40 text-primary',
+  success: 'border border-ok-edge text-ok',
+  warning: 'border border-warn-edge text-warn',
+  danger: 'border border-bad-edge text-bad',
+  info: 'border border-info-edge text-info',
+  accent: 'border border-acc-edge text-acc-ink',
 };
 
 const VARIANT: Record<BadgeVariant, Record<BadgeTone, string>> = {
@@ -50,9 +56,10 @@ const VARIANT: Record<BadgeVariant, Record<BadgeTone, string>> = {
   outline: OUTLINE,
 };
 
+// 11px là cỡ nhỏ nhất được phép — dưới mức đó không đọc được ở HiDPI.
 const SIZE_CLASS = {
-  xs: 'px-1.5 py-0.5 text-[10px]',
-  sm: 'px-2 py-0.5 text-[11px]',
+  xs: 'px-1.5 py-0.5 text-[11px]',
+  sm: 'px-2 py-[3px] text-[11px]',
 } as const;
 
 export interface BadgeProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'children'> {
@@ -82,7 +89,7 @@ export function Badge({
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-1 whitespace-nowrap leading-none',
-        pill ? 'rounded-full' : 'rounded',
+        pill ? 'rounded-full' : 'rounded-xs',
         SIZE_CLASS[size],
         VARIANT[variant][tone],
         uppercase ? 'font-semibold uppercase tracking-wide' : 'font-medium',

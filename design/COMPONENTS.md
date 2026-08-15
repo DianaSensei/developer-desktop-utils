@@ -134,18 +134,25 @@ Bán kính trong = ngoài − đệm.
 
 ---
 
-## Component cần dựng mới
+## Component đã dựng (G2)
 
-Chưa có trong `src/components/ui/`:
+Tất cả xuất từ `@/design-system`:
 
-| File | Nội dung |
-|---|---|
-| `status-chip.tsx` | Chip trạng thái, 4 tông |
-| `explain-band.tsx` | Dải nhuộm trong thân panel + chip ví dụ |
-| `outline-notice.tsx` | Thông báo chỉ viền |
-| `param-row.tsx` | Dòng bốn tầng |
-| `setting-row.tsx` | Dòng cấu hình, năm loại điều khiển |
-| `keycap.tsx` | Phím tắt |
-| `field-gutter.tsx` | Máng định dạng cho ô nhập |
+| File | Xuất | Nội dung |
+|---|---|---|
+| `status-chip.tsx` | `StatusChip` | Chip trạng thái, 5 tông (kèm `idle`) |
+| `outline-notice.tsx` | `OutlineNotice` | Thông báo chỉ viền + một hành động |
+| `explain-band.tsx` | `ExplainBand` | Dải nhuộm trong thân panel + chip ví dụ bấm được |
+| `param-row.tsx` | `ParamRow` | Dòng bốn tầng |
+| `setting-row.tsx` | `SettingRow`, `SettingGroup` | Dòng cấu hình + khung nhóm |
+| `field-shell.tsx` | `FieldShell` | Khung ô nhập, ép quy tắc hai phụ kiện |
+| `keycap.tsx` | `Keycap`, `MOD_KEY`, `IS_MAC` | Phím tắt, đứng riêng hoặc nội tuyến |
 
-Component cần thêm biến thể: `button.tsx` (thêm `tint` + `sc`).
+`button.tsx` có thêm biến thể **`tint`** và hai prop `sc` / `scMod` cho phím tắt nội tuyến.
+
+Đã di cư sang hệ token trạng thái: `badge.tsx`, `callout.tsx`, `status-dot.tsx`, `stat.tsx`
+— trước đó dùng `emerald-*` / `amber-*` / `sky-*` thô cùng cặp `dark:` thủ công.
+
+> `FieldShell` mang tên khác với `field-gutter.tsx` trong bản spec đầu: máng chỉ là một
+> trong hai khe, và chính cái KHUNG mới là thứ ép được quy tắc. Đặt tên theo khe sẽ mời
+> gọi thêm khe thứ ba.

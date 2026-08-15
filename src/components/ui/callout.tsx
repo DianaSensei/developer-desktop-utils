@@ -23,9 +23,9 @@ export type CalloutTone = 'error' | 'warning' | 'success' | 'info';
  * "what does an amber banner mean in this app" keeps one answer.
  */
 const TONE_CLASS: Record<CalloutTone, string> = {
-  error: 'border-destructive/40 bg-destructive/10 text-destructive',
-  warning: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  error: 'border-bad-edge bg-bad-tint text-bad',
+  warning: 'border-warn-edge bg-warn-tint text-warn',
+  success: 'border-ok-edge bg-ok-tint text-ok',
   info: 'border-border bg-muted/40 text-muted-foreground',
 };
 

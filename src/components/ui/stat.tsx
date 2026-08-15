@@ -20,10 +20,10 @@ export type StatVariant = 'card' | 'compact' | 'inline';
 const TONE_CLASS: Record<StatTone, string> = {
   default: 'text-foreground',
   muted: 'text-muted-foreground',
-  success: 'text-emerald-600 dark:text-emerald-400',
-  warning: 'text-amber-600 dark:text-amber-400',
-  danger: 'text-destructive',
-  accent: 'text-primary',
+  success: 'text-ok',
+  warning: 'text-warn',
+  danger: 'text-bad',
+  accent: 'text-acc-ink',
 };
 
 export interface StatProps {
@@ -80,7 +80,7 @@ export function Stat({
       <div className="min-w-0 flex-1">
         <p className={cn(
           'flex items-center gap-1 uppercase tracking-wide text-muted-foreground',
-          compact ? 'text-[10px]' : 'text-[11px]',
+          'text-[11px]',
         )}>
           {icon}{label}
         </p>
