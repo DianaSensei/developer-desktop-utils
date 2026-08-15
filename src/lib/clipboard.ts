@@ -7,6 +7,28 @@ export async function copyToClipboard(text: string): Promise<void> {
   }
 }
 
+/**
+ * Đọc văn bản trên clipboard hệ thống, hoặc `null` nếu trống/không có quyền.
+ *
+ * Dùng bởi ⌘K để đoán ý người dùng (xem `lib/clipboardIntent.ts`) — đọc clipboard
+ * lúc mở palette, không phải liên tục, nên không cần theo dõi thay đổi.
+ * Không bao giờ ném lỗi: quyền đọc clipboard có thể bị từ chối và đó không phải
+ * lý do để chặn cả command palette.
+ */
+export async function readTextFromClipboard(): Promise<string | null> {
+  try {
+    if (isTauri()) {
+      const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+      const text = await readText();
+      return text || null;
+    }
+    const text = await navigator.clipboard.readText();
+    return text || null;
+  } catch {
+    return null;
+  }
+}
+
 function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
