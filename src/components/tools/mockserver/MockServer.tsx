@@ -21,6 +21,7 @@ import { FallbackEditor } from './FallbackEditor';
 import { RequestLog } from './RequestLog';
 import { useMockServer, isTauri } from './useMockServer';
 import { newStub, type MockConfig, type Stub } from './types';
+import { liveConnections } from '@/lib/liveConnections';
 
 // Sentinel selection id for the editable "no-match" fallback response.
 const FALLBACK_ID = '__fallback__';
@@ -35,6 +36,12 @@ const badgeClass = (method: string) =>
 export function MockServer() {
   const { config, setConfig, updateConfig, updateStub, status, log, error, busy, start, stop, testScript, clearLog } =
     useMockServer();
+
+  // Sidebar/header chấm xanh khi server đang chạy — cùng cơ chế Kafka/RabbitMQ
+  // dùng cho "đang kết nối". Trước đây Mock Server không đăng ký gì vào đây,
+  // nên server chạy nền mà không có chỗ nào ngoài panel của chính nó nói điều
+  // đó — thoát trang thì mất dấu hoàn toàn.
+  useEffect(() => { liveConnections.set('mock-server', status.running); }, [status.running]);
 
   const [selectedId, setSelectedId] = useState<string | null>(config.stubs[0]?.id ?? null);
   const [logVisible, setLogVisible] = usePersistentState('devtool:mockServer:logVisible', true);
