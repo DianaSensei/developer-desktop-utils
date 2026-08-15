@@ -16,6 +16,23 @@ tests script → assertions) không đổi — đây thuần là gộp UI, khôn
 Đồng thời bỏ khối "Resolved URL" (preview URL đã resolve {{var}}/path param) khỏi tab Params —
 không đủ giá trị so với diện tích chiếm, và Send luôn cho thấy URL thật đã gửi.
 
+### Follow-up: gộp tiếp tab Vars vào Script
+
+Sau khi hoàn thành gộp Assert→Tests, tiếp tục gộp tab **Vars** (bảng khai báo Pre/Post Request
+var) vào tab **Script**, xuống còn 7 tab (`params | headers | body | auth | script | tests |
+settings`). Lý do khác với case Assert: Vars và Script không phải hai cách biểu diễn của cùng
+một việc thuộc chung 1 giai đoạn kiểm tra (như Assert/Tests) — Vars khai báo và Script code đều
+dùng để **set biến**, chạy đúng cùng giai đoạn (`engine.ts`: "pre-request vars → pre-request
+script", "post-response vars → post-response script" — vars luôn chạy TRƯỚC script cùng giai
+đoạn). Tách 2 tab cạnh nhau cho cùng một nhu cầu khiến user mới không biết nên dùng cái nào.
+
+Cách gộp: mỗi khối Pre-request/Post-response trong tab Script giờ có thêm 1
+`CollapsibleSection` "Vars" (component mới `VarsSection`) nằm giữa đoạn hint và ô script editor
+— đúng thứ tự chạy thật. Mặc định **đóng** khi rỗng (`defaultOpen={filled > 0}`) để không tốn
+chỗ cho trường hợp phổ biến (không dùng Vars khai báo, chỉ viết script) — chỉ hiện badge số
+lượng khi đã có var. `VarsEditor` (component tab riêng cũ) bị xoá; `toKv`/`fromKv` giữ nguyên,
+dùng trực tiếp trong `ScriptEditor`.
+
 ## Lý do
 
 - User yêu cầu cụ thể: "gộp assert và test lại, hoặc merge chung với Script nếu có thể, work

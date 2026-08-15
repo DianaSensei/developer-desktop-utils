@@ -136,6 +136,7 @@ export function RequestTabs({
         <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-background">
           <Settings2 className="h-4 w-4" />
         </IconButton>
+        <span className="mx-0.5 h-5 w-px bg-border" />
         <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-background">
           <KeyRound className="h-4 w-4" />
         </IconButton>

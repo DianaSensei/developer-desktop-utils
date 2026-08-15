@@ -18,7 +18,7 @@ import {
 import { Tabs } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Callout } from '@/components/ui/callout';
-import { InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
+import { Badge, CollapsibleSection, InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
 import { AuthEditor } from './AuthEditor';
@@ -32,7 +32,7 @@ import {
 } from './types';
 
 export type RequestPanelTab =
-  | 'params' | 'headers' | 'body' | 'auth' | 'script' | 'vars' | 'tests' | 'settings';
+  | 'params' | 'headers' | 'body' | 'auth' | 'script' | 'tests' | 'settings';
 type Tab = RequestPanelTab;
 
 interface Props {
@@ -60,8 +60,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
     { id: 'body', label: `Body${request.body.mode !== 'none' ? ' •' : ''}` },
     { id: 'headers', label: `Headers${count(enabledHeaders)}` },
     { id: 'auth', label: `Auth${request.auth.type !== 'none' ? ' •' : ''}` },
-    { id: 'vars', label: `Vars${hasVars ? ' •' : ''}` },
-    { id: 'script', label: `Script${hasScript ? ' •' : ''}` },
+    { id: 'script', label: `Script${hasScript || hasVars ? ' •' : ''}` },
     { id: 'tests', label: `Tests${count(enabledAsserts)}${request.tests.trim() ? ' •' : ''}` },
     { id: 'settings', label: 'Settings' },
   ];
@@ -96,7 +95,6 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'body' && <div className="flex min-h-0 flex-1 flex-col p-3"><BodyEditor request={request} onChange={onChange} vars={vars} /></div>}
         {tab === 'auth' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} vars={vars} /></div>}
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
-        {tab === 'vars' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><VarsEditor request={request} onChange={onChange} /></div>}
         {tab === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}
         {tab === 'tests' && (
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
@@ -157,10 +155,34 @@ function SnippetMenu({ snippets, onInsert }: { snippets: ScriptSnippet[]; onInse
   );
 }
 
-function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
-  const { script } = request;
+// Declarative vars run before the script in the same phase (see engine.ts's
+// documented pipeline: "pre-request vars → pre-request script", "post-response
+// vars → post-response script") — shown above the corresponding script editor
+// here so the tab reflects the real execution order. Collapsed by default
+// when empty so the common case (no declarative vars, just a script) doesn't
+// pay for a permanently-open table most requests never use.
+function VarsSection({ label, rows, onChange, valuePlaceholder }: {
+  label: string; rows: KeyValue[]; onChange: (rows: KeyValue[]) => void; valuePlaceholder: string;
+}) {
+  const filled = rows.filter((r) => r.key || r.value).length;
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+    <CollapsibleSection
+      title="Vars"
+      eyebrow
+      variant="bordered"
+      defaultOpen={filled > 0}
+      actions={filled > 0 ? <Badge tone="neutral" pill>{filled}</Badge> : undefined}
+    >
+      <p className="mb-1.5 text-[11px] text-muted-foreground">{label}, set without writing a script.</p>
+      <KeyValueEditor rows={rows} onChange={onChange} valuePlaceholder={valuePlaceholder} valueLabel={valuePlaceholder} bulkEdit={false} />
+    </CollapsibleSection>
+  );
+}
+
+function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
+  const { script, vars } = request;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
       <div className="flex min-h-0 flex-1 flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
           <Label className="text-xs">Pre-request</Label>
@@ -169,6 +191,12 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         <p className="text-[11px] text-muted-foreground">
           Runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars.
         </p>
+        <VarsSection
+          label="Variables to set before the request"
+          rows={toKv(vars.req)}
+          onChange={(rows) => onChange({ vars: { ...vars, req: fromKv(rows) } })}
+          valuePlaceholder="Value"
+        />
         <JavaScriptEditor
           value={script.req}
           onChange={(v) => onChange({ script: { ...script, req: v } })}
@@ -185,6 +213,12 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         <p className="text-[11px] text-muted-foreground">
           Runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars.
         </p>
+        <VarsSection
+          label="Variables to set from the response — expressions, e.g. res.body.token"
+          rows={toKv(vars.res)}
+          onChange={(rows) => onChange({ vars: { ...vars, res: fromKv(rows) } })}
+          valuePlaceholder="Expr"
+        />
         <JavaScriptEditor
           value={script.res}
           onChange={(v) => onChange({ script: { ...script, res: v } })}
@@ -203,34 +237,6 @@ const toKv = (defs: VarDef[]): KeyValue[] =>
   defs.map((d) => ({ id: d.id, key: d.name, value: d.value, enabled: d.enabled }));
 const fromKv = (rows: KeyValue[]): VarDef[] =>
   rows.map((r) => ({ id: r.id, name: r.key, value: r.value, enabled: r.enabled }));
-
-function VarsEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
-  const { vars } = request;
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Pre Request</Label>
-        <KeyValueEditor
-          rows={toKv(vars.req)}
-          onChange={(rows) => onChange({ vars: { ...vars, req: fromKv(rows) } })}
-          valuePlaceholder="Value"
-          valueLabel="Value"
-          bulkEdit={false}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Post Response</Label>
-        <KeyValueEditor
-          rows={toKv(vars.res)}
-          onChange={(rows) => onChange({ vars: { ...vars, res: fromKv(rows) } })}
-          valuePlaceholder="Expr"
-          valueLabel="Expr"
-          bulkEdit={false}
-        />
-      </div>
-    </div>
-  );
-}
 
 // ─── assertions (declarative) ─────────────────────────────────────────────────
 
