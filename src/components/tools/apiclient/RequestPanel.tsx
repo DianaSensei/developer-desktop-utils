@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Segmented } from '@/components/ui/segmented';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -179,54 +180,64 @@ function VarsSection({ label, rows, onChange, valuePlaceholder }: {
   );
 }
 
+type ScriptPhase = 'req' | 'res';
+
+// Pre-request và post-response từng đứng CHỒNG NHAU, mỗi bên full-height (chia
+// đôi khung dọc) — hai Label, hai đoạn giải thích, hai VarsSection, hai editor
+// đều hiện cùng lúc dù người dùng chỉ nhìn một bên tại một thời điểm. Giờ dùng
+// Segmented để chuyển pha (đúng công cụ chuyển-chế-độ của kit, xem
+// ui/segmented.tsx), một khung nội dung duy nhất được TOÀN BỘ chiều cao — và
+// hàng tiêu đề gọn lại giống "Path" ở tab Params: một nhãn nhỏ, không đoạn văn
+// luôn hiện.
 function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
   const { script, vars } = request;
+  const [phase, setPhase] = useState<ScriptPhase>('req');
+  const isReq = phase === 'req';
+
+  const phaseScript = isReq ? script.req : script.res;
+  const setPhaseScript = (v: string) =>
+    onChange({ script: isReq ? { ...script, req: v } : { ...script, res: v } });
+  const phaseVarRows = toKv(isReq ? vars.req : vars.res);
+  const setPhaseVarRows = (rows: KeyValue[]) =>
+    onChange({ vars: isReq ? { ...vars, req: fromKv(rows) } : { ...vars, res: fromKv(rows) } });
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <Label className="text-xs">Pre-request</Label>
-          <SnippetMenu snippets={PRE_REQUEST_SNIPPETS} onInsert={(s) => onChange({ script: { ...script, req: appendSnippet(script.req, s) } })} />
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          Runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars.
-        </p>
-        <VarsSection
-          label="Variables to set before the request"
-          rows={toKv(vars.req)}
-          onChange={(rows) => onChange({ vars: { ...vars, req: fromKv(rows) } })}
-          valuePlaceholder="Value"
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
+      <div className="flex items-center justify-between gap-2">
+        <Segmented
+          value={phase}
+          onValueChange={setPhase}
+          size="sm"
+          aria-label="Script phase"
+          options={[
+            { value: 'req', label: 'Pre-request' },
+            { value: 'res', label: 'Post-response' },
+          ]}
         />
-        <JavaScriptEditor
-          value={script.req}
-          onChange={(v) => onChange({ script: { ...script, req: v } })}
-          placeholder={"bru.setVar('ts', Date.now());\nreq.setHeader('X-Trace', 'abc');"}
-          extraExtensions={scriptApiExtensions}
+        <SnippetMenu
+          snippets={isReq ? PRE_REQUEST_SNIPPETS : POST_RESPONSE_SNIPPETS}
+          onInsert={(s) => onChange({ script: isReq ? { ...script, req: appendSnippet(script.req, s) } : { ...script, res: appendSnippet(script.res, s) } })}
         />
-        {scriptCallsNetwork(script.req) && <NetworkCallNotice />}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <Label className="text-xs">Post-response</Label>
-          <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ script: { ...script, res: appendSnippet(script.res, s) } })} />
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          Runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars.
-        </p>
-        <VarsSection
-          label="Variables to set from the response — expressions, e.g. res.body.token"
-          rows={toKv(vars.res)}
-          onChange={(rows) => onChange({ vars: { ...vars, res: fromKv(rows) } })}
-          valuePlaceholder="Expr"
-        />
-        <JavaScriptEditor
-          value={script.res}
-          onChange={(v) => onChange({ script: { ...script, res: v } })}
-          placeholder={"bru.setVar('token', res.getBody().token);"}
-          extraExtensions={scriptApiExtensions}
-        />
-        {scriptCallsNetwork(script.res) && <NetworkCallNotice />}
-      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {isReq
+          ? <>Runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars.</>
+          : <>Runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars.</>}
+      </p>
+      <VarsSection
+        label={isReq ? 'Variables to set before the request' : 'Variables to set from the response — expressions, e.g. res.body.token'}
+        rows={phaseVarRows}
+        onChange={setPhaseVarRows}
+        valuePlaceholder={isReq ? 'Value' : 'Expr'}
+      />
+      <JavaScriptEditor
+        key={phase}
+        value={phaseScript}
+        onChange={setPhaseScript}
+        placeholder={isReq ? "bru.setVar('ts', Date.now());\nreq.setHeader('X-Trace', 'abc');" : "bru.setVar('token', res.getBody().token);"}
+        extraExtensions={scriptApiExtensions}
+      />
+      {scriptCallsNetwork(phaseScript) && <NetworkCallNotice />}
     </div>
   );
 }
