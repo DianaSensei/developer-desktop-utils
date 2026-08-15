@@ -3,14 +3,10 @@ import ReactDOM from 'react-dom/client';
 // Self-hosted fonts — bundled by Vite, work offline, render identically on
 // macOS / Windows / Linux.
 //
-// Two sans faces are loaded on purpose during G1: the /type-specimen route
-// switches --sans between them so the Vietnamese diacritics can be judged in
-// the real webview before one is locked in. The loser gets deleted at the end
-// of G1 — this is a temporary two-font state, not the intended end state.
-import '@fontsource-variable/inter';
-// Be Vietnam Pro has no variable build on fontsource, so the three weights the
-// app actually uses are loaded individually. The `vietnamese` subset carries
-// the stacked diacritics (ế ộ ữ) that the latin subset does not.
+// Be Vietnam Pro, chosen over Inter after comparing both in the real webview at
+// the sizes the app actually uses. It has no variable build on fontsource, so
+// the three weights are loaded individually. The `vietnamese` subset carries the
+// stacked diacritics (ế ộ ữ) that the latin subset does not.
 import '@fontsource/be-vietnam-pro/latin-400.css';
 import '@fontsource/be-vietnam-pro/latin-500.css';
 import '@fontsource/be-vietnam-pro/latin-600.css';

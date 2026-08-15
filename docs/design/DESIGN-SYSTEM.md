@@ -23,7 +23,7 @@
 
 ---
 
-The single reference for how DevTool looks and feels: **azure-blue accent · soft-depth elevation · Apple-style frosted glass · Inter type · one motion rhythm**, all driven by CSS variables so theming and dark mode are free.
+The single reference for how DevTool looks and feels: **swappable accent · soft-depth elevation · Apple-style frosted glass · Be Vietnam Pro type · one motion rhythm**, all driven by CSS variables so theming and dark mode are free.
 
 > **Source of truth is the code, not this document.** The actual tokens, utilities, and Tailwind theme live in [`src/design-system/`](../../src/design-system/) — `tokens.css` (CSS variables + utility classes), `tailwind-preset.cjs` (Tailwind theme), and `index.ts` (component import surface). If a value here ever disagrees with `tokens.css`, `tokens.css` wins. This doc explains the *intent* and *how to use it*; [`src/design-system/README.md`](../../src/design-system/README.md) is the short "how to copy it into another project" guide.
 
@@ -61,13 +61,13 @@ Answer these first; if unknown, ask or state the assumption inline:
 
 ### Spacing
 
-- Use Tailwind's scale only. Vertical rhythm inside a tool is `tool-spacer` (`space-y-5 sm:space-y-6`); section padding `tool-padding`. Keep step sizes consistent within a view — inconsistent gaps read as bugs.
+- Use Tailwind's scale only. Vertical rhythm inside a tool is `tool-spacer` (`space-y-6 sm:space-y-7`); section padding `tool-padding`. Keep step sizes consistent within a view — inconsistent gaps read as bugs.
 - Prefer whitespace over cramming. Density is a deliberate choice, not a default.
 
 ### Typography
 
 - Use the typography utilities, never ad-hoc sizes: labels `text-xs font-medium`, hints `text-[11px] text-muted-foreground`, body `text-sm`, mono `font-mono text-sm`, headings via `.heading-xl…xs`. (See the type scale below.)
-- One family (Inter) plus the mono fallback; express hierarchy through weight and size, not new fonts.
+- One sans family (Be Vietnam Pro) plus one mono (IBM Plex Mono); express hierarchy through weight and size, not new fonts.
 - Left-align body and long-form text; never justify or center it.
 
 ### Color
@@ -133,7 +133,7 @@ All colors are CSS variables (HSL component triples) defined in `tokens.css` und
 
 ### Typography
 
-Font stack is **Inter Variable** with a full system fallback (see `tailwind-preset.cjs`); install via `@fontsource-variable/inter`. Use the typography utility classes rather than ad-hoc sizes:
+Font stack is **Be Vietnam Pro** (sans) + **IBM Plex Mono**, self-hosted with a full system fallback — see `design/tokens.css`. Chosen for Vietnamese: stacked diacritics (ế ộ ữ) stay clear of the letterform. Use the typography utility classes rather than ad-hoc sizes:
 
 | Class | Style |
 |---|---|
@@ -408,4 +408,4 @@ Verify each item and report the result; if any answer is "no," fix it or explici
 
 ## Reuse in another project
 
-The system is portable. Short version: copy `src/design-system/` (plus `src/components/ui/` and `src/lib/utils.ts`), import `tokens.css` at the top of your global CSS, add the preset to `tailwind.config.js`, and install Inter. Full steps are in [`src/design-system/README.md`](../../src/design-system/README.md).
+The system is portable. Short version: copy `src/design-system/` (plus `src/components/ui/` and `src/lib/utils.ts`), import `tokens.css` at the top of your global CSS, add the preset to `tailwind.config.js`, and install the fonts. Full steps are in [`src/design-system/README.md`](../../src/design-system/README.md).
