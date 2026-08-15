@@ -694,10 +694,11 @@ function AppContent() {
       />
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="z-30 header-premium shrink-0">
-          {/* py-2.5 khớp mức đã hạ ở header sidebar (py-3 → py-2.5) — cùng lý do:
-              nội dung chỉ còn một hàng cao h-ctl (34px), không cần đệm dọc lớn
-              như khi còn tên nhóm xếp phía trên tablist. */}
-          <div className="flex items-center justify-between px-4 py-2.5 sm:px-5">
+          {/* py-2 đưa tổng chiều cao về đúng 50px (2×8 + h-ctl 34) — khớp hàng
+              header sidebar bên trái (2×10 + logo 30 = 50px), để đường viền
+              dưới của cả hai nối thẳng thành một đường ngang liền mạch thay vì
+              lệch bậc. py-2.5 trước đó ra 54px, lệch 4px so với sidebar. */}
+          <div className="flex items-center justify-between px-4 py-2 sm:px-5">
             <div className="flex items-center gap-2.5">
               <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setSidebarOpen(true)}>
                 <Menu className="h-4 w-4" />
