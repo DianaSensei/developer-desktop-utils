@@ -51,6 +51,12 @@ Hai hệ màu **không được trộn**:
 Phép thử: đổi accent sang đỏ tía. Nếu có thứ gì đổi màu mà nó đang nói về *kết quả*
 chứ không phải về *tương tác*, thì chỗ đó sai.
 
+**Hệ quả ít ai nghĩ tới: accent cũng không được _trông giống_ màu trạng thái.**
+Tách hai hệ về mặt token là chưa đủ — nếu tone accent rơi vào đúng vùng màu của
+`--ok` hay `--bad` thì người dùng vẫn nhầm, dù code hoàn toàn đúng. Mọi tone mới
+phải cách `--ok` và `--bad` tối thiểu **45 đơn vị RGB**; `designKit.test.ts` canh
+tự động. Xem bảng hai tone đã vướng lỗi này trong `TOKENS.md`.
+
 Lỗi thật đã tìm thấy trong repo — `CronGenerator.tsx:723`:
 ```
 border-primary/25 bg-accent/45   ← --accent CHÍNH LÀ primary azure

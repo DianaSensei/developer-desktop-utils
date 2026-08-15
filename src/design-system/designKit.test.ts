@@ -83,11 +83,66 @@ describe('design kit — luật màu trạng thái', () => {
   });
 });
 
+describe('design kit — tone chủ đạo phải phân biệt được với màu trạng thái', () => {
+  /** HSL → RGB, để đo khoảng cách màu thật thay vì so từng kênh HSL. */
+  const toRgb = (h: number, s: number, l: number): [number, number, number] => {
+    const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      return (l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))) * 255;
+    };
+    return [f(0), f(8), f(4)];
+  };
+  const dist = (a: number[], b: number[]) =>
+    Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+  /** Màu trạng thái ở theme sáng — accent phải tránh xa các màu này. */
+  const statusHsl = (name: string) => {
+    const m = tokens.match(new RegExp(`--${name}-c:\\s*([\\d.]+)\\s+([\\d.]+)%\\s+([\\d.]+)%`));
+    if (!m) throw new Error(`không tìm thấy --${name}-c`);
+    return toRgb(Number(m[1]), Number(m[2]), Number(m[3]));
+  };
+
+  const presets = [...tokens.matchAll(
+    /\[data-accent="(\w+)"\]\s*\{\s*--a-h:\s*([\d.]+);\s*--a-s:\s*([\d.]+)%;\s*--a-l:\s*([\d.]+)%/g
+  )];
+
+  it('có ít nhất một bộ tone được khai báo', () => {
+    expect(presets.length).toBeGreaterThan(0);
+  });
+
+  // Một tone accent trùng màu với --bad nghĩa là người dùng không phân biệt được
+  // nút chính với báo lỗi. Bản oxblood đầu tiên vướng đúng lỗi này (cách --bad
+  // chỉ 10 đơn vị RGB), phát hiện khi đo bằng trình duyệt thật ở G1.
+  for (const [, name, h, s, l] of presets) {
+    it(`tone "${name}" đủ xa --bad và --ok`, () => {
+      const acc = toRgb(Number(h), Number(s), Number(l));
+      expect(dist(acc, statusHsl('bad')), `"${name}" quá giống màu lỗi`).toBeGreaterThan(45);
+      expect(dist(acc, statusHsl('ok')), `"${name}" quá giống màu hợp lệ`).toBeGreaterThan(45);
+    });
+  }
+});
+
 describe('design kit — trang mẫu', () => {
   it('không dùng biến CSS nào chưa được định nghĩa', () => {
     const known = new Set([...declared(tokens), ...declared(preview)]);
     const used = new Set([...preview.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1]));
     expect([...used].filter((v) => !known.has(v))).toEqual([]);
+  });
+
+  it('swatch tone khớp đúng preset trong tokens.css', () => {
+    // Trang mẫu phải chào bán đúng bộ tone mà app có. Trước G1 hai bên đã lệch
+    // (trang mẫu có "Forest h152 s56 l30", kit có "forest h152 s52 l32") — đúng
+    // kiểu trôi lệch mà cả bộ kit sinh ra để ngăn.
+    const presets = [...tokens.matchAll(
+      /\[data-accent="(\w+)"\]\s*\{\s*--a-h:\s*([\d.]+);\s*--a-s:\s*([\d.]+)%;\s*--a-l:\s*([\d.]+)%/g
+    )].map(([, , h, s, l]) => `${h} ${s}% ${l}%`);
+
+    const swatches = [...preview.matchAll(
+      /class="sw"\s+data-h="([\d.]+)"\s+data-s="([\d.]+%)"\s+data-l="([\d.]+%)"/g
+    )].map(([, h, s, l]) => `${h} ${s} ${l}`);
+
+    expect(swatches).toEqual(presets);
   });
 
   it('link tới token dùng chung thay vì tự khai báo lại', () => {

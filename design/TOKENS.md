@@ -27,7 +27,20 @@ Mọi biến thể accent **tính ra** từ ba số này, không mã hex nào vi
 | `--acc-ring` | `hsl(h s l / .22)` | vòng focus |
 
 **Thêm một tone = thêm ba con số.** Xem khối `[data-accent="…"]` cuối `tokens.css`.
-Sáu tone có sẵn: azure (mặc định), petrol, forest, iris, oxblood, amber.
+Sáu tone có sẵn: azure (mặc định), petrol, moss, iris, oxblood, amber.
+
+> ⚠️ **Tone mới phải đo khoảng cách tới `--ok` và `--bad`.** Vì màu trạng thái cố
+> định, accent không được lấn vào chỗ của chúng. Hai tone đầu tiên đều vướng lỗi này
+> và chỉ lộ ra khi đo bằng trình duyệt thật:
+>
+> | Tone bản đầu | Khoảng cách RGB | Hậu quả |
+> |---|---|---|
+> | `oxblood` h2 s58 l42 | **10** tới `--bad` | nút chính trông y hệt báo lỗi |
+> | `forest` h152 s52 l32 | **18** tới `--ok` | accent trông y hệt chip "hợp lệ" |
+>
+> Đã sửa thành `oxblood` h355 (cách 80) và `moss` h96 (cách 61). Ngưỡng tối thiểu
+> là **45**, được canh tự động trong `designKit.test.ts` — thêm tone mới mà quá gần
+> thì test đỏ ngay.
 
 Đổi lúc chạy:
 ```js

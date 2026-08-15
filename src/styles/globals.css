@@ -21,12 +21,9 @@
   body {
     @apply bg-background text-foreground;
     overflow: hidden;
-    /* Inter — one beautiful, highly-legible UI typeface across all platforms
-       (self-hosted variable font, see main.tsx). Native faces remain as the
-       fallback for the brief moment before the bundled font is ready. */
-    font-family: "Inter Variable", "Inter", system-ui, -apple-system, BlinkMacSystemFont,
-      "Segoe UI Variable Text", "Segoe UI", "Ubuntu", "Cantarell", "Noto Sans",
-      "Helvetica Neue", Arial, sans-serif;
+    /* Mặt chữ đến từ token, không viết cứng ở đây — nhờ vậy trang so sánh font
+       (/type-specimen) đổi được --sans lúc chạy. Fonts tự host, xem main.tsx. */
+    font-family: var(--sans);
     font-feature-settings: "kern", "liga";
     font-kerning: normal;
     height: 100%;
@@ -59,10 +56,10 @@
      is needed because CodeMirror injects its own theme as a runtime <style>
      that lands after this stylesheet, at equal selector specificity. */
   .diff-merge-view {
-    /* Tailwind's emerald-500 in raw H S% L% (no hex-in-CSS-function support),
-       matching Badge's tone="success" so "added" reads the same color
-       everywhere in the app. */
-    --diff-added: 160 84% 39%;
+    /* "Dòng thêm" là một TRẠNG THÁI, nên nó lấy màu từ hệ trạng thái của design
+       kit chứ không phải một emerald thô — nhờ vậy nó tự đúng ở cả sáng lẫn tối
+       và không đổi khi đổi tone accent. (Trước đây: `160 84% 39%`.) */
+    --diff-added: var(--ok-c);
   }
   .diff-merge-view .cm-mergeView {
     flex: 1 1 0;
@@ -162,33 +159,7 @@
     @apply flex gap-4 h-full;
   }
 
-  /* ── Premium form/button utilities (used by a few tools directly) ────── */
-  .input-premium {
-    @apply h-9 rounded-lg border border-border bg-input px-3 py-2 text-sm
-           transition-all duration-150 ease-out
-           placeholder:text-muted-foreground/50
-           focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card;
-  }
-  .textarea-premium {
-    @apply rounded-lg border border-border bg-input px-3 py-2 text-sm
-           transition-all duration-150 ease-out
-           placeholder:text-muted-foreground/50
-           focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:bg-card;
-  }
-  .btn-premium {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-150 ease-out
-           focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-1
-           active:scale-95;
-  }
-  .btn-primary-premium {
-    @apply btn-premium px-4 py-2 bg-primary text-primary-foreground shadow-sm-premium
-           hover:shadow-md-premium hover:bg-primary/95 active:shadow-sm-premium;
-  }
-  .btn-secondary-premium {
-    @apply btn-premium px-4 py-2 bg-muted text-foreground border border-border
-           hover:bg-muted/80 hover:shadow-sm-premium;
-  }
-  .btn-ghost-premium {
-    @apply btn-premium px-3 py-2 text-foreground hover:bg-muted/50;
-  }
+  /* Các utility `.input-premium` / `.textarea-premium` / `.btn-*-premium` đã bị
+     xoá ở G1 — không chỗ nào trong code dùng chúng, và chúng là bản sao song song
+     của <Input> / <Textarea> / <Button>. Dùng component, đừng dựng lại bằng CSS. */
 }
