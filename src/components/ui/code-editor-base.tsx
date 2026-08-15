@@ -10,7 +10,7 @@
 
 import { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
-import { keymap } from '@codemirror/view';
+import { keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { type LanguageSupport } from '@codemirror/language';
 import { EditorState, type Extension } from '@codemirror/state';
@@ -78,6 +78,14 @@ export function CodeSurface({
           ...(lang ? [lang] : []),
           ...extraExtensions,
           ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
+          // Fixed at mount, same as `lang`/`extraExtensions` — no call site needs
+          // this to change without also remounting (e.g. RawEditor swaps
+          // component identity when body.mode changes). CodeMirror's own
+          // placeholder decoration (not a hand-rolled overlay) is what
+          // InlineCodeField already uses — it renders inline in the real
+          // document flow, so multi-line text wraps correctly and it's never
+          // out of step with the actual caret position.
+          ...(placeholder ? [cmPlaceholder(placeholder)] : []),
           theme.extension,
           EditorView.lineWrapping,
           ...(hasVars ? [...varExtensions(() => varsRef.current ?? {}), varTheme] : []),
@@ -115,16 +123,11 @@ export function CodeSurface({
   return (
     <div
       className={cn(
-        'relative flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border border-input bg-background shadow-sm transition-shadow hover:border-border/80 focus-within:shadow-none focus-within:ring-2 focus-within:ring-ring/40',
+        'flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border border-input bg-background shadow-sm transition-shadow hover:border-border/80 focus-within:shadow-none focus-within:ring-2 focus-within:ring-ring/40',
         className,
       )}
     >
       <div ref={containerRef} className="flex flex-col flex-1 min-h-0" />
-      {!value && placeholder && (
-        <div className="pointer-events-none absolute left-9 top-2 font-mono text-[11px] text-muted-foreground/50">
-          {placeholder}
-        </div>
-      )}
     </div>
   );
 }

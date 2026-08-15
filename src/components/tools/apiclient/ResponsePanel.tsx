@@ -329,7 +329,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
               )}
               <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} />
               {showFilter && kind === 'json' && (
-                <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5">
+                <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5 focus-within:bg-muted/20">
                   <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <Input
                     value={filter}

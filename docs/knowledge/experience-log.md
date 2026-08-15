@@ -1,5 +1,34 @@
 # Experience log
 
+## [2026-08-14] api-client — placeholder/hint rendering broken across CodeSurface editors
+- Nguyên nhân: `CodeSurface` (`code-editor-base.tsx`, dùng cho JsonEditor/JavaScriptEditor/
+  TextEditor — tức Body JSON, Script pre/post-request, Tests, GraphQL query/variables) tự vẽ
+  placeholder bằng một `<div>` absolutely-positioned (`left-9 top-2`) đè lên editor, thay vì
+  dùng extension `placeholder()` có sẵn của CodeMirror. Hệ quả: (1) placeholder nhiều dòng
+  (vd body JSON `'{\n  "key": "value"\n}'`, script snippet có `\n`) bị whitespace-normal của
+  div gộp hết `\n` thành khoảng trắng, hiện thành một dòng dính chữ; (2) vị trí `left-9`
+  đoán mò không khớp với vị trí caret thật của CodeMirror (đặc biệt khi có lint gutter chiếm
+  thêm chỗ), nên khi field trống và đang focus, placeholder giả và caret thật chồng lên nhau
+  lệch nhau, nhìn như chữ bị vỡ/đè lên nhau. Cùng lúc đó, `jsonParseLinter()` (dùng cho
+  JsonEditor) coi document rỗng ("") là JSON không hợp lệ, nên field JSON trống — chưa gõ gì
+  — đã hiện marker lỗi đỏ ở gutter ngay từ đầu, cộng dồn vào cảm giác "vỡ layout". Trong khi
+  đó `InlineCodeField` (URL bar) đã làm đúng bằng `placeholder()` thật của
+  `@codemirror/view` — hai cơ chế implement khác nhau cho cùng một khái niệm "placeholder"
+  trong cùng codebase, một cái đúng một cái tự chế, không ai đối chiếu.
+- Số lần thử: 1/5
+- Kết quả: Đã fix
+- Cách fix: bỏ hẳn `<div>` placeholder tự chế trong `CodeSurface`, dùng
+  `placeholder as cmPlaceholder` từ `@codemirror/view` (giống hệt `InlineCodeField`), thêm
+  style `.cm-placeholder` dùng chung vào `codeTheme()` (`code-theme.ts`) để mọi editor nhất
+  quán. Bọc `jsonParseLinter()` trong `code-editor.tsx` để trả về `[]` khi
+  `view.state.doc.length === 0`, tránh báo lỗi trên field JSON còn trống.
+- Bài học chung: khi một component "tự chế" lại một cơ chế mà thư viện cốt lõi (ở đây là
+  CodeMirror) đã cung cấp sẵn (placeholder, gutter, v.v.), luôn có nguy cơ nó bỏ sót các case
+  thư viện đã xử lý đúng (multi-line, alignment với caret thật, resize theo nội dung...).
+  Nếu trong cùng codebase đã có một chỗ khác dùng đúng cơ chế gốc của thư viện cho cùng một
+  nhu cầu (ở đây là `InlineCodeField`), đó là tín hiệu mạnh nên đối chiếu và thống nhất theo
+  cách làm đúng thay vì giữ bản tự chế.
+
 ## [2026-08-14] api-client — sandbox worker "degraded" state was permanent for the whole session
 - Nguyên nhân: `scriptHost.ts`'s `getWorker()` cached `workerUsable = false` forever after a
   single `Worker` construction/load failure (a transient bundling hiccup, a CSP block, a

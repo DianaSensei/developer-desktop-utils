@@ -70,7 +70,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
         const isGhost = row.id === ghost.id;
         const isFile = row.kind === 'file' && !!row.fileName;
         return (
-          <div key={row.id} className="grid grid-cols-[1fr_1fr_10rem_2rem] border-b last:border-b-0">
+          <div key={row.id} className="grid grid-cols-[1fr_1fr_10rem_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/40">
             {/* key cell with enable checkbox */}
             <div className="flex items-center gap-1.5 border-r px-2">
               <button

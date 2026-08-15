@@ -311,10 +311,21 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
     });
   };
 
-  const iterStats = (iter: number) => {
-    const rows = records.filter((r) => r.iter === iter);
-    return { ok: rows.filter(isOk).length, total: rows.length };
-  };
+  // Per-iteration pass/total, computed once per `records` change (O(records))
+  // instead of re-scanning the whole array for every iteration-rail row on
+  // every render (O(iterations × records) — records grows live while a run is
+  // in progress, and a data-driven run can have hundreds of iterations).
+  const iterStatsMap = useMemo(() => {
+    const map = new Map<number, { ok: number; total: number }>();
+    for (const r of records) {
+      const s = map.get(r.iter) ?? { ok: 0, total: 0 };
+      s.total += 1;
+      if (isOk(r)) s.ok += 1;
+      map.set(r.iter, s);
+    }
+    return map;
+  }, [records]);
+  const iterStats = (iter: number) => iterStatsMap.get(iter) ?? { ok: 0, total: 0 };
 
   // Overall statistics across every execution in the run.
   const stats = useMemo(() => summarize(records), [records]);
@@ -324,9 +335,13 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
   const dataRow = dataRows ? dataRows[viewIter] : undefined;
   const multiIter = ranIters > 1 || (running && iters > 1);
 
-  const iterRecords = records.filter((r) => r.iter === viewIter);
-  const shown = iterRecords.filter((r) => (filter === 'all' ? true : filter === 'passed' ? isOk(r) : !isOk(r)));
+  const iterRecords = useMemo(() => records.filter((r) => r.iter === viewIter), [records, viewIter]);
+  const shown = useMemo(
+    () => iterRecords.filter((r) => (filter === 'all' ? true : filter === 'passed' ? isOk(r) : !isOk(r))),
+    [iterRecords, filter],
+  );
   const failedCount = stats.failed;
+  const detailRecord = useMemo(() => records.find((r) => r.key === detailKey) ?? null, [records, detailKey]);
 
   const exportResults = async () => {
     const report = {
@@ -677,8 +692,8 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
 
               {/* request results / detail */}
               <div className="flex min-w-0 flex-1 flex-col">
-                {detailKey && records.find((r) => r.key === detailKey)?.detail ? (
-                  <RunDetailView entry={records.find((r) => r.key === detailKey)!.detail!} onBack={() => setDetailKey(null)} />
+                {detailRecord?.detail ? (
+                  <RunDetailView entry={detailRecord.detail} onBack={() => setDetailKey(null)} />
                 ) : (
                   <>
                     {dataRow && Object.keys(dataRow).length > 0 && (

@@ -26,7 +26,12 @@ import { syntaxErrorLinter } from '@/components/ui/syntax-lint';
 const jsonLang = json();
 const jsLang = javascript();
 const sqlLang = sql();
-const jsonLint = [linter(jsonParseLinter()), lintGutter()];
+// jsonParseLinter() flags an empty document as invalid (empty string isn't
+// valid JSON) — that would put a permanent error marker on a pristine,
+// untouched field before the user has typed anything. Skip linting until
+// there's real content.
+const jsonLintSource = jsonParseLinter();
+const jsonLint = [linter((view) => (view.state.doc.length === 0 ? [] : jsonLintSource(view))), lintGutter()];
 // JS/SQL have no dedicated linter package (unlike JSON) — flag whatever the
 // grammar itself already marks unparseable, which is still a real win over
 // nothing (unclosed strings/brackets, stray tokens).
