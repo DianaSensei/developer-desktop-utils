@@ -60,6 +60,46 @@ function withGroupClustering(tools: ToolDef[]): ToolDef[] {
   return clusterToolOrder(tools.map((t) => t.id)).map((id) => map.get(id)!);
 }
 
+interface LogicalRow {
+  /** Row identity for drag/ref bookkeeping — a group id for a group row, the
+   *  tool id for a standalone row (including a group degraded to one member). */
+  key: string;
+  isGroup: boolean;
+  tools: ToolDef[];
+}
+
+/**
+ * Gộp một danh sách tool ĐÃ GOM NHÓM (xem `withGroupClustering`) thành các
+ * "hàng logic" — đơn vị mà kéo-thả thao tác lên. Một nhóm với ≥2 thành viên
+ * LIỀN NHAU trong `tools` gộp thành một hàng; tool đứng riêng (hoặc nhóm chỉ
+ * còn một thành viên, ví dụ đang lọc tìm kiếm) là một hàng của chính nó.
+ *
+ * Kéo một hàng nhóm di chuyển CẢ NHÓM cùng lúc — thứ tự các tool CON bên
+ * trong không sắp xếp được ở đây, nó theo đúng thứ tự tab con đã định nghĩa
+ * trong `TOOL_GROUPS`, chỉ đổi được ở nơi định nghĩa nhóm.
+ */
+function toLogicalRows(tools: ToolDef[]): LogicalRow[] {
+  const rows: LogicalRow[] = [];
+  let i = 0;
+  while (i < tools.length) {
+    const group = GROUP_OF_TOOL.get(tools[i].id);
+    if (!group) {
+      rows.push({ key: tools[i].id, isGroup: false, tools: [tools[i]] });
+      i++;
+      continue;
+    }
+    const members: ToolDef[] = [];
+    while (i < tools.length && GROUP_OF_TOOL.get(tools[i].id)?.id === group.id) {
+      members.push(tools[i]);
+      i++;
+    }
+    rows.push(members.length > 1
+      ? { key: group.id, isGroup: true, tools: members }
+      : { key: members[0].id, isGroup: false, tools: members });
+  }
+  return rows;
+}
+
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <button
@@ -76,6 +116,39 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
         checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
       )} />
     </button>
+  );
+}
+
+/** Icon + label/description + favourite + enable toggle — shared between a
+ *  standalone tool row (draggable, has a grip) and a group's child row
+ *  (not draggable, indented) so the two never drift apart visually. */
+function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnabled }: {
+  tool: ToolDef; enabled: boolean; favorite: boolean;
+  onToggleFavorite: () => void; onToggleEnabled: () => void;
+}) {
+  const Icon = tool.icon;
+  return (
+    <>
+      <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'text-muted-foreground')} />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium leading-none">{tool.label}</p>
+        <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{tool.description}</p>
+      </div>
+      {/* Favourite — pins the tool to the top of the sidebar */}
+      <button
+        type="button"
+        aria-label={favorite ? `Unfavorite ${tool.label}` : `Favorite ${tool.label}`}
+        title={favorite ? 'Remove from favorites' : 'Add to favorites'}
+        onClick={onToggleFavorite}
+        className={cn(
+          'shrink-0 rounded p-1 transition-colors',
+          favorite ? 'text-warn' : 'text-muted-foreground/40 hover:text-warn'
+        )}
+      >
+        <Star className={cn('h-3.5 w-3.5', favorite && 'fill-current')} />
+      </button>
+      <Toggle checked={enabled} onChange={onToggleEnabled} />
+    </>
   );
 }
 
@@ -226,8 +299,12 @@ export function Settings() {
   const [drag, setDrag] = useState<{ id: string; dy: number; dropIndex: number } | null>(null);
   const dragMeta = useRef<{ id: string; startY: number; order: string[] } | null>(null);
 
+  // `id` here is a LOGICAL ROW key (toLogicalRows) — a group id when dragging
+  // a group's header, a tool id for a standalone row. Group children are
+  // never draggable (see render below): their order is fixed by TOOL_GROUPS,
+  // only the group as a whole can move.
   const startDrag = useCallback((id: string, e: React.PointerEvent) => {
-    const order = displayTools.map((t) => t.id);
+    const order = toLogicalRows(displayTools).map((r) => r.key);
     const fromIndex = order.indexOf(id);
     dragMeta.current = { id, startY: e.clientY, order };
     setDrag({ id, dy: 0, dropIndex: fromIndex });
@@ -253,17 +330,17 @@ export function Settings() {
       setDrag((d) => {
         if (meta && d) {
           setDisplayTools((prev) => {
-            const next = [...prev];
-            const from = next.findIndex((t) => t.id === meta.id);
-            if (from >= 0) {
-              const [moved] = next.splice(from, 1);
-              next.splice(d.dropIndex, 0, moved);
-            }
-            // Kéo một tool trong nhóm rời khỏi cụm của nó sẽ bị kéo lại ngay
-            // sau đây — nhóm luôn hiển thị liền nhau, xem withGroupClustering.
-            const clustered = withGroupClustering(next);
-            reorderTools(clustered.map((t) => t.id));
-            return clustered;
+            const rows = toLogicalRows(prev);
+            const from = rows.findIndex((r) => r.key === meta.id);
+            if (from < 0) return prev;
+            const nextRows = [...rows];
+            const [moved] = nextRows.splice(from, 1);
+            nextRows.splice(d.dropIndex, 0, moved);
+            // Mỗi hàng đã là một khối liền — không cần cluster lại, chỉ trải
+            // phẳng theo đúng thứ tự hàng mới.
+            const flat = nextRows.flatMap((r) => r.tools);
+            reorderTools(flat.map((t) => t.id));
+            return flat;
           });
         }
         return null;
@@ -372,52 +449,90 @@ export function Settings() {
             const line = (key: string) => (
               <div key={key} className="pointer-events-none mx-3 h-0.5 rounded-full bg-primary" />
             );
-            // Một nhóm chỉ hiện tiêu đề cha khi ≥2 thành viên còn nằm trong
-            // visibleTools — tìm kiếm lọc còn đúng 1 thành viên thì nó đọc như
-            // tool đứng riêng, cùng quy tắc "thoái thành mục đơn" của sidebar
-            // (buildNavEntries). displayTools đã được withGroupClustering gom
-            // liền nhau nên duyệt phẳng vẫn phát hiện đúng ranh giới nhóm.
-            const groupVisibleCount = new Map<string, number>();
-            visibleTools.forEach((t) => {
-              const g = GROUP_OF_TOOL.get(t.id);
-              if (g) groupVisibleCount.set(g.id, (groupVisibleCount.get(g.id) ?? 0) + 1);
-            });
-            const renderedGroups = new Set<string>();
-            visibleTools.forEach((tool) => {
-              const Icon = tool.icon;
-              const enabled = features[tool.id] !== false;
-              const isDragging = drag?.id === tool.id;
-              const group = GROUP_OF_TOOL.get(tool.id);
-              const isGrouped = !!group && (groupVisibleCount.get(group.id) ?? 0) > 1;
-
-              if (isGrouped && !renderedGroups.has(group!.id)) {
-                renderedGroups.add(group!.id);
-                const GroupIcon = group!.icon;
-                nodes.push(
-                  <div key={`grp-${group!.id}`} className="flex items-center gap-2 bg-muted/30 px-3 py-1.5">
-                    <GroupIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <p className="text-xs font-semibold">{group!.label}</p>
-                    <p className="text-[11px] text-muted-foreground">{groupVisibleCount.get(group!.id)} tools</p>
-                  </div>
-                );
-              }
+            // Hàng LOGIC là đơn vị kéo-thả: một nhóm (≥2 thành viên liền nhau,
+            // tìm kiếm lọc còn 1 thì thoái thành hàng đơn — cùng quy tắc
+            // sidebar dùng ở buildNavEntries) là MỘT hàng có thể kéo; tool con
+            // bên trong không kéo được riêng, thứ tự của chúng theo đúng
+            // TOOL_GROUPS, chỉ nhóm mới di chuyển được trong danh sách này.
+            const rows = toLogicalRows(visibleTools);
+            rows.forEach((row) => {
+              const isDragging = drag?.id === row.key;
 
               if (!isDragging) {
                 if (drag && drag.dropIndex === slot) nodes.push(line(`line-${slot}`));
                 slot++;
               }
 
+              if (row.isGroup) {
+                const group = GROUP_OF_TOOL.get(row.tools[0].id)!;
+                const GroupIcon = group.icon;
+                nodes.push(
+                  <div key={row.key}>
+                    <div
+                      ref={(el) => {
+                        if (el) rowRefs.current.set(row.key, el);
+                        else rowRefs.current.delete(row.key);
+                      }}
+                      style={isDragging ? { transform: `translateY(${drag!.dy}px)` } : undefined}
+                      className={cn(
+                        'flex items-center gap-2 bg-muted/30 px-3 py-1.5 cursor-default',
+                        isDragging && 'relative z-20 rounded-lg bg-muted shadow-lg ring-1 ring-primary/50'
+                      )}
+                    >
+                      {/* Kéo cả nhóm — con bên trong không có tay cầm riêng,
+                          thứ tự của chúng cố định theo TOOL_GROUPS. */}
+                      <button
+                        type="button"
+                        aria-label={`Drag to reorder ${group.label}`}
+                        onPointerDown={!isSearching ? (e) => { e.preventDefault(); startDrag(row.key, e); } : undefined}
+                        className={cn(
+                          'shrink-0 touch-none text-muted-foreground/40 transition-colors',
+                          isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing hover:text-muted-foreground'
+                        )}
+                      >
+                        <GripVertical className="h-3.5 w-3.5" />
+                      </button>
+                      <GroupIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <p className="text-xs font-semibold">{group.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{row.tools.length} tools</p>
+                    </div>
+                    {row.tools.map((tool) => {
+                      const enabled = features[tool.id] !== false;
+                      return (
+                        <div
+                          key={tool.id}
+                          className={cn(
+                            'flex items-center gap-3 py-3 pl-10 pr-3 cursor-default bg-background',
+                            !enabled && 'opacity-50'
+                          )}
+                        >
+                          <ToolRowFields
+                            tool={tool}
+                            enabled={enabled}
+                            favorite={isFavorite(tool.id)}
+                            onToggleFavorite={() => toggleFavorite(tool.id)}
+                            onToggleEnabled={() => toggleFeature(tool.id)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+                return;
+              }
+
+              const tool = row.tools[0];
+              const enabled = features[tool.id] !== false;
               nodes.push(
                 <div
                   key={tool.id}
                   ref={(el) => {
-                    if (el) rowRefs.current.set(tool.id, el);
-                    else rowRefs.current.delete(tool.id);
+                    if (el) rowRefs.current.set(row.key, el);
+                    else rowRefs.current.delete(row.key);
                   }}
                   style={isDragging ? { transform: `translateY(${drag!.dy}px)` } : undefined}
                   className={cn(
                     'flex items-center gap-3 px-3 py-3 cursor-default bg-background',
-                    isGrouped && 'pl-8',
                     !enabled && 'opacity-50',
                     isDragging && 'relative z-20 rounded-lg bg-muted opacity-100 shadow-lg ring-1 ring-primary/50'
                   )}
@@ -426,7 +541,7 @@ export function Settings() {
                   <button
                     type="button"
                     aria-label="Drag to reorder"
-                    onPointerDown={!isSearching ? (e) => { e.preventDefault(); startDrag(tool.id, e); } : undefined}
+                    onPointerDown={!isSearching ? (e) => { e.preventDefault(); startDrag(row.key, e); } : undefined}
                     className={cn(
                       'shrink-0 touch-none text-muted-foreground/40 transition-colors',
                       isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing hover:text-muted-foreground'
@@ -434,25 +549,13 @@ export function Settings() {
                   >
                     <GripVertical className="h-3.5 w-3.5" />
                   </button>
-                  <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'text-muted-foreground')} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium leading-none">{tool.label}</p>
-                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{tool.description}</p>
-                  </div>
-                  {/* Favourite — pins the tool to the top of the sidebar */}
-                  <button
-                    type="button"
-                    aria-label={isFavorite(tool.id) ? `Unfavorite ${tool.label}` : `Favorite ${tool.label}`}
-                    title={isFavorite(tool.id) ? 'Remove from favorites' : 'Add to favorites'}
-                    onClick={() => toggleFavorite(tool.id)}
-                    className={cn(
-                      'shrink-0 rounded p-1 transition-colors',
-                      isFavorite(tool.id) ? 'text-warn' : 'text-muted-foreground/40 hover:text-warn'
-                    )}
-                  >
-                    <Star className={cn('h-3.5 w-3.5', isFavorite(tool.id) && 'fill-current')} />
-                  </button>
-                  <Toggle checked={enabled} onChange={() => toggleFeature(tool.id)} />
+                  <ToolRowFields
+                    tool={tool}
+                    enabled={enabled}
+                    favorite={isFavorite(tool.id)}
+                    onToggleFavorite={() => toggleFavorite(tool.id)}
+                    onToggleEnabled={() => toggleFeature(tool.id)}
+                  />
                 </div>
               );
             });
