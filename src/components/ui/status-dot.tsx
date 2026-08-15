@@ -14,7 +14,10 @@ const TONE_CLASS: Record<StatusDotTone, string> = {
   paused: 'bg-warn',
   idle: 'bg-muted-foreground/40',
   error: 'bg-bad',
-  recording: 'bg-bad',
+  // `recording` KHÔNG dùng --bad: một đồng hồ đang chạy và một lỗi thật không
+  // được cùng màu, nếu không đỏ mất nghĩa "có gì đó sai". --live là hệ quy ước
+  // riêng cho trạng thái đang-ghi (xem design-system/tokens.css).
+  recording: 'bg-[var(--live)]',
 };
 
 // Soft ring shadow for the `glow` prop, one per tone that actually gets glowed
@@ -23,7 +26,7 @@ const TONE_CLASS: Record<StatusDotTone, string> = {
 // nó theo được theme thay vì giữ nguyên một màu cho cả sáng lẫn tối.
 const TONE_GLOW: Partial<Record<StatusDotTone, string>> = {
   live: 'shadow-[0_0_0_3px_hsl(var(--ok-c)/0.22)]',
-  recording: 'shadow-[0_0_0_3px_hsl(var(--bad-c)/0.22)]',
+  recording: 'shadow-[0_0_0_3px_hsl(var(--live-c)/0.22)]',
   starting: 'shadow-[0_0_0_3px_hsl(var(--warn-c)/0.22)]',
   paused: 'shadow-[0_0_0_3px_hsl(var(--warn-c)/0.22)]',
 };

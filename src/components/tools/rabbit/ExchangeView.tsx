@@ -105,9 +105,9 @@ function AmqpOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs rounded-lg border bg-card/40 px-4 py-3">
         <dt className="text-muted-foreground">Exists</dt>
         <dd className="text-right">
-          {i.exists ? <span className="text-emerald-600 dark:text-emerald-400">Yes</span>
+          {i.exists ? <span className="text-ok">Yes</span>
             : i.error ? <span className="text-destructive">Error</span>
-            : <span className="text-amber-600 dark:text-amber-400">No</span>}
+            : <span className="text-warn">No</span>}
         </dd>
       </dl>
       {i.error && <Callout tone="error">{i.error}</Callout>}

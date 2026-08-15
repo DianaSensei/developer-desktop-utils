@@ -30,7 +30,7 @@ function Row({ action, when, calls, badge, note }: {
             <span className="text-[11px] text-muted-foreground">{when}</span>
           </div>
           <div className="text-[11px] font-mono text-muted-foreground/70 mt-0.5">{calls}</div>
-          {note && <div className="text-[11px] text-orange-400/90 mt-1">{note}</div>}
+          {note && <div className="text-[11px] text-warn mt-1">{note}</div>}
         </div>
       </div>
     </div>
@@ -77,7 +77,7 @@ export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoMod
             these are the real broker operations the HTTP API can't do.
           </p>
 
-          <p className="text-[11px] leading-relaxed mb-4 rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sky-700 dark:text-sky-300">
+          <p className="text-[11px] leading-relaxed mb-4 rounded-md border border-info-edge bg-info-tint px-3 py-2 text-info">
             <span className="font-semibold">AMQP-only mode.</span>{' '}
             If your broker exposes no management API, enable <span className="font-mono">AMQP-only</span> on the
             connection. The tool then works entirely over AMQP: you track queues/exchanges by name, counts come from a

@@ -25,7 +25,7 @@ export function CopyButton({
       onClick={() => copy(text)}
       className={cn(
         'transition-all duration-200',
-        copied && 'bg-green-500 hover:bg-green-500 text-white'
+        copied && 'bg-ok hover:bg-ok text-background'
       )}
       {...props}
     >

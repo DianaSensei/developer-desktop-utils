@@ -33,7 +33,7 @@ function Row({ action, when, calls, badge, note }: RowProps) {
           </div>
           <div className="text-[11px] font-mono text-muted-foreground/70 mt-0.5">{calls}</div>
           {note && (
-            <div className="text-[11px] text-orange-400/90 mt-1">{note}</div>
+            <div className="text-[11px] text-warn mt-1">{note}</div>
           )}
         </div>
       </div>

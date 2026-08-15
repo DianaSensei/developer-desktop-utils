@@ -78,13 +78,13 @@ function HistoryRow({ entry }: { entry: TimeEntry }) {
         <EditableTime ts={entry.start} dayTs={day} onCommit={(v) => updateEntry(entry.id, { start: Math.min(v, entry.end ?? Date.now()) })} />
         <span className="text-muted-foreground">–</span>
         {running ? (
-          <span className="w-[64px] text-center text-red-500">now</span>
+          <span className="w-[64px] text-center text-[var(--live)]">now</span>
         ) : (
           <EditableTime ts={entry.end!} dayTs={day} onCommit={(v) => updateEntry(entry.id, { end: Math.max(v, entry.start) })} />
         )}
       </div>
       {running ? (
-        <span className="ml-auto w-16 text-right font-mono tabular-nums text-red-500">{fmtTimer(duration)}</span>
+        <span className="ml-auto w-16 text-right font-mono tabular-nums text-[var(--live)]">{fmtTimer(duration)}</span>
       ) : (
         // Editing the duration keeps the start fixed and moves the end.
         <DurationInput
@@ -121,7 +121,7 @@ function AddSubtaskInput({ onAdd }: { onAdd: (name: string) => void }) {
 
 // Small read-only tag chip.
 function TagChip({ name }: { name: string }) {
-  return <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{name}</span>;
+  return <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{name}</span>;
 }
 
 // Inline task-name editor used by the rename affordance.
@@ -177,7 +177,7 @@ function FilterControls({
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
           {activeCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground">
               {activeCount}
             </span>
           )}
@@ -187,7 +187,7 @@ function FilterControls({
       {() => (
         <div className="space-y-3">
           <div className="space-y-1">
-            <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Project</p>
+            <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Project</p>
             <div className="max-h-40 overflow-y-auto">
               {([['all', 'All projects'], [null, 'No project']] as const).map(([val, label]) => (
                 <button
@@ -214,7 +214,7 @@ function FilterControls({
 
           {tags.length > 0 && (
             <div className="space-y-1 border-t border-border pt-2">
-              <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Tags</p>
+              <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tags</p>
               <div className="max-h-40 overflow-y-auto">
                 {tags.map((t) => (
                   <button key={t.id} onClick={() => toggleTag(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
@@ -527,7 +527,7 @@ export function TimeTracker() {
   return (
     <div className="flex h-full flex-col">
       {/* Entry bar */}
-      <div className={cn('shrink-0 border-b p-3 transition-colors', pomo?.onBreak && 'bg-emerald-500/5')}>
+      <div className={cn('shrink-0 border-b p-3 transition-colors', pomo?.onBreak && 'bg-ok/5')}>
         <div className="flex flex-wrap items-center gap-2">
           <Input
             ref={descRef}
@@ -558,7 +558,7 @@ export function TimeTracker() {
               ))}
             </div>
             {mode === 'timer' ? (
-              <span className={cn('flex w-[88px] items-center justify-center border-l font-mono text-sm font-semibold tabular-nums', running && 'text-red-500')}>
+              <span className={cn('flex w-[88px] items-center justify-center border-l font-mono text-sm font-semibold tabular-nums', running && 'text-[var(--live)]')}>
                 {fmtTimer(running ? now - running.start : 0)}
               </span>
             ) : (
@@ -571,7 +571,7 @@ export function TimeTracker() {
                     title="Set date & time"
                     className={cn('flex h-full w-[88px] flex-col items-center justify-center gap-0.5 border-l leading-none transition-colors hover:bg-muted', open && 'bg-muted')}
                   >
-                    <span className="text-[10px] font-medium text-muted-foreground">{manualDayLabel}</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">{manualDayLabel}</span>
                     <span className="font-mono text-sm font-semibold tabular-nums">{fmtHM(manualMs)}</span>
                   </button>
                 )}
@@ -594,12 +594,12 @@ export function TimeTracker() {
                   {manualKind === 'range' ? (
                     <div className="flex items-center justify-between gap-2">
                       <label className="flex flex-1 flex-col gap-1">
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Start</span>
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Start</span>
                         <TimeStepperField value={manualStart} onChange={setManualStart} className="w-full" />
                       </label>
                       <span className="mt-4 text-muted-foreground">–</span>
                       <label className="flex flex-1 flex-col gap-1">
-                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">End</span>
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">End</span>
                         <TimeStepperField value={manualEnd} onChange={setManualEnd} className="w-full" />
                       </label>
                     </div>
@@ -639,7 +639,7 @@ export function TimeTracker() {
         {pomo && (
           <div className="mt-2 flex items-center gap-2 text-xs">
             {pomo.onBreak ? (
-              <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="flex items-center gap-1.5 font-medium text-ok">
                 <Coffee className="h-3.5 w-3.5" /> Break
               </span>
             ) : (
@@ -706,7 +706,7 @@ export function TimeTracker() {
             <div className="flex items-center gap-2" title={`Today vs your ${settings.dailyTargetHours}h daily target`}>
               <div className="relative h-1.5 w-14 overflow-hidden rounded-full bg-muted">
                 <div
-                  className={cn('h-full rounded-full transition-[width] duration-500', overMs >= 0 ? 'bg-emerald-500' : 'bg-primary')}
+                  className={cn('h-full rounded-full transition-[width] duration-500', overMs >= 0 ? 'bg-ok' : 'bg-acc')}
                   style={{ width: `${targetPct}%` }}
                 />
               </div>
@@ -855,12 +855,12 @@ export function TimeTracker() {
                       {g.hasSub
                         ? <Badge pill>{g.subgroups.length} sub</Badge>
                         : <Badge pill>{g.recs.length}</Badge>}
-                      {isRunning && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />}
+                      {isRunning && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--live)]" />}
                     </button>
                   )}
-                  <span className={cn('shrink-0 font-mono text-sm tabular-nums', isRunning && 'text-red-500')}>{fmtTotal(total)}</span>
+                  <span className={cn('shrink-0 font-mono text-sm tabular-nums', isRunning && 'text-[var(--live)]')}>{fmtTotal(total)}</span>
                   {isRunning ? (
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:bg-red-500/10" onClick={stopRunning} title="Stop">
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title="Stop">
                       <Square className="h-4 w-4 fill-current" />
                     </Button>
                   ) : (
@@ -892,11 +892,11 @@ export function TimeTracker() {
                                   <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', subOpen && 'rotate-90')} />
                                   <span className="truncate text-sm">{sg.name}</span>
                                   <Badge pill>{sg.recs.length}</Badge>
-                                  {sg.running && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />}
+                                  {sg.running && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--live)]" />}
                                 </button>
-                                <span className={cn('shrink-0 font-mono text-xs tabular-nums', sg.running && 'text-red-500')}>{fmtTotal(subTotal)}</span>
+                                <span className={cn('shrink-0 font-mono text-xs tabular-nums', sg.running && 'text-[var(--live)]')}>{fmtTotal(subTotal)}</span>
                                 {sg.running ? (
-                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:bg-red-500/10" onClick={stopRunning} title="Stop">
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title="Stop">
                                     <Square className="h-3.5 w-3.5 fill-current" />
                                   </Button>
                                 ) : (
@@ -926,9 +926,9 @@ export function TimeTracker() {
                                   <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', subOpen && 'rotate-90')} />
                                   <span className="truncate text-sm italic text-muted-foreground">General</span>
                                   <Badge pill>{g.directRecs.length}</Badge>
-                                  {directRunning && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />}
+                                  {directRunning && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--live)]" />}
                                 </button>
-                                <span className={cn('shrink-0 font-mono text-xs tabular-nums', directRunning && 'text-red-500')}>{fmtTotal(directTotal)}</span>
+                                <span className={cn('shrink-0 font-mono text-xs tabular-nums', directRunning && 'text-[var(--live)]')}>{fmtTotal(directTotal)}</span>
                               </div>
                               {subOpen && <div className="divide-y bg-muted/30">{g.directRecs.map((e) => <HistoryRow key={e.id} entry={e} />)}</div>}
                             </div>

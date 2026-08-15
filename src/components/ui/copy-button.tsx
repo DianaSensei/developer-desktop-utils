@@ -102,7 +102,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
           />
           <Check
             className={cn(
-              'absolute inset-0 m-auto text-green-500 transition-all duration-200 ease-out motion-reduce:transition-none',
+              'absolute inset-0 m-auto text-ok transition-all duration-200 ease-out motion-reduce:transition-none',
               iconClassName,
               copied ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
             )}

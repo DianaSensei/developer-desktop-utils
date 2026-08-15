@@ -124,7 +124,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
               <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                 {parts.length} part{parts.length !== 1 ? 's' : ''}
               </span>
-              <span className={`text-xs font-mono tabular-nums w-24 text-right shrink-0 ${hasLag ? 'text-orange-500' : 'text-green-600'}`}>
+              <span className={`text-xs font-mono tabular-nums w-24 text-right shrink-0 ${hasLag ? 'text-warn' : 'text-ok'}`}>
                 lag {totalLag.toLocaleString()}
               </span>
             </div>
@@ -143,8 +143,8 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
                   const lagColor = p.lag < 0
                     ? 'text-muted-foreground'
                     : p.lag === 0
-                    ? 'text-green-600'
-                    : 'text-orange-500';
+                    ? 'text-ok'
+                    : 'text-warn';
                   const latest = p.lag >= 0 && p.committedOffset >= 0 ? p.committedOffset + p.lag : -1;
 
                   return (

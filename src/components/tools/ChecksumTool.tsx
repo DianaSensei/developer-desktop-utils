@@ -250,7 +250,7 @@ export function ChecksumTool() {
           <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
             <div className="min-w-0">
               <p className="text-xs font-medium truncate">{fileInfo.name}</p>
-              <p className="text-[10px] text-muted-foreground">{formatBytes(fileInfo.size)}</p>
+              <p className="text-[11px] text-muted-foreground">{formatBytes(fileInfo.size)}</p>
             </div>
             <button
               onClick={clear}
@@ -285,7 +285,7 @@ export function ChecksumTool() {
           <div className="space-y-3">
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="px-3 py-1.5 bg-muted/10 border-b border-border">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {algoLabel}
                 </span>
               </div>
@@ -315,14 +315,14 @@ export function ChecksumTool() {
                 {verifyNorm && (
                   <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
                     {hashMatch
-                      ? <CheckCircle className="h-4 w-4 text-green-500" />
+                      ? <CheckCircle className="h-4 w-4 text-ok" />
                       : <XCircle   className="h-4 w-4 text-destructive" />}
                   </span>
                 )}
               </div>
               {verifyNorm && (
                 <p className={cn('text-xs', hashMatch
-                  ? 'text-green-600 dark:text-green-400'
+                  ? 'text-ok'
                   : 'text-destructive')}>
                   {hashMatch ? 'Hashes match ✓' : 'Hashes do not match ✗'}
                 </p>

@@ -403,17 +403,17 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
           {(elapsed != null || outcome || stopped) && (
             <div className="flex items-center gap-2 text-sm flex-wrap">
               {elapsed != null && (
-                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <span className="text-ok flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4" /> Replied in {elapsed} ms
                 </span>
               )}
               {outcome && (
                 outcome.routed ? (
-                  <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <span className="text-ok flex items-center gap-1.5">
                     <Check className="h-4 w-4" /> {outcome.confirmed ? 'Sent & confirmed · routed' : 'Sent · routed'}
                   </span>
                 ) : (
-                  <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                  <span className="text-warn flex items-center gap-1.5">
                     <AlertTriangle className="h-4 w-4" /> Sent but unroutable{outcome.returnReason ? ` (${outcome.returnReason})` : ''}
                   </span>
                 )

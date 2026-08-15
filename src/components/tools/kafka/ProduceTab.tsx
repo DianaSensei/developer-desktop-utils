@@ -343,14 +343,14 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
           </Button>
 
           {result && (
-            <div className="flex items-center gap-1.5 text-sm text-green-600">
+            <div className="flex items-center gap-1.5 text-sm text-ok">
               <CheckCircle className="w-4 h-4" />
               partition {result.partition} @ offset {result.offset.toLocaleString()}
             </div>
           )}
 
           {batchResult !== null && (
-            <div className="flex items-center gap-1.5 text-sm text-green-600">
+            <div className="flex items-center gap-1.5 text-sm text-ok">
               <CheckCircle className="w-4 h-4" />
               produced {batchResult.toLocaleString()} message{batchResult !== 1 ? 's' : ''}
             </div>

@@ -406,7 +406,7 @@ export function Settings() {
                     onClick={() => toggleFavorite(tool.id)}
                     className={cn(
                       'shrink-0 rounded p-1 transition-colors',
-                      isFavorite(tool.id) ? 'text-amber-400 hover:text-amber-300' : 'text-muted-foreground/40 hover:text-amber-400'
+                      isFavorite(tool.id) ? 'text-warn' : 'text-muted-foreground/40 hover:text-warn'
                     )}
                   >
                     <Star className={cn('h-3.5 w-3.5', isFavorite(tool.id) && 'fill-current')} />
@@ -439,7 +439,7 @@ export function Settings() {
           Generated directly from src-tauri/capabilities/default.json — every permission the app can request is listed below, grouped by plugin, with its exact declaration.
         </p>
         {!isTauri && (
-          <p className="text-[11px] text-amber-500 dark:text-amber-400">
+          <p className="text-[11px] text-warn">
             Running in browser — permissions listed below apply to the desktop app only.
           </p>
         )}
@@ -540,20 +540,20 @@ export function Settings() {
             <span className="text-muted-foreground">Version</span>
             <div className="flex items-center gap-2">
               {updateStatus === 'not-available' && !updateAvailable && (
-                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <span className="flex items-center gap-1 text-ok">
                   <CheckCircle2 className="h-3 w-3" />
                   Up to date
                 </span>
               )}
               {updateAvailable && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 text-[10px] font-semibold">
+                <span className="inline-flex items-center gap-1 rounded-full bg-ok-tint text-ok px-1.5 py-0.5 text-[11px] font-semibold">
                   v{updateInfo?.version} available
                 </span>
               )}
               {updateStatus === 'error' && (
                 updateError?.startsWith('Offline') ? (
                   <span
-                    className="flex items-center gap-1 text-amber-600 dark:text-amber-400"
+                    className="flex items-center gap-1 text-warn"
                     title={updateError}
                   >
                     <WifiOff className="h-3 w-3 shrink-0" />
@@ -601,14 +601,14 @@ export function Settings() {
                   <>
                     <button
                       onClick={openUpdateDialog}
-                      className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
                       <Sparkles className="h-3 w-3" />
                       What's new
                     </button>
                     <button
                       onClick={installUpdate}
-                      className="flex items-center gap-1 rounded-lg bg-primary text-primary-foreground px-2 py-1 text-[10px] font-medium hover:bg-primary/90 transition-colors"
+                      className="flex items-center gap-1 rounded-lg bg-primary text-primary-foreground px-2 py-1 text-[11px] font-medium hover:bg-primary/90 transition-colors"
                     >
                       <Download className="h-3 w-3" />
                       Install
@@ -617,7 +617,7 @@ export function Settings() {
                 ) : (
                   <button
                     onClick={checkForUpdates}
-                    className="flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    className="flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   >
                     <RefreshCw className="h-3 w-3" />
                     Check

@@ -27,7 +27,7 @@ const STATUS_CONFIG: Record<Status, { icon: React.ComponentType<any>; className:
   },
   info: {
     icon: Info,
-    className: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300',
+    className: 'bg-info-tint border-info-edge text-info',
   },
 };
 
