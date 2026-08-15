@@ -9,21 +9,23 @@ import { cn } from '@/lib/utils';
 export type StatusDotTone = 'live' | 'starting' | 'paused' | 'idle' | 'error' | 'recording';
 
 const TONE_CLASS: Record<StatusDotTone, string> = {
-  live: 'bg-emerald-500',
-  starting: 'bg-amber-500',
-  paused: 'bg-amber-500',
+  live: 'bg-ok',
+  starting: 'bg-warn',
+  paused: 'bg-warn',
   idle: 'bg-muted-foreground/40',
-  error: 'bg-destructive',
-  recording: 'bg-red-500',
+  error: 'bg-bad',
+  recording: 'bg-bad',
 };
 
 // Soft ring shadow for the `glow` prop, one per tone that actually gets glowed
 // in practice (idle/error dots don't need the emphasis).
+// Quầng sáng lấy màu từ chính token của tông, thay cho rgba() viết cứng — nên
+// nó theo được theme thay vì giữ nguyên một màu cho cả sáng lẫn tối.
 const TONE_GLOW: Partial<Record<StatusDotTone, string>> = {
-  live: 'shadow-[0_0_0_3px_rgba(16,185,129,0.2)]',
-  recording: 'shadow-[0_0_0_3px_rgba(239,68,68,0.2)]',
-  starting: 'shadow-[0_0_0_3px_rgba(245,158,11,0.2)]',
-  paused: 'shadow-[0_0_0_3px_rgba(245,158,11,0.2)]',
+  live: 'shadow-[0_0_0_3px_hsl(var(--ok-c)/0.22)]',
+  recording: 'shadow-[0_0_0_3px_hsl(var(--bad-c)/0.22)]',
+  starting: 'shadow-[0_0_0_3px_hsl(var(--warn-c)/0.22)]',
+  paused: 'shadow-[0_0_0_3px_hsl(var(--warn-c)/0.22)]',
 };
 
 export interface StatusDotProps {

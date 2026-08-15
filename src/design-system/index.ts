@@ -51,6 +51,28 @@ export { SectionLabel, type SectionLabelProps } from '@/components/ui/section-la
 export { CollapsibleSection, type CollapsibleSectionProps } from '@/components/ui/collapsible-section';
 export { Stat, StatGrid, type StatProps, type StatGridProps, type StatTone, type StatVariant } from '@/components/ui/stat';
 
+// Hệ trạng thái ba bậc — chọn bậc theo mức độ cần nói, xem design/COMPONENTS.md:
+//   StatusChip     liếc là thấy, không giải thích        (thanh tiêu đề panel)
+//   OutlineNotice  việc đang chờ, kèm một hành động      (chỉ viền, không nền)
+//   ExplainBand    cần giải thích + ví dụ sửa được       (trong thân panel)
+// Cả ba nằm TRONG panel, nên chuyển hợp lệ ↔ lỗi không làm layout nhảy — đó là
+// lý do chúng tồn tại thay vì một thẻ cảnh báo rời.
+export { StatusChip, type StatusChipProps, type StatusChipTone } from '@/components/ui/status-chip';
+export { OutlineNotice, type OutlineNoticeProps, type OutlineNoticeTone } from '@/components/ui/outline-notice';
+export { ExplainBand, type ExplainBandProps, type ExplainBandTone, type ExplainBandExample } from '@/components/ui/explain-band';
+
+// Dòng — hai công thức, hai mục đích khác nhau:
+//   ParamRow    hiển thị tham số (nhãn · giá trị · tag · giải thích)
+//   SettingRow  cấu hình sửa được (icon · tiêu đề · mô tả · điều khiển)
+export { ParamRow, type ParamRowProps } from '@/components/ui/param-row';
+export { SettingRow, SettingGroup, type SettingRowProps } from '@/components/ui/setting-row';
+
+// Khung ô nhập — ép quy tắc tối đa hai phụ kiện trong ô.
+export { FieldShell, type FieldShellProps } from '@/components/ui/field-shell';
+
+// Phím tắt. <Button sc="⏎"> dùng bản nội tuyến của chính component này.
+export { Keycap, MOD_KEY, IS_MAC, type KeycapProps } from '@/components/ui/keycap';
+
 // Data display
 export {
   DataTable, Thead, Tbody, Tr, Th, Td,
