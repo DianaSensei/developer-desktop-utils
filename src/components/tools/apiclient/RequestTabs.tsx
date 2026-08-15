@@ -110,7 +110,10 @@ export function RequestTabs({
           value={store.activeEnvId ?? 'none'}
           onValueChange={(v) => store.setActiveEnvId(v === 'none' ? null : v)}
         >
-          <SelectTrigger className="h-8 w-40 text-xs rounded-sm"><SelectValue placeholder="No Environment" /></SelectTrigger>
+          {/* h-ctl khớp chiều cao IconButton bên cạnh — bản trước dùng h-8 (32px)
+              cạnh IconButton mặc định h-ctl (34px), lệch 2px khiến cả cụm nhìn
+              không thẳng hàng. */}
+          <SelectTrigger className="h-ctl w-40 text-xs rounded-sm"><SelectValue placeholder="No Environment" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No Environment</SelectItem>
             {collectionEnvs.length > 0 && (

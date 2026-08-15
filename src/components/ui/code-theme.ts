@@ -34,9 +34,13 @@ import { tags } from '@lezer/highlight';
 import { useEffect, useRef } from 'react';
 import { useIsDark } from '@/hooks/useIsDark';
 
-/** One mono stack for every code surface, webview-safe on all three platforms. */
-export const CODE_FONT =
-  'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
+/** Every code surface uses the kit's `--mono` token (IBM Plex Mono, then the
+ *  system stack) — same font `font-mono` resolves to everywhere else in the
+ *  app. This used to hardcode its own system-only stack that never picked up
+ *  IBM Plex Mono, so CodeMirror surfaces (Script editor, JSON viewer, address
+ *  bar…) silently rendered a different monospace than the rest of the app —
+ *  visible wherever the two sit side by side. */
+export const CODE_FONT = 'var(--mono)';
 
 /**
  * Syntax colors, all from the `--sql-*` / `--js-*` tokens so light/dark swap
