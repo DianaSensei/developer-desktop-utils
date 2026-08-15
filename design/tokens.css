@@ -90,6 +90,29 @@
   --bad:  hsl(var(--bad-c));   --bad-tint:  hsl(var(--bad-tint-c));   --bad-edge:  hsl(var(--bad-edge-c));
   --info: hsl(var(--info-c));  --info-tint: hsl(var(--info-tint-c));  --info-edge: hsl(var(--info-edge-c));
 
+  /* ── Bảng màu PHÂN LOẠI ───────────────────────────────────────────────
+     Dùng khi cần phân biệt các mục CÙNG LOẠI cạnh nhau mà thứ tự/danh tính
+     không mang nghĩa tốt-xấu: các match liền nhau trong Regex Tester, các
+     series trong biểu đồ. Đây là lần duy nhất màu xoay vòng được phép —
+     nếu hai match liền kề cùng màu thì không nhìn ra ranh giới.
+
+     Cố ý KHÔNG có đỏ và KHÔNG có xanh lá đúng hue của --ok/--bad: một dải
+     highlight xanh lá cạnh một chip "lỗi" đỏ sẽ đọc như trạng thái, không
+     phải như phân loại. Năm hue này cách xa cả hai. */
+  --cat-1-c:  45 92% 52%;   /* amber   */
+  --cat-2-c: 210 88% 56%;   /* azure   */
+  --cat-3-c: 275 70% 62%;   /* violet  */
+  --cat-4-c: 178 65% 42%;   /* teal    */
+  --cat-5-c: 320 68% 58%;   /* magenta */
+
+  /* Bản bọc sẵn cho khi KHÔNG cần alpha — `text-[var(--cat-3)]` đọc dễ hơn
+     `text-[hsl(var(--cat-3-c))]`. Dạng kênh ở trên dành cho nền có alpha. */
+  --cat-1: hsl(var(--cat-1-c));
+  --cat-2: hsl(var(--cat-2-c));
+  --cat-3: hsl(var(--cat-3-c));
+  --cat-4: hsl(var(--cat-4-c));
+  --cat-5: hsl(var(--cat-5-c));
+
   /* ── Bóng: ngả sắc accent, không phải đen thuần ───────────────────────
      Chỉ ba bậc. Một tầng nổi dùng --sh; lồng sâu hơn dùng viền, không bóng. */
   --sh-sm: 0 1px 2px hsl(var(--a-h) 30% 20% / .06);
@@ -170,6 +193,14 @@
   --warn-c: 36.3 60.4% 61.4%;       --warn-tint-c: 37.5 38.7% 12.2%;  --warn-edge-c: 38.9 44.9% 24.9%;
   --bad-c: 4.0 59.5% 70.0%;         --bad-tint-c: 5.5 32.4% 13.3%;    --bad-edge-c: 4.7 37.2% 26.9%;
   --info-c: 212.1 73.1% 69.4%;      --info-tint-c: 214.6 39.4% 12.9%;  --info-edge-c: 211.2 37.7% 27.1%;
+
+  /* Phân loại ở nền tối: sáng hơn và bớt bão hoà, để dải highlight vẫn tách
+     khỏi nền mà không chói. */
+  --cat-1-c:  45 80% 62%;
+  --cat-2-c: 210 78% 66%;
+  --cat-3-c: 275 62% 70%;
+  --cat-4-c: 178 55% 55%;
+  --cat-5-c: 320 60% 68%;
 
   --sh-sm: 0 1px 2px rgb(0 0 0 / .45);
   --sh:    0 1px 2px rgb(0 0 0 / .45), 0 10px 24px -14px rgb(0 0 0 / .8);

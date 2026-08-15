@@ -136,7 +136,7 @@ export function RandomGenerator() {
             <span className="text-xs text-muted-foreground">Count</span>
             <Input type="number" min={1} max={100} value={count}
               onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 100))}
-              className="h-8 text-xs w-20 rounded-lg" />
+              className="h-8 text-xs w-20 rounded-sm" />
           </div>
         )}
 
@@ -144,19 +144,19 @@ export function RandomGenerator() {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Min</span>
-              <Input type="number" value={numMin} onChange={(e) => setNumMin(parseFloat(e.target.value) || 0)} className="h-8 text-xs w-20 rounded-lg" />
+              <Input type="number" value={numMin} onChange={(e) => setNumMin(parseFloat(e.target.value) || 0)} className="h-8 text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Max</span>
-              <Input type="number" value={numMax} onChange={(e) => setNumMax(parseFloat(e.target.value) || 0)} className="h-8 text-xs w-20 rounded-lg" />
+              <Input type="number" value={numMax} onChange={(e) => setNumMax(parseFloat(e.target.value) || 0)} className="h-8 text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Decimals</span>
-              <Input type="number" min={0} max={10} value={decimals} onChange={(e) => setDecimals(clamp(parseInt(e.target.value) || 0, 0, 10))} className="h-8 text-xs w-16 rounded-lg" />
+              <Input type="number" min={0} max={10} value={decimals} onChange={(e) => setDecimals(clamp(parseInt(e.target.value) || 0, 0, 10))} className="h-8 text-xs w-16 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Count</span>
-              <Input type="number" min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxNumberCount))} className="h-8 text-xs w-20 rounded-lg" />
+              <Input type="number" min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxNumberCount))} className="h-8 text-xs w-20 rounded-sm" />
             </div>
           </div>
         )}
@@ -165,11 +165,11 @@ export function RandomGenerator() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Length</span>
-              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, maxTextLength))} className="h-8 text-xs w-20 rounded-lg" />
+              <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, maxTextLength))} className="h-8 text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-xs text-muted-foreground">Count</span>
-              <Input type="number" min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxTextCount))} className="h-8 text-xs w-20 rounded-lg" />
+              <Input type="number" min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxTextCount))} className="h-8 text-xs w-20 rounded-sm" />
             </div>
             <div className="flex gap-1.5">
               {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
@@ -180,7 +180,7 @@ export function RandomGenerator() {
                 </button>
               ))}
             </div>
-            <Input value={customChars} onChange={(e) => setCustomChars(e.target.value)} placeholder="Custom chars" className="h-8 text-xs w-28 font-mono rounded-lg" />
+            <Input value={customChars} onChange={(e) => setCustomChars(e.target.value)} placeholder="Custom chars" className="h-8 text-xs w-28 font-mono rounded-sm" />
           </div>
         )}
 

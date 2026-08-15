@@ -10,6 +10,7 @@ import { ImageBase64Tool } from './ImageBase64Tool';
 import { PasswordHash } from './PasswordHash';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import { Segmented } from '@/components/ui/segmented';
+import { Callout } from '@/components/ui/callout';
 import { ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import CryptoJS from 'crypto-js';
 import { cn } from '@/lib/utils';
@@ -632,7 +633,7 @@ export function EncodeHashEncrypt() {
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="shrink-0 px-4 py-2 border-b border-border bg-muted/5 flex flex-wrap items-center gap-3">
             <Select value={algorithm} onValueChange={setAlgorithm}>
-              <SelectTrigger className="h-8 w-44 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {CODECS.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
               </SelectContent>
@@ -680,12 +681,9 @@ export function EncodeHashEncrypt() {
       {tab === 'hash' && (
         <div className="tool-scrollable tool-padding tool-spacer">
 
-          <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30">
-            <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              One-way · The same input always produces the same digest, but the original text cannot be recovered.
-            </p>
-          </div>
+          <Callout tone="info" size="sm" icon={Lock} title="One-way">
+            The same input always produces the same digest, but the original text cannot be recovered.
+          </Callout>
 
           <ToolSection>
             <ToolLabel>Input Text</ToolLabel>
@@ -725,7 +723,7 @@ export function EncodeHashEncrypt() {
                   <div className="flex items-center gap-3 px-3 pt-2.5 pb-1 group">
                     <div className="shrink-0 w-24">
                       <p className="text-xs font-semibold text-foreground leading-none mb-0.5">{label}</p>
-                      <p className="text-[10px] text-muted-foreground">{bits}-bit</p>
+                      <p className="text-[11px] text-muted-foreground">{bits}-bit</p>
                     </div>
                     <Input
                       value={value}
@@ -743,7 +741,7 @@ export function EncodeHashEncrypt() {
                       </Button>
                     </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground/60 px-3 pb-2">{desc}</p>
+                  <p className="text-[11px] text-muted-foreground/60 px-3 pb-2">{desc}</p>
                   {isVerifying && (
                     <div className="px-3 pb-3 border-t border-border/50 pt-2.5 space-y-2">
                       <p className="text-[11px] text-muted-foreground font-medium">Verify {label} hash</p>
@@ -758,7 +756,7 @@ export function EncodeHashEncrypt() {
                         {verifyValue.trim() && verifyMatch !== null && (
                           <div className={cn(
                             'flex items-center gap-1 text-xs font-medium shrink-0',
-                            verifyMatch ? 'text-green-600 dark:text-green-400' : 'text-destructive'
+                            verifyMatch ? 'text-ok' : 'text-bad'
                           )}>
                             {verifyMatch
                               ? <><Check className="h-3.5 w-3.5" /> Match</>
@@ -805,7 +803,7 @@ export function EncodeHashEncrypt() {
                     <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-muted/20 group">
                       <div className="shrink-0 w-28">
                         <p className="text-xs font-semibold text-foreground leading-none mb-0.5">HMAC-{label}</p>
-                        <p className="text-[10px] text-muted-foreground">{bits}-bit</p>
+                        <p className="text-[11px] text-muted-foreground">{bits}-bit</p>
                       </div>
                       <Input
                         value={value}
@@ -858,12 +856,12 @@ export function EncodeHashEncrypt() {
           {/* Algorithm + mode row */}
           <div className="flex items-center gap-3 flex-wrap">
             <Select value={encryptAlgo} onValueChange={(v) => setEncryptAlgo(v as EncryptAlgo)}>
-              <SelectTrigger className="h-8 w-44 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ENCRYPT_ALGOS.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
                     <span className="flex items-center gap-2">
-                      {!a.safe && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                      {!a.safe && <AlertTriangle className="h-3 w-3 shrink-0 text-warn" />}
                       {a.label}
                     </span>
                   </SelectItem>
@@ -885,19 +883,14 @@ export function EncodeHashEncrypt() {
 
           {/* Algorithm description banner */}
           {selectedEncryptAlgo.safe ? (
-            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30">
-              <ArrowLeftRight className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
-              <p className="text-xs text-blue-700 dark:text-blue-400">
-                Reversible · {selectedEncryptAlgo.desc}
-              </p>
-            </div>
+            <Callout tone="info" size="sm" icon={ArrowLeftRight} title="Reversible">
+              {selectedEncryptAlgo.desc}
+            </Callout>
           ) : (
-            <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                Insecure · ECB mode encrypts identical 16-byte blocks to the same ciphertext, leaking data patterns. Use AES-256 CBC or CTR instead.
-              </p>
-            </div>
+            <Callout tone="warning" size="sm" title="Insecure">
+              ECB mode encrypts identical 16-byte blocks to the same ciphertext, leaking data
+              patterns. Use AES-256 CBC or CTR instead.
+            </Callout>
           )}
 
           <ToolSection>
