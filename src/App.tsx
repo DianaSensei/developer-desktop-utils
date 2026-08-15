@@ -596,6 +596,7 @@ function Sidebar({
 function AppContent() {
   const location = useLocation();
   const { isFeatureEnabled } = useFeatures();
+  const liveIds = useLiveConnections();
   useDesktopChrome();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -703,9 +704,21 @@ function AppContent() {
               </Button>
               <div
                 key={activeTool.path}
-                className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
               >
                 <ActiveIcon className="h-4 w-4 text-primary" />
+                {/* Mock Server / Kafka / RabbitMQ… đang chạy nền — cùng chấm
+                    xanh sidebar đã dùng cho "đang kết nối" (bg-ok cố định,
+                    không theo accent, xem RULES.md). Header trước đây không
+                    có chỗ nào nói điều này: mở tool khác rồi quay lại Mock
+                    Server không có cách nào biết nó vẫn đang chạy nếu không
+                    bấm vào hẳn. */}
+                {liveIds.includes(activeTool.featureId) && (
+                  <span
+                    className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-background"
+                    title="Running"
+                  />
+                )}
               </div>
               {/* Tên NHÓM ("Generate") không nói cái gì đang mở — tab con đã liệt
                   kê đúng thứ đó rồi ("Generator" đang bật). Giữ cả hai là lặp:
