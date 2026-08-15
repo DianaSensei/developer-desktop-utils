@@ -188,3 +188,27 @@ export function buildNavEntries({
 export function countFavoriteEntries(entries: NavEntry[], favorites: string[]): number {
   return entries.filter((e) => e.tools.some((t) => favorites.includes(t.id))).length;
 }
+
+/**
+ * Sắp lại một danh sách id tool PHẲNG sao cho các tool cùng nhóm luôn đứng
+ * liền nhau, tại vị trí của thành viên đứng sớm nhất — cùng quy tắc 1 của
+ * `buildNavEntries`, tách riêng vì Settings cần áp nó lên danh sách Bật/Tắt
+ * (có cả tool đang tắt, không có khái niệm "yêu thích nổi lên đầu" như
+ * sidebar) chứ không dựng ra `NavEntry`.
+ */
+export function clusterToolOrder(ids: string[]): string[] {
+  const present = new Set(ids);
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    const group = GROUP_OF_TOOL.get(id);
+    const members = group ? group.toolIds.filter((mid) => present.has(mid)) : [id];
+    for (const mid of members) {
+      if (seen.has(mid)) continue;
+      seen.add(mid);
+      result.push(mid);
+    }
+  }
+  return result;
+}

@@ -20,7 +20,8 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from '@/components/ui/select';
-import { TOOL_DEFS } from '@/lib/toolDefs';
+import { TOOL_DEFS, type ToolDef } from '@/lib/toolDefs';
+import { GROUP_OF_TOOL, clusterToolOrder } from '@/lib/toolGroups';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { CONFIG_FIELDS, SECTION_LABELS, type ConfigSection } from '@/config/appConfig';
 import { useUpdate } from '@/contexts/UpdateContext';
@@ -46,6 +47,17 @@ function applySavedOrder<T extends { id: string }>(tools: T[], savedOrder: strin
     if (!savedOrder.includes(t.id)) ordered.push(t);
   }
   return ordered;
+}
+
+/** Kéo các tool cùng nhóm (Generate = Generator + QR Code + Lucky Wheel…) đứng
+ *  liền nhau trong danh sách Bật/Tắt, để render được dưới một mục cha chung —
+ *  xem `clusterToolOrder`. Áp lại sau MỌI thay đổi thứ tự (kéo-thả, đổi
+ *  toolOrder từ nơi khác, reset) nên `displayTools` luôn ở trạng thái đã gom
+ *  nhóm; nhờ vậy chỉ số kéo-thả (tính từ `displayTools`) và thứ tự render
+ *  (cũng từ `displayTools`) không bao giờ lệch nhau. */
+function withGroupClustering(tools: ToolDef[]): ToolDef[] {
+  const map = new Map(tools.map((t) => [t.id, t]));
+  return clusterToolOrder(tools.map((t) => t.id)).map((id) => map.get(id)!);
 }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
@@ -167,14 +179,14 @@ export function Settings() {
     await revealItemInDir(dataDir);
   }, [dataDir]);
 
-  const [displayTools, setDisplayTools] = useState(() => applySavedOrder(TOOL_DEFS, toolOrder));
+  const [displayTools, setDisplayTools] = useState(() => withGroupClustering(applySavedOrder(TOOL_DEFS, toolOrder)));
 
   // keep in sync when toolOrder changes externally (e.g. reset)
   const prevOrderKey = useRef(toolOrder.join());
   const nextKey = toolOrder.join();
   if (prevOrderKey.current !== nextKey) {
     prevOrderKey.current = nextKey;
-    setDisplayTools(applySavedOrder(TOOL_DEFS, toolOrder));
+    setDisplayTools(withGroupClustering(applySavedOrder(TOOL_DEFS, toolOrder)));
   }
 
   const [toolQuery, setToolQuery] = useState('');
@@ -247,8 +259,11 @@ export function Settings() {
               const [moved] = next.splice(from, 1);
               next.splice(d.dropIndex, 0, moved);
             }
-            reorderTools(next.map((t) => t.id));
-            return next;
+            // Kéo một tool trong nhóm rời khỏi cụm của nó sẽ bị kéo lại ngay
+            // sau đây — nhóm luôn hiển thị liền nhau, xem withGroupClustering.
+            const clustered = withGroupClustering(next);
+            reorderTools(clustered.map((t) => t.id));
+            return clustered;
           });
         }
         return null;
@@ -357,10 +372,35 @@ export function Settings() {
             const line = (key: string) => (
               <div key={key} className="pointer-events-none mx-3 h-0.5 rounded-full bg-primary" />
             );
+            // Một nhóm chỉ hiện tiêu đề cha khi ≥2 thành viên còn nằm trong
+            // visibleTools — tìm kiếm lọc còn đúng 1 thành viên thì nó đọc như
+            // tool đứng riêng, cùng quy tắc "thoái thành mục đơn" của sidebar
+            // (buildNavEntries). displayTools đã được withGroupClustering gom
+            // liền nhau nên duyệt phẳng vẫn phát hiện đúng ranh giới nhóm.
+            const groupVisibleCount = new Map<string, number>();
+            visibleTools.forEach((t) => {
+              const g = GROUP_OF_TOOL.get(t.id);
+              if (g) groupVisibleCount.set(g.id, (groupVisibleCount.get(g.id) ?? 0) + 1);
+            });
+            const renderedGroups = new Set<string>();
             visibleTools.forEach((tool) => {
               const Icon = tool.icon;
               const enabled = features[tool.id] !== false;
               const isDragging = drag?.id === tool.id;
+              const group = GROUP_OF_TOOL.get(tool.id);
+              const isGrouped = !!group && (groupVisibleCount.get(group.id) ?? 0) > 1;
+
+              if (isGrouped && !renderedGroups.has(group!.id)) {
+                renderedGroups.add(group!.id);
+                const GroupIcon = group!.icon;
+                nodes.push(
+                  <div key={`grp-${group!.id}`} className="flex items-center gap-2 bg-muted/30 px-3 py-1.5">
+                    <GroupIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <p className="text-xs font-semibold">{group!.label}</p>
+                    <p className="text-[11px] text-muted-foreground">{groupVisibleCount.get(group!.id)} tools</p>
+                  </div>
+                );
+              }
 
               if (!isDragging) {
                 if (drag && drag.dropIndex === slot) nodes.push(line(`line-${slot}`));
@@ -377,6 +417,7 @@ export function Settings() {
                   style={isDragging ? { transform: `translateY(${drag!.dy}px)` } : undefined}
                   className={cn(
                     'flex items-center gap-3 px-3 py-3 cursor-default bg-background',
+                    isGrouped && 'pl-8',
                     !enabled && 'opacity-50',
                     isDragging && 'relative z-20 rounded-lg bg-muted opacity-100 shadow-lg ring-1 ring-primary/50'
                   )}
