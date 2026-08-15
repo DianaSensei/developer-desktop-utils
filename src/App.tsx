@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef, useCallback, useLayoutEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, Suspense } from 'react';
 import { cn } from '@/lib/utils';
 import { storageGet, storageSet, getThemePreference, setThemePreference, type ThemePreference } from '@/lib/persistentStore';
 import {
@@ -21,12 +21,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 import { useThemeSync, triggerThemeTransition } from '@/hooks/useThemeSync';
-import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
+import { TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
+import { allTools, toolPath } from '@/lib/toolRegistry';
 import { buildNavEntries, countFavoriteEntries, GROUP_OF_TOOL, type NavEntry } from '@/lib/toolGroups';
+import { toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
+import { CommandPalette } from '@/components/CommandPalette';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
+import { LocaleProvider, useLocale } from '@/contexts/LocaleContext';
 import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { MeetingsProvider } from '@/lib/meetings';
@@ -37,92 +41,6 @@ import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { useToolGuideTracking } from '@/hooks/useToolGuideTracking';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppLogo } from '@/components/AppLogo';
-
-// Tools are code-split: each loads its own chunk on first navigation instead of
-// being bundled into the initial payload. This keeps app startup fast and avoids
-// parsing heavy libs (CodeMirror, jsQR, qrcode, react-markdown) until needed.
-const named = <T,>(p: Promise<Record<string, T>>, key: string) =>
-  p.then((m) => ({ default: (m as Record<string, React.ComponentType>)[key] }));
-
-const CronGenerator = lazy(() => named(import('@/components/tools/CronGenerator'), 'CronGenerator'));
-const TextTransformer = lazy(() => named(import('@/components/tools/TextTransformer'), 'TextTransformer'));
-const EncodeHashEncrypt = lazy(() => named(import('@/components/tools/EncodeHashEncrypt'), 'EncodeHashEncrypt'));
-const DateTimeTool = lazy(() => named(import('@/components/tools/DateTimeTool'), 'DateTimeTool'));
-const JsonFormatter = lazy(() => named(import('@/components/tools/JsonFormatter'), 'JsonFormatter'));
-const DataConverter = lazy(() => named(import('@/components/tools/DataConverter'), 'DataConverter'));
-const JwtDebugger = lazy(() => named(import('@/components/tools/JwtDebugger'), 'JwtDebugger'));
-const RegexTester = lazy(() => named(import('@/components/tools/RegexTester'), 'RegexTester'));
-const Generator = lazy(() => named(import('@/components/tools/Generator'), 'Generator'));
-const TextDiff = lazy(() => named(import('@/components/tools/diff/TextDiff'), 'TextDiff'));
-const QRCodeTool = lazy(() => named(import('@/components/tools/QRCodeTool'), 'QRCodeTool'));
-const MarkdownPreview = lazy(() => named(import('@/components/tools/MarkdownPreview'), 'MarkdownPreview'));
-const ArrayDeduplicator = lazy(() => named(import('@/components/tools/ArrayDeduplicator'), 'ArrayDeduplicator'));
-const TextCounter = lazy(() => named(import('@/components/tools/TextCounter'), 'TextCounter'));
-const ColorPicker = lazy(() => named(import('@/components/tools/ColorPicker'), 'ColorPicker'));
-const Settings = lazy(() => named(import('@/components/Settings'), 'Settings'));
-const KafkaExplorer = lazy(() => named(import('@/components/tools/kafka/KafkaExplorer'), 'KafkaExplorer'));
-const RabbitClient = lazy(() => named(import('@/components/tools/rabbit/RabbitClient'), 'RabbitClient'));
-const SqlFormatter = lazy(() => named(import('@/components/tools/SqlFormatter'), 'SqlFormatter'));
-const TimeTracker = lazy(() => named(import('@/components/tools/clockify/Suite'), 'ClockifySuite'));
-const NetworkTools = lazy(() => named(import('@/components/tools/NetworkTools'), 'NetworkTools'));
-const LuckyWheel = lazy(() => named(import('@/components/tools/LuckyWheel'), 'LuckyWheel'));
-const ApiClient = lazy(() => named(import('@/components/tools/apiclient/ApiClient'), 'ApiClient'));
-const TwoFactorAuth = lazy(() => named(import('@/components/tools/TwoFactorAuth'), 'TwoFactorAuth'));
-const MockServer = lazy(() => named(import('@/components/tools/mockserver/MockServer'), 'MockServer'));
-
-const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
-  'cron-generator': { path: '/',              component: CronGenerator,      fullHeight: true },
-  'text-transform': { path: '/text-transform', component: TextTransformer,   fullHeight: true },
-  'text-counter':   { path: '/text-counter',   component: TextCounter,       fullHeight: true },
-  'color-picker':   { path: '/color-picker',   component: ColorPicker,       fullHeight: true },
-  'base64':         { path: '/base64',         component: EncodeHashEncrypt, fullHeight: true },
-  'unix-time':      { path: '/unix-time',      component: DateTimeTool,      fullHeight: true },
-  'json':           { path: '/json',           component: JsonFormatter,     fullHeight: true },
-  'data-converter': { path: '/data-converter', component: DataConverter,     fullHeight: true },
-  'jwt':            { path: '/jwt',            component: JwtDebugger,       fullHeight: true },
-  'regex':          { path: '/regex',          component: RegexTester,       fullHeight: true },
-  'diff':           { path: '/diff',           component: TextDiff,          fullHeight: true },
-  'qrcode':         { path: '/qrcode',         component: QRCodeTool,        fullHeight: true },
-  'markdown':       { path: '/markdown',       component: MarkdownPreview,   fullHeight: true },
-  'deduplicate':    { path: '/deduplicate',    component: ArrayDeduplicator, fullHeight: true },
-  'generator':      { path: '/generator',      component: Generator,         fullHeight: true },
-  'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer,     fullHeight: true },
-  'rabbit-client':  { path: '/rabbit-client',  component: RabbitClient,      fullHeight: true },
-  'sql-formatter':  { path: '/sql-formatter',  component: SqlFormatter,      fullHeight: true },
-  'task-tracker':   { path: '/task-tracker',   component: TimeTracker,       fullHeight: true },
-  'network':        { path: '/network',        component: NetworkTools,      fullHeight: true },
-  'lucky-wheel':    { path: '/lucky-wheel',    component: LuckyWheel,        fullHeight: true },
-  'api-client':     { path: '/api-client',     component: ApiClient,         fullHeight: true },
-  'mock-server':    { path: '/mock-server',    component: MockServer,        fullHeight: true },
-  '2fa':            { path: '/2fa',            component: TwoFactorAuth,     fullHeight: true },
-};
-
-const allTools = [
-  ...TOOL_DEFS.map((def) => ({
-    featureId: def.id,
-    label: def.label,
-    icon: def.icon,
-    description: def.description,
-    keywords: def.keywords ?? [],
-    ...TOOL_ROUTES[def.id],
-  })),
-  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', keywords: ['preferences', 'options', 'config'], path: '/settings', component: Settings },
-];
-
-// Match a tool against the sidebar search box. Searches the label, description,
-// and keyword synonyms so e.g. "epoch", "guid", or "postman" find the right
-// tool. Multi-word queries match when every term appears somewhere (AND).
-function toolMatchesQuery(
-  tool: { label: string; description: string; keywords?: string[] },
-  query: string,
-): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const haystack = [tool.label, tool.description, ...(tool.keywords ?? [])]
-    .join(' ')
-    .toLowerCase();
-  return q.split(/\s+/).every((term) => haystack.includes(term));
-}
 
 function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder: string[]): T[] {
   const order = savedOrder.length ? savedOrder : DEFAULT_TOOL_ORDER;
@@ -155,15 +73,10 @@ function ToolLoading() {
 // calling hooks inside an IIFE inside another component's render is invalid.
 type SidebarTool = (typeof allTools)[0];
 
-// id tool → đường dẫn route. Một mục sidebar có thể bọc nhiều tool, nên nơi
-// render cần tra ngược từ id ra path.
-const TOOL_PATHS = new Map(allTools.map((t) => [t.featureId, t.path]));
-const toolPath = (id: string) => TOOL_PATHS.get(id) ?? '/';
-
 // Small uppercase group header used to separate Favorites from the rest.
 function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className={cn('px-2.5 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60', className)}>
+    <p className={cn('px-2.5 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60', className)}>
       {children}
     </p>
   );
@@ -202,6 +115,7 @@ function NavScrollArea({
   // Section labels ("Favorites" / "All tools") only make sense when favourites
   // are pinned to the top of the full, unfiltered, expanded list.
   const showSections = !query && !isCollapsed && favoriteCount > 0 && favoriteCount < navEntries.length;
+  const { t } = useLocale();
 
   const checkScroll = useCallback(() => {
     const el = navRef.current;
@@ -223,7 +137,7 @@ function NavScrollArea({
     <div className="relative flex-1 min-h-0">
       <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
         {navEntries.length === 0 && disabledMatches.length === 0 && query && (
-          <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
+          <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">{t('shell.search.noMatch', { query })}</p>
         )}
         <div className="space-y-0.5">
           {navEntries.map((entry, i) => {
@@ -244,8 +158,8 @@ function NavScrollArea({
             return (
               <div key={entry.key}>
                 {/* Group headers — only when favourites are pinned at the top */}
-                {showSections && i === 0 && <SectionLabel>Favorites</SectionLabel>}
-                {showSections && i === favoriteCount && <SectionLabel className="mt-2">All tools</SectionLabel>}
+                {showSections && i === 0 && <SectionLabel>{t('shell.section.favorites')}</SectionLabel>}
+                {showSections && i === favoriteCount && <SectionLabel className="mt-2">{t('shell.section.allTools')}</SectionLabel>}
                 <Tooltip side="right" triggerClassName="block" label={isLive ? `${entry.label} — connected` : entry.label} description={desc}>
                   <Link
                     to={path}
@@ -332,8 +246,8 @@ function NavScrollArea({
             on, then navigates) rather than a plain link. */}
         {query && !isCollapsed && disabledMatches.length > 0 && (
           <div className="mt-3 space-y-0.5">
-            <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
-              Disabled
+            <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              {t('shell.section.disabled')}
             </p>
             {disabledMatches.map((tool) => {
               const Icon = tool.icon;
@@ -347,7 +261,7 @@ function NavScrollArea({
                   >
                     <Icon className="h-4 w-4 flex-shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
                     <span className="flex-1 truncate text-sm">{tool.label}</span>
-                    <span className="flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                    <span className="flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
                       <Plus className="h-3 w-3" /> Enable
                     </span>
                   </button>
@@ -372,7 +286,7 @@ function NavScrollArea({
               onClick={onClose}
               className={cn(
                 'mt-1.5 flex w-full items-center justify-center gap-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors',
-                isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[10px]'
+                isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[11px]'
               )}
             >
               <Plus className={isCollapsed ? 'h-3 w-3' : 'h-2.5 w-2.5 flex-shrink-0'} />
@@ -431,6 +345,7 @@ function Sidebar({
   const location = useLocation();
   const { isFeatureEnabled, toggleFeature, toolOrder, favorites, toggleFavorite, isFavorite } = useFeatures();
   const { updateAvailable } = useUpdate();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
 
@@ -547,7 +462,7 @@ function Sidebar({
                 ref={searchRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search tools…"
+                placeholder={t('shell.search.placeholder')}
                 className="h-7 pl-7 pr-7 text-xs rounded-md bg-muted/40 border-muted focus-visible:ring-1"
               />
               {query && (
@@ -704,6 +619,7 @@ function AppContent() {
   };
 
   const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
+  const SettingsComponent = allTools.find((t) => t.featureId === 'settings')!.component;
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
   const ActiveIcon = activeTool.icon;
   // Tool đang mở có nằm trong nhóm nhiều tool không? Nếu có, header hiện tên
@@ -749,7 +665,7 @@ function AppContent() {
           {enabledTools.map((tool) => (
             <Route key={tool.path} path={tool.path} element={<tool.component />} />
           ))}
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings" element={<SettingsComponent />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>
@@ -881,19 +797,22 @@ function AppContent() {
 function App() {
   return (
     <AppConfigProvider>
-      <FeatureProvider>
-        <OnboardingProvider>
-          <UpdateProvider>
-            <MeetingsProvider>
-              <Router>
-                <AppContent />
-                <UpdateDialog />
-                <OnboardingFlow />
-              </Router>
-            </MeetingsProvider>
-          </UpdateProvider>
-        </OnboardingProvider>
-      </FeatureProvider>
+      <LocaleProvider>
+        <FeatureProvider>
+          <OnboardingProvider>
+            <UpdateProvider>
+              <MeetingsProvider>
+                <Router>
+                  <AppContent />
+                  <UpdateDialog />
+                  <OnboardingFlow />
+                  <CommandPalette />
+                </Router>
+              </MeetingsProvider>
+            </UpdateProvider>
+          </OnboardingProvider>
+        </FeatureProvider>
+      </LocaleProvider>
     </AppConfigProvider>
   );
 }

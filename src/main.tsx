@@ -21,6 +21,7 @@ import '@fontsource/ibm-plex-mono/latin-500.css';
 import '@fontsource/ibm-plex-mono/latin-600.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
+import { applyAccentToDocument, getAccentPreference } from './lib/accentPreference';
 
 // The app's module graph (App.tsx and everything it imports, e.g.
 // src/lib/liveConnections.ts) reads persisted state synchronously at
@@ -39,6 +40,13 @@ async function bootstrap() {
   if (import.meta.env.DEV && isTauri) {
     await clearPersistentStore();
   }
+
+  // Áp dụng tone chủ đạo TRƯỚC lần vẽ đầu tiên — nếu không, người dùng đã chọn
+  // petrol sẽ thấy đúng một khung hình azure mặc định trước khi kịp đổi.
+  // Không cần hook: tone không có tín hiệu bên ngoài nào để theo dõi liên tục
+  // như dark-mode hệ thống, chỉ cần áp một lần lúc khởi động; đổi tại chỗ về
+  // sau do Settings tự set thẳng lên <html> khi người dùng bấm chọn.
+  applyAccentToDocument(getAccentPreference());
 
   const { default: App } = await import('./App');
   ReactDOM.createRoot(document.getElementById('root')!).render(

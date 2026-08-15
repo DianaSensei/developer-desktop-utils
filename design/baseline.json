@@ -1,10 +1,10 @@
 {
   "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
   "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
-  "_phase": "Hạ ở G3 (shell + nhóm sidebar).",
+  "_phase": "Hạ ở G3b (⌘K + i18n).",
   "limits": {
     "rawColors": 512,
-    "tinyText": 162,
+    "tinyText": 158,
     "mixedControlHeights": 352,
     "premiumUtilities": 42,
     "hoverLift": 0,

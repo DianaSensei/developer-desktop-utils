@@ -1,12 +1,19 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState, useEffect, type CSSProperties } from 'react';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
 import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
-  RotateCw, HardDrive, LayoutGrid, Cog,
+  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette,
 } from 'lucide-react';
+import { useLocale } from '@/contexts/LocaleContext';
+import { Segmented } from '@/components/ui/segmented';
+import { SettingRow, SettingGroup } from '@/components/ui/setting-row';
+import {
+  ACCENT_TONES, getAccentPreference, setAccentPreference,
+  applyAccentToDocument, type AccentTone,
+} from '@/lib/accentPreference';
 import { getAppPermissionGroups } from '@/lib/appPermissions';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
@@ -60,6 +67,46 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
   );
 }
 
+/**
+ * Sáu swatch tròn cho tone chủ đạo — bản gọn của bộ chọn trong `design/preview/index.html`.
+ * Chỉ đổi `--a-h/--a-s/--a-l`; mọi biến thể accent (nhuộm, viền, mực đậm) tự
+ * tính lại qua CSS. Xem `design/tokens.css`.
+ */
+function AccentSwatches({ value, onChange }: { value: AccentTone; onChange: (tone: AccentTone) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Accent tone" className="flex items-center gap-1.5">
+      {ACCENT_TONES.map((tone) => (
+        <button
+          key={tone}
+          type="button"
+          role="radio"
+          aria-checked={value === tone}
+          title={tone}
+          onClick={() => onChange(tone)}
+          className={cn(
+            'h-5 w-5 shrink-0 rounded-full border-2 transition-transform',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1',
+            value === tone ? 'scale-110 border-foreground' : 'border-transparent hover:scale-105',
+          )}
+          style={ACCENT_PREVIEW[tone]}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Bản xem trước cần MÀU THẬT của từng tone, không phải biến --a-h hiện tại —
+// nếu không cả sáu nút sẽ cùng một màu (màu của tone đang chọn). Giá trị lấy
+// đúng từ các khối [data-accent] trong design/tokens.css.
+const ACCENT_PREVIEW: Record<AccentTone, CSSProperties> = {
+  azure: { background: 'hsl(218 76% 48%)' },
+  petrol: { background: 'hsl(190 68% 36%)' },
+  moss: { background: 'hsl(96 40% 28%)' },
+  iris: { background: 'hsl(258 62% 56%)' },
+  oxblood: { background: 'hsl(355 38% 28%)' },
+  amber: { background: 'hsl(34 78% 44%)' },
+};
+
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function GitHubIcon({ className }: { className?: string }) {
@@ -90,10 +137,19 @@ export function Settings() {
   const { open: openOnboarding } = useOnboarding();
   const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall, openUpdateDialog } = useUpdate();
   const { config, setField, resetConfig } = useAppConfig();
+  const { locale, setLocale, t } = useLocale();
   const [configOpen, setConfigOpen] = useState(false);
   const [permsOpen, setPermsOpen] = useState(true);
   const [currentVersion, setCurrentVersion] = useState('');
   const [dataDir, setDataDir] = useState('');
+  // Khởi tạo từ storage — main.tsx đã áp tone này lên <html> trước khi React
+  // vẽ khung hình đầu tiên, nên state ở đây chỉ cần khớp lại, không cần áp lại.
+  const [accent, setAccent] = useState<AccentTone>(() => getAccentPreference());
+  const changeAccent = (tone: AccentTone) => {
+    setAccent(tone);
+    setAccentPreference(tone);
+    applyAccentToDocument(tone);
+  };
 
   useEffect(() => {
     if (!isTauri) return;
@@ -205,6 +261,34 @@ export function Settings() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 py-2">
+
+      {/* Appearance — đầu tiên vì đây là section duy nhất cho hiệu ứng THẤY
+          NGAY khi bấm chọn, khác với Tools (cần rời trang mới thấy đổi). */}
+      <SettingGroup title="Appearance">
+        <SettingRow
+          icon={Languages}
+          title={t('settings.language.label')}
+          description={t('settings.language.description')}
+          control={
+            <Segmented
+              size="sm"
+              aria-label={t('settings.language.label')}
+              value={locale}
+              onValueChange={setLocale}
+              options={[
+                { value: 'vi', label: 'VI' },
+                { value: 'en', label: 'EN' },
+              ]}
+            />
+          }
+        />
+        <SettingRow
+          icon={Palette}
+          title={t('settings.tone.label')}
+          description={t('settings.tone.description')}
+          control={<AccentSwatches value={accent} onChange={changeAccent} />}
+        />
+      </SettingGroup>
 
       {/* Tools section */}
       <section className="space-y-3">
