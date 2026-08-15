@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 import { useThemeSync, triggerThemeTransition } from '@/hooks/useThemeSync';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
+import { buildNavEntries, countFavoriteEntries, GROUP_OF_TOOL, type NavEntry } from '@/lib/toolGroups';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -154,6 +155,11 @@ function ToolLoading() {
 // calling hooks inside an IIFE inside another component's render is invalid.
 type SidebarTool = (typeof allTools)[0];
 
+// id tool → đường dẫn route. Một mục sidebar có thể bọc nhiều tool, nên nơi
+// render cần tra ngược từ id ra path.
+const TOOL_PATHS = new Map(allTools.map((t) => [t.featureId, t.path]));
+const toolPath = (id: string) => TOOL_PATHS.get(id) ?? '/';
+
 // Small uppercase group header used to separate Favorites from the rest.
 function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
@@ -164,7 +170,7 @@ function SectionLabel({ children, className }: { children: React.ReactNode; clas
 }
 
 function NavScrollArea({
-  navTools,
+  navEntries,
   query,
   disabledMatches,
   settingsTool,
@@ -176,7 +182,7 @@ function NavScrollArea({
   isFavorite,
   onToggleFavorite,
 }: {
-  navTools: SidebarTool[];
+  navEntries: NavEntry[];
   query: string;
   disabledMatches: SidebarTool[];
   settingsTool: SidebarTool;
@@ -195,7 +201,7 @@ function NavScrollArea({
 
   // Section labels ("Favorites" / "All tools") only make sense when favourites
   // are pinned to the top of the full, unfiltered, expanded list.
-  const showSections = !query && !isCollapsed && favoriteCount > 0 && favoriteCount < navTools.length;
+  const showSections = !query && !isCollapsed && favoriteCount > 0 && favoriteCount < navEntries.length;
 
   const checkScroll = useCallback(() => {
     const el = navRef.current;
@@ -211,43 +217,54 @@ function NavScrollArea({
     const ro = new ResizeObserver(checkScroll);
     ro.observe(el);
     return () => { el.removeEventListener('scroll', checkScroll); ro.disconnect(); };
-  }, [checkScroll, navTools.length, disabledMatches.length, query]);
+  }, [checkScroll, navEntries.length, disabledMatches.length, query]);
 
   return (
     <div className="relative flex-1 min-h-0">
       <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
-        {navTools.length === 0 && disabledMatches.length === 0 && query && (
+        {navEntries.length === 0 && disabledMatches.length === 0 && query && (
           <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">No tools match "{query}"</p>
         )}
         <div className="space-y-0.5">
-          {navTools.map((tool, i) => {
-            const Icon = tool.icon;
-            const isActive = location.pathname === tool.path;
-            const isLive = liveIds.includes(tool.featureId);
-            const fav = isFavorite(tool.featureId);
-            const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
+          {navEntries.map((entry, i) => {
+            const Icon = entry.icon;
+            // Bấm vào nhóm là vào tool đầu tiên; nhóm sáng lên khi ĐANG ở bất kỳ
+            // thành viên nào, nếu không mở Deduplicate sẽ thấy sidebar không
+            // sáng chỗ nào.
+            const memberPaths = entry.tools.map((t) => toolPath(t.id));
+            const path = memberPaths[0];
+            const isActive = memberPaths.includes(location.pathname);
+            const isLive = entry.tools.some((t) => liveIds.includes(t.id));
+            const fav = entry.tools.some((t) => isFavorite(t.id));
+            // Nhóm mô tả bằng tên các tool bên trong — hữu ích hơn là cố viết
+            // một câu bao trùm cả ba.
+            const desc = entry.isGroup
+              ? entry.tools.map((t) => t.label).join(' · ')
+              : entry.tools[0].description;
             return (
-              <div key={tool.path}>
+              <div key={entry.key}>
                 {/* Group headers — only when favourites are pinned at the top */}
                 {showSections && i === 0 && <SectionLabel>Favorites</SectionLabel>}
                 {showSections && i === favoriteCount && <SectionLabel className="mt-2">All tools</SectionLabel>}
-                <Tooltip side="right" triggerClassName="block" label={isLive ? `${tool.label} — connected` : tool.label} description={desc}>
+                <Tooltip side="right" triggerClassName="block" label={isLive ? `${entry.label} — connected` : entry.label} description={desc}>
                   <Link
-                    to={tool.path}
+                    to={path}
                     onClick={onClose}
                     className={cn(
-                      'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.98]',
+                      'group relative flex w-full items-center rounded-sm px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-200 ease-out',
                       isCollapsed ? 'justify-center' : 'gap-2.5',
                       isActive
-                        ? 'bg-primary/10 text-primary font-medium'
+                        ? 'bg-acc-tint text-acc-ink font-medium'
                         : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
                     )}
                   >
                     <span className="relative flex-shrink-0">
-                      <Icon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
+                      <Icon className="h-4 w-4" />
                       {isLive && (
+                        // "Đang kết nối" là TRẠNG THÁI → xanh lá cố định, không
+                        // theo accent. Xem design/RULES.md.
                         <span
-                          className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[hsl(var(--sidebar))]"
+                          className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-[hsl(var(--sidebar))]"
                           title="Connected"
                         />
                       )}
@@ -262,22 +279,42 @@ function NavScrollArea({
                         isActive && 'font-medium'
                       )}
                     >
-                      {tool.label}
+                      {entry.label}
+                      {/* Số tool trong nhóm — cho biết còn gì bên trong trước
+                          khi bấm vào. */}
+                      {entry.isGroup && (
+                        <span className="ml-1.5 text-[11px] tabular-nums text-muted-foreground/60">
+                          {entry.tools.length}
+                        </span>
+                      )}
                     </span>
-                    {/* Favourite toggle — pins the tool to the top of the list.
-                        Hidden when collapsed (no room); a starred tool shows a
-                        filled star always, others reveal an outline on hover. */}
+                    {/* Favourite toggle — pins the entry to the top of the list.
+                        Hidden when collapsed (no room); a starred entry shows a
+                        filled star always, others reveal an outline on hover.
+
+                        Trên một NHÓM, ngôi sao thao tác lên cả nhóm: bỏ yêu
+                        thích thì gỡ hết thành viên, thêm thì đánh dấu tool đầu.
+                        Nhờ vậy dữ liệu yêu thích vẫn là id tool như cũ — không
+                        cần di trú gì khi bật tính năng nhóm. */}
                     {!isCollapsed && (
                       <button
                         type="button"
-                        aria-label={fav ? `Unfavorite ${tool.label}` : `Favorite ${tool.label}`}
+                        aria-label={fav ? `Unfavorite ${entry.label}` : `Favorite ${entry.label}`}
                         title={fav ? 'Remove from favorites' : 'Add to favorites'}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(tool.featureId); }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (fav) {
+                            entry.tools.filter((t) => isFavorite(t.id)).forEach((t) => onToggleFavorite(t.id));
+                          } else {
+                            onToggleFavorite(entry.tools[0].id);
+                          }
+                        }}
                         className={cn(
-                          'ml-auto shrink-0 rounded p-0.5 transition-all duration-150',
+                          'ml-auto shrink-0 rounded-xs p-0.5 transition-colors duration-150',
                           fav
-                            ? 'text-amber-400 opacity-100 hover:text-amber-300'
-                            : 'text-muted-foreground/50 opacity-0 hover:text-amber-400 group-hover:opacity-100 focus-visible:opacity-100'
+                            ? 'text-warn opacity-100'
+                            : 'text-muted-foreground/50 opacity-0 hover:text-warn group-hover:opacity-100 focus-visible:opacity-100'
                         )}
                       >
                         <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
@@ -420,17 +457,24 @@ function Sidebar({
 
   // Settings is pinned to the bottom — exclude from the nav list
   const allNavTools = orderedTools.filter((t) => t.featureId !== 'settings');
-  const filteredNavTools = query.trim()
-    ? allNavTools.filter((t) => toolMatchesQuery(t, query))
-    : allNavTools;
-  // Favourites float to the top (most-recently-favorited first), the rest keep
-  // their saved order. Applied after search so a query still surfaces matches.
-  const favNavTools = filteredNavTools
-    .filter((t) => isFavorite(t.featureId))
-    .sort((a, b) => favorites.indexOf(a.featureId) - favorites.indexOf(b.featureId));
-  const restNavTools = filteredNavTools.filter((t) => !isFavorite(t.featureId));
-  const navTools = [...favNavTools, ...restNavTools];
-  const favoriteCount = favNavTools.length;
+
+  // ── Nav entries: grouped when browsing, flat when searching ───────────────
+  // Typing "cron" must land on Cron itself, not on a "Time" group the user then
+  // has to guess into. So a query produces one entry per matching tool, and the
+  // renderer below stays single-path: everything is a NavEntry either way.
+  const navEntries: NavEntry[] = query.trim()
+    ? allNavTools
+        .filter((t) => toolMatchesQuery(t, query))
+        .map((t) => {
+          const def = TOOL_DEF_MAP.get(t.featureId)!;
+          return { key: def.id, label: def.label, icon: def.icon, isGroup: false, tools: [def] };
+        })
+    : buildNavEntries({
+        enabledIds: new Set(allNavTools.map((t) => t.featureId)),
+        order: toolOrder,
+        favorites,
+      });
+  const favoriteCount = query.trim() ? 0 : countFavoriteEntries(navEntries, favorites);
   const settingsTool = allTools.find((t) => t.featureId === 'settings')!;
   const isSettingsActive = location.pathname === settingsTool.path;
   const activeThemeOption = THEME_OPTIONS.find((o) => o.value === themePreference)!;
@@ -522,7 +566,7 @@ function Sidebar({
 
         {/* Scrollable tool list with overflow fade */}
         <NavScrollArea
-          navTools={navTools}
+          navEntries={navEntries}
           query={query}
           disabledMatches={disabledMatches}
           settingsTool={settingsTool}
@@ -662,6 +706,10 @@ function AppContent() {
   const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
   const ActiveIcon = activeTool.icon;
+  // Tool đang mở có nằm trong nhóm nhiều tool không? Nếu có, header hiện tên
+  // NHÓM cùng tab con thay vì tên tool — để người dùng thấy được các tool anh em
+  // mà không phải quay lại sidebar.
+  const activeGroup = GROUP_OF_TOOL.get(activeTool.featureId);
   const isFullHeight = !!(activeTool as typeof allTools[0] & { fullHeight?: boolean }).fullHeight;
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideIsWhatsNew, setGuideIsWhatsNew] = useState(false);
@@ -730,12 +778,41 @@ function AppContent() {
               >
                 <ActiveIcon className="h-4 w-4 text-primary" />
               </div>
-              <div key={`${activeTool.path}-label`} className="min-w-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-left-1 motion-safe:duration-200">
-                <h2 className="text-sm font-semibold leading-none text-foreground">{activeTool.label}</h2>
-                {activeTool.description && (
-                  <p className="mt-1 hidden max-w-xl truncate text-xs text-muted-foreground sm:block">
-                    {activeTool.description}
-                  </p>
+              <div key={`${activeTool.path}-label`} className="min-w-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200">
+                <h2 className="text-sm font-semibold leading-none text-foreground">
+                  {activeGroup ? activeGroup.label : activeTool.label}
+                </h2>
+                {/* Dòng thứ hai từng lặp lại nguyên văn mô tả đã có trong tooltip
+                    sidebar — tốn một dòng header trên mọi màn để nói lại điều
+                    người dùng vừa đọc. Với nhóm, chỗ đó giờ là tab con; với tool
+                    đứng riêng thì bỏ hẳn, nhường không gian cho nội dung. */}
+                {activeGroup && (
+                  <div role="tablist" aria-label={activeGroup.label} className="mt-1 flex items-center gap-0.5">
+                    {activeGroup.toolIds
+                      .filter((id) => isFeatureEnabled(id))
+                      .map((id) => {
+                        const def = TOOL_DEF_MAP.get(id);
+                        if (!def) return null;
+                        const p = toolPath(id);
+                        const on = p === location.pathname;
+                        return (
+                          <Link
+                            key={id}
+                            to={p}
+                            role="tab"
+                            aria-selected={on}
+                            className={cn(
+                              'rounded-xs px-2 py-0.5 text-xs transition-colors',
+                              on
+                                ? 'bg-acc-tint font-medium text-acc-ink'
+                                : 'text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground',
+                            )}
+                          >
+                            {def.label}
+                          </Link>
+                        );
+                      })}
+                  </div>
                 )}
               </div>
             </div>
