@@ -436,16 +436,37 @@ function Sidebar({
             và chữ trượt mượt theo thay vì biến mất/hiện ra đột ngột. Bỏ dòng
             phụ "N tools" — không phải thông tin cần thấy mỗi lần mở app, và
             bỏ nó cho chữ "DevTool" canh đúng giữa logo theo chiều dọc thay vì
-            bị đẩy lệch lên bởi dòng phụ bên dưới. */}
+            bị đẩy lệch lên bởi dòng phụ bên dưới.
+
+            macOS overlay (showMacOverlayChrome): hàng này CHIA SẺ đúng dòng
+            với ba nút đèn giao thông — cao cố định 38px (giá trị Chrome/VS
+            Code dùng cho titlebar macOS) thay vì py-2.5, chừa 76px bên trái
+            lúc mở rộng. `data-tauri-drag-region="deep"` — KHÔNG PHẢI giá trị
+            rỗng/"true" — vì script kéo cửa sổ của Tauri chỉ coi một click là
+            "kéo" khi phần tử bị click CHÍNH LÀ phần tử mang thuộc tính (giá
+            trị rỗng/"true" nghĩa là "chỉ chính nó", không lan xuống con).
+            Click vào chữ "DevTool"/logo bên trong — vốn không mang thuộc tính
+            riêng — sẽ không kéo được gì cả với giá trị rỗng, dù cả hàng NHÌN
+            như một titlebar. "deep" lan xuống toàn bộ nhánh con, và Tauri tự
+            loại trừ phần tử bấm được (button/link/role=tab…) nên nút Close
+            vẫn bấm bình thường, không bị nuốt mất event. */}
         <div className={cn(
-          'flex shrink-0 items-center border-b border-border py-2.5',
-          isCollapsed ? 'justify-center px-2' : 'justify-between px-3'
-        )}>
+          'flex shrink-0 items-center border-b border-border',
+          isCollapsed
+            // Thu gọn: 56px hẹp hơn cả vùng 76px của ba nút đèn giao thông —
+            // không có cách nào chia sẻ hàng theo chiều ngang, nên đẩy logo
+            // XUỐNG dưới vùng đó bằng pt thay vì cố định h-[38px].
+            ? cn('justify-center px-2', showMacOverlayChrome ? 'pt-9 pb-2.5' : 'py-2.5')
+            : cn('justify-between', showMacOverlayChrome ? 'h-[38px] pl-[76px] pr-3' : 'py-2.5 px-3')
+        )}
+        data-tauri-drag-region={showMacOverlayChrome ? 'deep' : undefined}
+        >
           <div className="flex min-w-0 items-center gap-2.5">
-            <AppLogo size={30} />
+            <AppLogo size={showMacOverlayChrome ? 18 : 30} />
             <h1
               className={cn(
-                'whitespace-nowrap overflow-hidden text-sm font-semibold leading-none transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                'whitespace-nowrap overflow-hidden font-semibold leading-none transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                showMacOverlayChrome ? 'text-xs' : 'text-sm',
                 isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'
               )}
             >
@@ -691,21 +712,7 @@ function AppContent() {
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
-      {/* Dải titlebar macOS — chỉ khi titleBarStyle: "Overlay" thật sự có
-          hiệu lực (isTauri && IS_MAC, xem showMacOverlayChrome). Trống hoàn
-          toàn, không chứa gì để bấm hay canh chỉnh theo — ba nút đèn giao
-          thông nổi lên trên dải này, kéo bất kỳ đâu trong dải đều di chuyển
-          cửa sổ, đúng hành vi titlebar thật. Từng thử nhét icon/tab tool vào
-          chung một hàng với đèn giao thông (bản trước) nhưng chiều cao thật
-          của vùng đèn giao thông đổi theo phiên bản macOS — không có máy
-          macOS thật để đo, ghép chung hàng dễ lệch. Tách hẳn một dải riêng,
-          cao cố định 38px (giá trị chuẩn Chrome/VS Code dùng cho titlebar
-          macOS) thì không có gì cần canh khớp với đèn giao thông cả. */}
-      {showMacOverlayChrome && (
-        <div data-tauri-drag-region className="h-[38px] shrink-0 border-b border-border bg-chrome" />
-      )}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+    <div className="flex h-full overflow-hidden bg-background text-foreground">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -719,17 +726,35 @@ function AppContent() {
           {/* py-2 đưa tổng chiều cao về đúng 50px (2×8 + h-ctl 34) — khớp hàng
               header sidebar bên trái (2×10 + logo 30 = 50px), để đường viền
               dưới của cả hai nối thẳng thành một đường ngang liền mạch thay vì
-              lệch bậc. py-2.5 trước đó ra 54px, lệch 4px so với sidebar. */}
-          <div className="flex items-center justify-between px-4 py-2 sm:px-5">
+              lệch bậc. py-2.5 trước đó ra 54px, lệch 4px so với sidebar.
+
+              macOS overlay: hàng này KHÔNG nằm dưới ba nút đèn giao thông
+              (chúng chỉ phủ 76px đầu tiên bên trái, trong phạm vi sidebar),
+              nhưng vẫn phải cao 38px NHƯ header sidebar — hai hàng đứng cạnh
+              nhau, cùng một "thanh titlebar" trực quan, cao khác nhau thì
+              viền dưới lại lệch bậc y hệt lỗi đã sửa trước đó. Icon/tablist
+              co lại (h-6 thay h-ctl) để vừa khít 38px thay vì bị cắt.
+              `data-tauri-drag-region="deep"` — xem chú thích ở header
+              sidebar — để cả hàng cũng kéo được cửa sổ. */}
+          <div
+            className={cn(
+              'flex items-center justify-between px-4',
+              showMacOverlayChrome ? 'h-[38px]' : 'py-2 sm:px-5'
+            )}
+            data-tauri-drag-region={showMacOverlayChrome ? 'deep' : undefined}
+          >
             <div className="flex items-center gap-2.5">
               <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setSidebarOpen(true)}>
                 <Menu className="h-4 w-4" />
               </Button>
               <div
                 key={activeTool.path}
-                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+                className={cn(
+                  'relative flex shrink-0 items-center justify-center border border-primary/15 bg-primary/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200',
+                  showMacOverlayChrome ? 'h-6 w-6 rounded-md' : 'h-ctl w-ctl rounded-lg'
+                )}
               >
-                <ActiveIcon className="h-4 w-4 text-primary" />
+                <ActiveIcon className={showMacOverlayChrome ? 'h-3.5 w-3.5 text-primary' : 'h-4 w-4 text-primary'} />
                 {/* Mock Server / Kafka / RabbitMQ… đang chạy nền — cùng chấm
                     xanh sidebar đã dùng cho "đang kết nối" (bg-ok cố định,
                     không theo accent, xem RULES.md). Header trước đây không
@@ -759,7 +784,10 @@ function AppContent() {
                   key={`${activeTool.path}-tabs`}
                   role="tablist"
                   aria-label={activeGroup!.label}
-                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200',
+                    showMacOverlayChrome ? 'h-6' : 'h-ctl'
+                  )}
                 >
                   {activeGroupTabs.map((def) => {
                       const p = toolPath(def.id);
@@ -771,7 +799,8 @@ function AppContent() {
                           role="tab"
                           aria-selected={on}
                           className={cn(
-                            'inline-flex h-full items-center whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
+                            'inline-flex h-full items-center whitespace-nowrap rounded-sm leading-none transition-colors',
+                            showMacOverlayChrome ? 'px-2 text-xs' : 'px-3.5 text-sm',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
                             on
                               ? 'bg-acc font-semibold text-acc-fg shadow-soft'
@@ -786,9 +815,15 @@ function AppContent() {
               ) : (
                 <div
                   key={`${activeTool.path}-label`}
-                  className="inline-flex h-ctl shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+                  className={cn(
+                    'inline-flex shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200',
+                    showMacOverlayChrome ? 'h-6' : 'h-ctl'
+                  )}
                 >
-                  <h2 className="inline-flex h-full min-w-0 items-center whitespace-nowrap rounded-sm bg-acc px-3.5 text-sm font-semibold leading-none text-acc-fg shadow-soft sm:text-base">
+                  <h2 className={cn(
+                    'inline-flex h-full min-w-0 items-center whitespace-nowrap rounded-sm bg-acc font-semibold leading-none text-acc-fg shadow-soft',
+                    showMacOverlayChrome ? 'px-2 text-xs' : 'px-3.5 text-sm sm:text-base'
+                  )}>
                     {activeTool.label}
                   </h2>
                 </div>
@@ -843,7 +878,6 @@ function AppContent() {
           </div>
         )}
       </main>
-      </div>
 
       <ToolGuideModal
         toolId={activeTool.featureId}
