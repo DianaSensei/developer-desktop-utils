@@ -27,8 +27,8 @@ export const pathParamTheme = EditorView.theme({
     padding: '0 1px',
   },
   '.cm-pathparamtip': { display: 'flex', flexDirection: 'column', gap: '2px', padding: '6px 8px', maxWidth: '340px' },
-  '.cm-pathparamtip-name': { fontSize: '10px', color: 'hsl(var(--muted-foreground))', fontFamily: 'ui-monospace, monospace' },
-  '.cm-pathparamtip-val': { fontSize: '12px', color: 'hsl(var(--foreground))', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-all', whiteSpace: 'pre-wrap' },
+  '.cm-pathparamtip-name': { fontSize: '10px', color: 'hsl(var(--muted-foreground))', fontFamily: 'var(--mono)' },
+  '.cm-pathparamtip-val': { fontSize: '12px', color: 'hsl(var(--foreground))', fontFamily: 'var(--mono)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' },
   '.cm-pathparamtip-missing': { fontSize: '12px', color: 'hsl(var(--muted-foreground))' },
 });
 

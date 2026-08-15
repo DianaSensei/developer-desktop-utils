@@ -33,7 +33,7 @@ import {
 } from './types';
 
 export type RequestPanelTab =
-  | 'params' | 'headers' | 'body' | 'auth' | 'script' | 'tests' | 'settings';
+  | 'params' | 'body' | 'auth' | 'script' | 'tests' | 'settings';
 type Tab = RequestPanelTab;
 
 interface Props {
@@ -57,9 +57,11 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
   const enabledAsserts = request.assertions.filter((a) => a.enabled && a.expr).length;
 
   const tabs: { id: Tab; label: string }[] = [
+    // Số đếm chỉ tính Query — Path chưa từng tính vào đây (số path param đã lộ
+    // rõ ngay trên URL), và giờ Headers cũng theo cùng lý đó: đếm riêng ngay
+    // tại nhãn "Headers" bên trong, không gộp vào một con số duy nhất mơ hồ.
     { id: 'params', label: `Params${count(enabledParams)}` },
     { id: 'body', label: `Body${request.body.mode !== 'none' ? ' •' : ''}` },
-    { id: 'headers', label: `Headers${count(enabledHeaders)}` },
     { id: 'auth', label: `Auth${request.auth.type !== 'none' ? ' •' : ''}` },
     { id: 'script', label: `Script${hasScript || hasVars ? ' •' : ''}` },
     { id: 'tests', label: `Tests${count(enabledAsserts)}${request.tests.trim() ? ' •' : ''}` },
@@ -79,6 +81,9 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
 
       {/* tab body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {/* Headers từng là tab riêng — di chuyển vào đây làm phần thứ ba, cùng
+            hình dạng với Query/Path (nhãn nhỏ + bảng), thay vì buộc người dùng
+            nhảy tab để thấy trọn bộ những gì gắn liền với request này. */}
         {tab === 'params' && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
@@ -88,10 +93,14 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
               <AuthQueryParamRow request={request} />
             </div>
             <PathParamsEditor request={request} onChange={onChange} vars={vars} />
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs text-muted-foreground">Headers</Label>
+                {enabledHeaders > 0 && <Badge tone="neutral" pill>{enabledHeaders}</Badge>}
+              </div>
+              <KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} duplicateKeyHint="headers" />
+            </div>
           </div>
-        )}
-        {tab === 'headers' && (
-          <div className="min-h-0 flex-1 overflow-y-auto p-3"><KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} duplicateKeyHint="headers" /></div>
         )}
         {tab === 'body' && <div className="flex min-h-0 flex-1 flex-col p-3"><BodyEditor request={request} onChange={onChange} vars={vars} /></div>}
         {tab === 'auth' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><AuthEditor auth={request.auth} onChange={(auth) => onChange({ auth })} vars={vars} /></div>}
