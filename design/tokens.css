@@ -214,7 +214,12 @@
    Đặt data-accent trên <html> (hoặc bất kỳ container nào).
    ========================================================================== */
 [data-accent="azure"]   { --a-h: 218; --a-s: 76%; --a-l: 48%; }
-[data-accent="petrol"]  { --a-h: 190; --a-s: 68%; --a-l: 36%; }
+/* Bản đầu (l36) đo tương phản chữ trắng trên nền accent chỉ 4.29:1 — dưới
+   ngưỡng AA 4.5:1 cho chữ thường. Chưa lộ ra vì Segmented cũ dùng nền
+   accent-tint chứ không phải nền đặc; SubTab và Segmented (đã sửa) đều dùng
+   nền đặc + chữ trắng nên phải hạ `--a-l` để đạt ngưỡng. Đo bằng Chromium
+   thật, xem `design/preview/index.html` mục Segmented. */
+[data-accent="petrol"]  { --a-h: 190; --a-s: 68%; --a-l: 33%; }
 /* Xanh lá ngả VÀNG, không phải xanh lá thuần: --ok nằm ở hue ~155. Bản đầu
    ("forest", h152) chỉ cách --ok 18 đơn vị RGB — accent và "hợp lệ" gần như
    cùng một màu. h96 đẩy khoảng cách lên 61. */
@@ -225,7 +230,10 @@
    đúng 10 đơn vị, tức là mắt thường không phân biệt được nút chính với báo lỗi.
    Bản này cách 80. Bất kỳ tone đỏ nào thêm sau cũng phải qua phép đo đó. */
 [data-accent="oxblood"] { --a-h: 355; --a-s: 38%; --a-l: 28%; }
-[data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 44%; }
+/* amber là tone SÁNG NHẤT trong sáu tone — dễ hỏng chữ trắng nhất. Bản đầu
+   (l44) chỉ đạt 3.31:1, không đạt cả ngưỡng phi văn bản 3:1 lẫn văn bản
+   4.5:1. l35 đạt 4.94:1, còn dư biên so với 4.5. */
+[data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 35%; }
 
 /* ============================================================================
    NỀN MÔI TRƯỜNG — gradient pastel.

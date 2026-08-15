@@ -701,9 +701,21 @@ function AppContent() {
                 {/* Dòng thứ hai từng lặp lại nguyên văn mô tả đã có trong tooltip
                     sidebar — tốn một dòng header trên mọi màn để nói lại điều
                     người dùng vừa đọc. Với nhóm, chỗ đó giờ là tab con; với tool
-                    đứng riêng thì bỏ hẳn, nhường không gian cho nội dung. */}
+                    đứng riêng thì bỏ hẳn, nhường không gian cho nội dung.
+
+                    Bản trước dùng nền nhuộm rất nhạt (`bg-acc-tint`) cho mục
+                    đang chọn — cùng lỗi tương phản đã sửa ở `Segmented`: nền
+                    nhuộm gần như hoà vào nền header, phải nhìn rất lâu mới ra
+                    mục nào đang bật. Giờ mục đang chọn dùng nền đặc màu accent
+                    (`bg-acc text-acc-fg`) như mọi bộ chuyển khác trong kit, đặt
+                    trong một máng lõm (`bg-sunk`) để cả cụm đọc ra là MỘT khối
+                    điều hướng thay vì mấy chữ rời rạc trôi dưới tiêu đề. */}
                 {activeGroup && (
-                  <div role="tablist" aria-label={activeGroup.label} className="mt-1 flex items-center gap-0.5">
+                  <div
+                    role="tablist"
+                    aria-label={activeGroup.label}
+                    className="mt-1.5 inline-flex items-center gap-0.5 rounded-sm bg-sunk p-0.5"
+                  >
                     {activeGroup.toolIds
                       .filter((id) => isFeatureEnabled(id))
                       .map((id) => {
@@ -718,10 +730,11 @@ function AppContent() {
                             role="tab"
                             aria-selected={on}
                             className={cn(
-                              'rounded-xs px-2 py-0.5 text-xs transition-colors',
+                              'inline-flex items-center rounded-xs px-2 py-0.5 text-xs leading-none transition-colors',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
                               on
-                                ? 'bg-acc-tint font-medium text-acc-ink'
-                                : 'text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground',
+                                ? 'bg-acc font-semibold text-acc-fg shadow-soft'
+                                : 'text-muted-foreground hover:text-foreground',
                             )}
                           >
                             {def.label}
