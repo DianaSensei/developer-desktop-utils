@@ -3,11 +3,12 @@
 // password). Tokens/values accept {{variables}}.
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, RotateCcw } from 'lucide-react';
+import { Check, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import { InlineCodeField } from '@/design-system';
 import { clearOAuthTokenCache } from './request';
 import type { ApiKeyAuth, Auth, AuthType, OAuth2Auth, VarMap } from './types';
@@ -28,15 +29,41 @@ const AUTH_TYPES: { id: AuthType; label: string }[] = [
 // function identity was created on every render, so React unmounted and remounted
 // the subtree on each keystroke — tearing down and rebuilding the CodeMirror
 // instance inside InlineCodeField and dropping the caret after every character typed.
-function AuthField({ label, value, onValue, placeholder, vars }: {
-  label: string; value: string; onValue: (v: string) => void; placeholder?: string; vars?: VarMap;
+function AuthField({ label, value, onValue, placeholder, vars, masked }: {
+  label: string; value: string; onValue: (v: string) => void; placeholder?: string; vars?: VarMap; masked?: boolean;
 }) {
+  // `masked` fields (credentials — Bearer token, API key value, OAuth client
+  // secret/password) still need {{var}} highlighting, so this can't just be
+  // `type="password"` like Basic Auth's password below (InlineCodeField is a
+  // CodeMirror surface, not an <input>). Blur the value instead: hidden at
+  // rest, sharp while focused (so you can see what you're editing) or with the
+  // reveal toggle held open — same idea as the Vault/env-var secret rows in
+  // KeyValueEditor, just via CSS since there's no per-character mask here.
+  const [revealed, setRevealed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const hidden = !!masked && !revealed && !focused;
   return (
     <div className="space-y-1.5">
       <Label className="text-xs">{label}</Label>
       {vars ? (
-        <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40">
-          <InlineCodeField value={value} onChange={onValue} vars={vars} placeholder={placeholder} />
+        <div
+          className="flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        >
+          <div className={cn('min-w-0 flex-1 transition-[filter]', hidden && 'select-none blur-sm')}>
+            <InlineCodeField value={value} onChange={onValue} vars={vars} placeholder={placeholder} />
+          </div>
+          {masked && (
+            <button
+              type="button"
+              onClick={() => setRevealed((r) => !r)}
+              className="shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+              title={revealed ? 'Hide value' : 'Reveal value'}
+            >
+              {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
+          )}
         </div>
       ) : (
         <Input className="h-8 font-mono text-xs" spellCheck={false} value={value} onChange={(e) => onValue(e.target.value)} placeholder={placeholder} />
@@ -76,7 +103,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
       {auth.type === 'inherit' && <p className="py-4 text-center text-xs text-muted-foreground">Inherits auth from the parent folder or collection.</p>}
 
       {auth.type === 'bearer' && (
-        <AuthField vars={vars} label="Token" value={auth.token} onValue={(v) => set({ token: v })} placeholder="Token or {{var}}" />
+        <AuthField vars={vars} masked label="Token" value={auth.token} onValue={(v) => set({ token: v })} placeholder="Token or {{var}}" />
       )}
 
       {(auth.type === 'basic' || auth.type === 'digest') && (
@@ -95,7 +122,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
       {auth.type === 'apikey' && (
         <div className="space-y-2">
           <AuthField vars={vars} label="Key" value={auth.apiKey.key} onValue={(v) => setApiKey({ key: v })} placeholder="X-API-Key" />
-          <AuthField vars={vars} label="Value" value={auth.apiKey.value} onValue={(v) => setApiKey({ value: v })} placeholder="Value or {{var}}" />
+          <AuthField vars={vars} masked label="Value" value={auth.apiKey.value} onValue={(v) => setApiKey({ value: v })} placeholder="Value or {{var}}" />
           <div className="space-y-1.5">
             <Label className="text-xs">Add to</Label>
             <Select value={auth.apiKey.placement} onValueChange={(v) => setApiKey({ placement: v as ApiKeyAuth['placement'] })}>
@@ -123,12 +150,12 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
           </div>
           <AuthField vars={vars} label="Access Token URL" value={auth.oauth2.tokenUrl} onValue={(v) => setOAuth({ tokenUrl: v })} placeholder="https://auth.example.com/oauth/token" />
           <AuthField vars={vars} label="Client ID" value={auth.oauth2.clientId} onValue={(v) => setOAuth({ clientId: v })} />
-          <AuthField vars={vars} label="Client Secret" value={auth.oauth2.clientSecret} onValue={(v) => setOAuth({ clientSecret: v })} />
+          <AuthField vars={vars} masked label="Client Secret" value={auth.oauth2.clientSecret} onValue={(v) => setOAuth({ clientSecret: v })} />
           <AuthField vars={vars} label="Scope" value={auth.oauth2.scope} onValue={(v) => setOAuth({ scope: v })} placeholder="read write" />
           {auth.oauth2.grantType === 'password' && (
             <>
               <AuthField vars={vars} label="Username" value={auth.oauth2.username} onValue={(v) => setOAuth({ username: v })} />
-              <AuthField vars={vars} label="Password" value={auth.oauth2.password} onValue={(v) => setOAuth({ password: v })} />
+              <AuthField vars={vars} masked label="Password" value={auth.oauth2.password} onValue={(v) => setOAuth({ password: v })} />
             </>
           )}
           <div className="flex items-start justify-between gap-3">
