@@ -139,7 +139,10 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       // CodeMirror's own placeholder decoration — renders inline in the real
       // document flow (respects the gutter, wraps multi-line text correctly),
       // unlike a hand-rolled absolutely-positioned overlay.
-      '.cm-placeholder': { color: 'hsl(var(--muted-foreground) / 0.55)', fontStyle: 'normal' },
+      // `--muted-foreground` đã là màu mờ; đè thêm alpha 0.55 lên trên khiến
+      // chữ ví dụ gần như không đọc được (đo được ở Script tab của API
+      // Client). Input dùng `/75` cho placeholder — theo cùng mức đó.
+      '.cm-placeholder': { color: 'hsl(var(--muted-foreground) / 0.75)', fontStyle: 'normal' },
 
       '.cm-gutters': gutter === 'panel'
         ? {

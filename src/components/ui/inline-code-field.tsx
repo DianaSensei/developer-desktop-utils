@@ -32,7 +32,7 @@ export interface InlineCodeFieldProps {
 const singleLineTheme = EditorView.theme({
   '.cm-scroller': { overflow: 'hidden' },
   '.cm-line': { padding: '0' },
-  '.cm-placeholder': { color: 'hsl(var(--muted-foreground) / 0.6)' },
+  '.cm-placeholder': { color: 'hsl(var(--muted-foreground) / 0.75)' },
   '.cm-var, .cm-var-unknown': { fontSize: '11px' },
 });
 
