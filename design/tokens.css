@@ -1,0 +1,218 @@
+/* ============================================================================
+   DevTool Design Kit — TOKENS (nguồn sự thật duy nhất)
+   ----------------------------------------------------------------------------
+   CSS THUẦN. Không @layer, không @apply, không cú pháp Tailwind.
+   Vì vậy file này dùng được ở CẢ HAI nơi:
+
+     1. Trang mẫu tĩnh   →  <link rel="stylesheet" href="design/tokens.css">
+     2. App qua Tailwind →  @import "../../design/tokens.css";  (đầu tokens.css của app)
+
+   Đó là điều khiến trang mẫu KHÔNG THỂ trôi lệch khỏi app: cả hai đọc chung
+   một bộ giá trị. Sửa màu, bo góc, chiều cao control → sửa ở đây, chỉ ở đây.
+
+   ── Nguyên tắc kiến trúc quan trọng nhất ──────────────────────────────────
+   Accent khai báo bằng BA BIẾN RỜI (--a-h / --a-s / --a-l), không phải một mã
+   hex. Mọi biến thể accent — sáng hơn, nhuộm nhạt, mực đậm, viền, vòng focus —
+   đều tính ra bằng hsl(). Thêm một tone mới = thêm ba con số, không sửa gì khác.
+
+   Đổi lại, có một luật không được phá: MÀU TRẠNG THÁI LÀ HỆ RIÊNG, cố định,
+   không dẫn xuất từ accent. Nếu "hợp lệ" mà dùng accent thì khi đổi tone sang
+   đỏ, thẻ báo thành công sẽ hoá đỏ. Xem design/RULES.md.
+   ========================================================================== */
+
+:root {
+  /* ── Accent: ba kênh rời — mặc định azure ─────────────────────────────── */
+  --a-h: 218;
+  --a-s: 76%;
+  --a-l: 48%;
+
+  /* ── Biến KÊNH (không có hsl() bọc ngoài) ─────────────────────────────
+     Vì sao cần: Tailwind chỉ chèn được `<alpha-value>` vào màu dạng kênh.
+     Nếu token là màu hoàn chỉnh thì `bg-acc/20` mất tác dụng — mà repo dùng
+     bổ ngữ alpha rất nhiều. Nên mỗi màu có hai dạng:
+
+        --acc-c  = "218 76% 48%"          → cho preset Tailwind (có alpha)
+        --acc    = hsl(var(--acc-c))      → cho CSS thuần (tiện đọc)
+
+     Bản tối định nghĩa lại `-c`, nên cả hai dạng tự đúng theo theme. */
+  --acc-c:        var(--a-h) var(--a-s) var(--a-l);
+  --acc-hi-c:     var(--a-h) var(--a-s) calc(var(--a-l) + 7%);
+  --acc-tint-c:   var(--a-h) calc(var(--a-s) - 8%) 95%;
+  --acc-tint-2-c: var(--a-h) calc(var(--a-s) - 12%) 90%;
+  --acc-ink-c:    var(--a-h) calc(var(--a-s) + 6%) 34%;
+  --acc-edge-c:   var(--a-h) 44% 84%;
+
+  --acc:        hsl(var(--acc-c));
+  --acc-hi:     hsl(var(--acc-hi-c));
+  --acc-tint:   hsl(var(--acc-tint-c));
+  --acc-tint-2: hsl(var(--acc-tint-2-c));
+  --acc-ink:    hsl(var(--acc-ink-c));
+  --acc-edge:   hsl(var(--acc-edge-c));
+  --acc-ring:   hsl(var(--acc-c) / .22);
+  --acc-fg:     #fff;
+
+  /* ── Nền: xám NGẢ SẮC accent, không xám trung tính ────────────────────
+     Xám trung tính là thứ làm giao diện trông rẻ. Mọi bề mặt ở đây đều mang
+     một chút sắc của accent, nên khi đổi tone cả trang đổi theo, kể cả nền. */
+  --bg-c:     var(--a-h) 22% 96%;
+  --bg-2-c:   var(--a-h) 18% 92%;
+  --card-c:   0 0% 100%;
+  --sunk-c:   var(--a-h) 24% 97%;
+  --chrome-c: var(--a-h) 26% 98.5%;
+
+  --bg:     hsl(var(--bg-c));
+  --bg-2:   hsl(var(--bg-2-c));
+  --card:   hsl(var(--card-c));
+  --sunk:   hsl(var(--sunk-c));
+  --chrome: hsl(var(--chrome-c));
+
+  --fg-c:        var(--a-h) 24% 11%;
+  --fg-mute-c:   var(--a-h) 12% 42%;
+  --fg-faint-c:  var(--a-h) 12% 58%;
+  --line-c:      var(--a-h) 22% 88%;
+  --line-soft-c: var(--a-h) 24% 93%;
+
+  --fg:        hsl(var(--fg-c));
+  --fg-mute:   hsl(var(--fg-mute-c));
+  --fg-faint:  hsl(var(--fg-faint-c));
+  --line:      hsl(var(--line-c));
+  --line-soft: hsl(var(--line-soft-c));
+
+  /* ── Trạng thái: HỆ RIÊNG, độc lập accent, KHÔNG đổi khi swap tone ──── */
+  --ok-c: 154.5 69.2% 28.0%;        --ok-tint-c: 145.7 38.9% 92.9%;   --ok-edge-c: 147.1 38.2% 78.4%;
+  --warn-c: 36.4 79.2% 30.2%;       --warn-tint-c: 40.0 78.9% 92.5%;  --warn-edge-c: 38.3 61.0% 76.9%;
+  --bad-c: 2.7 60.5% 43.7%;         --bad-tint-c: 3.5 73.9% 95.5%;    --bad-edge-c: 3.5 63.0% 84.1%;
+  --info-c: 211.3 71.4% 38.4%;      --info-tint-c: 211.6 70.4% 94.7%;  --info-edge-c: 209.5 64.7% 83.3%;
+
+  --ok:   hsl(var(--ok-c));    --ok-tint:   hsl(var(--ok-tint-c));    --ok-edge:   hsl(var(--ok-edge-c));
+  --warn: hsl(var(--warn-c));  --warn-tint: hsl(var(--warn-tint-c));  --warn-edge: hsl(var(--warn-edge-c));
+  --bad:  hsl(var(--bad-c));   --bad-tint:  hsl(var(--bad-tint-c));   --bad-edge:  hsl(var(--bad-edge-c));
+  --info: hsl(var(--info-c));  --info-tint: hsl(var(--info-tint-c));  --info-edge: hsl(var(--info-edge-c));
+
+  /* ── Bóng: ngả sắc accent, không phải đen thuần ───────────────────────
+     Chỉ ba bậc. Một tầng nổi dùng --sh; lồng sâu hơn dùng viền, không bóng. */
+  --sh-sm: 0 1px 2px hsl(var(--a-h) 30% 20% / .06);
+  --sh:    0 1px 2px hsl(var(--a-h) 30% 20% / .06), 0 8px 20px -12px hsl(var(--a-h) 30% 20% / .22);
+  --sh-lg: 0 2px 4px hsl(var(--a-h) 30% 20% / .07), 0 18px 36px -18px hsl(var(--a-h) 30% 20% / .30);
+
+  /* ── Bo góc: thang RỜI NHAU ───────────────────────────────────────────
+     Thang cũ (--radius: 1rem → sm/md/lg = 12/14/16px) có ba bậc mà mắt không
+     phân biệt được, nên vô dụng. Thang này cách nhau đủ xa để có ý nghĩa. */
+  --r-xs:   6px;   /* chip, keycap, nút nhỏ */
+  --r-sm:  10px;   /* input, nút, ô nhỏ trong thẻ */
+  --r-md:  14px;   /* thẻ thường, dải nhuộm */
+  --r-lg:  18px;   /* panel, khung tool */
+  --r-xl:  24px;   /* modal, sheet */
+  --r-full: 999px;
+
+  /* ── Chiều cao control: MỘT giá trị, không ba ─────────────────────────
+     Repo hiện trộn h-7 (28px) / h-8 (32px) / h-9 (36px) → mọi hàng control
+     đều lệch nhau vài pixel. Chỉ còn hai bậc. */
+  --h:    34px;
+  --h-lg: 40px;
+
+  /* ── Mặt chữ ──────────────────────────────────────────────────────────
+     `mono` chưa từng được khai báo trong preset Tailwind của repo, dù
+     `font-mono` dùng 356 lần → rơi về Courier New trên Windows/Linux.
+     Danh sách dự phòng ở đây đảm bảo có chữ đơn cách thật trên cả ba nền. */
+  --sans: "Be Vietnam Pro Variable", "Be Vietnam Pro", system-ui, -apple-system,
+          "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+          Consolas, "Liberation Mono", monospace;
+
+  /* ── Chuyển động: một nhịp duy nhất ───────────────────────────────────
+     Rê chuột đổi nền/viền — KHÔNG đổi vị trí. Không hover-lift. */
+  --ease-out-soft: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring:   cubic-bezier(.34, 1.45, .64, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 340ms;
+
+  color-scheme: light;
+}
+
+/* ============================================================================
+   TỐI — `.dark` khớp với darkMode: ['class'] của Tailwind.
+   Chỉ định nghĩa lại token, không định nghĩa lại component.
+   Chú ý: màu trạng thái ở đây là bản sáng hơn cho nền tối, nhưng vẫn giữ
+   ĐÚNG tông nghĩa (ok vẫn xanh lá, bad vẫn đỏ) — không ngả về accent.
+   ========================================================================== */
+.dark {
+  /* Chỉ định nghĩa lại biến KÊNH — dạng hsl() ở :root tự đúng theo. */
+  --acc-c:        var(--a-h) calc(var(--a-s) - 8%) 68%;
+  --acc-hi-c:     var(--a-h) calc(var(--a-s) - 8%) 74%;
+  --acc-tint-c:   var(--a-h) 40% 22%;
+  --acc-tint-2-c: var(--a-h) 38% 27%;
+  --acc-ink-c:    var(--a-h) 60% 76%;
+  --acc-edge-c:   var(--a-h) 34% 32%;
+  --acc-ring:     hsl(var(--a-h) 70% 62% / .3);
+  --acc-fg:       hsl(var(--a-h) 60% 10%);
+
+  --bg-c:     var(--a-h) 18% 9%;
+  --bg-2-c:   var(--a-h) 18% 12%;
+  --card-c:   var(--a-h) 16% 14%;
+  --sunk-c:   var(--a-h) 18% 11%;
+  --chrome-c: var(--a-h) 16% 17%;
+
+  --fg-c:        var(--a-h) 14% 93%;
+  --fg-mute-c:   var(--a-h) 10% 63%;
+  --fg-faint-c:  var(--a-h) 10% 48%;
+  --line-c:      var(--a-h) 14% 24%;
+  --line-soft-c: var(--a-h) 14% 19%;
+
+  /* Bản tối KHÔNG phải bản sáng đảo ngược — mỗi tông chọn lại cho nền tối,
+     nhưng giữ ĐÚNG hue nghĩa (ok vẫn xanh lá, bad vẫn đỏ). */
+--ok-c: 148.4 42.2% 55.9%;        --ok-tint-c: 151.3 39.0% 11.6%;   --ok-edge-c: 152.5 38.7% 24.3%;
+  --warn-c: 36.3 60.4% 61.4%;       --warn-tint-c: 37.5 38.7% 12.2%;  --warn-edge-c: 38.9 44.9% 24.9%;
+  --bad-c: 4.0 59.5% 70.0%;         --bad-tint-c: 5.5 32.4% 13.3%;    --bad-edge-c: 4.7 37.2% 26.9%;
+  --info-c: 212.1 73.1% 69.4%;      --info-tint-c: 214.6 39.4% 12.9%;  --info-edge-c: 211.2 37.7% 27.1%;
+
+  --sh-sm: 0 1px 2px rgb(0 0 0 / .45);
+  --sh:    0 1px 2px rgb(0 0 0 / .45), 0 10px 24px -14px rgb(0 0 0 / .8);
+  --sh-lg: 0 2px 6px rgb(0 0 0 / .5),  0 20px 40px -20px rgb(0 0 0 / .9);
+
+  color-scheme: dark;
+}
+
+/* ============================================================================
+   PRESET TONE — thêm tone mới = thêm BA CON SỐ, không sửa gì khác.
+   Đặt data-accent trên <html> (hoặc bất kỳ container nào).
+   ========================================================================== */
+[data-accent="azure"]   { --a-h: 218; --a-s: 76%; --a-l: 48%; }
+[data-accent="petrol"]  { --a-h: 190; --a-s: 68%; --a-l: 36%; }
+[data-accent="forest"]  { --a-h: 152; --a-s: 52%; --a-l: 32%; }
+[data-accent="iris"]    { --a-h: 258; --a-s: 62%; --a-l: 56%; }
+[data-accent="oxblood"] { --a-h:   2; --a-s: 58%; --a-l: 42%; }
+[data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 44%; }
+
+/* ============================================================================
+   NỀN MÔI TRƯỜNG — gradient pastel.
+   Đây là chỗ DUY NHẤT gradient được phép. Không bao giờ trên nút, không bao
+   giờ sau chữ cần đọc. Đặt class .dk-bg lên phần tử nền toàn trang.
+   ========================================================================== */
+.env-bg { position: relative; }
+.env-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 700px at 12% -8%,  hsl(var(--a-h) 62% 88% / .55), transparent 62%),
+    radial-gradient(900px  600px at 92%  4%,  hsl(calc(var(--a-h) + 58) 60% 88% / .45), transparent 60%),
+    radial-gradient(1000px 800px at 50% 108%, hsl(calc(var(--a-h) - 42) 58% 90% / .40), transparent 64%);
+}
+.dark .env-bg::before,
+.env-bg.dark::before { opacity: .16; }
+
+/* ============================================================================
+   Tôn trọng "giảm chuyển động" của hệ điều hành.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

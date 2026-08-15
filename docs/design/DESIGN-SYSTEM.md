@@ -1,5 +1,28 @@
 # DevTool Design System
 
+> ## ⚠️ Two systems exist right now — read this first
+>
+> | | Where | Status |
+> |---|---|---|
+> | **Current** | `src/design-system/` + this document | What the app ships **today**. Still accurate. |
+> | **Approved target** | [`design/`](../../design/) | The **v4 design kit** — approved, not yet migrated into the app. |
+>
+> The [`design/`](../../design/) kit is the approved direction: accent swappable via three
+> HSL channels, status colors as a separate fixed system, bilingual VI/EN, a rebuilt
+> component set. It ships with a live sample page (`design/preview/index.html`) you can
+> open directly in a browser.
+>
+> **Writing new UI?** Read [`design/RULES.md`](../../design/RULES.md) — it supersedes the
+> "Design rules" section below wherever the two disagree. This document remains the
+> reference for everything the migration has not reached yet, and for app-specific
+> concerns the kit does not cover (layout utilities, cross-platform webview parity).
+>
+> The migration replaces this document's foundations section phase by phase. Until then,
+> **do not** assume a value here matches `design/tokens.css` — several deliberately differ
+> (radius scale, control heights, shadow system, `fontFamily.mono`).
+
+---
+
 The single reference for how DevTool looks and feels: **azure-blue accent · soft-depth elevation · Apple-style frosted glass · Inter type · one motion rhythm**, all driven by CSS variables so theming and dark mode are free.
 
 > **Source of truth is the code, not this document.** The actual tokens, utilities, and Tailwind theme live in [`src/design-system/`](../../src/design-system/) — `tokens.css` (CSS variables + utility classes), `tailwind-preset.cjs` (Tailwind theme), and `index.ts` (component import surface). If a value here ever disagrees with `tokens.css`, `tokens.css` wins. This doc explains the *intent* and *how to use it*; [`src/design-system/README.md`](../../src/design-system/README.md) is the short "how to copy it into another project" guide.

@@ -121,7 +121,22 @@ AppConfigProvider          ← tunable numbers (src/config/appConfig.ts)
 
 ## Design Principles (mandatory — read before writing any UI or feature code)
 
-> Full design system reference — **design decision rules** (hierarchy, color, feedback, accessibility, self-review checklist), tokens, utilities, and components — is in [../design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md). Read its "Design rules" and "Self-review" sections before building, editing, or reviewing any UI. The source of truth for actual values is [`src/design-system/`](../../src/design-system/) (`tokens.css`, `tailwind-preset.cjs`, `index.ts`).
+> **Two systems exist right now.** [`design/`](../../design/) is the **approved v4 design
+> kit** (accent swappable via three HSL channels, status colors as a separate fixed system,
+> bilingual VI/EN); `src/design-system/` is what the app **ships today**. The migration is
+> phased — see [`design/README.md`](../../design/README.md).
+>
+> - **New UI, or any design decision** → [`design/RULES.md`](../../design/RULES.md) first.
+>   It supersedes DESIGN-SYSTEM.md wherever the two disagree, and its checklist is what a
+>   UI PR is reviewed against. Component specs: [`design/COMPONENTS.md`](../../design/COMPONENTS.md).
+>   Live sample page: `design/preview/index.html` (opens directly in a browser).
+> - **Values the app currently compiles** → [`src/design-system/`](../../src/design-system/)
+>   (`tokens.css`, `tailwind-preset.cjs`, `index.ts`).
+> - **App-specific concerns the kit does not cover** (layout utilities, cross-platform
+>   webview parity, accessibility checklist) → [../design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md).
+>
+> Several values deliberately differ between the two (radius scale, control heights, shadow
+> system, `fontFamily.mono`). Do not assume they match until the migration reaches that phase.
 
 ### UI Components — always use the shared library, never OS-native
 
