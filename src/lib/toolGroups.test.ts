@@ -5,6 +5,7 @@ import {
   GROUP_OF_TOOL,
   buildNavEntries,
   countFavoriteEntries,
+  clusterToolOrder,
 } from '@/lib/toolGroups';
 
 const ALL = new Set(TOOL_DEFS.map((t) => t.id));
@@ -134,5 +135,40 @@ describe('GROUP_OF_TOOL', () => {
   it('tool đứng riêng không có trong bản đồ', () => {
     expect(GROUP_OF_TOOL.has('api-client')).toBe(false);
     expect(GROUP_OF_TOOL.get('kafka-explorer')?.id).toBe('g-brokers');
+  });
+});
+
+describe('clusterToolOrder', () => {
+  it('kéo các tool cùng nhóm đứng liền nhau, tại vị trí thành viên sớm nhất', () => {
+    // qrcode (nhóm g-generate: generator, qrcode, lucky-wheel) đứng ngay sau
+    // api-client — cả nhóm phải trồi lên đứng liền sau api-client, theo đúng
+    // thứ tự toolIds của nhóm, không phải thứ tự xuất hiện trong input.
+    const order = ['api-client', 'qrcode', 'text-counter', 'generator', 'lucky-wheel'];
+    expect(clusterToolOrder(order)).toEqual([
+      'api-client', 'generator', 'qrcode', 'lucky-wheel', 'text-counter',
+    ]);
+  });
+
+  it('không đổi thứ tự khi không có nhóm nào', () => {
+    const order = ['api-client', 'mock-server', 'regex'];
+    expect(clusterToolOrder(order)).toEqual(order);
+  });
+
+  it('giữ nguyên danh sách khi input rỗng', () => {
+    expect(clusterToolOrder([])).toEqual([]);
+  });
+
+  it('nhóm chỉ còn một thành viên trong input thì đứng y nguyên vị trí đó', () => {
+    // Mô phỏng tìm kiếm lọc còn đúng một tool của nhóm — không kéo thành
+    // viên vắng mặt vào (nó không có trong input để mà kéo).
+    const order = ['api-client', 'qrcode', 'text-counter'];
+    expect(clusterToolOrder(order)).toEqual(order);
+  });
+
+  it('không đánh rơi hay nhân đôi tool nào so với danh sách đầy đủ', () => {
+    const order = TOOL_DEFS.map((t) => t.id);
+    const clustered = clusterToolOrder(order);
+    expect(clustered).toHaveLength(order.length);
+    expect(new Set(clustered)).toEqual(new Set(order));
   });
 });
