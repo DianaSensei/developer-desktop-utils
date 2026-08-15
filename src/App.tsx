@@ -437,21 +437,11 @@ function Sidebar({
             phụ "N tools" — không phải thông tin cần thấy mỗi lần mở app, và
             bỏ nó cho chữ "DevTool" canh đúng giữa logo theo chiều dọc thay vì
             bị đẩy lệch lên bởi dòng phụ bên dưới. */}
-        {/* macOS overlay titlebar (tauri.conf.json titleBarStyle: "Overlay"):
-            cửa sổ không còn thanh tiêu đề riêng, ba nút đèn giao thông nổi
-            trực tiếp trên góc trên-trái ứng dụng — đúng ngay vùng sidebar này
-            vì sidebar đứng ở x:0. Mở rộng thì chừa 76px bên trái cho ba nút;
-            thu gọn (56px, hẹp hơn cả vùng nút) thì đẩy logo XUỐNG dưới ba nút
-            thay vì chồng lên, an toàn hơn co ngang. Windows/Linux không đụng
-            tới nhánh này — `showMacOverlayChrome` luôn false ở đó vì
-            titleBarStyle chỉ có tác dụng trên macOS. */}
         <div className={cn(
-          'flex shrink-0 items-center border-b border-border',
-          isCollapsed
-            ? cn('justify-center px-2', showMacOverlayChrome ? 'pt-9 pb-2.5' : 'py-2.5')
-            : cn('justify-between py-2.5', showMacOverlayChrome ? 'pl-[76px] pr-3' : 'px-3')
+          'flex shrink-0 items-center border-b border-border py-2.5',
+          isCollapsed ? 'justify-center px-2' : 'justify-between px-3'
         )}>
-          <div className="flex min-w-0 items-center gap-2.5" data-tauri-drag-region={showMacOverlayChrome || undefined}>
+          <div className="flex min-w-0 items-center gap-2.5">
             <AppLogo size={30} />
             <h1
               className={cn(
@@ -462,12 +452,6 @@ function Sidebar({
               DevTool
             </h1>
           </div>
-          {/* Vùng trống còn lại cũng kéo được cửa sổ — tách hẳn khỏi nút Close
-              (không nằm trong data-tauri-drag-region nào) nên không phụ thuộc
-              vào việc Tauri có cho click xuyên qua vùng kéo hay không. */}
-          {showMacOverlayChrome && !isCollapsed && (
-            <div className="flex-1" data-tauri-drag-region />
-          )}
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 lg:hidden" onClick={onClose} title="Close menu">
             <X className="h-4 w-4" />
           </Button>
@@ -707,7 +691,21 @@ function AppContent() {
   );
 
   return (
-    <div className="flex h-full overflow-hidden bg-background text-foreground">
+    <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
+      {/* Dải titlebar macOS — chỉ khi titleBarStyle: "Overlay" thật sự có
+          hiệu lực (isTauri && IS_MAC, xem showMacOverlayChrome). Trống hoàn
+          toàn, không chứa gì để bấm hay canh chỉnh theo — ba nút đèn giao
+          thông nổi lên trên dải này, kéo bất kỳ đâu trong dải đều di chuyển
+          cửa sổ, đúng hành vi titlebar thật. Từng thử nhét icon/tab tool vào
+          chung một hàng với đèn giao thông (bản trước) nhưng chiều cao thật
+          của vùng đèn giao thông đổi theo phiên bản macOS — không có máy
+          macOS thật để đo, ghép chung hàng dễ lệch. Tách hẳn một dải riêng,
+          cao cố định 38px (giá trị chuẩn Chrome/VS Code dùng cho titlebar
+          macOS) thì không có gì cần canh khớp với đèn giao thông cả. */}
+      {showMacOverlayChrome && (
+        <div data-tauri-drag-region className="h-[38px] shrink-0 border-b border-border bg-chrome" />
+      )}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -796,13 +794,6 @@ function AppContent() {
                 </div>
               )}
             </div>
-            {/* Khoảng trống giữa cụm trái (icon/tablist) và cụm phải (action
-                icon) vốn đã bỏ trống trên mọi màn rộng — chừa nó làm vùng kéo
-                cửa sổ khi titlebar hệ thống đã tắt (macOS overlay), giống
-                cách Postman/Arc dùng chính header app làm titlebar. Chỉ bật
-                khi showMacOverlayChrome; Windows/Linux vẫn có titlebar hệ
-                thống riêng nên không cần thêm vùng kéo trong nội dung. */}
-            {showMacOverlayChrome && <div className="flex-1" data-tauri-drag-region />}
             <div className="flex items-center gap-1">
               {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
               <div id="tool-header-actions" className="flex items-center gap-1" />
@@ -852,6 +843,7 @@ function AppContent() {
           </div>
         )}
       </main>
+      </div>
 
       <ToolGuideModal
         toolId={activeTool.featureId}
