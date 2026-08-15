@@ -1,16 +1,28 @@
-# DevTool Design System
+# DevTool Design System — lớp app
 
-A small, portable design system: **azure-blue accent · soft-depth elevation ·
-Apple-style frosted glass · Inter type · one motion rhythm**, all driven by CSS
-variables so theming and dark mode are free.
+> **Giá trị không nằm ở đây.** Nguồn sự thật là [`design/`](../../design/) —
+> bộ design kit dùng chung với trang mẫu tĩnh. Thư mục này chỉ là lớp app:
+> nó `@import` token của kit, bắc cầu từ vựng cũ sang từ vựng kit, và giữ những
+> thứ cần Tailwind xử lý (`@layer` / `@apply`).
+>
+> Sửa màu, bo góc, chiều cao control → sửa `design/tokens.css`.
+> Luật thiết kế → [`design/RULES.md`](../../design/RULES.md).
 
 ## What's in here
 
 | File | Purpose |
 |---|---|
-| `tokens.css` | Design tokens (`:root` / `.dark`), base resets, cross-platform scrollbar, and every design-system utility class (glass, soft-depth shadows, motion micro-interactions, premium card/typography/chrome). |
-| `tailwind-preset.cjs` | Tailwind theme: token-mapped colors, radius, cross-platform shadow scale, Inter font stack, easing + keyframes, dark mode, `tailwindcss-animate`. |
+| `tokens.css` | `@import` kit; **lớp bắc cầu** ánh xạ token cũ (`--background`, `--primary`…) sang kênh của kit (`--bg-c`, `--acc-c`…); base resets; cross-platform scrollbar; utility cần Tailwind. |
+| `tailwind-preset.cjs` | Kế thừa preset của kit rồi giữ lại 13 tên màu cũ để ~2430 chỗ gọi không phải sửa. |
 | `index.ts` | One import surface for all React primitives + `cn`. |
+
+### Hai từ vựng cùng tồn tại
+
+Code **mới** dùng từ vựng của kit: `bg-acc`, `text-fg-mute`, `border-line`,
+`bg-ok-tint`, `h-ctl`, `rounded-md`, `shadow`.
+
+Code **cũ** vẫn dùng `bg-primary`, `text-muted-foreground`, `border-border` — chúng
+vẫn chạy và đã nhận bảng màu mới, nhưng là lớp tạm. G4 di cư theo từng tool, G5 xoá.
 
 > Components themselves live in `src/components/ui/` (shadcn-style, Radix-based)
 > and are re-exported by `index.ts`. To lift the whole system into another
@@ -40,10 +52,13 @@ variables so theming and dark mode are free.
    };
    ```
 
-4. **Font** — install + import Inter once (e.g. in your entry file):
+4. **Font** — Be Vietnam Pro (sans) + IBM Plex Mono. Không có bản variable trên
+   fontsource nên nạp từng trọng lượng; subset `vietnamese` chứa dấu chồng hai tầng:
 
    ```ts
-   import '@fontsource-variable/inter';
+   import '@fontsource/be-vietnam-pro/latin-400.css';      // + 500, 600
+   import '@fontsource/be-vietnam-pro/vietnamese-400.css'; // + 500, 600
+   import '@fontsource/ibm-plex-mono/latin-400.css';       // + 500, 600
    ```
 
 5. **Use it**:
@@ -58,20 +73,24 @@ variables so theming and dark mode are free.
 - **Text**: `--foreground`, `--muted-foreground`
 - **Accent**: `--primary`, `--accent`, `--ring`, `--accent-glow` (HSL components)
 - **Lines/fields**: `--border`, `--input`, `--secondary`, `--muted`
-- **Status**: `--destructive`
-- **Shape**: `--radius` (1rem)
-- **Elevation**: `--shadow-xs … --shadow-2xl`
-- **Motion**: `--ease-out-soft`, `--ease-spring`, `--dur-fast|base|slow`
-- **Editor syntax**: `--sql-*`, `--js-*`
+- **Status**: `--destructive` — giờ trỏ vào `--bad-c` của hệ trạng thái
+- **Editor syntax**: `--sql-*`, `--js-*` (hệ riêng, không theo accent)
+
+Bo góc, bóng, chuyển động, chiều cao control nay do kit quản:
+xem [`design/TOKENS.md`](../../design/TOKENS.md).
 
 ## Utility classes
 
 - **Glass**: `.glass`, `.glass-strong`, `.glass-chrome`, `.glass-sheen`
-- **Elevation**: `.shadow-sm-premium … .shadow-2xl-premium`, `.shadow-primary`, `.shadow-primary-lg`
-- **Motion**: `.hover-elevate`, `.press`, `.accent-glow`, `.accent-glow-soft`, `.animate-pop`, `.animate-fade-in-up`, `.animate-scale-in`
-- **Components**: `.card-premium`, `.card-interactive`, `.container-premium`, `.badge-premium`, `.tab-premium`
+- **Elevation**: `.shadow-primary`, `.shadow-primary-lg`; `.shadow-sm-premium … .shadow-2xl-premium` là **bí danh tạm** ánh xạ xuống 3 bậc của kit
+- **Motion**: `.hover-elevate` (không còn nhấc phần tử), `.press`, `.animate-fade-in-up`, `.animate-scale-in`
 - **Chrome**: `.sidebar-premium`, `.header-premium`, `.content-wrapper`
 - **Typography**: `.heading-xl…xs`, `.text-body`, `.text-caption`
+
+> Đã xoá ở G1 (0 lượt dùng trong code): `.card-premium`, `.card-interactive`,
+> `.container-premium`, `.badge-premium`, `.tab-premium`, `.input-premium`,
+> `.textarea-premium`, `.btn-*-premium`, `.accent-glow*`, `.animate-pop`.
+> Dùng `<Card>`, `<Badge>`, `<Input>`, `<Button>` thay vì dựng lại bằng CSS.
 
 ## Principles
 

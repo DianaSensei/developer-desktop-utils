@@ -4,28 +4,31 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
+  // Rê chuột đổi màu/bóng, KHÔNG đổi vị trí — design/RULES.md. `transform` vẫn
+  // nằm trong transition cho hiệu ứng lún khi bấm (active:scale), là phản hồi
+  // trực tiếp dưới ngón tay chứ không phải chuyển động khi chỉ lướt qua.
+  'inline-flex items-center justify-center whitespace-nowrap rounded-sm text-sm font-medium ring-offset-background transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        // Raised, premium — soft blue accent glow that deepens on hover, lifts a
-        // hair and settles on press (Apple/Material key-action elevation).
         default:
-          'bg-primary text-primary-foreground shadow-primary hover:bg-primary/95 hover:shadow-primary-lg motion-safe:hover:-translate-y-0.5 active:shadow-primary motion-safe:active:translate-y-0',
+          'bg-primary text-primary-foreground shadow-primary hover:bg-primary/95 hover:shadow-primary-lg active:shadow-primary',
         destructive:
-          'bg-destructive text-destructive-foreground shadow-sm-premium hover:bg-destructive/90 hover:shadow-md-premium motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0',
+          'bg-destructive text-destructive-foreground shadow-sm-premium hover:bg-destructive/90 hover:shadow-md-premium',
         outline:
-          'border border-input bg-background shadow-sm-premium hover:bg-accent/10 hover:text-foreground hover:border-border/70 hover:shadow-md-premium motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0',
+          'border border-input bg-background shadow-sm-premium hover:bg-accent/10 hover:text-foreground hover:border-border/70 hover:shadow-md-premium',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-sm-premium',
         ghost: 'hover:bg-accent/15 hover:text-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-9 px-3 py-2',
-        sm: 'h-8 rounded-md px-2.5',
-        lg: 'h-10 rounded-md px-5',
-        icon: 'h-9 w-9',
+        // Một chiều cao control cho cả app: --h (34px). `lg` dùng --h-lg (40px)
+        // cho hành động chính của trang. `sm` giữ lại cho toolbar dày đặc.
+        default: 'h-ctl px-3 py-2',
+        sm: 'h-8 rounded-sm px-2.5',
+        lg: 'h-ctl-lg rounded-sm px-5',
+        icon: 'h-ctl w-ctl',
       },
     },
     defaultVariants: {

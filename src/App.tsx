@@ -59,6 +59,8 @@ const ArrayDeduplicator = lazy(() => named(import('@/components/tools/ArrayDedup
 const TextCounter = lazy(() => named(import('@/components/tools/TextCounter'), 'TextCounter'));
 const ColorPicker = lazy(() => named(import('@/components/tools/ColorPicker'), 'ColorPicker'));
 const Settings = lazy(() => named(import('@/components/Settings'), 'Settings'));
+// TẠM (G1) — trang so sánh mặt chữ, xem src/design-system/TypeSpecimen.tsx.
+const TypeSpecimen = lazy(() => import('@/design-system/TypeSpecimen'));
 const KafkaExplorer = lazy(() => named(import('@/components/tools/kafka/KafkaExplorer'), 'KafkaExplorer'));
 const RabbitClient = lazy(() => named(import('@/components/tools/rabbit/RabbitClient'), 'RabbitClient'));
 const SqlFormatter = lazy(() => named(import('@/components/tools/SqlFormatter'), 'SqlFormatter'));
@@ -702,6 +704,9 @@ function AppContent() {
             <Route key={tool.path} path={tool.path} element={<tool.component />} />
           ))}
           <Route path="/settings" element={<Settings />} />
+          {/* TẠM (G1): trang so sánh mặt chữ, cố ý không có trong sidebar.
+              Xoá cùng src/design-system/TypeSpecimen.tsx khi đã chốt font. */}
+          <Route path="/type-specimen" element={<TypeSpecimen />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

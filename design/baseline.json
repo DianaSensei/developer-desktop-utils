@@ -1,0 +1,13 @@
+{
+  "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
+  "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
+  "_phase": "Đặt ở G1 (nối design kit vào app).",
+  "limits": {
+    "rawColors": 553,
+    "tinyText": 164,
+    "mixedControlHeights": 352,
+    "premiumUtilities": 42,
+    "hoverLift": 0,
+    "handRolledTooltip": 5
+  }
+}

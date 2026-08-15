@@ -3,7 +3,7 @@
 // connections and channels, the API Client runner's data preview.
 //
 // All eight of those had independently arrived at nearly the same markup —
-// `overflow-x-auto rounded-xl border border-border/50` wrapping a
+// `overflow-x-auto rounded-lg border border-border/50` wrapping a
 // `w-full text-xs` table with a `bg-muted/20` header and `divide-y
 // divide-border/40` rows — but with drifting cell padding (`px-3` vs `px-3.5`)
 // and header tint (`bg-muted/20` vs `bg-muted/30`). These parts fix the
@@ -61,7 +61,7 @@ export interface DataTableProps extends React.TableHTMLAttributes<HTMLTableEleme
 export function DataTable({ className, containerClassName, density = 'default', children, ...props }: DataTableProps) {
   return (
     <DensityContext.Provider value={density}>
-      <div className={cn('overflow-x-auto rounded-xl border border-border/50', containerClassName)}>
+      <div className={cn('overflow-x-auto rounded-lg border border-border/50', containerClassName)}>
         <table className={cn('w-full text-xs', className)} {...props}>
           {children}
         </table>

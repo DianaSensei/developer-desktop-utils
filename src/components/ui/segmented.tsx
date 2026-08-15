@@ -31,13 +31,17 @@ export function Segmented<T extends string>({
   className,
   ...props
 }: SegmentedProps<T>) {
-  const pad = size === 'sm' ? 'h-7 text-xs' : 'h-8 text-sm';
+  // Chiều cao đặt ở KHUNG NGOÀI (h-ctl) và các nút con kéo `h-full`, để tổng
+  // chiều cao đúng bằng --h thay vì --h + đệm — nếu không, segmented sẽ cao hơn
+  // input/button đứng cạnh nó vài pixel.
+  const pad = size === 'sm' ? 'h-7 text-xs' : 'text-sm';
   return (
     <div
       role="tablist"
       aria-label={props['aria-label']}
       className={cn(
-        'inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5',
+        'inline-flex items-center gap-0.5 rounded-sm border border-border bg-muted/60 p-0.5',
+        size === 'md' && 'h-ctl',
         className
       )}
     >
@@ -53,8 +57,9 @@ export function Segmented<T extends string>({
             title={opt.title}
             onClick={() => onValueChange(opt.value)}
             className={cn(
-              'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[7px] px-3 font-medium',
+              'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xs px-3 font-medium',
               'transition-[color,background-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.97]',
+              size === 'md' && 'h-full',
               pad,
               active
                 ? 'bg-card text-foreground shadow-sm-premium'

@@ -44,7 +44,7 @@ module.exports = {
           'tint-2': ch('acc-tint-2'),
           ink: ch('acc-ink'),
           edge: ch('acc-edge'),
-          fg: 'var(--acc-fg)',
+          fg: ch('acc-fg'),
         },
 
         /* ── Bề mặt ──────────────────────────────────────────────────────── */
@@ -82,9 +82,11 @@ module.exports = {
         none: 'none',
       },
 
-      /* Chiều cao control — chỉ hai. */
+      /* Chiều cao control — chỉ hai. `width` đi kèm cho nút icon vuông. */
       height: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
       minHeight: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
+      width: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
+      minWidth: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
 
       ringColor: { DEFAULT: 'var(--acc-ring)' },
 

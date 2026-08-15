@@ -49,7 +49,8 @@
   --acc-ink:    hsl(var(--acc-ink-c));
   --acc-edge:   hsl(var(--acc-edge-c));
   --acc-ring:   hsl(var(--acc-c) / .22);
-  --acc-fg:     #fff;
+  --acc-fg-c:   0 0% 100%;
+  --acc-fg:     hsl(var(--acc-fg-c));
 
   /* ── Nền: xám NGẢ SẮC accent, không xám trung tính ────────────────────
      Xám trung tính là thứ làm giao diện trông rẻ. Mọi bề mặt ở đây đều mang
@@ -114,8 +115,11 @@
   /* ── Mặt chữ ──────────────────────────────────────────────────────────
      `mono` chưa từng được khai báo trong preset Tailwind của repo, dù
      `font-mono` dùng 356 lần → rơi về Courier New trên Windows/Linux.
-     Danh sách dự phòng ở đây đảm bảo có chữ đơn cách thật trên cả ba nền. */
-  --sans: "Be Vietnam Pro Variable", "Be Vietnam Pro", system-ui, -apple-system,
+     Danh sách dự phòng ở đây đảm bảo có chữ đơn cách thật trên cả ba nền.
+
+     Be Vietnam Pro chỉ có bản TĨNH trên fontsource (không có bản variable),
+     nên app nạp ba trọng lượng rời: 400 / 500 / 600, subset latin + vietnamese. */
+  --sans: "Be Vietnam Pro", system-ui, -apple-system,
           "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
           Consolas, "Liberation Mono", monospace;
@@ -146,7 +150,7 @@
   --acc-ink-c:    var(--a-h) 60% 76%;
   --acc-edge-c:   var(--a-h) 34% 32%;
   --acc-ring:     hsl(var(--a-h) 70% 62% / .3);
-  --acc-fg:       hsl(var(--a-h) 60% 10%);
+  --acc-fg-c:     var(--a-h) 60% 10%;
 
   --bg-c:     var(--a-h) 18% 9%;
   --bg-2-c:   var(--a-h) 18% 12%;
@@ -180,9 +184,16 @@
    ========================================================================== */
 [data-accent="azure"]   { --a-h: 218; --a-s: 76%; --a-l: 48%; }
 [data-accent="petrol"]  { --a-h: 190; --a-s: 68%; --a-l: 36%; }
-[data-accent="forest"]  { --a-h: 152; --a-s: 52%; --a-l: 32%; }
+/* Xanh lá ngả VÀNG, không phải xanh lá thuần: --ok nằm ở hue ~155. Bản đầu
+   ("forest", h152) chỉ cách --ok 18 đơn vị RGB — accent và "hợp lệ" gần như
+   cùng một màu. h96 đẩy khoảng cách lên 61. */
+[data-accent="moss"]    { --a-h:  96; --a-s: 40%; --a-l: 28%; }
 [data-accent="iris"]    { --a-h: 258; --a-s: 62%; --a-l: 56%; }
-[data-accent="oxblood"] { --a-h:   2; --a-s: 58%; --a-l: 42%; }
+/* Oxblood phải TỐI và NGẢ TÍA, không được là đỏ tươi: --bad nằm ở hue ~3.
+   Bản đầu (h2 s58 l42) cho ra rgb(169,49,45) — cách màu lỗi rgb(179,50,44)
+   đúng 10 đơn vị, tức là mắt thường không phân biệt được nút chính với báo lỗi.
+   Bản này cách 80. Bất kỳ tone đỏ nào thêm sau cũng phải qua phép đo đó. */
+[data-accent="oxblood"] { --a-h: 355; --a-s: 38%; --a-l: 28%; }
 [data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 44%; }
 
 /* ============================================================================

@@ -1,8 +1,13 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-// Minimal, dependency-free toggle switch styled to match the app's azure-blue
-// signature accent. Controlled via `checked` / `onCheckedChange`.
+// Minimal, dependency-free toggle switch. Controlled via `checked` /
+// `onCheckedChange`.
+//
+// The ON state is GREEN, not the accent. A switch reports state ("this is on"),
+// and state colors are a separate fixed system from the swappable accent — so
+// re-toning the app to a red or amber accent must not recolor every toggle.
+// See design/RULES.md, "Màu theo nghĩa".
 export interface SwitchProps {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
@@ -24,7 +29,7 @@ export const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-out',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-primary' : 'bg-input border border-border',
+        checked ? 'bg-ok' : 'bg-input border border-border',
         className,
       )}
       {...props}

@@ -1,8 +1,28 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-// Inter — self-hosted variable font (bundled by Vite, works offline, identical
-// on macOS / Windows / Linux). One UI typeface for the whole app.
+// Self-hosted fonts — bundled by Vite, work offline, render identically on
+// macOS / Windows / Linux.
+//
+// Two sans faces are loaded on purpose during G1: the /type-specimen route
+// switches --sans between them so the Vietnamese diacritics can be judged in
+// the real webview before one is locked in. The loser gets deleted at the end
+// of G1 — this is a temporary two-font state, not the intended end state.
 import '@fontsource-variable/inter';
+// Be Vietnam Pro has no variable build on fontsource, so the three weights the
+// app actually uses are loaded individually. The `vietnamese` subset carries
+// the stacked diacritics (ế ộ ữ) that the latin subset does not.
+import '@fontsource/be-vietnam-pro/latin-400.css';
+import '@fontsource/be-vietnam-pro/latin-500.css';
+import '@fontsource/be-vietnam-pro/latin-600.css';
+import '@fontsource/be-vietnam-pro/vietnamese-400.css';
+import '@fontsource/be-vietnam-pro/vietnamese-500.css';
+import '@fontsource/be-vietnam-pro/vietnamese-600.css';
+// IBM Plex Mono — the first real monospace the app has ever had. `font-mono` is
+// used in 356 places but `fontFamily.mono` was never declared, so every one of
+// them fell back to Courier New on Windows and Linux.
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/ibm-plex-mono/latin-600.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
 

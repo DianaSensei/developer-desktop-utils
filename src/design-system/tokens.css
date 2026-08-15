@@ -1,56 +1,71 @@
 /* ============================================================================
-   DevTool Design System — tokens + base + utilities (portable)
+   DevTool — lớp app của design system
    ----------------------------------------------------------------------------
-   Drop `src/design-system/` into another project and, at the TOP of your global
-   stylesheet (before the @tailwind directives), add:
+   Giá trị KHÔNG nằm ở đây. Nguồn sự thật là `design/tokens.css` (CSS thuần,
+   dùng chung với trang mẫu `design/preview/index.html`). File này chỉ làm ba việc:
 
-       @import "../design-system/tokens.css";
+     1. @import kit
+     2. BẮC CẦU từ vựng token cũ của app sang kênh của kit
+     3. Base reset + utility cần Tailwind xử lý (@layer / @apply)
 
-   Then add the preset to tailwind.config.js:
+   Muốn đổi màu, bo góc, chiều cao control → sửa `design/tokens.css`, không sửa đây.
 
-       presets: [require("./src/design-system/tailwind-preset.cjs")]
+   Cách dùng ở dự án khác: xem `design/README.md`.
+   ========================================================================== */
 
-   This file owns: the color/elevation/motion TOKENS (:root / .dark), the base
-   resets + cross-platform scrollbar, and every design-system utility class
-   (glass, soft-depth shadows, motion micro-interactions, premium components).
-   It is processed by Tailwind (uses @layer / @apply), so it must be imported
-   into a Tailwind-processed CSS entry (Vite inlines the @import at build).
-   ============================================================================ */
+@import "../../design/tokens.css";
 
 @layer base {
+  /* ══════════════════════════════════════════════════════════════════════
+     BẮC CẦU — từ vựng cũ → kênh của kit
+     ----------------------------------------------------------------------
+     App có ~2430 chỗ dùng các tên này (`bg-background`, `text-muted-foreground`,
+     `border-border`…). Đổi tên chúng trong một commit là viết lại cả app, nên
+     thay vào đó ta giữ nguyên TÊN và chỉ đổi GIÁ TRỊ bên dưới. Kết quả: 2430
+     chỗ không phải sửa một chữ nhưng nhận bảng màu mới.
+
+     Vì sao gán được: kit khai báo mỗi màu ở dạng KÊNH ("218 76% 48%"), đúng
+     dạng mà `hsl(var(--x) / <alpha-value>)` của preset cần — nên `bg-card/50`
+     vẫn chạy y như trước.
+
+     Đây là lớp TẠM. G4 di cư từng tool sang tên của kit (`bg-card` → `bg-card`,
+     `text-muted-foreground` → `text-fg-mute`…); G5 xoá hẳn khối này.
+     ══════════════════════════════════════════════════════════════════════ */
   :root {
-    /* Premium light mode — soft, approachable, high contrast for clarity. */
-    --background: 0 0% 95%;
-    --sidebar: 0 0% 92%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
-    --elevated: 0 0% 100%;
+    --background: var(--bg-c);
+    --sidebar: var(--chrome-c);
+    --card: var(--card-c);
+    --popover: var(--card-c);
+    --elevated: var(--chrome-c);
 
-    --foreground: 0 0% 8%;
-    --muted-foreground: 0 0% 42%;
+    --foreground: var(--fg-c);
+    --card-foreground: var(--fg-c);
+    --popover-foreground: var(--fg-c);
+    --muted-foreground: var(--fg-mute-c);
 
-    /* Primary: vivid azure / cobalt — eye-catching but comfortable on white. */
-    --primary: 216 94% 52%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 216 92% 56%;
-    --accent-foreground: 0 0% 100%;
-    /* Low-alpha-ready primary (HSL components) for focus / accent glow. */
-    --accent-glow: 216 96% 56%;
+    /* App dùng chung một azure cho cả primary / accent / ring — kit gọi nó là accent. */
+    --primary: var(--acc-c);
+    --accent: var(--acc-c);
+    --ring: var(--acc-c);
+    --accent-glow: var(--acc-c);
+    --primary-foreground: var(--acc-fg-c);
+    --accent-foreground: var(--acc-fg-c);
 
-    --secondary: 0 0% 88%;
-    --secondary-foreground: 0 0% 4%;
-    --input: 0 0% 96%;
-    --muted: 0 0% 92%;
+    --secondary: var(--bg-2-c);
+    --secondary-foreground: var(--fg-c);
+    --muted: var(--bg-2-c);
+    --input: var(--sunk-c);
+    --border: var(--line-c);
 
-    --border: 0 0% 86%;
-    --ring: 216 94% 52%;
-
-    --destructive: 0 84% 52%;
+    /* Lần đầu "lỗi" dùng đúng hệ trạng thái thay vì một đỏ rời rạc. */
+    --destructive: var(--bad-c);
     --destructive-foreground: 0 0% 100%;
+  }
 
-    /* SQL / JS editor syntax colors */
+  /* ── Bảng màu cú pháp editor ────────────────────────────────────────────
+     Hệ RIÊNG, không thuộc kit và không theo accent: màu token trong SQL/JS
+     mang nghĩa cú pháp, đổi tone không được làm keyword đổi màu. Giữ nguyên. */
+  :root {
     --sql-keyword: hsl(216 90% 46%);
     --sql-string: hsl(130 50% 35%);
     --sql-comment: hsl(0 0% 50%);
@@ -60,49 +75,9 @@
     --sql-type: hsl(270 55% 45%);
     --js-property: hsl(32 90% 44%);
     --js-method: hsl(270 60% 52%);
-
-    --radius: 1rem;
-
-    /* Soft-depth shadow scale — multi-layer for richer depth. */
-    --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.06);
-    --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.09), 0 1px 2px -1px rgba(15, 23, 42, 0.08);
-    --shadow-md: 0 4px 8px -2px rgba(15, 23, 42, 0.10), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
-    --shadow-lg: 0 12px 20px -4px rgba(15, 23, 42, 0.12), 0 4px 8px -4px rgba(15, 23, 42, 0.10);
-    --shadow-xl: 0 22px 30px -8px rgba(15, 23, 42, 0.16), 0 8px 14px -6px rgba(15, 23, 42, 0.12);
-    --shadow-2xl: 0 32px 64px -12px rgba(15, 23, 42, 0.22), 0 12px 24px -8px rgba(15, 23, 42, 0.14);
-
-    color-scheme: light;
   }
 
   .dark {
-    /* Premium dark mode — deep, sophisticated, careful contrast. */
-    --background: 0 0% 10%;
-    --sidebar: 0 0% 8%;
-    --card: 0 0% 14%;
-    --card-foreground: 0 0% 94%;
-    --popover: 0 0% 15%;
-    --popover-foreground: 0 0% 94%;
-    --elevated: 0 0% 17%;
-
-    --foreground: 0 0% 92%;
-    --muted-foreground: 0 0% 58%;
-
-    /* Same azure, more luminous on dark; near-black text on the bright blue. */
-    --primary: 214 100% 66%;
-    --primary-foreground: 216 60% 10%;
-    --accent: 214 98% 70%;
-    --accent-foreground: 216 60% 10%;
-    --accent-glow: 214 100% 66%;
-
-    --secondary: 0 0% 22%;
-    --secondary-foreground: 0 0% 92%;
-    --input: 0 0% 18%;
-    --muted: 0 0% 20%;
-
-    --border: 0 0% 22%;
-    --ring: 214 100% 66%;
-
-    --destructive: 0 80% 64%;
     --destructive-foreground: 0 0% 100%;
 
     --sql-keyword: hsl(214 100% 74%);
@@ -114,26 +89,6 @@
     --sql-type: hsl(270 60% 72%);
     --js-property: hsl(32 90% 66%);
     --js-method: hsl(270 65% 75%);
-
-    --radius: 1rem;
-
-    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
-    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 12px 20px -4px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.5);
-    --shadow-xl: 0 22px 30px -8px rgba(0, 0, 0, 0.6), 0 8px 14px -6px rgba(0, 0, 0, 0.5);
-    --shadow-2xl: 0 32px 64px -12px rgba(0, 0, 0, 0.7), 0 12px 24px -8px rgba(0, 0, 0, 0.55);
-
-    color-scheme: dark;
-  }
-
-  /* ── Motion tokens — one rhythm for every animation/micro-interaction. ── */
-  :root {
-    --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
-    --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
-    --dur-fast: 150ms;
-    --dur-base: 220ms;
-    --dur-slow: 340ms;
   }
 
   ::selection {
@@ -142,7 +97,7 @@
 
   /* Controlled light/dark color swap — added to <html> only during a toggle,
      never on first paint, and excluded from layout properties so nothing
-     reflows. Neutralized under reduce-motion below. */
+     reflows. Neutralized under reduce-motion (handled in design/tokens.css). */
   .theme-transition,
   .theme-transition *,
   .theme-transition *::before,
@@ -150,18 +105,6 @@
     transition: background-color 220ms ease, border-color 220ms ease,
       color 220ms ease, fill 220ms ease, stroke 220ms ease,
       box-shadow 220ms ease !important;
-  }
-
-  /* Respect OS "reduce motion" — neutralize all animation/transition. */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
   }
 
   /* ── Cross-platform custom scrollbar ───────────────────────────────────
@@ -211,38 +154,40 @@
     display: none;
   }
 
-  /* ── Soft-depth shadow aliases ─────────────────────────────────────── */
-  .shadow-sm-premium { box-shadow: var(--shadow-sm); }
-  .shadow-md-premium { box-shadow: var(--shadow-md); }
-  .shadow-lg-premium { box-shadow: var(--shadow-lg); }
-  .shadow-xl-premium { box-shadow: var(--shadow-xl); }
-  .shadow-2xl-premium { box-shadow: var(--shadow-2xl); }
+  /* ── Bí danh bóng đổ (đang còn 15 chỗ dùng) ────────────────────────────
+     Hệ cũ có 6 bậc, kit có 3. Ánh xạ xuống 3 bậc thật; G5 xoá bí danh khi
+     các chỗ gọi đã chuyển sang `shadow` / `shadow-soft` / `shadow-lift`. */
+  .shadow-sm-premium { box-shadow: var(--sh-sm); }
+  .shadow-md-premium { box-shadow: var(--sh); }
+  .shadow-lg-premium { box-shadow: var(--sh); }
+  .shadow-xl-premium { box-shadow: var(--sh-lg); }
+  .shadow-2xl-premium { box-shadow: var(--sh-lg); }
 
-  /* Tinted accent elevation — soft blue glow under the key action. */
+  /* Bóng ngả sắc accent dưới hành động chính. */
   .shadow-primary {
-    box-shadow: 0 2px 8px -2px hsl(var(--accent-glow) / 0.35),
-                0 1px 2px -1px hsl(var(--accent-glow) / 0.25);
+    box-shadow: 0 2px 8px -2px hsl(var(--acc-c) / 0.35),
+                0 1px 2px -1px hsl(var(--acc-c) / 0.25);
   }
   .shadow-primary-lg {
-    box-shadow: 0 8px 20px -4px hsl(var(--accent-glow) / 0.45),
-                0 3px 8px -3px hsl(var(--accent-glow) / 0.30);
+    box-shadow: 0 8px 20px -4px hsl(var(--acc-c) / 0.45),
+                0 3px 8px -3px hsl(var(--acc-c) / 0.30);
   }
 
   /* ── Glass surfaces (Apple-style frosted, kept legible) ───────────────
      Heavy blur + saturation, high fill opacity so content stays crisp.
      -webkit- + standard prefixes for all three Tauri webviews. */
   .glass {
-    background-color: hsl(var(--card) / 0.80);
+    background-color: hsl(var(--card-c) / 0.80);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);
   }
   .glass-strong {
-    background-color: hsl(var(--card) / 0.90);
+    background-color: hsl(var(--card-c) / 0.90);
     -webkit-backdrop-filter: blur(30px) saturate(190%);
     backdrop-filter: blur(30px) saturate(190%);
   }
   .glass-chrome {
-    background-color: hsl(var(--sidebar) / 0.86);
+    background-color: hsl(var(--chrome-c) / 0.86);
     -webkit-backdrop-filter: blur(26px) saturate(185%);
     backdrop-filter: blur(26px) saturate(185%);
   }
@@ -251,23 +196,17 @@
                 inset 0 -1px 0 0 hsl(0 0% 0% / 0.04);
   }
 
-  /* ── Motion micro-interactions (all transform effects behind motion-safe) ── */
+  /* ── Micro-interaction ────────────────────────────────────────────────
+     Rê chuột đổi NỀN/VIỀN, không đổi VỊ TRÍ — `design/RULES.md`. Bản cũ của
+     .hover-elevate dịch phần tử lên 2px khi rê; đã bỏ vì nó làm layout nhảy
+     dưới con trỏ. */
   .hover-elevate {
-    @apply transition-[transform,box-shadow,border-color] duration-200 ease-out
-           motion-safe:hover:-translate-y-0.5 hover:shadow-md-premium hover:border-border/70
-           motion-safe:active:translate-y-0 active:shadow-sm-premium;
-  }
-  .accent-glow {
-    box-shadow: 0 0 0 3px hsl(var(--accent-glow) / 0.22);
-  }
-  .accent-glow-soft {
-    box-shadow: 0 0 0 3px hsl(var(--accent-glow) / 0.14);
+    @apply transition-[box-shadow,border-color,background-color] duration-200 ease-out
+           hover:shadow-md-premium hover:border-border/70
+           active:shadow-sm-premium;
   }
   .press {
     @apply transition-transform duration-150 ease-out motion-safe:active:scale-[0.96];
-  }
-  .animate-pop {
-    animation: pop var(--dur-base) var(--ease-spring);
   }
   .animate-fade-in-up {
     animation: fadeInUp 0.3s ease-out;
@@ -283,22 +222,6 @@
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
   }
-  @keyframes pop {
-    0% { transform: scale(0.9); }
-    60% { transform: scale(1.04); }
-    100% { transform: scale(1); }
-  }
-
-  /* ── Card & container ─────────────────────────────────────────────── */
-  .card-premium {
-    @apply bg-card rounded-lg border border-border shadow-sm-premium transition-all duration-200 ease-out;
-  }
-  .card-interactive {
-    @apply card-premium hover-elevate;
-  }
-  .container-premium {
-    @apply rounded-lg border border-border bg-card/50 backdrop-blur-sm transition-colors duration-150;
-  }
 
   /* ── Typography ───────────────────────────────────────────────────── */
   .heading-xl { @apply text-xl font-semibold leading-tight tracking-tight; }
@@ -308,19 +231,6 @@
   .heading-xs { @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground; }
   .text-body { @apply text-sm leading-relaxed; }
   .text-caption { @apply text-xs leading-relaxed text-muted-foreground; }
-
-  /* ── Badges / tabs ────────────────────────────────────────────────── */
-  .badge-premium {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium
-           bg-muted/60 text-foreground border border-border/50 transition-colors duration-150;
-  }
-  .tab-premium {
-    @apply px-4 py-2.5 rounded-t-lg border border-b-0 border-border bg-muted/50 text-sm font-medium
-           text-muted-foreground transition-all duration-150 cursor-pointer hover:text-foreground hover:bg-muted/70;
-  }
-  .tab-premium.active {
-    @apply bg-card border-border text-foreground shadow-sm-premium;
-  }
 
   /* ── App chrome ───────────────────────────────────────────────────── */
   .sidebar-premium {
