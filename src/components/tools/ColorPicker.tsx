@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
 import { ColorPicker as ColorField } from '@/components/ui/color-picker';
 import { SectionLabel } from '@/components/ui/section-label';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   Copy, Check, Pipette, Image as ImageIcon, Download, SlidersHorizontal, HelpCircle, ArrowLeftRight,
 } from 'lucide-react';
@@ -137,15 +138,15 @@ const LOUPE = 132;   // loupe canvas size (px)
 const LOUPE_CELLS = 11; // source pixels shown across the loupe
 const PALETTE_SIZE = 16; // number of colors extracted from the image (strip scrolls)
 
-// Small hover "?" with a tooltip — replaces inline hint text.
+// Small hover "?" — dùng <Tooltip> dùng chung thay vì bản group-hover tự chế
+// (bản cũ không tới được bằng bàn phím và bị cắt trong khung overflow).
 function Help({ text }: { text: string }) {
   return (
-    <span className="group relative inline-flex align-middle">
-      <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground/50 transition-colors hover:text-foreground" />
-      <span className="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden w-56 rounded-md border bg-popover p-2 text-[11px] font-normal leading-relaxed text-muted-foreground shadow-lg group-hover:block">
-        {text}
+    <Tooltip label={text} side="bottom" width={224}>
+      <span tabIndex={0} className="inline-flex align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+        <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground/50 transition-colors hover:text-foreground" />
       </span>
-    </span>
+    </Tooltip>
   );
 }
 
@@ -383,7 +384,7 @@ export function ColorPicker() {
       >
         <span className="min-w-0 flex-1 truncate">{value.d}</span>
         {copied === id
-          ? <Check className="h-3 w-3 shrink-0 text-green-500" />
+          ? <Check className="h-3 w-3 shrink-0 text-ok" />
           : <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" />}
       </button>
     ) : (
@@ -394,7 +395,7 @@ export function ColorPicker() {
   // A label + the two views' values for one color format.
   const CompareRow = ({ label, field }: { label: string; field: 'hex' | 'rgb' | 'hsl' | 'cmyk' }) => (
     <>
-      <span className="self-center text-[10px] font-medium text-muted-foreground">{label}</span>
+      <span className="self-center text-[11px] font-medium text-muted-foreground">{label}</span>
       <Cell id={`sel-${field}`} value={selFmt?.[field]} />
       <Cell id={`hov-${field}`} value={hovFmt?.[field]} />
     </>
@@ -462,7 +463,7 @@ export function ColorPicker() {
                   </span>
                 </ColorField>
               </div>
-              <span className="px-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="px-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Hovering
               </span>
 
@@ -491,21 +492,21 @@ export function ColorPicker() {
                 <h2 className="text-sm font-semibold">Color Palette</h2>
                 <Help text="Colors extracted from the image. Click a swatch to select it. When there are more than fit, the strip scrolls sideways." />
                 {paletteScrollable && (
-                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
                     <ArrowLeftRight className="h-3 w-3" /> scroll
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={downloadPalette}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:bg-muted"
                   title="Download palette as PNG">
                   <Download className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={savePalette}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:bg-muted"
                   title="Copy all hex codes">
-                  {copied === 'palette' ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied === 'palette' ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
               </div>
             </div>

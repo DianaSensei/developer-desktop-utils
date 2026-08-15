@@ -1,13 +1,13 @@
 {
   "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
   "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
-  "_phase": "Hạ ở G4 đợt 4.1 (Text · JSON&Data · Time).",
+  "_phase": "Hạ ở G4 đợt 4.2 (Format · Encode&Hash · Generate · Diff · Regex · Color).",
   "limits": {
-    "rawColors": 424,
-    "tinyText": 136,
+    "rawColors": 306,
+    "tinyText": 106,
     "mixedControlHeights": 352,
     "premiumUtilities": 42,
     "hoverLift": 0,
-    "handRolledTooltip": 4
+    "handRolledTooltip": 3
   }
 }

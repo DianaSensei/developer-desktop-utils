@@ -71,7 +71,7 @@ export function FakeDataGenerator() {
             max={10000}
             value={count}
             onChange={(e) => setCount(parseInt(e.target.value) || 1)}
-            className="h-8 w-24 text-xs rounded-lg"
+            className="h-8 w-24 text-xs rounded-sm"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -80,14 +80,14 @@ export function FakeDataGenerator() {
             type="number"
             value={seed}
             onChange={(e) => setSeed(parseInt(e.target.value) || 0)}
-            className="h-8 w-24 text-xs rounded-lg"
+            className="h-8 w-24 text-xs rounded-sm"
           />
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setSeed(Math.floor(Math.random() * 1e9))}
             title="New random seed"
-            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
@@ -96,7 +96,7 @@ export function FakeDataGenerator() {
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Format</span>
           <Select value={format} onValueChange={(v) => setFormat(v as RowFormat)}>
-            <SelectTrigger className="h-8 w-28 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 w-28 text-xs rounded-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               {ROW_FORMATS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
             </SelectContent>
@@ -109,7 +109,7 @@ export function FakeDataGenerator() {
               value={table}
               onChange={(e) => setTable(e.target.value)}
               placeholder="users"
-              className="h-8 w-32 text-xs font-mono rounded-lg"
+              className="h-8 w-32 text-xs font-mono rounded-sm"
             />
           </div>
         )}
@@ -120,7 +120,7 @@ export function FakeDataGenerator() {
               value={prefix}
               onChange={(e) => setPrefix(e.target.value)}
               placeholder="data"
-              className="h-8 w-32 text-xs font-mono rounded-lg"
+              className="h-8 w-32 text-xs font-mono rounded-sm"
             />
           </div>
         )}
@@ -149,7 +149,7 @@ export function FakeDataGenerator() {
                   <button
                     onClick={() => removeField(f.id)}
                     title="Remove field"
-                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-bad/10 hover:text-bad"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -160,7 +160,7 @@ export function FakeDataGenerator() {
                     <SelectContent>
                       {FAKER_TYPE_GROUPS.map((g) => (
                         <SelectGroup key={g.group}>
-                          <SelectLabel className="text-[10px] uppercase tracking-wide text-muted-foreground/70">{g.group}</SelectLabel>
+                          <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground/70">{g.group}</SelectLabel>
                           {g.types.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                         </SelectGroup>
                       ))}
@@ -184,7 +184,7 @@ export function FakeDataGenerator() {
                         <SelectItem key={d.value} value={d.value}>
                           <span className="flex items-baseline gap-2">
                             {d.label}
-                            <span className="font-mono text-[10px] text-muted-foreground">{d.example}</span>
+                            <span className="font-mono text-[11px] text-muted-foreground">{d.example}</span>
                           </span>
                         </SelectItem>
                       ))}

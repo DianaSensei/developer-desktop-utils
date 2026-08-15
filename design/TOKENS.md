@@ -82,6 +82,30 @@ Bản tối không phải bản sáng đảo ngược — mỗi tông được c
 
 ---
 
+## Bảng màu phân loại — `--cat-1..5`
+
+Hệ thứ ba, tách khỏi cả accent lẫn trạng thái. Dùng khi cần phân biệt các mục
+**cùng loại** cạnh nhau mà danh tính không mang nghĩa tốt-xấu:
+
+| Dùng ở | Vì sao cần màu |
+|---|---|
+| Regex Tester — highlight match | Hai match **liền kề** cùng màu thì không thấy ranh giới |
+| Pipeline — loại bước (nguồn/ký/băm/mã hoá) | Quét nhanh một pipeline dài theo nhóm chức năng |
+
+Đây là **lần duy nhất màu được phép xoay vòng**. Ngoài hai chỗ trên, muốn dùng
+thì phải trả lời được: *nếu tất cả cùng một màu thì mất thông tin gì?* Không trả
+lời được nghĩa là màu đang trang trí — dùng trọng lượng chữ và khoảng cách.
+
+Năm hue cố ý **không có đỏ và không có xanh lá đúng hue `--ok`/`--bad`**: một dải
+highlight xanh lá nằm cạnh chip "lỗi" đỏ sẽ đọc như trạng thái chứ không phải
+phân loại.
+
+Hai dạng, như mọi màu khác trong kit:
+- `--cat-N-c` — kênh, cho nền có alpha: `bg-[hsl(var(--cat-1-c)/0.30)]`
+- `--cat-N` — bọc sẵn, khi không cần alpha: `text-[var(--cat-3)]`
+
+---
+
 ## Thang bo góc — vì sao rời nhau
 
 Thang cũ của repo:

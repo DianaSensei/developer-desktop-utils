@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { PaneHeader } from '@/components/ui/tool-layout';
 import { CodeViewer } from '@/design-system';
+import { Callout } from '@/components/ui/callout';
 import { Shield } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -47,28 +48,31 @@ export function JwtDebugger() {
       {/* Decoded output — scrollable */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
         {decoded.error ? (
-          <div className="p-3.5 bg-destructive/8 border border-destructive/20 rounded-lg">
-            <p className="text-sm text-destructive">{decoded.error}</p>
-          </div>
+          <Callout tone="error">{decoded.error}</Callout>
         ) : decoded.header ? (
           <>
+            {/* Header và Payload từng được phân biệt bằng MÀU KHUNG — accent cho
+                Header, tím cho Payload. Hai vấn đề: accent đổi theo tone chủ đạo
+                nên chỉ một trong hai khung đổi màu khi swap tone, và bản thân màu
+                không nói gì mà nhãn chưa nói. Giờ cả hai dùng cùng một khung
+                trung tính; nhãn chữ mang toàn bộ sự phân biệt. */}
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-primary uppercase tracking-wider">Header</div>
-              <div className="flex min-h-[100px] flex-col overflow-hidden rounded-lg border border-primary/20 bg-primary/[0.06] dark:bg-primary/[0.10]">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Header</div>
+              <div className="flex min-h-[100px] flex-col overflow-hidden rounded-md border border-border bg-sunk">
                 <CodeViewer value={decoded.header} language="json" />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Payload</div>
-              <div className="flex min-h-[180px] flex-col overflow-hidden rounded-lg border border-purple-200/50 bg-purple-50/70 dark:border-purple-900/40 dark:bg-purple-950/20">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payload</div>
+              <div className="flex min-h-[180px] flex-col overflow-hidden rounded-md border border-border bg-sunk">
                 <CodeViewer value={decoded.payload} language="json" />
               </div>
             </div>
-            <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/40 rounded-lg">
-              <p className="text-xs text-amber-800 dark:text-amber-300">
-                <span className="font-semibold">Note:</span> This tool only decodes the token — it does not verify the signature.
-              </p>
-            </div>
+            {/* Cảnh báo thật (không xác thực chữ ký) — dùng Callout thay vì tự
+                dựng khung amber lần thứ 8 trong repo. */}
+            <Callout tone="warning" size="sm" title="Decode only">
+              This tool does not verify the signature.
+            </Callout>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground gap-3 pt-12">

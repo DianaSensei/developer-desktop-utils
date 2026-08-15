@@ -92,12 +92,16 @@ const PRESETS: Preset[] = [
   },
 ];
 
+// Xoay vòng để hai match LIỀN KỀ không cùng màu — nếu cùng, không nhìn ra
+// ranh giới giữa chúng. Đây là mã hoá phân loại, dùng bảng --cat-* của kit
+// (xem design/tokens.css); chữ luôn là text-foreground nên tương phản không
+// phụ thuộc vào hue đang xoay tới đâu.
 const MATCH_COLORS = [
-  'bg-yellow-200/80 dark:bg-yellow-800/40 text-yellow-900 dark:text-yellow-200',
-  'bg-blue-200/80 dark:bg-blue-800/40 text-blue-900 dark:text-blue-200',
-  'bg-green-200/80 dark:bg-green-800/40 text-green-900 dark:text-green-200',
-  'bg-purple-200/80 dark:bg-purple-800/40 text-purple-900 dark:text-purple-200',
-  'bg-orange-200/80 dark:bg-orange-800/40 text-orange-900 dark:text-orange-200',
+  'bg-[hsl(var(--cat-1-c)/0.30)] text-foreground',
+  'bg-[hsl(var(--cat-2-c)/0.30)] text-foreground',
+  'bg-[hsl(var(--cat-3-c)/0.30)] text-foreground',
+  'bg-[hsl(var(--cat-4-c)/0.30)] text-foreground',
+  'bg-[hsl(var(--cat-5-c)/0.30)] text-foreground',
 ];
 
 const RESULT_VIEWS: { id: ResultView; label: string }[] = [
@@ -350,7 +354,7 @@ export function RegexTester() {
                 {/* Match count + coverage stats */}
                 <span className={cn(
                   'shrink-0 px-3 py-1.5 text-xs font-semibold whitespace-nowrap',
-                  result.matches.length > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'
+                  result.matches.length > 0 ? 'text-ok' : 'text-muted-foreground'
                 )}>
                   {result.matches.length} match{result.matches.length !== 1 ? 'es' : ''}
                   {stats && stats.chars > 0 && (
@@ -408,14 +412,14 @@ export function RegexTester() {
               ) : (
                 <div className="space-y-2">
                   {result.matches.map((m, idx) => (
-                    <div key={idx} className="p-3 bg-green-50/80 dark:bg-green-950/20 border border-green-200/50 dark:border-green-900/30 rounded-lg">
+                    <div key={idx} className="rounded-md border border-border bg-sunk p-3">
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 px-1.5 py-0.5 rounded">
+                            <span className="rounded-xs bg-acc-tint px-1.5 py-0.5 text-[11px] font-medium text-acc-ink">
                               #{idx + 1}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[11px] text-muted-foreground">
                               pos {m.index}–{(m.index ?? 0) + m[0].length} · {m[0].length} char{m[0].length !== 1 ? 's' : ''}
                             </span>
                           </div>
@@ -424,12 +428,12 @@ export function RegexTester() {
                         <CopyButton value={m[0]} className="h-6 w-6 shrink-0" iconClassName="h-3 w-3" />
                       </div>
                       {m.length > 1 && (
-                        <div className="mt-2 space-y-1 pl-2 border-l-2 border-green-300/60 dark:border-green-700/60">
+                        <div className="mt-2 space-y-1 border-l-2 border-border pl-2">
                           {m.slice(1).map((g, gIdx) => {
                             const name = groupNames[gIdx];
                             return (
                               <div key={gIdx} className="flex items-center gap-2">
-                                <span className="text-[10px] font-mono font-medium text-blue-700 dark:text-blue-400 bg-blue-100/80 dark:bg-blue-900/30 px-1.5 py-0.5 rounded shrink-0">
+                                <span className="shrink-0 rounded-xs bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
                                   {name ? `<${name}>` : `Group ${gIdx + 1}`}
                                 </span>
                                 <span className="font-mono text-xs text-muted-foreground break-all">
@@ -455,7 +459,7 @@ export function RegexTester() {
                 {result.matches.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 px-1">
                     {MATCH_COLORS.slice(0, Math.min(result.matches.length, MATCH_COLORS.length)).map((color, idx) => (
-                      <span key={idx} className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded', color)}>
+                      <span key={idx} className={cn('text-[11px] font-medium px-1.5 py-0.5 rounded', color)}>
                         Match {idx + 1}{idx === MATCH_COLORS.length - 1 && result.matches.length > MATCH_COLORS.length ? `–${result.matches.length}` : ''}
                       </span>
                     ))}
@@ -594,7 +598,7 @@ export function RegexTester() {
                       <label className="text-xs font-medium text-foreground">
                         Result
                         {replaceResult.output !== deferredTest && (
-                          <span className="ml-2 text-[10px] font-normal text-muted-foreground">
+                          <span className="ml-2 text-[11px] font-normal text-muted-foreground">
                             {deferredTest.length} → {replaceResult.output.length} chars
                           </span>
                         )}

@@ -362,7 +362,7 @@ export function LuckyWheel() {
             <Timer className="h-3.5 w-3.5" />
             <span>Spin time</span>
             <Select value={String(spinSec)} onValueChange={(v) => setSpinSec(Number(v))}>
-              <SelectTrigger className="h-8 w-[4.5rem] text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[4.5rem] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {SPIN_DURATIONS.map((s) => <SelectItem key={s} value={String(s)}>{s}s</SelectItem>)}
               </SelectContent>
@@ -423,9 +423,9 @@ export function LuckyWheel() {
           {winner && (
             <div
               key={`${winner}-${history.length}`}
-              className="flex h-full items-center gap-2.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 animate-in fade-in zoom-in-95 duration-300"
+              className="flex h-full items-center gap-2.5 rounded-md border border-ok-edge bg-ok-tint px-3 animate-in fade-in zoom-in-95 duration-300"
             >
-              <Trophy className="h-5 w-5 shrink-0 text-emerald-500" />
+              <Trophy className="h-5 w-5 shrink-0 text-ok" />
               <div className="min-w-0">
                 <p className="text-[11px] text-muted-foreground">Latest winner</p>
                 <p className="truncate text-base font-semibold">{winner}</p>

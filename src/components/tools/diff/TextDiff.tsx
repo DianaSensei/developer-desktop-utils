@@ -160,7 +160,7 @@ export function TextDiff() {
               <Badge tone="success" size="sm">No differences</Badge>
             ) : (
               <span className="inline-flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 font-mono text-xs tabular-nums">
-                <span className="text-emerald-600 dark:text-emerald-400">+{stats.added}</span>
+                <span className="text-ok">+{stats.added}</span>
                 <span className="text-destructive">&minus;{stats.removed}</span>
               </span>
             )
@@ -255,14 +255,14 @@ function JsonChangeRow({ change }: { change: Change }) {
         <span className="ml-2 break-all">
           {change.kind === 'changed' ? (
             <>
-              <span className="text-red-600 line-through dark:text-red-400">{preview(change.before)}</span>
+              <span className="text-bad line-through">{preview(change.before)}</span>
               <span className="mx-1 text-muted-foreground">→</span>
-              <span className="text-green-600 dark:text-green-400">{preview(change.after)}</span>
+              <span className="text-ok">{preview(change.after)}</span>
             </>
           ) : change.kind === 'added' ? (
-            <span className="text-green-600 dark:text-green-400">{preview(change.after)}</span>
+            <span className="text-ok">{preview(change.after)}</span>
           ) : (
-            <span className="text-red-600 line-through dark:text-red-400">{preview(change.before)}</span>
+            <span className="text-bad line-through">{preview(change.before)}</span>
           )}
         </span>
       </div>

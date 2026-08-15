@@ -66,18 +66,18 @@ interface StepResult { output: string; error?: string; }
 interface OpMeta { label: string; hint: string; icon: React.ElementType; color: string; }
 
 const OP_META: Record<StepOp, OpMeta> = {
-  'text-input': { label: 'Text Input',    hint: 'Free text — type or paste any string',                 icon: FileText,        color: 'text-emerald-500' },
-  'json-input': { label: 'JSON Input',    hint: 'Parse JSON and assemble fields into a string',         icon: Braces,          color: 'text-emerald-500' },
-  hmac:         { label: 'HMAC Sign',     hint: 'Keyed signature — MoMo, ZaloPay, Alipay, REST APIs',  icon: KeyRound,        color: 'text-violet-500'  },
-  hash:         { label: 'Hash',          hint: 'One-way fingerprint — MD5, SHA-256, SHA-512, …',       icon: Hash,            color: 'text-blue-500'    },
-  encode:       { label: 'Encode',        hint: 'Base64, URL-encode, Hex, …',                           icon: Code2,           color: 'text-cyan-500'    },
-  decode:       { label: 'Decode',        hint: 'Reverse Base64, URL-encode, Hex, …',                   icon: Code2,           color: 'text-cyan-500'    },
-  uppercase:    { label: 'Uppercase',     hint: 'UPPER CASE every letter',                              icon: Type,            color: 'text-slate-400'   },
-  lowercase:    { label: 'Lowercase',     hint: 'lower case every letter',                              icon: Type,            color: 'text-slate-400'   },
-  trim:         { label: 'Trim spaces',   hint: 'Remove leading / trailing whitespace',                 icon: Scissors,        color: 'text-slate-400'   },
-  prepend:      { label: 'Prepend text',  hint: 'Add fixed text before the current value',              icon: CornerDownRight, color: 'text-amber-500'   },
-  append:       { label: 'Append text',   hint: 'Add fixed text after the current value',               icon: CornerDownRight, color: 'text-amber-500'   },
-  replace:      { label: 'Find & Replace',hint: 'Replace every occurrence of a string',                 icon: Search,          color: 'text-amber-500'   },
+  'text-input': { label: 'Text Input',    hint: 'Free text — type or paste any string',                 icon: FileText,        color: 'text-[var(--cat-4)]' },
+  'json-input': { label: 'JSON Input',    hint: 'Parse JSON and assemble fields into a string',         icon: Braces,          color: 'text-[var(--cat-4)]' },
+  hmac:         { label: 'HMAC Sign',     hint: 'Keyed signature — MoMo, ZaloPay, Alipay, REST APIs',  icon: KeyRound,        color: 'text-[var(--cat-3)]'  },
+  hash:         { label: 'Hash',          hint: 'One-way fingerprint — MD5, SHA-256, SHA-512, …',       icon: Hash,            color: 'text-[var(--cat-2)]'    },
+  encode:       { label: 'Encode',        hint: 'Base64, URL-encode, Hex, …',                           icon: Code2,           color: 'text-[var(--cat-5)]'    },
+  decode:       { label: 'Decode',        hint: 'Reverse Base64, URL-encode, Hex, …',                   icon: Code2,           color: 'text-[var(--cat-5)]'    },
+  uppercase:    { label: 'Uppercase',     hint: 'UPPER CASE every letter',                              icon: Type,            color: 'text-muted-foreground'   },
+  lowercase:    { label: 'Lowercase',     hint: 'lower case every letter',                              icon: Type,            color: 'text-muted-foreground'   },
+  trim:         { label: 'Trim spaces',   hint: 'Remove leading / trailing whitespace',                 icon: Scissors,        color: 'text-muted-foreground'   },
+  prepend:      { label: 'Prepend text',  hint: 'Add fixed text before the current value',              icon: CornerDownRight, color: 'text-[var(--cat-1)]'   },
+  append:       { label: 'Append text',   hint: 'Add fixed text after the current value',               icon: CornerDownRight, color: 'text-[var(--cat-1)]'   },
+  replace:      { label: 'Find & Replace',hint: 'Replace every occurrence of a string',                 icon: Search,          color: 'text-[var(--cat-1)]'   },
 };
 
 const OP_GROUPS: { label: string; ops: StepOp[] }[] = [
@@ -308,7 +308,7 @@ function CopyBtn({ value, mini = false }: { value: string; mini?: boolean }) {
       size="sm"
       className={cn(
         'h-auto rounded-md font-medium text-muted-foreground',
-        mini ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs',
+        mini ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs',
       )}
       iconClassName="h-3 w-3"
     />
@@ -324,7 +324,7 @@ function OutputText({ value }: { value: string }) {
       {long && !expanded ? value.slice(0, LIMIT) : value}
       {long && (
         <button type="button" onClick={() => setExpanded((v) => !v)}
-          className="ml-1 text-primary text-[10px] font-sans underline underline-offset-2">
+          className="ml-1 text-primary text-[11px] font-sans underline underline-offset-2">
           {expanded ? 'less' : `+${value.length - LIMIT} more`}
         </button>
       )}
@@ -378,7 +378,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
           <div className={cn('flex items-center gap-1.5 min-w-0', !field.enabled && 'opacity-40')}>
             <span className="text-xs font-mono font-medium text-foreground truncate">{field.key}</span>
             {missing && (
-              <span className="shrink-0 text-[9px] font-medium text-amber-500 bg-amber-50 dark:bg-amber-950/30 border border-amber-300/50 dark:border-amber-700/40 px-1 py-px rounded leading-none">
+              <span className="shrink-0 rounded-xs border border-warn-edge bg-warn-tint px-1 py-px text-[11px] font-medium leading-none text-warn">
                 missing
               </span>
             )}
@@ -498,16 +498,16 @@ function JsonInputSection({
           value={jsonText}
           onChange={handleJsonChange}
           placeholder={'Paste JSON here\n\n{ "amount": "50000", "orderId": "abc", ... }'}
-          className={cn('min-h-[110px]', jsonError && jsonText.trim() && 'border-amber-400/60')}
+          className={cn('min-h-[110px]', jsonError && jsonText.trim() && 'border-warn-edge')}
         />
         {/* Validity badge */}
         {jsonText.trim() && (
           <div className="absolute top-2 right-2 pointer-events-none">
             {jsonError
-              ? <span className="flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-950/40 border border-amber-300/60 px-1.5 py-0.5 rounded">
+              ? <span className="flex items-center gap-1 rounded-xs border border-warn-edge bg-warn-tint px-1.5 py-0.5 text-[11px] text-warn">
                   <AlertTriangle className="h-2.5 w-2.5" />Invalid
                 </span>
-              : <span className="flex items-center gap-1 text-[10px] text-green-600 bg-green-50 dark:bg-green-950/40 border border-green-300/60 px-1.5 py-0.5 rounded">
+              : <span className="flex items-center gap-1 rounded-xs border border-ok-edge bg-ok-tint px-1.5 py-0.5 text-[11px] text-ok">
                   <CheckCircle2 className="h-2.5 w-2.5" />Valid
                 </span>
             }
@@ -518,7 +518,7 @@ function JsonInputSection({
       {/* ── Output options ── */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground font-medium">Sep</span>
+          <span className="text-[11px] text-muted-foreground font-medium">Sep</span>
           <Select value={jsonSeparator} onValueChange={(v) => onUpdate({ jsonSeparator: v })}>
             <SelectTrigger className="h-7 w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -527,7 +527,7 @@ function JsonInputSection({
           </Select>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground font-medium">Format</span>
+          <span className="text-[11px] text-muted-foreground font-medium">Format</span>
           <Segmented
             value={jsonFormat}
             onValueChange={(v) => onUpdate({ jsonFormat: v })}
@@ -540,7 +540,7 @@ function JsonInputSection({
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground font-medium">Sort</span>
+          <span className="text-[11px] text-muted-foreground font-medium">Sort</span>
           <Segmented
             value={jsonSort}
             onValueChange={(v) => onUpdate({ jsonSort: v })}
@@ -561,8 +561,8 @@ function JsonInputSection({
           {/* Header */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b border-border">
             <div className="w-4" />
-            <span className="w-36 shrink-0 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Field</span>
-            <span className="flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Value</span>
+            <span className="w-36 shrink-0 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Field</span>
+            <span className="flex-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Value</span>
           </div>
           {/* Rows */}
           <div className="px-3 divide-y divide-border/30">
@@ -645,7 +645,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 border-b border-border/40">
         <div className={cn(
-          'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+          'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold',
           result?.error ? 'bg-destructive/20 text-destructive' : 'bg-primary/15 text-primary'
         )}>
           {index + 1}
@@ -658,7 +658,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <SelectContent>
             {OP_GROUPS.map((group) => (
               <div key={group.label}>
-                <div className="px-2 pt-2 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</div>
+                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</div>
                 {group.ops.map((op) => {
                   const m = OP_META[op];
                   return (
@@ -767,7 +767,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {/* Prepend / Append */}
         {(step.op === 'prepend' || step.op === 'append') && (
           <div className="flex items-center gap-2">
-            <code className="text-[10px] text-muted-foreground bg-muted/40 border border-border/60 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
+            <code className="text-[11px] text-muted-foreground bg-muted/40 border border-border/60 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
               {step.op === 'prepend' ? '[text] + value' : 'value + [text]'}
             </code>
             <Input
@@ -783,11 +783,11 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {step.op === 'replace' && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <p className="text-[10px] text-muted-foreground mb-1">Find (all occurrences)</p>
+              <p className="text-[11px] text-muted-foreground mb-1">Find (all occurrences)</p>
               <Input value={step.find ?? ''} onChange={(e) => onUpdate({ find: e.target.value })} placeholder="Find…" className="h-7 text-xs font-mono" />
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground mb-1">Replace with (empty = delete)</p>
+              <p className="text-[11px] text-muted-foreground mb-1">Replace with (empty = delete)</p>
               <Input value={step.replacement ?? ''} onChange={(e) => onUpdate({ replacement: e.target.value })} placeholder="Replace with…" className="h-7 text-xs font-mono" />
             </div>
           </div>
@@ -829,7 +829,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
         </div>
         {OP_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{group.label}</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{group.label}</p>
             <div className="flex flex-wrap gap-1.5">
               {group.ops.map((op) => {
                 const m = OP_META[op]; const Icon = m.icon;
@@ -867,7 +867,7 @@ function FinalResult({ result }: { result: StepResult | undefined }) {
         ? <p className="font-mono text-sm leading-relaxed break-all text-foreground">{result.output}</p>
         : <p className="text-sm text-destructive">{result.error}</p>
       }
-      {ok && <p className="text-[10px] text-muted-foreground/40 mt-1.5">{result.output.length} chars</p>}
+      {ok && <p className="text-[11px] text-muted-foreground/40 mt-1.5">{result.output.length} chars</p>}
     </div>
   );
 }
