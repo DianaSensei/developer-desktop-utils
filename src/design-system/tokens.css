@@ -81,6 +81,30 @@
        tương đương. */
     --json-key: hsl(202 88% 38%);
     --json-null: hsl(350 68% 46%);
+
+    /* ── Màu HTTP method ─────────────────────────────────────────────────
+       Cùng loại với màu cú pháp: QUY ƯỚC NGÀNH, không phải trang trí.
+       Postman, Insomnia, Bruno đều dùng xanh-GET / cam-POST / đỏ-DELETE;
+       đổi đi là bắt người dùng học lại một thứ họ đã biết.
+
+       Đây là ngoại lệ DUY NHẤT được phép trùng hue với --ok/--bad. Lý do
+       chấp nhận được: method nằm ở cột bên trái mỗi request, còn status
+       code nằm ở panel kết quả — chúng không bao giờ đứng cạnh nhau trên
+       cùng một dòng để bị đọc nhầm thành một tín hiệu. Đừng nới ngoại lệ
+       này ra chỗ khác.
+
+       Dạng kênh vì badge cần nền có alpha. */
+    --method-get-c:    152 55% 34%;
+    --method-post-c:    32 85% 40%;
+    --method-put-c:    214 80% 46%;
+    --method-patch-c:  272 60% 50%;
+    --method-delete-c:   2 65% 46%;
+
+    --method-get:    hsl(var(--method-get-c));
+    --method-post:   hsl(var(--method-post-c));
+    --method-put:    hsl(var(--method-put-c));
+    --method-patch:  hsl(var(--method-patch-c));
+    --method-delete: hsl(var(--method-delete-c));
   }
 
   .dark {
@@ -97,6 +121,13 @@
     --js-method: hsl(270 65% 75%);
     --json-key: hsl(202 85% 68%);
     --json-null: hsl(350 75% 72%);
+
+    /* Chỉ định nghĩa lại KÊNH — bản bọc hsl() ở :root tự đúng theo. */
+    --method-get-c:    150 48% 58%;
+    --method-post-c:    34 78% 62%;
+    --method-put-c:    212 82% 68%;
+    --method-patch-c:  272 62% 72%;
+    --method-delete-c:   4 70% 68%;
   }
 
   ::selection {

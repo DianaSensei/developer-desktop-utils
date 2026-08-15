@@ -109,7 +109,7 @@ function TabBtn({ id, label, active, onSelect }: {
   return (
     <button
       onClick={() => onSelect(id)}
-      className={cn('border-b-2 py-2 text-xs font-medium transition-colors', active === id ? 'border-amber-400 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
+      className={cn('border-b-2 py-2 text-xs font-medium transition-colors', active === id ? 'border-acc text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
     >
       {label}
     </button>

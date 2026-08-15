@@ -121,10 +121,10 @@ function Pill({ children, tone = 'primary', className }: {
   const tones = {
     primary: 'bg-primary/10 text-primary',
     muted: 'bg-muted text-muted-foreground',
-    amber: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+    amber: 'bg-warn-tint text-warn',
   };
   return (
-    <span className={cn('w-fit rounded px-1.5 py-0.5 text-center font-mono text-[10px] font-semibold', tones[tone], className)}>
+    <span className={cn('w-fit rounded px-1.5 py-0.5 text-center font-mono text-[11px] font-semibold', tones[tone], className)}>
       {children}
     </span>
   );
@@ -370,7 +370,7 @@ function PropagationView() {
             {rows.map((r) => (
               <div key={r.provider.id} className="rounded-lg border bg-card px-3 py-2.5">
                 <div className="flex items-center gap-2">
-                  {r.ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" /> : <XCircle className="h-4 w-4 shrink-0 text-destructive" />}
+                  {r.ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-ok" /> : <XCircle className="h-4 w-4 shrink-0 text-bad" />}
                   <span className="text-sm font-medium">{r.provider.label}</span>
                   {r.status && r.status !== 'NOERROR' && <span className="ml-auto text-[11px] text-muted-foreground">{r.status}</span>}
                 </div>
@@ -402,7 +402,7 @@ function DnssecSection({ title, records }: { title: string; records: DnsAnswer[]
     <div className="rounded-lg border bg-card p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold">{title}</span>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{records.length}</span>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{records.length}</span>
       </div>
       <div className="space-y-1">
         {records.map((r, i) => (
@@ -763,15 +763,15 @@ function ProcessRow({ group, isFav, onToggleFav }: {
               title={`${p.port}/${p.protocol} on ${p.addresses.join(', ')} · ${fav ? 'remove from' : 'add to'} favourites`}
               className="group/port flex h-5 items-center gap-1.5 text-left"
             >
-              <Star className={cn('h-3 w-3 shrink-0', fav ? 'fill-current text-amber-500' : 'text-transparent group-hover/port:text-muted-foreground/40')} />
+              <Star className={cn('h-3 w-3 shrink-0', fav ? 'fill-current text-warn' : 'text-transparent group-hover/port:text-muted-foreground/40')} />
               <span className={cn(
                 'w-10 font-mono text-xs tabular-nums',
                 i === 0 ? 'font-semibold' : 'font-medium',
-                fav ? 'text-amber-500' : i === 0 ? 'text-foreground' : 'text-muted-foreground',
+                fav ? 'text-warn' : i === 0 ? 'text-foreground' : 'text-muted-foreground',
               )}>
                 {p.port}
               </span>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/40">{p.protocol}</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/40">{p.protocol}</span>
             </button>
           );
         })}
@@ -786,12 +786,12 @@ function ProcessRow({ group, isFav, onToggleFav }: {
             <span
               key={`${p.protocol}-${p.port}`}
               className={cn(
-                'flex h-5 items-center gap-1.5 text-[10px] font-medium',
-                scope.exposed ? 'text-amber-600 dark:text-amber-400/90' : 'text-muted-foreground/50',
+                'flex h-5 items-center gap-1.5 text-[11px] font-medium',
+                scope.exposed ? 'text-warn' : 'text-muted-foreground/50',
               )}
               title={`${SCOPE_DESC[scope.label]} — ${p.addresses.join(', ')}`}
             >
-              <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', scope.exposed ? 'bg-amber-500' : 'bg-muted-foreground/30')} />
+              <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', scope.exposed ? 'bg-warn' : 'bg-muted-foreground/30')} />
               {scope.label}
             </span>
           );
@@ -851,7 +851,7 @@ function FavStar({ port, fav, onToggle }: { port: number; fav: boolean; onToggle
       title={fav ? `Remove port ${port} from favourites` : `Add port ${port} to favourites`}
       className={cn(
         'group/star flex h-6 w-6 items-center justify-center rounded transition-colors',
-        fav ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground/40 hover:text-muted-foreground',
+        fav ? 'text-warn' : 'text-muted-foreground/40 hover:text-muted-foreground',
       )}
     >
       <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
@@ -895,7 +895,7 @@ function FreeRow({ port, fav, onToggle }: { port: number; fav: boolean; onToggle
 // Header row for the socket (flat / favourites) table.
 function SocketTableHeader() {
   return (
-    <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground')}>
+    <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground')}>
       {/* Empty placeholder for the star column — must stay in flow so it occupies
           its grid track (an sr-only span is position:absolute and would shift
           every following header one column to the left). */}
@@ -1156,7 +1156,7 @@ function PortsView() {
               </p>
             ) : (
               <div className="overflow-hidden rounded-lg border">
-                <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground')}>
+                <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground')}>
                   <span aria-hidden="true" />
                   {sortHeader('port', 'Port')}
                   {sortHeader('proto', 'Proto')}
@@ -1177,7 +1177,7 @@ function PortsView() {
             </p>
           ) : (
             <div className="overflow-hidden rounded-lg border">
-              <div className={cn(PROC_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[10px] font-semibold text-muted-foreground')}>
+              <div className={cn(PROC_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground')}>
                 {sortHeader('pid', 'PID')}
                 {/* Indent past the in-cell favourite star (w-3 + gap-1.5) so the
                     label sits above the port numbers, not the star. */}

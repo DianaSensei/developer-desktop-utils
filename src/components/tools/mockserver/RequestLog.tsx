@@ -7,10 +7,13 @@ import type { HttpMethod } from '../apiclient/types';
 import type { RequestLogEntry } from './types';
 
 function statusColor(status: number): string {
-  if (status >= 500) return 'text-red-600 dark:text-red-400';
-  if (status >= 400) return 'text-amber-600 dark:text-amber-400';
-  if (status >= 300) return 'text-violet-600 dark:text-violet-400';
-  if (status >= 200) return 'text-emerald-600 dark:text-emerald-400';
+  // 5xx/4xx là lỗi, 2xx thành công — hệ trạng thái. 3xx (redirect) không
+  // tốt cũng không xấu nhưng vẫn phải tách khỏi hai nhóm kia, nên lấy một
+  // hue từ bảng phân loại thay vì ép vào warn.
+  if (status >= 500) return 'text-bad';
+  if (status >= 400) return 'text-warn';
+  if (status >= 300) return 'text-[var(--cat-3)]';
+  if (status >= 200) return 'text-ok';
   return 'text-muted-foreground';
 }
 
@@ -74,11 +77,11 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
                   {e.query ? <span className="text-muted-foreground">?{e.query}</span> : null}
                 </span>
                 {!e.matchedStubId && (
-                  <span className="shrink-0 rounded bg-amber-100 px-1 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                  <span className="shrink-0 rounded-xs bg-warn-tint px-1 text-[11px] text-warn">
                     no match
                   </span>
                 )}
-                <span className="shrink-0 text-[10px] text-muted-foreground">{e.durationMs}ms</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{e.durationMs}ms</span>
               </button>
             ))}
           </div>
@@ -98,7 +101,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
                     {stubName?.(selected.matchedStubId) ?? '(deleted stub)'}
                   </button>
                 ) : (
-                  <span className="text-amber-600 dark:text-amber-400">No stub — default response</span>
+                  <span className="text-warn">No stub — default response</span>
                 )}
               </div>
               {selected.reqHeaders.length > 0 && (

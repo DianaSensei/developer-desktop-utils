@@ -42,7 +42,7 @@ export function CookieManager({ store, open, onClose }: Props) {
         </DialogHeader>
 
         {!store.cookiesEnabled && (
-          <div className="border-b bg-amber-400/10 px-4 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+          <div className="border-b bg-warn-tint px-4 py-1.5 text-[11px] text-warn">
             The cookie jar is off — cookies below won't be sent or captured until you enable it.
           </div>
         )}
@@ -111,8 +111,8 @@ function CookieRow({ cookie, store }: { cookie: Cookie; store: ApiStore }) {
           {cookie.value}
         </span>
       )}
-      <span className="shrink-0 font-mono text-[10px] text-muted-foreground/70" title="Path">{cookie.path}</span>
-      <span className="w-36 shrink-0 text-right text-[10px] text-muted-foreground/70" title="Expires">{fmtExpires(cookie)}</span>
+      <span className="shrink-0 font-mono text-[11px] text-muted-foreground/70" title="Path">{cookie.path}</span>
+      <span className="w-36 shrink-0 text-right text-[11px] text-muted-foreground/70" title="Expires">{fmtExpires(cookie)}</span>
       <div className="flex shrink-0 items-center gap-1">
         {cookie.secure && <span className="rounded bg-muted px-1 text-[9px] uppercase text-muted-foreground">secure</span>}
         {cookie.httpOnly && <span className="rounded bg-muted px-1 text-[9px] uppercase text-muted-foreground">http</span>}
@@ -155,7 +155,7 @@ function AddCookie({ store }: { store: ApiStore }) {
 function Field({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
     <div className={className}>
-      <Label className="mb-1 block text-[10px] uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

@@ -106,6 +106,28 @@ Hai dạng, như mọi màu khác trong kit:
 
 ---
 
+## Màu quy ước ngành — cú pháp và HTTP method
+
+Hệ thứ tư, sống trong `src/design-system/tokens.css` (không phải kit) vì nó gắn
+với **miền của app này**, không phải với ngôn ngữ thiết kế:
+
+| Nhóm token | Dùng ở |
+|---|---|
+| `--sql-*`, `--js-*` | Tô sáng cú pháp trong editor |
+| `--json-key`, `--json-null` | Cây JSON — phần SQL không có khái niệm tương đương |
+| `--method-get/post/put/patch/delete` | Nhãn HTTP method khắp API Client |
+
+Điểm chung: đây là **kiến thức người dùng mang sẵn tới**, không phải lựa chọn
+thẩm mỹ. Postman, Insomnia và Bruno đều tô xanh-GET / đỏ-DELETE; đổi đi là bắt
+người dùng học lại thứ họ đã biết. Cũng như keyword SQL xanh dương ở mọi editor.
+
+**`--method-*` là ngoại lệ duy nhất được phép trùng hue với `--ok`/`--bad`.**
+Chấp nhận được vì method nằm ở cột trái mỗi request còn status code nằm ở panel
+kết quả — chúng không đứng cạnh nhau trên cùng một dòng để bị đọc nhầm thành một
+tín hiệu. Đừng nới ngoại lệ này ra chỗ khác.
+
+---
+
 ## Thang bo góc — vì sao rời nhau
 
 Thang cũ của repo:

@@ -72,7 +72,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         tabs={tabs}
         active={tab}
         onSelect={(id) => onTabChange(id as Tab)}
-        activeClassName="border-amber-400 text-foreground"
+        activeClassName="border-acc text-foreground"
         right={tab === 'body' ? <BodyModeDropdown body={request.body} onChange={onChange} /> : undefined}
       />
 
@@ -347,7 +347,7 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
   if (!derived) return null;
   return (
     <div className="overflow-hidden rounded-md border text-xs">
-      <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+      <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
         <div />
         <div className="border-r px-3 py-1.5">From Auth (query)</div>
         <div className="px-3 py-1.5" />
@@ -355,7 +355,7 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
       </div>
       <div className="grid grid-cols-[1rem_1fr_1fr_2rem]">
         <div className="flex items-center justify-center">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" title="Sent, derived from the Auth tab" />
+          <span className="h-2 w-2 shrink-0 rounded-full bg-acc" title="Sent, derived from the Auth tab" />
         </div>
         <div className="flex h-9 items-center border-r px-2.5 font-mono text-muted-foreground">{derived.key}</div>
         <div className="flex h-9 items-center px-2.5 font-mono text-muted-foreground">
@@ -428,7 +428,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   onClick={() => toggleEnabled(name)}
                   className={cn(
                     'h-2 w-2 shrink-0 rounded-full transition-colors',
-                    enabled ? 'bg-amber-400' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50',
+                    enabled ? 'bg-acc' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50',
                   )}
                   title={enabled ? 'Disable' : 'Enable'}
                 />
@@ -595,7 +595,7 @@ const BODY_GROUPS: { label: string; items: { id: BodyMode; icon: LucideIcon }[] 
 function BodyModeDropdown({ body, onChange }: { body: ApiRequest['body']; onChange: (p: Partial<ApiRequest>) => void }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1.5 py-2 text-xs font-medium text-amber-500 transition-colors hover:text-amber-400">
+      <DropdownMenuTrigger className="flex items-center gap-1.5 py-2 text-xs font-medium text-acc-ink transition-colors hover:text-acc">
         {BODY_LABEL[body.mode]} <ChevronDown className="h-3.5 w-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 p-1.5">
@@ -608,12 +608,12 @@ function BodyModeDropdown({ body, onChange }: { body: ApiRequest['body']; onChan
                 <DropdownMenuItem
                   key={id}
                   onClick={() => onChange({ body: { ...body, mode: id } })}
-                  className={cn(active && 'bg-amber-400/10 text-amber-500')}
+                  className={cn(active && 'bg-acc-tint text-acc-ink')}
                   icon={<Icon className="h-3.5 w-3.5 shrink-0" />}
                 >
                   <span className="flex w-full items-center justify-between gap-2">
                     {BODY_LABEL[id]}
-                    {active && <Check className="h-3.5 w-3.5 text-amber-500" />}
+                    {active && <Check className="h-3.5 w-3.5 text-acc-ink" />}
                   </span>
                 </DropdownMenuItem>
               );

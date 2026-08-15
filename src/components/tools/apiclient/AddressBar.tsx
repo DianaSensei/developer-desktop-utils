@@ -102,7 +102,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
 
         {/* Send / Cancel */}
         {sending ? (
-          <Button variant="destructive" size="sm" onClick={onCancel} className="m-1 h-8 gap-1.5 rounded-lg">
+          <Button variant="destructive" size="sm" onClick={onCancel} className="m-1 h-8 gap-1.5 rounded-sm">
             <X className="h-3.5 w-3.5" /> Cancel
           </Button>
         ) : (
@@ -110,7 +110,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
             size="sm"
             onClick={onSend}
             disabled={!request.url.trim()}
-            className="m-1 h-8 gap-1.5 rounded-lg bg-amber-400 text-neutral-900 shadow-sm hover:bg-amber-500 active:scale-[0.97] transition-transform"
+            className="m-1 h-8 gap-1.5 rounded-sm shadow-sm active:scale-[0.97] transition-transform"
           >
             <Send className="h-3.5 w-3.5" /> Send
           </Button>

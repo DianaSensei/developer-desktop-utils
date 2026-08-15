@@ -170,7 +170,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     <div className="flex h-full w-full flex-col">
       {/* header */}
       <div className="flex items-center justify-between gap-1 border-b border-border px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
           <Boxes className="h-3.5 w-3.5" /> Collections
         </div>
         <div className="flex items-center gap-0.5">
@@ -462,7 +462,7 @@ function Row({
       onContextMenu={(e) => ctx.openMenu(e, entries)}
     >
       {/* Bruno-style left accent stripe on the active request */}
-      {active && <span className="pointer-events-none absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-amber-400" />}
+      {active && <span className="pointer-events-none absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-acc" />}
       {dt?.where === 'before' && <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-primary" />}
       {dt?.where === 'after' && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
       {hasChildren ? (

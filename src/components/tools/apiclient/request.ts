@@ -534,8 +534,10 @@ export function prettyBody(body: string, contentType: string): string {
 
 // Tailwind text color for an HTTP status family.
 export function statusColor(status: number): string {
-  if (status === 0) return 'text-destructive';
-  if (status < 300) return 'text-emerald-600 dark:text-emerald-400';
-  if (status < 400) return 'text-amber-600 dark:text-amber-400';
-  return 'text-destructive';
+  // 2xx thành công, 3xx "chú ý một chút", 4xx/5xx lỗi — ánh xạ 1-1 sang hệ
+  // trạng thái của kit, không phải bảng màu Tailwind.
+  if (status === 0) return 'text-bad';
+  if (status < 300) return 'text-ok';
+  if (status < 400) return 'text-warn';
+  return 'text-bad';
 }

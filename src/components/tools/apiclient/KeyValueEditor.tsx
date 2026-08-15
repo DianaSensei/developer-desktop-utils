@@ -154,7 +154,7 @@ export function KeyValueEditor({
     <div className="space-y-1.5">
       <div className="overflow-hidden rounded-md border text-xs">
         {/* Header row */}
-        <div className={cn('grid border-b bg-muted/40 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70', gridCols)}>
+        <div className={cn('grid border-b bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>
@@ -175,7 +175,7 @@ export function KeyValueEditor({
                   onClick={() => !isGhost && editRow(row.id, { enabled: !row.enabled })}
                   className={cn(
                     'h-2 w-2 shrink-0 rounded-full transition-colors',
-                    isGhost ? 'invisible' : row.enabled ? 'bg-amber-400' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50',
+                    isGhost ? 'invisible' : row.enabled ? 'bg-acc' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50',
                   )}
                   title={row.enabled ? 'Disable' : 'Enable'}
                 />
@@ -242,7 +242,7 @@ export function KeyValueEditor({
                       onClick={() => editRow(row.id, { secret: !row.secret })}
                       className={cn(
                         'rounded p-1 transition-colors',
-                        row.secret ? 'text-amber-500 hover:text-amber-400' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-foreground',
+                        row.secret ? 'text-acc-ink hover:text-acc' : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-foreground',
                       )}
                       title={row.secret ? 'Marked as secret — masked here and excluded from generated code/export' : 'Mark as secret'}
                     >
