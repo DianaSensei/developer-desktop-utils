@@ -701,10 +701,14 @@ function AppContent() {
               {/* Tên NHÓM ("Generate") không nói cái gì đang mở — tab con đã liệt
                   kê đúng thứ đó rồi ("Generator" đang bật). Giữ cả hai là lặp:
                   một chữ chung chung phía trước, một chữ cụ thể phía sau. Nên
-                  khi nhóm còn ≥2 tool, tablist chính là tiêu đề — bỏ hẳn hàng
-                  chữ tên nhóm. `aria-label` vẫn giữ tên nhóm cho trình đọc màn
-                  hình dù không hiện ra bằng mắt. Chỉ tool đứng riêng (không
-                  thuộc nhóm nào, hoặc nhóm chỉ còn 1 tool bật) mới cần <h2>. */}
+                  bỏ hẳn <h2> tên nhóm, để tablist tự làm tiêu đề.
+
+                  Tool đứng riêng (không thuộc nhóm, hoặc nhóm chỉ còn 1 tool
+                  bật) vẫn dựng ĐÚNG khung máng lõm + pill này để header không
+                  đổi hình dạng khi chuyển qua lại giữa tool đơn và tool trong
+                  nhóm — chỉ khác là pill đó KHÔNG phải link/tab, vì không có gì
+                  để chuyển tới. Không role="tablist"/"tab" trong trường hợp
+                  này: hứa điều hướng bàn phím cho một mục duy nhất là hứa suông. */}
               {activeGroupTabs.length > 1 ? (
                 <div
                   key={`${activeTool.path}-tabs`}
@@ -735,12 +739,14 @@ function AppContent() {
                     })}
                 </div>
               ) : (
-                <h2
+                <div
                   key={`${activeTool.path}-label`}
-                  className="min-w-0 truncate text-sm font-semibold leading-none text-foreground motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200 sm:text-base"
+                  className="inline-flex h-ctl shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
                 >
-                  {activeTool.label}
-                </h2>
+                  <h2 className="inline-flex h-full min-w-0 items-center whitespace-nowrap rounded-sm bg-acc px-3.5 text-sm font-semibold leading-none text-acc-fg shadow-soft sm:text-base">
+                    {activeTool.label}
+                  </h2>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-1">
