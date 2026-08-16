@@ -894,12 +894,15 @@ function AppContent() {
           chừa lề trái — không có đèn giao thông nào để né. */}
       {showCustomChrome && (
         <div
-          className="flex h-[38px] shrink-0 items-center justify-between border-b border-line bg-chrome pl-3 pr-1"
+          className="flex h-[38px] shrink-0 items-center justify-between border-b border-line bg-chrome pl-3"
           data-tauri-drag-region="deep"
         >
           {titlebarNav}
           <div className="flex-1" data-tauri-drag-region="deep" />
-          <div className="flex shrink-0 items-center gap-0.5">
+          {/* Không pr-* ở đây — nút Close phải chạm THẲNG vào mép phải cửa sổ,
+              y hệt Windows thật. Có padding thì vùng hover đỏ bị "đóng khung",
+              trông như một khối nổi lên thay vì góc vuông sát viền. */}
+          <div className="flex h-full shrink-0 items-center gap-0.5">
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
             {titlebarHelpAction}
             <span className="mx-1 h-4 w-px shrink-0 bg-line" />
