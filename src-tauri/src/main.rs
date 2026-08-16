@@ -57,7 +57,23 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // `Builder::default()` tracks + RESTORES every `StateFlags`, including
+        // `DECORATIONS` — mỗi lần mở app nó ghi decorations của cửa sổ về đúng
+        // giá trị đã lưu trong `.window-state.json` từ lần chạy trước, đè lên
+        // `decorations: false` của tauri.windows.conf.json / tauri.linux.conf.json.
+        // App từng chạy với decorations mặc định (true) trước khi có titlebar tự
+        // vẽ, nên file state cũ trên máy người dùng đã có `decorated: true` —
+        // đây là lý do titlebar gốc của Windows vẫn hiện dù config đã đúng.
+        // Loại DECORATIONS khỏi flags theo dõi: decorations luôn do config quyết
+        // định, không phải do trạng thái lưu lại.
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        - tauri_plugin_window_state::StateFlags::DECORATIONS,
+                )
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             checksum::hash_file,
             netinfo::local_network_info,
