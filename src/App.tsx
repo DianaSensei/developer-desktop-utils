@@ -710,7 +710,7 @@ function AppContent() {
           (…)}` quanh header đó) — không render trùng hai nơi. */}
       {showMacOverlayChrome && (
         <div
-          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[70px] pr-3"
+          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[92px] pr-3"
           data-tauri-drag-region="deep"
         >
           <div className="flex min-w-0 items-center gap-3">
