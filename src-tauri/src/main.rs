@@ -9,28 +9,41 @@ mod mockserver;
 mod ports;
 mod rabbit;
 
+#[cfg(target_os = "macos")]
 use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
 
 fn main() {
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(|_app| {
             // On macOS the OS only routes Cmd+Z/X/C/V/A to the webview when a
             // native Edit menu with PredefinedMenuItems exists. Without it, none
             // of the standard text-editing shortcuts work in <input>/<textarea>
-            // or CodeMirror. Windows/Linux work without this but the menu is
-            // harmless there.
-            let edit = Submenu::with_items(app, "Edit", true, &[
-                &PredefinedMenuItem::undo(app, None)?,
-                &PredefinedMenuItem::redo(app, None)?,
-                &PredefinedMenuItem::separator(app)?,
-                &PredefinedMenuItem::cut(app, None)?,
-                &PredefinedMenuItem::copy(app, None)?,
-                &PredefinedMenuItem::paste(app, None)?,
-                &PredefinedMenuItem::separator(app)?,
-                &PredefinedMenuItem::select_all(app, None)?,
-            ])?;
-            let menu = Menu::with_items(app, &[&edit])?;
-            app.set_menu(menu)?;
+            // or CodeMirror — so this menu is macOS-only.
+            //
+            // On Windows/Linux the app draws its own titlebar with
+            // `decorations: false` (see tauri.windows.conf.json /
+            // tauri.linux.conf.json) and standard keyboard shortcuts already
+            // reach the webview without a native menu. Calling `set_menu`
+            // there is NOT harmless as previously assumed — it forces the OS
+            // to keep a native menu bar (and, together with it, some native
+            // window chrome) even with `decorations: false`, producing a
+            // native titlebar/menu stacked on top of the app's own
+            // custom-drawn one.
+            #[cfg(target_os = "macos")]
+            {
+                let edit = Submenu::with_items(_app, "Edit", true, &[
+                    &PredefinedMenuItem::undo(_app, None)?,
+                    &PredefinedMenuItem::redo(_app, None)?,
+                    &PredefinedMenuItem::separator(_app)?,
+                    &PredefinedMenuItem::cut(_app, None)?,
+                    &PredefinedMenuItem::copy(_app, None)?,
+                    &PredefinedMenuItem::paste(_app, None)?,
+                    &PredefinedMenuItem::separator(_app)?,
+                    &PredefinedMenuItem::select_all(_app, None)?,
+                ])?;
+                let menu = Menu::with_items(_app, &[&edit])?;
+                _app.set_menu(menu)?;
+            }
             Ok(())
         })
         .manage(mockserver::MockState::default())
