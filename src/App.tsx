@@ -701,18 +701,93 @@ function AppContent() {
           isCollapsed. `data-tauri-drag-region="deep"` — xem chú thích cũ ở
           header sidebar (giờ đã xoá) — lan xuống nhánh con nhưng vẫn chừa
           nút Close bấm được bình thường. */}
+      {/* Icon/tablist của tool đang mở giờ CŨNG chuyển lên đây, thay vì đứng
+          riêng ở hàng bên dưới — đúng yêu cầu "đưa header lên chung title
+          bar". Bản compact (h-6, text-xs) như header chính từng dùng, cộng
+          một vạch ngăn mảnh phân tách khối định danh app (logo/DevTool) khỏi
+          khối điều hướng tool. Toàn bộ nội dung tương ứng ở header chính bên
+          dưới bị ẩn khi showMacOverlayChrome (xem `{!showMacOverlayChrome &&
+          (…)}` quanh header đó) — không render trùng hai nơi. */}
       {showMacOverlayChrome && (
         <div
-          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[76px] pr-3"
+          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[64px] pr-3"
           data-tauri-drag-region="deep"
         >
           <div className="flex min-w-0 items-center gap-2">
-            <AppLogo size={18} />
-            <h1 className="whitespace-nowrap text-xs font-semibold leading-none">DevTool</h1>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <AppLogo size={18} />
+              <h1 className="whitespace-nowrap text-xs font-semibold leading-none">DevTool</h1>
+            </div>
+            <span className="h-4 w-px shrink-0 bg-border" />
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(true)} title="Open menu">
+              <Menu className="h-3.5 w-3.5" />
+            </Button>
+            <div
+              key={activeTool.path}
+              className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+            >
+              <ActiveIcon className="h-3.5 w-3.5 text-primary" />
+              {liveIds.includes(activeTool.featureId) && (
+                <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-ok ring-2 ring-chrome" title="Running" />
+              )}
+            </div>
+            {activeGroupTabs.length > 1 ? (
+              <div
+                key={`${activeTool.path}-tabs`}
+                role="tablist"
+                aria-label={activeGroup!.label}
+                className="inline-flex h-6 shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+              >
+                {activeGroupTabs.map((def) => {
+                    const p = toolPath(def.id);
+                    const on = p === location.pathname;
+                    return (
+                      <Link
+                        key={def.id}
+                        to={p}
+                        role="tab"
+                        aria-selected={on}
+                        className={cn(
+                          'inline-flex h-full items-center whitespace-nowrap rounded-sm px-2 text-xs leading-none transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
+                          on
+                            ? 'bg-acc font-semibold text-acc-fg shadow-soft'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {def.label}
+                      </Link>
+                    );
+                  })}
+              </div>
+            ) : (
+              <div
+                key={`${activeTool.path}-label`}
+                className="inline-flex h-6 shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+              >
+                <h2 className="inline-flex h-full min-w-0 items-center whitespace-nowrap rounded-sm bg-acc px-2 text-xs font-semibold leading-none text-acc-fg shadow-soft">
+                  {activeTool.label}
+                </h2>
+              </div>
+            )}
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(false)} title="Close menu">
-            <X className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-0.5">
+            {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
+            <div id="tool-header-actions" className="flex items-center gap-0.5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground/70 hover:text-foreground"
+              onClick={openGuideManually}
+              title={`How to use ${activeTool.label}`}
+              aria-label={`How to use ${activeTool.label}`}
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(false)} title="Close menu">
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       )}
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -725,16 +800,16 @@ function AppContent() {
         onToggleCollapse={toggleCollapse}
       />
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Khi macOS overlay bật, icon/tablist/help của tool đã chuyển hẳn
+            lên dải titlebar phía trên (span toàn cửa sổ) — không render lại
+            ở đây, tránh trùng #tool-header-actions (portal target phải là
+            DUY NHẤT trong DOM). */}
+        {!showMacOverlayChrome && (
         <div className="z-30 header-premium shrink-0">
           {/* py-2 đưa tổng chiều cao về đúng 50px (2×8 + h-ctl 34) — khớp hàng
               header sidebar bên trái (2×10 + logo 30 = 50px), để đường viền
               dưới của cả hai nối thẳng thành một đường ngang liền mạch thay vì
-              lệch bậc. py-2.5 trước đó ra 54px, lệch 4px so với sidebar.
-
-              Hàng này không còn cần biết gì về macOS overlay nữa — logo/
-              "DevTool" và ba nút đèn giao thông giờ sống ở dải titlebar
-              riêng phía trên (xem AppContent), tách hẳn khỏi phần điều hướng
-              tool. Hàng này chỉ còn một việc: điều hướng trong tool đang mở. */}
+              lệch bậc. py-2.5 trước đó ra 54px, lệch 4px so với sidebar. */}
           <div className="flex items-center justify-between px-4 py-2 sm:px-5">
             <div className="flex items-center gap-2.5">
               <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setSidebarOpen(true)}>
@@ -840,6 +915,7 @@ function AppContent() {
             </div>
           </div>
         </div>
+        )}
         {isFullHeight ? (
           <div className="flex-1 min-h-0 overflow-hidden">
             {/* key on pathname re-triggers the entrance animation on each tool switch */}
