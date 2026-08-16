@@ -127,6 +127,7 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
   tool: ToolDef; enabled: boolean; favorite: boolean;
   onToggleFavorite: () => void; onToggleEnabled: () => void;
 }) {
+  const { t } = useLocale();
   const Icon = tool.icon;
   return (
     <>
@@ -138,8 +139,8 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
       {/* Favourite — pins the tool to the top of the sidebar */}
       <button
         type="button"
-        aria-label={favorite ? `Unfavorite ${tool.label}` : `Favorite ${tool.label}`}
-        title={favorite ? 'Remove from favorites' : 'Add to favorites'}
+        aria-label={favorite ? t('common.unfavoriteAria', { label: tool.label }) : t('common.favoriteAria', { label: tool.label })}
+        title={favorite ? t('common.unfavorite') : t('common.favorite')}
         onClick={onToggleFavorite}
         className={cn(
           'shrink-0 rounded p-1 transition-colors',
@@ -158,9 +159,9 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
  * Chỉ đổi `--a-h/--a-s/--a-l`; mọi biến thể accent (nhuộm, viền, mực đậm) tự
  * tính lại qua CSS. Xem `design/tokens.css`.
  */
-function AccentSwatches({ value, onChange }: { value: AccentTone; onChange: (tone: AccentTone) => void }) {
+function AccentSwatches({ value, onChange, ariaLabel }: { value: AccentTone; onChange: (tone: AccentTone) => void; ariaLabel: string }) {
   return (
-    <div role="radiogroup" aria-label="Accent tone" className="flex items-center gap-1.5">
+    <div role="radiogroup" aria-label={ariaLabel} className="flex items-center gap-1.5">
       {ACCENT_TONES.map((tone) => (
         <button
           key={tone}
@@ -356,7 +357,7 @@ export function Settings() {
 
       {/* Appearance — đầu tiên vì đây là section duy nhất cho hiệu ứng THẤY
           NGAY khi bấm chọn, khác với Tools (cần rời trang mới thấy đổi). */}
-      <SettingGroup title="Appearance">
+      <SettingGroup title={t('settings.section.appearance')}>
         <SettingRow
           icon={Languages}
           title={t('settings.language.label')}
@@ -378,7 +379,7 @@ export function Settings() {
           icon={Palette}
           title={t('settings.tone.label')}
           description={t('settings.tone.description')}
-          control={<AccentSwatches value={accent} onChange={changeAccent} />}
+          control={<AccentSwatches value={accent} onChange={changeAccent} ariaLabel={t('settings.tone.label')} />}
         />
       </SettingGroup>
 
@@ -386,9 +387,9 @@ export function Settings() {
       <section className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold">Tools</h2>
+            <h2 className="text-sm font-semibold">{t('settings.section.tools')}</h2>
             <p className="text-[11px] text-fg-mute mt-0.5">
-              {enabledCount} of {TOOL_DEFS.length} enabled
+              {t('settings.tools.enabledCount', { enabled: enabledCount, total: TOOL_DEFS.length })}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -398,7 +399,7 @@ export function Settings() {
                 className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
               >
                 <CheckCheck className="h-3 w-3 shrink-0" />
-                Enable all
+                {t('settings.tools.enableAll')}
               </button>
             )}
             {!allDisabled && (
@@ -407,7 +408,7 @@ export function Settings() {
                 className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
               >
                 <Ban className="h-3 w-3 shrink-0" />
-                Disable all
+                {t('settings.tools.disableAll')}
               </button>
             )}
             <button
@@ -415,7 +416,7 @@ export function Settings() {
               className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <RotateCcw className="h-3 w-3 shrink-0" />
-              Reset
+              {t('common.reset')}
             </button>
           </div>
         </div>
@@ -426,7 +427,7 @@ export function Settings() {
           <Input
             value={toolQuery}
             onChange={(e) => setToolQuery(e.target.value)}
-            placeholder="Search tools…"
+            placeholder={t('shell.search.placeholder')}
             className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-bg-2 focus-visible:ring-1"
           />
           {toolQuery && (
@@ -441,7 +442,7 @@ export function Settings() {
 
         <div className="relative rounded-lg border divide-y">
           {visibleTools.length === 0 && isSearching && (
-            <p className="px-4 py-6 text-center text-[11px] text-fg-mute">No tools match "{toolQuery}"</p>
+            <p className="px-4 py-6 text-center text-[11px] text-fg-mute">{t('shell.search.noMatch', { query: toolQuery })}</p>
           )}
           {(() => {
             const nodes: React.ReactNode[] = [];
@@ -483,7 +484,7 @@ export function Settings() {
                           thứ tự của chúng cố định theo TOOL_GROUPS. */}
                       <button
                         type="button"
-                        aria-label={`Drag to reorder ${group.label}`}
+                        aria-label={t('settings.tools.dragReorderGroup', { label: group.label })}
                         onPointerDown={!isSearching ? (e) => { e.preventDefault(); startDrag(row.key, e); } : undefined}
                         className={cn(
                           'shrink-0 touch-none text-fg-mute/40 transition-colors',
@@ -494,7 +495,7 @@ export function Settings() {
                       </button>
                       <GroupIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
                       <p className="text-xs font-semibold">{group.label}</p>
-                      <p className="text-[11px] text-fg-mute">{row.tools.length} tools</p>
+                      <p className="text-[11px] text-fg-mute">{t('settings.tools.count', { count: row.tools.length })}</p>
                     </div>
                     {row.tools.map((tool) => {
                       const enabled = features[tool.id] !== false;
@@ -540,7 +541,7 @@ export function Settings() {
                   {/* Drag handle — hidden while searching */}
                   <button
                     type="button"
-                    aria-label="Drag to reorder"
+                    aria-label={t('settings.tools.dragReorder')}
                     onPointerDown={!isSearching ? (e) => { e.preventDefault(); startDrag(row.key, e); } : undefined}
                     className={cn(
                       'shrink-0 touch-none text-fg-mute/40 transition-colors',
@@ -574,17 +575,17 @@ export function Settings() {
           aria-expanded={permsOpen}
         >
           <ChevronDown className={cn('h-4 w-4 text-fg-mute transition-transform', !permsOpen && '-rotate-90')} />
-          App Permissions
+          {t('settings.permissions.title')}
           <Shield className="h-3.5 w-3.5 text-fg-mute" />
         </button>
         {permsOpen && (
         <>
         <p className="text-[11px] text-fg-mute -mt-1">
-          Generated directly from src-tauri/capabilities/default.json — every permission the app can request is listed below, grouped by plugin, with its exact declaration.
+          {t('settings.permissions.description')}
         </p>
         {!isTauri && (
           <p className="text-[11px] text-warn">
-            Running in browser — permissions listed below apply to the desktop app only.
+            {t('settings.permissions.webWarning')}
           </p>
         )}
         <div className="rounded-lg border divide-y">
@@ -631,34 +632,34 @@ export function Settings() {
 
       {/* About section */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">About</h2>
+        <h2 className="text-sm font-semibold">{t('settings.about.title')}</h2>
         <div className="rounded-lg border divide-y text-xs">
           <div className="flex items-center gap-3 px-4 py-4">
             <AppLogo size={44} />
             <div>
               <p className="font-semibold text-sm leading-none">DevTool</p>
-              <p className="text-fg-mute mt-1 text-[11px]">Developer utilities for your desktop</p>
+              <p className="text-fg-mute mt-1 text-[11px]">{t('settings.about.tagline')}</p>
             </div>
           </div>
           <div className="flex items-center justify-between px-4 py-3 text-xs">
             <div>
-              <p className="font-medium">Hướng dẫn giới thiệu</p>
-              <p className="text-[11px] text-fg-mute mt-0.5">Xem lại màn welcome và chọn lại nhóm tool quan tâm</p>
+              <p className="font-medium">{t('settings.about.onboardingTitle')}</p>
+              <p className="text-[11px] text-fg-mute mt-0.5">{t('settings.about.onboardingDescription')}</p>
             </div>
             <button
               onClick={openOnboarding}
               className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <Compass className="h-3 w-3" />
-              Xem lại
+              {t('settings.about.reviewCta')}
             </button>
           </div>
           {isTauri && (
             <div className="flex items-center justify-between px-4 py-3 text-xs">
               <div>
-                <p className="font-medium">Auto-check for updates</p>
+                <p className="font-medium">{t('settings.about.autoCheckTitle')}</p>
                 <p className="text-[11px] text-fg-mute mt-0.5">
-                  Check on launch and daily at {formatHour(checkHour)}
+                  {t('settings.about.autoCheckDescription', { hour: formatHour(checkHour) })}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -681,17 +682,17 @@ export function Settings() {
             </div>
           )}
           <div className="flex items-center justify-between px-4 py-3 text-xs">
-            <span className="text-fg-mute">Version</span>
+            <span className="text-fg-mute">{t('settings.about.version')}</span>
             <div className="flex items-center gap-2">
               {updateStatus === 'not-available' && !updateAvailable && (
                 <span className="flex items-center gap-1 text-ok">
                   <CheckCircle2 className="h-3 w-3" />
-                  Up to date
+                  {t('settings.about.upToDate')}
                 </span>
               )}
               {updateAvailable && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-ok-tint text-ok px-1.5 py-0.5 text-[11px] font-semibold">
-                  v{updateInfo?.version} available
+                  {t('settings.about.updateAvailable', { version: updateInfo?.version ?? '' })}
                 </span>
               )}
               {updateStatus === 'error' && (
@@ -701,12 +702,12 @@ export function Settings() {
                     title={updateError}
                   >
                     <WifiOff className="h-3 w-3 shrink-0" />
-                    Offline
+                    {t('settings.about.offline')}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-bad">
                     <AlertCircle className="h-3 w-3 shrink-0" />
-                    {updateError ?? 'Update check failed'}
+                    {updateError ?? t('settings.about.updateCheckFailed')}
                   </span>
                 )
               )}
@@ -715,7 +716,7 @@ export function Settings() {
                 updateStatus === 'downloading' ? (
                   <span className="flex items-center gap-1.5 text-fg-mute">
                     <Spinner size="xs" />
-                    Downloading…
+                    {t('settings.about.downloading')}
                     {downloadProgress != null && (
                       <>
                         <span className="relative h-1 w-16 overflow-hidden rounded-full bg-bg-2">
@@ -729,8 +730,8 @@ export function Settings() {
                     )}
                     <button
                       onClick={cancelInstall}
-                      title="Cancel download"
-                      aria-label="Cancel download"
+                      title={t('settings.about.cancelDownload')}
+                      aria-label={t('settings.about.cancelDownload')}
                       className="ml-1 rounded-full text-fg-mute hover:text-fg transition-colors"
                     >
                       <XCircle className="h-4 w-4" />
@@ -739,7 +740,7 @@ export function Settings() {
                 ) : updateStatus === 'checking' ? (
                   <span className="flex items-center gap-1 text-fg-mute">
                     <Spinner size="xs" />
-                    Checking…
+                    {t('settings.about.checking')}
                   </span>
                 ) : updateAvailable ? (
                   <>
@@ -748,14 +749,14 @@ export function Settings() {
                       className="flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[11px] text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
                     >
                       <Sparkles className="h-3 w-3" />
-                      What's new
+                      {t('settings.about.whatsNew')}
                     </button>
                     <button
                       onClick={installUpdate}
                       className="flex items-center gap-1 rounded-lg bg-acc text-acc-fg px-2 py-1 text-[11px] font-medium hover:bg-acc/90 transition-colors"
                     >
                       <Download className="h-3 w-3" />
-                      Install
+                      {t('settings.about.install')}
                     </button>
                   </>
                 ) : (
@@ -764,7 +765,7 @@ export function Settings() {
                     className="flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
                   >
                     <RefreshCw className="h-3 w-3" />
-                    Check
+                    {t('settings.about.check')}
                   </button>
                 )
               )}
@@ -773,13 +774,13 @@ export function Settings() {
             </div>
           </div>
           <div className="flex items-center justify-between px-4 py-3">
-            <span className="text-fg-mute">Contact, feedback &amp; contribute</span>
+            <span className="text-fg-mute">{t('settings.about.contact')}</span>
             <a
               href="https://github.com/DianaSensei/developer-desktop-utils/issues"
               target="_blank"
               rel="noopener noreferrer"
-              title="Open GitHub issues"
-              aria-label="Open GitHub issues"
+              title={t('settings.about.openGitHub')}
+              aria-label={t('settings.about.openGitHub')}
               onClick={(e) => openExternal(e, 'https://github.com/DianaSensei/developer-desktop-utils/issues')}
               className="text-fg-mute hover:text-fg transition-colors"
             >
@@ -788,7 +789,7 @@ export function Settings() {
           </div>
           <div className="px-4 py-3">
             <p className="text-fg-mute leading-relaxed">
-              Everything runs on your device. Network access only happens when you ask for it, plus the daily check for app updates — no telemetry, analytics, or other data leaves your machine.
+              {t('settings.about.privacyNote')}
             </p>
           </div>
         </div>
@@ -796,18 +797,18 @@ export function Settings() {
 
       {/* Data & Storage section */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">Data &amp; Storage</h2>
+        <h2 className="text-sm font-semibold">{t('settings.storage.title')}</h2>
         <div className="rounded-lg border divide-y">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
-              <p className="text-xs font-medium">Where your data is stored</p>
+              <p className="text-xs font-medium">{t('settings.storage.location')}</p>
               <p className="text-[11px] text-fg-mute mt-0.5 leading-relaxed break-all">
                 {isTauri
-                  ? dataDir || 'Resolving…'
-                  : 'App data folder (available in the desktop app).'}
+                  ? dataDir || t('settings.storage.resolving')
+                  : t('settings.storage.webOnly')}
               </p>
               <p className="text-[11px] text-fg-mute mt-1 leading-relaxed">
-                All settings, tool history and workspaces are saved to a file on your device — not in the browser. Nothing leaves your machine.
+                {t('settings.storage.note')}
               </p>
             </div>
             {isTauri && (
@@ -817,7 +818,7 @@ export function Settings() {
                 className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors disabled:opacity-50"
               >
                 <FolderOpen className="h-3.5 w-3.5" />
-                Show in folder
+                {t('settings.storage.showInFolder')}
               </button>
             )}
           </div>
@@ -833,7 +834,7 @@ export function Settings() {
             aria-expanded={configOpen}
           >
             <ChevronDown className={cn('h-4 w-4 text-fg-mute transition-transform', !configOpen && '-rotate-90')} />
-            Configuration
+            {t('settings.config.title')}
           </button>
           {configOpen && (
             <button
@@ -841,14 +842,14 @@ export function Settings() {
               className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
-              Reset
+              {t('common.reset')}
             </button>
           )}
         </div>
         {configOpen && (
         <>
         <p className="text-[11px] text-fg-mute -mt-1">
-          Tunable app behavior. Changes are saved locally and applied immediately.
+          {t('settings.config.description')}
         </p>
         {(Object.keys(SECTION_LABELS) as ConfigSection[]).map((sec) => {
           const fields = CONFIG_FIELDS.filter((f) => f.section === sec);
