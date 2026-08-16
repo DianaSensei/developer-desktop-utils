@@ -35,7 +35,7 @@ export function JwtDebugger() {
   return (
     <div className="flex flex-col h-full">
       {/* Token input — fixed height */}
-      <div className="shrink-0 border-b border-border flex flex-col" style={{ height: '160px' }}>
+      <div className="shrink-0 border-b border-line flex flex-col" style={{ height: '160px' }}>
         <PaneHeader label="JWT Token" hint={quickPasteHint} />
         <Textarea
           value={token}
@@ -58,13 +58,13 @@ export function JwtDebugger() {
                 trung tính; nhãn chữ mang toàn bộ sự phân biệt. */}
             <div className="space-y-2">
               <div className="text-xs font-semibold uppercase tracking-wider text-fg-mute">Header</div>
-              <div className="flex min-h-[100px] flex-col overflow-hidden rounded-md border border-border bg-sunk">
+              <div className="flex min-h-[100px] flex-col overflow-hidden rounded-md border border-line bg-sunk">
                 <CodeViewer value={decoded.header} language="json" />
               </div>
             </div>
             <div className="space-y-2">
               <div className="text-xs font-semibold uppercase tracking-wider text-fg-mute">Payload</div>
-              <div className="flex min-h-[180px] flex-col overflow-hidden rounded-md border border-border bg-sunk">
+              <div className="flex min-h-[180px] flex-col overflow-hidden rounded-md border border-line bg-sunk">
                 <CodeViewer value={decoded.payload} language="json" />
               </div>
             </div>

@@ -28,8 +28,8 @@ export function RuntimeVarsInspector({ vars, open, onClose }: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {rows.length === 0 ? (
             <p className="px-4 py-10 text-center text-xs text-fg-mute">
-              No runtime variables set yet. They're created by <code className="rounded bg-muted px-1">bru.setVar(...)</code>{' '}
-              / <code className="rounded bg-muted px-1">pm.variables.set(...)</code> in a script, or the request's declarative
+              No runtime variables set yet. They're created by <code className="rounded bg-bg-2 px-1">bru.setVar(...)</code>{' '}
+              / <code className="rounded bg-bg-2 px-1">pm.variables.set(...)</code> in a script, or the request's declarative
               Vars tab, and last for this session only — they reset when the app restarts.
             </p>
           ) : (

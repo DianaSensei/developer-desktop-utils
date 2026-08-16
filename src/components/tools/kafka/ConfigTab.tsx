@@ -49,7 +49,7 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Filter bar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0 bg-muted/10">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-line shrink-0 bg-bg-2/10">
         <Search className="w-3.5 h-3.5 text-fg-mute shrink-0" />
         <Input
           value={filter}
@@ -68,7 +68,7 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
       <div className="flex-1 overflow-y-auto min-h-0">
         {/* Sticky header */}
         <div
-          className="grid gap-4 px-4 py-2 text-xs font-semibold text-fg-mute border-b border-border bg-muted/10 sticky top-0"
+          className="grid gap-4 px-4 py-2 text-xs font-semibold text-fg-mute border-b border-line bg-bg-2/10 sticky top-0"
           style={{ gridTemplateColumns: '1fr 1fr' }}
         >
           <span>Name</span>
@@ -82,8 +82,8 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
             <div
               key={c.name}
               className={cn(
-                'grid gap-4 px-4 py-1.5 text-xs border-b border-border/30 hover:bg-muted/20',
-                i % 2 === 1 && 'bg-muted/5',
+                'grid gap-4 px-4 py-1.5 text-xs border-b border-line/30 hover:bg-bg-2/20',
+                i % 2 === 1 && 'bg-bg-2/5',
               )}
               style={{ gridTemplateColumns: '1fr 1fr' }}
             >

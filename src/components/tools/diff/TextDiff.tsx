@@ -159,9 +159,9 @@ export function TextDiff() {
             stats.chunks === 0 ? (
               <Badge tone="success" size="sm">No differences</Badge>
             ) : (
-              <span className="inline-flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 font-mono text-xs tabular-nums">
+              <span className="inline-flex items-center gap-2 rounded-md border border-line bg-bg-2/40 px-2 py-1 font-mono text-xs tabular-nums">
                 <span className="text-ok">+{stats.added}</span>
-                <span className="text-destructive">&minus;{stats.removed}</span>
+                <span className="text-bad">&minus;{stats.removed}</span>
               </span>
             )
           )}
@@ -188,7 +188,7 @@ export function TextDiff() {
           50/50 columns (the middle spacer matches its revert-arrow gutter). */}
       <div className="flex shrink-0">
         <PaneHeader className="min-w-0 flex-1" label="Original" action={<CopyButton value={text1} iconClassName="h-3.5 w-3.5" />} />
-        <div className="w-[1.6em] shrink-0 border-b border-border bg-muted/10" />
+        <div className="w-[1.6em] shrink-0 border-b border-line bg-bg-2/10" />
         <PaneHeader className="min-w-0 flex-1" label="Modified" action={<CopyButton value={text2} iconClassName="h-3.5 w-3.5" />} />
       </div>
 
@@ -212,7 +212,7 @@ export function TextDiff() {
       {/* Structural JSON diff — logical changes by path, unaffected by
           formatting/key order. Only relevant in JSON mode. */}
       {mode === 'json' && hasContent && (
-        <div className="shrink-0 border-t border-border" style={{ maxHeight: '32%' }}>
+        <div className="shrink-0 border-t border-line" style={{ maxHeight: '32%' }}>
           <div className="h-full overflow-y-auto">
             <CollapsibleSection
               title="Structural changes"
@@ -221,7 +221,7 @@ export function TextDiff() {
               className="px-4 py-2.5"
             >
               {jsonDiff?.error ? (
-                <p className="font-mono text-xs text-destructive">Invalid JSON — {jsonDiff.error}</p>
+                <p className="font-mono text-xs text-bad">Invalid JSON — {jsonDiff.error}</p>
               ) : jsonDiff?.changes && jsonDiff.changes.length > 0 ? (
                 <div className="space-y-1 pb-1">
                   {jsonDiff.changes.map((c, i) => (

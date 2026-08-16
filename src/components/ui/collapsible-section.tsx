@@ -67,7 +67,7 @@ export function CollapsibleSection({
   };
 
   return (
-    <div className={cn(variant === 'bordered' && 'rounded-lg border border-border px-3', className)}>
+    <div className={cn(variant === 'bordered' && 'rounded-lg border border-line px-3', className)}>
       <div className={cn('flex items-center gap-2', headerClassName)}>
         <button
           type="button"

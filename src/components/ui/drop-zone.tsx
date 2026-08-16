@@ -80,7 +80,7 @@ export function DropZone({
         'transition-[border-color,background-color] duration-200 ease-out',
         dragging
           ? 'border-acc bg-acc/5'
-          : 'border-fg-mute/25 hover:border-fg-mute/50 hover:bg-muted/30',
+          : 'border-fg-mute/25 hover:border-fg-mute/50 hover:bg-bg-2/30',
         className
       )}
     >

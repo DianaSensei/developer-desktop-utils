@@ -426,7 +426,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
 
           {reply && (
             <div className="rounded-lg border bg-card/40 overflow-hidden">
-              <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/20 border-b text-[11px] text-fg-mute">
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-bg-2/20 border-b text-[11px] text-fg-mute">
                 <span className="font-mono truncate">
                   Reply{reply.contentType ? ` · ${reply.contentType}` : ''}
                   {reply.correlationId ? ` · correlation_id: ${reply.correlationId}` : ''}
@@ -549,7 +549,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
               key={s.key}
               type="button"
               onMouseDown={(ev) => { ev.preventDefault(); pick(s.key); }}
-              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === s.key && 'text-acc')}
+              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-bg-2/60', value === s.key && 'text-acc')}
             >
               <span className="font-mono text-sm flex-1 truncate">{s.key}</span>
               <span className="text-[11px] text-fg-mute shrink-0 truncate max-w-[45%]">{s.hint}</span>
@@ -599,7 +599,7 @@ function ExchangeCombobox({ connId, value, exchanges, onChange }: {
           <button
             type="button"
             onMouseDown={(e) => { e.preventDefault(); pick(''); }}
-            className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-sm text-left hover:bg-muted/60', value === '' && 'text-acc')}
+            className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-sm text-left hover:bg-bg-2/60', value === '' && 'text-acc')}
           >
             <span className="flex-1">(default exchange)</span>
             {value === '' && <Check className="h-3.5 w-3.5" />}
@@ -609,7 +609,7 @@ function ExchangeCombobox({ connId, value, exchanges, onChange }: {
               key={e.name}
               type="button"
               onMouseDown={(ev) => { ev.preventDefault(); pick(e.name); }}
-              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === e.name && 'text-acc')}
+              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-bg-2/60', value === e.name && 'text-acc')}
             >
               <span className="font-mono text-sm flex-1 truncate">{e.name}</span>
               <span className="text-[11px] text-fg-mute shrink-0">{e.type}</span>

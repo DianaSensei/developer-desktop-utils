@@ -7,7 +7,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-line;
   }
   html {
     height: 100%;
@@ -68,28 +68,28 @@
   }
   .diff-merge-view .cm-merge-a .cm-changedLine,
   .diff-merge-view .cm-deletedChunk {
-    background-color: hsl(var(--destructive) / 0.08) !important;
+    background-color: hsl(var(--bad-c) / 0.08) !important;
   }
   .diff-merge-view .cm-merge-b .cm-changedLine {
     background-color: hsl(var(--diff-added) / 0.08) !important;
   }
   .diff-merge-view .cm-merge-a .cm-changedText,
   .diff-merge-view .cm-deletedChunk .cm-deletedText {
-    background: linear-gradient(hsl(var(--destructive) / 0.5), hsl(var(--destructive) / 0.5)) bottom / 100% 2px no-repeat !important;
+    background: linear-gradient(hsl(var(--bad-c) / 0.5), hsl(var(--bad-c) / 0.5)) bottom / 100% 2px no-repeat !important;
   }
   .diff-merge-view .cm-merge-b .cm-changedText {
     background: linear-gradient(hsl(var(--diff-added) / 0.6), hsl(var(--diff-added) / 0.6)) bottom / 100% 2px no-repeat !important;
   }
   .diff-merge-view .cm-changedLineGutter,
   .diff-merge-view .cm-deletedLineGutter {
-    background: hsl(var(--destructive)) !important;
+    background: hsl(var(--bad-c)) !important;
   }
   .diff-merge-view .cm-merge-b .cm-changedLineGutter {
     background: hsl(var(--diff-added)) !important;
   }
   .diff-merge-view .cm-collapsedLines {
     color: hsl(var(--fg-mute-c)) !important;
-    background: hsl(var(--muted) / 0.6) !important;
+    background: hsl(var(--bg-2-c) / 0.6) !important;
   }
   .diff-merge-view .cm-merge-revert button {
     color: hsl(var(--fg-mute-c));

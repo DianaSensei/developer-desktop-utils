@@ -380,7 +380,7 @@ export function ColorPicker() {
       <button
         onClick={() => copy(id, value.c)}
         title={`Click to copy ${value.c}`}
-        className="group flex w-full min-w-0 items-center gap-1 rounded-lg px-1.5 py-1 text-left font-mono text-xs transition-colors hover:bg-muted"
+        className="group flex w-full min-w-0 items-center gap-1 rounded-lg px-1.5 py-1 text-left font-mono text-xs transition-colors hover:bg-bg-2"
       >
         <span className="min-w-0 flex-1 truncate">{value.d}</span>
         {copied === id
@@ -414,7 +414,7 @@ export function ColorPicker() {
               <h2 className="text-sm font-semibold">Image</h2>
               <Help text="Move over the image to magnify it, then click to pick the color under the crosshair." />
             </div>
-            <div className="relative w-full overflow-hidden rounded-lg border bg-muted/30">
+            <div className="relative w-full overflow-hidden rounded-lg border bg-bg-2/30">
               <canvas
                 ref={canvasRef}
                 onPointerMove={onMove}
@@ -469,7 +469,7 @@ export function ColorPicker() {
 
               {/* Swatch row */}
               <span />
-              <div className="h-11 rounded-lg border border-border shadow-sm" style={{ backgroundColor: color }} title={`Selected ${color}`} />
+              <div className="h-11 rounded-lg border border-line shadow-sm" style={{ backgroundColor: color }} title={`Selected ${color}`} />
               <div
                 className="h-11 rounded-md border shadow-sm"
                 style={hoverColor ? { backgroundColor: hoverColor } : undefined}
@@ -499,12 +499,12 @@ export function ColorPicker() {
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={downloadPalette}
-                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-border text-fg-mute transition-colors hover:bg-muted"
+                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-line text-fg-mute transition-colors hover:bg-bg-2"
                   title="Download palette as PNG">
                   <Download className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={savePalette}
-                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-border text-fg-mute transition-colors hover:bg-muted"
+                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-line text-fg-mute transition-colors hover:bg-bg-2"
                   title="Copy all hex codes">
                   {copied === 'palette' ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
@@ -517,7 +517,7 @@ export function ColorPicker() {
           </div>
 
           {/* Use your own image */}
-          <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+          <div className="space-y-2 rounded-lg border bg-bg-2/30 p-3">
             <h3 className="text-sm font-semibold">Use your own image</h3>
             <Button onClick={onUpload} className="w-full gap-2">
               <ImageIcon className="h-4 w-4" /> Use your image

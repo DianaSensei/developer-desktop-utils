@@ -63,7 +63,7 @@ export function TopicView({
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header — breadcrumb: Broker › Topic › Tab */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-line shrink-0">
         <div className="flex items-center gap-1.5 min-w-0 text-sm">
           <button onClick={onBackToTopics} className="text-fg-mute hover:text-fg shrink-0" title="Back to topics">
             <ArrowLeft className="h-4 w-4" />
@@ -109,14 +109,14 @@ export function TopicView({
 
       {/* Error */}
       {!loading && error && (
-        <div className="flex items-start gap-2 px-4 py-3 text-sm text-destructive border-b shrink-0">
+        <div className="flex items-start gap-2 px-4 py-3 text-sm text-bad border-b shrink-0">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span className="break-all">{error}</span>
         </div>
       )}
 
       {/* Tab bar */}
-      <div className="flex border-b border-border shrink-0 px-2 gap-0 overflow-x-auto no-scrollbar">
+      <div className="flex border-b border-line shrink-0 px-2 gap-0 overflow-x-auto no-scrollbar">
         {TABS.map((tab) => (
           <button
             key={tab.id}

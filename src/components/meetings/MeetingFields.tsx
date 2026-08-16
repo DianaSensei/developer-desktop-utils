@@ -61,7 +61,7 @@ export function MeetingFields({
         />
 
         {/* When — one tidy row */}
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-bg-2/20 p-2">
           <DatePicker value={dateISO} onChange={setDate} className="h-ctl" />
           <TimePicker value={toHM(meeting.start)} onChange={setStartTime} className="h-ctl w-[86px]" />
           <span className="text-fg-mute">–</span>
@@ -101,7 +101,7 @@ export function MeetingFields({
       />
 
       {/* Meta bar — when / who in one compact card */}
-      <div className="flex flex-wrap items-end gap-x-5 gap-y-3 rounded-lg border bg-muted/20 p-3.5">
+      <div className="flex flex-wrap items-end gap-x-5 gap-y-3 rounded-lg border bg-bg-2/20 p-3.5">
         <MetaField label="Date">
           <DatePicker value={dateISO} onChange={setDate} className="h-ctl w-[150px]" />
         </MetaField>

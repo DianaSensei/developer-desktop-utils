@@ -48,7 +48,7 @@ export function Keycap({ mod, inline, className, children, ...props }: KeycapPro
             // viền / ghost) mà không cần bảng màu riêng. Độ mờ đặt trên cả phần
             // tử — currentColor không nhận bổ ngữ alpha ở Tailwind 3.
             'ml-2 border-l border-current pl-2 opacity-60'
-          : 'rounded-xs border border-border bg-muted/60 px-1.5 py-1 text-fg-mute',
+          : 'rounded-xs border border-line bg-bg-2/60 px-1.5 py-1 text-fg-mute',
         className,
       )}
       {...props}

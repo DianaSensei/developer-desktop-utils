@@ -31,7 +31,7 @@ export function UpdateDialog() {
         </DialogHeader>
 
         {updateInfo?.body && (
-          <div className="max-h-48 overflow-y-auto rounded-md border bg-muted/40 p-3 text-xs whitespace-pre-wrap text-fg-mute">
+          <div className="max-h-48 overflow-y-auto rounded-md border bg-bg-2/40 p-3 text-xs whitespace-pre-wrap text-fg-mute">
             {updateInfo.body}
           </div>
         )}
@@ -40,14 +40,14 @@ export function UpdateDialog() {
           {isDownloading ? (
             <button
               onClick={cancelInstall}
-              className="rounded-md border px-3 py-1.5 text-xs font-medium text-fg-mute transition-colors hover:bg-muted hover:text-fg"
+              className="rounded-md border px-3 py-1.5 text-xs font-medium text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
             >
               Cancel
             </button>
           ) : (
             <button
               onClick={dismissUpdateDialog}
-              className="rounded-md border px-3 py-1.5 text-xs font-medium text-fg-mute transition-colors hover:bg-muted hover:text-fg"
+              className="rounded-md border px-3 py-1.5 text-xs font-medium text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
             >
               Later
             </button>

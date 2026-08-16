@@ -52,7 +52,7 @@ export function RequestTabs({
   const mismatchedEnv = store.activeEnvMismatched ? store.selectedEnv : null;
 
   return (
-    <div className="flex items-stretch border-b border-border bg-muted/10">
+    <div className="flex items-stretch border-b border-line bg-bg-2/10">
       {/* tabs (scrollable) + new */}
       <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar">
         {openRequests.map((req) => {
@@ -139,11 +139,11 @@ export function RequestTabs({
         <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-bg">
           <Settings2 className="h-4 w-4" />
         </IconButton>
-        <span className="mx-0.5 h-5 w-px bg-border" />
+        <span className="mx-0.5 h-5 w-px bg-line" />
         <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-bg">
           <KeyRound className="h-4 w-4" />
         </IconButton>
-        <span className="mx-0.5 h-5 w-px bg-border" />
+        <span className="mx-0.5 h-5 w-px bg-line" />
         <IconButton
           onClick={onOpenHistory}
           title="History"

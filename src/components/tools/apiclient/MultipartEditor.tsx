@@ -59,7 +59,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
   return (
     <div className="overflow-hidden rounded-md border text-xs">
       {/* header */}
-      <div className="grid grid-cols-[1fr_1fr_10rem_2rem] border-b bg-muted/30 font-semibold">
+      <div className="grid grid-cols-[1fr_1fr_10rem_2rem] border-b bg-bg-2/30 font-semibold">
         <div className="border-r px-3 py-1.5">Key</div>
         <div className="border-r px-3 py-1.5">Value</div>
         <div className="border-r px-3 py-1.5">Content-Type</div>
@@ -78,7 +78,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
                 onClick={() => !isGhost && editRow(row.id, { enabled: !row.enabled })}
                 className={cn(
                   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-                  isGhost ? 'invisible' : row.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-input',
+                  isGhost ? 'invisible' : row.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
                 )}
                 title={row.enabled ? 'Enabled' : 'Disabled'}
               >
@@ -99,7 +99,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
                 <>
                   <FileIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
                   <span className="flex-1 truncate" title={row.fileName}>{row.fileName}</span>
-                  <button type="button" onClick={() => clearFile(row.id)} title="Remove file" className="rounded p-0.5 text-fg-mute/60 hover:text-destructive">
+                  <button type="button" onClick={() => clearFile(row.id)} title="Remove file" className="rounded p-0.5 text-fg-mute/60 hover:text-bad">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </>
@@ -133,7 +133,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
             {/* action cell */}
             <div className="flex items-center justify-center">
               {!isGhost && (
-                <button type="button" onClick={() => removeRow(row.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-destructive">
+                <button type="button" onClick={() => removeRow(row.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-bad">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}

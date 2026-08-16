@@ -31,7 +31,7 @@ function groupByTopic(assignments: Assignment[]): [string, Assignment[]][] {
 const STATE_DOT: Record<string, string> = {
   Stable: 'bg-ok',
   Empty: 'bg-fg-mute/40',
-  Dead: 'bg-destructive',
+  Dead: 'bg-bad',
   PreparingRebalance: 'bg-warn',
   CompletingRebalance: 'bg-warn',
 };
@@ -96,9 +96,9 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
           <>
             {/* Members */}
             {data.members.length > 0 && (
-              <div className="border-b border-border/60">
-                <SectionLabel count={data.members.length} className="bg-muted/15 px-4 py-1.5">Members</SectionLabel>
-                <div className="divide-y divide-border/30">
+              <div className="border-b border-line/60">
+                <SectionLabel count={data.members.length} className="bg-bg-2/15 px-4 py-1.5">Members</SectionLabel>
+                <div className="divide-y divide-line/30">
                   {data.members.map((m) => (
                     <div key={m.memberId} className="px-4 py-1.5 flex items-center gap-3 text-xs min-w-0">
                       <span className="font-mono truncate flex-1" title={m.memberId}>{m.clientId || m.memberId}</span>
@@ -119,10 +119,10 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                 const totalLag = parts.reduce((s, a) => s + (a.lag > 0 ? a.lag : 0), 0);
                 const hasLag = parts.some((a) => a.lag > 0);
                 return (
-                  <div key={topic} className="border-b border-border/40">
+                  <div key={topic} className="border-b border-line/40">
                     {/* Topic header — toggles partition detail; topic name browses the topic */}
                     <div
-                      className="flex items-center gap-2 px-4 py-2 hover:bg-muted/15 cursor-pointer select-none"
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-bg-2/15 cursor-pointer select-none"
                       onClick={() => toggleTopic(topic)}
                     >
                       {open
@@ -146,7 +146,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                     {open && (
                       <div className="pb-1">
                         {/* Per-partition column headers */}
-                        <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-fg-mute bg-muted/10">
+                        <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-fg-mute bg-bg-2/10">
                           <span className="text-right">Part</span>
                           <span>Consumer</span>
                           <span className="text-right">Committed</span>
@@ -167,7 +167,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                           return (
                             <div
                               key={a.partition}
-                              className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-border/20 text-sm"
+                              className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-line/20 text-sm"
                             >
                               <span className="text-right text-xs text-fg-mute tabular-nums">{a.partition}</span>
                               <span className="min-w-0 truncate text-xs" title={a.memberId ?? undefined}>

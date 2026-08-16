@@ -75,7 +75,7 @@ export function ParamRow({
                 'rounded-xs px-1.5 py-0.5 text-[11px] leading-none',
                 tagActive
                   ? 'bg-acc-tint text-acc-ink'
-                  : 'bg-muted text-fg-mute',
+                  : 'bg-bg-2 text-fg-mute',
               )}
             >
               {tag}

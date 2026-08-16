@@ -21,7 +21,7 @@ export type BadgeVariant = 'soft' | 'solid' | 'outline';
 // Nhờ vậy chúng tự đúng ở cả sáng lẫn tối (không cần cặp `dark:` thủ công) và
 // KHÔNG đổi khi đổi tone accent — xem design/RULES.md.
 const SOFT: Record<BadgeTone, string> = {
-  neutral: 'bg-muted text-fg-mute',
+  neutral: 'bg-bg-2 text-fg-mute',
   success: 'bg-ok-tint text-ok',
   warning: 'bg-warn-tint text-warn',
   danger: 'bg-bad-tint text-bad',
@@ -42,7 +42,7 @@ const SOLID: Record<BadgeTone, string> = {
 };
 
 const OUTLINE: Record<BadgeTone, string> = {
-  neutral: 'border border-border text-fg-mute',
+  neutral: 'border border-line text-fg-mute',
   success: 'border border-ok-edge text-ok',
   warning: 'border border-warn-edge text-warn',
   danger: 'border border-bad-edge text-bad',

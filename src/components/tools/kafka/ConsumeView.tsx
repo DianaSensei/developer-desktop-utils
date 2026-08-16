@@ -72,7 +72,7 @@ export function ConsumeView({ brokerId, refreshKey, onRefresh, prefill, detailTo
             {sessions.length === 0
               ? <p className="text-sm text-fg-mute">No consumers running. Start one above to watch a topic in realtime.</p>
               : (
-                <div className="rounded-lg border divide-y divide-border/40 overflow-hidden">
+                <div className="rounded-lg border divide-y divide-line/40 overflow-hidden">
                   {sessions.map((s) => <ConsumerListRow key={s.topic} session={s} onOpen={() => onOpenConsumer(s.topic)} />)}
                 </div>
               )}
@@ -91,7 +91,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: KafkaConsumerSession
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
-      className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-muted/40"
+      className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-bg-2/40"
     >
       <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
       <span className="font-mono text-sm truncate">{s.topic}</span>
@@ -103,7 +103,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: KafkaConsumerSession
         {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
       </span>
       <span onClick={(e) => e.stopPropagation()} className="shrink-0">
-        <Button variant="ghost" size="sm" className="h-ctl px-2 text-destructive" title="Stop consumer" onClick={() => kafkaConsumerStore.stop(s.brokerId, s.topic)}>
+        <Button variant="ghost" size="sm" className="h-ctl px-2 text-bad" title="Stop consumer" onClick={() => kafkaConsumerStore.stop(s.brokerId, s.topic)}>
           <Square className="h-3 w-3" />
         </Button>
       </span>
@@ -281,7 +281,7 @@ function ConsumerDetail({ session: s, onBack }: { session: KafkaConsumerSession;
         {shown.length === 0
           ? <p className="px-5 py-4 text-sm text-fg-mute">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
           : (
-            <div className="divide-y divide-border/40">
+            <div className="divide-y divide-line/40">
               {shown.map((m) => <MessageRow key={`${m.partition}-${m.offset}`} m={m} format={format} />)}
               {matches.length > shown.length && (
                 <p className="px-5 py-2 text-[11px] text-fg-mute">
@@ -307,11 +307,11 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
         tabIndex={0}
         onClick={() => setExpanded((e) => !e)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((x) => !x); } }}
-        className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted/40"
+        className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-bg-2/40"
       >
         {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />}
         <span className="text-[11px] text-fg-mute tabular-nums shrink-0 w-[5.5rem]" title={m.timestamp}>{fmtTime(m.timestamp)}</span>
-        <span className="text-[11px] font-mono px-1 py-0.5 rounded bg-muted text-fg-mute shrink-0">p{m.partition}</span>
+        <span className="text-[11px] font-mono px-1 py-0.5 rounded bg-bg-2 text-fg-mute shrink-0">p{m.partition}</span>
         <span className="text-[11px] font-mono text-fg-mute tabular-nums shrink-0 w-14">@{m.offset}</span>
         {m.key != null && m.key !== '' && (
           <span className="text-[11px] font-mono text-acc/80 truncate max-w-[9rem] shrink-0" title={`key: ${m.key}`}>{m.key}</span>
@@ -327,7 +327,7 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
 
       {/* Expanded detail — full value, key, and headers for tracing. */}
       {expanded && (
-        <div className="px-3 pb-3 pt-1 space-y-2.5 bg-muted/10 border-t border-border/30">
+        <div className="px-3 pb-3 pt-1 space-y-2.5 bg-bg-2/10 border-t border-line/30">
           <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-fg-mute pt-1">
             <span>partition <span className="text-fg">{m.partition}</span></span>
             <span>offset <span className="text-fg">{m.offset}</span></span>
@@ -341,7 +341,7 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
           {headerEntries.length > 0 && (
             <div>
               <div className="text-[11px] font-medium text-fg-mute mb-1">Headers</div>
-              <div className="rounded-md border divide-y divide-border/40 overflow-hidden">
+              <div className="rounded-md border divide-y divide-line/40 overflow-hidden">
                 {headerEntries.map(([k, v]) => (
                   <div key={k} className="flex gap-3 px-2.5 py-1 text-[11px] font-mono">
                     <span className="text-fg-mute shrink-0">{k}</span>
@@ -468,7 +468,7 @@ function TopicCombobox({ brokerId, value, topics, onChange }: {
               key={t}
               type="button"
               onMouseDown={(ev) => { ev.preventDefault(); pick(t); }}
-              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === t && 'text-acc')}
+              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-bg-2/60', value === t && 'text-acc')}
             >
               <span className="font-mono text-sm flex-1 truncate">{t}</span>
               {value === t && <Check className="h-3.5 w-3.5 shrink-0" />}

@@ -13,7 +13,7 @@ export function StatusBar({ onSearch, onCookies, cookieCount, onRuntimeVars, run
   sandboxDegraded?: boolean;
 }) {
   return (
-    <div className="flex shrink-0 items-center justify-between border-t bg-muted/20 px-3 py-1 text-[11px] text-fg-mute">
+    <div className="flex shrink-0 items-center justify-between border-t bg-bg-2/20 px-3 py-1 text-[11px] text-fg-mute">
       <div className="flex items-center gap-3">
         <span className="font-medium tracking-wide">API Client</span>
         {sandboxDegraded && (
@@ -35,7 +35,7 @@ export function StatusBar({ onSearch, onCookies, cookieCount, onRuntimeVars, run
         >
           <Search className="h-3 w-3" /> Search
         </button>
-        <span className="h-3 w-px bg-border" />
+        <span className="h-3 w-px bg-line" />
         <button
           onClick={onRuntimeVars}
           title="Inspect runtime variables (bru.setVar)"
@@ -46,7 +46,7 @@ export function StatusBar({ onSearch, onCookies, cookieCount, onRuntimeVars, run
             <Badge tone="neutral" pill className="ml-0.5">{runtimeVarCount}</Badge>
           )}
         </button>
-        <span className="h-3 w-px bg-border" />
+        <span className="h-3 w-px bg-line" />
         <button
           onClick={onCookies}
           title="Manage cookies"

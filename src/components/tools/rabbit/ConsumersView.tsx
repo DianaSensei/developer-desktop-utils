@@ -95,7 +95,7 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill, detailQueu
             {sessions.length === 0
               ? <p className="text-sm text-fg-mute">No consumers running. Start one above.</p>
               : (
-                <div className="rounded-lg border divide-y divide-border/40 overflow-hidden">
+                <div className="rounded-lg border divide-y divide-line/40 overflow-hidden">
                   {sessions.map((s) => <ConsumerListRow key={s.queue} session={s} onOpen={() => onOpenConsumer(s.queue)} />)}
                 </div>
               )}
@@ -114,7 +114,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: ConsumerSession; onO
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
-      className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-muted/40"
+      className="flex items-center gap-2 px-3 py-2.5 cursor-pointer hover:bg-bg-2/40"
     >
       <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
       <span className="font-mono text-sm truncate">{s.queue}</span>
@@ -126,7 +126,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: ConsumerSession; onO
         {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
       </span>
       <span onClick={(e) => e.stopPropagation()} className="shrink-0">
-        <Button variant="ghost" size="sm" className="h-ctl px-2 text-destructive" title="Stop consumer" onClick={() => consumerStore.stop(s.connId, s.queue)}>
+        <Button variant="ghost" size="sm" className="h-ctl px-2 text-bad" title="Stop consumer" onClick={() => consumerStore.stop(s.connId, s.queue)}>
           <Square className="h-3 w-3" />
         </Button>
       </span>
@@ -248,7 +248,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
       )}
 
       {mode === 'respond' && (
-        <div className="rounded-md border bg-muted/10 p-3 space-y-3">
+        <div className="rounded-md border bg-bg-2/10 p-3 space-y-3">
           <label className="flex items-center justify-between">
             <span className="text-xs">
               <span className="font-medium">Echo request</span>
@@ -381,7 +381,7 @@ function ConsumerDetail({ session: s, onBack }: { session: ConsumerSession; onBa
         {shown.length === 0
           ? <p className="px-5 py-4 text-sm text-fg-mute">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
           : (
-            <div className="divide-y divide-border/40">
+            <div className="divide-y divide-line/40">
               {shown.map((m) => <MessageRow key={m.deliveryTag} m={m} format={format} />)}
               {matches.length > shown.length && (
                 <p className="px-5 py-2 text-[11px] text-fg-mute">
@@ -409,7 +409,7 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
         tabIndex={0}
         onClick={() => setExpanded((e) => !e)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((x) => !x); } }}
-        className="flex items-center gap-2 px-5 py-1.5 cursor-pointer hover:bg-muted/40"
+        className="flex items-center gap-2 px-5 py-1.5 cursor-pointer hover:bg-bg-2/40"
       >
         {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />}
         <span className="text-[11px] font-mono text-fg-mute truncate max-w-[12rem] shrink-0" title={`${m.exchange ? m.exchange + ' · ' : ''}${m.routingKey || '—'}`}>
@@ -425,7 +425,7 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
       </div>
 
       {expanded && (
-        <div className="px-5 pb-3 pt-1 space-y-2.5 bg-muted/10 border-t border-border/30">
+        <div className="px-5 pb-3 pt-1 space-y-2.5 bg-bg-2/10 border-t border-line/30">
           <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-fg-mute pt-1">
             <span>exchange <span className="text-fg">{m.exchange || '(default)'}</span></span>
             <span>routing key <span className="text-fg">{m.routingKey || '—'}</span></span>
@@ -438,7 +438,7 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
           {headerEntries.length > 0 && (
             <div>
               <div className="text-[11px] font-medium text-fg-mute mb-1">Headers</div>
-              <div className="rounded-md border divide-y divide-border/40 overflow-hidden">
+              <div className="rounded-md border divide-y divide-line/40 overflow-hidden">
                 {headerEntries.map(([k, v]) => (
                   <div key={k} className="flex gap-3 px-2.5 py-1 text-[11px] font-mono">
                     <span className="text-fg-mute shrink-0">{k}</span>
@@ -502,7 +502,7 @@ function QueueCombobox({ connId, value, queues, onChange }: {
               key={x.name}
               type="button"
               onMouseDown={(ev) => { ev.preventDefault(); pick(x.name); }}
-              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === x.name && 'text-acc')}
+              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-bg-2/60', value === x.name && 'text-acc')}
             >
               <span className="font-mono text-sm flex-1 truncate">{x.name}</span>
               <span className="text-[11px] text-fg-mute shrink-0 tabular-nums">{x.messages ?? 0}</span>

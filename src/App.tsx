@@ -500,7 +500,7 @@ function Sidebar({
             sách tool. Xem khối titlebar trong AppContent. */}
         {!showMergedTitlebar && (
           <div className={cn(
-            'flex shrink-0 items-center border-b border-border py-2.5',
+            'flex shrink-0 items-center border-b border-line py-2.5',
             isCollapsed ? 'justify-center px-2' : 'justify-between px-3'
           )}>
             <div className="flex min-w-0 items-center gap-2.5">
@@ -526,7 +526,7 @@ function Sidebar({
             <button
               onClick={() => { pendingSearchFocus.current = true; onToggleCollapse(); }}
               title="Search tools"
-              className="flex items-center justify-center h-ctl w-ctl rounded-md text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+              className="flex items-center justify-center h-ctl w-ctl rounded-md text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
             </button>
@@ -540,7 +540,7 @@ function Sidebar({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('shell.search.placeholder')}
-                className="h-ctl pl-7 pr-7 text-xs rounded-md bg-muted/40 border-muted focus-visible:ring-1"
+                className="h-ctl pl-7 pr-7 text-xs rounded-md bg-bg-2/40 border-bg-2 focus-visible:ring-1"
               />
               {query && (
                 <button
@@ -583,7 +583,7 @@ function Sidebar({
               onClick={onToggleCollapse}
               title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               className={cn(
-                'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-muted/60',
+                'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
@@ -606,7 +606,7 @@ function Sidebar({
               onClick={() => onThemeChange(NEXT_THEME[themePreference])}
               title={`Theme: ${activeThemeOption.label} (click to cycle)`}
               className={cn(
-                'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-muted/60',
+                'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
@@ -758,7 +758,7 @@ function AppContent() {
         <AppLogo size={18} />
         <h1 className="whitespace-nowrap text-xs font-semibold leading-none">DevTool</h1>
       </div>
-      <span className="h-4 w-px shrink-0 bg-border" />
+      <span className="h-4 w-px shrink-0 bg-line" />
       <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(true)} title="Open menu">
         <Menu className="h-3.5 w-3.5" />
       </Button>
@@ -847,7 +847,7 @@ function AppContent() {
           THOÁNG — 78px ban đầu vẫn dính, tăng lên 96px. */}
       {showMacOverlayChrome && (
         <div
-          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[96px] pr-3"
+          className="flex h-[38px] shrink-0 items-center justify-between border-b border-line bg-chrome pl-[96px] pr-3"
           data-tauri-drag-region="deep"
         >
           {titlebarNav}
@@ -874,7 +874,7 @@ function AppContent() {
           chừa lề trái — không có đèn giao thông nào để né. */}
       {showCustomChrome && (
         <div
-          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-3 pr-1"
+          className="flex h-[38px] shrink-0 items-center justify-between border-b border-line bg-chrome pl-3 pr-1"
           data-tauri-drag-region="deep"
         >
           {titlebarNav}
@@ -882,7 +882,7 @@ function AppContent() {
           <div className="flex shrink-0 items-center gap-0.5">
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
             {titlebarHelpAction}
-            <span className="mx-1 h-4 w-px shrink-0 bg-border" />
+            <span className="mx-1 h-4 w-px shrink-0 bg-line" />
             {/* h-full (không phải h-9 cố định) — hàng titlebar cao 38px, ba nút
                 caption theo đúng quy ước Windows/Linux là chạm sát mép trên/dưới
                 titlebar, không có khoảng hở. Cũng tránh trùng ngưỡng
@@ -897,7 +897,7 @@ function AppContent() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-full w-10 rounded-none text-fg-mute/70 hover:bg-destructive hover:text-destructive-foreground"
+              className="h-full w-10 rounded-none text-fg-mute/70 hover:bg-bad hover:text-white"
               onClick={winClose}
               title="Close"
             >

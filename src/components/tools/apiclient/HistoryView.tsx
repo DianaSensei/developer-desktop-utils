@@ -38,7 +38,7 @@ export function HistoryView({ store }: { store: ApiStore }) {
           <button onClick={() => setSelectedId(history[0]?.id ?? null)} title="Jump to latest" className="rounded p-1 text-fg-mute hover:bg-acc hover:text-fg">
             <RotateCw className="h-3.5 w-3.5" />
           </button>
-          <button onClick={() => store.clearHistory()} title="Clear history" className="rounded p-1 text-fg-mute hover:bg-acc hover:text-destructive">
+          <button onClick={() => store.clearHistory()} title="Clear history" className="rounded p-1 text-fg-mute hover:bg-acc hover:text-bad">
             <Eraser className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -59,7 +59,7 @@ export function HistoryView({ store }: { store: ApiStore }) {
               <span className="w-24 shrink-0 text-fg-mute">{timeAgo(h.at)}</span>
               <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(h.method))}>{h.method}</span>
               <span className="min-w-0 flex-1 truncate font-mono text-fg-mute" title={h.url}>{h.url}</span>
-              <span className={cn('shrink-0 font-semibold', h.error ? 'text-destructive' : statusColor(h.status))}>
+              <span className={cn('shrink-0 font-semibold', h.error ? 'text-bad' : statusColor(h.status))}>
                 {h.error ? 'ERR' : h.status}
               </span>
             </button>
@@ -119,7 +119,7 @@ function HistoryDetail({ entry }: { entry: HistoryEntry }) {
               </div>
             )}
             {hasBody && req && (
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 font-mono text-[11px]">
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-bg-2/40 p-2 font-mono text-[11px]">
                 {req.body.raw || req.body.form.map((f) => `${f.key}=${f.value}`).join('\n')}
               </pre>
             )}

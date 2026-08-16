@@ -128,7 +128,7 @@ function TopicCombobox({ brokerId, value, topics, onChange }: {
               key={t}
               type="button"
               onMouseDown={(ev) => { ev.preventDefault(); pick(t); }}
-              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === t && 'text-acc')}
+              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-bg-2/60', value === t && 'text-acc')}
             >
               <span className="font-mono text-sm flex-1 truncate">{t}</span>
               {value === t && <Check className="h-3.5 w-3.5 shrink-0" />}

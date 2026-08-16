@@ -128,7 +128,7 @@ export function CommandPalette() {
           }}
           className={cn(
             'fixed left-1/2 top-[14%] z-50 w-full max-w-2xl -translate-x-1/2 overflow-hidden',
-            'rounded-lg border border-border/70 glass-strong glass-sheen shadow-lift',
+            'rounded-lg border border-line/70 glass-strong glass-sheen shadow-lift',
             'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
             'data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           )}
@@ -138,7 +138,7 @@ export function CommandPalette() {
             {t('palette.placeholder')}
           </DialogPrimitive.Description>
 
-          <div className="flex items-center gap-2 border-b border-border px-3.5">
+          <div className="flex items-center gap-2 border-b border-line px-3.5">
             <Search className="h-4 w-4 shrink-0 text-fg-mute/60" />
             <input
               ref={inputRef}
@@ -154,7 +154,7 @@ export function CommandPalette() {
           </div>
 
           <div className="flex h-[380px]">
-            <div className="w-[56%] shrink-0 overflow-y-auto border-r border-border p-1.5">
+            <div className="w-[56%] shrink-0 overflow-y-auto border-r border-line p-1.5">
               {items.length === 0 && (
                 <p className="px-2.5 py-8 text-center text-[13px] text-fg-mute">
                   {t('palette.empty', { query })}
@@ -206,7 +206,7 @@ export function CommandPalette() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 border-t border-border px-3.5 py-2">
+          <div className="flex items-center gap-3 border-t border-line px-3.5 py-2">
             <span className="flex items-center gap-1 text-[11px] text-fg-mute">
               <Keycap>↑</Keycap>
               <Keycap>↓</Keycap> {t('palette.footer.navigate')}
@@ -251,7 +251,7 @@ function ToolRow({
       title={!enabled ? disabledHint : undefined}
       className={cn(
         'flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm transition-colors',
-        active ? 'bg-acc-tint text-acc-ink' : 'text-fg hover:bg-muted/50',
+        active ? 'bg-acc-tint text-acc-ink' : 'text-fg hover:bg-bg-2/50',
       )}
     >
       <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc-ink' : 'text-fg-mute')} />
@@ -288,7 +288,7 @@ function ClipboardRow({
       onMouseEnter={onHover}
       className={cn(
         'flex w-full flex-col gap-1 rounded-sm px-2.5 py-2 text-left transition-colors',
-        active ? 'bg-acc-tint' : 'hover:bg-muted/50',
+        active ? 'bg-acc-tint' : 'hover:bg-bg-2/50',
       )}
     >
       <span className="flex items-center gap-2.5">
@@ -318,7 +318,7 @@ function Preview({
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center gap-2.5">
-        <span className="grid h-ctl w-ctl shrink-0 place-items-center rounded-sm border border-border bg-sunk">
+        <span className="grid h-ctl w-ctl shrink-0 place-items-center rounded-sm border border-line bg-sunk">
           <Icon className="h-4 w-4 text-acc-ink" />
         </span>
         <div className="min-w-0">
@@ -338,7 +338,7 @@ function Preview({
           {tool.keywords.slice(0, 8).map((k) => (
             <span
               key={k}
-              className="rounded-xs bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute"
+              className="rounded-xs bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute"
             >
               {k}
             </span>

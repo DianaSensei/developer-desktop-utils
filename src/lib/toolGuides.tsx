@@ -27,10 +27,10 @@ export function GuideSection({
 }
 
 function Key({ children }: { children: ReactNode }) {
-  return <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[11px] text-fg">{children}</kbd>;
+  return <kbd className="rounded border border-line bg-bg-2 px-1 py-0.5 font-mono text-[11px] text-fg">{children}</kbd>;
 }
 function Tok({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-muted px-1 text-[11px] text-fg">{children}</code>;
+  return <code className="rounded bg-bg-2 px-1 text-[11px] text-fg">{children}</code>;
 }
 function Var({ children }: { children: ReactNode }) {
   return <code className="rounded-xs bg-ok-tint px-1 text-[11px] text-ok">{children}</code>;

@@ -254,7 +254,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           <span className="text-fg-mute">{formatBytes(response.sizeBytes)}</span>
         </>
       ) : (
-        <span className="font-semibold text-destructive">No response</span>
+        <span className="font-semibold text-bad">No response</span>
       )}
       {response && activeTab === 'body' && kind === 'json' && !big && (
         <IconButton
@@ -292,9 +292,9 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       </div>
 
       {error && (
-        <div className="flex max-h-40 shrink-0 flex-col divide-y divide-destructive/20 overflow-auto border-b border-destructive/20">
+        <div className="flex max-h-40 shrink-0 flex-col divide-y divide-bad/20 overflow-auto border-b border-bad/20">
           {parseScriptErrors(error).map((e, i) => (
-            <div key={i} className="flex items-start gap-2 bg-destructive/8 px-3 py-2 text-xs text-destructive">
+            <div key={i} className="flex items-start gap-2 bg-bad/8 px-3 py-2 text-xs text-bad">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
                 {e.label && <span className="font-semibold">{e.label}: </span>}
@@ -329,7 +329,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
               )}
               <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} />
               {showFilter && kind === 'json' && (
-                <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5 focus-within:bg-muted/20">
+                <div className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-1.5 focus-within:bg-bg-2/20">
                   <Filter className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
                   <Input
                     value={filter}
@@ -339,7 +339,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                     spellCheck={false}
                     autoFocus
                   />
-                  {filter && filterResult && !filterResult.ok && <span className="shrink-0 text-[11px] text-destructive">invalid</span>}
+                  {filter && filterResult && !filterResult.ok && <span className="shrink-0 text-[11px] text-bad">invalid</span>}
                   {filter && <button onClick={() => setFilter('')} title="Clear" className="shrink-0 rounded p-0.5 text-fg-mute hover:text-fg"><X className="h-3.5 w-3.5" /></button>}
                 </div>
               )}
@@ -370,10 +370,10 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                     <div key={i} className="flex items-start gap-2 px-3 py-1.5">
                       {t.passed
                         ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" />
-                        : <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />}
+                        : <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-bad" />}
                       <div className="min-w-0">
                         <span className={cn('break-words', !t.passed && 'text-fg')}>{t.name}</span>
-                        {!t.passed && t.error && <p className="break-words text-[11px] text-destructive">{t.error}</p>}
+                        {!t.passed && t.error && <p className="break-words text-[11px] text-bad">{t.error}</p>}
                       </div>
                     </div>
                   ))}
@@ -403,7 +403,7 @@ const LOG_COLOR: Record<LogEntry['level'], string> = {
   log: '',
   info: 'text-info',
   warn: 'text-warn',
-  error: 'text-destructive',
+  error: 'text-bad',
 };
 
 // Extension guessed from the response's content type, for the save dialog.
@@ -529,7 +529,7 @@ function TimingBar({ label, ms, total, tone }: { label: string; ms: number; tota
   return (
     <div className="flex items-center gap-2">
       <span className="w-28 shrink-0 text-fg-mute">{label}</span>
-      <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+      <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-bg-2">
         <span className={cn('block h-full rounded-full', tone)} style={{ width: `${pct}%` }} />
       </span>
       <span className="w-16 shrink-0 text-right text-fg">{ms} ms</span>
@@ -564,7 +564,7 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-bg px-1.5 py-0.5 font-mono text-[11px] text-fg-mute transition-colors hover:text-fg">
+      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-line bg-bg px-1.5 py-0.5 font-mono text-[11px] text-fg-mute transition-colors hover:text-fg">
         <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
       </DropdownMenuTrigger>

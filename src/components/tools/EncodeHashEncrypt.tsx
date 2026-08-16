@@ -631,7 +631,7 @@ export function EncodeHashEncrypt() {
       {/* ── Encode tab ───────────────────────────────────────────────────────── */}
       {tab === 'encode' && (
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="shrink-0 px-4 py-2 border-b border-border bg-muted/5 flex flex-wrap items-center gap-3">
+          <div className="shrink-0 px-4 py-2 border-b border-line bg-bg-2/5 flex flex-wrap items-center gap-3">
             <Select value={algorithm} onValueChange={setAlgorithm}>
               <SelectTrigger className="h-ctl w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -670,7 +670,7 @@ export function EncodeHashEncrypt() {
                 value={encodeError ? `Error: ${encodeError}` : encodeOutput}
                 readOnly
                 placeholder="Result appears here"
-                className={cn('flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4', encodeError && 'text-destructive')}
+                className={cn('flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4', encodeError && 'text-bad')}
               />
             </ToolPane>
           </ToolPanes>
@@ -707,7 +707,7 @@ export function EncodeHashEncrypt() {
                 'text-[11px] font-mono px-2 py-0.5 rounded border transition-colors',
                 upperHex
                   ? 'border-acc/40 bg-acc/10 text-acc'
-                  : 'border-border bg-muted/30 text-fg-mute hover:text-fg hover:border-border/80'
+                  : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg hover:border-line/80'
               )}
             >
               {upperHex ? 'ABC' : 'abc'}
@@ -719,7 +719,7 @@ export function EncodeHashEncrypt() {
               const value = hashes[id];
               const isVerifying = verifyAlgo === id;
               return (
-                <div key={id} className="rounded-lg border border-border bg-muted/20 overflow-hidden">
+                <div key={id} className="rounded-lg border border-line bg-bg-2/20 overflow-hidden">
                   <div className="flex items-center gap-3 px-3 pt-2.5 pb-1 group">
                     <div className="shrink-0 w-24">
                       <p className="text-xs font-semibold text-fg leading-none mb-0.5">{label}</p>
@@ -743,7 +743,7 @@ export function EncodeHashEncrypt() {
                   </div>
                   <p className="text-[11px] text-fg-mute/60 px-3 pb-2">{desc}</p>
                   {isVerifying && (
-                    <div className="px-3 pb-3 border-t border-border/50 pt-2.5 space-y-2">
+                    <div className="px-3 pb-3 border-t border-line/50 pt-2.5 space-y-2">
                       <p className="text-[11px] text-fg-mute font-medium">Verify {label} hash</p>
                       <div className="flex items-center gap-2">
                         <Input
@@ -800,7 +800,7 @@ export function EncodeHashEncrypt() {
                 {HMAC_ALGORITHMS.map(({ id, label, bits, chars }) => {
                   const value = hmacs[id];
                   return (
-                    <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-muted/20 group">
+                    <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-line bg-bg-2/20 group">
                       <div className="shrink-0 w-28">
                         <p className="text-xs font-semibold text-fg leading-none mb-0.5">HMAC-{label}</p>
                         <p className="text-[11px] text-fg-mute">{bits}-bit</p>
@@ -934,8 +934,8 @@ export function EncodeHashEncrypt() {
                 )}
               </div>
               {cryptoResult.error ? (
-                <div className="px-3 py-2.5 bg-destructive/8 border border-destructive/20 rounded-lg">
-                  <p className="text-sm text-destructive">{cryptoResult.error}</p>
+                <div className="px-3 py-2.5 bg-bad/8 border border-bad/20 rounded-lg">
+                  <p className="text-sm text-bad">{cryptoResult.error}</p>
                 </div>
               ) : (
                 <Textarea value={cryptoResult.output} readOnly className="min-h-[80px] font-mono text-xs" />

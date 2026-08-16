@@ -93,10 +93,10 @@ export function LeftPanel(props: LeftPanelProps) {
                 </span>
               </span>
               <div className="flex items-center gap-0.5 shrink-0">
-                <IconButton size="sm" className="hover:bg-muted" title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}>
+                <IconButton size="sm" className="hover:bg-bg-2" title="Edit" onClick={() => { setEditing(conn); setFormOpen(true); }}>
                   <Pencil className="h-3.5 w-3.5" />
                 </IconButton>
-                <IconButton size="sm" className="hover:bg-muted hover:text-destructive" title="Remove this saved connection" onClick={() => setDeleteOpen(true)}>
+                <IconButton size="sm" className="hover:bg-bg-2 hover:text-bad" title="Remove this saved connection" onClick={() => setDeleteOpen(true)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </IconButton>
               </div>
@@ -133,7 +133,7 @@ export function LeftPanel(props: LeftPanelProps) {
           <div
             className={cn(
               'group w-full flex items-center gap-2 px-2 rounded-md text-xs transition-colors',
-              view === 'consumers' ? 'bg-acc/10 text-acc font-medium' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
+              view === 'consumers' ? 'bg-acc/10 text-acc font-medium' : 'text-fg-mute hover:text-fg hover:bg-bg-2/60',
             )}
           >
             <button type="button" className="flex-1 min-w-0 flex items-center gap-2 py-1.5 text-left" onClick={onShowConsumers}>
@@ -145,7 +145,7 @@ export function LeftPanel(props: LeftPanelProps) {
             )}
             <button
               type="button"
-              className="p-0.5 rounded hover:bg-muted/60 shrink-0 disabled:opacity-30"
+              className="p-0.5 rounded hover:bg-bg-2/60 shrink-0 disabled:opacity-30"
               title={consumersExpanded ? 'Collapse' : 'Expand'}
               disabled={activeConsumers.length === 0}
               onClick={() => setConsumersExpanded((e) => !e)}
@@ -160,7 +160,7 @@ export function LeftPanel(props: LeftPanelProps) {
           {consumersExpanded && activeConsumers.map((s) => (
             <div
               key={s.queue}
-              className="group flex items-center gap-2 pl-3.5 pr-2 py-1 rounded-md text-xs hover:bg-muted/60"
+              className="group flex items-center gap-2 pl-3.5 pr-2 py-1 rounded-md text-xs hover:bg-bg-2/60"
             >
               <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} size="xs" title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
               <button
@@ -172,7 +172,7 @@ export function LeftPanel(props: LeftPanelProps) {
               </button>
               <span className="text-[11px] text-fg-mute tabular-nums shrink-0" title={`${s.received.toLocaleString()} received`}>{s.received.toLocaleString()}</span>
               <button
-                className="text-fg-mute hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-fg-mute hover:text-bad shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Stop consumer"
                 onClick={() => consumerStore.stop(s.connId, s.queue)}
               >
@@ -216,7 +216,7 @@ function NavItem({ icon: Icon, label, active, onClick }: {
       onClick={onClick}
       className={cn(
         'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors',
-        active ? 'bg-acc/10 text-acc font-medium' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
+        active ? 'bg-acc/10 text-acc font-medium' : 'text-fg-mute hover:text-fg hover:bg-bg-2/60',
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />

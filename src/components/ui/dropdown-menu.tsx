@@ -89,7 +89,7 @@ export function DropdownMenuContent({ align = 'start', className, children }: Dr
     <div
       role="menu"
       className={cn(
-        'absolute z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-card p-1 shadow-md',
+        'absolute z-50 mt-1 min-w-[10rem] rounded-lg border border-line bg-card p-1 shadow-md',
         'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-150',
         align === 'end' ? 'right-0' : 'left-0',
         className,
@@ -104,7 +104,7 @@ export interface DropdownMenuItemProps extends React.ButtonHTMLAttributes<HTMLBu
   icon?: React.ReactNode;
   /** Tints the row as the current selection (bg-acc/10 + text-acc). */
   active?: boolean;
-  /** Tints the row for a destructive action (text-destructive). */
+  /** Tints the row for a destructive action (text-bad). */
   danger?: boolean;
   /** Close the menu after this item is clicked. Default true. */
   closeOnSelect?: boolean;
@@ -123,7 +123,7 @@ export const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenu
         className={cn(
           'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-acc',
           active && 'bg-acc/10 text-acc',
-          danger && 'text-destructive hover:bg-destructive/10',
+          danger && 'text-bad hover:bg-bad/10',
           className,
         )}
         {...props}
@@ -147,5 +147,5 @@ export function DropdownMenuLabel({ className, children }: { className?: string;
 
 /** Hairline divider between item groups. */
 export function DropdownMenuSeparator({ className }: { className?: string }) {
-  return <div className={cn('my-1 border-t border-border', className)} />;
+  return <div className={cn('my-1 border-t border-line', className)} />;
 }

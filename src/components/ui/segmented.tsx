@@ -22,7 +22,7 @@ export interface SegmentedProps<T extends string> {
  * Pill / segmented toggle — the canonical mode-switch control for tools.
  *
  * ── Vì sao mục đang chọn là NỀN ĐẶC màu accent ──────────────────────────────
- * Bản trước dùng thẻ trắng (`bg-card`) trên nền xám nhạt (`bg-muted`). Trong
+ * Bản trước dùng thẻ trắng (`bg-card`) trên nền xám nhạt (`bg-bg-2`). Trong
  * bảng màu mới hai màu đó gần nhau, nên tương phản gần bằng không — nhìn không
  * ra đang chọn cái nào. Nền đặc + chữ nghịch đảo thì không thể nhầm được, ở cả
  * light lẫn dark, ở cả sáu tone accent.
@@ -70,7 +70,7 @@ export function Segmented<T extends string>({
       role="tablist"
       aria-label={props['aria-label']}
       className={cn(
-        'inline-flex items-center gap-0.5 rounded-sm border border-border bg-sunk p-0.5',
+        'inline-flex items-center gap-0.5 rounded-sm border border-line bg-sunk p-0.5',
         'shadow-[inset_0_1px_2px_hsl(var(--fg-c)/0.05)]',
         trackH,
         className

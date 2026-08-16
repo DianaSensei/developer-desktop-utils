@@ -284,7 +284,7 @@ function InfoTip({ text }: { text: string }) {
         hidden group-hover/tip:block w-52 rounded-md border bg-card px-2.5 py-2
         text-[11px] leading-relaxed text-fg shadow-md">
         {text}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-border" />
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-line" />
       </span>
     </span>
   );
@@ -356,7 +356,7 @@ function DiffDateInput({ value, onChange, tz }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Unix timestamp, ISO 8601, YYYY-MM-DD HH:mm:ss, …"
-        className={cn('font-mono text-xs h-ctl pr-9', hasError && 'border-destructive')}
+        className={cn('font-mono text-xs h-ctl pr-9', hasError && 'border-bad')}
       />
       <button
         onClick={() => {
@@ -364,7 +364,7 @@ function DiffDateInput({ value, onChange, tz }: {
           setSnapshot(parsed ?? new Date());
           setShowPicker(true);
         }}
-        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted text-fg-mute hover:text-fg transition-colors"
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors"
       >
         <Calendar className="h-3 w-3" />
       </button>
@@ -557,11 +557,11 @@ export function DateTimeTool() {
               value={rawInput}
               onChange={(e) => handleRawChange(e.target.value)}
               placeholder="Unix timestamp, ISO 8601, YYYY-MM-DD HH:mm:ss, June 14 2026, …"
-              className={cn('font-mono text-sm pr-9', parseError && 'border-destructive')}
+              className={cn('font-mono text-sm pr-9', parseError && 'border-bad')}
             />
             <button
               onClick={() => showPicker ? cancelPicker() : openPicker()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted text-fg-mute hover:text-fg transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors"
             >
               <Calendar className="h-3.5 w-3.5" />
             </button>
@@ -579,7 +579,7 @@ export function DateTimeTool() {
           </div>
 
           {parseError && (
-            <p className="text-xs text-destructive">
+            <p className="text-xs text-bad">
               Could not parse — try a unix timestamp, ISO 8601, or "June 14 2026 14:30"
             </p>
           )}
@@ -662,7 +662,7 @@ export function DateTimeTool() {
               const inVal  = tryFormatInTz(parsedDate, inputTz,  customFmt);
               const outVal = tryFormatInTz(parsedDate, outputTz, customFmt);
               if (inVal === null) return (
-                <p className="text-[11px] text-destructive pl-12">invalid format string</p>
+                <p className="text-[11px] text-bad pl-12">invalid format string</p>
               );
               return tzsDiffer ? (
                 <>
@@ -758,7 +758,7 @@ export function DateTimeTool() {
               const duration = humanReadableDuration(aDate, bDate);
               return (
                 <div className="space-y-2">
-                  <div className="rounded-lg border border-border px-3 py-2.5 space-y-2.5">
+                  <div className="rounded-lg border border-line px-3 py-2.5 space-y-2.5">
                     {/* Timeline visual */}
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] font-semibold text-fg shrink-0">From</span>
@@ -781,7 +781,7 @@ export function DateTimeTool() {
                       )}
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 border border-border rounded-lg px-3 py-1">
+                  <div className="grid grid-cols-2 gap-x-4 border border-line rounded-lg px-3 py-1">
                     {(Object.entries(diffResult) as [string, number][])
                       .filter(([, val]) => val !== 0)
                       .map(([label, val]) => (

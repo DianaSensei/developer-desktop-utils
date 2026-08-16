@@ -2,7 +2,7 @@
 // strip that sits above or inside a view.
 //
 // Before this existed, `flex items-start gap-2 rounded-md border
-// border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive`
+// border-bad/40 bg-bad/10 px-3 py-2.5 text-sm text-bad`
 // was pasted verbatim in 16 places (every Kafka and RabbitMQ view, Network
 // Tools, the API Client runner) with an amber twin in 7 more — each one
 // re-picking its own icon, padding and dark-mode text color. Use this instead
@@ -26,7 +26,7 @@ const TONE_CLASS: Record<CalloutTone, string> = {
   error: 'border-bad-edge bg-bad-tint text-bad',
   warning: 'border-warn-edge bg-warn-tint text-warn',
   success: 'border-ok-edge bg-ok-tint text-ok',
-  info: 'border-border bg-muted/40 text-fg-mute',
+  info: 'border-line bg-bg-2/40 text-fg-mute',
 };
 
 const TONE_ICON: Record<CalloutTone, LucideIcon> = {

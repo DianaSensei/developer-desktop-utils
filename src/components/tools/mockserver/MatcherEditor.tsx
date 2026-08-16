@@ -54,7 +54,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
         };
 
         return (
-          <div key={m.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-2">
+          <div key={m.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-bg-2/20 p-2">
             {/* What to look at */}
             <Select value={m.target} onValueChange={onTargetChange}>
               <SelectTrigger className="h-ctl w-[112px] shrink-0 text-xs">
@@ -127,7 +127,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-destructive"
+              className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-bad"
               onClick={() => remove(m.id)}
               aria-label="Remove matcher"
             >

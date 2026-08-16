@@ -92,7 +92,7 @@ export function FakeDataGenerator() {
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </div>
-        <div className="h-4 w-px bg-border" />
+        <div className="h-4 w-px bg-line" />
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-fg-mute">Format</span>
           <Select value={format} onValueChange={(v) => setFormat(v as RowFormat)}>
@@ -127,7 +127,7 @@ export function FakeDataGenerator() {
       </div>
 
       {/* Body: schema | output */}
-      <div className="flex flex-1 min-h-0 divide-x divide-border">
+      <div className="flex flex-1 min-h-0 divide-x divide-line">
         {/* Schema builder */}
         <div className="flex w-[360px] shrink-0 flex-col min-h-0">
           <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
@@ -138,7 +138,7 @@ export function FakeDataGenerator() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 space-y-2">
             {fields.map((f) => (
-              <div key={f.id} className="rounded-lg border border-border bg-muted/20 p-2 space-y-2">
+              <div key={f.id} className="rounded-lg border border-line bg-bg-2/20 p-2 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Input
                     value={f.name}

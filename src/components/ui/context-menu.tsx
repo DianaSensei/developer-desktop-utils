@@ -61,12 +61,12 @@ export function ContextMenu({ state, onClose, width = 220 }: ContextMenuProps) {
       />
       <div
         role="menu"
-        className="fixed z-[61] rounded-lg border border-border bg-card p-1 shadow-lg"
+        className="fixed z-[61] rounded-lg border border-line bg-card p-1 shadow-lg"
         style={{ left, top, width }}
       >
         {entries.map((en, i) => (
           <div key={i}>
-            {en.sep && i > 0 && <div className="my-1 border-t border-border" />}
+            {en.sep && i > 0 && <div className="my-1 border-t border-line" />}
             <button
               type="button"
               role="menuitem"
@@ -75,7 +75,7 @@ export function ContextMenu({ state, onClose, width = 220 }: ContextMenuProps) {
               className={cn(
                 'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-acc',
                 'disabled:pointer-events-none disabled:opacity-50',
-                en.danger && 'text-destructive hover:bg-destructive/10',
+                en.danger && 'text-bad hover:bg-bad/10',
               )}
             >
               {en.icon}{en.label}

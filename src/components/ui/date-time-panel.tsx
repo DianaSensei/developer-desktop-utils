@@ -137,7 +137,7 @@ export function DateTimePanel({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-muted"
+          className="flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-bg-2"
         >
           {cancelLabel}
         </button>

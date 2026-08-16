@@ -53,9 +53,9 @@ function ResultList({ items }: { items: string[] }) {
           />
         )}
       </div>
-      <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y">
+      <div className="max-h-72 overflow-y-auto rounded-lg border border-line divide-y">
         {items.map((v, i) => (
-          <div key={i} className="flex items-center gap-2 px-3 py-1.5 group hover:bg-muted/40 transition-colors">
+          <div key={i} className="flex items-center gap-2 px-3 py-1.5 group hover:bg-bg-2/40 transition-colors">
             <span className="flex-1 font-mono text-xs break-all">{v}</span>
             <CopyButton
               value={v}

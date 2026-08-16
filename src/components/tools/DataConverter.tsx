@@ -193,7 +193,7 @@ export function DataConverter() {
             </Select>
           </div>
 
-          <div className="h-4 w-px bg-border shrink-0" />
+          <div className="h-4 w-px bg-line shrink-0" />
 
           {/* Indent */}
           <div className="flex items-center gap-1.5">
@@ -215,7 +215,7 @@ export function DataConverter() {
                 'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none ' +
                 (xmlPretty
                   ? 'border-acc/50 bg-acc/10 text-acc'
-                  : 'border-input bg-transparent text-fg-mute hover:bg-muted hover:text-fg')
+                  : 'border-sunk bg-transparent text-fg-mute hover:bg-bg-2 hover:text-fg')
               }
             >
               Pretty XML
@@ -225,7 +225,7 @@ export function DataConverter() {
       </div>
 
       {/* Editors — source | result */}
-      <div className="flex flex-1 min-h-0 divide-x divide-border">
+      <div className="flex flex-1 min-h-0 divide-x divide-line">
         {/* Source */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">

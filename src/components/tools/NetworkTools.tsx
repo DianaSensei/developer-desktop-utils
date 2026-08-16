@@ -120,7 +120,7 @@ function Pill({ children, tone = 'primary', className }: {
 }) {
   const tones = {
     primary: 'bg-acc/10 text-acc',
-    muted: 'bg-muted text-fg-mute',
+    muted: 'bg-bg-2 text-fg-mute',
     amber: 'bg-warn-tint text-warn',
   };
   return (
@@ -138,7 +138,7 @@ function MetaBar({ summary, onClear }: { summary: React.ReactNode; onClear: () =
       <button
         type="button"
         onClick={onClear}
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
       >
         <X className="h-3 w-3" /> Clear
       </button>
@@ -276,7 +276,7 @@ function DnsView() {
             onClear={clear}
           />
           {answers.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs text-fg-mute">
+            <div className="flex items-center gap-2 rounded-lg border bg-bg-2/30 px-3 py-2.5 text-xs text-fg-mute">
               <AlertCircle className="h-4 w-4 shrink-0" />
               No {type} records found{status && status !== 'NOERROR' ? ` · ${status}` : ''}.
             </div>
@@ -375,7 +375,7 @@ function PropagationView() {
                   {r.status && r.status !== 'NOERROR' && <span className="ml-auto text-[11px] text-fg-mute">{r.status}</span>}
                 </div>
                 {r.error ? (
-                  <p className="mt-1.5 pl-6 text-xs text-destructive">{r.error}</p>
+                  <p className="mt-1.5 pl-6 text-xs text-bad">{r.error}</p>
                 ) : r.records.length ? (
                   <div className="mt-1.5 pl-6 space-y-1">
                     {r.records.map((rec, i) => <div key={i} className="font-mono text-xs break-all text-fg-mute">{rec}</div>)}
@@ -402,7 +402,7 @@ function DnssecSection({ title, records }: { title: string; records: DnsAnswer[]
     <div className="rounded-lg border bg-card p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold">{title}</span>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">{records.length}</span>
+        <span className="rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">{records.length}</span>
       </div>
       <div className="space-y-1">
         {records.map((r, i) => (
@@ -473,7 +473,7 @@ function DnssecView() {
               <DnssecSection title="RRSIG signatures" records={result.rrsig} />
             </div>
           ) : (
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs text-fg-mute">
+            <div className="flex items-center gap-2 rounded-lg border bg-bg-2/30 px-3 py-2.5 text-xs text-fg-mute">
               <AlertCircle className="h-4 w-4 shrink-0" />
               No DS, DNSKEY, or RRSIG records published for this domain.
             </div>
@@ -895,7 +895,7 @@ function FreeRow({ port, fav, onToggle }: { port: number; fav: boolean; onToggle
 // Header row for the socket (flat / favourites) table.
 function SocketTableHeader() {
   return (
-    <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute')}>
+    <div className={cn(PORTS_GRID, 'border-b bg-bg-2/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute')}>
       {/* Empty placeholder for the star column — must stay in flow so it occupies
           its grid track (an sr-only span is position:absolute and would shift
           every following header one column to the left). */}
@@ -1156,7 +1156,7 @@ function PortsView() {
               </p>
             ) : (
               <div className="overflow-hidden rounded-lg border">
-                <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-fg-mute')}>
+                <div className={cn(PORTS_GRID, 'border-b bg-bg-2/40 px-3 py-1.5 text-[11px] font-semibold text-fg-mute')}>
                   <span aria-hidden="true" />
                   {sortHeader('port', 'Port')}
                   {sortHeader('proto', 'Proto')}
@@ -1177,7 +1177,7 @@ function PortsView() {
             </p>
           ) : (
             <div className="overflow-hidden rounded-lg border">
-              <div className={cn(PROC_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-fg-mute')}>
+              <div className={cn(PROC_GRID, 'border-b bg-bg-2/40 px-3 py-1.5 text-[11px] font-semibold text-fg-mute')}>
                 {sortHeader('pid', 'PID')}
                 {/* Indent past the in-cell favourite star (w-3 + gap-1.5) so the
                     label sits above the port numbers, not the star. */}
@@ -1303,7 +1303,7 @@ export function NetworkTools() {
       {/* Two-tier navigation: categories (underline tabs) on top, the active
           category's views (tinted pills) below. Hierarchy comes from the two
           different active treatments, keeping the azure accent restrained. */}
-      <div className="shrink-0 border-b border-border">
+      <div className="shrink-0 border-b border-line">
         {/* Primary: categories — underline tabs */}
         <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar px-2 sm:px-3" role="tablist" aria-label="Network category">
           {CATEGORIES.map((cat) => {

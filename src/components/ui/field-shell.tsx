@@ -54,13 +54,13 @@ export function FieldShell({
         className={cn(
           'flex items-stretch overflow-hidden rounded-sm border bg-bg',
           'transition-colors focus-within:border-acc/60 focus-within:ring-2 focus-within:ring-acc/35',
-          tone ? TONE_EDGE[tone] : 'border-input',
+          tone ? TONE_EDGE[tone] : 'border-sunk',
         )}
       >
         {gutter && (
           <span
             className={cn(
-              'flex shrink-0 select-none items-center border-r border-border bg-sunk',
+              'flex shrink-0 select-none items-center border-r border-line bg-sunk',
               'px-2.5 font-mono text-[11px] uppercase tracking-wide text-fg-mute',
             )}
           >

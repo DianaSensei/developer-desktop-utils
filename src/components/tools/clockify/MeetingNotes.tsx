@@ -60,7 +60,7 @@ export function MeetingNotes() {
     <div className="grid h-full grid-cols-1 overflow-hidden md:grid-cols-[260px_1fr]">
       {/* List pane */}
       <div className="flex min-h-0 flex-col border-r">
-        <div className="shrink-0 space-y-2 border-b border-border p-2.5">
+        <div className="shrink-0 space-y-2 border-b border-line p-2.5">
           <Button onClick={createNew} size="sm" className="w-full gap-1.5">
             <Plus className="h-4 w-4" /> New note
           </Button>
@@ -79,7 +79,7 @@ export function MeetingNotes() {
                   onClick={() => setSelectedId(m.id)}
                   className={cn(
                     'group flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
-                    selectedId === m.id ? 'bg-fg/10' : 'hover:bg-muted',
+                    selectedId === m.id ? 'bg-fg/10' : 'hover:bg-bg-2',
                   )}
                 >
                   <div className="min-w-0 flex-1">
@@ -108,7 +108,7 @@ export function MeetingNotes() {
       {/* Detail pane — full-width editor with Edit / Markdown / Preview tabs */}
       {selected ? (
         <div className="flex min-h-0 flex-col">
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/10 px-4 py-2">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line bg-bg-2/10 px-4 py-2">
             <Segmented
               value={mode}
               onValueChange={setMode}
@@ -155,7 +155,7 @@ export function MeetingNotes() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-col items-center justify-center gap-3 p-4 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-card">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-line bg-card">
             <NotebookPen className="h-6 w-6 text-fg-mute/40" />
           </div>
           <p className="max-w-xs text-sm text-fg-mute">

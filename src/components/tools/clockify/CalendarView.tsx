@@ -319,8 +319,8 @@ export function CalendarView() {
                 {/* hour + half-hour gridlines */}
                 {Array.from({ length: 24 }, (_, h) => (
                   <div key={h}>
-                    <div className="absolute left-0 right-0 border-t border-border/70" style={{ top: h * HOUR_PX }} />
-                    <div className="absolute left-0 right-0 border-t border-border/30" style={{ top: h * HOUR_PX + HOUR_PX / 2 }} />
+                    <div className="absolute left-0 right-0 border-t border-line/70" style={{ top: h * HOUR_PX }} />
+                    <div className="absolute left-0 right-0 border-t border-line/30" style={{ top: h * HOUR_PX + HOUR_PX / 2 }} />
                   </div>
                 ))}
 

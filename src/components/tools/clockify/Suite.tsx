@@ -42,7 +42,7 @@ function SuiteInner() {
   return (
     <div className="flex h-full flex-col">
       {/* Header: tabs + actions */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1.5">
+      <div className="flex shrink-0 items-center gap-1 border-b border-line px-2 py-1.5">
         <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto no-scrollbar">
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -52,7 +52,7 @@ function SuiteInner() {
                 onClick={() => setTab(t.id)}
                 className={cn(
                   'flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                  tab === t.id ? 'bg-fg/10 text-fg' : 'text-fg-mute hover:bg-muted hover:text-fg'
+                  tab === t.id ? 'bg-fg/10 text-fg' : 'text-fg-mute hover:bg-bg-2 hover:text-fg'
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -115,7 +115,7 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
           </Button>
         </div>
 
-        <div className="max-h-[50vh] divide-y overflow-y-auto rounded-lg border border-border">
+        <div className="max-h-[50vh] divide-y overflow-y-auto rounded-lg border border-line">
           {projects.length === 0 && <p className="px-3 py-4 text-center text-xs text-fg-mute">No projects yet.</p>}
           {projects.map((p) => (
             <div key={p.id} className={cn('flex items-center gap-2 px-2.5 py-2', p.archived && 'opacity-50')}>
@@ -143,11 +143,11 @@ function ColorMenu({ color, onPick }: { color: string; onPick: (c: string) => vo
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <button onClick={() => setOpen((o) => !o)} className="h-4 w-4 rounded-full ring-1 ring-border" style={{ backgroundColor: color }} />
+      <button onClick={() => setOpen((o) => !o)} className="h-4 w-4 rounded-full ring-1 ring-line" style={{ backgroundColor: color }} />
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-50 mt-1 grid w-40 grid-cols-8 gap-1 rounded-lg border border-border bg-card p-2 shadow-lg">
+          <div className="absolute left-0 top-full z-50 mt-1 grid w-40 grid-cols-8 gap-1 rounded-lg border border-line bg-card p-2 shadow-lg">
             {PROJECT_COLORS.map((c) => (
               <button key={c} onClick={() => { onPick(c); setOpen(false); }} className="h-4 w-4 rounded-full" style={{ backgroundColor: c }} />
             ))}
@@ -176,7 +176,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <Toggle label="Week starts Monday" checked={settings.weekStartsMon} onChange={(v) => updateSettings({ weekStartsMon: v })} />
         </section>
 
-        <section className="space-y-2.5 border-t border-border pt-3">
+        <section className="space-y-2.5 border-t border-line pt-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">Work hours</h4>
             <span className="text-[11px] text-fg-mute">
@@ -209,7 +209,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           </div>
         </section>
 
-        <section className="space-y-2.5 border-t border-border pt-3">
+        <section className="space-y-2.5 border-t border-line pt-3">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">Pomodoro</h4>
           <Toggle label="Enable Pomodoro indicator" checked={settings.pomodoro} onChange={(v) => updateSettings({ pomodoro: v })} />
           <label className="flex items-center justify-between gap-3 text-xs">
@@ -223,7 +223,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <Toggle label="Phase chime" checked={settings.sound} onChange={(v) => updateSettings({ sound: v })} />
         </section>
 
-        <div className="flex justify-end border-t border-border pt-3">
+        <div className="flex justify-end border-t border-line pt-3">
           <Button size="sm" onClick={onClose}>Done</Button>
         </div>
       </div>

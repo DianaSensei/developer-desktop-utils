@@ -150,10 +150,10 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
 
       '.cm-gutters': gutter === 'panel'
         ? {
-            backgroundColor: 'hsl(var(--muted) / 0.4)',
+            backgroundColor: 'hsl(var(--bg-2-c) / 0.4)',
             color: 'hsl(var(--fg-mute-c))',
             border: 'none',
-            borderRight: '1px solid hsl(var(--border))',
+            borderRight: '1px solid hsl(var(--line-c))',
           }
         : {
             backgroundColor: 'transparent',
@@ -194,8 +194,8 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       // folded region in dark mode was a bright unthemed chip — replace it
       // with real tokens so it reads as part of the editor in both themes.
       '.cm-foldPlaceholder': {
-        backgroundColor: 'hsl(var(--muted))',
-        border: '1px solid hsl(var(--border))',
+        backgroundColor: 'hsl(var(--bg-2-c))',
+        border: '1px solid hsl(var(--line-c))',
         color: 'hsl(var(--fg-mute-c))',
         borderRadius: '4px',
         margin: '0 2px',
@@ -223,7 +223,7 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       // most visible symptom of the missing dark flag.
       '.cm-tooltip': {
         backgroundColor: 'hsl(var(--card-c))',
-        border: '1px solid hsl(var(--border))',
+        border: '1px solid hsl(var(--line-c))',
         borderRadius: '6px',
         boxShadow: '0 4px 12px rgb(0 0 0 / 0.18)',
         color: 'hsl(var(--fg-c))',
@@ -244,17 +244,17 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
 
       // Search / goto-line panel.
       '.cm-panels': { backgroundColor: 'hsl(var(--card-c))', color: 'hsl(var(--fg-c))' },
-      '.cm-panels.cm-panels-top': { borderBottom: '1px solid hsl(var(--border))' },
-      '.cm-panels.cm-panels-bottom': { borderTop: '1px solid hsl(var(--border))' },
+      '.cm-panels.cm-panels-top': { borderBottom: '1px solid hsl(var(--line-c))' },
+      '.cm-panels.cm-panels-bottom': { borderTop: '1px solid hsl(var(--line-c))' },
       '.cm-textfield': {
         backgroundColor: 'hsl(var(--bg-c))',
-        border: '1px solid hsl(var(--border))',
+        border: '1px solid hsl(var(--line-c))',
         color: 'hsl(var(--fg-c))',
       },
       '.cm-button': {
-        backgroundColor: 'hsl(var(--secondary))',
+        backgroundColor: 'hsl(var(--bg-2-c))',
         backgroundImage: 'none',
-        border: '1px solid hsl(var(--border))',
+        border: '1px solid hsl(var(--line-c))',
         borderRadius: '4px',
         color: 'hsl(var(--fg-c))',
       },

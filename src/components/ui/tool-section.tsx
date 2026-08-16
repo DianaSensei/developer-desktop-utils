@@ -77,7 +77,7 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
       </div>
       {children}
       {error
-        ? <p className="text-[11px] text-destructive">{error}</p>
+        ? <p className="text-[11px] text-bad">{error}</p>
         : hint && <ToolHint>{hint}</ToolHint>}
     </div>
   )

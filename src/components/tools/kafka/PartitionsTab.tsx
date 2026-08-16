@@ -11,7 +11,7 @@ export function PartitionsTab({ partitions }: PartitionsTabProps) {
 
   return (
     <div className="overflow-x-auto">
-      <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-6 px-4 py-2 text-xs font-medium text-fg-mute border-b bg-muted/20 sticky top-0">
+      <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-6 px-4 py-2 text-xs font-medium text-fg-mute border-b bg-bg-2/20 sticky top-0">
         <span>Partition</span>
         <span className="text-right">Earliest Offset</span>
         <span className="text-right">Latest Offset</span>
@@ -24,7 +24,7 @@ export function PartitionsTab({ partitions }: PartitionsTabProps) {
         return (
           <div
             key={p.id}
-            className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-6 px-4 py-2 border-b border-border/40 text-sm"
+            className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-6 px-4 py-2 border-b border-line/40 text-sm"
           >
             <span className="text-fg-mute tabular-nums font-mono text-xs">{p.id}</span>
             <span className="text-right tabular-nums font-mono text-xs">

@@ -34,7 +34,7 @@ const ToolPanes = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'flex-1 min-h-0 grid divide-y divide-border overflow-hidden',
+      'flex-1 min-h-0 grid divide-y divide-line overflow-hidden',
       rows === 3 ? 'grid-rows-3' : 'grid-rows-2',
       className
     )}
@@ -63,7 +63,7 @@ const PaneHeader = React.forwardRef<HTMLDivElement, PaneHeaderProps>(
     <div
       ref={ref}
       className={cn(
-        'shrink-0 px-4 py-1.5 border-b border-border bg-muted/10 flex items-center justify-between gap-2',
+        'shrink-0 px-4 py-1.5 border-b border-line bg-bg-2/10 flex items-center justify-between gap-2',
         className
       )}
       {...props}

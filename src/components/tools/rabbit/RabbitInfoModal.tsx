@@ -21,7 +21,7 @@ function Row({ action, when, calls, badge, note }: {
   note?: string;
 }) {
   return (
-    <div className="py-2.5 border-b border-border/30 last:border-0">
+    <div className="py-2.5 border-b border-line/30 last:border-0">
       <div className="flex items-start gap-2.5">
         <Badge tone={BADGE_TONE[badge.variant]} uppercase>{badge.label}</Badge>
         <div className="flex-1 min-w-0">
@@ -57,7 +57,7 @@ export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoMod
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-fg-mute hover:text-fg hover:bg-muted transition-colors ml-3 shrink-0"
+            className="p-1 rounded text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors ml-3 shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -91,11 +91,11 @@ export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoMod
             Use TLS (HTTPS) for any non-local broker.
           </Callout>
 
-          <div className="rounded-lg border border-border/50 overflow-hidden mb-4">
-            <div className="px-3 py-2 bg-muted/20 border-b border-border/40">
+          <div className="rounded-lg border border-line/50 overflow-hidden mb-4">
+            <div className="px-3 py-2 bg-bg-2/20 border-b border-line/40">
               <SectionLabel>Operations</SectionLabel>
             </div>
-            <div className="px-3 divide-y divide-border/20">
+            <div className="px-3 divide-y divide-line/20">
               <Row action="Test / Overview" when="on connect or Refresh" calls="GET /api/overview, /api/nodes" badge={{ label: 'Read', variant: 'read' }} />
               <Row action="Queue & exchange lists" when="on connect or Refresh" calls="GET /api/queues/{vhost}, /api/exchanges/{vhost}" badge={{ label: 'Read', variant: 'read' }} />
               <Row action="Open queue / exchange" when="on click" calls="GET …/{name} + …/bindings" badge={{ label: 'Read', variant: 'read' }} />
@@ -144,7 +144,7 @@ export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoMod
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t shrink-0 bg-muted/10">
+        <div className="flex items-center justify-between px-5 py-3 border-t shrink-0 bg-bg-2/10">
           <button
             onClick={onDismissPermanently}
             className="text-xs text-fg-mute hover:text-fg transition-colors"

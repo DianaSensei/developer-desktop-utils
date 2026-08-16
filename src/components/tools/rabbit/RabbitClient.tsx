@@ -122,7 +122,7 @@ export function RabbitClient() {
         <button
           onClick={() => setShowInfo(true)}
           title="How the RabbitMQ Client accesses your broker"
-          className="flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute/60 hover:text-fg hover:bg-muted/60 transition-colors"
+          className="flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute/60 hover:text-fg hover:bg-bg-2/60 transition-colors"
         >
           <Info className="h-4 w-4" />
         </button>
@@ -159,7 +159,7 @@ export function RabbitClient() {
         title="Drag to resize · Double-click to reset"
       >
         <div className={cn(
-          'absolute inset-y-0 left-[2px] w-px bg-border transition-all duration-100',
+          'absolute inset-y-0 left-[2px] w-px bg-line transition-all duration-100',
           'group-hover:w-[3px] group-hover:left-[1px] group-hover:bg-acc/50',
           isResizing && 'w-[3px] left-[1px] bg-acc/70',
         )} />
@@ -241,7 +241,7 @@ function DisconnectedPanel({ conn, connecting, error, onConnect }: {
   const endpoint = conn.amqpOnly ? `${conn.host}:${conn.amqpPort}` : `${conn.host}:${conn.port}`;
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 px-8 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/30">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-bg-2/30">
         <Plug className="h-ctl w-ctl text-fg-mute/50" />
       </div>
       <div className="space-y-1">
