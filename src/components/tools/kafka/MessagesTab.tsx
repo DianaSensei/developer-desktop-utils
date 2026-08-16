@@ -614,7 +614,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Partition</Label>
           <Select value={String(partition)} onValueChange={(v) => setPartition(Number(v))}>
-            <SelectTrigger className="h-8 text-xs font-mono min-w-[9rem]">
+            <SelectTrigger className="h-ctl text-xs font-mono min-w-[9rem]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -629,7 +629,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Start from</Label>
-          <div className="flex rounded-md border border-input overflow-hidden text-xs h-8">
+          <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl">
             {(['tail', 'from', 'range', 'time'] as FetchMode[]).map((m) => (
               <button
                 key={m}
@@ -649,7 +649,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground">Since</Label>
             <Select value={String(sinceMs)} onValueChange={(v) => setSinceMs(Number(v))}>
-              <SelectTrigger className="h-8 text-xs w-36">
+              <SelectTrigger className="h-ctl text-xs w-36">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -670,7 +670,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
               value={fromOffset}
               onChange={(e) => setFromOffset(e.target.value)}
               placeholder={selectedPartition ? String(selectedPartition.earliestOffset) : '0'}
-              className="h-8 w-28 text-xs font-mono"
+              className="h-ctl w-28 text-xs font-mono"
               onKeyDown={(e) => e.key === 'Enter' && doFetch()}
             />
           </div>
@@ -684,7 +684,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 type="number" min="0"
                 value={fromOffset}
                 onChange={(e) => setFromOffset(e.target.value)}
-                className="h-8 w-24 text-xs font-mono"
+                className="h-ctl w-24 text-xs font-mono"
                 onKeyDown={(e) => e.key === 'Enter' && doFetch()}
               />
             </div>
@@ -695,7 +695,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 type="number" min="0"
                 value={toOffset}
                 onChange={(e) => setToOffset(e.target.value)}
-                className="h-8 w-24 text-xs font-mono"
+                className="h-ctl w-24 text-xs font-mono"
                 onKeyDown={(e) => e.key === 'Enter' && doFetch()}
               />
             </div>
@@ -706,7 +706,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground">Limit</Label>
             <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
-              <SelectTrigger className="h-8 text-xs w-24">
+              <SelectTrigger className="h-ctl text-xs w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -718,7 +718,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Default view</Label>
-          <div className="flex rounded-md border border-input overflow-hidden text-xs h-8">
+          <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl">
             {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
               <button
                 key={m}
@@ -742,7 +742,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
               {' '}msg{filtered.length !== 1 ? 's' : ''}
             </span>
           )}
-          <Button size="sm" className="h-8 gap-1.5" onClick={doFetch} disabled={loading}>
+          <Button size="sm" className="h-ctl-lg gap-1.5" onClick={doFetch} disabled={loading}>
             {loading ? <Spinner size="xs" /> : 'Fetch'}
           </Button>
         </div>
@@ -756,7 +756,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           onChange={(e) => setKeyword(e.target.value)}
           placeholder={useRegex ? 'Filter by regex (key, value, headers)…' : 'Filter by key, value, or headers…'}
           className={cn(
-            'h-7 text-xs border-0 shadow-none focus-visible:ring-0 px-0 flex-1',
+            'h-ctl text-xs border-0 shadow-none focus-visible:ring-0 px-0 flex-1',
             useRegex && 'font-mono',
             regexError && 'text-destructive',
           )}

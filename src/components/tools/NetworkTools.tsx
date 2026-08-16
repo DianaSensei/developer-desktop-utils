@@ -180,7 +180,7 @@ function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && onEnter()}
         placeholder={placeholder}
-        className={cn('h-9 pl-9 text-sm', mono && 'font-mono')}
+        className={cn('h-ctl-lg pl-9 text-sm', mono && 'font-mono')}
         spellCheck={false}
         autoComplete="off"
       />
@@ -250,19 +250,19 @@ function DnsView() {
         <>
           <SearchInput value={domain} onChange={setDomain} onEnter={run} placeholder={`example.com — ${quickPasteHint}`} />
           <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="h-9 w-24 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl-lg w-24 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {DNS_RECORD_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
               <SelectItem value="ALL">ALL</SelectItem>
             </SelectContent>
           </Select>
           <Select value={providerId} onValueChange={setProviderId}>
-            <SelectTrigger className="h-9 w-40 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl-lg w-40 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {DOH_PROVIDERS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button onClick={run} disabled={loading || !domain.trim()} className="h-9 gap-1.5">
+          <Button onClick={run} disabled={loading || !domain.trim()} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <Search className="h-4 w-4" />}
             Lookup
           </Button>
@@ -341,12 +341,12 @@ function PropagationView() {
         <>
           <SearchInput value={domain} onChange={setDomain} onEnter={run} placeholder={`example.com — ${quickPasteHint}`} />
           <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="h-9 w-24 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl-lg w-24 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {DNS_RECORD_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button onClick={run} disabled={loading || !domain.trim()} className="h-9 gap-1.5">
+          <Button onClick={run} disabled={loading || !domain.trim()} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
             Check
           </Button>
@@ -445,7 +445,7 @@ function DnssecView() {
       toolbar={
         <>
           <SearchInput value={domain} onChange={setDomain} onEnter={run} placeholder={`example.com — ${quickPasteHint}`} />
-          <Button onClick={run} disabled={loading || !domain.trim()} className="h-9 gap-1.5">
+          <Button onClick={run} disabled={loading || !domain.trim()} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <ShieldCheck className="h-4 w-4" />}
             Check
           </Button>
@@ -530,7 +530,7 @@ function MyIpView() {
     <ViewShell
       toolbar={
         <>
-          <Button onClick={run} disabled={loading} className="h-9 gap-1.5">
+          <Button onClick={run} disabled={loading} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
             {info ? 'Refresh' : 'Detect my public IP'}
           </Button>
@@ -592,7 +592,7 @@ function LocalNetworkView() {
     <ViewShell
       toolbar={
         <>
-          <Button onClick={run} disabled={loading || !IS_TAURI} className="h-9 gap-1.5">
+          <Button onClick={run} disabled={loading || !IS_TAURI} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
             {info ? 'Refresh' : 'Detect local network'}
           </Button>
@@ -1079,7 +1079,7 @@ function PortsView() {
     <ViewShell
       toolbar={
         <>
-          <Button onClick={run} disabled={loading || !IS_TAURI} className="h-9 gap-1.5">
+          <Button onClick={run} disabled={loading || !IS_TAURI} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
             {entries ? 'Refresh' : 'Scan ports'}
           </Button>
@@ -1094,7 +1094,7 @@ function PortsView() {
           <Button
             variant="outline"
             onClick={() => setFavOnly((v) => !v)}
-            className={cn('h-9 gap-1.5', favBtnActive)}
+            className={cn('h-ctl-lg gap-1.5', favBtnActive)}
             title="Show only your favourite ports"
           >
             <Star className={cn('h-4 w-4', favOnly && 'fill-current')} />
@@ -1109,7 +1109,7 @@ function PortsView() {
                 onKeyDown={(e) => e.key === 'Enter' && addFavorite()}
                 placeholder="Add a port, e.g. 3000"
                 inputMode="numeric"
-                className="h-9 pl-9 text-sm font-mono"
+                className="h-ctl-lg pl-9 text-sm font-mono"
                 spellCheck={false}
                 autoComplete="off"
               />
@@ -1241,7 +1241,7 @@ function IpLookupView() {
       toolbar={
         <>
           <SearchInput value={ip} onChange={setIp} onEnter={run} icon={MapPin} mono placeholder={`8.8.8.8 or 2606:4700:4700::1111 — ${quickPasteHint}`} />
-          <Button onClick={run} disabled={loading || !ip.trim()} className="h-9 gap-1.5">
+          <Button onClick={run} disabled={loading || !ip.trim()} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <Search className="h-4 w-4" />}
             Lookup
           </Button>

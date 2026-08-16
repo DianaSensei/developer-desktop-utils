@@ -633,7 +633,7 @@ export function EncodeHashEncrypt() {
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="shrink-0 px-4 py-2 border-b border-border bg-muted/5 flex flex-wrap items-center gap-3">
             <Select value={algorithm} onValueChange={setAlgorithm}>
-              <SelectTrigger className="h-8 w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {CODECS.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
               </SelectContent>
@@ -728,15 +728,15 @@ export function EncodeHashEncrypt() {
                     <Input
                       value={value}
                       readOnly
-                      className="flex-1 h-7 font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
+                      className="flex-1 h-ctl font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
                       placeholder={`${chars} hex chars`}
                     />
                     <div className={cn(
                       'shrink-0 flex items-center gap-1 transition-opacity',
                       isVerifying ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     )}>
-                      <CopyButton value={value} disabled={!value} className="h-7 w-7" iconClassName="h-3 w-3" />
-                      <Button size="icon" variant={isVerifying ? 'secondary' : 'ghost'} disabled={!value} onClick={() => toggleVerify(id)} className="h-7 w-7" title="Verify hash">
+                      <CopyButton value={value} disabled={!value} className="h-ctl w-ctl" iconClassName="h-3 w-3" />
+                      <Button size="icon" variant={isVerifying ? 'secondary' : 'ghost'} disabled={!value} onClick={() => toggleVerify(id)} className="h-ctl w-ctl" title="Verify hash">
                         <Check className="h-3 w-3" />
                       </Button>
                     </div>
@@ -750,7 +750,7 @@ export function EncodeHashEncrypt() {
                           value={verifyValue}
                           onChange={(e) => setVerifyValue(e.target.value)}
                           placeholder="Paste a hash to compare…"
-                          className="h-7 font-mono text-xs flex-1"
+                          className="h-ctl font-mono text-xs flex-1"
                           autoFocus
                         />
                         {verifyValue.trim() && verifyMatch !== null && (
@@ -785,7 +785,7 @@ export function EncodeHashEncrypt() {
                 value={hmacKey}
                 onChange={(e) => setHmacKey(e.target.value)}
                 placeholder="Enter HMAC secret key…"
-                className="h-8 text-sm pr-9 font-mono"
+                className="h-ctl text-sm pr-9 font-mono"
               />
               <button
                 type="button"
@@ -808,10 +808,10 @@ export function EncodeHashEncrypt() {
                       <Input
                         value={value}
                         readOnly
-                        className="flex-1 h-7 font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
+                        className="flex-1 h-ctl font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
                         placeholder={`${chars} hex chars`}
                       />
-                      <CopyButton value={value} disabled={!value} className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" iconClassName="h-3 w-3" />
+                      <CopyButton value={value} disabled={!value} className="h-ctl w-ctl shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" iconClassName="h-3 w-3" />
                     </div>
                   );
                 })}
@@ -856,7 +856,7 @@ export function EncodeHashEncrypt() {
           {/* Algorithm + mode row */}
           <div className="flex items-center gap-3 flex-wrap">
             <Select value={encryptAlgo} onValueChange={(v) => setEncryptAlgo(v as EncryptAlgo)}>
-              <SelectTrigger className="h-8 w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ENCRYPT_ALGOS.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
@@ -902,7 +902,7 @@ export function EncodeHashEncrypt() {
                 value={encryptKey}
                 onChange={(e) => setEncryptKey(e.target.value)}
                 placeholder="Enter passphrase…"
-                className="h-8 text-sm pr-9 font-mono"
+                className="h-ctl text-sm pr-9 font-mono"
               />
               <button
                 type="button"

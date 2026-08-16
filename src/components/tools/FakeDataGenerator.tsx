@@ -71,7 +71,7 @@ export function FakeDataGenerator() {
             max={10000}
             value={count}
             onChange={(e) => setCount(parseInt(e.target.value) || 1)}
-            className="h-8 w-24 text-xs rounded-sm"
+            className="h-ctl w-24 text-xs rounded-sm"
           />
         </div>
         <div className="flex items-center gap-1.5">
@@ -80,14 +80,14 @@ export function FakeDataGenerator() {
             type="number"
             value={seed}
             onChange={(e) => setSeed(parseInt(e.target.value) || 0)}
-            className="h-8 w-24 text-xs rounded-sm"
+            className="h-ctl w-24 text-xs rounded-sm"
           />
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setSeed(Math.floor(Math.random() * 1e9))}
             title="New random seed"
-            className="h-8 w-8 rounded-sm text-muted-foreground hover:text-foreground"
+            className="h-ctl w-ctl rounded-sm text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
@@ -96,7 +96,7 @@ export function FakeDataGenerator() {
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Format</span>
           <Select value={format} onValueChange={(v) => setFormat(v as RowFormat)}>
-            <SelectTrigger className="h-8 w-28 text-xs rounded-sm"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl w-28 text-xs rounded-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               {ROW_FORMATS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
             </SelectContent>
@@ -109,7 +109,7 @@ export function FakeDataGenerator() {
               value={table}
               onChange={(e) => setTable(e.target.value)}
               placeholder="users"
-              className="h-8 w-32 text-xs font-mono rounded-sm"
+              className="h-ctl w-32 text-xs font-mono rounded-sm"
             />
           </div>
         )}
@@ -120,7 +120,7 @@ export function FakeDataGenerator() {
               value={prefix}
               onChange={(e) => setPrefix(e.target.value)}
               placeholder="data"
-              className="h-8 w-32 text-xs font-mono rounded-sm"
+              className="h-ctl w-32 text-xs font-mono rounded-sm"
             />
           </div>
         )}
@@ -144,7 +144,7 @@ export function FakeDataGenerator() {
                     value={f.name}
                     onChange={(e) => updateField(f.id, { name: e.target.value })}
                     placeholder="field name"
-                    className="h-7 flex-1 text-xs font-mono rounded-md"
+                    className="h-ctl flex-1 text-xs font-mono rounded-md"
                   />
                   <button
                     onClick={() => removeField(f.id)}
@@ -156,7 +156,7 @@ export function FakeDataGenerator() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Select value={f.type} onValueChange={(v) => updateField(f.id, { type: v as FakerType })}>
-                    <SelectTrigger className="h-7 flex-1 text-xs rounded-md"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-ctl flex-1 text-xs rounded-md"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {FAKER_TYPE_GROUPS.map((g) => (
                         <SelectGroup key={g.group}>
@@ -169,16 +169,16 @@ export function FakeDataGenerator() {
                 </div>
                 {(f.type === 'int' || f.type === 'float') && (
                   <div className="flex items-center gap-1.5">
-                    <Input type="number" value={f.min ?? 0} onChange={(e) => updateField(f.id, { min: parseFloat(e.target.value) || 0 })} placeholder="min" className="h-7 text-xs rounded-md" />
-                    <Input type="number" value={f.max ?? 1000} onChange={(e) => updateField(f.id, { max: parseFloat(e.target.value) || 0 })} placeholder="max" className="h-7 text-xs rounded-md" />
+                    <Input type="number" value={f.min ?? 0} onChange={(e) => updateField(f.id, { min: parseFloat(e.target.value) || 0 })} placeholder="min" className="h-ctl text-xs rounded-md" />
+                    <Input type="number" value={f.max ?? 1000} onChange={(e) => updateField(f.id, { max: parseFloat(e.target.value) || 0 })} placeholder="max" className="h-ctl text-xs rounded-md" />
                     {f.type === 'float' && (
-                      <Input type="number" min={0} max={10} value={f.decimals ?? 2} onChange={(e) => updateField(f.id, { decimals: parseInt(e.target.value) || 0 })} title="decimals" className="h-7 w-16 text-xs rounded-md" />
+                      <Input type="number" min={0} max={10} value={f.decimals ?? 2} onChange={(e) => updateField(f.id, { decimals: parseInt(e.target.value) || 0 })} title="decimals" className="h-ctl w-16 text-xs rounded-md" />
                     )}
                   </div>
                 )}
                 {(f.type === 'date' || f.type === 'birthdate') && (
                   <Select value={f.dateFormat ?? (f.type === 'birthdate' ? 'isoDate' : 'iso')} onValueChange={(v) => updateField(f.id, { dateFormat: v as DateFormat })}>
-                    <SelectTrigger className="h-7 text-xs rounded-md"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-ctl text-xs rounded-md"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {DATE_FORMATS.map((d) => (
                         <SelectItem key={d.value} value={d.value}>
@@ -196,7 +196,7 @@ export function FakeDataGenerator() {
                     value={f.values ?? ''}
                     onChange={(e) => updateField(f.id, { values: e.target.value })}
                     placeholder="comma,separated,values"
-                    className="h-7 text-xs font-mono rounded-md"
+                    className="h-ctl text-xs font-mono rounded-md"
                   />
                 )}
               </div>
