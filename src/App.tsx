@@ -531,91 +531,86 @@ function Sidebar({
 
         {/* Pinned bottom bar — always visible, order: Collapse → Dark mode → Settings */}
         <div className="shrink-0 border-t px-1.5 py-2 space-y-0.5">
-          {/* Collapse/expand — desktop only */}
-          <button
-            onClick={onToggleCollapse}
-            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={cn(
-              'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
-              isCollapsed ? 'justify-center' : 'gap-2.5'
-            )}
-          >
-            {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronLeft className="h-4 w-4 shrink-0" />}
-            {isCollapsed && (
-              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
-                {isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              </span>
-            )}
-            <span
+          {/* Collapse/expand — desktop only. Tooltip only matters collapsed
+              (expanded already shows the "Collapse" label inline) — bản trước
+              tự chế bằng group-hover:block, không xử lý được bàn phím hay
+              tràn viewport (xem design/RULES.md). Dùng chung `Tooltip` như
+              các dòng nav bên trên. */}
+          <Tooltip side="right" label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} disabled={!isCollapsed} triggerClassName="block w-full">
+            <button
+              onClick={onToggleCollapse}
+              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               className={cn(
-                'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
-                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
+                'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
-              Collapse
-            </span>
-          </button>
+              {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronLeft className="h-4 w-4 shrink-0" />}
+              <span
+                className={cn(
+                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                  isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
+                )}
+              >
+                Collapse
+              </span>
+            </button>
+          </Tooltip>
 
           {/* Theme preference — single cycling toggle (Light → Dark → System),
               styled to match the Collapse/Settings rows instead of a boxed segmented control */}
-          <button
-            onClick={() => onThemeChange(NEXT_THEME[themePreference])}
-            title={`Theme: ${activeThemeOption.label} (click to cycle)`}
-            className={cn(
-              'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
-              isCollapsed ? 'justify-center' : 'gap-2.5'
-            )}
-          >
-            <ThemeIcon className="h-4 w-4 shrink-0" />
-            {isCollapsed && (
-              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
+          <Tooltip side="right" label={activeThemeOption.label} disabled={!isCollapsed} triggerClassName="block w-full">
+            <button
+              onClick={() => onThemeChange(NEXT_THEME[themePreference])}
+              title={`Theme: ${activeThemeOption.label} (click to cycle)`}
+              className={cn(
+                'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                isCollapsed ? 'justify-center' : 'gap-2.5'
+              )}
+            >
+              <ThemeIcon className="h-4 w-4 shrink-0" />
+              <span
+                className={cn(
+                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                  isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
+                )}
+              >
                 {activeThemeOption.label}
               </span>
-            )}
-            <span
-              className={cn(
-                'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
-                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
-              )}
-            >
-              {activeThemeOption.label}
-            </span>
-          </button>
+            </button>
+          </Tooltip>
 
           {/* Settings — always last */}
-          <Link
-            to={settingsTool.path}
-            onClick={onClose}
-            title="Settings"
-            className={cn(
-              'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-200 ease-out',
-              isCollapsed ? 'justify-center' : 'gap-2.5',
-              isSettingsActive
-                ? 'bg-primary/10 text-primary font-medium'
-                : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
-            )}
-          >
-            <span className="relative shrink-0">
-              <SettingsIcon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
-              {updateAvailable && (
-                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-ok ring-1 ring-background" />
-              )}
-            </span>
-            {isCollapsed && (
-              <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-md group-hover:block">
-                Settings
-              </span>
-            )}
-            <span
+          <Tooltip side="right" label="Settings" disabled={!isCollapsed} triggerClassName="block w-full">
+            <Link
+              to={settingsTool.path}
+              onClick={onClose}
+              title="Settings"
               className={cn(
-                'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
-                isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
-                isSettingsActive && 'font-medium'
+                'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-200 ease-out',
+                isCollapsed ? 'justify-center' : 'gap-2.5',
+                isSettingsActive
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
               )}
             >
-              Settings
-            </span>
-          </Link>
+              <span className="relative shrink-0">
+                <SettingsIcon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
+                {updateAvailable && (
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-ok ring-1 ring-background" />
+                )}
+              </span>
+              <span
+                className={cn(
+                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                  isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
+                  isSettingsActive && 'font-medium'
+                )}
+              >
+                Settings
+              </span>
+            </Link>
+          </Tooltip>
         </div>
       </aside>
     </>
