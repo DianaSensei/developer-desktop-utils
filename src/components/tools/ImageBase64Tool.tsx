@@ -149,7 +149,7 @@ export function ImageBase64Tool() {
 
                 {/* File info */}
                 {encodeFile && (
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     {encodeFile.name} · {formatBytes(encodeFile.size)} · {encodeFile.type}
                   </p>
                 )}
@@ -164,7 +164,7 @@ export function ImageBase64Tool() {
                         label="Copy raw"
                         variant="ghost"
                         size="sm"
-                        className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                        className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
                         iconClassName="h-3 w-3"
                       />
                       <CopyButton
@@ -172,15 +172,15 @@ export function ImageBase64Tool() {
                         label="Copy data URL"
                         variant="ghost"
                         size="sm"
-                        className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                        className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
                         iconClassName="h-3 w-3"
                       />
                     </div>
                   </div>
                   <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-h-36 overflow-y-auto">
-                    <p className="font-mono text-[10px] break-all text-foreground/80 leading-relaxed">{base64Only}</p>
+                    <p className="font-mono text-[11px] break-all text-foreground/80 leading-relaxed">{base64Only}</p>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     Base64 length: {base64Only.length.toLocaleString()} chars · ~{formatBytes(Math.ceil(base64Only.length * 0.75))}
                   </p>
                 </div>
@@ -196,7 +196,7 @@ export function ImageBase64Tool() {
                 value={decodeInput}
                 onChange={(e) => { setDecodeInput(e.target.value); setDecodeError(false); }}
                 placeholder="data:image/png;base64,iVBORw0KGgo… or raw base64"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-[10px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
               />
             </div>
 
@@ -223,7 +223,7 @@ export function ImageBase64Tool() {
                     label="Copy image"
                     variant="ghost"
                     size="sm"
-                    className="absolute top-2 right-2 h-7 bg-background/80 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                    className="absolute top-2 right-2 h-7 bg-background/80 px-2 text-[11px] text-muted-foreground hover:text-foreground"
                     iconClassName="h-3 w-3"
                   />
                 )}

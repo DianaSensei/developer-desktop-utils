@@ -368,7 +368,7 @@ function NavScrollArea({
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 flex items-end justify-center pb-1"
           style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--sidebar)) 85%)' }}>
           <span className={cn(
-            'flex items-center gap-0.5 text-[9px] text-muted-foreground/60',
+            'flex items-center gap-0.5 text-[11px] text-muted-foreground/60',
             isCollapsed ? 'flex-col' : 'flex-row'
           )}>
             <ChevronDown className="h-2.5 w-2.5" />

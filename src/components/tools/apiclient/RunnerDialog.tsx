@@ -973,7 +973,7 @@ function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
             {m.used ? (
               <Check className="h-3 w-3 shrink-0 text-ok" aria-label="Used by the run" />
             ) : (
-              <span className="shrink-0 rounded bg-muted px-1 text-[9px] text-muted-foreground" title="No selected request references this variable">
+              <span className="shrink-0 rounded bg-muted px-1 text-[11px] text-muted-foreground" title="No selected request references this variable">
                 unused
               </span>
             )}

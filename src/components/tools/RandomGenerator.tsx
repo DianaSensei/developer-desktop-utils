@@ -48,7 +48,7 @@ function ResultList({ items }: { items: string[] }) {
             label="Copy all"
             variant="ghost"
             size="sm"
-            className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+            className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
             iconClassName="h-3 w-3"
           />
         )}

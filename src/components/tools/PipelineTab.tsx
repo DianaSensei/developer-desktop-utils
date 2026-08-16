@@ -359,7 +359,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
           field.enabled ? 'bg-primary border-primary' : 'border-border bg-card'
         )}
       >
-        {field.enabled && <span className="text-[8px] font-black text-primary-foreground leading-none">✓</span>}
+        {field.enabled && <span className="text-[11px] font-black text-primary-foreground leading-none">✓</span>}
       </button>
 
       {/* Key */}

@@ -114,8 +114,8 @@ function CookieRow({ cookie, store }: { cookie: Cookie; store: ApiStore }) {
       <span className="shrink-0 font-mono text-[11px] text-muted-foreground/70" title="Path">{cookie.path}</span>
       <span className="w-36 shrink-0 text-right text-[11px] text-muted-foreground/70" title="Expires">{fmtExpires(cookie)}</span>
       <div className="flex shrink-0 items-center gap-1">
-        {cookie.secure && <span className="rounded bg-muted px-1 text-[9px] uppercase text-muted-foreground">secure</span>}
-        {cookie.httpOnly && <span className="rounded bg-muted px-1 text-[9px] uppercase text-muted-foreground">http</span>}
+        {cookie.secure && <span className="rounded bg-muted px-1 text-[11px] uppercase text-muted-foreground">secure</span>}
+        {cookie.httpOnly && <span className="rounded bg-muted px-1 text-[11px] uppercase text-muted-foreground">http</span>}
         <button onClick={() => store.deleteCookie(cookie)} title="Delete" className="rounded p-1 text-muted-foreground/50 hover:text-destructive">
           <X className="h-3.5 w-3.5" />
         </button>

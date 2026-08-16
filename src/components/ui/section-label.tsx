@@ -2,8 +2,8 @@
 // "Operations", "Advanced", "Data file", "Active consumers", "Selected".
 //
 // Roughly 25 hand-written spans across the app use some spelling of
-// `text-[10px] font-semibold uppercase tracking-wide text-muted-foreground`,
-// varying between `text-[10px]`/`text-[11px]`/`text-xs` and
+// `text-[11px] font-semibold uppercase tracking-wide text-muted-foreground`,
+// varying between `text-[11px]`/`text-[11px]`/`text-xs` and
 // `tracking-wide`/`tracking-wider`/`tracking-widest` with no rule behind the
 // choice. Two sizes are enough:
 //
@@ -18,7 +18,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const SIZE_CLASS = {
-  xs: 'text-[10px]',
+  xs: 'text-[11px]',
   sm: 'text-xs',
 } as const;
 
@@ -54,7 +54,7 @@ export function SectionLabel({
         {children}
       </span>
       {count != null && (
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{count}</span>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{count}</span>
       )}
       {rule && <span className="h-px flex-1 bg-border" />}
       {actions && <span className={cn('flex items-center gap-1', !rule && 'ml-auto')}>{actions}</span>}

@@ -382,7 +382,7 @@ const RequestNode = memo(function RequestNode({ request, depth, collectionId, ct
       depth={depth}
       active={active}
       badge={
-        <span className={cn('shrink-0 rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide', methodBadgeStyle(request.method))}>
+        <span className={cn('shrink-0 rounded px-1 py-px text-[11px] font-bold uppercase tracking-wide', methodBadgeStyle(request.method))}>
           {request.method}
         </span>
       }
