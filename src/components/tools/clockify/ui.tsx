@@ -30,7 +30,7 @@ export function NumberStepper({
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const set = (v: number) => onChange(clamp(Number.isFinite(v) ? v : min));
   return (
-    <div className={cn('flex h-8 items-stretch overflow-hidden rounded-lg border border-border bg-background', className)}>
+    <div className={cn('flex h-ctl items-stretch overflow-hidden rounded-lg border border-border bg-background', className)}>
       <button
         type="button"
         onClick={() => set(value - step)}
@@ -95,7 +95,7 @@ export function TimeField({
         if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
         if (e.key === 'Escape') setDraft(null);
       }}
-      className={cn('h-7 w-[68px] text-center font-mono text-xs tabular-nums', className)}
+      className={cn('h-ctl w-[68px] text-center font-mono text-xs tabular-nums', className)}
     />
   );
 }
@@ -175,7 +175,7 @@ export function TimeStepperField({
   );
 
   return (
-    <div className={cn('flex h-9 items-stretch overflow-hidden rounded-md border border-input bg-background', className)}>
+    <div className={cn('flex h-ctl-lg items-stretch overflow-hidden rounded-md border border-input bg-background', className)}>
       <span className="flex items-center pl-2 text-muted-foreground">
         <Clock className="h-3.5 w-3.5" />
       </span>
@@ -454,7 +454,7 @@ export function ProjectPicker({
           onClick={toggle}
           className={cn(
             'flex items-center gap-1.5 rounded-lg border border-border px-2.5 text-sm transition-colors hover:bg-muted',
-            compact ? 'h-7' : 'h-9'
+            compact ? 'h-ctl' : 'h-ctl-lg'
           )}
         >
           <ColorDot color={project?.color} />
@@ -510,12 +510,12 @@ export function ProjectPicker({
                 }
               }}
               placeholder="New project…"
-              className="h-7 text-xs"
+              className="h-ctl text-xs"
             />
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 shrink-0"
+              className="h-ctl w-ctl shrink-0"
               onClick={() => {
                 if (!creating.trim()) return;
                 const p = addProject(creating.trim());
@@ -556,7 +556,7 @@ function CreateTaskRow({ onCreate }: { onCreate: (name: string) => void }) {
           }
         }}
         placeholder="New task in project…"
-        className="h-7 pl-7 text-xs"
+        className="h-ctl pl-7 text-xs"
       />
     </div>
   );
@@ -579,7 +579,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
       trigger={({ toggle: t }) => (
         <button
           onClick={t}
-          className={cn('flex items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors hover:bg-muted', compact ? 'h-7' : 'h-9')}
+          className={cn('flex items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors hover:bg-muted', compact ? 'h-ctl' : 'h-ctl-lg')}
         >
           <TagIcon className="h-3.5 w-3.5 opacity-60" />
           <span className={cn('truncate', !selected.length && 'text-muted-foreground')}>
@@ -611,7 +611,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
                 }
               }}
               placeholder="New tag…"
-              className="h-7 text-xs"
+              className="h-ctl text-xs"
             />
           </div>
         </div>

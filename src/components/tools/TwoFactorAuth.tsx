@@ -198,7 +198,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       {/* ── Header ── */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <div
-          className="w-9 h-9 rounded-md flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none"
+          className="w-ctl h-ctl rounded-md flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none"
           style={avatarStyle(account.name)}
         >
           {initials(account.name)}
@@ -234,7 +234,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
                 disabled={!code}
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-ctl w-ctl"
                 iconClassName="h-4 w-4"
                 title="Copy code"
               />
@@ -262,7 +262,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
         <div className="px-4 py-2 border-t bg-muted/30 shrink-0">
           <Button
             variant="ghost" size="sm"
-            className="h-7 w-full text-xs gap-1.5 text-acc-ink hover:bg-acc-tint"
+            className="h-ctl w-full text-xs gap-1.5 text-acc-ink hover:bg-acc-tint"
             onClick={() => onCounterIncrement(account.id)}
           >
             <RefreshCw className="h-3 w-3" />
@@ -285,7 +285,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
         </div>
         <Button
           variant="ghost" size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          className="h-ctl w-ctl text-muted-foreground hover:text-foreground"
           onClick={() => setShowSecret((s) => !s)}
           title={showSecret ? 'Hide secret' : 'Reveal secret'}
         >
@@ -293,7 +293,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
         </Button>
         <Button
           variant="ghost" size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          className="h-ctl w-ctl text-muted-foreground hover:text-destructive"
           onClick={() => onDelete(account.id)}
           title="Remove account"
         >
@@ -441,7 +441,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={isTotp ? 'e.g. GitHub, AWS, Google' : 'e.g. FIDO key'}
-              className="h-8 text-sm"
+              className="h-ctl text-sm"
             />
           </div>
           <div className="space-y-1.5">
@@ -450,7 +450,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
               value={issuer}
               onChange={(e) => setIssuer(e.target.value)}
               placeholder="e.g. github.com"
-              className="h-8 text-sm"
+              className="h-ctl text-sm"
             />
           </div>
         </div>
@@ -463,7 +463,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
             value={secret}
             onChange={(e) => { setSecret(e.target.value); setError(''); }}
             placeholder="JBSWY3DPEHPK3PXP"
-            className={cn('h-8 text-sm font-mono', error && 'border-destructive focus-visible:ring-destructive/30')}
+            className={cn('h-ctl text-sm font-mono', error && 'border-destructive focus-visible:ring-destructive/30')}
             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
           />
           {error && <p className="text-[11px] text-destructive">{error}</p>}
@@ -478,7 +478,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Algorithm</Label>
             <Select value={algorithm} onValueChange={(v) => setAlgorithm(v as Algorithm)}>
-              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="SHA-1">SHA-1</SelectItem>
                 <SelectItem value="SHA-256">SHA-256</SelectItem>
@@ -489,7 +489,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
           <div className="space-y-1.5">
             <Label className="text-xs">Digits</Label>
             <Select value={String(digits)} onValueChange={(v) => setDigits(Number(v) as 6 | 8)}>
-              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="6">6 digits</SelectItem>
                 <SelectItem value="8">8 digits</SelectItem>
@@ -500,7 +500,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
             <div className="space-y-1.5">
               <Label className="text-xs">Period</Label>
               <Select value={String(period)} onValueChange={(v) => setPeriod(Number(v) as 30 | 60)}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-ctl text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="30">30 seconds</SelectItem>
                   <SelectItem value="60">60 seconds</SelectItem>
@@ -530,7 +530,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
     <div className="flex flex-col items-center justify-center py-20 text-center gap-4 px-4">
       <div className="relative">
         <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
-          <ShieldCheck className="h-8 w-8 text-muted-foreground/40" />
+          <ShieldCheck className="h-ctl w-ctl text-muted-foreground/40" />
         </div>
         <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
           <KeyRound className="h-3 w-3 text-primary-foreground" />
@@ -805,7 +805,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
                       {checked && <Check className="h-3 w-3 text-primary-foreground" />}
                     </span>
                     <div
-                      className="w-7 h-7 rounded-sm flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                      className="w-ctl h-ctl rounded-sm flex items-center justify-center text-white text-[11px] font-bold shrink-0"
                       style={avatarStyle(entry.name)}
                     >
                       {initials(entry.name)}
@@ -934,7 +934,7 @@ export function TwoFactorAuth() {
           <div className="flex items-center gap-1.5">
             <Button
               variant="ghost" size="sm"
-              className="h-7 text-xs gap-1 text-muted-foreground"
+              className="h-ctl text-xs gap-1 text-muted-foreground"
               onClick={() => setShowInfo((s) => !s)}
             >
               {showInfo ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -943,7 +943,7 @@ export function TwoFactorAuth() {
             {accounts.length > 0 && (
               <Button
                 variant="ghost" size="icon"
-                className="h-7 w-7 text-muted-foreground"
+                className="h-ctl w-ctl text-muted-foreground"
                 onClick={() => exportAccounts(accounts)}
                 title="Export all accounts (otpauth URIs)"
               >
@@ -952,7 +952,7 @@ export function TwoFactorAuth() {
             )}
             <Button
               variant="outline" size="sm"
-              className="h-7 text-xs gap-1.5"
+              className="h-ctl text-xs gap-1.5"
               onClick={() => setShowImport(true)}
             >
               <Upload className="h-3.5 w-3.5" />
@@ -960,7 +960,7 @@ export function TwoFactorAuth() {
             </Button>
             <Button
               size="sm"
-              className="h-7 text-xs gap-1.5"
+              className="h-ctl text-xs gap-1.5"
               onClick={() => { setShowForm((s) => !s); }}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -1018,7 +1018,7 @@ export function TwoFactorAuth() {
                 value={search}
                 onChange={setSearch}
                 placeholder="Search accounts…"
-                className="h-7 text-xs"
+                className="h-ctl text-xs"
                 containerClassName="ml-auto w-full sm:w-56"
               />
             )}

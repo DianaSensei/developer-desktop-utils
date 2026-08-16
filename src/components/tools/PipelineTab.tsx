@@ -289,7 +289,7 @@ function HexToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
     <button
       type="button" onClick={() => onChange(!value)}
       className={cn(
-        'text-[11px] font-mono px-2 h-7 rounded-md border transition-colors',
+        'text-[11px] font-mono px-2 h-ctl rounded-md border transition-colors',
         value ? 'border-primary/50 bg-primary/10 text-primary' : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground'
       )}
     >
@@ -372,7 +372,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
               onChange({ key: k, enabled: k.length > 0 });
             }}
             placeholder="key"
-            className="h-7 text-xs font-mono"
+            className="h-ctl text-xs font-mono"
           />
         ) : (
           <div className={cn('flex items-center gap-1.5 min-w-0', !field.enabled && 'opacity-40')}>
@@ -393,7 +393,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
             value={field.customValue ?? ''}
             onChange={(e) => onChange({ customValue: e.target.value })}
             placeholder="value"
-            className="h-7 text-xs font-mono"
+            className="h-ctl text-xs font-mono"
           />
         ) : (
           <span className={cn(
@@ -520,7 +520,7 @@ function JsonInputSection({
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-muted-foreground font-medium">Sep</span>
           <Select value={jsonSeparator} onValueChange={(v) => onUpdate({ jsonSeparator: v })}>
-            <SelectTrigger className="h-7 w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
             <SelectContent>
               {SEP_OPTIONS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
             </SelectContent>
@@ -652,7 +652,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         </div>
 
         <Select value={step.op} onValueChange={(v) => onUpdate({ op: v as StepOp })}>
-          <SelectTrigger className="h-7 flex-1 max-w-[180px] text-xs font-semibold border-0 bg-transparent shadow-none focus:ring-0 px-0">
+          <SelectTrigger className="h-ctl flex-1 max-w-[180px] text-xs font-semibold border-0 bg-transparent shadow-none focus:ring-0 px-0">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -718,7 +718,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {step.op === 'hash' && (
           <div className="flex flex-wrap items-center gap-2">
             <Select value={step.algorithm ?? 'sha256'} onValueChange={(v) => onUpdate({ algorithm: v })}>
-              <SelectTrigger className="h-7 w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {HASH_ALGOS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label} ({a.bits}-bit)</SelectItem>)}
               </SelectContent>
@@ -732,7 +732,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Select value={step.algorithm ?? 'sha256'} onValueChange={(v) => onUpdate({ algorithm: v })}>
-                <SelectTrigger className="h-7 w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-ctl w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {HASH_ALGOS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label} ({a.bits}-bit)</SelectItem>)}
                 </SelectContent>
@@ -745,7 +745,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
                 value={step.key ?? ''}
                 onChange={(e) => onUpdate({ key: e.target.value })}
                 placeholder="Secret key…"
-                className="h-8 pr-9 font-mono text-sm"
+                className="h-ctl pr-9 font-mono text-sm"
               />
               <button type="button" onClick={onToggleKey} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -757,7 +757,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {/* Encode / Decode */}
         {(step.op === 'encode' || step.op === 'decode') && (
           <Select value={step.codec ?? 'base64'} onValueChange={(v) => onUpdate({ codec: v })}>
-            <SelectTrigger className="h-7 w-44 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl w-44 text-xs rounded-lg"><SelectValue /></SelectTrigger>
             <SelectContent>
               {CODECS.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
             </SelectContent>
@@ -774,7 +774,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
               value={step.text ?? ''}
               onChange={(e) => onUpdate({ text: e.target.value })}
               placeholder={step.op === 'prepend' ? 'Text to prepend…' : 'Text to append…'}
-              className="h-7 text-xs font-mono flex-1"
+              className="h-ctl text-xs font-mono flex-1"
             />
           </div>
         )}
@@ -784,11 +784,11 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <div className="grid grid-cols-2 gap-2">
             <div>
               <p className="text-[11px] text-muted-foreground mb-1">Find (all occurrences)</p>
-              <Input value={step.find ?? ''} onChange={(e) => onUpdate({ find: e.target.value })} placeholder="Find…" className="h-7 text-xs font-mono" />
+              <Input value={step.find ?? ''} onChange={(e) => onUpdate({ find: e.target.value })} placeholder="Find…" className="h-ctl text-xs font-mono" />
             </div>
             <div>
               <p className="text-[11px] text-muted-foreground mb-1">Replace with (empty = delete)</p>
-              <Input value={step.replacement ?? ''} onChange={(e) => onUpdate({ replacement: e.target.value })} placeholder="Replace with…" className="h-7 text-xs font-mono" />
+              <Input value={step.replacement ?? ''} onChange={(e) => onUpdate({ replacement: e.target.value })} placeholder="Replace with…" className="h-ctl text-xs font-mono" />
             </div>
           </div>
         )}
@@ -813,7 +813,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
       <div className="flex flex-col items-center gap-1">
         <div className="w-px h-3 bg-border/50" />
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}
-          className="h-7 px-4 text-xs rounded-full border-dashed gap-1.5 text-muted-foreground hover:text-foreground">
+          className="h-ctl px-4 text-xs rounded-full border-dashed gap-1.5 text-muted-foreground hover:text-foreground">
           <Plus className="h-3 w-3" />Add step
         </Button>
       </div>

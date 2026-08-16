@@ -60,7 +60,7 @@ function EditableTime({ ts, dayTs, onCommit }: { ts: number; dayTs: number; onCo
     <TimePicker
       value={timeOfDay(ts, false)}
       onChange={(hm) => { const v = parseTimeOfDay(hm, dayTs); if (v !== null) onCommit(v); }}
-      className="h-7"
+      className="h-ctl"
     />
   );
 }
@@ -90,7 +90,7 @@ function HistoryRow({ entry }: { entry: TimeEntry }) {
         <DurationInput
           ms={duration}
           onCommit={(ms) => updateEntry(entry.id, { end: entry.start + Math.max(60_000, ms) })}
-          className="ml-auto h-7 w-16 text-xs"
+          className="ml-auto h-ctl w-16 text-xs"
         />
       )}
       <ConfirmButton onConfirm={() => deleteEntry(entry.id)} title="Delete record" className="flex h-6 w-6 items-center justify-center rounded hover:bg-muted">
@@ -112,9 +112,9 @@ function AddSubtaskInput({ onAdd }: { onAdd: (name: string) => void }) {
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
         placeholder="Add subtask…"
-        className="h-7 flex-1 text-xs"
+        className="h-ctl flex-1 text-xs"
       />
-      <Button size="sm" variant="outline" className="h-7" onClick={submit} disabled={!v.trim()}>Add</Button>
+      <Button size="sm" variant="outline" className="h-ctl" onClick={submit} disabled={!v.trim()}>Add</Button>
     </div>
   );
 }
@@ -142,7 +142,7 @@ function RenameField({ initial, onCommit, onCancel }: { initial: string; onCommi
         if (e.key === 'Enter') commit();
         if (e.key === 'Escape') onCancel();
       }}
-      className="h-7 flex-1 text-sm"
+      className="h-ctl flex-1 text-sm"
     />
   );
 }
@@ -171,7 +171,7 @@ function FilterControls({
           onClick={toggle}
           title={activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active` : 'Filter tasks'}
           className={cn(
-            'relative flex h-7 w-7 items-center justify-center rounded-md border transition-colors hover:bg-muted hover:text-foreground',
+            'relative flex h-ctl w-ctl items-center justify-center rounded-md border transition-colors hover:bg-muted hover:text-foreground',
             activeCount > 0 ? 'border-primary/50 text-foreground' : 'text-muted-foreground'
           )}
         >
@@ -535,7 +535,7 @@ export function TimeTracker() {
             onChange={(e) => setDesc(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && mode === 'timer' && isNewTask && start()}
             placeholder="What are you working on?"
-            className="h-9 min-w-[180px] flex-1 text-sm"
+            className="h-ctl-lg min-w-[180px] flex-1 text-sm"
           />
           <ProjectPicker value={projectId} taskValue={taskId} onChange={(p, t) => { setProjectId(p); setTaskId(t); }} />
           <TagPicker value={tagIds} onChange={setTagIds} />
@@ -545,7 +545,7 @@ export function TimeTracker() {
               fixed width in both modes so switching never shifts the controls to
               the left. Timer shows the live clock; Manual shows the target day +
               duration and opens a date/time popover. */}
-          <div className="flex h-9 items-stretch overflow-hidden rounded-md border">
+          <div className="flex h-ctl-lg items-stretch overflow-hidden rounded-md border">
             <div className="flex items-stretch p-0.5">
               {(['timer', 'manual'] as const).map((m) => (
                 <button
@@ -604,7 +604,7 @@ export function TimeTracker() {
                       </label>
                     </div>
                   ) : (
-                    <Input value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} placeholder="1:30 or 90m" className="h-9 w-full text-center font-mono text-sm" />
+                    <Input value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} placeholder="1:30 or 90m" className="h-ctl-lg w-full text-center font-mono text-sm" />
                   )}
                 </div>
               )}
@@ -616,21 +616,21 @@ export function TimeTracker() {
               <>
                 {/* Start a different task without stopping first — the running one stops automatically. */}
                 {isNewTask && (
-                  <Button className="h-9 min-w-[100px] gap-2" onClick={start} title="Start this task (stops the current one)">
+                  <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={start} title="Start this task (stops the current one)">
                     <Play className="h-4 w-4" /> Start
                   </Button>
                 )}
-                <Button variant="destructive" className="h-9 min-w-[100px] gap-2" onClick={stopRunning} title={`Stop (${TOGGLE_HINT})`}>
+                <Button variant="destructive" className="h-ctl-lg min-w-[100px] gap-2" onClick={stopRunning} title={`Stop (${TOGGLE_HINT})`}>
                   <Square className="h-4 w-4 fill-current" /> Stop
                 </Button>
               </>
             ) : (
-              <Button className="h-9 min-w-[100px] gap-2" onClick={start} disabled={!hasTitle} title={hasTitle ? `Start (${TOGGLE_HINT})` : 'Enter a task name to start'}>
+              <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={start} disabled={!hasTitle} title={hasTitle ? `Start (${TOGGLE_HINT})` : 'Enter a task name to start'}>
                 <Play className="h-4 w-4" /> Start
               </Button>
             )
           ) : (
-            <Button className="h-9 min-w-[100px] gap-2" onClick={addManual} disabled={!hasTitle || manualMs <= 0} title={!hasTitle ? 'Enter a task name to add time' : manualMs <= 0 ? 'Set a valid time range' : undefined}>
+            <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={addManual} disabled={!hasTitle || manualMs <= 0} title={!hasTitle ? 'Enter a task name to add time' : manualMs <= 0 ? 'Set a valid time range' : undefined}>
               <Plus className="h-4 w-4" /> Add
             </Button>
           )}
@@ -693,9 +693,9 @@ export function TimeTracker() {
           </div>
           {period === 'range' && (
             <div className="flex items-center gap-1.5">
-              <DatePicker value={rangeStart} onChange={setRangeStart} className="h-7 text-xs" />
+              <DatePicker value={rangeStart} onChange={setRangeStart} className="h-ctl text-xs" />
               <span className="text-muted-foreground">→</span>
-              <DatePicker value={rangeEnd} onChange={setRangeEnd} className="h-7 text-xs" />
+              <DatePicker value={rangeEnd} onChange={setRangeEnd} className="h-ctl text-xs" />
             </div>
           )}
         </div>
@@ -734,7 +734,7 @@ export function TimeTracker() {
                 onBlur={() => { if (!query) setSearchOpen(false); }}
                 onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); setSearchOpen(false); } }}
                 placeholder="Search…"
-                className="h-7 w-44 pl-8 pr-7 text-xs"
+                className="h-ctl w-44 pl-8 pr-7 text-xs"
               />
               {query && (
                 <button onClick={() => { setQuery(''); setSearchOpen(false); }} title="Clear" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -743,7 +743,7 @@ export function TimeTracker() {
               )}
             </div>
           ) : (
-            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-ctl w-ctl items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <Search className="h-3.5 w-3.5" />
             </button>
           )}
@@ -766,7 +766,7 @@ export function TimeTracker() {
               <button
                 onClick={() => hasExportable && toggle()}
                 disabled={!hasExportable}
-                className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                className="flex h-ctl w-ctl items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
                 title={hasExportable ? 'Export visible entries' : 'Nothing to export'}
               >
                 <Download className="h-3.5 w-3.5" />
@@ -791,7 +791,7 @@ export function TimeTracker() {
       <div className="flex-1 overflow-y-auto">
         {visibleGroups.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
-            <TimerIcon className="h-9 w-9 opacity-30" />
+            <TimerIcon className="h-ctl w-ctl opacity-30" />
             {q || filterCount > 0 ? (
               <p className="text-sm">No tasks match your search or filters.</p>
             ) : entries.length === 0 ? (
@@ -860,14 +860,14 @@ export function TimeTracker() {
                   )}
                   <span className={cn('shrink-0 font-mono text-sm tabular-nums', isRunning && 'text-[var(--live)]')}>{fmtTotal(total)}</span>
                   {isRunning ? (
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title="Stop">
+                    <Button size="icon" variant="ghost" className="h-ctl w-ctl text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title="Stop">
                       <Square className="h-4 w-4 fill-current" />
                     </Button>
                   ) : (
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      className="h-ctl w-ctl text-muted-foreground hover:text-foreground"
                       title={g.hasSub ? 'Resume the latest subtask' : 'Start this task'}
                       onClick={startTask}
                     >
@@ -896,15 +896,15 @@ export function TimeTracker() {
                                 </button>
                                 <span className={cn('shrink-0 font-mono text-xs tabular-nums', sg.running && 'text-[var(--live)]')}>{fmtTotal(subTotal)}</span>
                                 {sg.running ? (
-                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title="Stop">
+                                  <Button size="icon" variant="ghost" className="h-ctl w-ctl text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title="Stop">
                                     <Square className="h-3.5 w-3.5 fill-current" />
                                   </Button>
                                 ) : (
-                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Start this subtask" onClick={() => resumeTask(g.name, g.projectId, g.tagIds, sg.name)}>
+                                  <Button size="icon" variant="ghost" className="h-ctl w-ctl text-muted-foreground hover:text-foreground" title="Start this subtask" onClick={() => resumeTask(g.name, g.projectId, g.tagIds, sg.name)}>
                                     <Play className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
-                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted">
+                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-ctl w-ctl items-center justify-center rounded text-muted-foreground hover:bg-muted">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </ConfirmButton>
                               </div>
