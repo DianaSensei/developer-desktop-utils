@@ -709,18 +709,15 @@ function AppContent() {
           dưới bị ẩn khi showMacOverlayChrome (xem `{!showMacOverlayChrome &&
           (…)}` quanh header đó) — không render trùng hai nơi.
 
-          `pl-[78px]` từng phải ĐOÁN vị trí ba nút đèn giao thông (macOS tự
-          đặt, không cố định giữa các phiên bản) — sai hai lần liền vì không
-          có máy thật để đo. Từ giờ không đoán nữa: `trafficLightPosition:
-          {x:12,y:20}` trong tauri.conf.json TỰ đặt vị trí ba nút đó (yêu cầu
-          titleBarStyle: "Overlay" + decorations mặc định true), nên 78px ở
-          đây tính được thẳng từ x=12 cộng bề rộng cụm nút (~54px) cộng đệm
-          nhỏ — không còn là số đoán mò. `y` canh cụm nút theo chiều dọc
-          trong hàng cao 38px — y:13 lần đầu vẫn cao hơn hẳn hàng logo, tăng
-          lên 20; đổi tauri.conf.json cần restart hẳn `tauri dev` mới thấy. */}
+          `trafficLightPosition: {x:12,y:20}` trong tauri.conf.json TỰ đặt vị
+          trí ba nút đèn giao thông (yêu cầu titleBarStyle: "Overlay" +
+          decorations mặc định true) — không còn phải đoán theo phiên bản
+          macOS như trước. `pl-[…px]` ở đây là khoảng cách từ mép trái tới
+          logo; x=12 + bề rộng cụm nút (~54px) mới chỉ đủ SÁT, không đủ
+          THOÁNG — 78px ban đầu vẫn dính, tăng lên 96px. */}
       {showMacOverlayChrome && (
         <div
-          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[78px] pr-3"
+          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[96px] pr-3"
           data-tauri-drag-region="deep"
         >
           <div className="flex min-w-0 items-center gap-3">
