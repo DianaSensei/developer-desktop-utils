@@ -6,6 +6,7 @@
 // build the `Authorization` header from the stored connection profile. This is a
 // desktop-only tool (the web build has no Tauri host to proxy through).
 
+import { isTauri } from '@/lib/platform';
 import type {
   RabbitConnection,
   Overview,
@@ -18,7 +19,6 @@ import type {
   ChannelRow,
 } from './types';
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 async function httpFetch(input: string, init?: RequestInit): Promise<Response> {
   if (isTauri) {

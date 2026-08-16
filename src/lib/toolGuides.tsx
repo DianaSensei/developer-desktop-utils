@@ -4,13 +4,13 @@ import {
   Play, Filter, FileCode2, Ban, ListChecks, Lightbulb, AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MOD_KEY } from '@/lib/platform';
 
 // Per-tool "how to use" guides shown by the header help (?) button. Tools listed
 // here get a hand-written guide; any tool not listed falls back to a generic
 // guide built from its description plus the shared tool conventions.
 
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
-const mod = isMac ? '⌘' : 'Ctrl';
+const mod = MOD_KEY;
 
 export function GuideSection({
   icon: Icon, title, tone, children,

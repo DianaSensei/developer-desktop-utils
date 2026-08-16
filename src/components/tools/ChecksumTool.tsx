@@ -4,6 +4,7 @@ import { Upload, X, CheckCircle, XCircle } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/utils';
+import { isTauri } from '@/lib/platform';
 
 const ALGORITHMS = [
   { label: 'MD5',     id: 'md5'    },
@@ -16,8 +17,6 @@ type AlgoId = (typeof ALGORITHMS)[number]['id'];
 type Status  = 'idle' | 'hashing' | 'done' | 'error';
 
 interface FileInfo { name: string; size: number }
-
-const isTauri = '__TAURI_INTERNALS__' in window;
 
 function formatBytes(n: number) {
   if (n === 0) return '0 B';

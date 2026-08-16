@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { DatePicker } from '@/components/ui/date-picker';
 import { TimePicker } from '@/components/ui/time-picker';
 import { cn } from '@/lib/utils';
+import { IS_MAC } from '@/lib/platform';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { useClockify, type TimeEntry } from './store';
 import { ColorDot, ConfirmButton, DurationInput, Popover, ProjectPicker, TagPicker, TimeStepperField } from './ui';
@@ -35,7 +36,6 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: 'range', label: 'Range' },
 ];
 
-const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const TOGGLE_HINT = IS_MAC ? '⌘↵' : 'Ctrl+↵';
 
 /** Inclusive window filter. A null bound means "open" on that side. */

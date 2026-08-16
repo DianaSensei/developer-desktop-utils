@@ -7,6 +7,7 @@ import {
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
   RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette,
 } from 'lucide-react';
+import { isTauri } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
 import { Segmented } from '@/components/ui/segmented';
 import { SettingRow, SettingGroup } from '@/components/ui/setting-row';
@@ -192,7 +193,6 @@ const ACCENT_PREVIEW: Record<AccentTone, CSSProperties> = {
   amber: { background: 'hsl(34 78% 44%)' },
 };
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function GitHubIcon({ className }: { className?: string }) {
   return (

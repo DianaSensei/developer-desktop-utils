@@ -7,10 +7,10 @@
 // requests. So we register a single listener for the app's lifetime and buffer
 // entries here; components subscribe via `useSyncExternalStore`.
 
+import { isTauri } from '@/lib/platform';
 import { type RequestLogEntry } from './types';
 
 const LOG_CAP = 500;
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 let entries: RequestLogEntry[] = [];
 const subscribers = new Set<() => void>();

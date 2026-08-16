@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-
-const isTauri = '__TAURI_INTERNALS__' in window;
+import { isTauri } from '@/lib/platform';
 
 interface DragDropPayload {
   type: 'enter' | 'over' | 'drop' | 'leave';

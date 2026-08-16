@@ -16,6 +16,7 @@ import { Callout } from '@/components/ui/callout';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Stat, StatGrid } from '@/components/ui/stat';
 import { cn } from '@/lib/utils';
+import { isTauri } from '@/lib/platform';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import {
@@ -65,7 +66,7 @@ const VIEWS_BY_CATEGORY: Record<Category, View[]> =
 // returns you to where you were rather than always its first view.
 const LAST_VIEW: Record<Category, View> = { dns: 'dns', ip: 'myip', machine: 'local' };
 
-const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+const IS_TAURI = isTauri;
 
 // ─── session store ──────────────────────────────────────────────────────────
 // Inputs + results live in a module-level object, not localStorage. This keeps

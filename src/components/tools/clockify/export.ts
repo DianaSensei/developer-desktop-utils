@@ -1,10 +1,10 @@
 // Export time entries to CSV / JSON. Works in both the Tauri desktop app
 // (native save dialog + fs plugin) and the web build (Blob download).
 
+import { isTauri } from '@/lib/platform';
 import type { Project, Tag, TimeEntry } from './store';
 import { fmtHM, pad, timeOfDay, toDateInput, weekdayShort } from './time';
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 const MS_HOUR = 3_600_000;
 

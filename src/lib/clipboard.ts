@@ -1,5 +1,7 @@
+import { isTauri } from '@/lib/platform';
+
 export async function copyToClipboard(text: string): Promise<void> {
-  if (isTauri()) {
+  if (isTauri) {
     const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
     await writeText(text);
   } else {
@@ -17,7 +19,7 @@ export async function copyToClipboard(text: string): Promise<void> {
  */
 export async function readTextFromClipboard(): Promise<string | null> {
   try {
-    if (isTauri()) {
+    if (isTauri) {
       const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
       const text = await readText();
       return text || null;
@@ -27,10 +29,6 @@ export async function readTextFromClipboard(): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
 // ── Image clipboard ──────────────────────────────────────────────────────────
@@ -91,7 +89,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 /** Copy an image (Blob or data/blob URL) to the system clipboard. */
 export async function copyImageToClipboard(source: Blob | string): Promise<void> {
   const blob = await blobFromSource(source);
-  if (isTauri()) {
+  if (isTauri) {
     const { writeImage } = await import('@tauri-apps/plugin-clipboard-manager');
     const { Image } = await import('@tauri-apps/api/image');
     const { data, width, height } = await rgbaFromBlob(blob);
@@ -108,7 +106,7 @@ export async function copyImageToClipboard(source: Blob | string): Promise<void>
  * when the clipboard holds no image (or access was denied).
  */
 export async function readImageFromClipboard(): Promise<string | null> {
-  if (isTauri()) {
+  if (isTauri) {
     try {
       const { readImage } = await import('@tauri-apps/plugin-clipboard-manager');
       const image = await readImage();

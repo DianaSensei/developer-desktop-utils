@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { defaultConfig, type MockConfig, type MockStatus, type ScriptResult, type Stub } from './types';
 import { clearRequestLog, getRequestLog, subscribeRequestLog } from './requestLogStore';
-
-export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+import { isTauri } from '@/lib/platform';
+export { isTauri };
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');

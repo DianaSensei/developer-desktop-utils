@@ -12,12 +12,11 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-
-/** macOS dùng ⌘, còn lại dùng Ctrl. Đọc một lần lúc nạp module. */
-export const IS_MAC =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '');
-
-export const MOD_KEY = IS_MAC ? '⌘' : 'Ctrl';
+// Re-export để không phải sửa hai chỗ gọi cũ (App.tsx, design-system/index.ts)
+// — định nghĩa thật nay sống ở src/lib/platform.ts, nguồn dùng chung cho cả
+// app thay vì chỉ riêng Keycap.
+import { IS_MAC, MOD_KEY } from '@/lib/platform';
+export { IS_MAC, MOD_KEY };
 
 export interface KeycapProps extends React.HTMLAttributes<HTMLElement> {
   /** Chèn phím lệnh của hệ điều hành vào trước — `<Keycap mod>K</Keycap>` → ⌘K / CtrlK. */
