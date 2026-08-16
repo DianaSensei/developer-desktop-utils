@@ -155,7 +155,7 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
 }
 
 /**
- * Sáu swatch tròn cho tone chủ đạo — bản gọn của bộ chọn trong `design/preview/index.html`.
+ * Bốn swatch tròn cho tone chủ đạo — bản gọn của bộ chọn trong `design/preview/index.html`.
  * Chỉ đổi `--a-h/--a-s/--a-l`; mọi biến thể accent (nhuộm, viền, mực đậm) tự
  * tính lại qua CSS. Xem `design/tokens.css`.
  */
@@ -183,15 +183,13 @@ function AccentSwatches({ value, onChange, ariaLabel }: { value: AccentTone; onC
 }
 
 // Bản xem trước cần MÀU THẬT của từng tone, không phải biến --a-h hiện tại —
-// nếu không cả sáu nút sẽ cùng một màu (màu của tone đang chọn). Giá trị lấy
+// nếu không cả bốn nút sẽ cùng một màu (màu của tone đang chọn). Giá trị lấy
 // đúng từ các khối [data-accent] trong design/tokens.css.
 const ACCENT_PREVIEW: Record<AccentTone, CSSProperties> = {
   azure: { background: 'hsl(218 76% 48%)' },
-  petrol: { background: 'hsl(190 68% 36%)' },
-  moss: { background: 'hsl(96 40% 28%)' },
+  teal: { background: 'hsl(196 65% 32%)' },
   iris: { background: 'hsl(258 62% 56%)' },
-  oxblood: { background: 'hsl(355 38% 28%)' },
-  amber: { background: 'hsl(34 78% 44%)' },
+  amber: { background: 'hsl(34 78% 35%)' },
 };
 
 

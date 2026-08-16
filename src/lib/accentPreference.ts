@@ -1,7 +1,7 @@
 import { storageGet, storageSet } from '@/lib/persistentStore';
 
 /**
- * Tone chủ đạo — sáu preset khai báo trong `design/tokens.css` dưới dạng
+ * Tone chủ đạo — bốn preset khai báo trong `design/tokens.css` dưới dạng
  * `[data-accent="…"]`. Áp dụng bằng cách gán `document.documentElement.dataset.accent`;
  * biến `--a-h/--a-s/--a-l` (và mọi thứ dẫn xuất từ chúng) tự đổi theo qua CSS,
  * không cần JS tính toán màu.
@@ -9,9 +9,9 @@ import { storageGet, storageSet } from '@/lib/persistentStore';
  * Danh sách này PHẢI khớp đúng các khối `[data-accent="…"]` trong tokens.css —
  * `accentPreference.test.ts` đối chiếu cả hai để không lệch nhau.
  */
-export type AccentTone = 'azure' | 'petrol' | 'moss' | 'iris' | 'oxblood' | 'amber';
+export type AccentTone = 'azure' | 'teal' | 'iris' | 'amber';
 
-export const ACCENT_TONES: AccentTone[] = ['azure', 'petrol', 'moss', 'iris', 'oxblood', 'amber'];
+export const ACCENT_TONES: AccentTone[] = ['azure', 'teal', 'iris', 'amber'];
 
 const ACCENT_KEY = 'devtool-accent';
 const DEFAULT_ACCENT: AccentTone = 'azure';

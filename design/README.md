@@ -41,7 +41,7 @@ open design/preview/index.html          # macOS
 
 Ba nút trên thanh đầu trang **chạy thật**, không phải ảnh chụp:
 
-1. **6 tone** — đổi swatch, cả trang đổi theo kể cả xám nền, đường kẻ và bóng đổ.
+1. **4 tone** — đổi swatch, cả trang đổi theo kể cả xám nền, đường kẻ và bóng đổ.
    Nhưng **không chip trạng thái nào đổi màu**. Đó là phép thử của cả hệ.
 2. **Sáng / Tối**
 3. **VI / EN** — tiếng Việt dài hơn tiếng Anh ~25%; đây là bài kiểm tra layout.

@@ -25,8 +25,8 @@ describe('getAccentPreference / setAccentPreference', () => {
   });
 
   it('lưu rồi đọc lại đúng giá trị', () => {
-    setAccentPreference('oxblood');
-    expect(getAccentPreference()).toBe('oxblood');
+    setAccentPreference('teal');
+    expect(getAccentPreference()).toBe('teal');
   });
 
   it('giá trị lưu hỏng (không thuộc ACCENT_TONES) thì rơi về mặc định', () => {
