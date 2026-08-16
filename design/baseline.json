@@ -1,10 +1,10 @@
 {
   "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
   "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
-  "_phase": "Hạ ở G5a.1 — premiumUtilities về 0 (xoá bí danh shadow-*-premium, đổi tên header/sidebar-premium → header/sidebar-chrome).",
+  "_phase": "Hạ ở G5a.2 — tinyText về 0 (mọi text-[Npx] N<11 bump lên text-[11px]).",
   "limits": {
     "rawColors": 0,
-    "tinyText": 30,
+    "tinyText": 0,
     "mixedControlHeights": 349,
     "premiumUtilities": 0,
     "hoverLift": 0,

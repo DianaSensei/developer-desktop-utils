@@ -222,7 +222,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   // Tab definitions (only the relevant ones for the current response state).
   const tabDefs: TabDef[] = [
     { id: 'body', label: 'Response' },
-    ...(response ? [{ id: 'headers', label: 'Headers', badge: <span className="text-[9px] text-muted-foreground">{response.headers.length}</span> }] : []),
+    ...(response ? [{ id: 'headers', label: 'Headers', badge: <span className="text-[11px] text-muted-foreground">{response.headers.length}</span> }] : []),
     ...(response ? [{ id: 'timeline', label: 'Timeline' }] : []),
     {
       id: 'tests', label: 'Tests',
@@ -232,7 +232,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         </span>
       ) : undefined,
     },
-    { id: 'console', label: 'Console', badge: logs.length > 0 ? <span className="text-[9px] text-muted-foreground">{logs.length}</span> : undefined },
+    { id: 'console', label: 'Console', badge: logs.length > 0 ? <span className="text-[11px] text-muted-foreground">{logs.length}</span> : undefined },
   ];
   // The active tab may vanish when a run ends without a response (Headers /
   // Timeline only exist alongside one) — fall back rather than render nothing.

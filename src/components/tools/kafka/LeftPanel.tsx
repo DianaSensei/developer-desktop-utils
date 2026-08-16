@@ -159,7 +159,7 @@ export function LeftPanel({
               Consume
             </button>
             {activeConsumers.length > 0 && (
-              <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">{activeConsumers.length}</span>
+              <span className="text-[11px] tabular-nums text-muted-foreground shrink-0">{activeConsumers.length}</span>
             )}
             <button
               type="button"
@@ -182,7 +182,7 @@ export function LeftPanel({
               >
                 {s.topic}
               </button>
-              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0" title={`${s.received.toLocaleString()} received`}>{s.received.toLocaleString()}</span>
+              <span className="text-[11px] text-muted-foreground tabular-nums shrink-0" title={`${s.received.toLocaleString()} received`}>{s.received.toLocaleString()}</span>
               <button
                 className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Stop consumer"

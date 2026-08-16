@@ -139,7 +139,7 @@ DropdownMenuItem.displayName = 'DropdownMenuItem';
 /** Small uppercase group heading inside the menu (e.g. a body-type category). */
 export function DropdownMenuLabel({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
-    <p className={cn('px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground', className)}>
+    <p className={cn('px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground', className)}>
       {children}
     </p>
   );

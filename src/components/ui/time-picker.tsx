@@ -45,7 +45,7 @@ function Column({
 }) {
   return (
     <div className={cn('flex flex-col items-center', fill && 'min-h-0 flex-1')} onWheel={(e) => { e.preventDefault(); onStep(e.deltaY > 0 ? 1 : -1); }}>
-      <span className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
       <button type="button" onClick={() => onStep(-1)} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Previous ${label}`}>
         <ChevronUp className="h-4 w-4" />
       </button>

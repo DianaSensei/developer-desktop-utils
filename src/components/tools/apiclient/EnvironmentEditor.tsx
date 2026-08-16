@@ -121,7 +121,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             {selection?.kind === 'collectionVars' && activeCollection ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                     {activeCollection.name}
                   </span>
                   <span className="text-sm font-medium">Collection Variables</span>
@@ -141,7 +141,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             ) : selected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                     {selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
                   </span>
                   <Input

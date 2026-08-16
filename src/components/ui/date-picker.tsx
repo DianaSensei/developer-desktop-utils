@@ -103,7 +103,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
       {/* Weekday header */}
       <div className="grid grid-cols-7 gap-0.5">
         {WEEKDAYS.map((w) => (
-          <div key={w} className="py-1 text-center text-[10px] font-medium text-muted-foreground">{w}</div>
+          <div key={w} className="py-1 text-center text-[11px] font-medium text-muted-foreground">{w}</div>
         ))}
       </div>
 
