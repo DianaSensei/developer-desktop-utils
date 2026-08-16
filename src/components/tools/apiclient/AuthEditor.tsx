@@ -47,7 +47,7 @@ function AuthField({ label, value, onValue, placeholder, vars, masked }: {
       <Label className="text-xs">{label}</Label>
       {vars ? (
         <div
-          className="flex h-8 items-center gap-1 rounded-md border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40"
+          className="flex h-ctl items-center gap-1 rounded-md border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         >
@@ -66,7 +66,7 @@ function AuthField({ label, value, onValue, placeholder, vars, masked }: {
           )}
         </div>
       ) : (
-        <Input className="h-8 font-mono text-xs" spellCheck={false} value={value} onChange={(e) => onValue(e.target.value)} placeholder={placeholder} />
+        <Input className="h-ctl font-mono text-xs" spellCheck={false} value={value} onChange={(e) => onValue(e.target.value)} placeholder={placeholder} />
       )}
     </div>
   );
@@ -93,7 +93,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
   return (
     <div className="max-w-lg space-y-3">
       <Select value={auth.type} onValueChange={(v) => set({ type: v as AuthType })}>
-        <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
+        <SelectTrigger className="h-ctl w-48 text-xs"><SelectValue /></SelectTrigger>
         <SelectContent>
           {types.map((a) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
         </SelectContent>
@@ -111,7 +111,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
           <AuthField vars={vars} label="Username" value={auth.username} onValue={(v) => set({ username: v })} placeholder="Username or {{var}}" />
           <div className="space-y-1.5">
             <Label className="text-xs">Password</Label>
-            <Input type="password" value={auth.password} onChange={(e) => set({ password: e.target.value })} className="h-8 text-xs" placeholder="Password or {{var}}" />
+            <Input type="password" value={auth.password} onChange={(e) => set({ password: e.target.value })} className="h-ctl text-xs" placeholder="Password or {{var}}" />
           </div>
           {auth.type === 'digest' && (
             <p className="text-[11px] text-muted-foreground">The server's 401 challenge is answered automatically with an MD5 Digest response.</p>
@@ -126,7 +126,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
           <div className="space-y-1.5">
             <Label className="text-xs">Add to</Label>
             <Select value={auth.apiKey.placement} onValueChange={(v) => setApiKey({ placement: v as ApiKeyAuth['placement'] })}>
-              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-40 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="header">Header</SelectItem>
                 <SelectItem value="query">Query Param</SelectItem>
@@ -141,7 +141,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
           <div className="space-y-1.5">
             <Label className="text-xs">Grant Type</Label>
             <Select value={auth.oauth2.grantType} onValueChange={(v) => setOAuth({ grantType: v as OAuth2Auth['grantType'] })}>
-              <SelectTrigger className="h-8 w-52 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-52 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="client_credentials">Client Credentials</SelectItem>
                 <SelectItem value="password">Password</SelectItem>
@@ -167,7 +167,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 shrink-0 gap-1.5 text-[11px]"
+              className="h-ctl shrink-0 gap-1.5 text-[11px]"
               onClick={forgetToken}
             >
               {tokenCleared ? <Check className="h-3 w-3 text-ok" /> : <RotateCcw className="h-3 w-3" />}

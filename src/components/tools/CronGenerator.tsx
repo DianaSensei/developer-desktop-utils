@@ -620,7 +620,7 @@ export function CronGenerator() {
           <button
             type="button"
             aria-label={`${mode} cron rule`}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
           >
             <HelpCircle className="h-4 w-4" />
           </button>
@@ -644,17 +644,17 @@ export function CronGenerator() {
               value={expression}
               onChange={(event) => updateExpression(event.target.value)}
               placeholder={mode === 'linux' ? '*/5 * * * *' : '0 */5 * ? * *'}
-              className="font-mono h-8 rounded-sm border-b border-border"
+              className="font-mono h-ctl-lg rounded-sm border-b border-border"
             />
             <CopyButton
               value={() => normalizeExpression(expression)}
               variant="outline"
               size="sm"
               title="Copy expression"
-              className="h-8 px-2"
+              className="h-ctl px-2"
               iconClassName="h-4 w-4"
             />
-            <Button onClick={reset} size="sm" variant="ghost" title="Reset" className="h-8 px-2">
+            <Button onClick={reset} size="sm" variant="ghost" title="Reset" className="h-ctl px-2">
               <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
@@ -678,7 +678,7 @@ export function CronGenerator() {
                     onChange={(event) => updateField(rule.key, event.target.value)}
                     placeholder={rule.optional ? 'optional' : '*'}
                     className={cn(
-                      'h-8 min-w-0 flex-1 font-mono',
+                      'h-ctl min-w-0 flex-1 font-mono',
                       fieldErrors.length > 0 && 'border-destructive'
                     )}
                   />
@@ -689,7 +689,7 @@ export function CronGenerator() {
                     <SelectTrigger
                       aria-label={`${rule.label} suggestions`}
                       title="Suggestions"
-                      className="group relative h-8 w-9 flex-none justify-center rounded-sm px-0 text-muted-foreground hover:text-foreground [&>span]:hidden [&>svg:last-child]:hidden"
+                      className="group relative h-ctl w-9 flex-none justify-center rounded-sm px-0 text-muted-foreground hover:text-foreground [&>span]:hidden [&>svg:last-child]:hidden"
                     >
                       <Lightbulb className="h-4 w-4" />
                       <SelectValue className="sr-only" placeholder="Suggestions" />
@@ -718,7 +718,7 @@ export function CronGenerator() {
           <Label>Presets</Label>
           <div className="flex flex-wrap gap-1.5">
             {PRESETS[mode].map((preset) => (
-              <Button key={preset.value} variant="outline" size="sm" onClick={() => applyPreset(preset.value)} className="h-8 text-xs">
+              <Button key={preset.value} variant="outline" size="sm" onClick={() => applyPreset(preset.value)} className="h-ctl text-xs">
                 {preset.label}
               </Button>
             ))}

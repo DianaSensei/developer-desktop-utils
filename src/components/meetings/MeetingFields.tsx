@@ -62,17 +62,17 @@ export function MeetingFields({
 
         {/* When — one tidy row */}
         <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-2">
-          <DatePicker value={dateISO} onChange={setDate} className="h-8" />
-          <TimePicker value={toHM(meeting.start)} onChange={setStartTime} className="h-8 w-[86px]" />
+          <DatePicker value={dateISO} onChange={setDate} className="h-ctl" />
+          <TimePicker value={toHM(meeting.start)} onChange={setStartTime} className="h-ctl w-[86px]" />
           <span className="text-muted-foreground">–</span>
-          <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-8 w-[86px]" />
+          <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-ctl w-[86px]" />
           <span className="ml-auto rounded-md bg-foreground/5 px-2 py-1 text-xs font-medium tabular-nums text-muted-foreground">{duration}</span>
         </div>
 
         {/* Participants — single line */}
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5 text-xs"><Users className="h-3.5 w-3.5 text-muted-foreground" /> Participants</Label>
-          <Input value={meeting.participants} onChange={(e) => onChange({ participants: e.target.value })} placeholder="Alice, Bob, Carol" className="h-9 text-sm" />
+          <Input value={meeting.participants} onChange={(e) => onChange({ participants: e.target.value })} placeholder="Alice, Bob, Carol" className="h-ctl text-sm" />
         </div>
 
         {/* Notes — icon-headed, auto-growing so empty sections stay compact */}
@@ -103,16 +103,16 @@ export function MeetingFields({
       {/* Meta bar — when / who in one compact card */}
       <div className="flex flex-wrap items-end gap-x-5 gap-y-3 rounded-lg border bg-muted/20 p-3.5">
         <MetaField label="Date">
-          <DatePicker value={dateISO} onChange={setDate} className="h-9 w-[150px]" />
+          <DatePicker value={dateISO} onChange={setDate} className="h-ctl w-[150px]" />
         </MetaField>
         <MetaField label="Start">
-          <TimePicker value={toHM(meeting.start)} onChange={setStartTime} className="h-9 w-[94px]" />
+          <TimePicker value={toHM(meeting.start)} onChange={setStartTime} className="h-ctl w-[94px]" />
         </MetaField>
         <MetaField label="End">
-          <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-9 w-[94px]" />
+          <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-ctl w-[94px]" />
         </MetaField>
         <MetaField label="Duration">
-          <div className="flex h-9 items-center rounded-md bg-foreground/5 px-3 text-sm font-semibold tabular-nums">{duration}</div>
+          <div className="flex h-ctl items-center rounded-md bg-foreground/5 px-3 text-sm font-semibold tabular-nums">{duration}</div>
         </MetaField>
         <div className="min-w-[200px] flex-1">
           <MetaField label="Participants" icon={Users}>
@@ -120,7 +120,7 @@ export function MeetingFields({
               value={meeting.participants}
               onChange={(e) => onChange({ participants: e.target.value })}
               placeholder="Alice, Bob, Carol"
-              className="h-9 text-sm"
+              className="h-ctl text-sm"
             />
           </MetaField>
         </div>

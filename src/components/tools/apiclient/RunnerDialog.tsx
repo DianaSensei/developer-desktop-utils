@@ -428,7 +428,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
               <Button
                 variant="ghost" size="sm"
                 onClick={() => setPhase('setup')}
-                className="ml-auto h-7 shrink-0 gap-1.5 text-xs"
+                className="ml-auto h-ctl shrink-0 gap-1.5 text-xs"
               >
                 <Settings2 className="h-3.5 w-3.5" /> Configure
               </Button>
@@ -449,11 +449,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       onChange={(e) => setIterations(e.target.value)}
                       disabled={!!dataFile}
                       inputMode="numeric"
-                      className="h-8 text-xs disabled:opacity-60"
+                      className="h-ctl text-xs disabled:opacity-60"
                     />
                   </Field>
                   <Field label="Delay (ms)">
-                    <Input value={delay} onChange={(e) => setDelay(e.target.value)} placeholder="0" inputMode="numeric" className="h-8 text-xs" />
+                    <Input value={delay} onChange={(e) => setDelay(e.target.value)} placeholder="0" inputMode="numeric" className="h-ctl text-xs" />
                   </Field>
                 </div>
 
@@ -519,10 +519,10 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
 
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Include tags">
-                    <Input value={includeTags} onChange={(e) => setIncludeTags(e.target.value)} placeholder="smoke" className="h-8 text-xs" />
+                    <Input value={includeTags} onChange={(e) => setIncludeTags(e.target.value)} placeholder="smoke" className="h-ctl text-xs" />
                   </Field>
                   <Field label="Exclude tags">
-                    <Input value={excludeTags} onChange={(e) => setExcludeTags(e.target.value)} placeholder="slow" className="h-8 text-xs" />
+                    <Input value={excludeTags} onChange={(e) => setExcludeTags(e.target.value)} placeholder="slow" className="h-ctl text-xs" />
                   </Field>
                 </div>
               </div>
@@ -580,7 +580,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
 
             {/* action bar */}
             <div className="flex shrink-0 items-center gap-3 border-t px-4 py-3">
-              <Button onClick={run} disabled={plannedCount === 0} className="h-9 gap-1.5 px-4">
+              <Button onClick={run} disabled={plannedCount === 0} className="h-ctl-lg gap-1.5 px-4">
                 <Play className="h-4 w-4" /> Run {plannedCount} request{plannedCount === 1 ? '' : 's'}
               </Button>
               <span className="text-xs text-muted-foreground">
@@ -605,7 +605,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
               <RunStat label="Data" value={formatBytes(stats.totalBytes)} />
               <div className="ml-auto flex items-center gap-2">
                 {running ? (
-                  <Button onClick={stop} variant="destructive" size="sm" className="h-8 gap-1.5">
+                  <Button onClick={stop} variant="destructive" size="sm" className="h-ctl gap-1.5">
                     <Square className="h-3.5 w-3.5" /> Stop
                   </Button>
                 ) : (
@@ -614,11 +614,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       onClick={exportResults}
                       disabled={totalRun === 0}
                       variant="outline" size="sm"
-                      className="h-8 gap-1.5 text-xs"
+                      className="h-ctl gap-1.5 text-xs"
                     >
                       <Download className="h-3.5 w-3.5" /> Export
                     </Button>
-                    <Button onClick={run} size="sm" className="h-8 gap-1.5">
+                    <Button onClick={run} size="sm" className="h-ctl gap-1.5">
                       <RotateCcw className="h-3.5 w-3.5" /> Run again
                     </Button>
                   </>

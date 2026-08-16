@@ -350,8 +350,8 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
               <div>
                 <Label className="text-xs">Correlation ID</Label>
                 <div className="mt-1 flex gap-1">
-                  <Input value={correlationId} onChange={(e) => { setCorrelationId(e.target.value); reset(); }} placeholder="(auto)" className="font-mono text-xs h-8" />
-                  <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Generate" onClick={() => { setCorrelationId(crypto.randomUUID()); reset(); }}>
+                  <Input value={correlationId} onChange={(e) => { setCorrelationId(e.target.value); reset(); }} placeholder="(auto)" className="font-mono text-xs h-ctl" />
+                  <Button type="button" variant="outline" size="icon" className="h-ctl w-ctl shrink-0" title="Generate" onClick={() => { setCorrelationId(crypto.randomUUID()); reset(); }}>
                     <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -384,7 +384,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Timer className="h-3.5 w-3.5" />
                 timeout
-                <Input type="number" min={100} value={timeoutMs} onChange={(e) => setTimeoutMs(Math.max(100, Number(e.target.value)))} className="h-7 w-20 font-mono text-xs" />
+                <Input type="number" min={100} value={timeoutMs} onChange={(e) => setTimeoutMs(Math.max(100, Number(e.target.value)))} className="h-ctl w-20 font-mono text-xs" />
                 ms
               </div>
             )}
@@ -471,7 +471,7 @@ function Field({ label, value, onChange, reset, placeholder }: {
   return (
     <div>
       <Label className="text-xs">{label}</Label>
-      <Input value={value} onChange={(e) => { onChange(e.target.value); reset(); }} placeholder={placeholder} className="mt-1 font-mono text-xs h-8" />
+      <Input value={value} onChange={(e) => { onChange(e.target.value); reset(); }} placeholder={placeholder} className="mt-1 font-mono text-xs h-ctl" />
     </div>
   );
 }
@@ -539,7 +539,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
         onBlur={() => { blurTimer.current = setTimeout(() => setOpen(false), 120); }}
         onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
         placeholder={isDefault ? 'queue name' : 'e.g. orders.created'}
-        className="font-mono text-sm h-9"
+        className="font-mono text-sm h-ctl"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">
@@ -591,7 +591,7 @@ function ExchangeCombobox({ connId, value, exchanges, onChange }: {
         onBlur={() => { blurTimer.current = setTimeout(() => setOpen(false), 120); }}
         onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
         placeholder="(default exchange) — type to search"
-        className="font-mono text-sm h-9"
+        className="font-mono text-sm h-ctl"
       />
       {open && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">

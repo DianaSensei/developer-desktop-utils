@@ -127,7 +127,7 @@ export function PasswordHash() {
             {/* Algorithm + params */}
             <div className="flex flex-wrap items-center gap-3">
               <Select value={algo} onValueChange={(v) => setAlgo(v as Algo)}>
-                <SelectTrigger className="h-8 w-40 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-ctl w-40 text-xs rounded-lg"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {ALGOS.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
                 </SelectContent>
@@ -136,21 +136,21 @@ export function PasswordHash() {
               {algo === 'bcrypt' ? (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">Cost</span>
-                  <Input type="number" min={4} max={20} value={cost} onChange={(e) => setCost(parseInt(e.target.value) || 10)} className="h-8 w-20 text-xs rounded-lg" />
+                  <Input type="number" min={4} max={20} value={cost} onChange={(e) => setCost(parseInt(e.target.value) || 10)} className="h-ctl w-20 text-xs rounded-lg" />
                 </div>
               ) : (
                 <>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-muted-foreground">Memory (KiB)</span>
-                    <Input type="number" min={8} value={memory} onChange={(e) => setMemory(parseInt(e.target.value) || 8)} className="h-8 w-24 text-xs rounded-lg" />
+                    <Input type="number" min={8} value={memory} onChange={(e) => setMemory(parseInt(e.target.value) || 8)} className="h-ctl w-24 text-xs rounded-lg" />
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-muted-foreground">Iterations</span>
-                    <Input type="number" min={1} value={iterations} onChange={(e) => setIterations(parseInt(e.target.value) || 1)} className="h-8 w-20 text-xs rounded-lg" />
+                    <Input type="number" min={1} value={iterations} onChange={(e) => setIterations(parseInt(e.target.value) || 1)} className="h-ctl w-20 text-xs rounded-lg" />
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-muted-foreground">Parallelism</span>
-                    <Input type="number" min={1} value={parallelism} onChange={(e) => setParallelism(parseInt(e.target.value) || 1)} className="h-8 w-20 text-xs rounded-lg" />
+                    <Input type="number" min={1} value={parallelism} onChange={(e) => setParallelism(parseInt(e.target.value) || 1)} className="h-ctl w-20 text-xs rounded-lg" />
                   </div>
                 </>
               )}
@@ -165,7 +165,7 @@ export function PasswordHash() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter a password to hash…"
-                  className="h-9 pr-9 font-mono text-sm"
+                  className="h-ctl-lg pr-9 font-mono text-sm"
                   onKeyDown={(e) => { if (e.key === 'Enter' && password) void runHash(); }}
                 />
                 <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -205,7 +205,7 @@ export function PasswordHash() {
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setVerifyResult(null); }}
                   placeholder="Enter the password…"
-                  className="h-9 pr-9 font-mono text-sm"
+                  className="h-ctl-lg pr-9 font-mono text-sm"
                 />
                 <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -220,7 +220,7 @@ export function PasswordHash() {
                 value={verifyHash}
                 onChange={(e) => { setVerifyHash(e.target.value); setVerifyResult(null); }}
                 placeholder="$2b$10$… or $argon2id$v=19$…"
-                className="h-9 font-mono text-xs"
+                className="h-ctl font-mono text-xs"
               />
             </ToolSection>
 

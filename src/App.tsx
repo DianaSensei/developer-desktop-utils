@@ -514,7 +514,7 @@ function Sidebar({
                 DevTool
               </h1>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 lg:hidden" onClick={onClose} title="Close menu">
+            <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0 lg:hidden" onClick={onClose} title="Close menu">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -526,7 +526,7 @@ function Sidebar({
             <button
               onClick={() => { pendingSearchFocus.current = true; onToggleCollapse(); }}
               title="Search tools"
-              className="flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="flex items-center justify-center h-ctl w-ctl rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
             </button>
@@ -540,7 +540,7 @@ function Sidebar({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('shell.search.placeholder')}
-                className="h-7 pl-7 pr-7 text-xs rounded-md bg-muted/40 border-muted focus-visible:ring-1"
+                className="h-ctl pl-7 pr-7 text-xs rounded-md bg-muted/40 border-muted focus-visible:ring-1"
               />
               {query && (
                 <button
@@ -929,7 +929,7 @@ function AppContent() {
               lệch bậc. py-2.5 trước đó ra 54px, lệch 4px so với sidebar. */}
           <div className="flex items-center justify-between px-4 py-2 sm:px-5">
             <div className="flex items-center gap-2.5">
-              <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setSidebarOpen(true)}>
+              <Button variant="ghost" size="icon" className="lg:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)}>
                 <Menu className="h-4 w-4" />
               </Button>
               <div
@@ -1007,7 +1007,7 @@ function AppContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground/70 hover:text-foreground"
+                className="h-ctl w-ctl text-muted-foreground/70 hover:text-foreground"
                 onClick={openGuideManually}
                 title={`How to use ${activeTool.label}`}
                 aria-label={`How to use ${activeTool.label}`}
@@ -1017,7 +1017,7 @@ function AppContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-8 w-8"
+                className="lg:hidden h-ctl w-ctl"
                 onClick={() => changeTheme(NEXT_THEME[themePreference])}
                 title={`Theme: ${themePreference} (tap to cycle)`}
               >
