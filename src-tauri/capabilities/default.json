@@ -39,6 +39,7 @@
         { "url": "http://127.0.0.1:*/*" }
       ]
     },
-    "core:default"
+    "core:default",
+    "core:window:allow-start-dragging"
   ]
 }
