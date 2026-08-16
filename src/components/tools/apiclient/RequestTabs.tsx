@@ -98,7 +98,10 @@ export function RequestTabs({
       </div>
 
       {/* right cluster: environment · history · layout */}
-      <div className="flex shrink-0 items-center gap-1 border-l pl-2 pr-1.5 text-fg-mute">
+      {/* py-1.5 — hàng này dùng items-stretch nên chiều cao thực tế do phần tử cao
+          nhất quyết định; SelectTrigger cao đúng h-ctl (34px), không có py thì nó
+          CHÍNH LÀ chiều cao cả hàng, khiến pill chạm sát viền trên/dưới toolbar. */}
+      <div className="flex shrink-0 items-center gap-1 border-l py-1.5 pl-2 pr-1.5 text-fg-mute">
         {mismatchedEnv && (
           <span
             title={`"${mismatchedEnv.name}" belongs to another collection and is not applied here — its variables won't be substituted into this request. Pick an environment from this collection or Global, or switch back to that collection.`}
