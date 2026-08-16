@@ -2,11 +2,10 @@
    DevTool — lớp app của design system
    ----------------------------------------------------------------------------
    Giá trị KHÔNG nằm ở đây. Nguồn sự thật là `design/tokens.css` (CSS thuần,
-   dùng chung với trang mẫu `design/preview/index.html`). File này chỉ làm ba việc:
+   dùng chung với trang mẫu `design/preview/index.html`). File này chỉ làm hai việc:
 
      1. @import kit
-     2. BẮC CẦU từ vựng token cũ của app sang kênh của kit
-     3. Base reset + utility cần Tailwind xử lý (@layer / @apply)
+     2. Base reset + utility cần Tailwind xử lý (@layer / @apply)
 
    Muốn đổi màu, bo góc, chiều cao control → sửa `design/tokens.css`, không sửa đây.
 
@@ -16,52 +15,6 @@
 @import "../../design/tokens.css";
 
 @layer base {
-  /* ══════════════════════════════════════════════════════════════════════
-     BẮC CẦU — từ vựng cũ → kênh của kit
-     ----------------------------------------------------------------------
-     App có ~2430 chỗ dùng các tên này (`bg-background`, `text-muted-foreground`,
-     `border-border`…). Đổi tên chúng trong một commit là viết lại cả app, nên
-     thay vào đó ta giữ nguyên TÊN và chỉ đổi GIÁ TRỊ bên dưới. Kết quả: 2430
-     chỗ không phải sửa một chữ nhưng nhận bảng màu mới.
-
-     Vì sao gán được: kit khai báo mỗi màu ở dạng KÊNH ("218 76% 48%"), đúng
-     dạng mà `hsl(var(--x) / <alpha-value>)` của preset cần — nên `bg-card/50`
-     vẫn chạy y như trước.
-
-     Đây là lớp TẠM. G4 di cư từng tool sang tên của kit (`bg-card` → `bg-card`,
-     `text-muted-foreground` → `text-fg-mute`…); G5 xoá hẳn khối này.
-     ══════════════════════════════════════════════════════════════════════ */
-  :root {
-    --background: var(--bg-c);
-    --sidebar: var(--chrome-c);
-    --card: var(--card-c);
-    --popover: var(--card-c);
-    --elevated: var(--chrome-c);
-
-    --foreground: var(--fg-c);
-    --card-foreground: var(--fg-c);
-    --popover-foreground: var(--fg-c);
-    --muted-foreground: var(--fg-mute-c);
-
-    /* App dùng chung một azure cho cả primary / accent / ring — kit gọi nó là accent. */
-    --primary: var(--acc-c);
-    --accent: var(--acc-c);
-    --ring: var(--acc-c);
-    --accent-glow: var(--acc-c);
-    --primary-foreground: var(--acc-fg-c);
-    --accent-foreground: var(--acc-fg-c);
-
-    --secondary: var(--bg-2-c);
-    --secondary-foreground: var(--fg-c);
-    --muted: var(--bg-2-c);
-    --input: var(--sunk-c);
-    --border: var(--line-c);
-
-    /* Lần đầu "lỗi" dùng đúng hệ trạng thái thay vì một đỏ rời rạc. */
-    --destructive: var(--bad-c);
-    --destructive-foreground: 0 0% 100%;
-  }
-
   /* ── Bảng màu cú pháp editor ────────────────────────────────────────────
      Hệ RIÊNG, không thuộc kit và không theo accent: màu token trong SQL/JS
      mang nghĩa cú pháp, đổi tone không được làm keyword đổi màu. Giữ nguyên. */
@@ -116,8 +69,6 @@
   }
 
   .dark {
-    --destructive-foreground: 0 0% 100%;
-
     --sql-keyword: hsl(214 100% 74%);
     --sql-string: hsl(130 55% 60%);
     --sql-comment: hsl(0 0% 50%);
@@ -140,7 +91,7 @@
   }
 
   ::selection {
-    @apply bg-primary/20;
+    @apply bg-acc/20;
   }
 
   /* Controlled light/dark color swap — added to <html> only during a toggle,
@@ -160,7 +111,7 @@
      and Linux (WebKitGTK). */
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
+    scrollbar-color: hsl(var(--fg-mute-c) / 0.4) transparent;
   }
   ::-webkit-scrollbar {
     width: 10px;
@@ -170,7 +121,7 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.35);
+    background-color: hsl(var(--fg-mute-c) / 0.35);
     border-radius: 9999px;
     border: 3px solid transparent;
     background-clip: padding-box;
@@ -179,10 +130,10 @@
     transition: background-color 0.2s ease, box-shadow 0.2s ease;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.55);
+    background-color: hsl(var(--fg-mute-c) / 0.55);
   }
   ::-webkit-scrollbar-thumb:active {
-    background-color: hsl(var(--muted-foreground) / 0.75);
+    background-color: hsl(var(--fg-mute-c) / 0.75);
   }
   ::-webkit-scrollbar-button {
     display: none;
@@ -241,7 +192,7 @@
      dưới con trỏ. */
   .hover-elevate {
     @apply transition-[box-shadow,border-color,background-color] duration-200 ease-out
-           hover:shadow hover:border-border/70
+           hover:shadow hover:border-line/70
            active:shadow-sm;
   }
   .press {
@@ -267,16 +218,16 @@
   .heading-lg { @apply text-lg font-semibold leading-snug tracking-tight; }
   .heading-md { @apply text-base font-semibold leading-relaxed tracking-tight; }
   .heading-sm { @apply text-sm font-semibold leading-relaxed; }
-  .heading-xs { @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground; }
+  .heading-xs { @apply text-xs font-semibold uppercase tracking-wider text-fg-mute; }
   .text-body { @apply text-sm leading-relaxed; }
-  .text-caption { @apply text-xs leading-relaxed text-muted-foreground; }
+  .text-caption { @apply text-xs leading-relaxed text-fg-mute; }
 
   /* ── App chrome ───────────────────────────────────────────────────── */
   .sidebar-chrome {
-    @apply glass-chrome glass-sheen border-r border-border/70;
+    @apply glass-chrome glass-sheen border-r border-line/70;
   }
   .header-chrome {
-    @apply glass-chrome border-b border-border/70;
+    @apply glass-chrome border-b border-line/70;
   }
   .content-wrapper {
     @apply mx-auto w-full max-w-7xl;

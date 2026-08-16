@@ -1,7 +1,7 @@
 {
   "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
   "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
-  "_phase": "Hạ ở G5a.5 — mixedControlHeights về 0 (mọi h-7/h-8/h-9 → h-ctl/h-ctl-lg, 3 đợt).",
+  "_phase": "G5 xong — cả 5 chỉ số về 0. Lớp bắc cầu từ vựng màu cũ đã xoá (G5b.4).",
   "limits": {
     "rawColors": 0,
     "tinyText": 0,
