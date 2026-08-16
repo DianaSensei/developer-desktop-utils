@@ -8,7 +8,7 @@ interface PropertiesTabProps {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <>
-      <span className="text-sm text-muted-foreground py-1.5">{label}</span>
+      <span className="text-sm text-fg-mute py-1.5">{label}</span>
       <span className="font-mono text-sm py-1.5 break-all">{value}</span>
     </>
   );
@@ -38,10 +38,10 @@ export function PropertiesTab({ details }: PropertiesTabProps) {
       <section>
         <SectionLabel as="h3" size="sm" className="mb-3 border-b pb-1">Messages</SectionLabel>
         <div className="grid gap-x-8 gap-y-0.5 items-start" style={{ gridTemplateColumns: '11rem 1fr' }}>
-          <span className="text-sm text-muted-foreground py-1.5">Total messages</span>
+          <span className="text-sm text-fg-mute py-1.5">Total messages</span>
           <span className="font-mono text-sm py-1.5">{totalMessages.toLocaleString()}</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-fg-mute mt-2">
           Computed from partition offsets (latest − earliest). May differ from actual message count if compaction or retention has run.
         </p>
       </section>
@@ -50,7 +50,7 @@ export function PropertiesTab({ details }: PropertiesTabProps) {
       <section>
         <SectionLabel as="h3" size="sm" className="mb-3 border-b pb-1">Partition Offsets</SectionLabel>
         <div className="rounded-lg border border-border overflow-hidden">
-          <div className="grid text-xs font-medium text-muted-foreground bg-muted/10 px-3 py-2 border-b border-border"
+          <div className="grid text-xs font-medium text-fg-mute bg-muted/10 px-3 py-2 border-b border-border"
             style={{ gridTemplateColumns: '3rem 1fr 1fr 1fr' }}>
             <span>ID</span>
             <span>Earliest</span>
@@ -68,8 +68,8 @@ export function PropertiesTab({ details }: PropertiesTabProps) {
                 style={{ gridTemplateColumns: '3rem 1fr 1fr 1fr' }}
               >
                 <span>{p.id}</span>
-                <span className="text-muted-foreground">{p.earliestOffset >= 0 ? p.earliestOffset.toLocaleString() : '—'}</span>
-                <span className="text-muted-foreground">{p.latestOffset >= 0 ? p.latestOffset.toLocaleString() : '—'}</span>
+                <span className="text-fg-mute">{p.earliestOffset >= 0 ? p.earliestOffset.toLocaleString() : '—'}</span>
+                <span className="text-fg-mute">{p.latestOffset >= 0 ? p.latestOffset.toLocaleString() : '—'}</span>
                 <span>{count >= 0 ? count.toLocaleString() : '—'}</span>
               </div>
             );

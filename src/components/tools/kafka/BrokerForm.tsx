@@ -59,12 +59,12 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
   // wrapper (an animating `transform` ancestor would offset a fixed child).
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-background border rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+      <div className="bg-bg border rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-semibold text-base">
             {form.id ? 'Edit Broker' : 'Add Broker'}
           </h2>
-          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground">
+          <button onClick={onCancel} className="text-fg-mute hover:text-fg">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -90,7 +90,7 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
               placeholder="localhost:9092"
               className="mt-1 font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground mt-1">Kafka broker ports only — not ZooKeeper (2181)</p>
+            <p className="text-xs text-fg-mute mt-1">Kafka broker ports only — not ZooKeeper (2181)</p>
           </div>
 
           <Callout tone="warning" size="sm" icon={Info}>

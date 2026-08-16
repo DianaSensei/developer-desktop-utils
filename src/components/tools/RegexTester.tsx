@@ -94,14 +94,14 @@ const PRESETS: Preset[] = [
 
 // Xoay vòng để hai match LIỀN KỀ không cùng màu — nếu cùng, không nhìn ra
 // ranh giới giữa chúng. Đây là mã hoá phân loại, dùng bảng --cat-* của kit
-// (xem design/tokens.css); chữ luôn là text-foreground nên tương phản không
+// (xem design/tokens.css); chữ luôn là text-fg nên tương phản không
 // phụ thuộc vào hue đang xoay tới đâu.
 const MATCH_COLORS = [
-  'bg-[hsl(var(--cat-1-c)/0.30)] text-foreground',
-  'bg-[hsl(var(--cat-2-c)/0.30)] text-foreground',
-  'bg-[hsl(var(--cat-3-c)/0.30)] text-foreground',
-  'bg-[hsl(var(--cat-4-c)/0.30)] text-foreground',
-  'bg-[hsl(var(--cat-5-c)/0.30)] text-foreground',
+  'bg-[hsl(var(--cat-1-c)/0.30)] text-fg',
+  'bg-[hsl(var(--cat-2-c)/0.30)] text-fg',
+  'bg-[hsl(var(--cat-3-c)/0.30)] text-fg',
+  'bg-[hsl(var(--cat-4-c)/0.30)] text-fg',
+  'bg-[hsl(var(--cat-5-c)/0.30)] text-fg',
 ];
 
 const RESULT_VIEWS: { id: ResultView; label: string }[] = [
@@ -275,14 +275,14 @@ export function RegexTester() {
       {/* Pattern + Flags row */}
       <div className="shrink-0 header-chrome px-4 py-2.5 space-y-2">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-muted-foreground select-none">/</span>
+          <span className="font-mono text-sm text-fg-mute select-none">/</span>
           <Input
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
             placeholder="[a-z]+"
             className={cn('flex-1 h-ctl font-mono text-sm rounded-lg', result.error && 'border-destructive')}
           />
-          <span className="font-mono text-sm text-muted-foreground select-none">/</span>
+          <span className="font-mono text-sm text-fg-mute select-none">/</span>
           <div className="inline-flex h-ctl rounded-lg border border-border bg-muted/50 p-0.5 gap-px">
             {FLAG_DEFS.map(({ flag, title }) => (
               <button
@@ -294,7 +294,7 @@ export function RegexTester() {
                   'w-6 rounded-md font-mono text-xs font-medium transition-all duration-150',
                   flags.includes(flag)
                     ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'text-fg-mute hover:text-fg'
                 )}
               >
                 {flag}
@@ -325,7 +325,7 @@ export function RegexTester() {
 
         {/* Active preset description — plain-language hint */}
         {activePreset && (
-          <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+          <p className="text-[11px] text-fg-mute/80 leading-relaxed">
             {activePreset.description} · click the chip again to reload sample text
           </p>
         )}
@@ -354,11 +354,11 @@ export function RegexTester() {
                 {/* Match count + coverage stats */}
                 <span className={cn(
                   'shrink-0 px-3 py-1.5 text-xs font-semibold whitespace-nowrap',
-                  result.matches.length > 0 ? 'text-ok' : 'text-muted-foreground'
+                  result.matches.length > 0 ? 'text-ok' : 'text-fg-mute'
                 )}>
                   {result.matches.length} match{result.matches.length !== 1 ? 'es' : ''}
                   {stats && stats.chars > 0 && (
-                    <span className="font-normal text-muted-foreground"> · {stats.chars} chars · {stats.pct}%</span>
+                    <span className="font-normal text-fg-mute"> · {stats.chars} chars · {stats.pct}%</span>
                   )}
                 </span>
                 {/* View tabs */}
@@ -371,8 +371,8 @@ export function RegexTester() {
                       className={cn(
                         'shrink-0 px-3 py-1.5 text-xs font-medium transition-colors border-b-2',
                         resultView === id
-                          ? 'text-foreground border-primary'
-                          : 'text-muted-foreground hover:text-foreground border-transparent'
+                          ? 'text-fg border-primary'
+                          : 'text-fg-mute hover:text-fg border-transparent'
                       )}
                     >
                       {label}
@@ -407,7 +407,7 @@ export function RegexTester() {
             {!result.error && resultView === 'matches' && (
               result.matches.length === 0 ? (
                 <div className="px-3 py-2.5 bg-muted/50 border border-border rounded-lg">
-                  <p className="text-sm text-muted-foreground">No matches found</p>
+                  <p className="text-sm text-fg-mute">No matches found</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -419,11 +419,11 @@ export function RegexTester() {
                             <span className="rounded-xs bg-acc-tint px-1.5 py-0.5 text-[11px] font-medium text-acc-ink">
                               #{idx + 1}
                             </span>
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-[11px] text-fg-mute">
                               pos {m.index}–{(m.index ?? 0) + m[0].length} · {m[0].length} char{m[0].length !== 1 ? 's' : ''}
                             </span>
                           </div>
-                          <p className="font-mono text-sm text-foreground break-all">&quot;{m[0]}&quot;</p>
+                          <p className="font-mono text-sm text-fg break-all">&quot;{m[0]}&quot;</p>
                         </div>
                         <CopyButton value={m[0]} className="h-6 w-6 shrink-0" iconClassName="h-3 w-3" />
                       </div>
@@ -433,10 +433,10 @@ export function RegexTester() {
                             const name = groupNames[gIdx];
                             return (
                               <div key={gIdx} className="flex items-center gap-2">
-                                <span className="shrink-0 rounded-xs bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                                <span className="shrink-0 rounded-xs bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-fg-mute">
                                   {name ? `<${name}>` : `Group ${gIdx + 1}`}
                                 </span>
-                                <span className="font-mono text-xs text-muted-foreground break-all">
+                                <span className="font-mono text-xs text-fg-mute break-all">
                                   {g !== undefined ? `"${g}"` : <span className="opacity-40">undefined</span>}
                                 </span>
                                 {g !== undefined && (
@@ -467,7 +467,7 @@ export function RegexTester() {
                 )}
                 <div className="font-mono text-sm whitespace-pre-wrap break-all leading-relaxed p-3 rounded-lg border border-border bg-muted/20 min-h-[80px]">
                   {highlightSegments.length === 0 && (
-                    <span className="text-muted-foreground/60">Enter a test string above</span>
+                    <span className="text-fg-mute/60">Enter a test string above</span>
                   )}
                   {highlightSegments.map((seg, idx) =>
                     seg.isMatch ? (
@@ -490,13 +490,13 @@ export function RegexTester() {
             {!result.error && resultView === 'extract' && (
               result.matches.length === 0 ? (
                 <div className="px-3 py-2.5 bg-muted/50 border border-border rounded-lg">
-                  <p className="text-sm text-muted-foreground">No matches to extract</p>
+                  <p className="text-sm text-fg-mute">No matches to extract</p>
                 </div>
               ) : !result.matches.some((m) => m.length > 1) ? (
                 <div className="space-y-3">
                   <div className="px-3 py-2.5 bg-muted/50 border border-border rounded-lg space-y-1">
-                    <p className="text-sm text-muted-foreground">No capturing groups — showing all matches.</p>
-                    <p className="text-[11px] text-muted-foreground/70">
+                    <p className="text-sm text-fg-mute">No capturing groups — showing all matches.</p>
+                    <p className="text-[11px] text-fg-mute/70">
                       Wrap parts of your pattern in <code className="font-mono">( )</code> to capture them as groups.
                     </p>
                   </div>
@@ -513,9 +513,9 @@ export function RegexTester() {
                     <Tbody zebra>
                       {result.matches.map((m, idx) => (
                         <Tr key={idx}>
-                          <Td className="text-muted-foreground">{idx + 1}</Td>
-                          <Td className="text-muted-foreground">{m.index}</Td>
-                          <Td className="text-muted-foreground">{m[0].length}</Td>
+                          <Td className="text-fg-mute">{idx + 1}</Td>
+                          <Td className="text-fg-mute">{m.index}</Td>
+                          <Td className="text-fg-mute">{m[0].length}</Td>
                           <Td className="max-w-[300px] truncate" title={m[0]}>{m[0]}</Td>
                         </Tr>
                       ))}
@@ -525,7 +525,7 @@ export function RegexTester() {
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-1">
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[11px] text-fg-mute">
                       {result.matches[0].length - 1} group{result.matches[0].length - 1 !== 1 ? 's' : ''} captured per match
                     </p>
                     <CopyButton
@@ -557,12 +557,12 @@ export function RegexTester() {
                     <Tbody zebra>
                       {result.matches.map((m, idx) => (
                         <Tr key={idx}>
-                          <Td className="text-muted-foreground">{idx + 1}</Td>
-                          <Td className="text-muted-foreground">{m.index}</Td>
+                          <Td className="text-fg-mute">{idx + 1}</Td>
+                          <Td className="text-fg-mute">{m.index}</Td>
                           <Td className="max-w-[180px] truncate" title={m[0]}>{m[0]}</Td>
                           {m.slice(1).map((g, gIdx) => (
                             <Td key={gIdx} className="max-w-[160px] truncate" title={g ?? ''}>
-                              {g !== undefined ? g : <span className="text-muted-foreground/40">—</span>}
+                              {g !== undefined ? g : <span className="text-fg-mute/40">—</span>}
                             </Td>
                           ))}
                         </Tr>
@@ -577,14 +577,14 @@ export function RegexTester() {
             {!result.error && resultView === 'replace' && (
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Replacement text</label>
+                  <label className="text-xs font-medium text-fg">Replacement text</label>
                   <Input
                     value={replacement}
                     onChange={(e) => setReplacement(e.target.value)}
                     placeholder="Type replacement text here, or leave empty to delete matches"
                     className="h-ctl font-mono text-sm rounded-lg"
                   />
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[11px] text-fg-mute">
                     Advanced: <code className="font-mono">$1</code>, <code className="font-mono">$2</code>… insert captured groups · <code className="font-mono">$&</code> inserts the whole match · <code className="font-mono">{'$<name>'}</code> for named groups
                   </p>
                 </div>
@@ -595,10 +595,10 @@ export function RegexTester() {
                 ) : (
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-medium text-foreground">
+                      <label className="text-xs font-medium text-fg">
                         Result
                         {replaceResult.output !== deferredTest && (
-                          <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                          <span className="ml-2 text-[11px] font-normal text-fg-mute">
                             {deferredTest.length} → {replaceResult.output.length} chars
                           </span>
                         )}

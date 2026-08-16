@@ -19,7 +19,7 @@
     text-size-adjust: 100%;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-bg text-fg;
     overflow: hidden;
     /* Mặt chữ đến từ token, không viết cứng ở đây — nhờ vậy trang so sánh font
        (/type-specimen) đổi được --sans lúc chạy. Fonts tự host, xem main.tsx. */
@@ -88,11 +88,11 @@
     background: hsl(var(--diff-added)) !important;
   }
   .diff-merge-view .cm-collapsedLines {
-    color: hsl(var(--muted-foreground)) !important;
+    color: hsl(var(--fg-mute-c)) !important;
     background: hsl(var(--muted) / 0.6) !important;
   }
   .diff-merge-view .cm-merge-revert button {
-    color: hsl(var(--muted-foreground));
+    color: hsl(var(--fg-mute-c));
     border-radius: 4px;
     transition: background-color 150ms, color 150ms;
   }

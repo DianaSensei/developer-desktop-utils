@@ -61,7 +61,7 @@ export function ContextMenu({ state, onClose, width = 220 }: ContextMenuProps) {
       />
       <div
         role="menu"
-        className="fixed z-[61] rounded-lg border border-border bg-popover p-1 shadow-lg"
+        className="fixed z-[61] rounded-lg border border-border bg-card p-1 shadow-lg"
         style={{ left, top, width }}
       >
         {entries.map((en, i) => (

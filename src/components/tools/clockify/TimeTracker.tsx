@@ -73,10 +73,10 @@ function HistoryRow({ entry }: { entry: TimeEntry }) {
   const duration = (entry.end ?? now) - entry.start;
   return (
     <div className="flex items-center gap-2 py-1.5 pl-9 pr-3 text-xs">
-      <span className="w-16 shrink-0 text-muted-foreground">{shortDate(entry.start)}</span>
+      <span className="w-16 shrink-0 text-fg-mute">{shortDate(entry.start)}</span>
       <div className="flex items-center gap-1">
         <EditableTime ts={entry.start} dayTs={day} onCommit={(v) => updateEntry(entry.id, { start: Math.min(v, entry.end ?? Date.now()) })} />
-        <span className="text-muted-foreground">–</span>
+        <span className="text-fg-mute">–</span>
         {running ? (
           <span className="w-[64px] text-center text-[var(--live)]">now</span>
         ) : (
@@ -106,7 +106,7 @@ function AddSubtaskInput({ onAdd }: { onAdd: (name: string) => void }) {
   const submit = () => { const n = v.trim(); if (n) { onAdd(n); setV(''); } };
   return (
     <div className="flex items-center gap-2 border-t py-2 pl-8 pr-3">
-      <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <Plus className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
       <Input
         value={v}
         onChange={(e) => setV(e.target.value)}
@@ -121,7 +121,7 @@ function AddSubtaskInput({ onAdd }: { onAdd: (name: string) => void }) {
 
 // Small read-only tag chip.
 function TagChip({ name }: { name: string }) {
-  return <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{name}</span>;
+  return <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">{name}</span>;
 }
 
 // Inline task-name editor used by the rename affordance.
@@ -171,8 +171,8 @@ function FilterControls({
           onClick={toggle}
           title={activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active` : 'Filter tasks'}
           className={cn(
-            'relative flex h-ctl w-ctl items-center justify-center rounded-md border transition-colors hover:bg-muted hover:text-foreground',
-            activeCount > 0 ? 'border-primary/50 text-foreground' : 'text-muted-foreground'
+            'relative flex h-ctl w-ctl items-center justify-center rounded-md border transition-colors hover:bg-muted hover:text-fg',
+            activeCount > 0 ? 'border-primary/50 text-fg' : 'text-fg-mute'
           )}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -187,13 +187,13 @@ function FilterControls({
       {() => (
         <div className="space-y-3">
           <div className="space-y-1">
-            <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Project</p>
+            <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">Project</p>
             <div className="max-h-40 overflow-y-auto">
               {([['all', 'All projects'], [null, 'No project']] as const).map(([val, label]) => (
                 <button
                   key={String(val)}
                   onClick={() => onProject(val)}
-                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted', projectId === val && 'bg-foreground/10')}
+                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted', projectId === val && 'bg-fg/10')}
                 >
                   <ColorDot color={val === null ? undefined : 'transparent'} />
                   <span className={cn(val === 'all' && 'font-medium')}>{label}</span>
@@ -203,7 +203,7 @@ function FilterControls({
                 <button
                   key={p.id}
                   onClick={() => onProject(p.id)}
-                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted', projectId === p.id && 'bg-foreground/10')}
+                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted', projectId === p.id && 'bg-fg/10')}
                 >
                   <ColorDot color={p.color} />
                   <span className="truncate">{p.name}</span>
@@ -214,11 +214,11 @@ function FilterControls({
 
           {tags.length > 0 && (
             <div className="space-y-1 border-t border-border pt-2">
-              <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tags</p>
+              <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">Tags</p>
               <div className="max-h-40 overflow-y-auto">
                 {tags.map((t) => (
                   <button key={t.id} onClick={() => toggleTag(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                    <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', tagIds.includes(t.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+                    <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', tagIds.includes(t.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-fg-mute/40')}>
                       {tagIds.includes(t.id) && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="truncate">{t.name}</span>
@@ -229,7 +229,7 @@ function FilterControls({
           )}
 
           {activeCount > 0 && (
-            <button onClick={onClear} className="w-full rounded border border-border py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <button onClick={onClear} className="w-full rounded border border-border py-1.5 text-xs text-fg-mute transition-colors hover:bg-muted hover:text-fg">
               Clear filters
             </button>
           )}
@@ -551,7 +551,7 @@ export function TimeTracker() {
                 <button
                   key={m}
                   onClick={() => setMode(m)}
-                  className={cn('rounded px-2.5 text-xs font-medium capitalize transition-colors', mode === m ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground hover:text-foreground')}
+                  className={cn('rounded px-2.5 text-xs font-medium capitalize transition-colors', mode === m ? 'bg-fg/10 text-fg' : 'text-fg-mute hover:text-fg')}
                 >
                   {m}
                 </button>
@@ -571,7 +571,7 @@ export function TimeTracker() {
                     title="Set date & time"
                     className={cn('flex h-full w-[88px] flex-col items-center justify-center gap-0.5 border-l leading-none transition-colors hover:bg-muted', open && 'bg-muted')}
                   >
-                    <span className="text-[11px] font-medium text-muted-foreground">{manualDayLabel}</span>
+                    <span className="text-[11px] font-medium text-fg-mute">{manualDayLabel}</span>
                     <span className="font-mono text-sm font-semibold tabular-nums">{fmtHM(manualMs)}</span>
                   </button>
                 )}
@@ -585,7 +585,7 @@ export function TimeTracker() {
                       <button
                         key={k}
                         onClick={() => setManualKind(k)}
-                        className={cn('flex-1 rounded px-2 py-1 font-medium capitalize transition-colors', manualKind === k ? 'bg-foreground/10' : 'text-muted-foreground hover:text-foreground')}
+                        className={cn('flex-1 rounded px-2 py-1 font-medium capitalize transition-colors', manualKind === k ? 'bg-fg/10' : 'text-fg-mute hover:text-fg')}
                       >
                         {k}
                       </button>
@@ -594,12 +594,12 @@ export function TimeTracker() {
                   {manualKind === 'range' ? (
                     <div className="flex items-center justify-between gap-2">
                       <label className="flex flex-1 flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Start</span>
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute">Start</span>
                         <TimeStepperField value={manualStart} onChange={setManualStart} className="w-full" />
                       </label>
-                      <span className="mt-4 text-muted-foreground">–</span>
+                      <span className="mt-4 text-fg-mute">–</span>
                       <label className="flex flex-1 flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">End</span>
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute">End</span>
                         <TimeStepperField value={manualEnd} onChange={setManualEnd} className="w-full" />
                       </label>
                     </div>
@@ -643,11 +643,11 @@ export function TimeTracker() {
                 <Coffee className="h-3.5 w-3.5" /> Break
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 font-medium text-foreground">
+              <span className="flex items-center gap-1.5 font-medium text-fg">
                 <TimerIcon className="h-3.5 w-3.5" /> Focus
               </span>
             )}
-            <span className="text-muted-foreground">
+            <span className="text-fg-mute">
               ends in <span className="font-mono tabular-nums">{fmtTimer(pomo.remaining)}</span>
             </span>
           </div>
@@ -657,7 +657,7 @@ export function TimeTracker() {
             Only shown when idle (no timer running, nothing typed) so it never clutters. */}
         {mode === 'timer' && !running && desc.trim() === '' && groups.length > 0 && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <span className="mr-0.5 text-[11px] font-medium text-muted-foreground">Continue</span>
+            <span className="mr-0.5 text-[11px] font-medium text-fg-mute">Continue</span>
             {groups.slice(0, 4).map((g) => {
               const project = projectById(g.projectId);
               return (
@@ -665,7 +665,7 @@ export function TimeTracker() {
                   key={g.key}
                   onClick={() => resumeGroup(g)}
                   title={`Resume “${g.name}”`}
-                  className="group flex max-w-[220px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted hover:text-foreground"
+                  className="group flex max-w-[220px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-fg-mute transition-colors hover:border-primary/50 hover:bg-muted hover:text-fg"
                 >
                   <Play className="h-3 w-3 shrink-0 fill-current text-primary" />
                   <ColorDot color={project?.color} />
@@ -685,7 +685,7 @@ export function TimeTracker() {
               <button
                 key={p.id}
                 onClick={() => setPeriod(p.id)}
-                className={cn('rounded px-2 py-1 font-medium transition-colors', period === p.id ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground hover:text-foreground')}
+                className={cn('rounded px-2 py-1 font-medium transition-colors', period === p.id ? 'bg-fg/10 text-fg' : 'text-fg-mute hover:text-fg')}
               >
                 {p.label}
               </button>
@@ -694,7 +694,7 @@ export function TimeTracker() {
           {period === 'range' && (
             <div className="flex items-center gap-1.5">
               <DatePicker value={rangeStart} onChange={setRangeStart} className="h-ctl text-xs" />
-              <span className="text-muted-foreground">→</span>
+              <span className="text-fg-mute">→</span>
               <DatePicker value={rangeEnd} onChange={setRangeEnd} className="h-ctl text-xs" />
             </div>
           )}
@@ -710,23 +710,23 @@ export function TimeTracker() {
                   style={{ width: `${targetPct}%` }}
                 />
               </div>
-              <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-                Today <span className="font-mono tabular-nums text-foreground">{fmtTotal(todayTotal)}</span>
-                <span className="text-muted-foreground/70"> / {settings.dailyTargetHours}h</span>
+              <span className="whitespace-nowrap text-[11px] text-fg-mute">
+                Today <span className="font-mono tabular-nums text-fg">{fmtTotal(todayTotal)}</span>
+                <span className="text-fg-mute/70"> / {settings.dailyTargetHours}h</span>
               </span>
             </div>
           )}
 
           {/* Period total */}
-          <span className="whitespace-nowrap text-muted-foreground">
+          <span className="whitespace-nowrap text-fg-mute">
             {period === 'all' ? 'Total' : period === 'range' ? 'Range' : `This ${period}`}{' '}
-            <span className="font-mono tabular-nums text-foreground">{fmtTotal(periodTotal)}</span>
+            <span className="font-mono tabular-nums text-fg">{fmtTotal(periodTotal)}</span>
           </span>
 
           {/* Search — expands inline on demand */}
           {searchOpen || query ? (
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-mute" />
               <Input
                 autoFocus
                 value={query}
@@ -737,13 +737,13 @@ export function TimeTracker() {
                 className="h-ctl w-44 pl-8 pr-7 text-xs"
               />
               {query && (
-                <button onClick={() => { setQuery(''); setSearchOpen(false); }} title="Clear" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <button onClick={() => { setQuery(''); setSearchOpen(false); }} title="Clear" className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg">
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
           ) : (
-            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-ctl w-ctl items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-ctl w-ctl items-center justify-center rounded-md border text-fg-mute transition-colors hover:bg-muted hover:text-fg">
               <Search className="h-3.5 w-3.5" />
             </button>
           )}
@@ -766,7 +766,7 @@ export function TimeTracker() {
               <button
                 onClick={() => hasExportable && toggle()}
                 disabled={!hasExportable}
-                className="flex h-ctl w-ctl items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                className="flex h-ctl w-ctl items-center justify-center rounded-md border text-fg-mute transition-colors hover:bg-muted hover:text-fg disabled:opacity-40"
                 title={hasExportable ? 'Export visible entries' : 'Nothing to export'}
               >
                 <Download className="h-3.5 w-3.5" />
@@ -776,10 +776,10 @@ export function TimeTracker() {
             {(close) => (
               <div className="space-y-0.5">
                 <button onClick={() => doExport('csv', close)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                  <Download className="h-3.5 w-3.5 text-muted-foreground" /> Export CSV
+                  <Download className="h-3.5 w-3.5 text-fg-mute" /> Export CSV
                 </button>
                 <button onClick={() => doExport('json', close)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                  <Download className="h-3.5 w-3.5 text-muted-foreground" /> Export JSON
+                  <Download className="h-3.5 w-3.5 text-fg-mute" /> Export JSON
                 </button>
               </div>
             )}
@@ -790,14 +790,14 @@ export function TimeTracker() {
       {/* Task list */}
       <div className="flex-1 overflow-y-auto">
         {visibleGroups.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-fg-mute">
             <TimerIcon className="h-ctl w-ctl opacity-30" />
             {q || filterCount > 0 ? (
               <p className="text-sm">No tasks match your search or filters.</p>
             ) : entries.length === 0 ? (
               <>
-                <p className="text-sm font-medium text-foreground">Start tracking your time</p>
-                <p className="text-xs">Type what you're working on above, then press <span className="font-medium text-foreground">Start</span>.</p>
+                <p className="text-sm font-medium text-fg">Start tracking your time</p>
+                <p className="text-xs">Type what you're working on above, then press <span className="font-medium text-fg">Start</span>.</p>
               </>
             ) : (
               <p className="text-sm">
@@ -830,7 +830,7 @@ export function TimeTracker() {
                 <div className="flex items-center gap-2 px-3 py-2.5">
                   {renaming === g.key ? (
                     <>
-                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
                       <ColorDot color={project?.color} />
                       <RenameField
                         initial={g.name}
@@ -840,14 +840,14 @@ export function TimeTracker() {
                     </>
                   ) : (
                     <button onClick={() => toggleExpand(g.key)} className="group flex min-w-0 flex-1 items-center gap-2 text-left">
-                      <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-90')} />
+                      <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-fg-mute transition-transform', isOpen && 'rotate-90')} />
                       <ColorDot color={project?.color} />
                       <span className="truncate text-sm font-medium">{g.name}</span>
                       <Pencil
-                        className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                        className="h-3 w-3 shrink-0 text-fg-mute opacity-0 transition-opacity hover:text-fg group-hover:opacity-100"
                         onClick={(e) => { e.stopPropagation(); setRenaming(g.key); }}
                       />
-                      {project && <span className="shrink-0 truncate text-[11px] text-muted-foreground">{project.name}</span>}
+                      {project && <span className="shrink-0 truncate text-[11px] text-fg-mute">{project.name}</span>}
                       {g.allTagIds.slice(0, 3).map((id) => {
                         const t = tagById(id);
                         return t ? <TagChip key={id} name={t.name} /> : null;
@@ -867,7 +867,7 @@ export function TimeTracker() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-ctl w-ctl text-muted-foreground hover:text-foreground"
+                      className="h-ctl w-ctl text-fg-mute hover:text-fg"
                       title={g.hasSub ? 'Resume the latest subtask' : 'Start this task'}
                       onClick={startTask}
                     >
@@ -889,7 +889,7 @@ export function TimeTracker() {
                             <div key={subKey} className="border-t first:border-t-0">
                               <div className="flex items-center gap-2 py-2 pl-8 pr-3">
                                 <button onClick={() => toggleExpand(subKey)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                                  <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', subOpen && 'rotate-90')} />
+                                  <ChevronRight className={cn('h-3 w-3 shrink-0 text-fg-mute transition-transform', subOpen && 'rotate-90')} />
                                   <span className="truncate text-sm">{sg.name}</span>
                                   <Badge pill>{sg.recs.length}</Badge>
                                   {sg.running && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--live)]" />}
@@ -900,17 +900,17 @@ export function TimeTracker() {
                                     <Square className="h-3.5 w-3.5 fill-current" />
                                   </Button>
                                 ) : (
-                                  <Button size="icon" variant="ghost" className="h-ctl w-ctl text-muted-foreground hover:text-foreground" title="Start this subtask" onClick={() => resumeTask(g.name, g.projectId, g.tagIds, sg.name)}>
+                                  <Button size="icon" variant="ghost" className="h-ctl w-ctl text-fg-mute hover:text-fg" title="Start this subtask" onClick={() => resumeTask(g.name, g.projectId, g.tagIds, sg.name)}>
                                     <Play className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
-                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-ctl w-ctl items-center justify-center rounded text-muted-foreground hover:bg-muted">
+                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-ctl w-ctl items-center justify-center rounded text-fg-mute hover:bg-muted">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </ConfirmButton>
                               </div>
                               {subOpen && (sg.recs.length > 0
                                 ? <div className="divide-y bg-muted/30">{sg.recs.map((e) => <HistoryRow key={e.id} entry={e} />)}</div>
-                                : <p className="py-2 pl-12 pr-3 text-xs text-muted-foreground">No time tracked yet.</p>)}
+                                : <p className="py-2 pl-12 pr-3 text-xs text-fg-mute">No time tracked yet.</p>)}
                             </div>
                           );
                         })}
@@ -923,8 +923,8 @@ export function TimeTracker() {
                             <div className="border-t">
                               <div className="flex items-center gap-2 py-2 pl-8 pr-3">
                                 <button onClick={() => toggleExpand(subKey)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                                  <ChevronRight className={cn('h-3 w-3 shrink-0 text-muted-foreground transition-transform', subOpen && 'rotate-90')} />
-                                  <span className="truncate text-sm italic text-muted-foreground">General</span>
+                                  <ChevronRight className={cn('h-3 w-3 shrink-0 text-fg-mute transition-transform', subOpen && 'rotate-90')} />
+                                  <span className="truncate text-sm italic text-fg-mute">General</span>
                                   <Badge pill>{g.directRecs.length}</Badge>
                                   {directRunning && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--live)]" />}
                                 </button>

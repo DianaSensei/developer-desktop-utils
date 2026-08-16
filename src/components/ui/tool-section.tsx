@@ -12,7 +12,7 @@ ToolSection.displayName = 'ToolSection';
 // Consistent label for tool sections
 const ToolLabel = React.forwardRef<HTMLLabelElement, React.LabelHTMLAttributes<HTMLLabelElement>>(
   ({ className, ...props }, ref) => (
-    <label ref={ref} className={cn('block text-xs font-medium text-foreground', className)} {...props} />
+    <label ref={ref} className={cn('block text-xs font-medium text-fg', className)} {...props} />
   )
 );
 ToolLabel.displayName = 'ToolLabel';
@@ -20,7 +20,7 @@ ToolLabel.displayName = 'ToolLabel';
 // Consistent hint text
 const ToolHint = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('text-[11px] text-muted-foreground', className)} {...props} />
+    <p ref={ref} className={cn('text-[11px] text-fg-mute', className)} {...props} />
   )
 );
 ToolHint.displayName = 'ToolHint';
@@ -71,7 +71,7 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
       <div className="flex min-h-[1.25rem] items-center gap-2">
         <ToolLabel htmlFor={htmlFor} className="min-w-0 flex-1 truncate">
           {label}
-          {required && <span className="ml-0.5 text-muted-foreground">*</span>}
+          {required && <span className="ml-0.5 text-fg-mute">*</span>}
         </ToolLabel>
         {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
       </div>

@@ -130,7 +130,7 @@ function CodeDisplay({ code, digits }: { code: string; digits: number }) {
       )}>
         {isEmpty ? '•'.repeat(half) : left}
       </span>
-      <span className="text-muted-foreground/40 text-lg font-light select-none">·</span>
+      <span className="text-fg-mute/40 text-lg font-light select-none">·</span>
       <span className={cn(
         'font-mono font-bold tabular-nums tracking-[0.2em] transition-opacity duration-300',
         'text-[1.75rem] leading-none',
@@ -206,7 +206,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-tight truncate">{account.name || 'Account'}</p>
           {account.issuer && (
-            <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">{account.issuer}</p>
+            <p className="text-[11px] text-fg-mute truncate leading-tight mt-0.5">{account.issuer}</p>
           )}
         </div>
         <Badge tone={typeTone} size="sm" uppercase pill>{account.type}</Badge>
@@ -225,7 +225,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
             <div className="flex items-center gap-1 shrink-0 ml-auto">
               {isTotp && <CountdownRing remaining={remaining} period={account.period} />}
               {!isTotp && (
-                <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                <span className="text-[11px] text-fg-mute font-mono tabular-nums">
                   #{account.counter}
                 </span>
               )}
@@ -278,14 +278,14 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
           {([account.algorithm, `${account.digits} digits`, isTotp ? `${account.period}s` : null] as (string | null)[])
             .filter(Boolean)
             .map((tag) => (
-              <span key={tag} className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
+              <span key={tag} className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-fg-mute font-mono">
                 {tag}
               </span>
             ))}
         </div>
         <Button
           variant="ghost" size="icon"
-          className="h-ctl w-ctl text-muted-foreground hover:text-foreground"
+          className="h-ctl w-ctl text-fg-mute hover:text-fg"
           onClick={() => setShowSecret((s) => !s)}
           title={showSecret ? 'Hide secret' : 'Reveal secret'}
         >
@@ -293,7 +293,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
         </Button>
         <Button
           variant="ghost" size="icon"
-          className="h-ctl w-ctl text-muted-foreground hover:text-destructive"
+          className="h-ctl w-ctl text-fg-mute hover:text-destructive"
           onClick={() => onDelete(account.id)}
           title="Remove account"
         >
@@ -304,7 +304,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       {/* ── Secret reveal ── */}
       {showSecret && (
         <div className="px-4 pb-3 pt-1 border-t bg-muted/10">
-          <p className="text-[11px] font-mono text-muted-foreground break-all bg-muted/60 rounded-md px-2.5 py-2 border leading-relaxed">
+          <p className="text-[11px] font-mono text-fg-mute break-all bg-muted/60 rounded-md px-2.5 py-2 border leading-relaxed">
             {account.secret || '(empty)'}
           </p>
         </div>
@@ -349,7 +349,7 @@ function LivePreview({ secret, type, period, digits, algorithm, counter }: {
         <span>Invalid Base32 secret</span>
       ) : (
         <>
-          <span className="text-muted-foreground">Preview:</span>
+          <span className="text-fg-mute">Preview:</span>
           <span className="font-mono font-bold tracking-widest">{preview}</span>
         </>
       )}
@@ -407,7 +407,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
       {/* Form header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
         <div className="flex items-center gap-2">
-          <Plus className="h-4 w-4 text-muted-foreground" />
+          <Plus className="h-4 w-4 text-fg-mute" />
           <span className="text-sm font-semibold">Add Account</span>
         </div>
         {/* Type pill toggle */}
@@ -423,7 +423,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
                   ? t === 'totp'
                     ? 'bg-[var(--cat-4)] text-white shadow-sm'
                     : 'bg-[var(--cat-3)] text-white shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
+                  : 'text-fg-mute hover:text-fg',
               )}
             >
               {t}
@@ -445,7 +445,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Issuer <span className="text-muted-foreground">(optional)</span></Label>
+            <Label className="text-xs">Issuer <span className="text-fg-mute">(optional)</span></Label>
             <Input
               value={issuer}
               onChange={(e) => setIssuer(e.target.value)}
@@ -457,7 +457,7 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
 
         {/* Secret */}
         <div className="space-y-2">
-          <Label className="text-xs">Secret Key <span className="text-muted-foreground">(Base32)</span></Label>
+          <Label className="text-xs">Secret Key <span className="text-fg-mute">(Base32)</span></Label>
           <Input
             ref={secretRef}
             value={secret}
@@ -530,7 +530,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
     <div className="flex flex-col items-center justify-center py-20 text-center gap-4 px-4">
       <div className="relative">
         <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
-          <ShieldCheck className="h-ctl w-ctl text-muted-foreground/40" />
+          <ShieldCheck className="h-ctl w-ctl text-fg-mute/40" />
         </div>
         <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
           <KeyRound className="h-3 w-3 text-primary-foreground" />
@@ -538,7 +538,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </div>
       <div className="space-y-1">
         <p className="text-sm font-semibold">No accounts yet</p>
-        <p className="text-xs text-muted-foreground max-w-[240px]">
+        <p className="text-xs text-fg-mute max-w-[240px]">
           Add a TOTP or HOTP account using the Base32 secret from your authenticator app setup.
         </p>
       </div>
@@ -554,7 +554,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 
 function InfoPanel() {
   return (
-    <div className="rounded-lg border bg-muted/30 p-4 text-xs space-y-3 text-muted-foreground leading-relaxed">
+    <div className="rounded-lg border bg-muted/30 p-4 text-xs space-y-3 text-fg-mute leading-relaxed">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-4)]">
@@ -577,7 +577,7 @@ function InfoPanel() {
         </div>
       </div>
       <p className="border-t pt-2">
-        Secrets are stored in <strong className="text-foreground">localStorage</strong> only — nothing leaves your device.
+        Secrets are stored in <strong className="text-fg">localStorage</strong> only — nothing leaves your device.
         Secrets must be Base32-encoded (A–Z and 2–7, case-insensitive, spaces ignored).
       </p>
     </div>
@@ -736,13 +736,13 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); }}
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-colors',
-            dragOver ? 'border-primary bg-primary/5' : 'border-input hover:border-muted-foreground/40 hover:bg-muted/30',
+            dragOver ? 'border-primary bg-primary/5' : 'border-input hover:border-fg-mute/40 hover:bg-muted/30',
           )}
         >
           {busy ? (
-            <Spinner size="lg" className="text-muted-foreground" />
+            <Spinner size="lg" className="text-fg-mute" />
           ) : (
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex items-center gap-2 text-fg-mute">
               <QrCode className="h-6 w-6" />
               <FileText className="h-6 w-6" />
             </div>
@@ -750,7 +750,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
           <p className="text-xs font-medium">
             {busy ? 'Reading…' : 'Drop QR image or export file here'}
           </p>
-          <p className="text-[11px] text-muted-foreground">PNG · JPG · .txt · .json — or click to browse</p>
+          <p className="text-[11px] text-fg-mute">PNG · JPG · .txt · .json — or click to browse</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -812,7 +812,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">{entry.name}</p>
-                      {entry.issuer && <p className="text-[11px] text-muted-foreground truncate">{entry.issuer}</p>}
+                      {entry.issuer && <p className="text-[11px] text-fg-mute truncate">{entry.issuer}</p>}
                     </div>
                     <span className={cn(
                       'text-[11px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0',
@@ -927,14 +927,14 @@ export function TwoFactorAuth() {
             <ShieldCheck className="h-5 w-5 text-ok shrink-0" />
             <div>
               <h2 className="text-sm font-semibold leading-tight">2FA Authenticator</h2>
-              <p className="text-[11px] text-muted-foreground">TOTP · HOTP · SHA-1/256/512 · 6 or 8 digits</p>
+              <p className="text-[11px] text-fg-mute">TOTP · HOTP · SHA-1/256/512 · 6 or 8 digits</p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
             <Button
               variant="ghost" size="sm"
-              className="h-ctl text-xs gap-1 text-muted-foreground"
+              className="h-ctl text-xs gap-1 text-fg-mute"
               onClick={() => setShowInfo((s) => !s)}
             >
               {showInfo ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -943,7 +943,7 @@ export function TwoFactorAuth() {
             {accounts.length > 0 && (
               <Button
                 variant="ghost" size="icon"
-                className="h-ctl w-ctl text-muted-foreground"
+                className="h-ctl w-ctl text-fg-mute"
                 onClick={() => exportAccounts(accounts)}
                 title="Export all accounts (otpauth URIs)"
               >
@@ -1005,7 +1005,7 @@ export function TwoFactorAuth() {
                       'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
                       filter === key
                         ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                        : 'text-fg-mute hover:text-fg hover:bg-accent/50',
                     )}
                   >
                     {label}
@@ -1040,13 +1040,13 @@ export function TwoFactorAuth() {
         ) : accounts.length === 0 && !showForm ? (
           <EmptyState onAdd={() => setShowForm(true)} />
         ) : filtered.length === 0 && accounts.length > 0 ? (
-          <div className="text-center py-8 text-xs text-muted-foreground">
+          <div className="text-center py-8 text-xs text-fg-mute">
             {search.trim() ? (
               <>No accounts match "{search}".{' '}
-                <button className="underline hover:text-foreground" onClick={() => setSearch('')}>Clear search</button></>
+                <button className="underline hover:text-fg" onClick={() => setSearch('')}>Clear search</button></>
             ) : (
               <>No {filter.toUpperCase()} accounts.{' '}
-                <button className="underline hover:text-foreground" onClick={() => setFilter('all')}>Show all</button></>
+                <button className="underline hover:text-fg" onClick={() => setFilter('all')}>Show all</button></>
             )}
           </div>
         ) : null}

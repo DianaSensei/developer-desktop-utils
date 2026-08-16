@@ -64,14 +64,14 @@ export function MeetingFields({
         <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-2">
           <DatePicker value={dateISO} onChange={setDate} className="h-ctl" />
           <TimePicker value={toHM(meeting.start)} onChange={setStartTime} className="h-ctl w-[86px]" />
-          <span className="text-muted-foreground">–</span>
+          <span className="text-fg-mute">–</span>
           <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-ctl w-[86px]" />
-          <span className="ml-auto rounded-md bg-foreground/5 px-2 py-1 text-xs font-medium tabular-nums text-muted-foreground">{duration}</span>
+          <span className="ml-auto rounded-md bg-fg/5 px-2 py-1 text-xs font-medium tabular-nums text-fg-mute">{duration}</span>
         </div>
 
         {/* Participants — single line */}
         <div className="space-y-1.5">
-          <Label className="flex items-center gap-1.5 text-xs"><Users className="h-3.5 w-3.5 text-muted-foreground" /> Participants</Label>
+          <Label className="flex items-center gap-1.5 text-xs"><Users className="h-3.5 w-3.5 text-fg-mute" /> Participants</Label>
           <Input value={meeting.participants} onChange={(e) => onChange({ participants: e.target.value })} placeholder="Alice, Bob, Carol" className="h-ctl text-sm" />
         </div>
 
@@ -112,7 +112,7 @@ export function MeetingFields({
           <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-ctl w-[94px]" />
         </MetaField>
         <MetaField label="Duration">
-          <div className="flex h-ctl items-center rounded-md bg-foreground/5 px-3 text-sm font-semibold tabular-nums">{duration}</div>
+          <div className="flex h-ctl items-center rounded-md bg-fg/5 px-3 text-sm font-semibold tabular-nums">{duration}</div>
         </MetaField>
         <div className="min-w-[200px] flex-1">
           <MetaField label="Participants" icon={Users}>
@@ -195,7 +195,7 @@ function AutoTextarea({
 function MetaField({ label, icon: Icon, children }: { label: string; icon?: typeof Users; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <Label className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-fg-mute">
         {Icon && <Icon className="h-3 w-3" />}
         {label}
       </Label>
@@ -214,9 +214,9 @@ function Section({ icon: Icon, title, hint, children, className }: {
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center gap-1.5">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+        <Icon className="h-3.5 w-3.5 text-fg-mute" />
         <span className="text-xs font-semibold">{title}</span>
-        {hint && <span className="text-[11px] text-muted-foreground/60">— {hint}</span>}
+        {hint && <span className="text-[11px] text-fg-mute/60">— {hint}</span>}
       </div>
       {children}
     </div>

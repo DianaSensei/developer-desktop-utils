@@ -31,8 +31,8 @@ export const varTheme = EditorView.theme({
   // Tooltip/autocomplete chrome now comes from the shared `codeTheme`; only the
   // var-specific bits live here.
   '.cm-vartip': { display: 'flex', flexDirection: 'column', gap: '2px', padding: '6px 8px', maxWidth: '340px' },
-  '.cm-vartip-name': { fontSize: '10px', color: 'hsl(var(--muted-foreground))', fontFamily: 'var(--mono)' },
-  '.cm-vartip-val': { fontSize: '12px', color: 'hsl(var(--foreground))', fontFamily: 'var(--mono)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' },
+  '.cm-vartip-name': { fontSize: '10px', color: 'hsl(var(--fg-mute-c))', fontFamily: 'var(--mono)' },
+  '.cm-vartip-val': { fontSize: '12px', color: 'hsl(var(--fg-c))', fontFamily: 'var(--mono)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' },
   '.cm-vartip-missing': { fontSize: '12px', color: 'hsl(0 72% 60%)' },
 });
 

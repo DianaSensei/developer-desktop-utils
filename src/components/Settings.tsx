@@ -108,7 +108,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
       onClick={onChange}
       className={cn(
         'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-        checked ? 'bg-primary' : 'bg-muted-foreground/25'
+        checked ? 'bg-primary' : 'bg-fg-mute/25'
       )}
     >
       <span className={cn(
@@ -129,10 +129,10 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
   const Icon = tool.icon;
   return (
     <>
-      <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'text-muted-foreground')} />
+      <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'text-fg-mute')} />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium leading-none">{tool.label}</p>
-        <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{tool.description}</p>
+        <p className="text-[11px] text-fg-mute mt-1 leading-relaxed">{tool.description}</p>
       </div>
       {/* Favourite — pins the tool to the top of the sidebar */}
       <button
@@ -142,7 +142,7 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
         onClick={onToggleFavorite}
         className={cn(
           'shrink-0 rounded p-1 transition-colors',
-          favorite ? 'text-warn' : 'text-muted-foreground/40 hover:text-warn'
+          favorite ? 'text-warn' : 'text-fg-mute/40 hover:text-warn'
         )}
       >
         <Star className={cn('h-3.5 w-3.5', favorite && 'fill-current')} />
@@ -171,7 +171,7 @@ function AccentSwatches({ value, onChange }: { value: AccentTone; onChange: (ton
           className={cn(
             'h-5 w-5 shrink-0 rounded-full border-2 transition-transform',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1',
-            value === tone ? 'scale-110 border-foreground' : 'border-transparent hover:scale-105',
+            value === tone ? 'scale-110 border-fg' : 'border-transparent hover:scale-105',
           )}
           style={ACCENT_PREVIEW[tone]}
         />
@@ -387,7 +387,7 @@ export function Settings() {
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold">Tools</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-[11px] text-fg-mute mt-0.5">
               {enabledCount} of {TOOL_DEFS.length} enabled
             </p>
           </div>
@@ -395,7 +395,7 @@ export function Settings() {
             {!allEnabled && (
               <button
                 onClick={enableAll}
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
               >
                 <CheckCheck className="h-3 w-3 shrink-0" />
                 Enable all
@@ -404,7 +404,7 @@ export function Settings() {
             {!allDisabled && (
               <button
                 onClick={disableAll}
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
               >
                 <Ban className="h-3 w-3 shrink-0" />
                 Disable all
@@ -412,7 +412,7 @@ export function Settings() {
             )}
             <button
               onClick={resetToDefaults}
-              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
             >
               <RotateCcw className="h-3 w-3 shrink-0" />
               Reset
@@ -422,7 +422,7 @@ export function Settings() {
 
         {/* Search */}
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-mute/60" />
           <Input
             value={toolQuery}
             onChange={(e) => setToolQuery(e.target.value)}
@@ -432,7 +432,7 @@ export function Settings() {
           {toolQuery && (
             <button
               onClick={() => setToolQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute/60 hover:text-fg transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -441,7 +441,7 @@ export function Settings() {
 
         <div className="relative rounded-lg border divide-y">
           {visibleTools.length === 0 && isSearching && (
-            <p className="px-4 py-6 text-center text-[11px] text-muted-foreground">No tools match "{toolQuery}"</p>
+            <p className="px-4 py-6 text-center text-[11px] text-fg-mute">No tools match "{toolQuery}"</p>
           )}
           {(() => {
             const nodes: React.ReactNode[] = [];
@@ -486,15 +486,15 @@ export function Settings() {
                         aria-label={`Drag to reorder ${group.label}`}
                         onPointerDown={!isSearching ? (e) => { e.preventDefault(); startDrag(row.key, e); } : undefined}
                         className={cn(
-                          'shrink-0 touch-none text-muted-foreground/40 transition-colors',
-                          isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing hover:text-muted-foreground'
+                          'shrink-0 touch-none text-fg-mute/40 transition-colors',
+                          isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing hover:text-fg-mute'
                         )}
                       >
                         <GripVertical className="h-3.5 w-3.5" />
                       </button>
-                      <GroupIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <GroupIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
                       <p className="text-xs font-semibold">{group.label}</p>
-                      <p className="text-[11px] text-muted-foreground">{row.tools.length} tools</p>
+                      <p className="text-[11px] text-fg-mute">{row.tools.length} tools</p>
                     </div>
                     {row.tools.map((tool) => {
                       const enabled = features[tool.id] !== false;
@@ -502,7 +502,7 @@ export function Settings() {
                         <div
                           key={tool.id}
                           className={cn(
-                            'flex items-center gap-3 py-3 pl-10 pr-3 cursor-default bg-background',
+                            'flex items-center gap-3 py-3 pl-10 pr-3 cursor-default bg-bg',
                             !enabled && 'opacity-50'
                           )}
                         >
@@ -532,7 +532,7 @@ export function Settings() {
                   }}
                   style={isDragging ? { transform: `translateY(${drag!.dy}px)` } : undefined}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-3 cursor-default bg-background',
+                    'flex items-center gap-3 px-3 py-3 cursor-default bg-bg',
                     !enabled && 'opacity-50',
                     isDragging && 'relative z-20 rounded-lg bg-muted opacity-100 shadow-lg ring-1 ring-primary/50'
                   )}
@@ -543,8 +543,8 @@ export function Settings() {
                     aria-label="Drag to reorder"
                     onPointerDown={!isSearching ? (e) => { e.preventDefault(); startDrag(row.key, e); } : undefined}
                     className={cn(
-                      'shrink-0 touch-none text-muted-foreground/40 transition-colors',
-                      isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing hover:text-muted-foreground'
+                      'shrink-0 touch-none text-fg-mute/40 transition-colors',
+                      isSearching ? 'opacity-0 pointer-events-none' : 'cursor-grab active:cursor-grabbing hover:text-fg-mute'
                     )}
                   >
                     <GripVertical className="h-3.5 w-3.5" />
@@ -570,16 +570,16 @@ export function Settings() {
       <section className="space-y-3">
         <button
           onClick={() => setPermsOpen((o) => !o)}
-          className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-foreground/80"
+          className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-fg/80"
           aria-expanded={permsOpen}
         >
-          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !permsOpen && '-rotate-90')} />
+          <ChevronDown className={cn('h-4 w-4 text-fg-mute transition-transform', !permsOpen && '-rotate-90')} />
           App Permissions
-          <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+          <Shield className="h-3.5 w-3.5 text-fg-mute" />
         </button>
         {permsOpen && (
         <>
-        <p className="text-[11px] text-muted-foreground -mt-1">
+        <p className="text-[11px] text-fg-mute -mt-1">
           Generated directly from src-tauri/capabilities/default.json — every permission the app can request is listed below, grouped by plugin, with its exact declaration.
         </p>
         {!isTauri && (
@@ -595,24 +595,24 @@ export function Settings() {
                 <Icon className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <p className="text-xs font-medium">
-                    {name} <span className="font-mono text-muted-foreground/60">{namespace}</span>
+                    {name} <span className="font-mono text-fg-mute/60">{namespace}</span>
                   </p>
                   <ul className="space-y-1.5">
                     {permissions.map((p) => (
                       <li key={p.identifier} className="text-[11px] leading-relaxed">
                         <div className="flex items-baseline gap-2">
-                          <span className="mt-px text-muted-foreground/40">•</span>
-                          <code className="flex-1 min-w-0 truncate font-mono text-muted-foreground/80">{p.identifier}</code>
+                          <span className="mt-px text-fg-mute/40">•</span>
+                          <code className="flex-1 min-w-0 truncate font-mono text-fg-mute/80">{p.identifier}</code>
                         </div>
                         {p.description && (
-                          <p className="pl-4 text-muted-foreground">{p.description}</p>
+                          <p className="pl-4 text-fg-mute">{p.description}</p>
                         )}
                         {p.allowUrls && p.allowUrls.length > 0 && (
                           <ul className="pl-4 mt-0.5 space-y-0.5">
                             {p.allowUrls.map((url) => (
                               <li key={url} className="flex items-baseline gap-2">
-                                <span className="mt-px text-muted-foreground/30">–</span>
-                                <code className="font-mono text-muted-foreground/70 break-all">{url}</code>
+                                <span className="mt-px text-fg-mute/30">–</span>
+                                <code className="font-mono text-fg-mute/70 break-all">{url}</code>
                               </li>
                             ))}
                           </ul>
@@ -637,17 +637,17 @@ export function Settings() {
             <AppLogo size={44} />
             <div>
               <p className="font-semibold text-sm leading-none">DevTool</p>
-              <p className="text-muted-foreground mt-1 text-[11px]">Developer utilities for your desktop</p>
+              <p className="text-fg-mute mt-1 text-[11px]">Developer utilities for your desktop</p>
             </div>
           </div>
           <div className="flex items-center justify-between px-4 py-3 text-xs">
             <div>
               <p className="font-medium">Hướng dẫn giới thiệu</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Xem lại màn welcome và chọn lại nhóm tool quan tâm</p>
+              <p className="text-[11px] text-fg-mute mt-0.5">Xem lại màn welcome và chọn lại nhóm tool quan tâm</p>
             </div>
             <button
               onClick={openOnboarding}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
             >
               <Compass className="h-3 w-3" />
               Xem lại
@@ -657,7 +657,7 @@ export function Settings() {
             <div className="flex items-center justify-between px-4 py-3 text-xs">
               <div>
                 <p className="font-medium">Auto-check for updates</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+                <p className="text-[11px] text-fg-mute mt-0.5">
                   Check on launch and daily at {formatHour(checkHour)}
                 </p>
               </div>
@@ -681,7 +681,7 @@ export function Settings() {
             </div>
           )}
           <div className="flex items-center justify-between px-4 py-3 text-xs">
-            <span className="text-muted-foreground">Version</span>
+            <span className="text-fg-mute">Version</span>
             <div className="flex items-center gap-2">
               {updateStatus === 'not-available' && !updateAvailable && (
                 <span className="flex items-center gap-1 text-ok">
@@ -713,7 +713,7 @@ export function Settings() {
 
               {isTauri && (
                 updateStatus === 'downloading' ? (
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-fg-mute">
                     <Spinner size="xs" />
                     Downloading…
                     {downloadProgress != null && (
@@ -731,13 +731,13 @@ export function Settings() {
                       onClick={cancelInstall}
                       title="Cancel download"
                       aria-label="Cancel download"
-                      className="ml-1 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+                      className="ml-1 rounded-full text-fg-mute hover:text-fg transition-colors"
                     >
                       <XCircle className="h-4 w-4" />
                     </button>
                   </span>
                 ) : updateStatus === 'checking' ? (
-                  <span className="flex items-center gap-1 text-muted-foreground">
+                  <span className="flex items-center gap-1 text-fg-mute">
                     <Spinner size="xs" />
                     Checking…
                   </span>
@@ -745,7 +745,7 @@ export function Settings() {
                   <>
                     <button
                       onClick={openUpdateDialog}
-                      className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-fg-mute hover:text-fg hover:bg-muted transition-colors"
                     >
                       <Sparkles className="h-3 w-3" />
                       What's new
@@ -761,7 +761,7 @@ export function Settings() {
                 ) : (
                   <button
                     onClick={checkForUpdates}
-                    className="flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    className="flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-fg-mute hover:text-fg hover:bg-muted transition-colors"
                   >
                     <RefreshCw className="h-3 w-3" />
                     Check
@@ -773,7 +773,7 @@ export function Settings() {
             </div>
           </div>
           <div className="flex items-center justify-between px-4 py-3">
-            <span className="text-muted-foreground">Contact, feedback &amp; contribute</span>
+            <span className="text-fg-mute">Contact, feedback &amp; contribute</span>
             <a
               href="https://github.com/DianaSensei/developer-desktop-utils/issues"
               target="_blank"
@@ -781,13 +781,13 @@ export function Settings() {
               title="Open GitHub issues"
               aria-label="Open GitHub issues"
               onClick={(e) => openExternal(e, 'https://github.com/DianaSensei/developer-desktop-utils/issues')}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-fg-mute hover:text-fg transition-colors"
             >
               <GitHubIcon className="h-4 w-4" />
             </a>
           </div>
           <div className="px-4 py-3">
-            <p className="text-muted-foreground leading-relaxed">
+            <p className="text-fg-mute leading-relaxed">
               Everything runs on your device. Network access only happens when you ask for it, plus the daily check for app updates — no telemetry, analytics, or other data leaves your machine.
             </p>
           </div>
@@ -801,12 +801,12 @@ export function Settings() {
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
               <p className="text-xs font-medium">Where your data is stored</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed break-all">
+              <p className="text-[11px] text-fg-mute mt-0.5 leading-relaxed break-all">
                 {isTauri
                   ? dataDir || 'Resolving…'
                   : 'App data folder (available in the desktop app).'}
               </p>
-              <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+              <p className="text-[11px] text-fg-mute mt-1 leading-relaxed">
                 All settings, tool history and workspaces are saved to a file on your device — not in the browser. Nothing leaves your machine.
               </p>
             </div>
@@ -814,7 +814,7 @@ export function Settings() {
               <button
                 onClick={revealDataDir}
                 disabled={!dataDir}
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors disabled:opacity-50"
               >
                 <FolderOpen className="h-3.5 w-3.5" />
                 Show in folder
@@ -829,16 +829,16 @@ export function Settings() {
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => setConfigOpen((o) => !o)}
-            className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-foreground/80"
+            className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-fg/80"
             aria-expanded={configOpen}
           >
-            <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !configOpen && '-rotate-90')} />
+            <ChevronDown className={cn('h-4 w-4 text-fg-mute transition-transform', !configOpen && '-rotate-90')} />
             Configuration
           </button>
           {configOpen && (
             <button
               onClick={resetConfig}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
               Reset
@@ -847,7 +847,7 @@ export function Settings() {
         </div>
         {configOpen && (
         <>
-        <p className="text-[11px] text-muted-foreground -mt-1">
+        <p className="text-[11px] text-fg-mute -mt-1">
           Tunable app behavior. Changes are saved locally and applied immediately.
         </p>
         {(Object.keys(SECTION_LABELS) as ConfigSection[]).map((sec) => {
@@ -855,14 +855,14 @@ export function Settings() {
           if (!fields.length) return null;
           return (
             <div key={sec} className="rounded-lg border divide-y">
-              <div className="bg-muted/10 border-b border-border px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="bg-muted/10 border-b border-border px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
                 {SECTION_LABELS[sec]}
               </div>
               {fields.map((f) => (
                 <div key={f.key} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-xs font-medium">{f.label}</p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{f.description}</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-fg-mute">{f.description}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <Input
@@ -877,7 +877,7 @@ export function Settings() {
                       }}
                       className="h-ctl w-24 text-center text-xs rounded-lg"
                     />
-                    {f.unit && <span className="w-5 text-[11px] text-muted-foreground">{f.unit}</span>}
+                    {f.unit && <span className="w-5 text-[11px] text-fg-mute">{f.unit}</span>}
                   </div>
                 </div>
               ))}

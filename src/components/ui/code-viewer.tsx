@@ -80,7 +80,7 @@ export function CodeViewer({ value, language, plain, placeholder }: CodeViewerPr
     <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden">
       <div ref={containerRef} className="flex flex-col flex-1 min-h-0 overflow-hidden" />
       {!value && placeholder && (
-        <div className="pointer-events-none absolute left-9 top-2 font-mono text-[11px] text-muted-foreground/50">
+        <div className="pointer-events-none absolute left-9 top-2 font-mono text-[11px] text-fg-mute/50">
           {placeholder}
         </div>
       )}

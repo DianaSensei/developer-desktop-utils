@@ -17,7 +17,7 @@ export function VaultManager({ store, open, onClose }: { store: ApiStore; open: 
           <DialogTitle>Vault</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 p-4">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px] text-fg-mute">
             Local-only secrets, separate from environments. Reference one anywhere with{' '}
             <code className="rounded bg-muted px-1">{'{{vault.name}}'}</code>. Vault values are masked in the UI,
             excluded from collection/Postman export and generated code, and invisible to pre/post-request scripts —

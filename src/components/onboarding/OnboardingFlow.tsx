@@ -72,7 +72,7 @@ export function OnboardingFlow() {
               key={s}
               className={cn(
                 'h-1.5 rounded-full transition-all',
-                i === stepIndex ? 'w-6 bg-primary' : 'w-1.5 bg-muted-foreground/25'
+                i === stepIndex ? 'w-6 bg-primary' : 'w-1.5 bg-fg-mute/25'
               )}
             />
           ))}
@@ -116,11 +116,11 @@ export function OnboardingFlow() {
                     className={cn(
                       'flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
                       active
-                        ? 'border-primary/50 bg-primary/10 text-foreground'
-                        : 'border-border hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                        ? 'border-primary/50 bg-primary/10 text-fg'
+                        : 'border-border hover:bg-muted/50 text-fg-mute hover:text-fg'
                     )}
                   >
-                    <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : 'text-muted-foreground')} />
+                    <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : 'text-fg-mute')} />
                     <span className="min-w-0 flex-1 truncate font-medium">{group.label}</span>
                     {active && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
                   </button>
@@ -142,7 +142,7 @@ export function OnboardingFlow() {
               </div>
               <DialogTitle className="text-lg">Sẵn sàng rồi!</DialogTitle>
               <DialogDescription>
-                Các tool bạn chọn đã lên đầu sidebar. Bấm nút <span className="font-medium text-foreground">?</span> ở góc trên mỗi tool bất
+                Các tool bạn chọn đã lên đầu sidebar. Bấm nút <span className="font-medium text-fg">?</span> ở góc trên mỗi tool bất
                 cứ lúc nào để xem hướng dẫn sử dụng chi tiết.
               </DialogDescription>
             </DialogHeader>

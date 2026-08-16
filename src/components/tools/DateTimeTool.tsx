@@ -174,7 +174,7 @@ function DurationParts({ a, b }: { a: Date; b: Date }) {
       {parts.map((text, i) => (
         <span key={i}>
           <span className="font-semibold font-mono">{text}</span>
-          {i < parts.length - 1 && <span className="text-muted-foreground/50 mx-0.5">·</span>}
+          {i < parts.length - 1 && <span className="text-fg-mute/50 mx-0.5">·</span>}
         </span>
       ))}
     </>
@@ -279,10 +279,10 @@ const BOUNDARY_PAIRS: [string, (d: Date) => Date, (d: Date) => Date][] = [
 function InfoTip({ text }: { text: string }) {
   return (
     <span className="relative group/tip inline-flex items-center">
-      <Info className="h-2.5 w-2.5 text-muted-foreground/40 hover:text-muted-foreground cursor-help transition-colors" />
+      <Info className="h-2.5 w-2.5 text-fg-mute/40 hover:text-fg-mute cursor-help transition-colors" />
       <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50
-        hidden group-hover/tip:block w-52 rounded-md border bg-popover px-2.5 py-2
-        text-[11px] leading-relaxed text-popover-foreground shadow-md">
+        hidden group-hover/tip:block w-52 rounded-md border bg-card px-2.5 py-2
+        text-[11px] leading-relaxed text-fg shadow-md">
         {text}
         <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-border" />
       </span>
@@ -293,7 +293,7 @@ function InfoTip({ text }: { text: string }) {
 function CopyValue({ value, dim = false }: { value: string; dim?: boolean }) {
   return (
     <div className="flex items-center gap-1 group min-w-0">
-      <span className={cn('font-mono text-xs truncate flex-1', dim && 'text-muted-foreground')}>{value}</span>
+      <span className={cn('font-mono text-xs truncate flex-1', dim && 'text-fg-mute')}>{value}</span>
       {!dim && (
         <CopyButton
           value={value}
@@ -311,7 +311,7 @@ function TzSelect({ label, value, onChange, availableTzs }: {
 }) {
   return (
     <div className="flex items-center gap-2 flex-1">
-      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <span className="text-xs text-fg-mute shrink-0">{label}</span>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="flex-1 h-ctl text-xs rounded-sm">
           <SelectValue />
@@ -364,7 +364,7 @@ function DiffDateInput({ value, onChange, tz }: {
           setSnapshot(parsed ?? new Date());
           setShowPicker(true);
         }}
-        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted text-fg-mute hover:text-fg transition-colors"
       >
         <Calendar className="h-3 w-3" />
       </button>
@@ -545,7 +545,7 @@ export function DateTimeTool() {
             </div>
             <button
               onClick={resetToNow}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-1 text-xs text-fg-mute hover:text-fg transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
               Reset to now
@@ -561,7 +561,7 @@ export function DateTimeTool() {
             />
             <button
               onClick={() => showPicker ? cancelPicker() : openPicker()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted text-fg-mute hover:text-fg transition-colors"
             >
               <Calendar className="h-3.5 w-3.5" />
             </button>
@@ -584,7 +584,7 @@ export function DateTimeTool() {
             </p>
           )}
           {showHint && parsedDate && (
-            <p className="text-xs text-muted-foreground font-mono">→ {parsedDate.toISOString()}</p>
+            <p className="text-xs text-fg-mute font-mono">→ {parsedDate.toISOString()}</p>
           )}
         </div>
 
@@ -597,17 +597,17 @@ export function DateTimeTool() {
           <div className="flex-1 space-y-0.5">
             <TzSelect label="Input TZ" value={inputTz} onChange={setInputTz} availableTzs={availableTzs} />
             {tzsDiffer && parsedDate && (
-              <p className="text-[11px] font-mono text-muted-foreground">
+              <p className="text-[11px] font-mono text-fg-mute">
                 {formatInTz(parsedDate, inputTz, 'yyyy-MM-dd HH:mm:ss')}{' '}
                 <span className="text-info">{getLocalTzLabel(inputTz)}</span>
               </p>
             )}
           </div>
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-2" />
+          <ChevronRight className="h-3.5 w-3.5 text-fg-mute shrink-0 mt-2" />
           <div className="flex-1 space-y-0.5">
             <TzSelect label="Output TZ" value={outputTz} onChange={setOutputTz} availableTzs={availableTzs} />
             {tzsDiffer && parsedDate && (
-              <p className="text-[11px] font-mono text-muted-foreground">
+              <p className="text-[11px] font-mono text-fg-mute">
                 {formatInTz(parsedDate, outputTz, 'yyyy-MM-dd HH:mm:ss')}{' '}
                 <span className="text-warn">{getLocalTzLabel(outputTz)}</span>
               </p>
@@ -626,7 +626,7 @@ export function DateTimeTool() {
               return (
                 <div key={row.label} className="py-1.5 space-y-0.5 border-b last:border-b-0 [&:nth-last-child(2)]:border-b-0">
                   <div className="flex items-center gap-1">
-                    <span className="text-[11px] text-muted-foreground">{row.label}</span>
+                    <span className="text-[11px] text-fg-mute">{row.label}</span>
                     <InfoTip text={row.description} />
                   </div>
                   {showDual ? (
@@ -650,7 +650,7 @@ export function DateTimeTool() {
           {/* Custom format */}
           <div className="border-t mt-0.5 pt-2 space-y-0.5">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground shrink-0 w-10">Custom</span>
+              <span className="text-[11px] text-fg-mute shrink-0 w-10">Custom</span>
               <Input
                 value={customFmt}
                 onChange={(e) => setCustomFmt(e.target.value)}
@@ -689,8 +689,8 @@ export function DateTimeTool() {
           <div className="pt-1">
             <div className="grid grid-cols-[4rem_1fr_1fr] gap-2 pb-1">
               <span />
-              <span className="text-[11px] font-medium text-muted-foreground">Start</span>
-              <span className="text-[11px] font-medium text-muted-foreground">End</span>
+              <span className="text-[11px] font-medium text-fg-mute">Start</span>
+              <span className="text-[11px] font-medium text-fg-mute">End</span>
             </div>
             {BOUNDARY_PAIRS.map(([label, startFn, endFn]) => {
               // Compute boundary in the inputTz context
@@ -698,7 +698,7 @@ export function DateTimeTool() {
               const e = parsedDate ? applyBoundaryInTz(endFn,   parsedDate, inputTz) : null;
 
               const renderCell = (bd: Date | null) => {
-                if (!bd) return <span className="text-xs text-muted-foreground">—</span>;
+                if (!bd) return <span className="text-xs text-fg-mute">—</span>;
                 const inStr  = formatInTz(bd, inputTz, 'yyyy-MM-dd HH:mm:ss');
                 const outStr = formatInTz(bd, outputTz, 'yyyy-MM-dd HH:mm:ss');
                 const ts = getUnixTime(bd);
@@ -709,12 +709,12 @@ export function DateTimeTool() {
                       <CopyButton value={inStr} variant="ghost" className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" iconClassName="h-2.5 w-2.5" />
                     </div>
                     {tzsDiffer && inStr !== outStr && (
-                      <span className="font-mono text-[11px] text-muted-foreground">
+                      <span className="font-mono text-[11px] text-fg-mute">
                         {outStr}{' '}(<span className="text-warn">{getLocalTzLabel(outputTz)}</span>)
                       </span>
                     )}
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-[11px] text-muted-foreground">{ts}</span>
+                      <span className="font-mono text-[11px] text-fg-mute">{ts}</span>
                       <CopyButton value={String(ts)} variant="ghost" className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" iconClassName="h-2.5 w-2.5" />
                     </div>
                   </div>
@@ -723,7 +723,7 @@ export function DateTimeTool() {
 
               return (
                 <div key={label} className="grid grid-cols-[4rem_1fr_1fr] gap-2 py-1.5 border-t">
-                  <span className="text-xs text-muted-foreground self-start pt-0.5">{label}</span>
+                  <span className="text-xs text-fg-mute self-start pt-0.5">{label}</span>
                   {renderCell(s)}
                   {renderCell(e)}
                 </div>
@@ -739,10 +739,10 @@ export function DateTimeTool() {
               {([['From', diffA, setDiffA], ['To', diffB, setDiffB]] as const).map(([lbl, val, set]) => (
                 <div key={lbl} className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground">{lbl}</Label>
+                    <Label className="text-xs text-fg-mute">{lbl}</Label>
                     <button
                       onClick={() => set(formatInTz(new Date(), inputTz, "yyyy-MM-dd'T'HH:mm:ss"))}
-                      className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                      className="text-[11px] text-fg-mute hover:text-fg transition-colors"
                     >
                       now
                     </button>
@@ -761,7 +761,7 @@ export function DateTimeTool() {
                   <div className="rounded-lg border border-border px-3 py-2.5 space-y-2.5">
                     {/* Timeline visual */}
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-semibold text-foreground shrink-0">From</span>
+                      <span className="text-[11px] font-semibold text-fg shrink-0">From</span>
                       <div className="flex flex-1 items-center gap-1.5 min-w-0">
                         <div className={cn('h-0.5 flex-1 rounded-full', isForward ? 'bg-ok' : 'bg-bad')} />
                         <span className="shrink-0 text-xs"><DurationParts a={aDate} b={bDate} /></span>
@@ -769,15 +769,15 @@ export function DateTimeTool() {
                       </div>
                       <div className={cn('flex items-center gap-0.5 shrink-0', isForward ? 'text-ok' : 'text-bad')}>
                         {isForward ? <ChevronRight className="h-4 w-4 stroke-[2.5]" /> : <ChevronLeft className="h-4 w-4 stroke-[2.5]" />}
-                        <span className="text-[11px] font-semibold text-foreground">To</span>
+                        <span className="text-[11px] font-semibold text-fg">To</span>
                       </div>
                     </div>
                     {/* Plain-language explanation */}
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    <p className="text-[11px] text-fg-mute leading-relaxed">
                       {isForward ? (
-                        <>The first date is <span className="font-semibold text-foreground">{duration}</span> <span className="font-semibold text-ok">earlier</span> than the second.</>
+                        <>The first date is <span className="font-semibold text-fg">{duration}</span> <span className="font-semibold text-ok">earlier</span> than the second.</>
                       ) : (
-                        <>The first date is <span className="font-semibold text-foreground">{duration}</span> <span className="font-semibold text-bad">later</span> than the second.</>
+                        <>The first date is <span className="font-semibold text-fg">{duration}</span> <span className="font-semibold text-bad">later</span> than the second.</>
                       )}
                     </p>
                   </div>
@@ -786,7 +786,7 @@ export function DateTimeTool() {
                       .filter(([, val]) => val !== 0)
                       .map(([label, val]) => (
                         <div key={label} className="flex flex-col py-1.5 border-b [&:nth-last-child(-n+2)]:border-b-0">
-                          <span className="text-[11px] text-muted-foreground">{label}</span>
+                          <span className="text-[11px] text-fg-mute">{label}</span>
                           <CopyValue value={val.toLocaleString()} />
                         </div>
                       ))}
@@ -794,7 +794,7 @@ export function DateTimeTool() {
                 </div>
               );
             })() : (
-              <p className="text-xs text-muted-foreground">Enter two dates above to calculate the difference.</p>
+              <p className="text-xs text-fg-mute">Enter two dates above to calculate the difference.</p>
             )}
           </div>
         </CollapsibleSection>

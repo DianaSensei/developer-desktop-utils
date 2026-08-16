@@ -2,7 +2,7 @@
 // "Operations", "Advanced", "Data file", "Active consumers", "Selected".
 //
 // Roughly 25 hand-written spans across the app use some spelling of
-// `text-[11px] font-semibold uppercase tracking-wide text-muted-foreground`,
+// `text-[11px] font-semibold uppercase tracking-wide text-fg-mute`,
 // varying between `text-[11px]`/`text-[11px]`/`text-xs` and
 // `tracking-wide`/`tracking-wider`/`tracking-widest` with no rule behind the
 // choice. Two sizes are enough:
@@ -50,11 +50,11 @@ export function SectionLabel({
 }: SectionLabelProps) {
   return (
     <Tag className={cn('flex items-center gap-2', className)} {...props}>
-      <span className={cn('font-semibold uppercase tracking-wide text-muted-foreground', SIZE_CLASS[size])}>
+      <span className={cn('font-semibold uppercase tracking-wide text-fg-mute', SIZE_CLASS[size])}>
         {children}
       </span>
       {count != null && (
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{count}</span>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">{count}</span>
       )}
       {rule && <span className="h-px flex-1 bg-border" />}
       {actions && <span className={cn('flex items-center gap-1', !rule && 'ml-auto')}>{actions}</span>}

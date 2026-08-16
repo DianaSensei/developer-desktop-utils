@@ -27,23 +27,23 @@ function NodeCard({ node }: { node: NodeInfo }) {
           {node.running ? 'Running' : 'Down'}
         </Badge>
       </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs text-fg-mute">
         <span>Memory</span>
-        <span className="text-right tabular-nums text-foreground">
+        <span className="text-right tabular-nums text-fg">
           {formatBytes(node.mem_used)}{memPct != null && ` (${memPct}%)`}
         </span>
         <span>Disk free</span>
-        <span className="text-right tabular-nums text-foreground">{formatBytes(node.disk_free)}</span>
+        <span className="text-right tabular-nums text-fg">{formatBytes(node.disk_free)}</span>
         <span>File descriptors</span>
-        <span className="text-right tabular-nums text-foreground">
+        <span className="text-right tabular-nums text-fg">
           {formatNumber(node.fd_used)} / {formatNumber(node.fd_total)}
         </span>
         <span>Sockets</span>
-        <span className="text-right tabular-nums text-foreground">
+        <span className="text-right tabular-nums text-fg">
           {formatNumber(node.sockets_used)} / {formatNumber(node.sockets_total)}
         </span>
         <span>Uptime</span>
-        <span className="text-right tabular-nums text-foreground">{formatUptime(node.uptime)}</span>
+        <span className="text-right tabular-nums text-fg">{formatUptime(node.uptime)}</span>
       </div>
     </div>
   );
@@ -63,7 +63,7 @@ export function OverviewView({ conn, refreshKey, onRefresh }: OverviewViewProps)
       <div className="flex items-center justify-between px-5 py-3 border-b shrink-0">
         <div className="min-w-0">
           <h2 className="font-semibold text-sm truncate">Overview</h2>
-          <p className="text-[11px] text-muted-foreground truncate">
+          <p className="text-[11px] text-fg-mute truncate">
             {o?.product_name ?? 'RabbitMQ'} {o?.rabbitmq_version ?? o?.product_version ?? ''}
             {o?.cluster_name ? ` · ${o.cluster_name}` : ''}
           </p>

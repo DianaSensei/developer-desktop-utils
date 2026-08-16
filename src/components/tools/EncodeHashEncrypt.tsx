@@ -648,7 +648,7 @@ export function EncodeHashEncrypt() {
               ]}
               aria-label="Encode mode"
             />
-            <span className="text-xs text-muted-foreground truncate hidden sm:block">{codec.description}</span>
+            <span className="text-xs text-fg-mute truncate hidden sm:block">{codec.description}</span>
           </div>
 
           <ToolPanes>
@@ -707,7 +707,7 @@ export function EncodeHashEncrypt() {
                 'text-[11px] font-mono px-2 py-0.5 rounded border transition-colors',
                 upperHex
                   ? 'border-primary/40 bg-primary/10 text-primary'
-                  : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground hover:border-border/80'
+                  : 'border-border bg-muted/30 text-fg-mute hover:text-fg hover:border-border/80'
               )}
             >
               {upperHex ? 'ABC' : 'abc'}
@@ -722,13 +722,13 @@ export function EncodeHashEncrypt() {
                 <div key={id} className="rounded-lg border border-border bg-muted/20 overflow-hidden">
                   <div className="flex items-center gap-3 px-3 pt-2.5 pb-1 group">
                     <div className="shrink-0 w-24">
-                      <p className="text-xs font-semibold text-foreground leading-none mb-0.5">{label}</p>
-                      <p className="text-[11px] text-muted-foreground">{bits}-bit</p>
+                      <p className="text-xs font-semibold text-fg leading-none mb-0.5">{label}</p>
+                      <p className="text-[11px] text-fg-mute">{bits}-bit</p>
                     </div>
                     <Input
                       value={value}
                       readOnly
-                      className="flex-1 h-ctl font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
+                      className="flex-1 h-ctl font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-fg-mute"
                       placeholder={`${chars} hex chars`}
                     />
                     <div className={cn(
@@ -741,10 +741,10 @@ export function EncodeHashEncrypt() {
                       </Button>
                     </div>
                   </div>
-                  <p className="text-[11px] text-muted-foreground/60 px-3 pb-2">{desc}</p>
+                  <p className="text-[11px] text-fg-mute/60 px-3 pb-2">{desc}</p>
                   {isVerifying && (
                     <div className="px-3 pb-3 border-t border-border/50 pt-2.5 space-y-2">
-                      <p className="text-[11px] text-muted-foreground font-medium">Verify {label} hash</p>
+                      <p className="text-[11px] text-fg-mute font-medium">Verify {label} hash</p>
                       <div className="flex items-center gap-2">
                         <Input
                           value={verifyValue}
@@ -775,7 +775,7 @@ export function EncodeHashEncrypt() {
           {/* HMAC section (7 algorithms — SHA-3 excluded, no per-length HmacSHA3) */}
           <ToolSection>
             <div className="flex items-center gap-1.5">
-              <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
+              <KeyRound className="h-3.5 w-3.5 text-fg-mute" />
               <ToolLabel>HMAC — Keyed Hash</ToolLabel>
             </div>
             <ToolHint>Combines your text with a secret key · used for API authentication and message signing</ToolHint>
@@ -790,7 +790,7 @@ export function EncodeHashEncrypt() {
               <button
                 type="button"
                 onClick={() => setShowHmacKey((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg transition-colors"
               >
                 {showHmacKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -802,13 +802,13 @@ export function EncodeHashEncrypt() {
                   return (
                     <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-muted/20 group">
                       <div className="shrink-0 w-28">
-                        <p className="text-xs font-semibold text-foreground leading-none mb-0.5">HMAC-{label}</p>
-                        <p className="text-[11px] text-muted-foreground">{bits}-bit</p>
+                        <p className="text-xs font-semibold text-fg leading-none mb-0.5">HMAC-{label}</p>
+                        <p className="text-[11px] text-fg-mute">{bits}-bit</p>
                       </div>
                       <Input
                         value={value}
                         readOnly
-                        className="flex-1 h-ctl font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-muted-foreground"
+                        className="flex-1 h-ctl font-mono text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-fg-mute"
                         placeholder={`${chars} hex chars`}
                       />
                       <CopyButton value={value} disabled={!value} className="h-ctl w-ctl shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" iconClassName="h-3 w-3" />
@@ -817,7 +817,7 @@ export function EncodeHashEncrypt() {
                 })}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground/50 text-center py-2">
+              <p className="text-xs text-fg-mute/50 text-center py-2">
                 Enter a key above to generate HMAC signatures
               </p>
             )}
@@ -907,7 +907,7 @@ export function EncodeHashEncrypt() {
               <button
                 type="button"
                 onClick={() => setShowKey((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg transition-colors"
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>

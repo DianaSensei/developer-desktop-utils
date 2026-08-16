@@ -80,7 +80,7 @@ export function DropZone({
         'transition-[border-color,background-color] duration-200 ease-out',
         dragging
           ? 'border-primary bg-primary/5'
-          : 'border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/30',
+          : 'border-fg-mute/25 hover:border-fg-mute/50 hover:bg-muted/30',
         className
       )}
     >
@@ -93,10 +93,10 @@ export function DropZone({
           onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); }}
         />
       )}
-      <Icon className={cn('h-ctl w-ctl transition-colors', dragging ? 'text-primary' : 'text-muted-foreground/50')} />
+      <Icon className={cn('h-ctl w-ctl transition-colors', dragging ? 'text-primary' : 'text-fg-mute/50')} />
       <div>
         <p className="text-sm font-medium">{title}</p>
-        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+        {hint && <p className="mt-0.5 text-xs text-fg-mute">{hint}</p>}
       </div>
       {children}
     </div>

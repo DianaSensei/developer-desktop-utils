@@ -38,13 +38,13 @@ export function EmptyState({
       )}
     >
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/20">
-        <Icon className="h-ctl w-ctl text-muted-foreground/40" />
+        <Icon className="h-ctl w-ctl text-fg-mute/40" />
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-base font-medium text-foreground">{title}</h3>
+        <h3 className="text-base font-medium text-fg">{title}</h3>
         {description && (
-          <p className="max-w-xs text-sm text-muted-foreground">{description}</p>
+          <p className="max-w-xs text-sm text-fg-mute">{description}</p>
         )}
       </div>
 

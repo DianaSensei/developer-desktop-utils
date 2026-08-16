@@ -362,7 +362,7 @@ function ToggleChip({ active, onClick, children }: {
         'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none',
         active
           ? 'border-primary/50 bg-primary/10 text-primary'
-          : 'border-input bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+          : 'border-input bg-transparent text-fg-mute hover:bg-muted hover:text-fg'
       )}
     >
       {children}
@@ -517,7 +517,7 @@ export function SqlFormatter() {
 
           {/* Indent size */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Indent</span>
+            <span className="text-xs text-fg-mute">Indent</span>
             <Select value={indentSize} onValueChange={(v) => setIndentSize(v as '2' | '4')}>
               <SelectTrigger className="h-ctl w-[88px] text-xs rounded-sm">
                 <SelectValue />
@@ -553,7 +553,7 @@ export function SqlFormatter() {
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
           ref={containerRef}
-          className="flex flex-col flex-1 min-h-0 overflow-hidden [&_.cm-editor]:bg-background [&_.cm-editor.cm-focused]:outline-none"
+          className="flex flex-col flex-1 min-h-0 overflow-hidden [&_.cm-editor]:bg-bg [&_.cm-editor.cm-focused]:outline-none"
         />
       </div>
 
@@ -563,7 +563,7 @@ export function SqlFormatter() {
           variant="ghost"
           size="sm"
           onClick={handleClear}
-          className="h-ctl gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground rounded-sm"
+          className="h-ctl gap-1.5 px-2 text-xs text-fg-mute hover:text-fg rounded-sm"
         >
           <Trash2 className="h-3 w-3" />
           Clear

@@ -21,13 +21,13 @@ export function LoadingOverlay({
       className={cn(
         'flex flex-col items-center justify-center gap-3 animate-fade-in',
         fullScreen
-          ? 'fixed inset-0 bg-background/50 backdrop-blur-sm z-50'
-          : 'absolute inset-0 bg-background/40 backdrop-blur-xs rounded-lg',
+          ? 'fixed inset-0 bg-bg/50 backdrop-blur-sm z-50'
+          : 'absolute inset-0 bg-bg/40 backdrop-blur-xs rounded-lg',
         className
       )}
     >
       <Spinner size="lg" className="text-primary" />
-      {message && <p className="text-sm text-muted-foreground loading-text">{message}</p>}
+      {message && <p className="text-sm text-fg-mute loading-text">{message}</p>}
     </div>
   );
 }

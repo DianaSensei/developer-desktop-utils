@@ -170,7 +170,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     <div className="flex h-full w-full flex-col">
       {/* header */}
       <div className="flex items-center justify-between gap-1 border-b border-border px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-fg-mute/70">
           <Boxes className="h-3.5 w-3.5" /> Collections
         </div>
         <div className="flex items-center gap-0.5">
@@ -178,7 +178,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
             <Plus className="h-4 w-4" />
           </IconButton>
           <DropdownMenu>
-            <DropdownMenuTrigger title="More" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            <DropdownMenuTrigger title="More" className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-accent hover:text-fg">
               <MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
@@ -201,11 +201,11 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       {/* tree */}
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {store.collections.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+          <p className="px-3 py-6 text-center text-xs text-fg-mute">
             No collections yet. Create one or import a Postman file.
           </p>
         ) : visible.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-muted-foreground">No matches.</p>
+          <p className="px-3 py-6 text-center text-xs text-fg-mute">No matches.</p>
         ) : (
           visible.map((c) => <CollectionNode key={c.id} collection={c} ctx={nodeCtx} />)
         )}
@@ -283,7 +283,7 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
         depth={0}
         collapsed={collapsed}
         hasChildren
-        icon={<Layers className="h-3.5 w-3.5 text-muted-foreground" />}
+        icon={<Layers className="h-3.5 w-3.5 text-fg-mute" />}
         name={collection.name}
         onToggle={() => store.toggleCollapse(collection.id)}
         onRename={(name) => store.renameCollection(collection.id, name)}
@@ -453,7 +453,7 @@ function Row({
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onDrop(); }}
       className={cn(
         'group relative flex items-center gap-1.5 py-[5px] pr-1 text-xs cursor-pointer transition-colors hover:bg-accent/60',
-        active && 'bg-accent/80 text-foreground',
+        active && 'bg-accent/80 text-fg',
         dragging && 'opacity-40',
         dt?.where === 'inside' && 'bg-primary/10 ring-1 ring-inset ring-primary/40',
       )}
@@ -466,8 +466,8 @@ function Row({
       {dt?.where === 'before' && <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-primary" />}
       {dt?.where === 'after' && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
       {hasChildren ? (
-        collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
+          : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
       ) : (
         <span className="w-0 shrink-0" />
       )}
@@ -502,7 +502,7 @@ function Row({
 // (the panel background differs from the app chrome IconButton defaults to).
 function IconBtn({ children, title, onClick }: { children: React.ReactNode; title: string; onClick: (e: React.MouseEvent) => void }) {
   return (
-    <IconButton size="sm" title={title} onClick={onClick} className="hover:bg-background">
+    <IconButton size="sm" title={title} onClick={onClick} className="hover:bg-bg">
       {children}
     </IconButton>
   );

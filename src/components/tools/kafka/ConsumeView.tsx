@@ -48,10 +48,10 @@ export function ConsumeView({ brokerId, refreshKey, onRefresh, prefill, detailTo
     <div className="tool-full-height">
       <div className="flex items-center justify-between px-5 py-3 border-b shrink-0 gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <Radio className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Radio className="h-4 w-4 text-fg-mute shrink-0" />
           <div className="min-w-0">
             <h2 className="font-semibold text-sm">Consume (realtime)</h2>
-            <p className="text-[11px] text-muted-foreground">{sessions.length} active · anonymous, no offsets committed</p>
+            <p className="text-[11px] text-fg-mute">{sessions.length} active · anonymous, no offsets committed</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
@@ -70,7 +70,7 @@ export function ConsumeView({ brokerId, refreshKey, onRefresh, prefill, detailTo
           <div>
             <SectionLabel as="h3" size="sm" className="mb-2">Active consumers</SectionLabel>
             {sessions.length === 0
-              ? <p className="text-sm text-muted-foreground">No consumers running. Start one above to watch a topic in realtime.</p>
+              ? <p className="text-sm text-fg-mute">No consumers running. Start one above to watch a topic in realtime.</p>
               : (
                 <div className="rounded-lg border divide-y divide-border/40 overflow-hidden">
                   {sessions.map((s) => <ConsumerListRow key={s.topic} session={s} onOpen={() => onOpenConsumer(s.topic)} />)}
@@ -99,7 +99,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: KafkaConsumerSession
       {s.paused && (
         <Badge tone="warning" uppercase>paused</Badge>
       )}
-      <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
+      <span className="ml-auto text-xs text-fg-mute tabular-nums shrink-0">
         {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
       </span>
       <span onClick={(e) => e.stopPropagation()} className="shrink-0">
@@ -107,7 +107,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: KafkaConsumerSession
           <Square className="h-3 w-3" />
         </Button>
       </span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      <ChevronRight className="h-4 w-4 text-fg-mute shrink-0" />
     </div>
   );
 }
@@ -176,7 +176,7 @@ function StartConsumerForm({ brokerId, refreshKey, sessions, prefill, onStarted 
           </div>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[11px] text-fg-mute">
         {from === 'latest'
           ? 'Streams only messages produced after you start (all partitions).'
           : 'Replays from the earliest retained offset, then follows new messages (all partitions).'}
@@ -217,13 +217,13 @@ function ConsumerDetail({ session: s, onBack }: { session: KafkaConsumerSession;
       {/* Header: back · topic · status · controls */}
       <div className="flex items-center justify-between px-5 py-3 border-b shrink-0 gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <button onClick={() => onBack()} className="text-muted-foreground hover:text-foreground shrink-0" title="Back to consumers">
+          <button onClick={() => onBack()} className="text-fg-mute hover:text-fg shrink-0" title="Back to consumers">
             <ArrowLeft className="h-4 w-4" />
           </button>
           <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
           <div className="min-w-0">
             <h2 className="font-semibold text-sm font-mono truncate">{s.topic}</h2>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-fg-mute">
               {s.from === 'latest' ? 'new only' : 'from start'}
               {' · '}
               {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
@@ -270,7 +270,7 @@ function ConsumerDetail({ session: s, onBack }: { session: KafkaConsumerSession;
             { value: 'hex', label: 'Hex' },
           ]}
         />
-        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums shrink-0">
+        <span className="ml-auto text-[11px] text-fg-mute tabular-nums shrink-0">
           {q ? `${matches.length.toLocaleString()} match${matches.length === 1 ? '' : 'es'}` : `${buffered.toLocaleString()} buffered`}
           {capped && ' · capped'}
         </span>
@@ -279,12 +279,12 @@ function ConsumerDetail({ session: s, onBack }: { session: KafkaConsumerSession;
       {/* Messages */}
       <div className="tool-scrollable">
         {shown.length === 0
-          ? <p className="px-5 py-4 text-sm text-muted-foreground">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
+          ? <p className="px-5 py-4 text-sm text-fg-mute">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
           : (
             <div className="divide-y divide-border/40">
               {shown.map((m) => <MessageRow key={`${m.partition}-${m.offset}`} m={m} format={format} />)}
               {matches.length > shown.length && (
-                <p className="px-5 py-2 text-[11px] text-muted-foreground">
+                <p className="px-5 py-2 text-[11px] text-fg-mute">
                   Showing first 200 of {matches.length.toLocaleString()}{q ? ' matches' : ''}. Narrow your search to see more.
                 </p>
               )}
@@ -309,16 +309,16 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((x) => !x); } }}
         className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted/40"
       >
-        {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-        <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 w-[5.5rem]" title={m.timestamp}>{fmtTime(m.timestamp)}</span>
-        <span className="text-[11px] font-mono px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0">p{m.partition}</span>
-        <span className="text-[11px] font-mono text-muted-foreground tabular-nums shrink-0 w-14">@{m.offset}</span>
+        {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />}
+        <span className="text-[11px] text-fg-mute tabular-nums shrink-0 w-[5.5rem]" title={m.timestamp}>{fmtTime(m.timestamp)}</span>
+        <span className="text-[11px] font-mono px-1 py-0.5 rounded bg-muted text-fg-mute shrink-0">p{m.partition}</span>
+        <span className="text-[11px] font-mono text-fg-mute tabular-nums shrink-0 w-14">@{m.offset}</span>
         {m.key != null && m.key !== '' && (
           <span className="text-[11px] font-mono text-primary/80 truncate max-w-[9rem] shrink-0" title={`key: ${m.key}`}>{m.key}</span>
         )}
-        <span className="flex-1 min-w-0 font-mono text-xs text-foreground/80 truncate">{previewValue(m, format)}</span>
+        <span className="flex-1 min-w-0 font-mono text-xs text-fg/80 truncate">{previewValue(m, format)}</span>
         {headerEntries.length > 0 && (
-          <span className="text-[11px] text-muted-foreground shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>
+          <span className="text-[11px] text-fg-mute shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>
         )}
         <span onClick={(e) => e.stopPropagation()} className="shrink-0">
           <CopyButton value={m.value ?? ''} iconClassName="h-3.5 w-3.5" />
@@ -328,9 +328,9 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
       {/* Expanded detail — full value, key, and headers for tracing. */}
       {expanded && (
         <div className="px-3 pb-3 pt-1 space-y-2.5 bg-muted/10 border-t border-border/30">
-          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-muted-foreground pt-1">
-            <span>partition <span className="text-foreground">{m.partition}</span></span>
-            <span>offset <span className="text-foreground">{m.offset}</span></span>
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-fg-mute pt-1">
+            <span>partition <span className="text-fg">{m.partition}</span></span>
+            <span>offset <span className="text-fg">{m.offset}</span></span>
             <span>{m.timestamp}</span>
           </div>
 
@@ -340,12 +340,12 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
 
           {headerEntries.length > 0 && (
             <div>
-              <div className="text-[11px] font-medium text-muted-foreground mb-1">Headers</div>
+              <div className="text-[11px] font-medium text-fg-mute mb-1">Headers</div>
               <div className="rounded-md border divide-y divide-border/40 overflow-hidden">
                 {headerEntries.map(([k, v]) => (
                   <div key={k} className="flex gap-3 px-2.5 py-1 text-[11px] font-mono">
-                    <span className="text-muted-foreground shrink-0">{k}</span>
-                    <span className="text-foreground break-all flex-1 min-w-0">{v}</span>
+                    <span className="text-fg-mute shrink-0">{k}</span>
+                    <span className="text-fg break-all flex-1 min-w-0">{v}</span>
                   </div>
                 ))}
               </div>
@@ -354,13 +354,13 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-medium text-muted-foreground">Value</span>
+              <span className="text-[11px] font-medium text-fg-mute">Value</span>
               <CopyButton value={m.value ?? ''} iconClassName="h-3.5 w-3.5" />
             </div>
             {format === 'hex' ? (
-              <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto rounded-md border bg-background px-2.5 py-2">{formatValue(m, format)}</pre>
+              <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto rounded-md border bg-bg px-2.5 py-2">{formatValue(m, format)}</pre>
             ) : (
-              <div className="flex h-64 rounded-md border bg-background overflow-hidden">
+              <div className="flex h-64 rounded-md border bg-bg overflow-hidden">
                 <CodeViewer value={formatValue(m, format)} language={format === 'json' ? 'json' : 'text'} />
               </div>
             )}
@@ -375,10 +375,10 @@ function DetailField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+        <span className="text-[11px] font-medium text-fg-mute">{label}</span>
         <CopyButton value={value} iconClassName="h-3.5 w-3.5" />
       </div>
-      <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-md border bg-background px-2.5 py-1.5">{value}</pre>
+      <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-md border bg-bg px-2.5 py-1.5">{value}</pre>
     </div>
   );
 }
@@ -461,7 +461,7 @@ function TopicCombobox({ brokerId, value, topics, onChange }: {
         className="font-mono text-sm h-ctl"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">
+        <div className="absolute z-20 mt-1 w-full rounded-md border bg-card shadow max-h-64 overflow-y-auto py-1">
           <RecentSuggestions items={recent} brokerId={brokerId} field="topic" value={value} onPick={pick} />
           {matches.map((t) => (
             <button

@@ -502,9 +502,9 @@ export function JsonFormatter() {
   const outputText = mode === 'minify' ? minified : mode === 'string' ? jsonString : beautified;
 
   const renderValue = (line: FlatLine, bracketClass: string) => {
-    const comma = !line.isLast && <span className="text-muted-foreground">,</span>;
+    const comma = !line.isLast && <span className="text-fg-mute">,</span>;
     const badge = (
-      <span className="ml-2 text-xs text-muted-foreground/70">
+      <span className="ml-2 text-xs text-fg-mute/70">
         {line.isArray ? `${line.count} ${line.count === 1 ? 'item' : 'items'}` : `${line.count} ${line.count === 1 ? 'field' : 'fields'}`}
       </span>
     );
@@ -528,7 +528,7 @@ export function JsonFormatter() {
         return (
           <>
             <span className={bracketClass}>{line.bracketOpen}</span>
-            <span className="text-muted-foreground"> … </span>
+            <span className="text-fg-mute"> … </span>
             <span className={bracketClass}>{line.bracketClose}</span>
             {comma}
             {badge}
@@ -575,7 +575,7 @@ export function JsonFormatter() {
               <span className="font-mono text-xs">{parsed.error}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-fg-mute">
               <CheckCircle2 className="h-4 w-4 text-ok" />
               <span className="text-xs">Valid JSON</span>
             </div>
@@ -618,7 +618,7 @@ export function JsonFormatter() {
           >
             {lines.map((line) => {
               const bracketHighlighted = line.kind !== 'primitive' && line.path === hoveredContainer;
-              const bracketClass = cn('text-muted-foreground', bracketHighlighted && 'text-foreground font-semibold');
+              const bracketClass = cn('text-fg-mute', bracketHighlighted && 'text-fg font-semibold');
               const isMatch = lineMatches(line, lowerQuery);
               const isSelected = line.kind !== 'close' && selectedPath === line.path;
               const isToggle = line.kind === 'open' || line.kind === 'collapsed';
@@ -629,18 +629,18 @@ export function JsonFormatter() {
                   onMouseEnter={() => setHoveredContainer(line.containerPath)}
                   onClick={() => { setSelectedPath(line.path); if (isToggle && !forceExpand) toggle(line.path); }}
                 >
-                  <span className="w-12 shrink-0 select-none pr-3 text-right text-xs leading-relaxed text-muted-foreground/45 tabular-nums">
+                  <span className="w-12 shrink-0 select-none pr-3 text-right text-xs leading-relaxed text-fg-mute/45 tabular-nums">
                     {line.no}
                   </span>
                   <div className="flex min-w-0 flex-1 items-start pr-3" style={{ paddingLeft: `${line.depth * indent.size}ch` }}>
-                    <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-muted-foreground">
+                    <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-fg-mute">
                       {isToggle && (line.kind === 'open' ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)}
                     </span>
-                    <span className={cn('whitespace-pre rounded-sm px-0.5', isSelected && 'bg-foreground/10', isMatch && 'bg-warn/25')}>
+                    <span className={cn('whitespace-pre rounded-sm px-0.5', isSelected && 'bg-fg/10', isMatch && 'bg-warn/25')}>
                       {line.name !== undefined && (
                         <>
                           <span className="text-[var(--json-key)]">{quoteText(line.name, quote)}</span>
-                          <span className="text-muted-foreground">: </span>
+                          <span className="text-fg-mute">: </span>
                         </>
                       )}
                       {renderValue(line, bracketClass)}
@@ -666,8 +666,8 @@ export function JsonFormatter() {
 
         {/* Empty state */}
         {parsed.value === undefined && !parsed.error && (
-          <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground px-8 gap-3">
-            <FileJson className="h-12 w-12 text-muted-foreground/30" />
+          <div className="flex-1 flex flex-col items-center justify-center text-center text-fg-mute px-8 gap-3">
+            <FileJson className="h-12 w-12 text-fg-mute/30" />
             <p className="text-sm">Paste JSON to get started</p>
             {!showInput && (
               <Button variant="outline" size="sm" className="h-ctl text-xs rounded-sm" onClick={() => setShowInput(true)}>
@@ -681,8 +681,8 @@ export function JsonFormatter() {
       {/* Beautify: path breadcrumb */}
       {parsed.value !== undefined && mode === 'beautify' && (
         <div className="shrink-0 border-t border-border flex items-center gap-2 px-4 py-2 bg-muted/10 text-xs">
-          <span className="text-muted-foreground">Path</span>
-          <code className="flex-1 truncate font-mono text-foreground">{selectedPath || '$ (click a node)'}</code>
+          <span className="text-fg-mute">Path</span>
+          <code className="flex-1 truncate font-mono text-fg">{selectedPath || '$ (click a node)'}</code>
           {selectedPath && (
             <CopyButton value={selectedPath} variant="ghost" size="sm" className="h-6 px-2" iconClassName="h-3.5 w-3.5" />
           )}
@@ -708,7 +708,7 @@ export function JsonFormatter() {
           />
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Indent</span>
+            <span className="text-xs text-fg-mute">Indent</span>
             <Select value={indentKey} onValueChange={setIndentKey}>
               <SelectTrigger className="h-ctl w-[108px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -720,7 +720,7 @@ export function JsonFormatter() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Quotes</span>
+            <span className="text-xs text-fg-mute">Quotes</span>
             <Select value={quote} onValueChange={setQuote}>
               <SelectTrigger className="h-ctl w-[112px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>

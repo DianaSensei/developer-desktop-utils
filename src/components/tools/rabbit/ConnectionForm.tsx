@@ -165,12 +165,12 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
-      <div className="bg-background border rounded-lg shadow-xl w-full max-w-md mx-4 p-6 max-h-[88vh] overflow-y-auto">
+      <div className="bg-bg border rounded-lg shadow-xl w-full max-w-md mx-4 p-6 max-h-[88vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-semibold text-base">
             {form.id ? 'Edit Connection' : 'Add Connection'}
           </h2>
-          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground">
+          <button onClick={onCancel} className="text-fg-mute hover:text-fg">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -194,7 +194,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
               <button
                 type="button"
                 onClick={() => setShowUri((s) => !s)}
-                className="text-[11px] text-muted-foreground hover:text-foreground"
+                className="text-[11px] text-fg-mute hover:text-fg"
                 title="Fill the fields from an amqp:// URI"
               >
                 {showUri ? 'Hide URI' : 'Paste URI'}
@@ -207,7 +207,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
               placeholder="127.0.0.1:5672, broker2:5672"
               className="mt-1 font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-fg-mute mt-1">
               <span className="font-mono">host:port</span>, comma-separated. The first is primary; the rest are tried on failover. Default port <span className="font-mono">{defaultPort(form.useTls)}</span> ({form.useTls ? 'amqps' : 'amqp'}).
             </p>
             {showUri && (
@@ -252,7 +252,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
           <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
             <div>
               <Label htmlFor="rb-tls" className="cursor-pointer">Use TLS</Label>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
+              <p className="text-[11px] text-fg-mute mt-0.5">
                 Connect over <span className="font-mono">amqps</span> (and <span className="font-mono">https</span> for the management API).
               </p>
             </div>
@@ -264,8 +264,8 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
           <div className="rounded-md border">
             <div className="flex items-center justify-between px-3 py-2.5">
               <div className="pr-2">
-                <Label className="cursor-pointer">Management API <span className="font-normal text-muted-foreground">— optional</span></Label>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+                <Label className="cursor-pointer">Management API <span className="font-normal text-fg-mute">— optional</span></Label>
+                <p className="text-[11px] text-fg-mute mt-0.5">
                   Adds browse-all queues &amp; exchanges, the overview dashboard and connections — needs the RabbitMQ <span className="font-medium">management</span> plugin. Leave off to work over AMQP with typed names.
                 </p>
               </div>
@@ -281,7 +281,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                   onChange={(e) => set('port', Number(e.target.value))}
                   className="mt-1 font-mono text-sm h-ctl w-32"
                 />
-                <p className="text-[11px] text-muted-foreground mt-1">
+                <p className="text-[11px] text-fg-mute mt-1">
                   Default <span className="font-mono">15672</span> on <span className="font-mono">{form.host || 'host'}</span> ({form.useTls ? 'https' : 'http'}).
                 </p>
               </div>
@@ -325,7 +325,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                 placeholder="/"
                 className="mt-1 font-mono text-xs h-ctl"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Addresses field above for HA failover.</p>
+              <p className="text-[11px] text-fg-mute mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Addresses field above for HA failover.</p>
             </div>
             <div>
               <Label htmlFor="rb-ca" className="text-xs">Trust CA certificate (PEM)</Label>
@@ -334,7 +334,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                 onChange={(e) => set('tlsCaPem', e.target.value || null)}
                 placeholder="-----BEGIN CERTIFICATE-----" className="mt-1 font-mono text-[11px] min-h-16"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">For self-signed / private brokers (amqps). The proper alternative to disabling verification.</p>
+              <p className="text-[11px] text-fg-mute mt-1">For self-signed / private brokers (amqps). The proper alternative to disabling verification.</p>
             </div>
             <div>
               <Label htmlFor="rb-p12" className="text-xs">Client identity — PKCS#12 (base64)</Label>

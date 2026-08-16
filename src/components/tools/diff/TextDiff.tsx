@@ -148,7 +148,7 @@ export function TextDiff() {
           ]}
           aria-label="Diff mode"
         />
-        <span className="hidden text-xs text-muted-foreground lg:block">
+        <span className="hidden text-xs text-fg-mute lg:block">
           {mode === 'text'
             ? 'Live diff — synced scrolling, inline highlights, and chunk arrows to copy changes across.'
             : 'Structural diff by path below, plus a synced line diff of the formatted JSON.'}
@@ -229,7 +229,7 @@ export function TextDiff() {
                   ))}
                 </div>
               ) : (
-                <p className="pb-1 text-sm text-muted-foreground">
+                <p className="pb-1 text-sm text-fg-mute">
                   {text1.length + text2.length > STRUCTURAL_DIFF_CHAR_LIMIT
                     ? 'Input is too large for the structural diff — the line diff above still works.'
                     : 'No differences — the two JSON values are structurally identical.'}
@@ -251,12 +251,12 @@ function JsonChangeRow({ change }: { change: Change }) {
     <div className="flex items-start gap-2 font-mono text-xs">
       <Badge tone={tone} uppercase>{change.kind}</Badge>
       <div className="min-w-0 flex-1">
-        <span className="font-medium text-foreground">{change.path}</span>
+        <span className="font-medium text-fg">{change.path}</span>
         <span className="ml-2 break-all">
           {change.kind === 'changed' ? (
             <>
               <span className="text-bad line-through">{preview(change.before)}</span>
-              <span className="mx-1 text-muted-foreground">→</span>
+              <span className="mx-1 text-fg-mute">→</span>
               <span className="text-ok">{preview(change.after)}</span>
             </>
           ) : change.kind === 'added' ? (

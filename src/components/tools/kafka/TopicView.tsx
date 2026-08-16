@@ -65,16 +65,16 @@ export function TopicView({
       {/* Header — breadcrumb: Broker › Topic › Tab */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
         <div className="flex items-center gap-1.5 min-w-0 text-sm">
-          <button onClick={onBackToTopics} className="text-muted-foreground hover:text-foreground shrink-0" title="Back to topics">
+          <button onClick={onBackToTopics} className="text-fg-mute hover:text-fg shrink-0" title="Back to topics">
             <ArrowLeft className="h-4 w-4" />
           </button>
           {brokerName && (
             <>
-              <span className="flex items-center gap-1 text-muted-foreground shrink-0">
+              <span className="flex items-center gap-1 text-fg-mute shrink-0">
                 <Server className="w-3.5 h-3.5" />
                 <span className="truncate max-w-[10rem]">{brokerName}</span>
               </span>
-              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+              <ChevronRight className="w-3.5 h-3.5 text-fg-mute/50 shrink-0" />
             </>
           )}
           <button
@@ -84,14 +84,14 @@ export function TopicView({
           >
             {topic}
           </button>
-          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-          <span className="text-muted-foreground shrink-0">{TABS.find((t) => t.id === activeTab)?.label}</span>
+          <ChevronRight className="w-3.5 h-3.5 text-fg-mute/50 shrink-0" />
+          <span className="text-fg-mute shrink-0">{TABS.find((t) => t.id === activeTab)?.label}</span>
           {data && (
-            <span className="ml-2 text-xs text-muted-foreground shrink-0 hidden sm:inline">
+            <span className="ml-2 text-xs text-fg-mute shrink-0 hidden sm:inline">
               {data.partitions.length}p · RF {data.replicationFactor}
             </span>
           )}
-          {loading && <Spinner size="sm" className="text-muted-foreground" />}
+          {loading && <Spinner size="sm" className="text-fg-mute" />}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Produce / Consume open the global panels pre-targeted at this topic. */}
@@ -123,8 +123,8 @@ export function TopicView({
             className={cn(
               'px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0',
               activeTab === tab.id
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
+                ? 'border-primary text-fg'
+                : 'border-transparent text-fg-mute hover:text-fg',
             )}
             onClick={() => onSelectTab(tab.id)}
           >

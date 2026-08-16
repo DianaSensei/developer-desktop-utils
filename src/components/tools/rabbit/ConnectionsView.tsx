@@ -55,7 +55,7 @@ export function ConnectionsView({ conn, refreshKey, onRefresh }: ConnectionsView
 
         {tab === 'connections' && conns.data && (
           conns.data.length === 0
-            ? <p className="text-sm text-muted-foreground">No active connections.</p>
+            ? <p className="text-sm text-fg-mute">No active connections.</p>
             : (
               <DataTable>
                 <Thead>
@@ -73,7 +73,7 @@ export function ConnectionsView({ conn, refreshKey, onRefresh }: ConnectionsView
                       <Td><StateBadge state={c.state} /></Td>
                       <Td className="whitespace-nowrap">{c.protocol ?? '—'}</Td>
                       <Td className="tabular-nums">{formatNumber(c.channels)}</Td>
-                      <Td mono className="whitespace-nowrap text-muted-foreground">{c.peer_host}:{c.peer_port}</Td>
+                      <Td mono className="whitespace-nowrap text-fg-mute">{c.peer_host}:{c.peer_port}</Td>
                       <Td>{c.ssl ? 'Yes' : 'No'}</Td>
                       <Td numeric>{formatBytes(c.recv_oct)}</Td>
                       <Td numeric>{formatBytes(c.send_oct)}</Td>
@@ -86,7 +86,7 @@ export function ConnectionsView({ conn, refreshKey, onRefresh }: ConnectionsView
 
         {tab === 'channels' && chans.data && (
           chans.data.length === 0
-            ? <p className="text-sm text-muted-foreground">No active channels.</p>
+            ? <p className="text-sm text-fg-mute">No active channels.</p>
             : (
               <DataTable>
                 <Thead>

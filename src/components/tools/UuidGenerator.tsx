@@ -22,7 +22,7 @@ export function UuidGenerator() {
       <div className="p-4 sm:p-5 space-y-4">
         <div className="flex items-end gap-2">
           <div className="space-y-1.5 flex-1 max-w-[160px]">
-            <span className="text-xs font-medium text-muted-foreground">Count (max 100)</span>
+            <span className="text-xs font-medium text-fg-mute">Count (max 100)</span>
             <Input
               type="number"
               min="1"
@@ -40,7 +40,7 @@ export function UuidGenerator() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Generated UUIDs</span>
+            <span className="text-xs font-medium text-fg-mute">Generated UUIDs</span>
             {uuids.length > 1 && (
               <CopyButton value={() => uuids.join('\n')} label="Copy All" size="sm" variant="ghost" className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />
             )}

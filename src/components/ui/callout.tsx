@@ -26,7 +26,7 @@ const TONE_CLASS: Record<CalloutTone, string> = {
   error: 'border-bad-edge bg-bad-tint text-bad',
   warning: 'border-warn-edge bg-warn-tint text-warn',
   success: 'border-ok-edge bg-ok-tint text-ok',
-  info: 'border-border bg-muted/40 text-muted-foreground',
+  info: 'border-border bg-muted/40 text-fg-mute',
 };
 
 const TONE_ICON: Record<CalloutTone, LucideIcon> = {

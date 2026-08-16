@@ -17,20 +17,20 @@ export function GuideSection({
 }: { icon: typeof Send; title: string; tone?: 'caveat'; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
-      <h3 className="flex items-center gap-2 text-xs font-semibold text-foreground">
+      <h3 className="flex items-center gap-2 text-xs font-semibold text-fg">
         <Icon className={cn('h-3.5 w-3.5', tone === 'caveat' ? 'text-warn' : 'text-acc-ink')} />
         {title}
       </h3>
-      <div className="space-y-1 pl-5 text-[12px] leading-relaxed text-muted-foreground">{children}</div>
+      <div className="space-y-1 pl-5 text-[12px] leading-relaxed text-fg-mute">{children}</div>
     </section>
   );
 }
 
 function Key({ children }: { children: ReactNode }) {
-  return <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">{children}</kbd>;
+  return <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[11px] text-fg">{children}</kbd>;
 }
 function Tok({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-muted px-1 text-[11px] text-foreground">{children}</code>;
+  return <code className="rounded bg-muted px-1 text-[11px] text-fg">{children}</code>;
 }
 function Var({ children }: { children: ReactNode }) {
   return <code className="rounded-xs bg-ok-tint px-1 text-[11px] text-ok">{children}</code>;
@@ -61,7 +61,7 @@ function makeGuide(g: { use: ReactNode[]; know?: ReactNode[]; caveat?: ReactNode
 export function GenericGuide({ description }: { description: string }) {
   return (
     <>
-      {description && <p className="text-[12px] leading-relaxed text-muted-foreground">{description}</p>}
+      {description && <p className="text-[12px] leading-relaxed text-fg-mute">{description}</p>}
       <GuideSection icon={Lightbulb} title="Good to know">
         <List items={[
           'Most tools update their output live as you type — no “run” button needed.',
@@ -80,16 +80,16 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
   'api-client': (
     <>
       <GuideSection icon={Send} title="Send a request">
-        <p>Pick a method, type the URL, and click <strong className="text-foreground">Send</strong> (or <Key>{mod}</Key>+<Key>↵</Key>). The response — status, time, size, headers, and a pretty-printed body — shows on the right.</p>
+        <p>Pick a method, type the URL, and click <strong className="text-fg">Send</strong> (or <Key>{mod}</Key>+<Key>↵</Key>). The response — status, time, size, headers, and a pretty-printed body — shows on the right.</p>
         <p>In the desktop app requests go through Rust, so there’s no browser CORS restriction — you can call any API.</p>
       </GuideSection>
       <GuideSection icon={Braces} title="Variables">
         <p>Use <Var>{'{{name}}'}</Var> anywhere — URL, query, headers, body, or auth. A token turns <span className="text-ok">green</span> when it resolves in the current context and <span className="text-bad">red</span> when it doesn’t; hover to see its value.</p>
-        <p>Define variables in an <strong className="text-foreground">Environment</strong> (top-right dropdown) and select it to activate. Scripts can set session variables with <Tok>bru.setVar()</Tok>.</p>
+        <p>Define variables in an <strong className="text-fg">Environment</strong> (top-right dropdown) and select it to activate. Scripts can set session variables with <Tok>bru.setVar()</Tok>.</p>
       </GuideSection>
       <GuideSection icon={Code2} title="Body & auth">
         <p>Body modes: JSON, XML, text, form-urlencoded, multipart (file upload), GraphQL, or raw file. JSON can be pretty-printed.</p>
-        <p>Auth: Bearer, Basic, Digest, API key, or OAuth2 — or <strong className="text-foreground">Inherit</strong> from the parent folder/collection.</p>
+        <p>Auth: Bearer, Basic, Digest, API key, or OAuth2 — or <strong className="text-fg">Inherit</strong> from the parent folder/collection.</p>
       </GuideSection>
       <GuideSection icon={ShieldCheck} title="Scripts, tests & cookies">
         <p>Each request has pre-request and post-response scripts plus tests/assertions (Bruno-style <Tok>bru</Tok>/<Tok>req</Tok>/<Tok>res</Tok> API, with a Postman <Tok>pm.*</Tok> shim). Collection/folder scripts are inherited.</p>
@@ -99,17 +99,17 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
         <p>Set-Cookie responses are captured into a per-domain jar (toggle in the status bar) and re-sent automatically.</p>
       </GuideSection>
       <GuideSection icon={Play} title="Runner">
-        <p>Right-click a collection or folder → <strong className="text-foreground">Run</strong> to execute its requests in order, with iterations, a delay, parallel mode, and tag filters.</p>
-        <p>Bind a CSV or JSON <strong className="text-foreground">data file</strong> to drive one iteration per row. CSV files may be comma-, semicolon-, or tab-separated (detected automatically) and may carry an Excel byte-order mark. The Runner shows each column beside the <Var>{'{{variable}}'}</Var> it binds and a sample value, marks columns no request references as <strong className="text-foreground">unused</strong>, and warns about variables the run needs that neither the file nor your environment supplies.</p>
-        <p><strong className="text-foreground">Flow control</strong>: call <Tok>bru.setNextRequest("Login")</Tok> (or <Tok>pm.execution.setNextRequest</Tok> / <Tok>postman.setNextRequest</Tok>) from a script to jump to another request by name, or pass <Tok>null</Tok> to end the iteration early. Jumps are shown under the row that made them, so retry loops and conditional paths are visible in the results.</p>
-        <p>Advanced options: <strong className="text-foreground">stop the run on the first failure</strong>, and turn off <strong className="text-foreground">save responses</strong> for long runs you don’t need to inspect afterwards.</p>
-        <p>Results show a live progress bar, wall-clock duration, average response time, total data received, and a per-status-code breakdown with min/avg/max timing — collected for every execution even when responses aren’t saved. Filter by passed/failed, or <strong className="text-foreground">Export</strong> the whole run as a JSON report: options used, summary counts, timings, per-request tests, console output, iteration data, and response bodies when kept.</p>
-        <p><strong className="text-foreground">Stop</strong> aborts the request in flight. Runner results stay in the Runner and don’t crowd out your History.</p>
+        <p>Right-click a collection or folder → <strong className="text-fg">Run</strong> to execute its requests in order, with iterations, a delay, parallel mode, and tag filters.</p>
+        <p>Bind a CSV or JSON <strong className="text-fg">data file</strong> to drive one iteration per row. CSV files may be comma-, semicolon-, or tab-separated (detected automatically) and may carry an Excel byte-order mark. The Runner shows each column beside the <Var>{'{{variable}}'}</Var> it binds and a sample value, marks columns no request references as <strong className="text-fg">unused</strong>, and warns about variables the run needs that neither the file nor your environment supplies.</p>
+        <p><strong className="text-fg">Flow control</strong>: call <Tok>bru.setNextRequest("Login")</Tok> (or <Tok>pm.execution.setNextRequest</Tok> / <Tok>postman.setNextRequest</Tok>) from a script to jump to another request by name, or pass <Tok>null</Tok> to end the iteration early. Jumps are shown under the row that made them, so retry loops and conditional paths are visible in the results.</p>
+        <p>Advanced options: <strong className="text-fg">stop the run on the first failure</strong>, and turn off <strong className="text-fg">save responses</strong> for long runs you don’t need to inspect afterwards.</p>
+        <p>Results show a live progress bar, wall-clock duration, average response time, total data received, and a per-status-code breakdown with min/avg/max timing — collected for every execution even when responses aren’t saved. Filter by passed/failed, or <strong className="text-fg">Export</strong> the whole run as a JSON report: options used, summary counts, timings, per-request tests, console output, iteration data, and response bodies when kept.</p>
+        <p><strong className="text-fg">Stop</strong> aborts the request in flight. Runner results stay in the Runner and don’t crowd out your History.</p>
       </GuideSection>
       <GuideSection icon={FolderTree} title="Organize, import & export">
         <p>Group requests into collections and folders in the left sidebar; open several in tabs — each remembers the tab you were working in. History records every send you make by hand.</p>
-        <p>Import a <strong className="text-foreground">Postman v2.1</strong> collection or a <strong className="text-foreground">cURL</strong> command; export the collection or generate a code snippet with the <Tok>{'</>'}</Tok> button.</p>
-        <p>If an imported collection carries <strong className="text-foreground">scripts</strong>, they’d run the next time you press Send — so the import pauses and shows you each one and its source. Choose <strong className="text-foreground">Import without scripts</strong> to keep the requests and drop the executable parts, or import them as-is if you trust the source.</p>
+        <p>Import a <strong className="text-fg">Postman v2.1</strong> collection or a <strong className="text-fg">cURL</strong> command; export the collection or generate a code snippet with the <Tok>{'</>'}</Tok> button.</p>
+        <p>If an imported collection carries <strong className="text-fg">scripts</strong>, they’d run the next time you press Send — so the import pauses and shows you each one and its source. Choose <strong className="text-fg">Import without scripts</strong> to keep the requests and drop the executable parts, or import them as-is if you trust the source.</p>
       </GuideSection>
       <GuideSection icon={Keyboard} title="Shortcuts">
         <p><Key>{mod}</Key>+<Key>↵</Key> send · <Key>{mod}</Key>+<Key>B</Key> new request · <Key>{mod}</Key>+<Key>E</Key> environments · <Key>{mod}</Key>+<Key>W</Key> close tab</p>
@@ -120,17 +120,17 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
   'mock-server': (
     <>
       <GuideSection icon={Play} title="Start the server">
-        <p>Choose a host and port and click <strong className="text-foreground">Start</strong>. <strong className="text-foreground">Local</strong> binds both IPv4 and IPv6, so <Tok>http://localhost:&lt;port&gt;</Tok> works from any client (browser, curl, the API Client). Pick <Tok>0.0.0.0</Tok> to expose it to your LAN.</p>
+        <p>Choose a host and port and click <strong className="text-fg">Start</strong>. <strong className="text-fg">Local</strong> binds both IPv4 and IPv6, so <Tok>http://localhost:&lt;port&gt;</Tok> works from any client (browser, curl, the API Client). Pick <Tok>0.0.0.0</Tok> to expose it to your LAN.</p>
         <p>Edits apply live while the server runs — no restart needed.</p>
       </GuideSection>
       <GuideSection icon={Filter} title="Define stubs">
-        <p>Each stub matches on <strong className="text-foreground">method</strong> + <strong className="text-foreground">path</strong>. Paths support <Tok>:param</Tok> captures and <Tok>*</Tok> wildcards (e.g. <Tok>/users/:id</Tok>); method <Tok>ANY</Tok> matches every verb.</p>
-        <p>Add <strong className="text-foreground">matchers</strong> to also require a query param, header, path param, or body — by <Tok>equals</Tok>, <Tok>contains</Tok>, <Tok>regex</Tok>, or <Tok>exists</Tok>. A body matcher can target the whole body or a JSON field path like <Tok>user.name</Tok>.</p>
-        <p>Stubs are tried top to bottom — <strong className="text-foreground">first match wins</strong>, so order matters. Reorder with the ▲▼ buttons.</p>
+        <p>Each stub matches on <strong className="text-fg">method</strong> + <strong className="text-fg">path</strong>. Paths support <Tok>:param</Tok> captures and <Tok>*</Tok> wildcards (e.g. <Tok>/users/:id</Tok>); method <Tok>ANY</Tok> matches every verb.</p>
+        <p>Add <strong className="text-fg">matchers</strong> to also require a query param, header, path param, or body — by <Tok>equals</Tok>, <Tok>contains</Tok>, <Tok>regex</Tok>, or <Tok>exists</Tok>. A body matcher can target the whole body or a JSON field path like <Tok>user.name</Tok>.</p>
+        <p>Stubs are tried top to bottom — <strong className="text-fg">first match wins</strong>, so order matters. Reorder with the ▲▼ buttons.</p>
       </GuideSection>
       <GuideSection icon={FileCode2} title="Responses">
-        <p><strong className="text-foreground">Static</strong>: a status, headers, and body. Text/JSON bodies support templates like <Tok>{'{{path.id}}'}</Tok>, <Tok>{'{{request.query.x}}'}</Tok>, <Tok>{'{{uuid}}'}</Tok>, <Tok>{'{{now.iso}}'}</Tok>. Body type <strong className="text-foreground">File</strong> serves base64 bytes as a download.</p>
-        <p><strong className="text-foreground">Script</strong>: a sandboxed Rhai script gets <Tok>req</Tok> and returns a string or <Tok>{'#{ status, headers, body }'}</Tok>. Preview it with <strong className="text-foreground">Test script</strong>.</p>
+        <p><strong className="text-fg">Static</strong>: a status, headers, and body. Text/JSON bodies support templates like <Tok>{'{{path.id}}'}</Tok>, <Tok>{'{{request.query.x}}'}</Tok>, <Tok>{'{{uuid}}'}</Tok>, <Tok>{'{{now.iso}}'}</Tok>. Body type <strong className="text-fg">File</strong> serves base64 bytes as a download.</p>
+        <p><strong className="text-fg">Script</strong>: a sandboxed Rhai script gets <Tok>req</Tok> and returns a string or <Tok>{'#{ status, headers, body }'}</Tok>. Preview it with <strong className="text-fg">Test script</strong>.</p>
       </GuideSection>
       <GuideSection icon={Ban} title="No-match response">
         <p>The pinned entry at the bottom of the stub list edits the response returned when nothing matches (default <Tok>404</Tok>).</p>
@@ -317,9 +317,9 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 
   generator: makeGuide({
     use: [
-      <><strong className="text-foreground">Random</strong> tab: pick UUID, Number, or Text, set the options (count; min/max/decimals; length + character sets), and click Generate. Copy one result or all.</>,
-      <><strong className="text-foreground">Test Data</strong> tab: define a field schema (40+ types across Identity, Internet, Location, Business, Finance, Content…), set a row count, and export as JSON, NDJSON, YAML, CSV, TSV, SQL inserts, or .properties.</>,
-      <>Test Data output is deterministic for a given <strong className="text-foreground">seed</strong> — edit the schema and it stays stable; hit the seed’s refresh button for fresh data.</>,
+      <><strong className="text-fg">Random</strong> tab: pick UUID, Number, or Text, set the options (count; min/max/decimals; length + character sets), and click Generate. Copy one result or all.</>,
+      <><strong className="text-fg">Test Data</strong> tab: define a field schema (40+ types across Identity, Internet, Location, Business, Finance, Content…), set a row count, and export as JSON, NDJSON, YAML, CSV, TSV, SQL inserts, or .properties.</>,
+      <>Test Data output is deterministic for a given <strong className="text-fg">seed</strong> — edit the schema and it stays stable; hit the seed’s refresh button for fresh data.</>,
       'Great for seeding a database or pasting into a Mock Server stub / API Client body.',
     ],
     know: [
@@ -363,7 +363,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 
   'data-converter': makeGuide({
     use: [
-      <>Pick the <strong className="text-foreground">From</strong> format, paste your data on the left, and choose the <strong className="text-foreground">To</strong> format — the result updates live on the right.</>,
+      <>Pick the <strong className="text-fg">From</strong> format, paste your data on the left, and choose the <strong className="text-fg">To</strong> format — the result updates live on the right.</>,
       <>Use the <Tok>⇄</Tok> button to swap directions; the current result becomes the new input, so you can round-trip a value.</>,
       <>Adjust indent, CSV delimiter, or XML pretty-printing in the toolbar; copy or download the result.</>,
     ],
@@ -372,9 +372,9 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <>Parse errors show inline on the right with the reason; fix the source and they clear.</>,
     ],
     caveat: [
-      <><strong className="text-foreground">TOML</strong> output needs a top-level table (object); a bare array or scalar at the root can’t be represented.</>,
-      <><strong className="text-foreground">XML</strong> uses <Tok>@_</Tok>-prefixed keys for attributes; arrays/scalars are wrapped in a <Tok>&lt;root&gt;</Tok> element so the output stays valid.</>,
-      <><strong className="text-foreground">.properties</strong> has no nesting: dotted keys map to nested objects and <Tok>key[0]</Tok> to arrays, values are type-inferred, and comments are dropped. A literal dot in a key name isn’t supported.</>,
+      <><strong className="text-fg">TOML</strong> output needs a top-level table (object); a bare array or scalar at the root can’t be represented.</>,
+      <><strong className="text-fg">XML</strong> uses <Tok>@_</Tok>-prefixed keys for attributes; arrays/scalars are wrapped in a <Tok>&lt;root&gt;</Tok> element so the output stays valid.</>,
+      <><strong className="text-fg">.properties</strong> has no nesting: dotted keys map to nested objects and <Tok>key[0]</Tok> to arrays, values are type-inferred, and comments are dropped. A literal dot in a key name isn’t supported.</>,
     ],
   }),
 
@@ -395,7 +395,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     use: [
       <>Add a task (with a project), then Start/Stop the timer (<Key>{mod}</Key>+<Key>↵</Key> toggles); edit entry times inline.</>,
       'Switch tabs: Timesheet grid (dates × projects), Calendar, and Meeting Notes; manage projects/colors and settings in the side panels.',
-      <>In <strong className="text-foreground">Meeting Notes</strong>, create a note and fill title, participants, agenda, decisions, and action items; a note with a start time also appears on the Calendar. Use the Markdown tab to copy exportable minutes.</>,
+      <>In <strong className="text-fg">Meeting Notes</strong>, create a note and fill title, participants, agenda, decisions, and action items; a note with a start time also appears on the Calendar. Use the Markdown tab to copy exportable minutes.</>,
       'Export time entries as JSON or CSV.',
     ],
     know: ['The timer and all data persist locally; Pomodoro pauses and beeps after the configured interval; meeting notes and time entries share the same calendar.'],
@@ -404,10 +404,10 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
 
   settings: makeGuide({
     use: [
-      <><strong className="text-foreground">Tools</strong> section: search, enable/disable individual tools, drag rows to reorder the sidebar, and star a tool to pin it near the top.</>,
-      <><strong className="text-foreground">Configuration</strong> section: tunable numbers (editor limits, generator defaults, Kafka/update timings) — changes save and apply immediately, no restart needed.</>,
-      <><strong className="text-foreground">Data & Storage</strong> section: see where your local data lives on disk and reveal it in Finder/Explorer.</>,
-      <><strong className="text-foreground">About</strong> section: current version, auto-update toggle/schedule, and the “Xem lại” button to reopen the welcome tour.</>,
+      <><strong className="text-fg">Tools</strong> section: search, enable/disable individual tools, drag rows to reorder the sidebar, and star a tool to pin it near the top.</>,
+      <><strong className="text-fg">Configuration</strong> section: tunable numbers (editor limits, generator defaults, Kafka/update timings) — changes save and apply immediately, no restart needed.</>,
+      <><strong className="text-fg">Data & Storage</strong> section: see where your local data lives on disk and reveal it in Finder/Explorer.</>,
+      <><strong className="text-fg">About</strong> section: current version, auto-update toggle/schedule, and the “Xem lại” button to reopen the welcome tour.</>,
     ],
     know: ['Everything here is stored locally on your device — nothing syncs to a server.'],
   }),

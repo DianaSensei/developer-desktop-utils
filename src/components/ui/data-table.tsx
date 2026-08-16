@@ -132,7 +132,7 @@ export function Th({ align = 'left', className, ...props }: ThProps) {
     <th
       className={cn(
         DENSITY_CELL[density].head,
-        'font-medium text-muted-foreground',
+        'font-medium text-fg-mute',
         ALIGN_CLASS[align],
         className,
       )}

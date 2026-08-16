@@ -95,7 +95,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                     selection?.kind === 'collectionVars' && 'bg-accent',
                   )}
                 >
-                  <Layers className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  <Layers className="h-3 w-3 shrink-0 text-fg-mute" />
                   <span className="truncate">Collection Variables</span>
                 </button>
               </div>
@@ -121,7 +121,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             {selection?.kind === 'collectionVars' && activeCollection ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-fg-mute">
                     {activeCollection.name}
                   </span>
                   <span className="text-sm font-medium">Collection Variables</span>
@@ -132,7 +132,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   keyPlaceholder="Variable"
                   valuePlaceholder="Value"
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-fg-mute">
                   Shared defaults for every request in this collection, regardless of which
                   environment is active. An environment variable with the same name still
                   overrides it.
@@ -141,7 +141,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             ) : selected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-fg-mute">
                     {selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
                   </span>
                   <Input
@@ -159,7 +159,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       title="Export environment"
-                      className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-accent hover:text-fg"
                     >
                       <Download className="h-4 w-4" />
                     </DropdownMenuTrigger>
@@ -171,7 +171,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-ctl w-ctl shrink-0 text-muted-foreground hover:text-destructive"
+                    className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-destructive"
                     onClick={() => store.deleteEnvironment(selected.id)}
                     title="Delete environment"
                   >
@@ -186,14 +186,14 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   masked={(row) => !!row.secret}
                   secretToggle
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-fg-mute">
                   Reference a variable anywhere with <code className="rounded bg-muted px-1">{'{{name}}'}</code>.{' '}
                   Click the lock icon to mark a value secret — it stays masked here and is left out of
                   generated code, exports, and history the same way the Vault is.
                 </p>
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+              <div className="flex h-full items-center justify-center text-xs text-fg-mute">
                 Create an environment to add variables.
               </div>
             )}

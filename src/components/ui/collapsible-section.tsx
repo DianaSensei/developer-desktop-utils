@@ -74,18 +74,18 @@ export function CollapsibleSection({
           onClick={toggle}
           aria-expanded={open}
           className={cn(
-            'flex min-w-0 flex-1 items-center gap-1.5 py-2 text-left transition-colors hover:text-foreground',
+            'flex min-w-0 flex-1 items-center gap-1.5 py-2 text-left transition-colors hover:text-fg',
             eyebrow
-              ? 'text-xs font-semibold uppercase tracking-wide text-muted-foreground'
-              : 'text-sm font-medium text-foreground',
+              ? 'text-xs font-semibold uppercase tracking-wide text-fg-mute'
+              : 'text-sm font-medium text-fg',
           )}
         >
           <ChevronRight
-            className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')}
+            className={cn('h-3.5 w-3.5 shrink-0 text-fg-mute transition-transform', open && 'rotate-90')}
           />
           {icon}
           <span className="truncate">{title}</span>
-          {hint && <span className="truncate text-[11px] font-normal text-muted-foreground/70">{hint}</span>}
+          {hint && <span className="truncate text-[11px] font-normal text-fg-mute/70">{hint}</span>}
         </button>
         {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
       </div>

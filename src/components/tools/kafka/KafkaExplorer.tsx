@@ -123,7 +123,7 @@ export function KafkaExplorer() {
         <button
           onClick={() => setShowInfo(true)}
           title="How Kafka Explorer accesses your cluster"
-          className="flex h-ctl w-ctl items-center justify-center rounded-sm text-muted-foreground/60 hover:text-foreground hover:bg-muted/60 transition-colors"
+          className="flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute/60 hover:text-fg hover:bg-muted/60 transition-colors"
         >
           <Info className="h-4 w-4" />
         </button>
@@ -167,7 +167,7 @@ export function KafkaExplorer() {
       {/* Right panel */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {!selectedBrokerId ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+          <div className="flex flex-col items-center justify-center h-full text-fg-mute gap-2">
             <Server className="w-ctl h-ctl opacity-30" />
             <p className="text-sm">Add a broker to get started</p>
           </div>
@@ -241,7 +241,7 @@ function DisconnectedPanel({ name, connecting, error, onConnect }: {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 px-8 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/30">
-        <Plug className="h-ctl w-ctl text-muted-foreground/50" />
+        <Plug className="h-ctl w-ctl text-fg-mute/50" />
       </div>
       {name && <p className="text-sm font-medium">{name}</p>}
       <Button onClick={onConnect} disabled={connecting}>

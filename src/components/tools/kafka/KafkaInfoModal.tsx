@@ -28,10 +28,10 @@ function Row({ action, when, calls, badge, note }: RowProps) {
         <Badge tone={BADGE_TONE[badge.variant]} uppercase>{badge.label}</Badge>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-xs font-semibold text-foreground">{action}</span>
-            <span className="text-[11px] text-muted-foreground">{when}</span>
+            <span className="text-xs font-semibold text-fg">{action}</span>
+            <span className="text-[11px] text-fg-mute">{when}</span>
           </div>
-          <div className="text-[11px] font-mono text-muted-foreground/70 mt-0.5">{calls}</div>
+          <div className="text-[11px] font-mono text-fg-mute/70 mt-0.5">{calls}</div>
           {note && (
             <div className="text-[11px] text-warn mt-1">{note}</div>
           )}
@@ -50,19 +50,19 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-background border rounded-lg shadow-2xl w-full max-w-xl max-h-[88vh] flex flex-col mx-4">
+      <div className="bg-bg border rounded-lg shadow-2xl w-full max-w-xl max-h-[88vh] flex flex-col mx-4">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b shrink-0">
           <div>
             <p className="text-sm font-semibold">How Kafka Explorer accesses your cluster</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-[11px] text-fg-mute mt-0.5">
               Every action that contacts the broker is listed below.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-3 shrink-0"
+            className="p-1 rounded text-fg-mute hover:text-fg hover:bg-muted transition-colors ml-3 shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -72,8 +72,8 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
         <div className="flex-1 overflow-y-auto min-h-0 px-5 py-3">
 
           {/* Connection model */}
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
-            <span className="font-semibold text-foreground">No persistent connection.</span>{' '}
+          <p className="text-[11px] text-fg-mute leading-relaxed mb-3">
+            <span className="font-semibold text-fg">No persistent connection.</span>{' '}
             Each action opens one TCP connection to your broker and closes it when done.
             The connection starts with a short probe (MetadataRequest, to confirm this is a Kafka port)
             and is then reused for the command. The app identifies itself to brokers as
@@ -174,8 +174,8 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
             </div>
           </div>
 
-          <p className="text-[11px] text-muted-foreground">
-            Full documentation: <span className="font-mono text-foreground/70">docs/human/kafka-explorer.md</span>
+          <p className="text-[11px] text-fg-mute">
+            Full documentation: <span className="font-mono text-fg/70">docs/human/kafka-explorer.md</span>
           </p>
         </div>
 
@@ -183,7 +183,7 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
         <div className="flex items-center justify-between px-5 py-3 border-t shrink-0 bg-muted/10">
           <button
             onClick={onDismissPermanently}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs text-fg-mute hover:text-fg transition-colors"
           >
             Don't show again
           </button>

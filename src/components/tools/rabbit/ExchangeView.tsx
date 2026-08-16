@@ -83,11 +83,11 @@ function MgmtOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
   return (
     <div className="space-y-5">
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs rounded-lg border bg-card/40 px-4 py-3">
-        <dt className="text-muted-foreground">Type</dt><dd className="text-right">{ex.type ?? '—'}</dd>
-        <dt className="text-muted-foreground">Durable</dt><dd className="text-right">{ex.durable ? 'Yes' : 'No'}</dd>
-        <dt className="text-muted-foreground">Auto-delete</dt><dd className="text-right">{ex.auto_delete ? 'Yes' : 'No'}</dd>
-        <dt className="text-muted-foreground">Internal</dt><dd className="text-right">{ex.internal ? 'Yes' : 'No'}</dd>
-        <dt className="text-muted-foreground">Publish rate</dt><dd className="text-right tabular-nums">{formatRate(s?.publish_details?.rate)}</dd>
+        <dt className="text-fg-mute">Type</dt><dd className="text-right">{ex.type ?? '—'}</dd>
+        <dt className="text-fg-mute">Durable</dt><dd className="text-right">{ex.durable ? 'Yes' : 'No'}</dd>
+        <dt className="text-fg-mute">Auto-delete</dt><dd className="text-right">{ex.auto_delete ? 'Yes' : 'No'}</dd>
+        <dt className="text-fg-mute">Internal</dt><dd className="text-right">{ex.internal ? 'Yes' : 'No'}</dd>
+        <dt className="text-fg-mute">Publish rate</dt><dd className="text-right tabular-nums">{formatRate(s?.publish_details?.rate)}</dd>
       </dl>
     </div>
   );
@@ -103,7 +103,7 @@ function AmqpOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
   return (
     <div className="space-y-3">
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs rounded-lg border bg-card/40 px-4 py-3">
-        <dt className="text-muted-foreground">Exists</dt>
+        <dt className="text-fg-mute">Exists</dt>
         <dd className="text-right">
           {i.exists ? <span className="text-ok">Yes</span>
             : i.error ? <span className="text-destructive">Error</span>
@@ -111,7 +111,7 @@ function AmqpOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
         </dd>
       </dl>
       {i.error && <Callout tone="error">{i.error}</Callout>}
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[11px] text-fg-mute">
         AMQP-only mode: type, durability and bindings require the management API and aren't queryable over AMQP. Use New exchange to declare one.
       </p>
     </div>
@@ -130,7 +130,7 @@ function BindingsTab({ conn, exchangeName, refreshKey }: { conn: RabbitConnectio
             onBind={async (dest, key) => { await rabbitApi.amqpBindQueue(conn.id, dest, exchangeName, key); }}
           />
         )}
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[11px] text-fg-mute">
           AMQP can't list bindings — you can create one above, but they aren't enumerable without the management API.
         </p>
       </div>
@@ -153,7 +153,7 @@ function MgmtBindingsTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
       )}
       {b.loading ? <LoadingRow />
         : b.error ? <Callout tone="error">{b.error}</Callout>
-        : !b.data || b.data.length === 0 ? <p className="text-sm text-muted-foreground">No bindings from this exchange.</p>
+        : !b.data || b.data.length === 0 ? <p className="text-sm text-fg-mute">No bindings from this exchange.</p>
         : (
           <DataTable>
             <Thead>

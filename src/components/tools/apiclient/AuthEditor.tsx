@@ -47,7 +47,7 @@ function AuthField({ label, value, onValue, placeholder, vars, masked }: {
       <Label className="text-xs">{label}</Label>
       {vars ? (
         <div
-          className="flex h-ctl items-center gap-1 rounded-md border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/40"
+          className="flex h-ctl items-center gap-1 rounded-md border border-input bg-bg px-3 focus-within:ring-2 focus-within:ring-ring/40"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         >
@@ -58,7 +58,7 @@ function AuthField({ label, value, onValue, placeholder, vars, masked }: {
             <button
               type="button"
               onClick={() => setRevealed((r) => !r)}
-              className="shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+              className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
               title={revealed ? 'Hide value' : 'Reveal value'}
             >
               {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -99,8 +99,8 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
         </SelectContent>
       </Select>
 
-      {auth.type === 'none' && <p className="py-4 text-center text-xs text-muted-foreground">This request uses no authorization.</p>}
-      {auth.type === 'inherit' && <p className="py-4 text-center text-xs text-muted-foreground">Inherits auth from the parent folder or collection.</p>}
+      {auth.type === 'none' && <p className="py-4 text-center text-xs text-fg-mute">This request uses no authorization.</p>}
+      {auth.type === 'inherit' && <p className="py-4 text-center text-xs text-fg-mute">Inherits auth from the parent folder or collection.</p>}
 
       {auth.type === 'bearer' && (
         <AuthField vars={vars} masked label="Token" value={auth.token} onValue={(v) => set({ token: v })} placeholder="Token or {{var}}" />
@@ -114,7 +114,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
             <Input type="password" value={auth.password} onChange={(e) => set({ password: e.target.value })} className="h-ctl text-xs" placeholder="Password or {{var}}" />
           </div>
           {auth.type === 'digest' && (
-            <p className="text-[11px] text-muted-foreground">The server's 401 challenge is answered automatically with an MD5 Digest response.</p>
+            <p className="text-[11px] text-fg-mute">The server's 401 challenge is answered automatically with an MD5 Digest response.</p>
           )}
         </div>
       )}
@@ -159,7 +159,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
             </>
           )}
           <div className="flex items-start justify-between gap-3">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-fg-mute">
               The access token is fetched on the first send and reused until it expires, then sent as a Bearer header.
               It is held in memory only — never written to disk.
             </p>

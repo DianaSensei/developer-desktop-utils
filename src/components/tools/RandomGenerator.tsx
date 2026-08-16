@@ -41,14 +41,14 @@ function ResultList({ items }: { items: string[] }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{items.length} result{items.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-fg-mute">{items.length} result{items.length !== 1 ? 's' : ''}</span>
         {items.length > 1 && (
           <CopyButton
             value={() => items.join('\n')}
             label="Copy all"
             variant="ghost"
             size="sm"
-            className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+            className="h-6 px-1.5 text-[11px] text-fg-mute hover:text-fg"
             iconClassName="h-3 w-3"
           />
         )}
@@ -60,7 +60,7 @@ function ResultList({ items }: { items: string[] }) {
             <CopyButton
               value={v}
               variant="ghost"
-              className="shrink-0 h-6 w-6 p-0 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-muted-foreground"
+              className="shrink-0 h-6 w-6 p-0 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-fg-mute"
               iconClassName="h-3 w-3"
             />
           </div>
@@ -133,7 +133,7 @@ export function RandomGenerator() {
 
         {mode === 'uuid' && (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Count</span>
+            <span className="text-xs text-fg-mute">Count</span>
             <Input type="number" min={1} max={100} value={count}
               onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, 100))}
               className="h-ctl text-xs w-20 rounded-sm" />
@@ -143,19 +143,19 @@ export function RandomGenerator() {
         {mode === 'number' && (
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Min</span>
+              <span className="text-xs text-fg-mute">Min</span>
               <Input type="number" value={numMin} onChange={(e) => setNumMin(parseFloat(e.target.value) || 0)} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Max</span>
+              <span className="text-xs text-fg-mute">Max</span>
               <Input type="number" value={numMax} onChange={(e) => setNumMax(parseFloat(e.target.value) || 0)} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Decimals</span>
+              <span className="text-xs text-fg-mute">Decimals</span>
               <Input type="number" min={0} max={10} value={decimals} onChange={(e) => setDecimals(clamp(parseInt(e.target.value) || 0, 0, 10))} className="h-ctl text-xs w-16 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Count</span>
+              <span className="text-xs text-fg-mute">Count</span>
               <Input type="number" min={1} max={maxNumberCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxNumberCount))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
           </div>
@@ -164,18 +164,18 @@ export function RandomGenerator() {
         {mode === 'text' && (
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Length</span>
+              <span className="text-xs text-fg-mute">Length</span>
               <Input type="number" min={1} max={maxTextLength} value={textLen} onChange={(e) => setTextLen(clamp(parseInt(e.target.value) || 1, 1, maxTextLength))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Count</span>
+              <span className="text-xs text-fg-mute">Count</span>
               <Input type="number" min={1} max={maxTextCount} value={count} onChange={(e) => setCount(clamp(parseInt(e.target.value) || 1, 1, maxTextCount))} className="h-ctl text-xs w-20 rounded-sm" />
             </div>
             <div className="flex gap-1.5">
               {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
                 <button key={k} onClick={() => toggleCharset(k)}
                   className={cn('rounded-lg border px-2 py-0.5 text-xs font-medium transition-colors',
-                    charsets[k] ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground hover:text-foreground')}>
+                    charsets[k] ? 'bg-primary/10 text-primary border-primary/30' : 'text-fg-mute hover:text-fg')}>
                   {k === 'lower' ? 'a–z' : k === 'upper' ? 'A–Z' : k === 'digits' ? '0–9' : '!@#'}
                 </button>
               ))}
@@ -196,7 +196,7 @@ export function RandomGenerator() {
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <ResultList items={results} />
         {!results.length && (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+          <div className="flex items-center justify-center h-full text-fg-mute text-sm">
             Configure options above and click Generate
           </div>
         )}

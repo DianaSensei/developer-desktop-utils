@@ -105,9 +105,9 @@ export function Tooltip({
           )}
           style={{ top: coords.top, left: coords.left, width: width ?? 'max-content', maxWidth: '13rem' }}
         >
-          <p className="text-xs font-semibold leading-none text-popover-foreground">{label}</p>
+          <p className="text-xs font-semibold leading-none text-fg">{label}</p>
           {description && (
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{description}</p>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-fg-mute">{description}</p>
           )}
         </div>,
         document.body

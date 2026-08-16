@@ -93,7 +93,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
             title="Copy"
             variant="ghost"
             size="icon"
-            className="absolute right-3 top-3 h-ctl w-ctl text-muted-foreground"
+            className="absolute right-3 top-3 h-ctl w-ctl text-fg-mute"
             iconClassName="h-4 w-4"
           />
         </div>

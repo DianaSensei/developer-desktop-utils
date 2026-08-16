@@ -217,7 +217,7 @@ export function TextTransformer() {
                 Remove whitespace between lines
               </Button>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">Remove chars</span>
+                <span className="text-xs text-fg-mute">Remove chars</span>
                 <Input
                   value={removeChars}
                   onChange={(e) => setRemoveChars(e.target.value)}
@@ -230,7 +230,7 @@ export function TextTransformer() {
 
           {mode === 'multiple-lines' && (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">Split by</span>
+              <span className="text-xs text-fg-mute">Split by</span>
               <Input
                 value={delimiters}
                 onChange={(e) => setDelimiters(e.target.value)}

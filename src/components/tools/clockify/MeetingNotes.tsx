@@ -68,7 +68,7 @@ export function MeetingNotes() {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
           {filtered.length === 0 ? (
-            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+            <p className="px-2 py-6 text-center text-xs text-fg-mute">
               {meetings.length === 0 ? 'No meeting notes yet.' : 'No notes match your search.'}
             </p>
           ) : (
@@ -79,12 +79,12 @@ export function MeetingNotes() {
                   onClick={() => setSelectedId(m.id)}
                   className={cn(
                     'group flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
-                    selectedId === m.id ? 'bg-foreground/10' : 'hover:bg-muted',
+                    selectedId === m.id ? 'bg-fg/10' : 'hover:bg-muted',
                   )}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{m.title.trim() || 'Untitled meeting'}</p>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-mute">
                       <Clock className="h-3 w-3" />
                       {whenLabel(m)} · {formatDuration(meetingDurationMs(m))}
                     </p>
@@ -93,7 +93,7 @@ export function MeetingNotes() {
                     role="button"
                     tabIndex={-1}
                     onClick={(e) => { e.stopPropagation(); remove(m.id); }}
-                    className="mt-0.5 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-bad group-hover:opacity-100"
+                    className="mt-0.5 shrink-0 text-fg-mute opacity-0 transition-opacity hover:text-bad group-hover:opacity-100"
                     title="Delete note"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -125,13 +125,13 @@ export function MeetingNotes() {
                 label="Copy markdown"
                 variant="outline"
                 size="sm"
-                className="h-auto rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground"
+                className="h-auto rounded-lg px-2.5 py-1.5 text-xs text-fg-mute"
                 iconClassName="h-3.5 w-3.5"
               />
               <button
                 type="button"
                 onClick={() => remove(selected.id)}
-                className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-bad/10 hover:text-bad"
+                className="flex items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs text-fg-mute transition-colors hover:bg-bad/10 hover:text-bad"
                 title="Delete note"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -156,9 +156,9 @@ export function MeetingNotes() {
       ) : (
         <div className="flex min-h-0 flex-col items-center justify-center gap-3 p-4 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-card">
-            <NotebookPen className="h-6 w-6 text-muted-foreground/40" />
+            <NotebookPen className="h-6 w-6 text-fg-mute/40" />
           </div>
-          <p className="max-w-xs text-sm text-muted-foreground">
+          <p className="max-w-xs text-sm text-fg-mute">
             Select a note to view and edit, or create a new one. Notes with a time appear in the Time Tracker calendar.
           </p>
           <Button onClick={createNew} size="sm" className="gap-1.5">

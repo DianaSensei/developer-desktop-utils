@@ -30,12 +30,12 @@ export function NumberStepper({
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const set = (v: number) => onChange(clamp(Number.isFinite(v) ? v : min));
   return (
-    <div className={cn('flex h-ctl items-stretch overflow-hidden rounded-lg border border-border bg-background', className)}>
+    <div className={cn('flex h-ctl items-stretch overflow-hidden rounded-lg border border-border bg-bg', className)}>
       <button
         type="button"
         onClick={() => set(value - step)}
         disabled={value <= min}
-        className="flex w-6 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+        className="flex w-6 items-center justify-center text-fg-mute transition-colors hover:bg-muted hover:text-fg disabled:opacity-30"
       >
         <Minus className="h-3 w-3" />
       </button>
@@ -54,7 +54,7 @@ export function NumberStepper({
         type="button"
         onClick={() => set(value + step)}
         disabled={value >= max}
-        className="flex w-6 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+        className="flex w-6 items-center justify-center text-fg-mute transition-colors hover:bg-muted hover:text-fg disabled:opacity-30"
       >
         <Plus className="h-3 w-3" />
       </button>
@@ -168,15 +168,15 @@ export function TimeStepperField({
       onPointerUp={stopHold}
       onPointerLeave={stopHold}
       onPointerCancel={stopHold}
-      className={cn('flex flex-1 select-none items-center justify-center px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', extra)}
+      className={cn('flex flex-1 select-none items-center justify-center px-1 text-fg-mute transition-colors hover:bg-muted hover:text-fg', extra)}
     >
       <Icon className="h-3 w-3" />
     </button>
   );
 
   return (
-    <div className={cn('flex h-ctl-lg items-stretch overflow-hidden rounded-md border border-input bg-background', className)}>
-      <span className="flex items-center pl-2 text-muted-foreground">
+    <div className={cn('flex h-ctl-lg items-stretch overflow-hidden rounded-md border border-input bg-bg', className)}>
+      <span className="flex items-center pl-2 text-fg-mute">
         <Clock className="h-3.5 w-3.5" />
       </span>
       <input
@@ -231,12 +231,12 @@ export function Modal({
   return createPortal(
     <div className="fixed inset-0 z-[9998] flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[10vh] backdrop-blur-[1px]" onMouseDown={onClose}>
       <div
-        className={cn('w-full rounded-lg border bg-popover shadow-xl animate-in fade-in-0 zoom-in-95 duration-100', width)}
+        className={cn('w-full rounded-lg border bg-card shadow-xl animate-in fade-in-0 zoom-in-95 duration-100', width)}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 className="text-sm font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <button onClick={onClose} className="text-fg-mute hover:text-fg">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -324,7 +324,7 @@ export function Popover({
             minWidth: pos.width,
           }}
           className={cn(
-            'z-[9999] min-w-[200px] rounded-lg border border-border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
+            'z-[9999] min-w-[200px] rounded-lg border border-border bg-card p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
             className
           )}
         >
@@ -349,7 +349,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       onClick={() => onChange(!checked)}
       className={cn(
         'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-        checked ? 'bg-primary' : 'bg-muted-foreground/25'
+        checked ? 'bg-primary' : 'bg-fg-mute/25'
       )}
     >
       <span
@@ -363,7 +363,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   if (!label) return btn;
   return (
     <label className="flex cursor-pointer items-center justify-between gap-3 text-xs">
-      <span className="text-muted-foreground">{label}</span>
+      <span className="text-fg-mute">{label}</span>
       {btn}
     </label>
   );
@@ -377,7 +377,7 @@ export function ColorDot({ color, className }: { color?: string; className?: str
   return (
     <span
       className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-full', className)}
-      style={{ backgroundColor: color ?? 'hsl(var(--muted-foreground))' }}
+      style={{ backgroundColor: color ?? 'hsl(var(--fg-mute-c))' }}
     />
   );
 }
@@ -415,7 +415,7 @@ export function ConfirmButton({
       }}
       className={cn(
         'transition-colors',
-        armed ? 'text-bad' : 'text-muted-foreground hover:text-bad',
+        armed ? 'text-bad' : 'text-fg-mute hover:text-bad',
         className
       )}
     >
@@ -458,7 +458,7 @@ export function ProjectPicker({
           )}
         >
           <ColorDot color={project?.color} />
-          <span className={cn('truncate', !project && 'text-muted-foreground')}>
+          <span className={cn('truncate', !project && 'text-fg-mute')}>
             {project ? project.name : 'No project'}
             {task ? ` · ${task.name}` : ''}
           </span>
@@ -480,7 +480,7 @@ export function ProjectPicker({
               <div key={p.id}>
                 <button
                   onClick={() => { onChange(p.id, null); close(); }}
-                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted', value === p.id && !taskValue && 'bg-foreground/10')}
+                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted', value === p.id && !taskValue && 'bg-fg/10')}
                 >
                   <ColorDot color={p.color} />
                   <span className="truncate">{p.name}</span>
@@ -489,7 +489,7 @@ export function ProjectPicker({
                   <button
                     key={t.id}
                     onClick={() => { onChange(p.id, t.id); close(); }}
-                    className={cn('flex w-full items-center gap-2 rounded py-1 pl-7 pr-2 text-xs text-muted-foreground hover:bg-muted', taskValue === t.id && 'bg-foreground/10 text-foreground')}
+                    className={cn('flex w-full items-center gap-2 rounded py-1 pl-7 pr-2 text-xs text-fg-mute hover:bg-muted', taskValue === t.id && 'bg-fg/10 text-fg')}
                   >
                     {t.name}
                   </button>
@@ -582,7 +582,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
           className={cn('flex items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors hover:bg-muted', compact ? 'h-ctl' : 'h-ctl-lg')}
         >
           <TagIcon className="h-3.5 w-3.5 opacity-60" />
-          <span className={cn('truncate', !selected.length && 'text-muted-foreground')}>
+          <span className={cn('truncate', !selected.length && 'text-fg-mute')}>
             {selected.length ? selected.map((t) => t.name).join(', ') : 'Tags'}
           </span>
         </button>
@@ -590,10 +590,10 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
     >
       {() => (
         <div className="max-h-72 w-52 overflow-y-auto">
-          {tags.length === 0 && <p className="px-2 py-1.5 text-xs text-muted-foreground">No tags yet</p>}
+          {tags.length === 0 && <p className="px-2 py-1.5 text-xs text-fg-mute">No tags yet</p>}
           {tags.map((t) => (
             <button key={t.id} onClick={() => toggle(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-              <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', value.includes(t.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+              <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', value.includes(t.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-fg-mute/40')}>
                 {value.includes(t.id) && <Check className="h-2.5 w-2.5" />}
               </span>
               <span className="truncate">{t.name}</span>

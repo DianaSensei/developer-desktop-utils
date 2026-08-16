@@ -63,7 +63,7 @@ export function RequestTabs({
               onClick={() => onSelectRequest(req.id)}
               className={cn(
                 'group relative flex max-w-[200px] shrink-0 cursor-pointer items-center gap-2 border-r px-3 py-2 text-xs transition-colors',
-                active ? 'bg-background text-foreground' : 'text-muted-foreground hover:bg-background/50',
+                active ? 'bg-bg text-fg' : 'text-fg-mute hover:bg-bg/50',
               )}
             >
               {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />}
@@ -72,7 +72,7 @@ export function RequestTabs({
               <button
                 onClick={(e) => { e.stopPropagation(); store.closeTab(req.id); }}
                 className={cn(
-                  'ml-1 rounded-md p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground',
+                  'ml-1 rounded-md p-0.5 text-fg-mute/70 hover:bg-accent hover:text-fg',
                   active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
                 )}
                 title="Close tab"
@@ -83,22 +83,22 @@ export function RequestTabs({
           );
         })}
         {historyActive && (
-          <div className="group relative flex shrink-0 items-center gap-2 border-r bg-background px-3 py-2 text-xs text-foreground">
+          <div className="group relative flex shrink-0 items-center gap-2 border-r bg-bg px-3 py-2 text-xs text-fg">
             <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />
             <Clock className="h-3.5 w-3.5 text-acc-ink" />
             <span>History</span>
-            <button onClick={onCloseHistory} className="ml-1 rounded p-0.5 text-muted-foreground/70 hover:bg-accent hover:text-foreground" title="Close history">
+            <button onClick={onCloseHistory} className="ml-1 rounded p-0.5 text-fg-mute/70 hover:bg-accent hover:text-fg" title="Close history">
               <X className="h-3 w-3" />
             </button>
           </div>
         )}
-        <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none px-2.5 hover:bg-background">
+        <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none px-2.5 hover:bg-bg">
           <Plus className="h-4 w-4" />
         </IconButton>
       </div>
 
       {/* right cluster: environment · history · layout */}
-      <div className="flex shrink-0 items-center gap-1 border-l pl-2 pr-1.5 text-muted-foreground">
+      <div className="flex shrink-0 items-center gap-1 border-l pl-2 pr-1.5 text-fg-mute">
         {mismatchedEnv && (
           <span
             title={`"${mismatchedEnv.name}" belongs to another collection and is not applied here — its variables won't be substituted into this request. Pick an environment from this collection or Global, or switch back to that collection.`}
@@ -118,43 +118,43 @@ export function RequestTabs({
             <SelectItem value="none">No Environment</SelectItem>
             {collectionEnvs.length > 0 && (
               <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">{collection?.name ?? 'Collection'}</SelectLabel>
+                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">{collection?.name ?? 'Collection'}</SelectLabel>
                 {collectionEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
               </SelectGroup>
             )}
             {globalEnvs.length > 0 && (
               <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">Global</SelectLabel>
+                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">Global</SelectLabel>
                 {globalEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
               </SelectGroup>
             )}
             {mismatchedEnv && (
               <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">Inactive here</SelectLabel>
+                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">Inactive here</SelectLabel>
                 <SelectItem value={mismatchedEnv.id}>{mismatchedEnv.name} (other collection)</SelectItem>
               </SelectGroup>
             )}
           </SelectContent>
         </Select>
-        <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-background">
+        <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-bg">
           <Settings2 className="h-4 w-4" />
         </IconButton>
         <span className="mx-0.5 h-5 w-px bg-border" />
-        <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-background">
+        <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-bg">
           <KeyRound className="h-4 w-4" />
         </IconButton>
         <span className="mx-0.5 h-5 w-px bg-border" />
         <IconButton
           onClick={onOpenHistory}
           title="History"
-          className={cn('hover:bg-background', historyActive && 'text-acc-ink')}
+          className={cn('hover:bg-bg', historyActive && 'text-acc-ink')}
         >
           <Clock className="h-4 w-4" />
         </IconButton>
         <IconButton
           onClick={onToggleDirection}
           title={direction === 'horizontal' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
-          className="hover:bg-background"
+          className="hover:bg-bg"
         >
           {direction === 'horizontal' ? <Rows2 className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}
         </IconButton>

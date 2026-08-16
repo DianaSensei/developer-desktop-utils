@@ -72,7 +72,7 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
         {exchanges.error && <Callout tone="error">{exchanges.error}</Callout>}
         {exchanges.data && (
           rows.length === 0
-            ? <p className="text-sm text-muted-foreground">{f ? 'No matching exchanges.' : 'No exchanges.'}</p>
+            ? <p className="text-sm text-fg-mute">{f ? 'No matching exchanges.' : 'No exchanges.'}</p>
             : (
               <>
                 <DataTable>
@@ -94,7 +94,7 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
                   </Tbody>
                 </DataTable>
                 {rows.length > shown.length && (
-                  <p className="mt-2 text-[11px] text-muted-foreground">Showing first {LIST_RENDER_CAP} of {rows.length.toLocaleString()} — search to narrow.</p>
+                  <p className="mt-2 text-[11px] text-fg-mute">Showing first {LIST_RENDER_CAP} of {rows.length.toLocaleString()} — search to narrow.</p>
                 )}
               </>
             )
@@ -158,7 +158,7 @@ function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
           />
           <Button variant="outline" size="sm" onClick={addName} disabled={!adding.trim()}>Track</Button>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1.5">
+        <p className="text-[11px] text-fg-mute mt-1.5">
           AMQP can't list exchanges, so add the names you want to work with. Existence comes from a passive declare; type/bindings aren't queryable over AMQP.
         </p>
       </div>
@@ -166,7 +166,7 @@ function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
       <div className="tool-scrollable px-5 py-4">
         {info.error && <Callout tone="error" className="mb-3">{info.error}</Callout>}
         {names.length === 0
-          ? <p className="text-sm text-muted-foreground">No exchanges tracked yet. Add one above or create a new exchange.</p>
+          ? <p className="text-sm text-fg-mute">No exchanges tracked yet. Add one above or create a new exchange.</p>
           : (
             <DataTable>
               <Thead>
@@ -190,7 +190,7 @@ function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
                       </Td>
                       <Td align="right">
                         <button
-                          className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="text-fg-mute hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Stop tracking (does not delete the exchange)"
                           onClick={(e) => { e.stopPropagation(); knownNamesStore.removeExchange(conn.id, name); }}
                         >

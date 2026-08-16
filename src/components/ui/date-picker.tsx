@@ -67,7 +67,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         <button
           type="button"
           onClick={() => setViewMonth((m) => addMonths(m, -1))}
-          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="shrink-0 rounded-md p-1 text-fg-mute transition-colors hover:bg-muted hover:text-fg"
           aria-label="Previous month"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -93,7 +93,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         <button
           type="button"
           onClick={() => setViewMonth((m) => addMonths(m, 1))}
-          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="shrink-0 rounded-md p-1 text-fg-mute transition-colors hover:bg-muted hover:text-fg"
           aria-label="Next month"
         >
           <ChevronRight className="h-4 w-4" />
@@ -103,7 +103,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
       {/* Weekday header */}
       <div className="grid grid-cols-7 gap-0.5">
         {WEEKDAYS.map((w) => (
-          <div key={w} className="py-1 text-center text-[11px] font-medium text-muted-foreground">{w}</div>
+          <div key={w} className="py-1 text-center text-[11px] font-medium text-fg-mute">{w}</div>
         ))}
       </div>
 
@@ -120,7 +120,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
               onClick={() => pick(d)}
               className={cn(
                 'h-ctl rounded-md text-xs transition-colors',
-                !inMonth && 'text-muted-foreground/40',
+                !inMonth && 'text-fg-mute/40',
                 isSel
                   ? 'bg-primary font-semibold text-primary-foreground'
                   : 'hover:bg-muted',
@@ -137,7 +137,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
       <button
         type="button"
         onClick={() => { setViewMonth(startOfMonth(today)); pick(today); }}
-        className="mt-2 w-full rounded-md border py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="mt-2 w-full rounded-md border py-1 text-xs text-fg-mute transition-colors hover:bg-muted hover:text-fg"
       >
         Today
       </button>
@@ -145,7 +145,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
   );
 
   if (inline) {
-    return <div ref={wrapRef} className={cn('w-60 rounded-lg border bg-popover p-3', className)}>{calendar}</div>;
+    return <div ref={wrapRef} className={cn('w-60 rounded-lg border bg-card p-3', className)}>{calendar}</div>;
   }
 
   return (
@@ -161,14 +161,14 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
           className,
         )}
       >
-        <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className={cn('truncate', !selected && 'text-muted-foreground')}>
+        <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
+        <span className={cn('truncate', !selected && 'text-fg-mute')}>
           {selected ? format(selected, 'MMM d, yyyy') : placeholder}
         </span>
       </button>
 
       {open && !disabled && (
-        <div className="absolute z-50 mt-1.5 w-64 rounded-lg border bg-popover p-3 shadow-xl">
+        <div className="absolute z-50 mt-1.5 w-64 rounded-lg border bg-card p-3 shadow-xl">
           {calendar}
         </div>
       )}

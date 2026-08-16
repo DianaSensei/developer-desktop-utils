@@ -31,7 +31,7 @@ type Tab = 'overview' | 'bindings';
 function KV({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <>
-      <dt className="text-muted-foreground">{label}</dt>
+      <dt className="text-fg-mute">{label}</dt>
       <dd className="text-right tabular-nums">{value}</dd>
     </>
   );
@@ -137,7 +137,7 @@ function AmqpOverviewTab({ conn, queueName, refreshKey }: { conn: RabbitConnecti
         {i.error
           ? <Callout tone="error">{i.error}</Callout>
           : <Callout tone="warning">Queue <span className="font-mono">{queueName}</span> does not exist on the broker.</Callout>}
-        <p className="text-[11px] text-muted-foreground">Use New queue to declare it, or Publish/Consume to work with it once it exists.</p>
+        <p className="text-[11px] text-fg-mute">Use New queue to declare it, or Publish/Consume to work with it once it exists.</p>
       </div>
     );
   }
@@ -148,7 +148,7 @@ function AmqpOverviewTab({ conn, queueName, refreshKey }: { conn: RabbitConnecti
         <Stat label="Ready" value={formatNumber(i.messages ?? 0)} />
         <Stat label="Consumers" value={formatNumber(i.consumers ?? 0)} />
       </div>
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[11px] text-fg-mute">
         AMQP-only mode: counts come from a passive declare. Unacked totals, rates, node and memory require the management API and aren't shown.
       </p>
     </div>
@@ -171,7 +171,7 @@ function AmqpBindingsTab({ conn, queueName }: { conn: RabbitConnection; queueNam
         sourcePlaceholder="my.exchange"
         onBind={async (source, key) => { await rabbitApi.amqpBindQueue(conn.id, queueName, source, key); }}
       />
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[11px] text-fg-mute">
         AMQP can't list existing bindings — you can create one above, but they aren't enumerable without the management API.
       </p>
     </div>
@@ -189,7 +189,7 @@ function MgmtBindingsTab({ conn, queueName, refreshKey }: { conn: RabbitConnecti
       />
       {b.loading ? <LoadingRow />
         : b.error ? <Callout tone="error">{b.error}</Callout>
-        : !b.data || b.data.length === 0 ? <p className="text-sm text-muted-foreground">No bindings.</p>
+        : !b.data || b.data.length === 0 ? <p className="text-sm text-fg-mute">No bindings.</p>
         : (
           <DataTable>
             <Thead>

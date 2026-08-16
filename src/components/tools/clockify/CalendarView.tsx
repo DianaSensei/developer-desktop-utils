@@ -218,7 +218,7 @@ export function CalendarView() {
   };
 
   const nowMin = (now - dayStart(now)) / MS_MIN;
-  const totalColor = (ms: number) => (targetMs > 0 && ms >= targetMs ? 'text-ok' : 'text-muted-foreground');
+  const totalColor = (ms: number) => (targetMs > 0 && ms >= targetMs ? 'text-ok' : 'text-fg-mute');
 
   return (
     <div className="flex h-full flex-col">
@@ -237,8 +237,8 @@ export function CalendarView() {
           {view === 'day' ? shortDate(days[0]) : weekRangeLabel(anchor, settings.weekStartsMon)}
         </span>
         {view === 'week' && weekTotal > 0 && (
-          <span className="text-xs text-muted-foreground">
-            · <span className="font-mono tabular-nums text-foreground">{fmtTotal(weekTotal)}</span> tracked
+          <span className="text-xs text-fg-mute">
+            · <span className="font-mono tabular-nums text-fg">{fmtTotal(weekTotal)}</span> tracked
           </span>
         )}
         <Button
@@ -257,7 +257,7 @@ export function CalendarView() {
             <button
               key={v}
               onClick={() => setView(v)}
-              className={cn('rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors', view === v ? 'bg-foreground/10' : 'text-muted-foreground hover:text-foreground')}
+              className={cn('rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors', view === v ? 'bg-fg/10' : 'text-fg-mute hover:text-fg')}
             >
               {v}
             </button>
@@ -272,8 +272,8 @@ export function CalendarView() {
           const today = sameDay(d, now);
           return (
             <div key={d} className="flex flex-1 flex-col items-center gap-0.5 py-1.5">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{weekdayShort(d)}</span>
-              <span className={cn('flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-sm font-semibold', today ? 'bg-primary text-primary-foreground' : 'text-foreground')}>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute">{weekdayShort(d)}</span>
+              <span className={cn('flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-sm font-semibold', today ? 'bg-primary text-primary-foreground' : 'text-fg')}>
                 {new Date(d).getDate()}
               </span>
               <span className={cn('font-mono text-[11px] tabular-nums', total > 0 ? totalColor(total) : 'text-transparent')}>
@@ -290,7 +290,7 @@ export function CalendarView() {
           {/* hour axis */}
           <div className="relative w-12 shrink-0">
             {Array.from({ length: 24 }, (_, h) => (
-              <div key={h} className="absolute right-1 -translate-y-1/2 text-[11px] tabular-nums text-muted-foreground" style={{ top: h * HOUR_PX }}>
+              <div key={h} className="absolute right-1 -translate-y-1/2 text-[11px] tabular-nums text-fg-mute" style={{ top: h * HOUR_PX }}>
                 {h > 0 ? `${pad(h)}:00` : ''}
               </div>
             ))}
@@ -361,7 +361,7 @@ export function CalendarView() {
                         key={`m-${b.id}`}
                         data-block
                         onClick={(ev) => { ev.stopPropagation(); setEditingMeetingId(mt.id); }}
-                        className="group absolute z-30 flex flex-col overflow-hidden rounded-sm border border-[hsl(var(--cat-3-c)/0.55)] bg-[hsl(var(--cat-3-c)/0.15)] py-1 pl-2.5 pr-1.5 text-left text-[11px] leading-tight text-foreground shadow-sm backdrop-blur-[1px] transition duration-100 hover:shadow-md hover:brightness-[1.03]"
+                        className="group absolute z-30 flex flex-col overflow-hidden rounded-sm border border-[hsl(var(--cat-3-c)/0.55)] bg-[hsl(var(--cat-3-c)/0.15)] py-1 pl-2.5 pr-1.5 text-left text-[11px] leading-tight text-fg shadow-sm backdrop-blur-[1px] transition duration-100 hover:shadow-md hover:brightness-[1.03]"
                         style={posStyle}
                       >
                         <span className="absolute inset-y-0 left-0 w-1 bg-[var(--cat-3)]" />
@@ -485,7 +485,7 @@ function EntryEditor({
             {entry.end !== null ? (
               <DateTimePicker value={entry.end} onChange={(ts) => onChange({ end: Math.max(ts, entry.start) })} />
             ) : (
-              <div className="flex h-ctl-lg items-center px-1 text-xs text-muted-foreground">Running…</div>
+              <div className="flex h-ctl-lg items-center px-1 text-xs text-fg-mute">Running…</div>
             )}
           </div>
         </div>
@@ -540,7 +540,7 @@ function QuickCreateDialog({
             <button
               key={k}
               onClick={() => setKind(k)}
-              className={cn('flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors', kind === k ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground hover:text-foreground')}
+              className={cn('flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors', kind === k ? 'bg-fg/10 text-fg' : 'text-fg-mute hover:text-fg')}
             >
               <Icon className="h-3.5 w-3.5" /> {label}
             </button>
@@ -583,11 +583,11 @@ function QuickCreateDialog({
         )}
 
         {kind === 'meeting' && (
-          <p className="text-[11px] text-muted-foreground">Notes (agenda, decisions, action items) open next, and stay in sync with the Meeting Notes tool.</p>
+          <p className="text-[11px] text-fg-mute">Notes (agenda, decisions, action items) open next, and stay in sync with the Meeting Notes tool.</p>
         )}
 
         <div className="flex items-center justify-between border-t pt-3">
-          <span className="text-xs text-muted-foreground">{valid ? fmtTimer(end - start) : 'End must be after start'}</span>
+          <span className="text-xs text-fg-mute">{valid ? fmtTimer(end - start) : 'End must be after start'}</span>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
             <Button size="sm" disabled={!valid} onClick={submit}>

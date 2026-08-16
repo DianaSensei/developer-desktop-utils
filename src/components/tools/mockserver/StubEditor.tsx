@@ -90,14 +90,14 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
 
   const delayField = (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-muted-foreground">Delay</span>
+      <span className="text-xs text-fg-mute">Delay</span>
       <Input
         type="number"
         value={stub.delayMs}
         onChange={(e) => onChange({ delayMs: Math.max(0, Number(e.target.value) || 0) })}
         className="h-ctl w-20 text-xs"
       />
-      <span className="text-xs text-muted-foreground">ms</span>
+      <span className="text-xs text-fg-mute">ms</span>
     </div>
   );
 
@@ -111,7 +111,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
           placeholder="Stub name"
           className="h-ctl flex-1 text-sm font-medium"
         />
-        <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+        <label className="flex shrink-0 items-center gap-2 text-xs text-fg-mute">
           {stub.enabled ? 'Enabled' : 'Disabled'}
           <Switch checked={stub.enabled} onCheckedChange={(v) => onChange({ enabled: v })} />
         </label>
@@ -167,7 +167,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">Status</span>
+                <span className="text-xs text-fg-mute">Status</span>
                 <Input
                   type="number"
                   value={stub.status}
@@ -179,20 +179,20 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-xs text-muted-foreground">Headers</span>
+              <span className="text-xs text-fg-mute">Headers</span>
               <KeyValueEditor rows={stub.headers} onChange={(headers) => onChange({ headers })} />
             </div>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Body</span>
+                  <span className="text-xs text-fg-mute">Body</span>
                   {stub.bodyType === 'json' && (
                     <>
                       <button
                         type="button"
                         onClick={formatJson}
-                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute transition-colors hover:bg-muted hover:text-fg"
                         title="Pretty-print JSON"
                       >
                         <Braces className="h-3 w-3" />
@@ -238,24 +238,24 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                       Choose file…
                     </Button>
                     {stub.body ? (
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1.5 text-xs text-fg-mute">
                         <FileDown className="h-3.5 w-3.5" />
                         {humanSize(approxBytes(stub.body))}
                         <button
                           type="button"
                           onClick={() => onChange({ body: '', fileName: '' })}
-                          className="text-muted-foreground hover:text-destructive"
+                          className="text-fg-mute hover:text-destructive"
                           aria-label="Clear file"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </span>
                     ) : (
-                      <span className="text-[11px] text-muted-foreground">or paste base64 below</span>
+                      <span className="text-[11px] text-fg-mute">or paste base64 below</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="shrink-0 text-xs text-muted-foreground">Download name</span>
+                    <span className="shrink-0 text-xs text-fg-mute">Download name</span>
                     <Input
                       value={stub.fileName}
                       onChange={(e) => onChange({ fileName: e.target.value })}
@@ -324,8 +324,8 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
               <div className="rounded-md border bg-muted/20 p-2 text-xs">
                 {result.ok ? (
                   <>
-                    <div className="mb-1 text-muted-foreground">
-                      Status <span className="font-mono text-foreground">{result.status}</span>
+                    <div className="mb-1 text-fg-mute">
+                      Status <span className="font-mono text-fg">{result.status}</span>
                     </div>
                     <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px]">
                       {result.body}

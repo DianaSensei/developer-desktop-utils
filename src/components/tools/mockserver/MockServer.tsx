@@ -30,7 +30,7 @@ const FALLBACK_ID = '__fallback__';
 // instead of looking like a specific verb.
 const badgeClass = (method: string) =>
   method === 'ANY'
-    ? 'border border-dashed border-muted-foreground/50 text-muted-foreground'
+    ? 'border border-dashed border-fg-mute/50 text-fg-mute'
     : methodBadgeStyle(method as HttpMethod);
 
 export function MockServer() {
@@ -144,7 +144,7 @@ export function MockServer() {
   const stubListPane = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Stubs</span>
+        <span className="text-xs font-medium text-fg-mute">Stubs</span>
         <div className="flex items-center gap-0.5">
           <CopyButton
             value={exportJson}
@@ -192,7 +192,7 @@ export function MockServer() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium">{s.name || '(unnamed)'}</div>
-              <div className="truncate font-mono text-[11px] text-muted-foreground">{s.path}</div>
+              <div className="truncate font-mono text-[11px] text-fg-mute">{s.path}</div>
             </div>
             <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
               <IconBtn label="Move up" title="Move up" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveStub(s.id, -1); }}>
@@ -214,7 +214,7 @@ export function MockServer() {
           <button
             type="button"
             onClick={addStub}
-            className="m-3 flex w-[calc(100%-1.5rem)] items-center justify-center gap-1.5 rounded-md border border-dashed py-6 text-xs text-muted-foreground hover:bg-muted/40"
+            className="m-3 flex w-[calc(100%-1.5rem)] items-center justify-center gap-1.5 rounded-md border border-dashed py-6 text-xs text-fg-mute hover:bg-muted/40"
           >
             <Plus className="h-4 w-4" /> Add your first stub
           </button>
@@ -230,12 +230,12 @@ export function MockServer() {
           selectedId === FALLBACK_ID ? 'border-l-primary bg-muted/60' : 'border-l-transparent',
         )}
       >
-        <span className="flex w-11 shrink-0 items-center justify-center rounded bg-muted/60 py-0.5 text-muted-foreground">
+        <span className="flex w-11 shrink-0 items-center justify-center rounded bg-muted/60 py-0.5 text-fg-mute">
           <Ban className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium">No-match response</div>
-          <div className="truncate font-mono text-[11px] text-muted-foreground">default · {config.notFoundStatus}</div>
+          <div className="truncate font-mono text-[11px] text-fg-mute">default · {config.notFoundStatus}</div>
         </div>
       </button>
     </div>
@@ -247,7 +247,7 @@ export function MockServer() {
     ) : selected ? (
       <StubEditor key={selected.id} stub={selected} onChange={(patch) => updateStub(selected.id, patch)} testScript={testScript} />
     ) : (
-      <div className="flex h-full w-full flex-1 items-center justify-center text-sm text-muted-foreground">Select or add a stub.</div>
+      <div className="flex h-full w-full flex-1 items-center justify-center text-sm text-fg-mute">Select or add a stub.</div>
     );
 
   return (
@@ -291,7 +291,7 @@ export function MockServer() {
         )}
 
         <div className="flex items-center gap-1 rounded-md border bg-muted/30 px-2 py-1 font-mono text-xs">
-          <span className="text-muted-foreground">{baseUrl}</span>
+          <span className="text-fg-mute">{baseUrl}</span>
           <CopyButton value={baseUrl} icon={CopyIcon} iconClassName="h-3 w-3" />
         </div>
 
@@ -303,13 +303,13 @@ export function MockServer() {
         )}
 
         {error && <span className="text-[11px] text-destructive">{error}</span>}
-        {!isTauri && <span className="text-[11px] text-muted-foreground">Server runs in the desktop app only.</span>}
+        {!isTauri && <span className="text-[11px] text-fg-mute">Server runs in the desktop app only.</span>}
 
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="ml-auto h-ctl text-xs text-muted-foreground"
+          className="ml-auto h-ctl text-xs text-fg-mute"
           onClick={() => setLogVisible((v) => !v)}
         >
           {logVisible ? <PanelRightClose className="mr-1 h-3.5 w-3.5" /> : <PanelRightOpen className="mr-1 h-3.5 w-3.5" />}
@@ -405,8 +405,8 @@ function IconBtn({
       aria-label={label}
       title={title}
       className={cn(
-        'rounded p-1 text-muted-foreground transition-colors',
-        disabled ? 'cursor-default opacity-30' : danger ? 'hover:bg-muted hover:text-destructive' : 'hover:bg-muted hover:text-foreground',
+        'rounded p-1 text-fg-mute transition-colors',
+        disabled ? 'cursor-default opacity-30' : danger ? 'hover:bg-muted hover:text-destructive' : 'hover:bg-muted hover:text-fg',
       )}
     >
       {children}

@@ -51,9 +51,9 @@ export function ImportReviewDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="shrink-0 space-y-2 border-b px-4 py-3 text-xs text-muted-foreground">
+        <div className="shrink-0 space-y-2 border-b px-4 py-3 text-xs text-fg-mute">
           <p>
-            <span className="font-medium text-foreground">{collectionName}</span> ships{' '}
+            <span className="font-medium text-fg">{collectionName}</span> ships{' '}
             {findings.length} script{findings.length === 1 ? '' : 's'} that would run automatically
             whenever you send one of its requests.
           </p>
@@ -73,16 +73,16 @@ export function ImportReviewDialog({
                   className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs transition-colors hover:bg-accent/50"
                 >
                   {open
-                    ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                  <FileCode2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
+                    : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />}
+                  <FileCode2 className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
                   <span className="min-w-0 flex-1 truncate font-medium" title={f.path || collectionName}>
                     {f.path || collectionName}
                   </span>
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">
                     {KIND_LABEL[f.kind]}
                   </span>
-                  <span className="w-16 shrink-0 text-right text-[11px] text-muted-foreground">
+                  <span className="w-16 shrink-0 text-right text-[11px] text-fg-mute">
                     {f.code.split('\n').length} lines
                   </span>
                 </button>
@@ -103,7 +103,7 @@ export function ImportReviewDialog({
           <Button variant="outline" onClick={onImportWithScripts}>
             Import with scripts
           </Button>
-          <Button variant="ghost" onClick={onCancel} className={cn('ml-auto text-muted-foreground')}>
+          <Button variant="ghost" onClick={onCancel} className={cn('ml-auto text-fg-mute')}>
             Cancel
           </Button>
         </div>

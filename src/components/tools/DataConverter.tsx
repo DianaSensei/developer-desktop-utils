@@ -181,7 +181,7 @@ export function DataConverter() {
               size="icon"
               onClick={handleSwap}
               title="Swap directions"
-              className="h-ctl w-ctl shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
+              className="h-ctl w-ctl shrink-0 rounded-sm text-fg-mute hover:text-fg"
             >
               <ArrowLeftRight className="h-4 w-4" />
             </Button>
@@ -197,7 +197,7 @@ export function DataConverter() {
 
           {/* Indent */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Indent</span>
+            <span className="text-xs text-fg-mute">Indent</span>
             <Select value={indent} onValueChange={(v) => setIndent(v as '2' | '4')}>
               <SelectTrigger className="h-ctl w-[88px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -215,7 +215,7 @@ export function DataConverter() {
                 'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none ' +
                 (xmlPretty
                   ? 'border-primary/50 bg-primary/10 text-primary'
-                  : 'border-input bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground')
+                  : 'border-input bg-transparent text-fg-mute hover:bg-muted hover:text-fg')
               }
             >
               Pretty XML
@@ -228,7 +228,7 @@ export function DataConverter() {
       <div className="flex flex-1 min-h-0 divide-x divide-border">
         {/* Source */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-muted-foreground">
+          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
             <span>Source · {FORMATS.find((f) => f.value === from)?.label}</span>
           </div>
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
@@ -242,7 +242,7 @@ export function DataConverter() {
 
         {/* Result */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-muted-foreground">
+          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
             <span>Result · {FORMATS.find((f) => f.value === to)?.label}</span>
             <div className="flex items-center gap-1">
               <Button
@@ -251,7 +251,7 @@ export function DataConverter() {
                 onClick={handleDownload}
                 disabled={!output}
                 title="Download result"
-                className="h-6 w-6 rounded text-muted-foreground hover:text-foreground"
+                className="h-6 w-6 rounded text-fg-mute hover:text-fg"
               >
                 <Download className="h-3.5 w-3.5" />
               </Button>

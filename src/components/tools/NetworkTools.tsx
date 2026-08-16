@@ -105,7 +105,7 @@ function CopyBtn({ value }: { value: string }) {
       value={value}
       variant="ghost"
       size="icon"
-      className="h-6 w-6 shrink-0 text-muted-foreground/60 hover:text-foreground"
+      className="h-6 w-6 shrink-0 text-fg-mute/60 hover:text-fg"
       iconClassName="h-3.5 w-3.5"
     />
   );
@@ -120,7 +120,7 @@ function Pill({ children, tone = 'primary', className }: {
 }) {
   const tones = {
     primary: 'bg-primary/10 text-primary',
-    muted: 'bg-muted text-muted-foreground',
+    muted: 'bg-muted text-fg-mute',
     amber: 'bg-warn-tint text-warn',
   };
   return (
@@ -134,11 +134,11 @@ function Pill({ children, tone = 'primary', className }: {
 function MetaBar({ summary, onClear }: { summary: React.ReactNode; onClear: () => void }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[11px] text-muted-foreground">{summary}</span>
+      <span className="text-[11px] text-fg-mute">{summary}</span>
       <button
         type="button"
         onClick={onClear}
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute hover:text-fg hover:bg-muted transition-colors"
       >
         <X className="h-3 w-3" /> Clear
       </button>
@@ -154,9 +154,9 @@ function Empty({ icon: Icon = Globe, children }: { icon?: typeof Globe; children
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-card">
-        <Icon className="h-6 w-6 text-muted-foreground/40" />
+        <Icon className="h-6 w-6 text-fg-mute/40" />
       </div>
-      <p className="max-w-xs text-sm text-muted-foreground">{children}</p>
+      <p className="max-w-xs text-sm text-fg-mute">{children}</p>
     </div>
   );
 }
@@ -174,7 +174,7 @@ function SearchInput({
 }) {
   return (
     <div className="relative flex-1 min-w-[200px]">
-      <Icon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+      <Icon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-mute/60" />
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -204,7 +204,7 @@ function StatCard({ icon: Icon, label, value }: { icon: typeof Globe; label: str
   return (
     <Stat
       mono
-      icon={<Icon className="h-3.5 w-3.5 text-muted-foreground/70" />}
+      icon={<Icon className="h-3.5 w-3.5 text-fg-mute/70" />}
       label={label}
       value={value}
       action={<CopyBtn value={value} />}
@@ -276,7 +276,7 @@ function DnsView() {
             onClear={clear}
           />
           {answers.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs text-fg-mute">
               <AlertCircle className="h-4 w-4 shrink-0" />
               No {type} records found{status && status !== 'NOERROR' ? ` · ${status}` : ''}.
             </div>
@@ -286,7 +286,7 @@ function DnsView() {
                 <div key={i} className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2">
                   <Pill className="shrink-0 w-12">{a.typeName}</Pill>
                   <span className="flex-1 font-mono text-xs break-all">{a.data}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums" title="TTL (seconds)">{a.ttl}s</span>
+                  <span className="shrink-0 text-[11px] text-fg-mute tabular-nums" title="TTL (seconds)">{a.ttl}s</span>
                   <CopyBtn value={a.data} />
                 </div>
               ))}
@@ -372,16 +372,16 @@ function PropagationView() {
                 <div className="flex items-center gap-2">
                   {r.ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-ok" /> : <XCircle className="h-4 w-4 shrink-0 text-bad" />}
                   <span className="text-sm font-medium">{r.provider.label}</span>
-                  {r.status && r.status !== 'NOERROR' && <span className="ml-auto text-[11px] text-muted-foreground">{r.status}</span>}
+                  {r.status && r.status !== 'NOERROR' && <span className="ml-auto text-[11px] text-fg-mute">{r.status}</span>}
                 </div>
                 {r.error ? (
                   <p className="mt-1.5 pl-6 text-xs text-destructive">{r.error}</p>
                 ) : r.records.length ? (
                   <div className="mt-1.5 pl-6 space-y-1">
-                    {r.records.map((rec, i) => <div key={i} className="font-mono text-xs break-all text-muted-foreground">{rec}</div>)}
+                    {r.records.map((rec, i) => <div key={i} className="font-mono text-xs break-all text-fg-mute">{rec}</div>)}
                   </div>
                 ) : (
-                  <p className="mt-1.5 pl-6 text-xs text-muted-foreground">No {type} records</p>
+                  <p className="mt-1.5 pl-6 text-xs text-fg-mute">No {type} records</p>
                 )}
               </div>
             ))}
@@ -402,12 +402,12 @@ function DnssecSection({ title, records }: { title: string; records: DnsAnswer[]
     <div className="rounded-lg border bg-card p-3">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold">{title}</span>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{records.length}</span>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">{records.length}</span>
       </div>
       <div className="space-y-1">
         {records.map((r, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className="flex-1 font-mono text-[11px] break-all text-muted-foreground">{r.data}</span>
+            <span className="flex-1 font-mono text-[11px] break-all text-fg-mute">{r.data}</span>
             <CopyBtn value={r.data} />
           </div>
         ))}
@@ -473,7 +473,7 @@ function DnssecView() {
               <DnssecSection title="RRSIG signatures" records={result.rrsig} />
             </div>
           ) : (
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-xs text-fg-mute">
               <AlertCircle className="h-4 w-4 shrink-0" />
               No DS, DNSKEY, or RRSIG records published for this domain.
             </div>
@@ -625,7 +625,7 @@ function LocalNetworkView() {
                   >
                     <Pill className="shrink-0 w-12">{iface.family === 'IPv6' ? 'v6' : 'v4'}</Pill>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[11px] text-fg-mute">
                         {iface.name}{iface.internal && ' · internal'}
                       </p>
                       <p className="font-mono text-xs break-all">{iface.ip}</p>
@@ -745,7 +745,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
   return (
     <div className={cn(PROC_GRID, 'px-3 py-2')}>
       {/* PID — first column */}
-      <span className="py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground" title="Process ID">
+      <span className="py-0.5 font-mono text-[11px] tabular-nums text-fg-mute" title="Process ID">
         {group.pid != null ? group.pid : '—'}
       </span>
 
@@ -763,15 +763,15 @@ function ProcessRow({ group, isFav, onToggleFav }: {
               title={`${p.port}/${p.protocol} on ${p.addresses.join(', ')} · ${fav ? 'remove from' : 'add to'} favourites`}
               className="group/port flex h-5 items-center gap-1.5 text-left"
             >
-              <Star className={cn('h-3 w-3 shrink-0', fav ? 'fill-current text-warn' : 'text-transparent group-hover/port:text-muted-foreground/40')} />
+              <Star className={cn('h-3 w-3 shrink-0', fav ? 'fill-current text-warn' : 'text-transparent group-hover/port:text-fg-mute/40')} />
               <span className={cn(
                 'w-10 font-mono text-xs tabular-nums',
                 i === 0 ? 'font-semibold' : 'font-medium',
-                fav ? 'text-warn' : i === 0 ? 'text-foreground' : 'text-muted-foreground',
+                fav ? 'text-warn' : i === 0 ? 'text-fg' : 'text-fg-mute',
               )}>
                 {p.port}
               </span>
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/40">{p.protocol}</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute/40">{p.protocol}</span>
             </button>
           );
         })}
@@ -787,11 +787,11 @@ function ProcessRow({ group, isFav, onToggleFav }: {
               key={`${p.protocol}-${p.port}`}
               className={cn(
                 'flex h-5 items-center gap-1.5 text-[11px] font-medium',
-                scope.exposed ? 'text-warn' : 'text-muted-foreground/50',
+                scope.exposed ? 'text-warn' : 'text-fg-mute/50',
               )}
               title={`${SCOPE_DESC[scope.label]} — ${p.addresses.join(', ')}`}
             >
-              <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', scope.exposed ? 'bg-warn' : 'bg-muted-foreground/30')} />
+              <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', scope.exposed ? 'bg-warn' : 'bg-fg-mute/30')} />
               {scope.label}
             </span>
           );
@@ -803,7 +803,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
         <div className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium" title={title}>{title}</span>
           {group.framework && (
-            <span className="shrink-0 text-[11px] text-muted-foreground" title="Detected framework">
+            <span className="shrink-0 text-[11px] text-fg-mute" title="Detected framework">
               {emoji && <span aria-hidden>{emoji} </span>}{group.framework}
             </span>
           )}
@@ -815,7 +815,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
               onClick={() => setCmdOpen((o) => !o)}
               title={cmdOpen ? 'Click to collapse' : 'Click to show the full command'}
               className={cn(
-                'min-w-0 flex-1 text-left font-mono text-[11px] leading-tight text-muted-foreground/70 hover:text-muted-foreground',
+                'min-w-0 flex-1 text-left font-mono text-[11px] leading-tight text-fg-mute/70 hover:text-fg-mute',
                 cmdOpen ? 'whitespace-pre-wrap break-all' : 'truncate',
               )}
             >
@@ -824,17 +824,17 @@ function ProcessRow({ group, isFav, onToggleFav }: {
             <CopyButton
               value={subtitle}
               iconClassName="h-3 w-3"
-              className="h-5 w-5 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity hover:text-foreground group-hover/cmd:opacity-100"
+              className="h-5 w-5 shrink-0 text-fg-mute/50 opacity-0 transition-opacity hover:text-fg group-hover/cmd:opacity-100"
             />
           </div>
         )}
       </div>
 
       {/* MEM · UPTIME — quiet, right-aligned metric columns */}
-      <span className="py-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground" title="Resident memory">
+      <span className="py-0.5 text-right font-mono text-xs tabular-nums text-fg-mute" title="Resident memory">
         {group.memBytes != null ? formatMem(group.memBytes) : ''}
       </span>
-      <span className="py-0.5 text-right text-[11px] tabular-nums text-muted-foreground" title="Uptime">
+      <span className="py-0.5 text-right text-[11px] tabular-nums text-fg-mute" title="Uptime">
         {group.uptimeSecs != null ? formatUptime(group.uptimeSecs) : ''}
       </span>
     </div>
@@ -851,7 +851,7 @@ function FavStar({ port, fav, onToggle }: { port: number; fav: boolean; onToggle
       title={fav ? `Remove port ${port} from favourites` : `Add port ${port} to favourites`}
       className={cn(
         'group/star flex h-6 w-6 items-center justify-center rounded transition-colors',
-        fav ? 'text-warn' : 'text-muted-foreground/40 hover:text-muted-foreground',
+        fav ? 'text-warn' : 'text-fg-mute/40 hover:text-fg-mute',
       )}
     >
       <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
@@ -872,8 +872,8 @@ function SocketRow({ entry, isFav, onToggleFav }: {
       <span className="font-mono font-semibold tabular-nums">{entry.localPort}</span>
       <Pill tone={entry.protocol === 'UDP' ? 'amber' : 'primary'}>{entry.protocol}</Pill>
       <span className="truncate" title={entry.processName ?? undefined}>{entry.processName ?? '—'}</span>
-      <span className="font-mono tabular-nums text-muted-foreground">{entry.pid ?? '—'}</span>
-      <span className="truncate font-mono text-muted-foreground" title={entry.localAddress}>{entry.localAddress}</span>
+      <span className="font-mono tabular-nums text-fg-mute">{entry.pid ?? '—'}</span>
+      <span className="truncate font-mono text-fg-mute" title={entry.localAddress}>{entry.localAddress}</span>
     </div>
   );
 }
@@ -885,9 +885,9 @@ function FreeRow({ port, fav, onToggle }: { port: number; fav: boolean; onToggle
       <FavStar port={port} fav={fav} onToggle={onToggle} />
       <span className="font-mono font-semibold tabular-nums">{port}</span>
       <Pill tone="muted">FREE</Pill>
-      <span className="italic text-muted-foreground">not listening</span>
-      <span className="text-muted-foreground">—</span>
-      <span className="text-muted-foreground">—</span>
+      <span className="italic text-fg-mute">not listening</span>
+      <span className="text-fg-mute">—</span>
+      <span className="text-fg-mute">—</span>
     </div>
   );
 }
@@ -895,7 +895,7 @@ function FreeRow({ port, fav, onToggle }: { port: number; fav: boolean; onToggle
 // Header row for the socket (flat / favourites) table.
 function SocketTableHeader() {
   return (
-    <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground')}>
+    <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute')}>
       {/* Empty placeholder for the star column — must stay in flow so it occupies
           its grid track (an sr-only span is position:absolute and would shift
           every following header one column to the left). */}
@@ -1060,9 +1060,9 @@ function PortsView() {
         type="button"
         onClick={() => toggleSort(col)}
         className={cn(
-          'flex items-center gap-0.5 uppercase tracking-wide transition-colors hover:text-foreground',
+          'flex items-center gap-0.5 uppercase tracking-wide transition-colors hover:text-fg',
           alignRight && 'justify-end',
-          sortCol === col && 'text-foreground',
+          sortCol === col && 'text-fg',
           className,
         )}
       >
@@ -1102,7 +1102,7 @@ function PortsView() {
           </Button>
           {favOnly ? (
             <div className="relative flex-1 min-w-[160px]">
-              <Plus className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+              <Plus className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-mute/60" />
               <Input
                 value={addValue}
                 onChange={(e) => setAddValue(e.target.value)}
@@ -1136,7 +1136,7 @@ function PortsView() {
           />
           {favOnly ? (
             favRows.length === 0 ? (
-              <p className="px-1 py-6 text-center text-xs text-muted-foreground">No favourite ports match "{filter}".</p>
+              <p className="px-1 py-6 text-center text-xs text-fg-mute">No favourite ports match "{filter}".</p>
             ) : (
               <div className="overflow-hidden rounded-lg border">
                 <SocketTableHeader />
@@ -1151,12 +1151,12 @@ function PortsView() {
             )
           ) : viewMode === 'flat' ? (
             sortedSockets.length === 0 ? (
-              <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+              <p className="px-1 py-6 text-center text-xs text-fg-mute">
                 {entries.length === 0 ? 'No listening ports found.' : `Nothing matches "${filter}"`}
               </p>
             ) : (
               <div className="overflow-hidden rounded-lg border">
-                <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground')}>
+                <div className={cn(PORTS_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-fg-mute')}>
                   <span aria-hidden="true" />
                   {sortHeader('port', 'Port')}
                   {sortHeader('proto', 'Proto')}
@@ -1172,12 +1172,12 @@ function PortsView() {
               </div>
             )
           ) : groups.length === 0 ? (
-            <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+            <p className="px-1 py-6 text-center text-xs text-fg-mute">
               {entries.length === 0 ? 'No listening ports found.' : `Nothing matches "${filter}"`}
             </p>
           ) : (
             <div className="overflow-hidden rounded-lg border">
-              <div className={cn(PROC_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground')}>
+              <div className={cn(PROC_GRID, 'border-b bg-muted/40 px-3 py-1.5 text-[11px] font-semibold text-fg-mute')}>
                 {sortHeader('pid', 'PID')}
                 {/* Indent past the in-cell favourite star (w-3 + gap-1.5) so the
                     label sits above the port numbers, not the star. */}
@@ -1187,7 +1187,7 @@ function PortsView() {
                   title={`Where each port is reachable.\n• local — ${SCOPE_DESC.local}\n• LAN — ${SCOPE_DESC.LAN}\n• all — ${SCOPE_DESC.all}`}
                 >
                   Scope
-                  <Info className="h-3 w-3 text-muted-foreground/50" />
+                  <Info className="h-3 w-3 text-fg-mute/50" />
                 </span>
                 {sortHeader('process', 'Process')}
                 {sortHeader('mem', 'Mem', true)}
@@ -1200,7 +1200,7 @@ function PortsView() {
               </div>
             </div>
           )}
-          <p className="px-1 text-[11px] text-muted-foreground/70">
+          <p className="px-1 text-[11px] text-fg-mute/70">
             Shows your own user's processes. System or other-user processes may need elevated privileges to appear — an OS restriction, not a tool limit.
           </p>
         </div>
@@ -1317,7 +1317,7 @@ export function NetworkTools() {
                 onClick={() => selectView(LAST_VIEW[cat.id])}
                 className={cn(
                   'relative flex shrink-0 items-center gap-1.5 px-2.5 py-2.5 text-sm font-medium transition-colors',
-                  active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  active ? 'text-fg' : 'text-fg-mute hover:text-fg',
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -1348,7 +1348,7 @@ export function NetworkTools() {
                   'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
                   active
                     ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.06]',
+                    : 'text-fg-mute hover:text-fg hover:bg-fg/[0.06]',
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />

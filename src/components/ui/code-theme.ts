@@ -61,7 +61,7 @@ export const codeHighlight = HighlightStyle.define([
   { tag: tags.propertyName, color: 'var(--js-property)' },
   // Method calls — `.aggregate(`, `.find(`.
   { tag: tags.function(tags.name), color: 'var(--js-method)' },
-  { tag: tags.variableName, color: 'hsl(var(--foreground))' },
+  { tag: tags.variableName, color: 'hsl(var(--fg-c))' },
   { tag: tags.definition(tags.variableName), color: 'var(--sql-function)' },
 ]);
 
@@ -138,26 +138,26 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       },
       '&.cm-focused': { outline: 'none' },
       '.cm-scroller': { overflow: 'auto', minHeight: '0', fontFamily: 'inherit' },
-      '.cm-content': { caretColor: 'hsl(var(--foreground))', padding: contentPadding },
-      '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--foreground))', borderLeftWidth: '1.5px' },
+      '.cm-content': { caretColor: 'hsl(var(--fg-c))', padding: contentPadding },
+      '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--fg-c))', borderLeftWidth: '1.5px' },
       // CodeMirror's own placeholder decoration — renders inline in the real
       // document flow (respects the gutter, wraps multi-line text correctly),
       // unlike a hand-rolled absolutely-positioned overlay.
       // `--muted-foreground` đã là màu mờ; đè thêm alpha 0.55 lên trên khiến
       // chữ ví dụ gần như không đọc được (đo được ở Script tab của API
       // Client). Input dùng `/75` cho placeholder — theo cùng mức đó.
-      '.cm-placeholder': { color: 'hsl(var(--muted-foreground) / 0.75)', fontStyle: 'normal' },
+      '.cm-placeholder': { color: 'hsl(var(--fg-mute-c) / 0.75)', fontStyle: 'normal' },
 
       '.cm-gutters': gutter === 'panel'
         ? {
             backgroundColor: 'hsl(var(--muted) / 0.4)',
-            color: 'hsl(var(--muted-foreground))',
+            color: 'hsl(var(--fg-mute-c))',
             border: 'none',
             borderRight: '1px solid hsl(var(--border))',
           }
         : {
             backgroundColor: 'transparent',
-            color: 'hsl(var(--muted-foreground) / 0.5)',
+            color: 'hsl(var(--fg-mute-c) / 0.5)',
             border: 'none',
           },
       '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 8px' },
@@ -181,7 +181,7 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         width: '15px',
         height: '15px',
         borderRadius: '4px',
-        color: 'hsl(var(--muted-foreground) / 0.75)',
+        color: 'hsl(var(--fg-mute-c) / 0.75)',
         transition: 'background-color 150ms, color 150ms',
       },
       '.cm-foldGutter span:hover': {
@@ -196,7 +196,7 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       '.cm-foldPlaceholder': {
         backgroundColor: 'hsl(var(--muted))',
         border: '1px solid hsl(var(--border))',
-        color: 'hsl(var(--muted-foreground))',
+        color: 'hsl(var(--fg-mute-c))',
         borderRadius: '4px',
         margin: '0 2px',
         padding: '0 4px',
@@ -222,41 +222,41 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       // Popups. Every editor gets these — an unthemed autocomplete list was the
       // most visible symptom of the missing dark flag.
       '.cm-tooltip': {
-        backgroundColor: 'hsl(var(--popover))',
+        backgroundColor: 'hsl(var(--card-c))',
         border: '1px solid hsl(var(--border))',
         borderRadius: '6px',
         boxShadow: '0 4px 12px rgb(0 0 0 / 0.18)',
-        color: 'hsl(var(--foreground))',
+        color: 'hsl(var(--fg-c))',
       },
       '.cm-tooltip.cm-tooltip-autocomplete': { overflow: 'hidden' },
       '.cm-tooltip-autocomplete > ul > li': {
         padding: '3px 8px',
         fontFamily: CODE_FONT,
         fontSize: '12px',
-        color: 'hsl(var(--foreground))',
+        color: 'hsl(var(--fg-c))',
       },
       '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
         backgroundColor: 'hsl(var(--accent))',
         color: 'hsl(var(--accent-foreground))',
       },
       '.cm-completionLabel': { color: 'inherit' },
-      '.cm-completionDetail': { color: 'hsl(var(--muted-foreground))' },
+      '.cm-completionDetail': { color: 'hsl(var(--fg-mute-c))' },
 
       // Search / goto-line panel.
-      '.cm-panels': { backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--foreground))' },
+      '.cm-panels': { backgroundColor: 'hsl(var(--card-c))', color: 'hsl(var(--fg-c))' },
       '.cm-panels.cm-panels-top': { borderBottom: '1px solid hsl(var(--border))' },
       '.cm-panels.cm-panels-bottom': { borderTop: '1px solid hsl(var(--border))' },
       '.cm-textfield': {
-        backgroundColor: 'hsl(var(--background))',
+        backgroundColor: 'hsl(var(--bg-c))',
         border: '1px solid hsl(var(--border))',
-        color: 'hsl(var(--foreground))',
+        color: 'hsl(var(--fg-c))',
       },
       '.cm-button': {
         backgroundColor: 'hsl(var(--secondary))',
         backgroundImage: 'none',
         border: '1px solid hsl(var(--border))',
         borderRadius: '4px',
-        color: 'hsl(var(--foreground))',
+        color: 'hsl(var(--fg-c))',
       },
     },
     { dark },

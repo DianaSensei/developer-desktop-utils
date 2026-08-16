@@ -18,8 +18,8 @@ export type StatTone = 'default' | 'muted' | 'success' | 'warning' | 'danger' | 
 export type StatVariant = 'card' | 'compact' | 'inline';
 
 const TONE_CLASS: Record<StatTone, string> = {
-  default: 'text-foreground',
-  muted: 'text-muted-foreground',
+  default: 'text-fg',
+  muted: 'text-fg-mute',
   success: 'text-ok',
   warning: 'text-warn',
   danger: 'text-bad',
@@ -62,7 +62,7 @@ export function Stat({
     return (
       <div className={cn('flex items-baseline gap-1', className)} title={title}>
         <span className={cn('text-base font-bold leading-none', mono ? 'font-mono' : 'tabular-nums', TONE_CLASS[tone])}>{value}</span>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">{icon}{label}</span>
+        <span className="flex items-center gap-1 text-xs text-fg-mute">{icon}{label}</span>
       </div>
     );
   }
@@ -79,7 +79,7 @@ export function Stat({
     >
       <div className="min-w-0 flex-1">
         <p className={cn(
-          'flex items-center gap-1 uppercase tracking-wide text-muted-foreground',
+          'flex items-center gap-1 uppercase tracking-wide text-fg-mute',
           'text-[11px]',
         )}>
           {icon}{label}
@@ -92,7 +92,7 @@ export function Stat({
         )}>
           {value}
         </p>
-        {sub && !compact && <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>}
+        {sub && !compact && <p className="mt-0.5 text-[11px] text-fg-mute">{sub}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>

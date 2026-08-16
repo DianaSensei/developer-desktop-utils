@@ -57,8 +57,8 @@ export function Timesheet() {
           <ChevronRight className="h-4 w-4" />
         </Button>
         <span className="ml-2 text-sm font-medium">{weekRangeLabel(anchor, settings.weekStartsMon)}</span>
-        <span className="ml-auto text-xs text-muted-foreground">
-          Week total <span className="font-mono tabular-nums text-foreground">{fmtHM(grandTotal)}</span>
+        <span className="ml-auto text-xs text-fg-mute">
+          Week total <span className="font-mono tabular-nums text-fg">{fmtHM(grandTotal)}</span>
         </span>
       </div>
 
@@ -67,22 +67,22 @@ export function Timesheet() {
         <table className="w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 w-56 bg-background px-2 py-2 text-left text-xs font-medium text-muted-foreground">
+              <th className="sticky left-0 z-10 w-56 bg-bg px-2 py-2 text-left text-xs font-medium text-fg-mute">
                 Project / Task
               </th>
               {days.map((d) => (
-                <th key={d} className={cn('px-1 py-2 text-center text-xs font-medium', sameDay(d, now) ? 'text-foreground' : 'text-muted-foreground')}>
+                <th key={d} className={cn('px-1 py-2 text-center text-xs font-medium', sameDay(d, now) ? 'text-fg' : 'text-fg-mute')}>
                   <div>{weekdayShort(d)}</div>
                   <div className="font-normal opacity-70">{new Date(d).getDate()}</div>
                 </th>
               ))}
-              <th className="px-2 py-2 text-center text-xs font-medium text-muted-foreground">Total</th>
+              <th className="px-2 py-2 text-center text-xs font-medium text-fg-mute">Total</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-10 text-center text-xs text-muted-foreground">
+                <td colSpan={9} className="py-10 text-center text-xs text-fg-mute">
                   No rows yet. Add a project row below or track time in the Time Tracker.
                 </td>
               </tr>
@@ -92,10 +92,10 @@ export function Timesheet() {
               const task = taskById(r.t);
               return (
                 <tr key={comboKey(r.p, r.t)} className="group">
-                  <td className="sticky left-0 z-10 bg-background px-2 py-1">
+                  <td className="sticky left-0 z-10 bg-bg px-2 py-1">
                     <div className="flex items-center gap-1.5">
                       <ColorDot color={project?.color} />
-                      <span className={cn('truncate text-sm', !project && 'text-muted-foreground')}>
+                      <span className={cn('truncate text-sm', !project && 'text-fg-mute')}>
                         {project ? project.name : 'No project'}
                         {task ? ` · ${task.name}` : ''}
                       </span>
@@ -112,9 +112,9 @@ export function Timesheet() {
             })}
             {/* day totals */}
             <tr>
-              <td className="sticky left-0 z-10 bg-background px-2 py-2 text-xs font-medium text-muted-foreground">Daily total</td>
+              <td className="sticky left-0 z-10 bg-bg px-2 py-2 text-xs font-medium text-fg-mute">Daily total</td>
               {days.map((d) => (
-                <td key={d} className="px-1 py-2 text-center font-mono text-xs tabular-nums text-muted-foreground">
+                <td key={d} className="px-1 py-2 text-center font-mono text-xs tabular-nums text-fg-mute">
                   {fmtHM(dayTotal(d))}
                 </td>
               ))}
@@ -125,7 +125,7 @@ export function Timesheet() {
 
         {/* Add row */}
         <div className="mt-3 flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Add row:</span>
+          <span className="text-xs text-fg-mute">Add row:</span>
           <ProjectPicker
             value={null}
             onChange={(p, t) => {
@@ -135,7 +135,7 @@ export function Timesheet() {
             }}
             compact
           />
-          <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+          <Plus className="h-3.5 w-3.5 text-fg-mute" />
         </div>
       </div>
     </div>

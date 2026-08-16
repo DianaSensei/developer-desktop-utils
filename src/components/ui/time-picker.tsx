@@ -45,8 +45,8 @@ function Column({
 }) {
   return (
     <div className={cn('flex flex-col items-center', fill && 'min-h-0 flex-1')} onWheel={(e) => { e.preventDefault(); onStep(e.deltaY > 0 ? 1 : -1); }}>
-      <span className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
-      <button type="button" onClick={() => onStep(-1)} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Previous ${label}`}>
+      <span className="mb-1 text-[11px] font-medium uppercase tracking-wide text-fg-mute">{label}</span>
+      <button type="button" onClick={() => onStep(-1)} className="rounded p-0.5 text-fg-mute hover:bg-muted hover:text-fg" aria-label={`Previous ${label}`}>
         <ChevronUp className="h-4 w-4" />
       </button>
       <div className={cn('my-1 w-10 overflow-y-auto rounded-md border bg-muted/20 px-1 py-1 no-scrollbar', fill ? 'min-h-0 flex-1' : listClass)}>
@@ -68,7 +68,7 @@ function Column({
           );
         })}
       </div>
-      <button type="button" onClick={() => onStep(1)} className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Next ${label}`}>
+      <button type="button" onClick={() => onStep(1)} className="rounded p-0.5 text-fg-mute hover:bg-muted hover:text-fg" aria-label={`Next ${label}`}>
         <ChevronDown className="h-4 w-4" />
       </button>
     </div>
@@ -114,7 +114,7 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
   const stepSec = (d: number) => emit(h, m, (s + 60 + d) % 60);
 
   const listClass = 'h-[132px]';
-  const sep = <span className="self-center font-mono text-lg text-muted-foreground">:</span>;
+  const sep = <span className="self-center font-mono text-lg text-fg-mute">:</span>;
   const columns = (
     <>
       <div className={cn('flex justify-center gap-1', inline ? 'min-h-0 flex-1 items-stretch' : 'items-start')}>
@@ -131,7 +131,7 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
       <button
         type="button"
         onClick={() => { const d = new Date(); pendingScroll.current = true; emit(d.getHours(), d.getMinutes(), d.getSeconds()); }}
-        className="mt-2 w-full rounded-md border py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="mt-2 w-full rounded-md border py-1 text-xs text-fg-mute transition-colors hover:bg-muted hover:text-fg"
       >
         Now
       </button>
@@ -139,7 +139,7 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
   );
 
   if (inline) {
-    return <div ref={wrapRef} className={cn('flex h-full flex-col rounded-lg border bg-popover p-3', className)}>{columns}</div>;
+    return <div ref={wrapRef} className={cn('flex h-full flex-col rounded-lg border bg-card p-3', className)}>{columns}</div>;
   }
 
   return (
@@ -155,12 +155,12 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
           className,
         )}
       >
-        <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <Clock className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
         <span className="font-mono">{pad2(h)}:{pad2(m)}{showSeconds && `:${pad2(s)}`}</span>
       </button>
 
       {open && !disabled && (
-        <div className="absolute z-50 mt-1.5 rounded-lg border bg-popover p-3 shadow-xl">
+        <div className="absolute z-50 mt-1.5 rounded-lg border bg-card p-3 shadow-xl">
           {columns}
         </div>
       )}

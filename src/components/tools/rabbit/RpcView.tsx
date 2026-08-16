@@ -218,17 +218,17 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
   const replyText = reply ? (replyFormat === 'json' ? prettyJsonOrRaw(reply.payload) : reply.payload) : '';
 
   const routingHint = exchange === ''
-    ? <>Default exchange — the message goes to the queue <span className="font-mono text-foreground">named exactly the routing key</span>.</>
-    : <>Routes via <span className="font-mono text-foreground">{exchange}</span> by its type (direct/topic/fanout/headers).</>;
+    ? <>Default exchange — the message goes to the queue <span className="font-mono text-fg">named exactly the routing key</span>.</>
+    : <>Routes via <span className="font-mono text-fg">{exchange}</span> by its type (direct/topic/fanout/headers).</>;
 
   return (
     <div className="tool-full-height">
       <div className="flex items-center justify-between gap-3 px-5 py-3 border-b shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <Repeat className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Repeat className="h-4 w-4 text-fg-mute shrink-0" />
           <div className="min-w-0">
             <h2 className="font-semibold text-sm">Send / Request</h2>
-            <p className="text-[11px] text-muted-foreground truncate">
+            <p className="text-[11px] text-fg-mute truncate">
               AMQP ({conn.useTls ? 'amqps' : 'amqp'}://{conn.host}:{conn.amqpPort}) · vhost {conn.vhost}
             </p>
           </div>
@@ -262,7 +262,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
               />
             </div>
           </div>
-          <p className="-mt-2.5 text-[11px] text-muted-foreground leading-relaxed">{routingHint}</p>
+          <p className="-mt-2.5 text-[11px] text-fg-mute leading-relaxed">{routingHint}</p>
 
           {/* Payload */}
           <div>
@@ -274,7 +274,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
                     type="button"
                     onClick={formatPayload}
                     disabled={!payload.trim()}
-                    className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-40"
+                    className="text-[11px] text-fg-mute hover:text-fg disabled:opacity-40"
                     title="Pretty-print as JSON"
                   >
                     Format
@@ -315,14 +315,14 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
               <label className="flex items-center justify-between rounded-md border px-3 py-2 cursor-pointer">
                 <span className="text-xs">
                   <span className="font-medium">Mandatory</span>
-                  <span className="block text-[11px] text-muted-foreground">Return if unroutable</span>
+                  <span className="block text-[11px] text-fg-mute">Return if unroutable</span>
                 </span>
                 <Switch checked={mandatory} onCheckedChange={(v) => { setMandatory(v); reset(); }} aria-label="Mandatory" />
               </label>
               <label className="flex items-center justify-between rounded-md border px-3 py-2 cursor-pointer">
                 <span className="text-xs">
                   <span className="font-medium">Publisher confirm</span>
-                  <span className="block text-[11px] text-muted-foreground">Wait for broker ack</span>
+                  <span className="block text-[11px] text-fg-mute">Wait for broker ack</span>
                 </span>
                 <Switch checked={confirm} onCheckedChange={(v) => { setConfirm(v); reset(); }} aria-label="Publisher confirm" />
               </label>
@@ -381,7 +381,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
           {/* Action row */}
           <div className="flex items-center gap-3 flex-wrap">
             {mode === 'request' && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 text-xs text-fg-mute">
                 <Timer className="h-3.5 w-3.5" />
                 timeout
                 <Input type="number" min={100} value={timeoutMs} onChange={(e) => setTimeoutMs(Math.max(100, Number(e.target.value)))} className="h-ctl w-20 font-mono text-xs" />
@@ -418,7 +418,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
                   </span>
                 )
               )}
-              {stopped && <span className="text-muted-foreground">Stopped waiting for a reply.</span>}
+              {stopped && <span className="text-fg-mute">Stopped waiting for a reply.</span>}
             </div>
           )}
 
@@ -426,7 +426,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
 
           {reply && (
             <div className="rounded-lg border bg-card/40 overflow-hidden">
-              <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/20 border-b text-[11px] text-muted-foreground">
+              <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/20 border-b text-[11px] text-fg-mute">
                 <span className="font-mono truncate">
                   Reply{reply.contentType ? ` · ${reply.contentType}` : ''}
                   {reply.correlationId ? ` · correlation_id: ${reply.correlationId}` : ''}
@@ -542,7 +542,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
         className="font-mono text-sm h-ctl"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">
+        <div className="absolute z-20 mt-1 w-full rounded-md border bg-card shadow max-h-64 overflow-y-auto py-1">
           <RecentSuggestions items={recent} connId={conn.id} field="routingKey" value={value} onPick={pick} />
           {matches.map((s) => (
             <button
@@ -552,7 +552,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
               className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === s.key && 'text-primary')}
             >
               <span className="font-mono text-sm flex-1 truncate">{s.key}</span>
-              <span className="text-[11px] text-muted-foreground shrink-0 truncate max-w-[45%]">{s.hint}</span>
+              <span className="text-[11px] text-fg-mute shrink-0 truncate max-w-[45%]">{s.hint}</span>
               {value === s.key && <Check className="h-3.5 w-3.5 shrink-0" />}
             </button>
           ))}
@@ -594,7 +594,7 @@ function ExchangeCombobox({ connId, value, exchanges, onChange }: {
         className="font-mono text-sm h-ctl"
       />
       {open && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">
+        <div className="absolute z-20 mt-1 w-full rounded-md border bg-card shadow max-h-64 overflow-y-auto py-1">
           <RecentSuggestions items={recent} connId={connId} field="exchange" value={value} onPick={pick} />
           <button
             type="button"
@@ -612,13 +612,13 @@ function ExchangeCombobox({ connId, value, exchanges, onChange }: {
               className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === e.name && 'text-primary')}
             >
               <span className="font-mono text-sm flex-1 truncate">{e.name}</span>
-              <span className="text-[11px] text-muted-foreground shrink-0">{e.type}</span>
+              <span className="text-[11px] text-fg-mute shrink-0">{e.type}</span>
               {value === e.name && <Check className="h-3.5 w-3.5 shrink-0" />}
             </button>
           ))}
           {q !== '' && matches.length === 0 && (
-            <div className="px-2.5 py-1.5 text-[11px] text-muted-foreground">
-              No match — <span className="font-mono text-foreground">{value}</span> will be used as a custom exchange.
+            <div className="px-2.5 py-1.5 text-[11px] text-fg-mute">
+              No match — <span className="font-mono text-fg">{value}</span> will be used as a custom exchange.
             </div>
           )}
         </div>

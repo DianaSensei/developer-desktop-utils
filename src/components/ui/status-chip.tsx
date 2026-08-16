@@ -23,8 +23,8 @@ const TONE: Record<StatusChipTone, { chip: string; pip: string }> = {
   bad: { chip: 'bg-bad-tint text-bad border-bad-edge', pip: 'bg-bad' },
   info: { chip: 'bg-info-tint text-info border-info-edge', pip: 'bg-info' },
   idle: {
-    chip: 'bg-muted/60 text-muted-foreground border-border',
-    pip: 'bg-muted-foreground/50',
+    chip: 'bg-muted/60 text-fg-mute border-border',
+    pip: 'bg-fg-mute/50',
   },
 };
 

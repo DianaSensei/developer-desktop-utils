@@ -12,7 +12,7 @@ const TONE_CLASS: Record<StatusDotTone, string> = {
   live: 'bg-ok',
   starting: 'bg-warn',
   paused: 'bg-warn',
-  idle: 'bg-muted-foreground/40',
+  idle: 'bg-fg-mute/40',
   error: 'bg-bad',
   // `recording` KHÔNG dùng --bad: một đồng hồ đang chạy và một lỗi thật không
   // được cùng màu, nếu không đỏ mất nghĩa "có gì đó sai". --live là hệ quy ước
