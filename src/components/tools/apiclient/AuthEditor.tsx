@@ -47,7 +47,7 @@ function AuthField({ label, value, onValue, placeholder, vars, masked }: {
       <Label className="text-xs">{label}</Label>
       {vars ? (
         <div
-          className="flex h-ctl items-center gap-1 rounded-md border border-input bg-bg px-3 focus-within:ring-2 focus-within:ring-acc/40"
+          className="flex h-ctl items-center gap-1 rounded-md border border-sunk bg-bg px-3 focus-within:ring-2 focus-within:ring-acc/40"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         >

@@ -620,7 +620,7 @@ export function CronGenerator() {
           <button
             type="button"
             aria-label={`${mode} cron rule`}
-            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute hover:bg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/35"
+            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute hover:bg-bg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/35"
           >
             <HelpCircle className="h-4 w-4" />
           </button>
@@ -644,7 +644,7 @@ export function CronGenerator() {
               value={expression}
               onChange={(event) => updateExpression(event.target.value)}
               placeholder={mode === 'linux' ? '*/5 * * * *' : '0 */5 * ? * *'}
-              className="font-mono h-ctl-lg rounded-sm border-b border-border"
+              className="font-mono h-ctl-lg rounded-sm border-b border-line"
             />
             <CopyButton
               value={() => normalizeExpression(expression)}
@@ -666,7 +666,7 @@ export function CronGenerator() {
             const fieldErrors = validateField(fields[rule.key], rule);
 
             return (
-              <div key={rule.key} className="space-y-2 rounded-lg border border-border bg-bg/50 px-3 py-2.5">
+              <div key={rule.key} className="space-y-2 rounded-lg border border-line bg-bg/50 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor={`cron-${rule.key}`}>{rule.label}</Label>
                   <span className="text-xs text-fg-mute">{rule.range}</span>
@@ -679,7 +679,7 @@ export function CronGenerator() {
                     placeholder={rule.optional ? 'optional' : '*'}
                     className={cn(
                       'h-ctl min-w-0 flex-1 font-mono',
-                      fieldErrors.length > 0 && 'border-destructive'
+                      fieldErrors.length > 0 && 'border-bad'
                     )}
                   />
                   <Select
@@ -707,7 +707,7 @@ export function CronGenerator() {
                   </Select>
                 </div>
                 {fieldErrors.length > 0 && (
-                  <p className="text-xs text-destructive">{fieldErrors[0]}</p>
+                  <p className="text-xs text-bad">{fieldErrors[0]}</p>
                 )}
               </div>
             );

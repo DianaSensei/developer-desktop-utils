@@ -121,7 +121,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             {selection?.kind === 'collectionVars' && activeCollection ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-fg-mute">
+                  <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute">
                     {activeCollection.name}
                   </span>
                   <span className="text-sm font-medium">Collection Variables</span>
@@ -141,7 +141,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             ) : selected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-fg-mute">
+                  <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute">
                     {selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
                   </span>
                   <Input
@@ -171,7 +171,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-destructive"
+                    className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-bad"
                     onClick={() => store.deleteEnvironment(selected.id)}
                     title="Delete environment"
                   >
@@ -187,7 +187,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   secretToggle
                 />
                 <p className="text-[11px] text-fg-mute">
-                  Reference a variable anywhere with <code className="rounded bg-muted px-1">{'{{name}}'}</code>.{' '}
+                  Reference a variable anywhere with <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code>.{' '}
                   Click the lock icon to mark a value secret — it stays masked here and is left out of
                   generated code, exports, and history the same way the Vault is.
                 </p>

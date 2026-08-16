@@ -384,7 +384,7 @@ function QrGenerator() {
     cn('rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none',
       active
         ? 'border-acc/30 bg-acc/10 text-acc'
-        : 'border-border bg-bg hover:border-acc/60 hover:bg-muted/50');
+        : 'border-line bg-bg hover:border-acc/60 hover:bg-bg-2/50');
 
   return (
     <div className="space-y-4">
@@ -609,7 +609,7 @@ function QrReader() {
         onDrop={handleDrop}
         className={cn(
           'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors',
-          dragging ? 'border-acc bg-acc/5' : 'hover:border-acc/60 hover:bg-muted/40',
+          dragging ? 'border-acc bg-acc/5' : 'hover:border-acc/60 hover:bg-bg-2/40',
         )}
       >
         {loading
@@ -620,7 +620,7 @@ function QrReader() {
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); void pasteFromClipboard(); }}
-          className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1 text-xs font-medium text-fg-mute transition-colors hover:bg-muted/50 hover:text-fg"
+          className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-line bg-bg px-2.5 py-1 text-xs font-medium text-fg-mute transition-colors hover:bg-bg-2/50 hover:text-fg"
         >
           <ClipboardPaste className="h-3.5 w-3.5" />
           Paste from clipboard · {quickPasteHint}

@@ -100,7 +100,7 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
           </Callout>
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-bad">{error}</p>
           )}
         </div>
 

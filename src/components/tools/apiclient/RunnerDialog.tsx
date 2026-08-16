@@ -485,7 +485,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 text-ok" />
                         <span className="min-w-0 flex-1 truncate text-xs font-medium" title={dataFile.name}>{dataFile.name}</span>
-                        <button onClick={() => { setDataFile(null); resetRun(); }} title="Remove" className="rounded p-0.5 text-fg-mute/60 hover:text-destructive">
+                        <button onClick={() => { setDataFile(null); resetRun(); }} title="Remove" className="rounded p-0.5 text-fg-mute/60 hover:text-bad">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -513,8 +513,8 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       <FileSpreadsheet className="h-3.5 w-3.5" /> Select CSV or JSON file
                     </button>
                   )}
-                  {dataError && <p className="text-[11px] text-destructive">{dataError}</p>}
-                  {!dataFile && <p className="text-[11px] text-fg-mute">Binds each row's columns to <code className="rounded bg-muted px-1">{'{{var}}'}</code>, one iteration per row.</p>}
+                  {dataError && <p className="text-[11px] text-bad">{dataError}</p>}
+                  {!dataFile && <p className="text-[11px] text-fg-mute">Binds each row's columns to <code className="rounded bg-bg-2 px-1">{'{{var}}'}</code>, one iteration per row.</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -552,13 +552,13 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-fg-mute/30 group-hover:text-fg-mute/60" />
                         <span
                           className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                            checked ? 'border-acc bg-acc text-acc-fg' : 'border-input')}
+                            checked ? 'border-acc bg-acc text-acc-fg' : 'border-sunk')}
                         >
                           {checked && <Check className="h-3 w-3" />}
                         </span>
                         <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(req.method))}>{req.method}</span>
                         <span className="min-w-0 flex-1 truncate" title={req.url}>{req.name}</span>
-                        {filteredOut && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">filtered</span>}
+                        {filteredOut && <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">filtered</span>}
                       </div>
                     );
                   })}
@@ -572,7 +572,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                 <Callout tone="warning" size="sm">
                   Duplicate request name{duplicateNames.length === 1 ? '' : 's'} in this run:{' '}
                   <span className="font-mono">{duplicateNames.join(', ')}</span>. A script's{' '}
-                  <code className="rounded bg-muted px-1">setNextRequest(name)</code> always jumps to the
+                  <code className="rounded bg-bg-2 px-1">setNextRequest(name)</code> always jumps to the
                   first match — rename one to make a flow-control jump to it unambiguous.
                 </Callout>
               </div>
@@ -652,7 +652,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
             )}
 
             {/* progress — fixed-height strip so the layout doesn't shift */}
-            <div className="h-0.5 shrink-0 overflow-hidden bg-muted">
+            <div className="h-0.5 shrink-0 overflow-hidden bg-bg-2">
               {running && (
                 <div
                   className="h-full bg-acc transition-[width] duration-200"
@@ -697,10 +697,10 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                 ) : (
                   <>
                     {dataRow && Object.keys(dataRow).length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 border-b bg-muted/20 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-1.5 border-b bg-bg-2/20 px-3 py-2">
                         <SectionLabel>Data</SectionLabel>
                         {Object.entries(dataRow).map(([k, v]) => (
-                          <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"><span className="text-fg-mute">{k}=</span>{v}</span>
+                          <span key={k} className="rounded bg-bg-2 px-1.5 py-0.5 font-mono text-[11px]"><span className="text-fg-mute">{k}=</span>{v}</span>
                         ))}
                       </div>
                     )}
@@ -741,7 +741,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                         <p className="px-4 py-6 text-center text-xs text-fg-mute">Nothing matches this filter.</p>
                       )}
                       {cappedIters.has(viewIter) && (
-                        <p className="px-3 py-2 text-[11px] text-destructive">
+                        <p className="px-3 py-2 text-[11px] text-bad">
                           Stopped after {MAX_STEPS_PER_ITERATION} requests — setNextRequest appears to loop.
                         </p>
                       )}
@@ -781,7 +781,7 @@ function RecordRow({ record: r, onOpen }: { record: RunRecord; onOpen: () => voi
       </button>
       {r.jump && (
         <p className={cn('flex items-center gap-1.5 px-3 pb-1.5 pl-10 text-[11px]',
-          r.jump.missing ? 'text-destructive' : 'text-fg-mute')}>
+          r.jump.missing ? 'text-bad' : 'text-fg-mute')}>
           <CornerDownRight className="h-3 w-3 shrink-0" />
           {r.jump.to === null
             ? 'Script ended the iteration here.'
@@ -810,7 +810,7 @@ function DataPreview({ rows, columns }: { rows: DataRow[]; columns: string[] }) 
   return (
     <div className="max-h-40 overflow-auto rounded border">
       <table className="w-full border-collapse text-[11px]">
-        <thead className="sticky top-0 bg-muted/60">
+        <thead className="sticky top-0 bg-bg-2/60">
           <tr>
             <th className="border-b px-1.5 py-1 text-left font-semibold text-fg-mute">#</th>
             {cols.map((c) => <th key={c} className="border-b px-1.5 py-1 text-left font-mono font-semibold">{c}</th>)}
@@ -818,7 +818,7 @@ function DataPreview({ rows, columns }: { rows: DataRow[]; columns: string[] }) 
         </thead>
         <tbody>
           {shown.map((row, i) => (
-            <tr key={i} className="odd:bg-muted/20">
+            <tr key={i} className="odd:bg-bg-2/20">
               <td className="px-1.5 py-0.5 text-fg-mute">{i + 1}</td>
               {cols.map((c) => <td key={c} className="max-w-[8rem] truncate px-1.5 py-0.5 font-mono" title={row[c]}>{row[c]}</td>)}
             </tr>
@@ -847,7 +847,7 @@ function RunDetailView({ entry, onBack }: { entry: RunDetail; onBack: () => void
         <span className="min-w-0 truncate font-medium" title={request.name}>{request.name}</span>
         <div className="ml-auto flex items-center gap-1.5">
           {result.response && <span className={cn('font-semibold', statusColor(status))}>{status}</span>}
-          {result.error && <span className="font-semibold text-destructive">ERR</span>}
+          {result.error && <span className="font-semibold text-bad">ERR</span>}
           {result.response && <span className="text-fg-mute">{result.response.timeMs} ms</span>}
         </div>
       </div>
@@ -901,7 +901,7 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
           <p className="mb-1 font-semibold text-fg-mute">Iteration data</p>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(dataVars).map(([k, v]) => (
-              <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"><span className="text-fg-mute">{k}=</span>{v}</span>
+              <span key={k} className="rounded bg-bg-2 px-1.5 py-0.5 font-mono text-[11px]"><span className="text-fg-mute">{k}=</span>{v}</span>
             ))}
           </div>
         </div>
@@ -922,7 +922,7 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
       </div>
       <div>
         <p className="mb-1 font-semibold text-fg-mute">Body <span className="font-normal">({body.mode})</span></p>
-        {bodyText ? <pre className="whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono">{sub(bodyText)}</pre> : <p className="text-fg-mute">No body.</p>}
+        {bodyText ? <pre className="whitespace-pre-wrap break-all rounded bg-bg-2/40 p-2 font-mono">{sub(bodyText)}</pre> : <p className="text-fg-mute">No body.</p>}
       </div>
     </div>
   );
@@ -951,11 +951,11 @@ function OptionRow({ label, hint, checked, onChange }: {
 // will be substituted and whether anything in the run actually uses it.
 function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
   if (mappings.length === 0) {
-    return <p className="text-[11px] text-destructive">No columns found — is the header row present?</p>;
+    return <p className="text-[11px] text-bad">No columns found — is the header row present?</p>;
   }
   return (
     <div className="overflow-hidden rounded border">
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-x-2 border-b bg-muted/40 px-1.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-x-2 border-b bg-bg-2/40 px-1.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
         <span>Column</span>
         <span>Variable</span>
         <span />
@@ -973,7 +973,7 @@ function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
             {m.used ? (
               <Check className="h-3 w-3 shrink-0 text-ok" aria-label="Used by the run" />
             ) : (
-              <span className="shrink-0 rounded bg-muted px-1 text-[11px] text-fg-mute" title="No selected request references this variable">
+              <span className="shrink-0 rounded bg-bg-2 px-1 text-[11px] text-fg-mute" title="No selected request references this variable">
                 unused
               </span>
             )}

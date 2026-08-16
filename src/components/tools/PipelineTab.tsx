@@ -32,7 +32,7 @@ interface FieldConfig {
 }
 
 type StepOp =
-  | 'text-input' | 'json-input' | 'hash' | 'hmac' | 'encode' | 'decode'
+  | 'text-sunk' | 'json-input' | 'hash' | 'hmac' | 'encode' | 'decode'
   | 'uppercase' | 'lowercase' | 'trim' | 'prepend' | 'append' | 'replace';
 
 interface PipelineStep {
@@ -66,7 +66,7 @@ interface StepResult { output: string; error?: string; }
 interface OpMeta { label: string; hint: string; icon: React.ElementType; color: string; }
 
 const OP_META: Record<StepOp, OpMeta> = {
-  'text-input': { label: 'Text Input',    hint: 'Free text — type or paste any string',                 icon: FileText,        color: 'text-[var(--cat-4)]' },
+  'text-sunk': { label: 'Text Input',    hint: 'Free text — type or paste any string',                 icon: FileText,        color: 'text-[var(--cat-4)]' },
   'json-input': { label: 'JSON Input',    hint: 'Parse JSON and assemble fields into a string',         icon: Braces,          color: 'text-[var(--cat-4)]' },
   hmac:         { label: 'HMAC Sign',     hint: 'Keyed signature — MoMo, ZaloPay, Alipay, REST APIs',  icon: KeyRound,        color: 'text-[var(--cat-3)]'  },
   hash:         { label: 'Hash',          hint: 'One-way fingerprint — MD5, SHA-256, SHA-512, …',       icon: Hash,            color: 'text-[var(--cat-2)]'    },
@@ -81,7 +81,7 @@ const OP_META: Record<StepOp, OpMeta> = {
 };
 
 const OP_GROUPS: { label: string; ops: StepOp[] }[] = [
-  { label: 'Input',       ops: ['text-input', 'json-input'] },
+  { label: 'Input',       ops: ['text-sunk', 'json-input'] },
   { label: 'Sign / Hash', ops: ['hmac', 'hash'] },
   { label: 'Encode',      ops: ['encode', 'decode'] },
   { label: 'Text',        ops: ['uppercase', 'lowercase', 'trim', 'prepend', 'append', 'replace'] },
@@ -223,7 +223,7 @@ function mergeJsonFields(existing: FieldConfig[], flatMap: Record<string, string
 function executeStep(step: PipelineStep, input: string): StepResult {
   try {
     switch (step.op) {
-      case 'text-input':
+      case 'text-sunk':
         return { output: step.textValue ?? '' };
       case 'json-input': {
         let flatMap: Record<string, string> = {};
@@ -290,7 +290,7 @@ function HexToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
       type="button" onClick={() => onChange(!value)}
       className={cn(
         'text-[11px] font-mono px-2 h-ctl rounded-md border transition-colors',
-        value ? 'border-acc/50 bg-acc/10 text-acc' : 'border-border bg-muted/30 text-fg-mute hover:text-fg'
+        value ? 'border-acc/50 bg-acc/10 text-acc' : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg'
       )}
     >
       {value ? 'ABC' : 'abc'}
@@ -356,7 +356,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
         onClick={() => onChange({ enabled: !field.enabled })}
         className={cn(
           'shrink-0 h-4 w-4 rounded border transition-colors flex items-center justify-center',
-          field.enabled ? 'bg-acc border-acc' : 'border-border bg-card'
+          field.enabled ? 'bg-acc border-acc' : 'border-line bg-card'
         )}
       >
         {field.enabled && <span className="text-[11px] font-black text-acc-fg leading-none">✓</span>}
@@ -418,7 +418,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
         </button>
         {field.type === 'custom' && (
           <button type="button" onClick={onRemove}
-            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-destructive transition-colors">
+            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-bad transition-colors">
             <Trash2 className="h-3 w-3" />
           </button>
         )}
@@ -557,15 +557,15 @@ function JsonInputSection({
 
       {/* ── Unified field table ── */}
       {jsonFields.length > 0 && (
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-lg border border-line overflow-hidden">
           {/* Header */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b border-border">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-bg-2/30 border-b border-line">
             <div className="w-4" />
             <span className="w-36 shrink-0 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">Field</span>
             <span className="flex-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">Value</span>
           </div>
           {/* Rows */}
-          <div className="px-3 divide-y divide-border/30">
+          <div className="px-3 divide-y divide-line/30">
             {jsonFields.map((field, i) => (
               <FieldRow
                 key={field.id}
@@ -602,8 +602,8 @@ function StepOutputBar({ result }: { result: StepResult | undefined }) {
     <div className={cn(
       'flex items-start gap-2 px-3 py-2 border-t text-xs font-mono',
       result.error
-        ? 'bg-destructive/5 border-destructive/20 text-destructive'
-        : 'bg-muted/20 border-border/40 text-fg-mute'
+        ? 'bg-bad/5 border-bad/20 text-bad'
+        : 'bg-bg-2/20 border-line/40 text-fg-mute'
     )}>
       <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-px text-fg-mute/50" />
       <span className="flex-1 min-w-0">
@@ -640,13 +640,13 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
   return (
     <div className={cn(
       'rounded-lg border bg-card shadow-sm overflow-hidden',
-      result?.error ? 'border-destructive/30' : 'border-border'
+      result?.error ? 'border-bad/30' : 'border-line'
     )}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 border-b border-border/40">
+      <div className="flex items-center gap-2 px-3 py-2 bg-bg-2/20 border-b border-line/40">
         <div className={cn(
           'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold',
-          result?.error ? 'bg-destructive/20 text-destructive' : 'bg-acc/15 text-acc'
+          result?.error ? 'bg-bad/20 text-bad' : 'bg-acc/15 text-acc'
         )}>
           {index + 1}
         </div>
@@ -681,7 +681,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <button type="button" disabled={index === total - 1} onClick={onMoveDown} className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors">
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
-          <button type="button" onClick={onRemove} className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-destructive transition-colors">
+          <button type="button" onClick={onRemove} className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-bad transition-colors">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -690,7 +690,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
       {/* Params */}
       <div className="px-3 pt-3 pb-3 space-y-2.5">
         {/* Text input step */}
-        {step.op === 'text-input' && (
+        {step.op === 'text-sunk' && (
           <Textarea
             value={step.textValue ?? ''}
             onChange={(e) => onUpdate({ textValue: e.target.value })}
@@ -767,7 +767,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {/* Prepend / Append */}
         {(step.op === 'prepend' || step.op === 'append') && (
           <div className="flex items-center gap-2">
-            <code className="text-[11px] text-fg-mute bg-muted/40 border border-border/60 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
+            <code className="text-[11px] text-fg-mute bg-bg-2/40 border border-line/60 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
               {step.op === 'prepend' ? '[text] + value' : 'value + [text]'}
             </code>
             <Input
@@ -811,7 +811,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
   if (!open) {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div className="w-px h-3 bg-border/50" />
+        <div className="w-px h-3 bg-line/50" />
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}
           className="h-ctl px-4 text-xs rounded-full border-dashed gap-1.5 text-fg-mute hover:text-fg">
           <Plus className="h-3 w-3" />Add step
@@ -821,7 +821,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
   }
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="w-px h-3 bg-border/50" />
+      <div className="w-px h-3 bg-line/50" />
       <div className="w-full rounded-lg border border-dashed border-acc/30 bg-acc/3 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold">Add a step</p>
@@ -836,7 +836,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
                 return (
                   <button key={op} type="button"
                     onClick={() => { onAdd(op); setOpen(false); }}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs font-medium hover:border-acc/40 hover:bg-acc/5 hover:text-acc transition-all">
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-card text-xs font-medium hover:border-acc/40 hover:bg-acc/5 hover:text-acc transition-all">
                     <Icon className={cn('h-3.5 w-3.5', m.color)} />{m.label}
                   </button>
                 );
@@ -855,17 +855,17 @@ function FinalResult({ result }: { result: StepResult | undefined }) {
   if (!result || (!result.output && !result.error)) return null;
   const ok = !!result.output && !result.error;
   return (
-    <div className={cn('rounded-lg border p-4', ok ? 'border-acc/25 bg-acc/5' : 'border-destructive/25 bg-destructive/5')}>
+    <div className={cn('rounded-lg border p-4', ok ? 'border-acc/25 bg-acc/5' : 'border-bad/25 bg-bad/5')}>
       <div className="flex items-center justify-between mb-2.5">
         <span className="flex items-center gap-1.5 text-xs font-semibold">
-          {ok ? <CheckCircle2 className="h-4 w-4 text-acc" /> : <AlertTriangle className="h-4 w-4 text-destructive" />}
+          {ok ? <CheckCircle2 className="h-4 w-4 text-acc" /> : <AlertTriangle className="h-4 w-4 text-bad" />}
           {ok ? 'Final Result' : 'Pipeline Error'}
         </span>
         {ok && <CopyBtn value={result.output} />}
       </div>
       {ok
         ? <p className="font-mono text-sm leading-relaxed break-all text-fg">{result.output}</p>
-        : <p className="text-sm text-destructive">{result.error}</p>
+        : <p className="text-sm text-bad">{result.error}</p>
       }
       {ok && <p className="text-[11px] text-fg-mute/40 mt-1.5">{result.output.length} chars</p>}
     </div>
@@ -875,7 +875,7 @@ function FinalResult({ result }: { result: StepResult | undefined }) {
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 const STEP_DEFAULTS: Partial<Record<StepOp, Partial<PipelineStep>>> = {
-  'text-input': { textValue: '' },
+  'text-sunk': { textValue: '' },
   'json-input': { jsonText: '', jsonFields: [], jsonSeparator: '&', jsonSort: 'none', jsonFormat: 'key=value' },
   hmac:         { algorithm: 'sha256', key: '', upperHex: false },
   hash:         { algorithm: 'sha256', upperHex: false },
@@ -894,10 +894,10 @@ export function PipelineTab({ active }: { active: boolean }) {
 
   // Quick-paste JSON directly into the input step
   useQuickPaste((text) => {
-    // Paste into the first json-input step found; if none, try first text-input
+    // Paste into the first json-input step found; if none, try first text-sunk
     setSteps((prev) => {
       const jsonIdx = prev.findIndex((s) => s.op === 'json-input');
-      const textIdx = prev.findIndex((s) => s.op === 'text-input');
+      const textIdx = prev.findIndex((s) => s.op === 'text-sunk');
       const target = jsonIdx >= 0 ? jsonIdx : textIdx;
       if (target < 0) return prev;
       return prev.map((s, i) => {
@@ -965,7 +965,7 @@ export function PipelineTab({ active }: { active: boolean }) {
             />
             {index < steps.length - 1 && (
               <div className="flex justify-center py-0.5">
-                <div className="w-px h-4 bg-border/50" />
+                <div className="w-px h-4 bg-line/50" />
               </div>
             )}
           </div>

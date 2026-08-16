@@ -73,7 +73,7 @@ export function Stat({
       title={title}
       className={cn(
         'flex items-start gap-2',
-        compact ? 'min-w-[5.5rem] rounded-md border bg-muted/20 px-3 py-1.5' : 'rounded-lg border bg-card/40 px-4 py-3',
+        compact ? 'min-w-[5.5rem] rounded-md border bg-bg-2/20 px-3 py-1.5' : 'rounded-lg border bg-card/40 px-4 py-3',
         className,
       )}
     >

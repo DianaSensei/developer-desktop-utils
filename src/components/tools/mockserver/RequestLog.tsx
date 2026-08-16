@@ -64,8 +64,8 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
                 type="button"
                 onClick={() => setSelectedId(e.id === selectedId ? null : e.id)}
                 className={
-                  'flex w-full items-center gap-2 border-b border-border/60 px-3 py-1.5 text-left text-xs transition-colors hover:bg-muted/40 ' +
-                  (e.id === selectedId ? 'bg-muted/50' : '')
+                  'flex w-full items-center gap-2 border-b border-line/60 px-3 py-1.5 text-left text-xs transition-colors hover:bg-bg-2/40 ' +
+                  (e.id === selectedId ? 'bg-bg-2/50' : '')
                 }
               >
                 <span className={'w-12 shrink-0 font-mono font-medium ' + methodColor(e.method as HttpMethod)}>
@@ -87,7 +87,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
           </div>
 
           {selected && (
-            <div className="max-h-[45%] shrink-0 space-y-2 overflow-y-auto border-t border-border bg-muted/10 p-3 text-xs">
+            <div className="max-h-[45%] shrink-0 space-y-2 overflow-y-auto border-t border-line bg-bg-2/10 p-3 text-xs">
               <Detail label="Time" value={new Date(selected.ts).toLocaleTimeString()} />
               <div className="flex gap-2">
                 <span className="w-14 shrink-0 text-fg-mute">Matched</span>

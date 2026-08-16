@@ -3,10 +3,10 @@
 // connections and channels, the API Client runner's data preview.
 //
 // All eight of those had independently arrived at nearly the same markup —
-// `overflow-x-auto rounded-lg border border-border/50` wrapping a
-// `w-full text-xs` table with a `bg-muted/20` header and `divide-y
-// divide-border/40` rows — but with drifting cell padding (`px-3` vs `px-3.5`)
-// and header tint (`bg-muted/20` vs `bg-muted/30`). These parts fix the
+// `overflow-x-auto rounded-lg border border-line/50` wrapping a
+// `w-full text-xs` table with a `bg-bg-2/20` header and `divide-y
+// divide-line/40` rows — but with drifting cell padding (`px-3` vs `px-3.5`)
+// and header tint (`bg-bg-2/20` vs `bg-bg-2/30`). These parts fix the
 // geometry in one place.
 //
 //   <DataTable>
@@ -61,7 +61,7 @@ export interface DataTableProps extends React.TableHTMLAttributes<HTMLTableEleme
 export function DataTable({ className, containerClassName, density = 'default', children, ...props }: DataTableProps) {
   return (
     <DensityContext.Provider value={density}>
-      <div className={cn('overflow-x-auto rounded-lg border border-border/50', containerClassName)}>
+      <div className={cn('overflow-x-auto rounded-lg border border-line/50', containerClassName)}>
         <table className={cn('w-full text-xs', className)} {...props}>
           {children}
         </table>
@@ -79,7 +79,7 @@ export function Thead({ sticky, className, ...props }: TheadProps) {
   return (
     <thead
       className={cn(
-        'border-b border-border/50 bg-muted/20',
+        'border-b border-line/50 bg-bg-2/20',
         sticky && 'sticky top-0 z-10 backdrop-blur',
         className,
       )}
@@ -96,7 +96,7 @@ export interface TbodyProps extends React.HTMLAttributes<HTMLTableSectionElement
 export function Tbody({ zebra, className, ...props }: TbodyProps) {
   return (
     <tbody
-      className={cn(zebra ? '[&>tr:nth-child(odd)]:bg-muted/20' : 'divide-y divide-border/40', className)}
+      className={cn(zebra ? '[&>tr:nth-child(odd)]:bg-bg-2/20' : 'divide-y divide-line/40', className)}
       {...props}
     />
   );
@@ -113,7 +113,7 @@ export function Tr({ interactive, selected, className, ...props }: TrProps) {
     <tr
       className={cn(
         'transition-colors',
-        interactive && 'cursor-pointer hover:bg-muted/40',
+        interactive && 'cursor-pointer hover:bg-bg-2/40',
         selected && 'bg-acc/10',
         className,
       )}

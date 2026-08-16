@@ -184,7 +184,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
                   key={i}
                   onClick={() => loadRecent(r)}
                   title={r.value}
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-mono text-fg-mute transition-colors hover:bg-muted hover:text-fg max-w-[14rem]"
+                  className="inline-flex items-center gap-1 rounded-md border border-line bg-bg-2/40 px-2 py-1 text-[11px] font-mono text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg max-w-[14rem]"
                 >
                   <RotateCcw className="w-2.5 h-2.5 shrink-0" />
                   <span className="truncate">{r.key ? `${r.key}: ` : ''}{r.value || '(empty)'}</span>
@@ -198,15 +198,15 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         <div className="flex items-center gap-3">
           <div>
             <Label className="text-xs">Partition</Label>
-            <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl mt-1">
+            <div className="flex rounded-md border border-sunk overflow-hidden text-xs h-ctl mt-1">
               <button
-                className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted'}`}
+                className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-bg-2'}`}
                 onClick={() => setPartitionMode('auto')}
               >
                 Auto
               </button>
               <button
-                className={`px-3 py-1 transition-colors ${partitionMode === 'manual' ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted'}`}
+                className={`px-3 py-1 transition-colors ${partitionMode === 'manual' ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-bg-2'}`}
                 onClick={() => setPartitionMode('manual')}
               >
                 Manual
@@ -278,7 +278,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
                 className="h-ctl text-xs font-mono flex-[2]"
               />
               <button
-                className="text-fg-mute hover:text-destructive px-1"
+                className="text-fg-mute hover:text-bad px-1"
                 onClick={() => removeHeader(i)}
               >
                 <X className="w-3 h-3" />
@@ -357,7 +357,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
           )}
 
           {error && (
-            <div className="flex items-start gap-1.5 text-sm text-destructive">
+            <div className="flex items-start gap-1.5 text-sm text-bad">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span className="break-all">{error}</span>
             </div>

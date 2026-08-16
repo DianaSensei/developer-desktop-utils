@@ -60,7 +60,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
 
   return (
     <div className="px-3 py-2.5">
-      <div className="flex items-center overflow-hidden rounded-lg border border-border bg-bg shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-2 focus-within:ring-acc/40">
+      <div className="flex items-center overflow-hidden rounded-lg border border-line bg-bg shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-2 focus-within:ring-acc/40">
         {/* Method selector — tinted to match the active HTTP method (Bruno-style) */}
         <Select value={request.method} onValueChange={(v) => onChange({ method: v as ApiRequest['method'] })}>
           <SelectTrigger
@@ -82,7 +82,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         </Select>
 
         {/* Divider between method and URL */}
-        <span className="h-5 w-px shrink-0 bg-border" />
+        <span className="h-5 w-px shrink-0 bg-line" />
 
         <div className="flex h-ctl-lg min-w-0 flex-1 items-center px-3">
           <InlineCodeField

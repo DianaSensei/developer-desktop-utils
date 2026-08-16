@@ -146,7 +146,7 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
         onClick={() => !disabled && setOpen((v) => !v)}
         style={{ backgroundColor: value }}
         className={cn(
-          'rounded-md border border-border shadow-sm transition-shadow',
+          'rounded-md border border-line shadow-sm transition-shadow',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow',
           'h-6 w-6',

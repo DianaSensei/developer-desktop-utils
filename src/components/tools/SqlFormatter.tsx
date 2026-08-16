@@ -362,7 +362,7 @@ function ToggleChip({ active, onClick, children }: {
         'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none',
         active
           ? 'border-acc/50 bg-acc/10 text-acc'
-          : 'border-input bg-transparent text-fg-mute hover:bg-muted hover:text-fg'
+          : 'border-sunk bg-transparent text-fg-mute hover:bg-bg-2 hover:text-fg'
       )}
     >
       {children}
@@ -513,7 +513,7 @@ export function SqlFormatter() {
             className="shrink-0"
           />
 
-          <div className="h-4 w-px bg-border shrink-0" />
+          <div className="h-4 w-px bg-line shrink-0" />
 
           {/* Indent size */}
           <div className="flex items-center gap-1.5">
@@ -558,7 +558,7 @@ export function SqlFormatter() {
       </div>
 
       {/* Action bar */}
-      <div className="shrink-0 border-t border-border bg-muted/10 px-4 py-2.5 flex items-center justify-between">
+      <div className="shrink-0 border-t border-line bg-bg-2/10 px-4 py-2.5 flex items-center justify-between">
         <Button
           variant="ghost"
           size="sm"

@@ -54,9 +54,9 @@ export function SectionLabel({
         {children}
       </span>
       {count != null && (
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">{count}</span>
+        <span className="rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">{count}</span>
       )}
-      {rule && <span className="h-px flex-1 bg-border" />}
+      {rule && <span className="h-px flex-1 bg-line" />}
       {actions && <span className={cn('flex items-center gap-1', !rule && 'ml-auto')}>{actions}</span>}
     </Tag>
   );

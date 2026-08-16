@@ -50,7 +50,7 @@ export function SettingRow({
       {Icon && (
         <span
           className={cn(
-            'grid h-ctl w-ctl shrink-0 place-items-center rounded-sm border border-border bg-sunk',
+            'grid h-ctl w-ctl shrink-0 place-items-center rounded-sm border border-line bg-sunk',
             'text-fg-mute',
           )}
         >
@@ -87,7 +87,7 @@ export function SettingRow({
         className={cn(
           shared,
           // Rê chuột đổi NỀN, không đổi vị trí — design/RULES.md.
-          'transition-colors hover:bg-muted/40',
+          'transition-colors hover:bg-bg-2/40',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
         )}
       >
@@ -120,7 +120,7 @@ export function SettingGroup({
           {title}
         </h3>
       )}
-      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-soft">
+      <div className="overflow-hidden rounded-lg border border-line bg-card shadow-soft">
         {children}
       </div>
     </section>

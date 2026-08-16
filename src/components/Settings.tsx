@@ -395,7 +395,7 @@ export function Settings() {
             {!allEnabled && (
               <button
                 onClick={enableAll}
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
               >
                 <CheckCheck className="h-3 w-3 shrink-0" />
                 Enable all
@@ -404,7 +404,7 @@ export function Settings() {
             {!allDisabled && (
               <button
                 onClick={disableAll}
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
               >
                 <Ban className="h-3 w-3 shrink-0" />
                 Disable all
@@ -412,7 +412,7 @@ export function Settings() {
             )}
             <button
               onClick={resetToDefaults}
-              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <RotateCcw className="h-3 w-3 shrink-0" />
               Reset
@@ -427,7 +427,7 @@ export function Settings() {
             value={toolQuery}
             onChange={(e) => setToolQuery(e.target.value)}
             placeholder="Search tools…"
-            className="pl-8 pr-8 h-ctl text-xs bg-muted/40 border-muted focus-visible:ring-1"
+            className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-bg-2 focus-visible:ring-1"
           />
           {toolQuery && (
             <button
@@ -475,8 +475,8 @@ export function Settings() {
                       }}
                       style={isDragging ? { transform: `translateY(${drag!.dy}px)` } : undefined}
                       className={cn(
-                        'flex items-center gap-2 bg-muted/30 px-3 py-1.5 cursor-default',
-                        isDragging && 'relative z-20 rounded-lg bg-muted shadow-lg ring-1 ring-acc/50'
+                        'flex items-center gap-2 bg-bg-2/30 px-3 py-1.5 cursor-default',
+                        isDragging && 'relative z-20 rounded-lg bg-bg-2 shadow-lg ring-1 ring-acc/50'
                       )}
                     >
                       {/* Kéo cả nhóm — con bên trong không có tay cầm riêng,
@@ -534,7 +534,7 @@ export function Settings() {
                   className={cn(
                     'flex items-center gap-3 px-3 py-3 cursor-default bg-bg',
                     !enabled && 'opacity-50',
-                    isDragging && 'relative z-20 rounded-lg bg-muted opacity-100 shadow-lg ring-1 ring-acc/50'
+                    isDragging && 'relative z-20 rounded-lg bg-bg-2 opacity-100 shadow-lg ring-1 ring-acc/50'
                   )}
                 >
                   {/* Drag handle — hidden while searching */}
@@ -647,7 +647,7 @@ export function Settings() {
             </div>
             <button
               onClick={openOnboarding}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <Compass className="h-3 w-3" />
               Xem lại
@@ -704,7 +704,7 @@ export function Settings() {
                     Offline
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-destructive">
+                  <span className="flex items-center gap-1 text-bad">
                     <AlertCircle className="h-3 w-3 shrink-0" />
                     {updateError ?? 'Update check failed'}
                   </span>
@@ -718,7 +718,7 @@ export function Settings() {
                     Downloading…
                     {downloadProgress != null && (
                       <>
-                        <span className="relative h-1 w-16 overflow-hidden rounded-full bg-muted">
+                        <span className="relative h-1 w-16 overflow-hidden rounded-full bg-bg-2">
                           <span
                             className="absolute inset-y-0 left-0 rounded-full bg-acc transition-all duration-150"
                             style={{ width: `${downloadProgress}%` }}
@@ -745,7 +745,7 @@ export function Settings() {
                   <>
                     <button
                       onClick={openUpdateDialog}
-                      className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+                      className="flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[11px] text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
                     >
                       <Sparkles className="h-3 w-3" />
                       What's new
@@ -761,7 +761,7 @@ export function Settings() {
                 ) : (
                   <button
                     onClick={checkForUpdates}
-                    className="flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+                    className="flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
                   >
                     <RefreshCw className="h-3 w-3" />
                     Check
@@ -814,7 +814,7 @@ export function Settings() {
               <button
                 onClick={revealDataDir}
                 disabled={!dataDir}
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors disabled:opacity-50"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors disabled:opacity-50"
               >
                 <FolderOpen className="h-3.5 w-3.5" />
                 Show in folder
@@ -838,7 +838,7 @@ export function Settings() {
           {configOpen && (
             <button
               onClick={resetConfig}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
               Reset
@@ -855,7 +855,7 @@ export function Settings() {
           if (!fields.length) return null;
           return (
             <div key={sec} className="rounded-lg border divide-y">
-              <div className="bg-muted/10 border-b border-border px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
+              <div className="bg-bg-2/10 border-b border-line px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
                 {SECTION_LABELS[sec]}
               </div>
               {fields.map((f) => (

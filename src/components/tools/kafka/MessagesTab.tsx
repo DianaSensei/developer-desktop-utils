@@ -108,7 +108,7 @@ function CopyBtn({ text, className }: { text: string; className?: string }) {
 
 function SectionHead({ title, aside }: { title: string; aside?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between px-3 py-1.5 bg-muted/15 border-b border-border/40">
+    <div className="flex items-center justify-between px-3 py-1.5 bg-bg-2/15 border-b border-line/40">
       <span className="text-[11px] font-semibold text-fg-mute uppercase tracking-widest">
         {title}
       </span>
@@ -150,7 +150,7 @@ function ColHeader({ label, col, align = 'left', sortCol, sortDir, onSort, onRes
           className="absolute right-0 top-0 bottom-0 w-2 translate-x-full cursor-col-resize flex items-center justify-center z-10 group"
           onMouseDown={onResizeStart}
         >
-          <div className="w-px h-4 bg-border group-hover:bg-acc/70 transition-colors" />
+          <div className="w-px h-4 bg-line group-hover:bg-acc/70 transition-colors" />
         </div>
       )}
     </div>
@@ -263,19 +263,19 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Panel title bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/10 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-line bg-bg-2/10 shrink-0">
         <SectionLabel size="sm">Message Detail</SectionLabel>
         <button
           onClick={onClose}
           title="Close"
-          className="p-0.5 rounded text-fg-mute hover:text-fg hover:bg-muted transition-colors"
+          className="p-0.5 rounded text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
         >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-border/40">
+      <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-line/40">
 
         {/* ── Properties ── */}
         <div>
@@ -303,13 +303,13 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
             title="Value"
             aside={
               <div className="flex items-center gap-1.5">
-                <div className="flex rounded border border-input text-xs overflow-hidden">
+                <div className="flex rounded border border-sunk text-xs overflow-hidden">
                   {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
                     <button
                       key={m}
                       className={cn(
                         'px-2 py-0.5 font-mono transition-colors',
-                        valueMode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted/60',
+                        valueMode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-bg-2/60',
                       )}
                       onClick={() => setValueMode(m)}
                     >
@@ -345,7 +345,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
           {headerEntries.length === 0 ? (
             <p className="px-3 py-2.5 text-xs italic text-fg-mute/40">No headers</p>
           ) : (
-            <div className="divide-y divide-border/30">
+            <div className="divide-y divide-line/30">
               {headerEntries.map(([k, v]) => (
                 <div key={k} className="px-3 py-2 flex items-start gap-2 min-w-0">
                   <div className="flex-1 min-w-0 space-y-0.5">
@@ -610,7 +610,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
     <div className="flex-1 flex flex-col min-h-0">
 
       {/* ── Toolbar ── */}
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-4 py-2.5 border-b border-border shrink-0 bg-muted/10">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-4 py-2.5 border-b border-line shrink-0 bg-bg-2/10">
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-fg-mute">Partition</Label>
           <Select value={String(partition)} onValueChange={(v) => setPartition(Number(v))}>
@@ -629,13 +629,13 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-fg-mute">Start from</Label>
-          <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl">
+          <div className="flex rounded-md border border-sunk overflow-hidden text-xs h-ctl">
             {(['tail', 'from', 'range', 'time'] as FetchMode[]).map((m) => (
               <button
                 key={m}
                 className={cn(
                   'px-2.5 transition-colors whitespace-nowrap',
-                  mode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted',
+                  mode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-bg-2',
                 )}
                 onClick={() => setMode(m)}
               >
@@ -718,13 +718,13 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-fg-mute">Default view</Label>
-          <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl">
+          <div className="flex rounded-md border border-sunk overflow-hidden text-xs h-ctl">
             {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
               <button
                 key={m}
                 className={cn(
                   'px-2.5 transition-colors font-mono',
-                  defaultValueMode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted',
+                  defaultValueMode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-bg-2',
                 )}
                 onClick={() => setDefaultValueMode(m)}
               >
@@ -749,7 +749,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
       </div>
 
       {/* ── Filter bar ── */}
-      <div className="px-4 py-1.5 border-b border-border shrink-0 flex items-center gap-2 bg-muted/5">
+      <div className="px-4 py-1.5 border-b border-line shrink-0 flex items-center gap-2 bg-bg-2/5">
         <Search className="w-3.5 h-3.5 text-fg-mute shrink-0" />
         <Input
           value={keyword}
@@ -758,18 +758,18 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           className={cn(
             'h-ctl text-xs border-0 shadow-none focus-visible:ring-0 px-0 flex-1',
             useRegex && 'font-mono',
-            regexError && 'text-destructive',
+            regexError && 'text-bad',
           )}
           disabled={!fetched}
         />
-        {regexError && <span className="text-[11px] text-destructive shrink-0">invalid regex</span>}
+        {regexError && <span className="text-[11px] text-bad shrink-0">invalid regex</span>}
         <button
           title={useRegex ? 'Regex mode on' : 'Use regular expression'}
           aria-pressed={useRegex}
           onClick={() => setUseRegex((v) => !v)}
           className={cn(
             'p-1 rounded transition-colors shrink-0',
-            useRegex ? 'bg-acc/10 text-acc' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
+            useRegex ? 'bg-acc/10 text-acc' : 'text-fg-mute hover:text-fg hover:bg-bg-2/60',
           )}
         >
           <Regex className="w-3.5 h-3.5" />
@@ -783,7 +783,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           </button>
         )}
         {fetched && sorted.length > 0 && (
-          <div className="flex items-center gap-1 shrink-0 border-l border-border/50 pl-2 ml-1">
+          <div className="flex items-center gap-1 shrink-0 border-l border-line/50 pl-2 ml-1">
             <span className="text-[11px] text-fg-mute/70 hidden sm:inline">Export</span>
             <CopyButton value={() => messagesToJson(sorted)} label="JSON" variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" iconClassName="h-3 w-3" />
             <CopyButton value={() => messagesToCsv(sorted)} label="CSV" variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" iconClassName="h-3 w-3" />
@@ -804,7 +804,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 <LoadingRow label="Fetching messages…" />
               )}
               {!loading && error && (
-                <span className="flex items-start gap-2 text-sm text-destructive px-6 max-w-xs">
+                <span className="flex items-start gap-2 text-sm text-bad px-6 max-w-xs">
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                   <span className="break-all">{error}</span>
                 </span>
@@ -823,7 +823,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           {/* Column headers */}
           {!loading && !error && sorted.length > 0 && (
             <div
-              className="grid px-3 py-2 border-b border-border bg-muted/10 shrink-0"
+              className="grid px-3 py-2 border-b border-line bg-bg-2/10 shrink-0"
               style={{ gridTemplateColumns: gridCols, gap: '0.5rem' }}
             >
               <ColHeader label="P" col="partition" align="right" {...sortProps}
@@ -849,10 +849,10 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                     key={`${msg.partition}-${msg.offset}`}
                     title="Click to view full message"
                     className={cn(
-                      'group w-full grid cursor-pointer px-3 py-1.5 text-left border-b border-border/30 transition-colors border-l-2',
+                      'group w-full grid cursor-pointer px-3 py-1.5 text-left border-b border-line/30 transition-colors border-l-2',
                       isSelected
                         ? 'bg-acc/10 border-l-acc'
-                        : 'border-l-transparent hover:bg-muted/40 hover:border-l-acc/40',
+                        : 'border-l-transparent hover:bg-bg-2/40 hover:border-l-acc/40',
                     )}
                     style={{ gridTemplateColumns: gridCols, gap: '0.5rem' }}
                     onClick={() => handleRowClick(msg)}
@@ -884,12 +884,12 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
               {/* Load more older messages */}
               {(hasMore || loadingMore) && (
-                <div className="flex items-center justify-center py-3 border-t border-border/20">
+                <div className="flex items-center justify-center py-3 border-t border-line/20">
                   {loadingMore ? (
                     <LoadingRow size="sm" />
                   ) : (
                     <button
-                      className="text-xs text-fg-mute hover:text-fg transition-colors px-3 py-1 rounded hover:bg-muted/40"
+                      className="text-xs text-fg-mute hover:text-fg transition-colors px-3 py-1 rounded hover:bg-bg-2/40"
                       onClick={loadMore}
                     >
                       Load older messages

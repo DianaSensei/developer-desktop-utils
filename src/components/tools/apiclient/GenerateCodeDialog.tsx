@@ -76,7 +76,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
               onClick={() => setInterpolate((i) => !i)}
               className={cn(
                 'flex h-4 w-4 items-center justify-center rounded border transition-colors',
-                interpolate ? 'border-acc bg-acc text-acc-fg' : 'border-input',
+                interpolate ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
               )}
             >
               {interpolate && <Check className="h-3 w-3" />}

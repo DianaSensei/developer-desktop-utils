@@ -134,7 +134,7 @@ export function SplitPane({
         aria-orientation={horizontal ? 'vertical' : 'horizontal'}
         title="Drag to resize · double-click to reset"
         className={cn(
-          'group relative shrink-0 bg-border transition-colors hover:bg-acc/40',
+          'group relative shrink-0 bg-line transition-colors hover:bg-acc/40',
           horizontal ? 'w-px cursor-col-resize' : 'h-px cursor-row-resize',
           dragging && 'bg-acc/60',
         )}

@@ -192,13 +192,13 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                       <button
                         type="button"
                         onClick={formatJson}
-                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute transition-colors hover:bg-muted hover:text-fg"
+                        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
                         title="Pretty-print JSON"
                       >
                         <Braces className="h-3 w-3" />
                         Format
                       </button>
-                      {jsonError && <span className="text-[11px] text-destructive">Invalid JSON</span>}
+                      {jsonError && <span className="text-[11px] text-bad">Invalid JSON</span>}
                     </>
                   )}
                 </div>
@@ -215,7 +215,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
               </div>
 
               {stub.bodyType === 'base64' ? (
-                <div className="space-y-2 rounded-md border bg-muted/10 p-3">
+                <div className="space-y-2 rounded-md border bg-bg-2/10 p-3">
                   <input
                     ref={fileInput}
                     type="file"
@@ -244,7 +244,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                         <button
                           type="button"
                           onClick={() => onChange({ body: '', fileName: '' })}
-                          className="text-fg-mute hover:text-destructive"
+                          className="text-fg-mute hover:text-bad"
                           aria-label="Clear file"
                         >
                           <X className="h-3.5 w-3.5" />
@@ -321,7 +321,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
               </Button>
             </div>
             {result && (
-              <div className="rounded-md border bg-muted/20 p-2 text-xs">
+              <div className="rounded-md border bg-bg-2/20 p-2 text-xs">
                 {result.ok ? (
                   <>
                     <div className="mb-1 text-fg-mute">
@@ -332,7 +332,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                     </pre>
                   </>
                 ) : (
-                  <pre className="whitespace-pre-wrap break-words font-mono text-[11px] text-destructive">
+                  <pre className="whitespace-pre-wrap break-words font-mono text-[11px] text-bad">
                     {result.error}
                   </pre>
                 )}

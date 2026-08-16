@@ -35,7 +35,7 @@ export function CookieManager({ store, open, onClose }: Props) {
                 <Switch checked={store.cookiesEnabled} onCheckedChange={store.setCookiesEnabled} aria-label="Cookie jar enabled" />
               </label>
               {store.cookies.length > 0 && (
-                <button onClick={store.clearCookies} className="text-destructive hover:underline">Clear all</button>
+                <button onClick={store.clearCookies} className="text-bad hover:underline">Clear all</button>
               )}
             </div>
           </DialogTitle>
@@ -50,17 +50,17 @@ export function CookieManager({ store, open, onClose }: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {groups.length === 0 ? (
             <p className="px-4 py-10 text-center text-xs text-fg-mute">
-              No cookies yet. They're captured automatically from response <code className="rounded bg-muted px-1">Set-Cookie</code> headers, or add one below.
+              No cookies yet. They're captured automatically from response <code className="rounded bg-bg-2 px-1">Set-Cookie</code> headers, or add one below.
             </p>
           ) : (
             groups.map(([domain, cookies]) => (
               <div key={domain} className="border-b">
-                <div className="flex items-center justify-between bg-muted/30 px-4 py-1.5">
+                <div className="flex items-center justify-between bg-bg-2/30 px-4 py-1.5">
                   <span className="font-mono text-xs font-semibold">{domain}</span>
                   <button
                     onClick={() => store.clearDomainCookies(domain)}
                     title="Remove all cookies for this domain"
-                    className="rounded p-1 text-fg-mute/60 hover:text-destructive"
+                    className="rounded p-1 text-fg-mute/60 hover:text-bad"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -114,9 +114,9 @@ function CookieRow({ cookie, store }: { cookie: Cookie; store: ApiStore }) {
       <span className="shrink-0 font-mono text-[11px] text-fg-mute/70" title="Path">{cookie.path}</span>
       <span className="w-36 shrink-0 text-right text-[11px] text-fg-mute/70" title="Expires">{fmtExpires(cookie)}</span>
       <div className="flex shrink-0 items-center gap-1">
-        {cookie.secure && <span className="rounded bg-muted px-1 text-[11px] uppercase text-fg-mute">secure</span>}
-        {cookie.httpOnly && <span className="rounded bg-muted px-1 text-[11px] uppercase text-fg-mute">http</span>}
-        <button onClick={() => store.deleteCookie(cookie)} title="Delete" className="rounded p-1 text-fg-mute/50 hover:text-destructive">
+        {cookie.secure && <span className="rounded bg-bg-2 px-1 text-[11px] uppercase text-fg-mute">secure</span>}
+        {cookie.httpOnly && <span className="rounded bg-bg-2 px-1 text-[11px] uppercase text-fg-mute">http</span>}
+        <button onClick={() => store.deleteCookie(cookie)} title="Delete" className="rounded p-1 text-fg-mute/50 hover:text-bad">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>

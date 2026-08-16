@@ -161,7 +161,7 @@ export function TextCounter() {
           />
         </StatGrid>
 
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-line pt-4">
           <p className="text-xs font-semibold text-fg-mute uppercase tracking-wider mb-3">Byte Size</p>
           <StatGrid columns={4} className="mb-4">
             <Stat variant="compact" label="UTF-8 bytes" value={stats.utf8Bytes} />

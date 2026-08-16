@@ -335,7 +335,7 @@ export function LuckyWheel() {
                 'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                 uniqueOnly
                   ? 'border-acc/30 bg-acc/10 text-acc'
-                  : 'border-border text-fg-mute hover:bg-muted hover:text-fg',
+                  : 'border-line text-fg-mute hover:bg-bg-2 hover:text-fg',
               )}
             >
               {uniqueOnly && <Check className="h-3 w-3" />}
@@ -350,7 +350,7 @@ export function LuckyWheel() {
                 'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                 removeOnWin
                   ? 'border-acc/30 bg-acc/10 text-acc'
-                  : 'border-border text-fg-mute hover:bg-muted hover:text-fg',
+                  : 'border-line text-fg-mute hover:bg-bg-2 hover:text-fg',
               )}
             >
               {removeOnWin && <Check className="h-3 w-3" />}
@@ -380,14 +380,14 @@ export function LuckyWheel() {
               <button
                 type="button"
                 onClick={clearHistory}
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute transition-colors hover:bg-muted hover:text-fg"
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
               >
                 <Eraser className="h-3 w-3" /> Clear
               </button>
             )}
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border">
-            <div className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] font-medium text-fg-mute">
+            <div className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b border-line bg-bg-2/30 px-3 py-1.5 text-[11px] font-medium text-fg-mute">
               <span>#</span>
               <span>Winner</span>
               <button
@@ -460,7 +460,7 @@ export function LuckyWheel() {
             {spinning && !autoLeft ? 'Spinning…' : 'Spin'}
           </Button>
 
-          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card p-1">
+          <div className="flex items-center gap-1.5 rounded-lg border border-line bg-card p-1">
             <Input
               type="number"
               min={1}

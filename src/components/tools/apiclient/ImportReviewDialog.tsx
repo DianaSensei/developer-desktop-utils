@@ -79,7 +79,7 @@ export function ImportReviewDialog({
                   <span className="min-w-0 flex-1 truncate font-medium" title={f.path || collectionName}>
                     {f.path || collectionName}
                   </span>
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">
+                  <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">
                     {KIND_LABEL[f.kind]}
                   </span>
                   <span className="w-16 shrink-0 text-right text-[11px] text-fg-mute">
@@ -87,7 +87,7 @@ export function ImportReviewDialog({
                   </span>
                 </button>
                 {open && (
-                  <pre className="max-h-64 overflow-auto border-t bg-muted/30 px-4 py-2 font-mono text-[11px] leading-relaxed">
+                  <pre className="max-h-64 overflow-auto border-t bg-bg-2/30 px-4 py-2 font-mono text-[11px] leading-relaxed">
                     {f.code}
                   </pre>
                 )}

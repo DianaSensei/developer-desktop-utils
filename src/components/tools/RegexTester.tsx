@@ -280,10 +280,10 @@ export function RegexTester() {
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
             placeholder="[a-z]+"
-            className={cn('flex-1 h-ctl font-mono text-sm rounded-lg', result.error && 'border-destructive')}
+            className={cn('flex-1 h-ctl font-mono text-sm rounded-lg', result.error && 'border-bad')}
           />
           <span className="font-mono text-sm text-fg-mute select-none">/</span>
-          <div className="inline-flex h-ctl rounded-lg border border-border bg-muted/50 p-0.5 gap-px">
+          <div className="inline-flex h-ctl rounded-lg border border-line bg-bg-2/50 p-0.5 gap-px">
             {FLAG_DEFS.map(({ flag, title }) => (
               <button
                 key={flag}
@@ -344,11 +344,11 @@ export function RegexTester() {
 
       {/* Results panel */}
       {hasResult && (
-        <div className="shrink-0 border-t border-border flex flex-col overflow-hidden" style={{ maxHeight: '45%' }}>
+        <div className="shrink-0 border-t border-line flex flex-col overflow-hidden" style={{ maxHeight: '45%' }}>
           {/* Status bar: count + stats + view tabs + copy-all */}
-          <div className="shrink-0 px-1 border-b border-border bg-muted/10 flex items-center">
+          <div className="shrink-0 px-1 border-b border-line bg-bg-2/10 flex items-center">
             {result.error ? (
-              <span className="px-3 py-1.5 text-xs font-semibold text-destructive">Error</span>
+              <span className="px-3 py-1.5 text-xs font-semibold text-bad">Error</span>
             ) : (
               <>
                 {/* Match count + coverage stats */}
@@ -398,21 +398,21 @@ export function RegexTester() {
           {/* Tab body */}
           <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
             {result.error && (
-              <div className="px-3 py-2.5 bg-destructive/8 border border-destructive/20 rounded-lg">
-                <p className="font-mono text-sm text-destructive">{result.error}</p>
+              <div className="px-3 py-2.5 bg-bad/8 border border-bad/20 rounded-lg">
+                <p className="font-mono text-sm text-bad">{result.error}</p>
               </div>
             )}
 
             {/* Matches view */}
             {!result.error && resultView === 'matches' && (
               result.matches.length === 0 ? (
-                <div className="px-3 py-2.5 bg-muted/50 border border-border rounded-lg">
+                <div className="px-3 py-2.5 bg-bg-2/50 border border-line rounded-lg">
                   <p className="text-sm text-fg-mute">No matches found</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {result.matches.map((m, idx) => (
-                    <div key={idx} className="rounded-md border border-border bg-sunk p-3">
+                    <div key={idx} className="rounded-md border border-line bg-sunk p-3">
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
@@ -428,12 +428,12 @@ export function RegexTester() {
                         <CopyButton value={m[0]} className="h-6 w-6 shrink-0" iconClassName="h-3 w-3" />
                       </div>
                       {m.length > 1 && (
-                        <div className="mt-2 space-y-1 border-l-2 border-border pl-2">
+                        <div className="mt-2 space-y-1 border-l-2 border-line pl-2">
                           {m.slice(1).map((g, gIdx) => {
                             const name = groupNames[gIdx];
                             return (
                               <div key={gIdx} className="flex items-center gap-2">
-                                <span className="shrink-0 rounded-xs bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-fg-mute">
+                                <span className="shrink-0 rounded-xs bg-bg-2 px-1.5 py-0.5 font-mono text-[11px] font-medium text-fg-mute">
                                   {name ? `<${name}>` : `Group ${gIdx + 1}`}
                                 </span>
                                 <span className="font-mono text-xs text-fg-mute break-all">
@@ -465,7 +465,7 @@ export function RegexTester() {
                     ))}
                   </div>
                 )}
-                <div className="font-mono text-sm whitespace-pre-wrap break-all leading-relaxed p-3 rounded-lg border border-border bg-muted/20 min-h-[80px]">
+                <div className="font-mono text-sm whitespace-pre-wrap break-all leading-relaxed p-3 rounded-lg border border-line bg-bg-2/20 min-h-[80px]">
                   {highlightSegments.length === 0 && (
                     <span className="text-fg-mute/60">Enter a test string above</span>
                   )}
@@ -489,12 +489,12 @@ export function RegexTester() {
             {/* Extract view — table of captured groups */}
             {!result.error && resultView === 'extract' && (
               result.matches.length === 0 ? (
-                <div className="px-3 py-2.5 bg-muted/50 border border-border rounded-lg">
+                <div className="px-3 py-2.5 bg-bg-2/50 border border-line rounded-lg">
                   <p className="text-sm text-fg-mute">No matches to extract</p>
                 </div>
               ) : !result.matches.some((m) => m.length > 1) ? (
                 <div className="space-y-3">
-                  <div className="px-3 py-2.5 bg-muted/50 border border-border rounded-lg space-y-1">
+                  <div className="px-3 py-2.5 bg-bg-2/50 border border-line rounded-lg space-y-1">
                     <p className="text-sm text-fg-mute">No capturing groups — showing all matches.</p>
                     <p className="text-[11px] text-fg-mute/70">
                       Wrap parts of your pattern in <code className="font-mono">( )</code> to capture them as groups.
@@ -589,8 +589,8 @@ export function RegexTester() {
                   </p>
                 </div>
                 {replaceResult.error ? (
-                  <div className="px-3 py-2.5 bg-destructive/8 border border-destructive/20 rounded-lg">
-                    <p className="font-mono text-sm text-destructive">{replaceResult.error}</p>
+                  <div className="px-3 py-2.5 bg-bad/8 border border-bad/20 rounded-lg">
+                    <p className="font-mono text-sm text-bad">{replaceResult.error}</p>
                   </div>
                 ) : (
                   <div className="space-y-1.5">

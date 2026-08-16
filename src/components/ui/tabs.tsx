@@ -135,7 +135,7 @@ export function Tabs({ tabs, active, onSelect, right, className, activeClassName
   }
 
   return (
-    <div ref={headerRef} className={cn('flex items-center border-b border-border px-3', className)}>
+    <div ref={headerRef} className={cn('flex items-center border-b border-line px-3', className)}>
       {/* hidden row used only to measure intrinsic tab widths */}
       <div ref={hiddenRowRef} aria-hidden className="pointer-events-none invisible fixed left-0 top-0 flex items-center gap-4">
         {tabs.map((t) => (
@@ -170,7 +170,7 @@ function TabBtn({ def, active, activeClassName, onClick }: {
         'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-medium transition-colors',
         active
           ? (activeClassName ?? 'border-acc text-fg')
-          : 'border-transparent text-fg-mute hover:text-fg hover:border-border',
+          : 'border-transparent text-fg-mute hover:text-fg hover:border-line',
       )}
     >
       {def.label}{def.badge}
@@ -189,7 +189,7 @@ function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string
         <ChevronsRight className="h-4 w-4" />
       </button>
       {open && (
-        <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-card p-1 shadow-md">
+        <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-line bg-card p-1 shadow-md">
           {tabs.map((t) => (
             <button
               key={t.id}

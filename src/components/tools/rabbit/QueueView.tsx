@@ -200,7 +200,7 @@ function MgmtBindingsTab({ conn, queueName, refreshKey }: { conn: RabbitConnecti
             </Thead>
             <Tbody>
               {b.data.map((x, i) => (
-                <Tr key={i} className="hover:bg-muted/40">
+                <Tr key={i} className="hover:bg-bg-2/40">
                   <Td mono>{x.source || '(default)'}</Td>
                   <Td mono>{x.routing_key || '—'}</Td>
                 </Tr>

@@ -118,7 +118,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
                 <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ tests: appendSnippet(request.tests, s) })} />
               </div>
               <p className="text-[11px] text-fg-mute">
-                Post-response — use <code className="rounded bg-muted px-1">test()</code> and <code className="rounded bg-muted px-1">expect()</code> with <code className="rounded bg-muted px-1">res</code>, <code className="rounded bg-muted px-1">bru</code>.
+                Post-response — use <code className="rounded bg-bg-2 px-1">test()</code> and <code className="rounded bg-bg-2 px-1">expect()</code> with <code className="rounded bg-bg-2 px-1">res</code>, <code className="rounded bg-bg-2 px-1">bru</code>.
               </p>
               <JavaScriptEditor
                 value={request.tests}
@@ -230,8 +230,8 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
       </div>
       <p className="text-[11px] text-fg-mute">
         {isReq
-          ? <>Runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars.</>
-          : <>Runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars.</>}
+          ? <>Runs before send; mutate <code className="rounded bg-bg-2 px-1">req</code>, set <code className="rounded bg-bg-2 px-1">bru</code> vars.</>
+          : <>Runs after response; read <code className="rounded bg-bg-2 px-1">res</code>, set <code className="rounded bg-bg-2 px-1">bru</code> vars.</>}
       </p>
       <VarsSection
         label={isReq ? 'Variables to set before the request' : 'Variables to set from the response — expressions, e.g. res.body.token'}
@@ -285,7 +285,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
   return (
     <div className="overflow-hidden rounded-md border text-xs">
       {/* header */}
-      <div className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b bg-muted/30 font-semibold">
+      <div className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b bg-bg-2/30 font-semibold">
         <div className="border-r px-3 py-1.5">Expr</div>
         <div className="border-r px-3 py-1.5">Operator</div>
         <div className="border-r px-3 py-1.5">Value</div>
@@ -304,7 +304,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
                 onClick={() => !isGhost && editRow(a.id, { enabled: !a.enabled })}
                 className={cn(
                   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-                  isGhost ? 'invisible' : a.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-input',
+                  isGhost ? 'invisible' : a.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
                 )}
                 title={a.enabled ? 'Enabled' : 'Disabled'}
               >
@@ -345,7 +345,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
             {/* action cell */}
             <div className="flex items-center justify-center">
               {!isGhost && (
-                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-destructive">
+                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-bad">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -367,7 +367,7 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
   if (!derived) return null;
   return (
     <div className="overflow-hidden rounded-md border text-xs">
-      <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/70">
+      <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/70">
         <div />
         <div className="border-r px-3 py-1.5">From Auth (query)</div>
         <div className="px-3 py-1.5" />
@@ -433,7 +433,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
     <div className="space-y-2">
       <Label className="text-xs text-fg-mute">Path</Label>
       <div className="overflow-hidden rounded-md border text-xs">
-        <div className="grid grid-cols-[1rem_1fr_1fr] border-b bg-muted/30 font-semibold">
+        <div className="grid grid-cols-[1rem_1fr_1fr] border-b bg-bg-2/30 font-semibold">
           <div />
           <div className="border-r px-3 py-1.5">Name</div>
           <div className="px-3 py-1.5">Value</div>
@@ -492,9 +492,9 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>
         <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-2 focus-within:ring-acc/40">
           {settings.tags.map((t) => (
-            <span key={t} className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px]">
+            <span key={t} className="flex items-center gap-1 rounded bg-bg-2 px-1.5 py-0.5 text-[11px]">
               {t}
-              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-fg-mute hover:text-destructive">
+              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-fg-mute hover:text-bad">
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -729,7 +729,7 @@ function FileBody({ body, setBody }: { body: ApiRequest['body']; setBody: (p: Pa
             <Button variant="outline" size="sm" className="h-ctl" onClick={pick}>Change</Button>
             <button
               onClick={() => setBody({ fileName: undefined, fileType: undefined, fileContent: undefined })}
-              className="rounded p-1 text-fg-mute/60 hover:text-destructive"
+              className="rounded p-1 text-fg-mute/60 hover:text-bad"
               title="Remove"
             >
               <Trash2 className="h-3.5 w-3.5" />

@@ -40,10 +40,10 @@ const BADGE: Record<HttpMethod, string> = {
   PUT:     'bg-[hsl(var(--method-put-c)/0.16)]    text-[var(--method-put)]',
   PATCH:   'bg-[hsl(var(--method-patch-c)/0.16)]  text-[var(--method-patch)]',
   DELETE:  'bg-[hsl(var(--method-delete-c)/0.16)] text-[var(--method-delete)]',
-  HEAD:    'bg-muted/60 text-fg-mute',
-  OPTIONS: 'bg-muted/60 text-fg-mute',
+  HEAD:    'bg-bg-2/60 text-fg-mute',
+  OPTIONS: 'bg-bg-2/60 text-fg-mute',
 };
 
 export const methodColor      = (m: HttpMethod): string => TEXT[m]  ?? 'text-fg';
 export const methodBg         = (m: HttpMethod): string => BG[m]   ?? 'bg-transparent';
-export const methodBadgeStyle = (m: HttpMethod): string => BADGE[m] ?? 'bg-muted/60 text-fg';
+export const methodBadgeStyle = (m: HttpMethod): string => BADGE[m] ?? 'bg-bg-2/60 text-fg';

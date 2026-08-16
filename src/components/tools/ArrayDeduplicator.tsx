@@ -80,7 +80,7 @@ function LineNumbers({
   return (
     <div
       ref={containerRef}
-      className="shrink-0 overflow-hidden select-none font-mono text-xs text-fg-mute bg-muted/40 border-r border-border"
+      className="shrink-0 overflow-hidden select-none font-mono text-xs text-fg-mute bg-bg-2/40 border-r border-line"
       style={{ width }}
     />
   );
@@ -418,7 +418,7 @@ export function ArrayDeduplicator() {
   return (
     <div className="h-full flex flex-col overflow-hidden bg-bg">
       {/* ── Toolbar ── */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border">
+      <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-line">
         <Segmented
           value={mode}
           onValueChange={(v) => setMode(v)}
@@ -433,9 +433,9 @@ export function ArrayDeduplicator() {
         <div className="ml-auto flex items-center gap-5">
           {isProcessing && <Spinner size="sm" className="text-fg-mute" />}
           <Stat variant="inline" label="original" value={count(stats?.original)} />
-          <div className="w-px h-4 bg-border" />
+          <div className="w-px h-4 bg-line" />
           <Stat variant="inline" tone="success" label="unique" value={count(stats?.unique)} />
-          <div className="w-px h-4 bg-border" />
+          <div className="w-px h-4 bg-line" />
           <Stat variant="inline" tone="danger" label="removed" value={count(stats?.removed)} />
         </div>
       </div>
@@ -444,8 +444,8 @@ export function ArrayDeduplicator() {
       <div className="flex-1 min-h-0 flex">
 
         {/* Input pane */}
-        <div className={cn('flex-1 min-w-0 flex flex-col', mode === 'sort' && 'border-r border-border')}>
-          <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30">
+        <div className={cn('flex-1 min-w-0 flex flex-col', mode === 'sort' && 'border-r border-line')}>
+          <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-line bg-bg-2/30">
             <span className="text-xs font-medium text-fg-mute">Input · one item per line</span>
             <div className="flex items-center gap-0.5">
               <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Jump to top" disabled={!hasInput} onClick={handleScrollTop}>
@@ -478,7 +478,7 @@ export function ArrayDeduplicator() {
         {mode === 'preserve' && (
           <div
             ref={trackRef}
-            className="w-3 shrink-0 relative bg-muted/20 border-x border-border cursor-pointer select-none"
+            className="w-3 shrink-0 relative bg-bg-2/20 border-x border-line cursor-pointer select-none"
             onClick={handleTrackClick}
           >
             <div
@@ -495,7 +495,7 @@ export function ArrayDeduplicator() {
           className="flex-1 min-w-0 flex flex-col transition-opacity duration-150"
           style={{ opacity: isProcessing ? 0.55 : 1 }}
         >
-          <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30">
+          <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-line bg-bg-2/30">
             <span className="text-xs font-medium text-fg-mute">Output</span>
             <CopyButton
               value={() => result?.output ?? ''}

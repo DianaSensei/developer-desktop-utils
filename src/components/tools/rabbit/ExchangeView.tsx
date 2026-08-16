@@ -106,7 +106,7 @@ function AmqpOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
         <dt className="text-fg-mute">Exists</dt>
         <dd className="text-right">
           {i.exists ? <span className="text-ok">Yes</span>
-            : i.error ? <span className="text-destructive">Error</span>
+            : i.error ? <span className="text-bad">Error</span>
             : <span className="text-warn">No</span>}
         </dd>
       </dl>
@@ -165,7 +165,7 @@ function MgmtBindingsTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
             </Thead>
             <Tbody>
               {b.data.map((x, i) => (
-                <Tr key={i} className="hover:bg-muted/40">
+                <Tr key={i} className="hover:bg-bg-2/40">
                   <Td mono>{x.destination}</Td>
                   <Td>{x.destination_type}</Td>
                   <Td mono>{x.routing_key || '—'}</Td>

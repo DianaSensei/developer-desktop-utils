@@ -93,7 +93,7 @@ function HistoryRow({ entry }: { entry: TimeEntry }) {
           className="ml-auto h-ctl w-16 text-xs"
         />
       )}
-      <ConfirmButton onConfirm={() => deleteEntry(entry.id)} title="Delete record" className="flex h-6 w-6 items-center justify-center rounded hover:bg-muted">
+      <ConfirmButton onConfirm={() => deleteEntry(entry.id)} title="Delete record" className="flex h-6 w-6 items-center justify-center rounded hover:bg-bg-2">
         <Trash2 className="h-3 w-3" />
       </ConfirmButton>
     </div>
@@ -121,7 +121,7 @@ function AddSubtaskInput({ onAdd }: { onAdd: (name: string) => void }) {
 
 // Small read-only tag chip.
 function TagChip({ name }: { name: string }) {
-  return <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">{name}</span>;
+  return <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">{name}</span>;
 }
 
 // Inline task-name editor used by the rename affordance.
@@ -171,7 +171,7 @@ function FilterControls({
           onClick={toggle}
           title={activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active` : 'Filter tasks'}
           className={cn(
-            'relative flex h-ctl w-ctl items-center justify-center rounded-md border transition-colors hover:bg-muted hover:text-fg',
+            'relative flex h-ctl w-ctl items-center justify-center rounded-md border transition-colors hover:bg-bg-2 hover:text-fg',
             activeCount > 0 ? 'border-acc/50 text-fg' : 'text-fg-mute'
           )}
         >
@@ -193,7 +193,7 @@ function FilterControls({
                 <button
                   key={String(val)}
                   onClick={() => onProject(val)}
-                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted', projectId === val && 'bg-fg/10')}
+                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2', projectId === val && 'bg-fg/10')}
                 >
                   <ColorDot color={val === null ? undefined : 'transparent'} />
                   <span className={cn(val === 'all' && 'font-medium')}>{label}</span>
@@ -203,7 +203,7 @@ function FilterControls({
                 <button
                   key={p.id}
                   onClick={() => onProject(p.id)}
-                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted', projectId === p.id && 'bg-fg/10')}
+                  className={cn('flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2', projectId === p.id && 'bg-fg/10')}
                 >
                   <ColorDot color={p.color} />
                   <span className="truncate">{p.name}</span>
@@ -213,11 +213,11 @@ function FilterControls({
           </div>
 
           {tags.length > 0 && (
-            <div className="space-y-1 border-t border-border pt-2">
+            <div className="space-y-1 border-t border-line pt-2">
               <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">Tags</p>
               <div className="max-h-40 overflow-y-auto">
                 {tags.map((t) => (
-                  <button key={t.id} onClick={() => toggleTag(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                  <button key={t.id} onClick={() => toggleTag(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2">
                     <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', tagIds.includes(t.id) ? 'border-acc bg-acc text-acc-fg' : 'border-fg-mute/40')}>
                       {tagIds.includes(t.id) && <Check className="h-2.5 w-2.5" />}
                     </span>
@@ -229,7 +229,7 @@ function FilterControls({
           )}
 
           {activeCount > 0 && (
-            <button onClick={onClear} className="w-full rounded border border-border py-1.5 text-xs text-fg-mute transition-colors hover:bg-muted hover:text-fg">
+            <button onClick={onClear} className="w-full rounded border border-line py-1.5 text-xs text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg">
               Clear filters
             </button>
           )}
@@ -569,7 +569,7 @@ export function TimeTracker() {
                   <button
                     onClick={toggle}
                     title="Set date & time"
-                    className={cn('flex h-full w-[88px] flex-col items-center justify-center gap-0.5 border-l leading-none transition-colors hover:bg-muted', open && 'bg-muted')}
+                    className={cn('flex h-full w-[88px] flex-col items-center justify-center gap-0.5 border-l leading-none transition-colors hover:bg-bg-2', open && 'bg-bg-2')}
                   >
                     <span className="text-[11px] font-medium text-fg-mute">{manualDayLabel}</span>
                     <span className="font-mono text-sm font-semibold tabular-nums">{fmtHM(manualMs)}</span>
@@ -665,7 +665,7 @@ export function TimeTracker() {
                   key={g.key}
                   onClick={() => resumeGroup(g)}
                   title={`Resume “${g.name}”`}
-                  className="group flex max-w-[220px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-fg-mute transition-colors hover:border-acc/50 hover:bg-muted hover:text-fg"
+                  className="group flex max-w-[220px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-fg-mute transition-colors hover:border-acc/50 hover:bg-bg-2 hover:text-fg"
                 >
                   <Play className="h-3 w-3 shrink-0 fill-current text-acc" />
                   <ColorDot color={project?.color} />
@@ -704,7 +704,7 @@ export function TimeTracker() {
           {/* Daily goal — today's time vs target */}
           {targetMs > 0 && (
             <div className="flex items-center gap-2" title={`Today vs your ${settings.dailyTargetHours}h daily target`}>
-              <div className="relative h-1.5 w-14 overflow-hidden rounded-full bg-muted">
+              <div className="relative h-1.5 w-14 overflow-hidden rounded-full bg-bg-2">
                 <div
                   className={cn('h-full rounded-full transition-[width] duration-500', overMs >= 0 ? 'bg-ok' : 'bg-acc')}
                   style={{ width: `${targetPct}%` }}
@@ -743,7 +743,7 @@ export function TimeTracker() {
               )}
             </div>
           ) : (
-            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-ctl w-ctl items-center justify-center rounded-md border text-fg-mute transition-colors hover:bg-muted hover:text-fg">
+            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-ctl w-ctl items-center justify-center rounded-md border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg">
               <Search className="h-3.5 w-3.5" />
             </button>
           )}
@@ -766,7 +766,7 @@ export function TimeTracker() {
               <button
                 onClick={() => hasExportable && toggle()}
                 disabled={!hasExportable}
-                className="flex h-ctl w-ctl items-center justify-center rounded-md border text-fg-mute transition-colors hover:bg-muted hover:text-fg disabled:opacity-40"
+                className="flex h-ctl w-ctl items-center justify-center rounded-md border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-40"
                 title={hasExportable ? 'Export visible entries' : 'Nothing to export'}
               >
                 <Download className="h-3.5 w-3.5" />
@@ -775,10 +775,10 @@ export function TimeTracker() {
           >
             {(close) => (
               <div className="space-y-0.5">
-                <button onClick={() => doExport('csv', close)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                <button onClick={() => doExport('csv', close)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2">
                   <Download className="h-3.5 w-3.5 text-fg-mute" /> Export CSV
                 </button>
-                <button onClick={() => doExport('json', close)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
+                <button onClick={() => doExport('json', close)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2">
                   <Download className="h-3.5 w-3.5 text-fg-mute" /> Export JSON
                 </button>
               </div>
@@ -878,7 +878,7 @@ export function TimeTracker() {
 
                 {/* Expanded: subtasks (if any) or plain history, plus an add-subtask input */}
                 {isOpen && (
-                  <div className="border-t bg-muted/20">
+                  <div className="border-t bg-bg-2/20">
                     {g.hasSub ? (
                       <>
                         {g.subgroups.map((sg) => {
@@ -904,12 +904,12 @@ export function TimeTracker() {
                                     <Play className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
-                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-ctl w-ctl items-center justify-center rounded text-fg-mute hover:bg-muted">
+                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-ctl w-ctl items-center justify-center rounded text-fg-mute hover:bg-bg-2">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </ConfirmButton>
                               </div>
                               {subOpen && (sg.recs.length > 0
-                                ? <div className="divide-y bg-muted/30">{sg.recs.map((e) => <HistoryRow key={e.id} entry={e} />)}</div>
+                                ? <div className="divide-y bg-bg-2/30">{sg.recs.map((e) => <HistoryRow key={e.id} entry={e} />)}</div>
                                 : <p className="py-2 pl-12 pr-3 text-xs text-fg-mute">No time tracked yet.</p>)}
                             </div>
                           );
@@ -930,7 +930,7 @@ export function TimeTracker() {
                                 </button>
                                 <span className={cn('shrink-0 font-mono text-xs tabular-nums', directRunning && 'text-[var(--live)]')}>{fmtTotal(directTotal)}</span>
                               </div>
-                              {subOpen && <div className="divide-y bg-muted/30">{g.directRecs.map((e) => <HistoryRow key={e.id} entry={e} />)}</div>}
+                              {subOpen && <div className="divide-y bg-bg-2/30">{g.directRecs.map((e) => <HistoryRow key={e.id} entry={e} />)}</div>}
                             </div>
                           );
                         })()}

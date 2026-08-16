@@ -67,7 +67,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         <button
           type="button"
           onClick={() => setViewMonth((m) => addMonths(m, -1))}
-          className="shrink-0 rounded-md p-1 text-fg-mute transition-colors hover:bg-muted hover:text-fg"
+          className="shrink-0 rounded-md p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
           aria-label="Previous month"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -93,7 +93,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         <button
           type="button"
           onClick={() => setViewMonth((m) => addMonths(m, 1))}
-          className="shrink-0 rounded-md p-1 text-fg-mute transition-colors hover:bg-muted hover:text-fg"
+          className="shrink-0 rounded-md p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
           aria-label="Next month"
         >
           <ChevronRight className="h-4 w-4" />
@@ -123,7 +123,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
                 !inMonth && 'text-fg-mute/40',
                 isSel
                   ? 'bg-acc font-semibold text-acc-fg'
-                  : 'hover:bg-muted',
+                  : 'hover:bg-bg-2',
                 !isSel && isToday && 'font-semibold text-acc ring-1 ring-acc/40',
               )}
             >
@@ -137,7 +137,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
       <button
         type="button"
         onClick={() => { setViewMonth(startOfMonth(today)); pick(today); }}
-        className="mt-2 w-full rounded-md border py-1 text-xs text-fg-mute transition-colors hover:bg-muted hover:text-fg"
+        className="mt-2 w-full rounded-md border py-1 text-xs text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg"
       >
         Today
       </button>
@@ -155,9 +155,9 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         disabled={disabled}
         onClick={() => !disabled && setOpen((v) => !v)}
         className={cn(
-          'flex h-ctl-lg items-center gap-2 rounded-md border border-input bg-card px-2.5 text-sm shadow-sm',
+          'flex h-ctl-lg items-center gap-2 rounded-md border border-sunk bg-card px-2.5 text-sm shadow-sm',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
-          disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-muted/50',
+          disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-bg-2/50',
           className,
         )}
       >

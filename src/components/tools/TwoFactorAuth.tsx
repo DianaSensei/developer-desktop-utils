@@ -95,7 +95,7 @@ function CountdownRing({ remaining, period }: { remaining: number; period: numbe
   return (
     <div className="relative flex items-center justify-center w-11 h-11 shrink-0">
       <svg width="44" height="44" className="-rotate-90" style={{ overflow: 'visible' }}>
-        <circle cx="22" cy="22" r={r} fill="none" strokeWidth="2.5" className="stroke-muted" />
+        <circle cx="22" cy="22" r={r} fill="none" strokeWidth="2.5" className="stroke-bg-2" />
         <circle
           cx="22" cy="22" r={r} fill="none" strokeWidth="2.5"
           stroke={stroke} strokeLinecap="round"
@@ -216,7 +216,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       <div className="px-4 pb-4">
         {error ? (
           <div className="flex items-center gap-2 py-2">
-            <span className="text-xs text-destructive">{error}</span>
+            <span className="text-xs text-bad">{error}</span>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
@@ -248,7 +248,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
         const pct = (remaining / account.period) * 100;
         const barColor = remaining <= 5 ? 'bg-bad' : remaining <= 10 ? 'bg-warn' : 'bg-ok';
         return (
-          <div className="h-[3px] w-full bg-muted shrink-0">
+          <div className="h-[3px] w-full bg-bg-2 shrink-0">
             <div
               className={cn('h-full transition-all duration-1000', barColor)}
               style={{ width: `${pct}%` }}
@@ -259,7 +259,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
 
       {/* ── HOTP next-code row ── */}
       {!isTotp && !error && (
-        <div className="px-4 py-2 border-t bg-muted/30 shrink-0">
+        <div className="px-4 py-2 border-t bg-bg-2/30 shrink-0">
           <Button
             variant="ghost" size="sm"
             className="h-ctl w-full text-xs gap-1.5 text-acc-ink hover:bg-acc-tint"
@@ -273,12 +273,12 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       )}
 
       {/* ── Footer ── */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-t bg-muted/20 shrink-0">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-t bg-bg-2/20 shrink-0">
         <div className="flex flex-wrap gap-1 flex-1">
           {([account.algorithm, `${account.digits} digits`, isTotp ? `${account.period}s` : null] as (string | null)[])
             .filter(Boolean)
             .map((tag) => (
-              <span key={tag} className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-fg-mute font-mono">
+              <span key={tag} className="text-[11px] px-1.5 py-0.5 rounded bg-bg-2 text-fg-mute font-mono">
                 {tag}
               </span>
             ))}
@@ -293,7 +293,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
         </Button>
         <Button
           variant="ghost" size="icon"
-          className="h-ctl w-ctl text-fg-mute hover:text-destructive"
+          className="h-ctl w-ctl text-fg-mute hover:text-bad"
           onClick={() => onDelete(account.id)}
           title="Remove account"
         >
@@ -303,8 +303,8 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
 
       {/* ── Secret reveal ── */}
       {showSecret && (
-        <div className="px-4 pb-3 pt-1 border-t bg-muted/10">
-          <p className="text-[11px] font-mono text-fg-mute break-all bg-muted/60 rounded-md px-2.5 py-2 border leading-relaxed">
+        <div className="px-4 pb-3 pt-1 border-t bg-bg-2/10">
+          <p className="text-[11px] font-mono text-fg-mute break-all bg-bg-2/60 rounded-md px-2.5 py-2 border leading-relaxed">
             {account.secret || '(empty)'}
           </p>
         </div>
@@ -405,13 +405,13 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
   return (
     <div className="border rounded-lg overflow-hidden bg-card" onKeyDown={handleKeyDown}>
       {/* Form header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-bg-2/20">
         <div className="flex items-center gap-2">
           <Plus className="h-4 w-4 text-fg-mute" />
           <span className="text-sm font-semibold">Add Account</span>
         </div>
         {/* Type pill toggle */}
-        <div className="flex rounded-md border bg-muted/50 p-0.5 gap-0.5">
+        <div className="flex rounded-md border bg-bg-2/50 p-0.5 gap-0.5">
           {(['totp', 'hotp'] as OTPType[]).map((t) => (
             <button
               key={t}
@@ -463,10 +463,10 @@ function AddAccountForm({ onAdd, onCancel }: AddAccountFormProps) {
             value={secret}
             onChange={(e) => { setSecret(e.target.value); setError(''); }}
             placeholder="JBSWY3DPEHPK3PXP"
-            className={cn('h-ctl text-sm font-mono', error && 'border-destructive focus-visible:ring-destructive/30')}
+            className={cn('h-ctl text-sm font-mono', error && 'border-bad focus-visible:ring-bad/30')}
             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
           />
-          {error && <p className="text-[11px] text-destructive">{error}</p>}
+          {error && <p className="text-[11px] text-bad">{error}</p>}
           <LivePreview
             secret={secret} type={type} period={period}
             digits={digits} algorithm={algorithm} counter={0}
@@ -529,7 +529,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center gap-4 px-4">
       <div className="relative">
-        <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
+        <div className="w-16 h-16 rounded-lg bg-bg-2 flex items-center justify-center">
           <ShieldCheck className="h-ctl w-ctl text-fg-mute/40" />
         </div>
         <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-acc flex items-center justify-center">
@@ -554,7 +554,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 
 function InfoPanel() {
   return (
-    <div className="rounded-lg border bg-muted/30 p-4 text-xs space-y-3 text-fg-mute leading-relaxed">
+    <div className="rounded-lg border bg-bg-2/30 p-4 text-xs space-y-3 text-fg-mute leading-relaxed">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-4)]">
@@ -563,7 +563,7 @@ function InfoPanel() {
           <p>
             Generates a new code every 30 or 60 seconds.
             Used by Google Authenticator, Authy, 1Password, and most sites.
-            Counter = <code className="bg-muted px-1 rounded font-mono">⌊time / period⌋</code>.
+            Counter = <code className="bg-bg-2 px-1 rounded font-mono">⌊time / period⌋</code>.
           </p>
         </div>
         <div className="space-y-1">
@@ -736,7 +736,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); }}
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-colors',
-            dragOver ? 'border-acc bg-acc/5' : 'border-input hover:border-fg-mute/40 hover:bg-muted/30',
+            dragOver ? 'border-acc bg-acc/5' : 'border-sunk hover:border-fg-mute/40 hover:bg-bg-2/30',
           )}
         >
           {busy ? (
@@ -775,7 +775,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
             placeholder={'otpauth://totp/Example?secret=JBSWY3DPEHPK3PXP&issuer=Example\notpauth-migration://offline?data=…'}
             className="h-20"
           />
-          {fileError && <p className="text-[11px] text-destructive">{fileError}</p>}
+          {fileError && <p className="text-[11px] text-bad">{fileError}</p>}
         </div>
 
         {/* Parsed preview */}
@@ -796,11 +796,11 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
                   <button
                     key={i}
                     onClick={() => toggle(i)}
-                    className="flex items-center gap-2.5 w-full px-3 py-2 text-left hover:bg-muted/40 transition-colors"
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-left hover:bg-bg-2/40 transition-colors"
                   >
                     <span className={cn(
                       'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
-                      checked ? 'bg-acc border-acc' : 'border-input',
+                      checked ? 'bg-acc border-acc' : 'border-sunk',
                     )}>
                       {checked && <Check className="h-3 w-3 text-acc-fg" />}
                     </span>

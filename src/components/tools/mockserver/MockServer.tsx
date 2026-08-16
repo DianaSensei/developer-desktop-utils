@@ -143,7 +143,7 @@ export function MockServer() {
   // ── Panels ───────────────────────────────────────────────────────────────
   const stubListPane = (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
+      <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-1.5">
         <span className="text-xs font-medium text-fg-mute">Stubs</span>
         <div className="flex items-center gap-0.5">
           <CopyButton
@@ -182,8 +182,8 @@ export function MockServer() {
             onClick={() => setSelectedId(s.id)}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setSelectedId(s.id)}
             className={cn(
-              'group flex cursor-pointer items-center gap-2 border-l-2 px-3 py-2 transition-colors hover:bg-muted/40',
-              s.id === selectedId ? 'border-l-acc bg-muted/60' : 'border-l-transparent',
+              'group flex cursor-pointer items-center gap-2 border-l-2 px-3 py-2 transition-colors hover:bg-bg-2/40',
+              s.id === selectedId ? 'border-l-acc bg-bg-2/60' : 'border-l-transparent',
               !s.enabled && 'opacity-50',
             )}
           >
@@ -214,7 +214,7 @@ export function MockServer() {
           <button
             type="button"
             onClick={addStub}
-            className="m-3 flex w-[calc(100%-1.5rem)] items-center justify-center gap-1.5 rounded-md border border-dashed py-6 text-xs text-fg-mute hover:bg-muted/40"
+            className="m-3 flex w-[calc(100%-1.5rem)] items-center justify-center gap-1.5 rounded-md border border-dashed py-6 text-xs text-fg-mute hover:bg-bg-2/40"
           >
             <Plus className="h-4 w-4" /> Add your first stub
           </button>
@@ -226,11 +226,11 @@ export function MockServer() {
         type="button"
         onClick={() => setSelectedId(FALLBACK_ID)}
         className={cn(
-          'flex shrink-0 items-center gap-2 border-l-2 border-t border-border px-3 py-2 text-left transition-colors hover:bg-muted/40',
-          selectedId === FALLBACK_ID ? 'border-l-acc bg-muted/60' : 'border-l-transparent',
+          'flex shrink-0 items-center gap-2 border-l-2 border-t border-line px-3 py-2 text-left transition-colors hover:bg-bg-2/40',
+          selectedId === FALLBACK_ID ? 'border-l-acc bg-bg-2/60' : 'border-l-transparent',
         )}
       >
-        <span className="flex w-11 shrink-0 items-center justify-center rounded bg-muted/60 py-0.5 text-fg-mute">
+        <span className="flex w-11 shrink-0 items-center justify-center rounded bg-bg-2/60 py-0.5 text-fg-mute">
           <Ban className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
@@ -290,7 +290,7 @@ export function MockServer() {
           </Button>
         )}
 
-        <div className="flex items-center gap-1 rounded-md border bg-muted/30 px-2 py-1 font-mono text-xs">
+        <div className="flex items-center gap-1 rounded-md border bg-bg-2/30 px-2 py-1 font-mono text-xs">
           <span className="text-fg-mute">{baseUrl}</span>
           <CopyButton value={baseUrl} icon={CopyIcon} iconClassName="h-3 w-3" />
         </div>
@@ -302,7 +302,7 @@ export function MockServer() {
           </span>
         )}
 
-        {error && <span className="text-[11px] text-destructive">{error}</span>}
+        {error && <span className="text-[11px] text-bad">{error}</span>}
         {!isTauri && <span className="text-[11px] text-fg-mute">Server runs in the desktop app only.</span>}
 
         <Button
@@ -325,7 +325,7 @@ export function MockServer() {
         <div
           onPointerDown={startSidebarDrag}
           className={cn(
-            'group relative w-px shrink-0 cursor-col-resize bg-border transition-colors hover:bg-acc/40',
+            'group relative w-px shrink-0 cursor-col-resize bg-line transition-colors hover:bg-acc/40',
             dragging && 'bg-acc/60',
           )}
         >
@@ -406,7 +406,7 @@ function IconBtn({
       title={title}
       className={cn(
         'rounded p-1 text-fg-mute transition-colors',
-        disabled ? 'cursor-default opacity-30' : danger ? 'hover:bg-muted hover:text-destructive' : 'hover:bg-muted hover:text-fg',
+        disabled ? 'cursor-default opacity-30' : danger ? 'hover:bg-bg-2 hover:text-bad' : 'hover:bg-bg-2 hover:text-fg',
       )}
     >
       {children}

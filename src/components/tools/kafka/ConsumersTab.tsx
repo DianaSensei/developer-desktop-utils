@@ -65,7 +65,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
   if (error) {
     return (
       <div className="px-4 py-6">
-        <div className="flex items-start gap-2 text-sm text-destructive">
+        <div className="flex items-start gap-2 text-sm text-bad">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span className="break-all">{error}</span>
         </div>
@@ -91,7 +91,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex items-center justify-between px-4 py-1.5 border-b bg-muted/10 sticky top-0">
+      <div className="flex items-center justify-between px-4 py-1.5 border-b bg-bg-2/10 sticky top-0">
         <span className="text-xs text-fg-mute">
           {grouped.length} group{grouped.length !== 1 ? 's' : ''}
         </span>
@@ -105,10 +105,10 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
         const totalLag = parts.reduce((s, p) => s + (p.lag > 0 ? p.lag : 0), 0);
         const hasLag = parts.some((p) => p.lag > 0);
         return (
-          <div key={groupId} className="border-b border-border/40">
+          <div key={groupId} className="border-b border-line/40">
             {/* Group header — toggles partition detail; group name opens the group */}
             <div
-              className="flex items-center gap-2 px-4 py-2 hover:bg-muted/15 cursor-pointer select-none"
+              className="flex items-center gap-2 px-4 py-2 hover:bg-bg-2/15 cursor-pointer select-none"
               onClick={() => toggleGroup(groupId)}
             >
               {open
@@ -132,7 +132,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
             {open && (
               <div className="pb-1">
                 {/* Per-partition column headers */}
-                <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-fg-mute bg-muted/10">
+                <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-fg-mute bg-bg-2/10">
                   <span className="text-right">Part</span>
                   <span className="text-right">Committed</span>
                   <span className="text-right">Latest</span>
@@ -150,7 +150,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
                   return (
                     <div
                       key={p.partition}
-                      className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-border/20 text-sm"
+                      className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-line/20 text-sm"
                     >
                       <span className="text-right text-xs text-fg-mute tabular-nums">{p.partition}</span>
                       <span className="text-right font-mono text-xs tabular-nums">

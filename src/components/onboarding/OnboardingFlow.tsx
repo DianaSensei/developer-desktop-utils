@@ -117,7 +117,7 @@ export function OnboardingFlow() {
                       'flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
                       active
                         ? 'border-acc/50 bg-acc/10 text-fg'
-                        : 'border-border hover:bg-muted/50 text-fg-mute hover:text-fg'
+                        : 'border-line hover:bg-bg-2/50 text-fg-mute hover:text-fg'
                     )}
                   >
                     <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc' : 'text-fg-mute')} />

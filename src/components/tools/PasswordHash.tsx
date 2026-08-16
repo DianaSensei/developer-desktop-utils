@@ -187,7 +187,7 @@ export function PasswordHash() {
                   <ToolLabel>Hash</ToolLabel>
                   <CopyButton value={hashOut} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
                 </div>
-                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                <div className="rounded-lg border border-line bg-bg-2/30 px-3 py-2.5">
                   <p className="break-all font-mono text-xs text-fg/90">{hashOut}</p>
                 </div>
               </ToolSection>
@@ -236,7 +236,7 @@ export function PasswordHash() {
                 'flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium',
                 verifyResult
                   ? 'border-ok-edge bg-ok-tint text-ok'
-                  : 'border-destructive/30 bg-destructive/8 text-destructive',
+                  : 'border-bad/30 bg-bad/8 text-bad',
               )}>
                 {verifyResult ? <><Check className="h-4 w-4" /> Match — the password matches this hash.</> : <><X className="h-4 w-4" /> No match.</>}
               </div>

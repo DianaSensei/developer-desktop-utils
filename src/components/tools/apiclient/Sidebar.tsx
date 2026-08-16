@@ -169,7 +169,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   return (
     <div className="flex h-full w-full flex-col">
       {/* header */}
-      <div className="flex items-center justify-between gap-1 border-b border-border px-3 py-2">
+      <div className="flex items-center justify-between gap-1 border-b border-line px-3 py-2">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-fg-mute/70">
           <Boxes className="h-3.5 w-3.5" /> Collections
         </div>
@@ -190,12 +190,12 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       </div>
 
       {/* search */}
-      <div className="border-b border-border px-2 py-1.5">
+      <div className="border-b border-line px-2 py-1.5">
         <SearchInput ref={searchInputRef} value={query} onChange={setQuery} placeholder="Search" className="h-ctl text-xs" />
       </div>
 
       {error && (
-        <div className="border-b border-destructive/20 bg-destructive/8 px-3 py-1.5 text-[11px] text-destructive">{error}</div>
+        <div className="border-b border-bad/20 bg-bad/8 px-3 py-1.5 text-[11px] text-bad">{error}</div>
       )}
 
       {/* tree */}

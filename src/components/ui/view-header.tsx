@@ -23,19 +23,19 @@ export interface ViewHeaderProps {
  */
 export function ViewHeader({ icon: Icon, title, subtitle, actions, onBack, className }: ViewHeaderProps) {
   return (
-    <div className={cn('shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-border/60', className)}>
+    <div className={cn('shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-line/60', className)}>
       <div className="flex items-center gap-2.5 min-w-0">
         {onBack && (
           <button
             type="button"
             onClick={() => onBack()}
             title="Back"
-            className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute hover:text-fg hover:bg-muted/60 transition-colors"
+            className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute hover:text-fg hover:bg-bg-2/60 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
         )}
-        <div className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg bg-muted/50 text-fg-mute">
+        <div className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg bg-bg-2/50 text-fg-mute">
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">

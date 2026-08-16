@@ -123,7 +123,7 @@ export function CodeSurface({
   return (
     <div
       className={cn(
-        'flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border border-input bg-bg shadow-sm transition-shadow hover:border-border/80 focus-within:shadow-none focus-within:ring-2 focus-within:ring-acc/40',
+        'flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border border-sunk bg-bg shadow-sm transition-shadow hover:border-line/80 focus-within:shadow-none focus-within:ring-2 focus-within:ring-acc/40',
         className,
       )}
     >

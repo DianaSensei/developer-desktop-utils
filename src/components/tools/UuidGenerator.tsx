@@ -45,9 +45,9 @@ export function UuidGenerator() {
               <CopyButton value={() => uuids.join('\n')} label="Copy All" size="sm" variant="ghost" className="h-6 px-2 text-xs rounded-lg" iconClassName="h-3 w-3" />
             )}
           </div>
-          <div key={genId} className="space-y-1.5 max-h-[400px] overflow-y-auto rounded-lg border border-border p-3 motion-safe:animate-fade-in-up">
+          <div key={genId} className="space-y-1.5 max-h-[400px] overflow-y-auto rounded-lg border border-line p-3 motion-safe:animate-fade-in-up">
             {uuids.map((uuid, idx) => (
-              <div key={idx} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors group">
+              <div key={idx} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bg-2/50 transition-colors group">
                 <span className="flex-1 font-mono text-xs">{uuid}</span>
                 <CopyButton
                   value={uuid}

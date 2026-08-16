@@ -229,7 +229,7 @@ export function ChecksumTool() {
             'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 cursor-pointer transition-colors',
             dragging
               ? 'border-acc bg-acc/5'
-              : 'border-fg-mute/25 hover:border-fg-mute/50 hover:bg-muted/30',
+              : 'border-fg-mute/25 hover:border-fg-mute/50 hover:bg-bg-2/30',
           )}
         >
           {/* hidden input only used in web mode */}
@@ -247,14 +247,14 @@ export function ChecksumTool() {
 
         {/* File info */}
         {fileInfo && (
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-line bg-bg-2/30 px-3 py-2">
             <div className="min-w-0">
               <p className="text-xs font-medium truncate">{fileInfo.name}</p>
               <p className="text-[11px] text-fg-mute">{formatBytes(fileInfo.size)}</p>
             </div>
             <button
               onClick={clear}
-              className="ml-3 shrink-0 p-1 rounded hover:bg-muted text-fg-mute hover:text-fg transition-colors"
+              className="ml-3 shrink-0 p-1 rounded hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -271,7 +271,7 @@ export function ChecksumTool() {
               </span>
               <span className="tabular-nums">{progress}%</span>
             </div>
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div className="h-1.5 rounded-full bg-bg-2 overflow-hidden">
               <div
                 className="h-full rounded-full bg-acc transition-[width] duration-150 ease-out"
                 style={{ width: `${progress}%` }}
@@ -283,8 +283,8 @@ export function ChecksumTool() {
         {/* Result */}
         {status === 'done' && hash && (
           <div className="space-y-3">
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-3 py-1.5 bg-muted/10 border-b border-border">
+            <div className="rounded-lg border border-line overflow-hidden">
+              <div className="px-3 py-1.5 bg-bg-2/10 border-b border-line">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-mute">
                   {algoLabel}
                 </span>
@@ -316,14 +316,14 @@ export function ChecksumTool() {
                   <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
                     {hashMatch
                       ? <CheckCircle className="h-4 w-4 text-ok" />
-                      : <XCircle   className="h-4 w-4 text-destructive" />}
+                      : <XCircle   className="h-4 w-4 text-bad" />}
                   </span>
                 )}
               </div>
               {verifyNorm && (
                 <p className={cn('text-xs', hashMatch
                   ? 'text-ok'
-                  : 'text-destructive')}>
+                  : 'text-bad')}>
                   {hashMatch ? 'Hashes match ✓' : 'Hashes do not match ✗'}
                 </p>
               )}
@@ -332,7 +332,7 @@ export function ChecksumTool() {
         )}
 
         {status === 'error' && (
-          <p className="text-xs text-destructive">
+          <p className="text-xs text-bad">
             Failed to compute checksum. The file may be inaccessible.
           </p>
         )}

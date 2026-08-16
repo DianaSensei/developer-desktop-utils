@@ -190,7 +190,7 @@ function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
                       </Td>
                       <Td align="right">
                         <button
-                          className="text-fg-mute hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="text-fg-mute hover:text-bad opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Stop tracking (does not delete the exchange)"
                           onClick={(e) => { e.stopPropagation(); knownNamesStore.removeExchange(conn.id, name); }}
                         >

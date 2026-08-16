@@ -552,7 +552,7 @@ export function JsonFormatter() {
   };
 
   const inputPanel = (
-    <div className="h-full border-b border-border flex flex-col">
+    <div className="h-full border-b border-line flex flex-col">
       <PaneHeader label="Input" hint={quickPasteHint} />
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-2">
         <JsonSyntaxEditor
@@ -568,9 +568,9 @@ export function JsonFormatter() {
     <div className="h-full min-h-0 flex flex-col">
       {/* Status bar */}
       {(parsed.error || parsed.value !== undefined) && (
-        <div className="shrink-0 border-b border-border px-4 py-2">
+        <div className="shrink-0 border-b border-line px-4 py-2">
           {parsed.error ? (
-            <div className="flex items-center gap-2 text-sm text-destructive">
+            <div className="flex items-center gap-2 text-sm text-bad">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span className="font-mono text-xs">{parsed.error}</span>
             </div>
@@ -585,7 +585,7 @@ export function JsonFormatter() {
 
       {/* Beautify: search + action bar */}
       {parsed.value !== undefined && mode === 'beautify' && (
-        <div className="shrink-0 border-b border-border px-4 py-2">
+        <div className="shrink-0 border-b border-line px-4 py-2">
           <div className="flex flex-wrap items-center gap-2">
             <SearchInput
               value={query}
@@ -625,7 +625,7 @@ export function JsonFormatter() {
               return (
                 <div
                   key={`${line.path}:${line.kind}`}
-                  className="flex items-start hover:bg-muted/30"
+                  className="flex items-start hover:bg-bg-2/30"
                   onMouseEnter={() => setHoveredContainer(line.containerPath)}
                   onClick={() => { setSelectedPath(line.path); if (isToggle && !forceExpand) toggle(line.path); }}
                 >
@@ -680,7 +680,7 @@ export function JsonFormatter() {
 
       {/* Beautify: path breadcrumb */}
       {parsed.value !== undefined && mode === 'beautify' && (
-        <div className="shrink-0 border-t border-border flex items-center gap-2 px-4 py-2 bg-muted/10 text-xs">
+        <div className="shrink-0 border-t border-line flex items-center gap-2 px-4 py-2 bg-bg-2/10 text-xs">
           <span className="text-fg-mute">Path</span>
           <code className="flex-1 truncate font-mono text-fg">{selectedPath || '$ (click a node)'}</code>
           {selectedPath && (
