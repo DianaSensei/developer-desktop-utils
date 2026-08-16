@@ -707,10 +707,19 @@ function AppContent() {
           một vạch ngăn mảnh phân tách khối định danh app (logo/DevTool) khỏi
           khối điều hướng tool. Toàn bộ nội dung tương ứng ở header chính bên
           dưới bị ẩn khi showMacOverlayChrome (xem `{!showMacOverlayChrome &&
-          (…)}` quanh header đó) — không render trùng hai nơi. */}
+          (…)}` quanh header đó) — không render trùng hai nơi.
+
+          `pl-[78px]` từng phải ĐOÁN vị trí ba nút đèn giao thông (macOS tự
+          đặt, không cố định giữa các phiên bản) — sai hai lần liền vì không
+          có máy thật để đo. Từ giờ không đoán nữa: `trafficLightPosition:
+          {x:12,y:13}` trong tauri.conf.json TỰ đặt vị trí ba nút đó (yêu cầu
+          titleBarStyle: "Overlay" + decorations mặc định true), nên 78px ở
+          đây tính được thẳng từ x=12 cộng bề rộng cụm nút (~54px) cộng đệm
+          nhỏ — không còn là số đoán mò. `y:13` canh giữa cụm nút theo chiều
+          dọc trong hàng cao 38px (so với mặc định macOS ~28px). */}
       {showMacOverlayChrome && (
         <div
-          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[92px] pr-3"
+          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[78px] pr-3"
           data-tauri-drag-region="deep"
         >
           <div className="flex min-w-0 items-center gap-3">
