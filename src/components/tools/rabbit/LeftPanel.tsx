@@ -87,7 +87,7 @@ export function LeftPanel(props: LeftPanelProps) {
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 min-w-0">
                 <StatusDot tone={connected ? 'live' : 'idle'} size="xs" title={connected ? 'connected' : 'not connected'} />
-                <span className="text-[11px] text-muted-foreground font-mono truncate" title={conn.amqpOnly ? 'AMQP endpoint' : 'Management endpoint'}>
+                <span className="text-[11px] text-fg-mute font-mono truncate" title={conn.amqpOnly ? 'AMQP endpoint' : 'Management endpoint'}>
                   {conn.amqpOnly ? `${conn.host}:${conn.amqpPort}` : `${conn.host}:${conn.port}`}
                   {conn.extraHosts?.length ? ` +${conn.extraHosts.length}` : ''}
                 </span>
@@ -118,7 +118,7 @@ export function LeftPanel(props: LeftPanelProps) {
       {!conn ? (
         <div className="flex-1 flex items-center justify-center p-4 text-center">
           {!connectionsLoading && (
-            <p className="text-xs text-muted-foreground">Add a connection to get started.</p>
+            <p className="text-xs text-fg-mute">Add a connection to get started.</p>
           )}
         </div>
       ) : (
@@ -133,7 +133,7 @@ export function LeftPanel(props: LeftPanelProps) {
           <div
             className={cn(
               'group w-full flex items-center gap-2 px-2 rounded-md text-xs transition-colors',
-              view === 'consumers' ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+              view === 'consumers' ? 'bg-primary/10 text-primary font-medium' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
             )}
           >
             <button type="button" className="flex-1 min-w-0 flex items-center gap-2 py-1.5 text-left" onClick={onShowConsumers}>
@@ -141,7 +141,7 @@ export function LeftPanel(props: LeftPanelProps) {
               Consumers
             </button>
             {activeConsumers.length > 0 && (
-              <span className="text-[11px] tabular-nums text-muted-foreground shrink-0">{activeConsumers.length}</span>
+              <span className="text-[11px] tabular-nums text-fg-mute shrink-0">{activeConsumers.length}</span>
             )}
             <button
               type="button"
@@ -164,15 +164,15 @@ export function LeftPanel(props: LeftPanelProps) {
             >
               <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} size="xs" title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
               <button
-                className="flex-1 min-w-0 text-left font-mono truncate text-muted-foreground group-hover:text-foreground"
+                className="flex-1 min-w-0 text-left font-mono truncate text-fg-mute group-hover:text-fg"
                 title={`${s.queue} (${s.mode})`}
                 onClick={() => onOpenConsumer(s.queue)}
               >
                 {s.queue}
               </button>
-              <span className="text-[11px] text-muted-foreground tabular-nums shrink-0" title={`${s.received.toLocaleString()} received`}>{s.received.toLocaleString()}</span>
+              <span className="text-[11px] text-fg-mute tabular-nums shrink-0" title={`${s.received.toLocaleString()} received`}>{s.received.toLocaleString()}</span>
               <button
-                className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-fg-mute hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Stop consumer"
                 onClick={() => consumerStore.stop(s.connId, s.queue)}
               >
@@ -216,7 +216,7 @@ function NavItem({ icon: Icon, label, active, onClick }: {
       onClick={onClick}
       className={cn(
         'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors',
-        active ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+        active ? 'bg-primary/10 text-primary font-medium' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />

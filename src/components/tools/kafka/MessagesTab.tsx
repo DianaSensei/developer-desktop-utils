@@ -98,7 +98,7 @@ function CopyBtn({ text, className }: { text: string; className?: string }) {
       title="Copy to clipboard"
       variant="ghost"
       size="icon"
-      className={cn('h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground', className)}
+      className={cn('h-6 w-6 shrink-0 text-fg-mute hover:text-fg', className)}
       iconClassName="w-3 h-3"
     />
   );
@@ -109,7 +109,7 @@ function CopyBtn({ text, className }: { text: string; className?: string }) {
 function SectionHead({ title, aside }: { title: string; aside?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between px-3 py-1.5 bg-muted/15 border-b border-border/40">
-      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+      <span className="text-[11px] font-semibold text-fg-mute uppercase tracking-widest">
         {title}
       </span>
       {aside}
@@ -139,7 +139,7 @@ function ColHeader({ label, col, align = 'left', sortCol, sortDir, onSort, onRes
         onClick={() => onSort(col)}
         className={cn(
           'flex items-center gap-1 text-xs font-medium transition-colors select-none whitespace-nowrap',
-          active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+          active ? 'text-fg' : 'text-fg-mute hover:text-fg',
         )}
       >
         {label}
@@ -208,7 +208,7 @@ const TOK_CLS: Record<JTok['t'], string> = {
   num:   'text-[var(--sql-number)]',
   bool:  'text-[var(--sql-type)]',
   null:  'text-[var(--json-null)]',
-  punct: 'text-muted-foreground/70',
+  punct: 'text-fg-mute/70',
   ws:    '',
 };
 
@@ -225,7 +225,7 @@ function JsonHighlight({ raw }: { raw: string }) {
     return (
       <div>
         <pre className="px-3 py-2.5 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed">{raw}</pre>
-        <p className="px-3 pb-2 text-[11px] text-muted-foreground/40 italic">Not valid JSON</p>
+        <p className="px-3 pb-2 text-[11px] text-fg-mute/40 italic">Not valid JSON</p>
       </div>
     );
   }
@@ -268,7 +268,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
         <button
           onClick={onClose}
           title="Close"
-          className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          className="p-0.5 rounded text-fg-mute hover:text-fg hover:bg-muted transition-colors"
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -283,14 +283,14 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
           <div className="px-3 py-2 space-y-1.5">
             {properties.map(({ label, value }) => (
               <div key={label} className="flex items-start gap-2 min-w-0">
-                <span className="text-xs text-muted-foreground w-[4.5rem] shrink-0 pt-px">{label}</span>
+                <span className="text-xs text-fg-mute w-[4.5rem] shrink-0 pt-px">{label}</span>
                 {value !== null ? (
                   <>
                     <span className="text-xs font-mono flex-1 break-all leading-snug">{value}</span>
                     <CopyBtn text={value} />
                   </>
                 ) : (
-                  <span className="text-xs font-mono italic text-muted-foreground/50">null</span>
+                  <span className="text-xs font-mono italic text-fg-mute/50">null</span>
                 )}
               </div>
             ))}
@@ -322,7 +322,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
             }
           />
           {msg.value === null ? (
-            <p className="px-3 py-2.5 text-xs font-mono italic text-muted-foreground/50">null</p>
+            <p className="px-3 py-2.5 text-xs font-mono italic text-fg-mute/50">null</p>
           ) : valueMode === 'json' ? (
             <JsonHighlight raw={msg.value} />
           ) : (
@@ -338,18 +338,18 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
             title="Headers"
             aside={
               headerEntries.length > 0
-                ? <span className="text-xs text-muted-foreground/60 tabular-nums">{headerEntries.length}</span>
+                ? <span className="text-xs text-fg-mute/60 tabular-nums">{headerEntries.length}</span>
                 : undefined
             }
           />
           {headerEntries.length === 0 ? (
-            <p className="px-3 py-2.5 text-xs italic text-muted-foreground/40">No headers</p>
+            <p className="px-3 py-2.5 text-xs italic text-fg-mute/40">No headers</p>
           ) : (
             <div className="divide-y divide-border/30">
               {headerEntries.map(([k, v]) => (
                 <div key={k} className="px-3 py-2 flex items-start gap-2 min-w-0">
                   <div className="flex-1 min-w-0 space-y-0.5">
-                    <div className="text-xs font-mono text-muted-foreground truncate">{k}</div>
+                    <div className="text-xs font-mono text-fg-mute truncate">{k}</div>
                     <div className="text-xs font-mono break-all leading-snug">{v}</div>
                   </div>
                   <CopyBtn text={v} />
@@ -612,7 +612,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
       {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-4 py-2.5 border-b border-border shrink-0 bg-muted/10">
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Partition</Label>
+          <Label className="text-xs text-fg-mute">Partition</Label>
           <Select value={String(partition)} onValueChange={(v) => setPartition(Number(v))}>
             <SelectTrigger className="h-ctl text-xs font-mono min-w-[9rem]">
               <SelectValue />
@@ -628,7 +628,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Start from</Label>
+          <Label className="text-xs text-fg-mute">Start from</Label>
           <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl">
             {(['tail', 'from', 'range', 'time'] as FetchMode[]).map((m) => (
               <button
@@ -647,7 +647,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         {mode === 'time' && (
           <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Since</Label>
+            <Label className="text-xs text-fg-mute">Since</Label>
             <Select value={String(sinceMs)} onValueChange={(v) => setSinceMs(Number(v))}>
               <SelectTrigger className="h-ctl text-xs w-36">
                 <SelectValue />
@@ -663,7 +663,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         {mode === 'from' && (
           <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Start offset</Label>
+            <Label className="text-xs text-fg-mute">Start offset</Label>
             <Input
               type="number"
               min="0"
@@ -679,7 +679,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         {mode === 'range' && (
           <div className="flex items-end gap-2">
             <div className="flex flex-col gap-1">
-              <Label className="text-xs text-muted-foreground">From</Label>
+              <Label className="text-xs text-fg-mute">From</Label>
               <Input
                 type="number" min="0"
                 value={fromOffset}
@@ -688,9 +688,9 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 onKeyDown={(e) => e.key === 'Enter' && doFetch()}
               />
             </div>
-            <span className="text-sm text-muted-foreground mb-1.5">–</span>
+            <span className="text-sm text-fg-mute mb-1.5">–</span>
             <div className="flex flex-col gap-1">
-              <Label className="text-xs text-muted-foreground">To</Label>
+              <Label className="text-xs text-fg-mute">To</Label>
               <Input
                 type="number" min="0"
                 value={toOffset}
@@ -704,7 +704,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         {mode !== 'range' && (
           <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Limit</Label>
+            <Label className="text-xs text-fg-mute">Limit</Label>
             <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
               <SelectTrigger className="h-ctl text-xs w-24">
                 <SelectValue />
@@ -717,7 +717,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         )}
 
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Default view</Label>
+          <Label className="text-xs text-fg-mute">Default view</Label>
           <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl">
             {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
               <button
@@ -736,7 +736,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex items-end gap-2 ml-auto">
           {fetched && !loading && (
-            <span className="text-xs text-muted-foreground tabular-nums mb-1.5">
+            <span className="text-xs text-fg-mute tabular-nums mb-1.5">
               {filtered.length.toLocaleString()}
               {keyword ? ` / ${messages.length.toLocaleString()}` : ''}
               {' '}msg{filtered.length !== 1 ? 's' : ''}
@@ -750,7 +750,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
       {/* ── Filter bar ── */}
       <div className="px-4 py-1.5 border-b border-border shrink-0 flex items-center gap-2 bg-muted/5">
-        <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <Search className="w-3.5 h-3.5 text-fg-mute shrink-0" />
         <Input
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
@@ -769,14 +769,14 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           onClick={() => setUseRegex((v) => !v)}
           className={cn(
             'p-1 rounded transition-colors shrink-0',
-            useRegex ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
+            useRegex ? 'bg-primary/10 text-primary' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
           )}
         >
           <Regex className="w-3.5 h-3.5" />
         </button>
         {keyword && (
           <button
-            className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            className="p-0.5 rounded text-fg-mute hover:text-fg transition-colors shrink-0"
             onClick={() => setKeyword('')}
           >
             <X className="w-3 h-3" />
@@ -784,7 +784,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         )}
         {fetched && sorted.length > 0 && (
           <div className="flex items-center gap-1 shrink-0 border-l border-border/50 pl-2 ml-1">
-            <span className="text-[11px] text-muted-foreground/70 hidden sm:inline">Export</span>
+            <span className="text-[11px] text-fg-mute/70 hidden sm:inline">Export</span>
             <CopyButton value={() => messagesToJson(sorted)} label="JSON" variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" iconClassName="h-3 w-3" />
             <CopyButton value={() => messagesToCsv(sorted)} label="CSV" variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" iconClassName="h-3 w-3" />
           </div>
@@ -810,10 +810,10 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 </span>
               )}
               {!loading && !error && !fetched && (
-                <span className="text-sm text-muted-foreground">Choose a partition and click Fetch</span>
+                <span className="text-sm text-fg-mute">Choose a partition and click Fetch</span>
               )}
               {!loading && !error && fetched && filtered.length === 0 && (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-fg-mute">
                   {keyword ? 'No messages match the filter' : 'No messages in this range'}
                 </span>
               )}
@@ -857,19 +857,19 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                     style={{ gridTemplateColumns: gridCols, gap: '0.5rem' }}
                     onClick={() => handleRowClick(msg)}
                   >
-                    <span className="text-right text-xs text-muted-foreground tabular-nums font-mono">{msg.partition}</span>
-                    <span className="text-xs font-mono text-muted-foreground tabular-nums">{msg.offset.toLocaleString()}</span>
+                    <span className="text-right text-xs text-fg-mute tabular-nums font-mono">{msg.partition}</span>
+                    <span className="text-xs font-mono text-fg-mute tabular-nums">{msg.offset.toLocaleString()}</span>
                     <span className="text-xs font-mono truncate">
                       {msg.key !== null
                         ? msg.key
-                        : <span className="italic text-muted-foreground/40">null</span>}
+                        : <span className="italic text-fg-mute/40">null</span>}
                     </span>
-                    <span className="text-xs font-mono truncate text-foreground/80">
+                    <span className="text-xs font-mono truncate text-fg/80">
                       {msg.value !== null
                         ? msg.value
-                        : <span className="italic text-muted-foreground/40">null</span>}
+                        : <span className="italic text-fg-mute/40">null</span>}
                     </span>
-                    <span className="flex items-center justify-between gap-1 text-xs text-muted-foreground min-w-0">
+                    <span className="flex items-center justify-between gap-1 text-xs text-fg-mute min-w-0">
                       <span className="truncate">{ts}</span>
                       <ChevronRight
                         className={cn(
@@ -889,7 +889,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                     <LoadingRow size="sm" />
                   ) : (
                     <button
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded hover:bg-muted/40"
+                      className="text-xs text-fg-mute hover:text-fg transition-colors px-3 py-1 rounded hover:bg-muted/40"
                       onClick={loadMore}
                     >
                       Load older messages

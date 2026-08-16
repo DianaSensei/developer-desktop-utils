@@ -77,10 +77,10 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill, detailQueu
     <div className="tool-full-height">
       <div className="flex items-center justify-between px-5 py-3 border-b shrink-0 gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <Headphones className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Headphones className="h-4 w-4 text-fg-mute shrink-0" />
           <div className="min-w-0">
             <h2 className="font-semibold text-sm">Consumers</h2>
-            <p className="text-[11px] text-muted-foreground">{sessions.length} active · vhost {conn.vhost}</p>
+            <p className="text-[11px] text-fg-mute">{sessions.length} active · vhost {conn.vhost}</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
@@ -93,7 +93,7 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill, detailQueu
           <div>
             <SectionLabel as="h3" size="sm" className="mb-2">Active consumers</SectionLabel>
             {sessions.length === 0
-              ? <p className="text-sm text-muted-foreground">No consumers running. Start one above.</p>
+              ? <p className="text-sm text-fg-mute">No consumers running. Start one above.</p>
               : (
                 <div className="rounded-lg border divide-y divide-border/40 overflow-hidden">
                   {sessions.map((s) => <ConsumerListRow key={s.queue} session={s} onOpen={() => onOpenConsumer(s.queue)} />)}
@@ -122,7 +122,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: ConsumerSession; onO
       {s.paused && (
         <Badge tone="warning" uppercase>paused</Badge>
       )}
-      <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
+      <span className="ml-auto text-xs text-fg-mute tabular-nums shrink-0">
         {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
       </span>
       <span onClick={(e) => e.stopPropagation()} className="shrink-0">
@@ -130,7 +130,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: ConsumerSession; onO
           <Square className="h-3 w-3" />
         </Button>
       </span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      <ChevronRight className="h-4 w-4 text-fg-mute shrink-0" />
     </div>
   );
 }
@@ -226,7 +226,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
             ]}
           />
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1">
+        <p className="text-[11px] text-fg-mute mt-1">
           {mode === 'peek' && 'Leaves messages in the queue (delivered unacked, bounded by prefetch; requeued on stop).'}
           {mode === 'consume' && 'Acknowledges (removes) each message from the queue.'}
           {mode === 'respond' && 'Acts as an RPC server: acks each request and publishes a reply to its reply_to with the same correlation id.'}
@@ -252,7 +252,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
           <label className="flex items-center justify-between">
             <span className="text-xs">
               <span className="font-medium">Echo request</span>
-              <span className="block text-[11px] text-muted-foreground">Reply with the request body</span>
+              <span className="block text-[11px] text-fg-mute">Reply with the request body</span>
             </span>
             <Switch checked={echo} onCheckedChange={setEcho} aria-label="Echo request" />
           </label>
@@ -317,13 +317,13 @@ function ConsumerDetail({ session: s, onBack }: { session: ConsumerSession; onBa
       {/* Header: back · queue · mode · controls */}
       <div className="flex items-center justify-between px-5 py-3 border-b shrink-0 gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <button onClick={() => onBack()} className="text-muted-foreground hover:text-foreground shrink-0" title="Back to consumers">
+          <button onClick={() => onBack()} className="text-fg-mute hover:text-fg shrink-0" title="Back to consumers">
             <ArrowLeft className="h-4 w-4" />
           </button>
           <StatusDot tone={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} title={s.starting ? 'starting' : s.paused ? 'paused' : 'live'} />
           <div className="min-w-0">
             <h2 className="font-semibold text-sm font-mono truncate">{s.queue}</h2>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-fg-mute">
               {MODE_LABEL[s.mode]}
               {s.mode === 'respond' && ` · ${s.reply?.echo ? 'echo' : 'static reply'}`}
               {' · '}
@@ -370,7 +370,7 @@ function ConsumerDetail({ session: s, onBack }: { session: ConsumerSession; onBa
             { value: 'plain', label: 'Plain' },
           ]}
         />
-        <span className="ml-auto text-[11px] text-muted-foreground tabular-nums shrink-0">
+        <span className="ml-auto text-[11px] text-fg-mute tabular-nums shrink-0">
           {q ? `${matches.length.toLocaleString()} match${matches.length === 1 ? '' : 'es'}` : `${buffered.toLocaleString()} buffered`}
           {capped && ' · capped'}
         </span>
@@ -379,12 +379,12 @@ function ConsumerDetail({ session: s, onBack }: { session: ConsumerSession; onBa
       {/* Messages */}
       <div className="tool-scrollable">
         {shown.length === 0
-          ? <p className="px-5 py-4 text-sm text-muted-foreground">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
+          ? <p className="px-5 py-4 text-sm text-fg-mute">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
           : (
             <div className="divide-y divide-border/40">
               {shown.map((m) => <MessageRow key={m.deliveryTag} m={m} format={format} />)}
               {matches.length > shown.length && (
-                <p className="px-5 py-2 text-[11px] text-muted-foreground">
+                <p className="px-5 py-2 text-[11px] text-fg-mute">
                   Showing first {RENDER_CAP} of {matches.length.toLocaleString()}{q ? ' matches' : ''}. Narrow your search to see more.
                 </p>
               )}
@@ -411,14 +411,14 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((x) => !x); } }}
         className="flex items-center gap-2 px-5 py-1.5 cursor-pointer hover:bg-muted/40"
       >
-        {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-        <span className="text-[11px] font-mono text-muted-foreground truncate max-w-[12rem] shrink-0" title={`${m.exchange ? m.exchange + ' · ' : ''}${m.routingKey || '—'}`}>
+        {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />}
+        <span className="text-[11px] font-mono text-fg-mute truncate max-w-[12rem] shrink-0" title={`${m.exchange ? m.exchange + ' · ' : ''}${m.routingKey || '—'}`}>
           {m.exchange ? `${m.exchange}/` : ''}{m.routingKey || '—'}
         </span>
         {m.correlationId && <span className="text-[11px] font-mono text-primary/80 truncate max-w-[8rem] shrink-0" title={`correlation id: ${m.correlationId}`}>corr {m.correlationId}</span>}
         {m.redelivered && <span className="text-[11px] text-warn shrink-0">redelivered</span>}
-        <span className="flex-1 min-w-0 font-mono text-xs text-foreground/80 truncate">{preview}</span>
-        {headerEntries.length > 0 && <span className="text-[11px] text-muted-foreground shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>}
+        <span className="flex-1 min-w-0 font-mono text-xs text-fg/80 truncate">{preview}</span>
+        {headerEntries.length > 0 && <span className="text-[11px] text-fg-mute shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>}
         <span onClick={(e) => e.stopPropagation()} className="shrink-0">
           <CopyButton value={m.payload} iconClassName="h-3.5 w-3.5" />
         </span>
@@ -426,23 +426,23 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
 
       {expanded && (
         <div className="px-5 pb-3 pt-1 space-y-2.5 bg-muted/10 border-t border-border/30">
-          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-muted-foreground pt-1">
-            <span>exchange <span className="text-foreground">{m.exchange || '(default)'}</span></span>
-            <span>routing key <span className="text-foreground">{m.routingKey || '—'}</span></span>
-            {m.correlationId && <span>correlation id <span className="text-foreground">{m.correlationId}</span></span>}
-            {m.contentType && <span>content-type <span className="text-foreground">{m.contentType}</span></span>}
-            {m.messageId && <span>message id <span className="text-foreground">{m.messageId}</span></span>}
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-fg-mute pt-1">
+            <span>exchange <span className="text-fg">{m.exchange || '(default)'}</span></span>
+            <span>routing key <span className="text-fg">{m.routingKey || '—'}</span></span>
+            {m.correlationId && <span>correlation id <span className="text-fg">{m.correlationId}</span></span>}
+            {m.contentType && <span>content-type <span className="text-fg">{m.contentType}</span></span>}
+            {m.messageId && <span>message id <span className="text-fg">{m.messageId}</span></span>}
             {m.redelivered && <span className="text-warn">redelivered</span>}
           </div>
 
           {headerEntries.length > 0 && (
             <div>
-              <div className="text-[11px] font-medium text-muted-foreground mb-1">Headers</div>
+              <div className="text-[11px] font-medium text-fg-mute mb-1">Headers</div>
               <div className="rounded-md border divide-y divide-border/40 overflow-hidden">
                 {headerEntries.map(([k, v]) => (
                   <div key={k} className="flex gap-3 px-2.5 py-1 text-[11px] font-mono">
-                    <span className="text-muted-foreground shrink-0">{k}</span>
-                    <span className="text-foreground break-all flex-1 min-w-0">{v}</span>
+                    <span className="text-fg-mute shrink-0">{k}</span>
+                    <span className="text-fg break-all flex-1 min-w-0">{v}</span>
                   </div>
                 ))}
               </div>
@@ -451,10 +451,10 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-medium text-muted-foreground">Payload</span>
+              <span className="text-[11px] font-medium text-fg-mute">Payload</span>
               <CopyButton value={m.payload} iconClassName="h-3.5 w-3.5" />
             </div>
-            <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto rounded-md border bg-background px-2.5 py-2">{body}</pre>
+            <pre className="text-xs font-mono whitespace-pre-wrap break-words max-h-96 overflow-y-auto rounded-md border bg-bg px-2.5 py-2">{body}</pre>
           </div>
         </div>
       )}
@@ -495,7 +495,7 @@ function QueueCombobox({ connId, value, queues, onChange }: {
         className="font-mono text-sm h-ctl"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">
+        <div className="absolute z-20 mt-1 w-full rounded-md border bg-card shadow max-h-64 overflow-y-auto py-1">
           <RecentSuggestions items={recent} connId={connId} field="queue" value={value} onPick={pick} />
           {matches.map((x) => (
             <button
@@ -505,7 +505,7 @@ function QueueCombobox({ connId, value, queues, onChange }: {
               className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === x.name && 'text-primary')}
             >
               <span className="font-mono text-sm flex-1 truncate">{x.name}</span>
-              <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">{x.messages ?? 0}</span>
+              <span className="text-[11px] text-fg-mute shrink-0 tabular-nums">{x.messages ?? 0}</span>
               {value === x.name && <Check className="h-3.5 w-3.5 shrink-0" />}
             </button>
           ))}

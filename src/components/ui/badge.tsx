@@ -21,7 +21,7 @@ export type BadgeVariant = 'soft' | 'solid' | 'outline';
 // Nhờ vậy chúng tự đúng ở cả sáng lẫn tối (không cần cặp `dark:` thủ công) và
 // KHÔNG đổi khi đổi tone accent — xem design/RULES.md.
 const SOFT: Record<BadgeTone, string> = {
-  neutral: 'bg-muted text-muted-foreground',
+  neutral: 'bg-muted text-fg-mute',
   success: 'bg-ok-tint text-ok',
   warning: 'bg-warn-tint text-warn',
   danger: 'bg-bad-tint text-bad',
@@ -30,19 +30,19 @@ const SOFT: Record<BadgeTone, string> = {
 };
 
 const SOLID: Record<BadgeTone, string> = {
-  neutral: 'bg-muted-foreground text-background',
-  // `text-background` chứ không phải `text-white`: ở theme tối các tông trạng
+  neutral: 'bg-fg-mute text-bg',
+  // `text-bg` chứ không phải `text-white`: ở theme tối các tông trạng
   // thái là bản SÁNG, nên chữ trắng sẽ chìm. Nền của app đảo theo theme nên chữ
   // luôn tương phản ở cả hai.
-  success: 'bg-ok text-background',
-  warning: 'bg-warn text-background',
-  danger: 'bg-bad text-background',
-  info: 'bg-info text-background',
+  success: 'bg-ok text-bg',
+  warning: 'bg-warn text-bg',
+  danger: 'bg-bad text-bg',
+  info: 'bg-info text-bg',
   accent: 'bg-acc text-acc-fg',
 };
 
 const OUTLINE: Record<BadgeTone, string> = {
-  neutral: 'border border-border text-muted-foreground',
+  neutral: 'border border-border text-fg-mute',
   success: 'border border-ok-edge text-ok',
   warning: 'border border-warn-edge text-warn',
   danger: 'border border-bad-edge text-bad',

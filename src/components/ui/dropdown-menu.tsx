@@ -89,7 +89,7 @@ export function DropdownMenuContent({ align = 'start', className, children }: Dr
     <div
       role="menu"
       className={cn(
-        'absolute z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-popover p-1 shadow-md',
+        'absolute z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-card p-1 shadow-md',
         'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-150',
         align === 'end' ? 'right-0' : 'left-0',
         className,
@@ -139,7 +139,7 @@ DropdownMenuItem.displayName = 'DropdownMenuItem';
 /** Small uppercase group heading inside the menu (e.g. a body-type category). */
 export function DropdownMenuLabel({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
-    <p className={cn('px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground', className)}>
+    <p className={cn('px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', className)}>
       {children}
     </p>
   );

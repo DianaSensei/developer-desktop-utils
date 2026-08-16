@@ -57,13 +57,13 @@ export function JwtDebugger() {
                 không nói gì mà nhãn chưa nói. Giờ cả hai dùng cùng một khung
                 trung tính; nhãn chữ mang toàn bộ sự phân biệt. */}
             <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Header</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-fg-mute">Header</div>
               <div className="flex min-h-[100px] flex-col overflow-hidden rounded-md border border-border bg-sunk">
                 <CodeViewer value={decoded.header} language="json" />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payload</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-fg-mute">Payload</div>
               <div className="flex min-h-[180px] flex-col overflow-hidden rounded-md border border-border bg-sunk">
                 <CodeViewer value={decoded.payload} language="json" />
               </div>
@@ -75,10 +75,10 @@ export function JwtDebugger() {
             </Callout>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground gap-3 pt-12">
-            <Shield className="h-12 w-12 text-muted-foreground/25" />
+          <div className="flex flex-col items-center justify-center h-full text-center text-fg-mute gap-3 pt-12">
+            <Shield className="h-12 w-12 text-fg-mute/25" />
             <p className="text-sm font-medium">Paste a JWT token to decode it</p>
-            <p className="text-xs text-muted-foreground/70">Supports HS256, RS256, ES256 and more</p>
+            <p className="text-xs text-fg-mute/70">Supports HS256, RS256, ES256 and more</p>
           </div>
         )}
       </div>

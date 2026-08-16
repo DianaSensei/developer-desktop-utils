@@ -160,8 +160,8 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
       <div className="px-4 py-4 space-y-4 max-w-2xl">
         {/* Topic label + Single/Batch */}
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xs text-muted-foreground">
-            Sending to <span className="font-mono font-medium text-foreground">{topic}</span>
+          <div className="text-xs text-fg-mute">
+            Sending to <span className="font-mono font-medium text-fg">{topic}</span>
           </div>
           <Segmented
             value={batch ? 'batch' : 'single'}
@@ -175,7 +175,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         {/* Recent sends — quick "send again" */}
         {!batch && recent.length > 0 && (
           <div className="space-y-1">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 text-xs text-fg-mute">
               <History className="w-3 h-3" /> Recent
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -184,7 +184,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
                   key={i}
                   onClick={() => loadRecent(r)}
                   title={r.value}
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-mono text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-w-[14rem]"
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-mono text-fg-mute transition-colors hover:bg-muted hover:text-fg max-w-[14rem]"
                 >
                   <RotateCcw className="w-2.5 h-2.5 shrink-0" />
                   <span className="truncate">{r.key ? `${r.key}: ` : ''}{r.value || '(empty)'}</span>
@@ -228,7 +228,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
             </div>
           )}
           {previewPartition !== null && (
-            <span className="mt-auto mb-1 text-xs text-muted-foreground" title="Computed with Kafka's murmur2 default partitioner">
+            <span className="mt-auto mb-1 text-xs text-fg-mute" title="Computed with Kafka's murmur2 default partitioner">
               key routes to <span className="font-mono font-medium text-primary">P{previewPartition}</span>
             </span>
           )}
@@ -237,7 +237,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         {/* Key */}
         {!batch && (
         <div>
-          <Label htmlFor="pk-key" className="text-xs">Key <span className="text-muted-foreground font-normal">(optional)</span></Label>
+          <Label htmlFor="pk-key" className="text-xs">Key <span className="text-fg-mute font-normal">(optional)</span></Label>
           <Input
             id="pk-key"
             value={key}
@@ -252,16 +252,16 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         {!batch && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <Label className="text-xs">Headers <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Label className="text-xs">Headers <span className="text-fg-mute font-normal">(optional)</span></Label>
             <button
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
+              className="text-xs text-fg-mute hover:text-fg flex items-center gap-0.5"
               onClick={addHeader}
             >
               <Plus className="w-3 h-3" /> Add
             </button>
           </div>
           {headers.length === 0 && (
-            <div className="text-xs text-muted-foreground">No headers</div>
+            <div className="text-xs text-fg-mute">No headers</div>
           )}
           {headers.map((h, i) => (
             <div key={i} className="flex gap-1.5 mb-1.5">
@@ -278,7 +278,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
                 className="h-ctl text-xs font-mono flex-[2]"
               />
               <button
-                className="text-muted-foreground hover:text-destructive px-1"
+                className="text-fg-mute hover:text-destructive px-1"
                 onClick={() => removeHeader(i)}
               >
                 <X className="w-3 h-3" />
@@ -298,7 +298,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
                   type="button"
                   onClick={formatValue}
                   disabled={!value.trim()}
-                  className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-40"
+                  className="text-[11px] text-fg-mute hover:text-fg disabled:opacity-40"
                   title="Pretty-print as JSON"
                 >
                   Format
@@ -314,7 +314,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
             </div>
           </div>
           {batch && (
-            <p className="mb-1 text-[11px] text-muted-foreground">
+            <p className="mb-1 text-[11px] text-fg-mute">
               An array of strings or <span className="font-mono">{'{ value, key?, headers? }'}</span> objects — produced to one partition.
             </p>
           )}

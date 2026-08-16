@@ -8,8 +8,8 @@ export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEl
 }
 
 /**
- * Icon-only action button — the `rounded p-1.5 text-muted-foreground
- * hover:bg-accent hover:text-foreground` pattern that was hand-rolled at
+ * Icon-only action button — the `rounded p-1.5 text-fg-mute
+ * hover:bg-accent hover:text-fg` pattern that was hand-rolled at
  * every call site (sidebars, tab bars, panel headers). Always pass a `title`
  * for accessibility since there is no visible label.
  */
@@ -19,8 +19,8 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       ref={ref}
       type={type}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors',
-        'hover:bg-accent hover:text-foreground',
+        'inline-flex shrink-0 items-center justify-center rounded-sm text-fg-mute transition-colors',
+        'hover:bg-accent hover:text-fg',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
         'disabled:pointer-events-none disabled:opacity-50',
         size === 'sm' ? 'h-ctl w-ctl' : 'h-ctl w-ctl',

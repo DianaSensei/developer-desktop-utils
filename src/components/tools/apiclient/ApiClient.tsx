@@ -412,10 +412,10 @@ export function ApiClient() {
               />
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-fg-mute">
               <Send className="h-10 w-10 opacity-20" />
               <div className="text-center">
-                <p className="text-sm font-medium text-foreground/70">No request open</p>
+                <p className="text-sm font-medium text-fg/70">No request open</p>
                 <p className="mt-1 text-xs">Select a request from the sidebar, or press <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[11px]">⌘B</kbd> to create one.</p>
               </div>
             </div>

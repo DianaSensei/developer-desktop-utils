@@ -52,7 +52,7 @@ export function FieldShell({
     <div className={cn('min-w-0', className)}>
       <div
         className={cn(
-          'flex items-stretch overflow-hidden rounded-sm border bg-background',
+          'flex items-stretch overflow-hidden rounded-sm border bg-bg',
           'transition-colors focus-within:border-ring/60 focus-within:ring-2 focus-within:ring-ring/35',
           tone ? TONE_EDGE[tone] : 'border-input',
         )}
@@ -61,7 +61,7 @@ export function FieldShell({
           <span
             className={cn(
               'flex shrink-0 select-none items-center border-r border-border bg-sunk',
-              'px-2.5 font-mono text-[11px] uppercase tracking-wide text-muted-foreground',
+              'px-2.5 font-mono text-[11px] uppercase tracking-wide text-fg-mute',
             )}
           >
             {gutter}
@@ -86,7 +86,7 @@ export function FieldShell({
           <span
             className={cn(
               'flex shrink-0 select-none items-center pr-2.5',
-              'font-mono text-[11px] tabular-nums text-muted-foreground',
+              'font-mono text-[11px] tabular-nums text-fg-mute',
             )}
           >
             {meter}

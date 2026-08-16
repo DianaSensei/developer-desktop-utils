@@ -79,7 +79,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
   if (!groups || groups.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-        <p className="text-sm text-muted-foreground">No consumer groups committed to this topic</p>
+        <p className="text-sm text-fg-mute">No consumer groups committed to this topic</p>
         <Button variant="outline" size="sm" className="h-ctl gap-1.5 text-xs" onClick={load} disabled={loading}>
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
@@ -92,7 +92,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
   return (
     <div className="overflow-x-auto">
       <div className="flex items-center justify-between px-4 py-1.5 border-b bg-muted/10 sticky top-0">
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-fg-mute">
           {grouped.length} group{grouped.length !== 1 ? 's' : ''}
         </span>
         <Button variant="ghost" size="sm" className="h-ctl gap-1.5 text-xs" onClick={load} disabled={loading}>
@@ -112,8 +112,8 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
               onClick={() => toggleGroup(groupId)}
             >
               {open
-                ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-fg-mute" />
+                : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-fg-mute" />}
               <button
                 className="font-mono text-xs truncate flex-1 text-left hover:text-primary hover:underline"
                 onClick={(e) => { e.stopPropagation(); onSelectGroup(groupId); }}
@@ -121,7 +121,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
               >
                 {groupId}
               </button>
-              <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+              <span className="text-xs text-fg-mute tabular-nums shrink-0">
                 {parts.length} part{parts.length !== 1 ? 's' : ''}
               </span>
               <span className={`text-xs font-mono tabular-nums w-24 text-right shrink-0 ${hasLag ? 'text-warn' : 'text-ok'}`}>
@@ -132,7 +132,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
             {open && (
               <div className="pb-1">
                 {/* Per-partition column headers */}
-                <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-muted-foreground bg-muted/10">
+                <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-fg-mute bg-muted/10">
                   <span className="text-right">Part</span>
                   <span className="text-right">Committed</span>
                   <span className="text-right">Latest</span>
@@ -141,7 +141,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
 
                 {parts.map((p) => {
                   const lagColor = p.lag < 0
-                    ? 'text-muted-foreground'
+                    ? 'text-fg-mute'
                     : p.lag === 0
                     ? 'text-ok'
                     : 'text-warn';
@@ -152,11 +152,11 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
                       key={p.partition}
                       className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-border/20 text-sm"
                     >
-                      <span className="text-right text-xs text-muted-foreground tabular-nums">{p.partition}</span>
+                      <span className="text-right text-xs text-fg-mute tabular-nums">{p.partition}</span>
                       <span className="text-right font-mono text-xs tabular-nums">
                         {p.committedOffset >= 0 ? p.committedOffset.toLocaleString() : '—'}
                       </span>
-                      <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                      <span className="text-right font-mono text-xs tabular-nums text-fg-mute">
                         {latest >= 0 ? latest.toLocaleString() : '—'}
                       </span>
                       <span className={`text-right font-mono text-xs tabular-nums ${lagColor}`}>

@@ -52,7 +52,7 @@ function SuiteInner() {
                 onClick={() => setTab(t.id)}
                 className={cn(
                   'flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
-                  tab === t.id ? 'bg-foreground/10 text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  tab === t.id ? 'bg-fg/10 text-fg' : 'text-fg-mute hover:bg-muted hover:text-fg'
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -116,14 +116,14 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="max-h-[50vh] divide-y overflow-y-auto rounded-lg border border-border">
-          {projects.length === 0 && <p className="px-3 py-4 text-center text-xs text-muted-foreground">No projects yet.</p>}
+          {projects.length === 0 && <p className="px-3 py-4 text-center text-xs text-fg-mute">No projects yet.</p>}
           {projects.map((p) => (
             <div key={p.id} className={cn('flex items-center gap-2 px-2.5 py-2', p.archived && 'opacity-50')}>
               <ColorMenu color={p.color} onPick={(c) => updateProject(p.id, { color: c })} />
               <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-ctl flex-1 text-sm rounded-sm" />
               <button
                 onClick={() => updateProject(p.id, { archived: !p.archived })}
-                className="text-[11px] text-muted-foreground hover:text-foreground"
+                className="text-[11px] text-fg-mute hover:text-fg"
               >
                 {p.archived ? 'restore' : 'archive'}
               </button>
@@ -133,7 +133,7 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-muted-foreground">Deleting a project keeps its time entries but unassigns them.</p>
+        <p className="text-[11px] text-fg-mute">Deleting a project keeps its time entries but unassigns them.</p>
       </div>
     </Modal>
   );
@@ -147,7 +147,7 @@ function ColorMenu({ color, onPick }: { color: string; onPick: (c: string) => vo
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-50 mt-1 grid w-40 grid-cols-8 gap-1 rounded-lg border border-border bg-popover p-2 shadow-lg">
+          <div className="absolute left-0 top-full z-50 mt-1 grid w-40 grid-cols-8 gap-1 rounded-lg border border-border bg-card p-2 shadow-lg">
             {PROJECT_COLORS.map((c) => (
               <button key={c} onClick={() => { onPick(c); setOpen(false); }} className="h-4 w-4 rounded-full" style={{ backgroundColor: c }} />
             ))}
@@ -172,52 +172,52 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
     <Modal open onClose={onClose} title="Settings">
       <div className="space-y-4">
         <section className="space-y-2.5">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">General</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">General</h4>
           <Toggle label="Week starts Monday" checked={settings.weekStartsMon} onChange={(v) => updateSettings({ weekStartsMon: v })} />
         </section>
 
         <section className="space-y-2.5 border-t border-border pt-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Work hours</h4>
-            <span className="text-[11px] text-muted-foreground">
-              Target <span className="font-mono font-medium text-foreground">{dailyTarget}h</span>/day
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">Work hours</h4>
+            <span className="text-[11px] text-fg-mute">
+              Target <span className="font-mono font-medium text-fg">{dailyTarget}h</span>/day
             </span>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-muted-foreground">Work (before lunch)</span>
+            <span className="text-fg-mute">Work (before lunch)</span>
             <div className="flex items-center gap-1.5">
               <TimePicker value={settings.workStart} onChange={(v) => setWorkHours({ workStart: v })} />
-              <span className="text-muted-foreground">–</span>
+              <span className="text-fg-mute">–</span>
               <TimePicker value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-muted-foreground">Lunch break</span>
+            <span className="text-fg-mute">Lunch break</span>
             <div className="flex items-center gap-1.5">
               <TimePicker value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
-              <span className="text-muted-foreground">–</span>
+              <span className="text-fg-mute">–</span>
               <TimePicker value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-muted-foreground">Work (after lunch)</span>
+            <span className="text-fg-mute">Work (after lunch)</span>
             <div className="flex items-center gap-1.5">
               <TimePicker value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
-              <span className="text-muted-foreground">–</span>
+              <span className="text-fg-mute">–</span>
               <TimePicker value={settings.workEnd} onChange={(v) => setWorkHours({ workEnd: v })} />
             </div>
           </div>
         </section>
 
         <section className="space-y-2.5 border-t border-border pt-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pomodoro</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">Pomodoro</h4>
           <Toggle label="Enable Pomodoro indicator" checked={settings.pomodoro} onChange={(v) => updateSettings({ pomodoro: v })} />
           <label className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-muted-foreground">Work (min)</span>
+            <span className="text-fg-mute">Work (min)</span>
             <NumberStepper value={settings.workMinutes} min={1} max={180} onChange={(v) => updateSettings({ workMinutes: v })} />
           </label>
           <label className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-muted-foreground">Break (min)</span>
+            <span className="text-fg-mute">Break (min)</span>
             <NumberStepper value={settings.breakMinutes} min={1} max={120} onChange={(v) => updateSettings({ breakMinutes: v })} />
           </label>
           <Toggle label="Phase chime" checked={settings.sound} onChange={(v) => updateSettings({ sound: v })} />

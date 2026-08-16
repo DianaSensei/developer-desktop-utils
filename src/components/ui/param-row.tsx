@@ -57,8 +57,8 @@ export function ParamRow({
                 role="button"
                 aria-label="Giải thích thêm"
                 className={cn(
-                  'shrink-0 cursor-help text-muted-foreground/70',
-                  'transition-colors hover:text-muted-foreground',
+                  'shrink-0 cursor-help text-fg-mute/70',
+                  'transition-colors hover:text-fg-mute',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
                 )}
               >
@@ -75,7 +75,7 @@ export function ParamRow({
                 'rounded-xs px-1.5 py-0.5 text-[11px] leading-none',
                 tagActive
                   ? 'bg-acc-tint text-acc-ink'
-                  : 'bg-muted text-muted-foreground',
+                  : 'bg-muted text-fg-mute',
               )}
             >
               {tag}
@@ -86,7 +86,7 @@ export function ParamRow({
       </div>
 
       {children && (
-        <p className="mt-0.5 pr-1 text-[12.5px] leading-snug text-muted-foreground">
+        <p className="mt-0.5 pr-1 text-[12.5px] leading-snug text-fg-mute">
           {children}
         </p>
       )}

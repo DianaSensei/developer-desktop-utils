@@ -69,8 +69,8 @@ const PaneHeader = React.forwardRef<HTMLDivElement, PaneHeaderProps>(
       {...props}
     >
       <div className="flex min-w-0 items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        {hint && <span className="truncate text-[11px] text-muted-foreground/70">{hint}</span>}
+        <span className="text-xs font-medium text-fg-mute">{label}</span>
+        {hint && <span className="truncate text-[11px] text-fg-mute/70">{hint}</span>}
       </div>
       {action}
     </div>

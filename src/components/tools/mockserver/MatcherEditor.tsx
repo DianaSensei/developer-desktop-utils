@@ -33,7 +33,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
   return (
     <div className="space-y-2">
       {matchers.length === 0 && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[11px] text-fg-mute">
           No extra matchers — the stub matches on method and path alone. Add a matcher to also require a
           query param, header, path param, or body condition.
         </p>
@@ -127,7 +127,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-ctl w-ctl shrink-0 text-muted-foreground hover:text-destructive"
+              className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-destructive"
               onClick={() => remove(m.id)}
               aria-label="Remove matcher"
             >
@@ -138,7 +138,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
       })}
 
       {matchers.some((m) => m.target === 'body' && (m.bodyMode ?? (m.key ? 'field' : 'whole')) === 'field') && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[11px] text-fg-mute">
           JSON field paths read the request body as JSON, e.g. <code>user.name</code> or <code>items.0.id</code>.
         </p>
       )}

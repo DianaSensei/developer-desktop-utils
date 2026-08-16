@@ -127,7 +127,7 @@ export function DateTimePanel({
       </div>
 
       {/* Preview */}
-      <div className="border-t pt-1.5 text-center font-mono text-[11px] text-muted-foreground">
+      <div className="border-t pt-1.5 text-center font-mono text-[11px] text-fg-mute">
         {dateISO} {timeStr}{' '}
         <span className="text-info">{tzShortLabel(tz) || tz}</span>
       </div>

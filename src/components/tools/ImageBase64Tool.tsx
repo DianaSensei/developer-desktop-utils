@@ -128,7 +128,7 @@ export function ImageBase64Tool() {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); void pasteFromClipboard(); }}
-                  className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                  className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1 text-xs font-medium text-fg-mute transition-colors hover:bg-muted/50 hover:text-fg"
                 >
                   <ClipboardPaste className="h-3.5 w-3.5" />
                   Paste from clipboard · {quickPasteHint}
@@ -141,7 +141,7 @@ export function ImageBase64Tool() {
                   <img src={encodeDataUrl} alt="preview" className="max-h-48 max-w-full rounded object-contain" />
                   <button
                     onClick={clearEncode}
-                    className="absolute top-2 right-2 p-1 rounded-md bg-background/80 border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute top-2 right-2 p-1 rounded-md bg-bg/80 border hover:bg-muted text-fg-mute hover:text-fg transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -149,7 +149,7 @@ export function ImageBase64Tool() {
 
                 {/* File info */}
                 {encodeFile && (
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[11px] text-fg-mute">
                     {encodeFile.name} · {formatBytes(encodeFile.size)} · {encodeFile.type}
                   </p>
                 )}
@@ -157,14 +157,14 @@ export function ImageBase64Tool() {
                 {/* Base64 output */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Base64 (raw, without data URL prefix)</span>
+                    <span className="text-xs text-fg-mute">Base64 (raw, without data URL prefix)</span>
                     <div className="flex gap-1.5">
                       <CopyButton
                         value={base64Only}
                         label="Copy raw"
                         variant="ghost"
                         size="sm"
-                        className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                        className="h-6 px-1.5 text-[11px] text-fg-mute hover:text-fg"
                         iconClassName="h-3 w-3"
                       />
                       <CopyButton
@@ -172,15 +172,15 @@ export function ImageBase64Tool() {
                         label="Copy data URL"
                         variant="ghost"
                         size="sm"
-                        className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                        className="h-6 px-1.5 text-[11px] text-fg-mute hover:text-fg"
                         iconClassName="h-3 w-3"
                       />
                     </div>
                   </div>
                   <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-h-36 overflow-y-auto">
-                    <p className="font-mono text-[11px] break-all text-foreground/80 leading-relaxed">{base64Only}</p>
+                    <p className="font-mono text-[11px] break-all text-fg/80 leading-relaxed">{base64Only}</p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[11px] text-fg-mute">
                     Base64 length: {base64Only.length.toLocaleString()} chars · ~{formatBytes(Math.ceil(base64Only.length * 0.75))}
                   </p>
                 </div>
@@ -191,12 +191,12 @@ export function ImageBase64Tool() {
           <div className="space-y-3">
             {/* Input */}
             <div className="space-y-1.5">
-              <span className="text-xs text-muted-foreground">Paste base64 string or data URL</span>
+              <span className="text-xs text-fg-mute">Paste base64 string or data URL</span>
               <textarea
                 value={decodeInput}
                 onChange={(e) => { setDecodeInput(e.target.value); setDecodeError(false); }}
                 placeholder="data:image/png;base64,iVBORw0KGgo… or raw base64"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
+                className="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-ring placeholder:text-fg-mute/50"
               />
             </div>
 
@@ -223,7 +223,7 @@ export function ImageBase64Tool() {
                     label="Copy image"
                     variant="ghost"
                     size="sm"
-                    className="absolute top-2 right-2 h-ctl bg-background/80 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                    className="absolute top-2 right-2 h-ctl bg-bg/80 px-2 text-[11px] text-fg-mute hover:text-fg"
                     iconClassName="h-3 w-3"
                   />
                 )}
@@ -238,7 +238,7 @@ export function ImageBase64Tool() {
             )}
 
             {!decodeInput.trim() && (
-              <p className="text-xs text-muted-foreground">The image will appear here as you paste base64.</p>
+              <p className="text-xs text-fg-mute">The image will appear here as you paste base64.</p>
             )}
           </div>
         )}

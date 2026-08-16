@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <AlertTriangle className="h-ctl w-ctl text-warn" />
           <div>
             <p className="text-sm font-semibold">This tool hit an error</p>
-            <p className="mt-1 max-w-md text-xs text-muted-foreground break-words">
+            <p className="mt-1 max-w-md text-xs text-fg-mute break-words">
               {this.state.error.message || 'Something went wrong while rendering.'}
             </p>
           </div>

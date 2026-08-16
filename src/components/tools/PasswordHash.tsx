@@ -116,7 +116,7 @@ export function PasswordHash() {
           ]}
           aria-label="Mode"
         />
-        <span className="hidden text-xs text-muted-foreground sm:block">
+        <span className="hidden text-xs text-fg-mute sm:block">
           {mode === 'hash' ? 'Hash a password with a random salt.' : 'Check a password against an existing hash (algorithm auto-detected).'}
         </span>
       </div>
@@ -135,21 +135,21 @@ export function PasswordHash() {
 
               {algo === 'bcrypt' ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">Cost</span>
+                  <span className="text-xs text-fg-mute">Cost</span>
                   <Input type="number" min={4} max={20} value={cost} onChange={(e) => setCost(parseInt(e.target.value) || 10)} className="h-ctl w-20 text-xs rounded-lg" />
                 </div>
               ) : (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">Memory (KiB)</span>
+                    <span className="text-xs text-fg-mute">Memory (KiB)</span>
                     <Input type="number" min={8} value={memory} onChange={(e) => setMemory(parseInt(e.target.value) || 8)} className="h-ctl w-24 text-xs rounded-lg" />
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">Iterations</span>
+                    <span className="text-xs text-fg-mute">Iterations</span>
                     <Input type="number" min={1} value={iterations} onChange={(e) => setIterations(parseInt(e.target.value) || 1)} className="h-ctl w-20 text-xs rounded-lg" />
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">Parallelism</span>
+                    <span className="text-xs text-fg-mute">Parallelism</span>
                     <Input type="number" min={1} value={parallelism} onChange={(e) => setParallelism(parseInt(e.target.value) || 1)} className="h-ctl w-20 text-xs rounded-lg" />
                   </div>
                 </>
@@ -168,7 +168,7 @@ export function PasswordHash() {
                   className="h-ctl-lg pr-9 font-mono text-sm"
                   onKeyDown={(e) => { if (e.key === 'Enter' && password) void runHash(); }}
                 />
-                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg">
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
@@ -188,7 +188,7 @@ export function PasswordHash() {
                   <CopyButton value={hashOut} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                  <p className="break-all font-mono text-xs text-foreground/90">{hashOut}</p>
+                  <p className="break-all font-mono text-xs text-fg/90">{hashOut}</p>
                 </div>
               </ToolSection>
             )}
@@ -207,7 +207,7 @@ export function PasswordHash() {
                   placeholder="Enter the password…"
                   className="h-ctl-lg pr-9 font-mono text-sm"
                 />
-                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg">
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>

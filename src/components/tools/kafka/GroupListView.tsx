@@ -60,7 +60,7 @@ export function GroupListView({ brokerId, refreshKey, onRefresh, onSelectGroup }
         {error && <Callout tone="error">{error}</Callout>}
         {groups && !error && (
           rows.length === 0
-            ? <p className="text-sm text-muted-foreground">{f ? 'No matching groups.' : 'No consumer groups.'}</p>
+            ? <p className="text-sm text-fg-mute">{f ? 'No matching groups.' : 'No consumer groups.'}</p>
             : (
               <DataTable>
                 <Thead>
@@ -80,7 +80,7 @@ export function GroupListView({ brokerId, refreshKey, onRefresh, onSelectGroup }
                           {g.state || '—'}
                         </span>
                       </Td>
-                      <Td className="text-muted-foreground">{g.protocolType || '—'}</Td>
+                      <Td className="text-fg-mute">{g.protocolType || '—'}</Td>
                     </Tr>
                   ))}
                 </Tbody>

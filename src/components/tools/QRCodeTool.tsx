@@ -384,7 +384,7 @@ function QrGenerator() {
     cn('rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none',
       active
         ? 'border-primary/30 bg-primary/10 text-primary'
-        : 'border-border bg-background hover:border-primary/60 hover:bg-muted/50');
+        : 'border-border bg-bg hover:border-primary/60 hover:bg-muted/50');
 
   return (
     <div className="space-y-4">
@@ -400,7 +400,7 @@ function QrGenerator() {
         <div className="rounded-lg border divide-y text-sm">
           {/* Frame */}
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <span className="w-12 shrink-0 text-xs text-muted-foreground font-medium">Frame</span>
+            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">Frame</span>
             <div className="flex gap-1.5 flex-wrap">
               {FRAME_OPTIONS.map((f) => (
                 <button key={f.value} onClick={() => setFrame(f.value)}
@@ -413,7 +413,7 @@ function QrGenerator() {
 
           {/* Logo */}
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <span className="w-12 shrink-0 text-xs text-muted-foreground font-medium">Logo</span>
+            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">Logo</span>
             <div className="flex gap-1.5 flex-wrap items-center">
               {LOGO_PRESETS.map((l) => (
                 <button key={l.value}
@@ -430,7 +430,7 @@ function QrGenerator() {
               {customImageUrl
                 ? <div className={cn(chip(logo === 'custom'), 'flex items-center gap-1 px-1.5 py-1')}>
                     <img src={customImageUrl} alt="logo" className="h-5 w-5 object-contain rounded" />
-                    <button onClick={clearCustomImage} className="text-muted-foreground hover:text-foreground">
+                    <button onClick={clearCustomImage} className="text-fg-mute hover:text-fg">
                       <X className="h-3 w-3" />
                     </button>
                   </div>
@@ -444,11 +444,11 @@ function QrGenerator() {
 
           {/* Color */}
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <span className="w-12 shrink-0 text-xs text-muted-foreground font-medium">Color</span>
+            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">Color</span>
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <ColorPicker value={darkColor} onChange={setDarkColor} title="QR foreground color" />
-                <span className="text-xs text-muted-foreground font-mono">{darkColor.toUpperCase()} FG</span>
+                <span className="text-xs text-fg-mute font-mono">{darkColor.toUpperCase()} FG</span>
               </div>
               <div className={cn('flex items-center gap-1.5', transparent && 'opacity-40')}>
                 <ColorPicker
@@ -457,7 +457,7 @@ function QrGenerator() {
                   onChange={(c) => { setLightColor(c); setTransparent(false); }}
                   title="Background color"
                 />
-                <span className="text-xs text-muted-foreground font-mono">
+                <span className="text-xs text-fg-mute font-mono">
                   {transparent ? 'Transparent' : `${lightColor.toUpperCase()} BG`}
                 </span>
               </div>
@@ -472,7 +472,7 @@ function QrGenerator() {
 
         {dataUrl && (
           <div className="space-y-3">
-            <div className="flex justify-center p-6 rounded-lg border bg-background shadow-sm">
+            <div className="flex justify-center p-6 rounded-lg border bg-bg shadow-sm">
               <img src={dataUrl} alt="QR Code" className="max-w-full w-[280px]" />
             </div>
             <div className="flex gap-2">
@@ -613,14 +613,14 @@ function QrReader() {
         )}
       >
         {loading
-          ? <Spinner size="lg" className="text-muted-foreground" />
-          : <Upload className="h-6 w-6 text-muted-foreground" />}
+          ? <Spinner size="lg" className="text-fg-mute" />
+          : <Upload className="h-6 w-6 text-fg-mute" />}
         <p className="text-sm font-medium">Click to upload or drop a QR image</p>
-        <p className="text-xs text-muted-foreground">PNG, JPG, GIF, or WebP</p>
+        <p className="text-xs text-fg-mute">PNG, JPG, GIF, or WebP</p>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); void pasteFromClipboard(); }}
-          className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+          className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1 text-xs font-medium text-fg-mute transition-colors hover:bg-muted/50 hover:text-fg"
         >
           <ClipboardPaste className="h-3.5 w-3.5" />
           Paste from clipboard · {quickPasteHint}
@@ -630,14 +630,14 @@ function QrReader() {
       {error && <Callout tone="error" size="sm">{error}</Callout>}
 
       {imageUrl && (
-        <div className="flex justify-center rounded-lg border bg-background p-6 shadow-sm">
+        <div className="flex justify-center rounded-lg border bg-bg p-6 shadow-sm">
           <img src={imageUrl} alt="Uploaded QR" className="w-[200px] max-w-full object-contain" />
         </div>
       )}
 
       {result && (
         <div className="space-y-2">
-          <span className="text-xs font-medium text-muted-foreground">Decoded content</span>
+          <span className="text-xs font-medium text-fg-mute">Decoded content</span>
           <Textarea value={result} readOnly className="min-h-[80px] resize-y font-mono text-sm" />
           <div className="flex gap-2">
             <CopyButton value={() => result} label="Copy content" variant="default" size="default" className="flex-1" iconClassName="h-4 w-4" />

@@ -139,7 +139,7 @@ export function CommandPalette() {
           </DialogPrimitive.Description>
 
           <div className="flex items-center gap-2 border-b border-border px-3.5">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+            <Search className="h-4 w-4 shrink-0 text-fg-mute/60" />
             <input
               ref={inputRef}
               value={query}
@@ -149,14 +149,14 @@ export function CommandPalette() {
               }}
               onKeyDown={onQueryKeyDown}
               placeholder={t('palette.placeholder')}
-              className="h-ctl-lg w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+              className="h-ctl-lg w-full bg-transparent text-sm text-fg outline-none placeholder:text-fg-mute/60"
             />
           </div>
 
           <div className="flex h-[380px]">
             <div className="w-[56%] shrink-0 overflow-y-auto border-r border-border p-1.5">
               {items.length === 0 && (
-                <p className="px-2.5 py-8 text-center text-[13px] text-muted-foreground">
+                <p className="px-2.5 py-8 text-center text-[13px] text-fg-mute">
                   {t('palette.empty', { query })}
                 </p>
               )}
@@ -207,14 +207,14 @@ export function CommandPalette() {
           </div>
 
           <div className="flex items-center gap-3 border-t border-border px-3.5 py-2">
-            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1 text-[11px] text-fg-mute">
               <Keycap>↑</Keycap>
               <Keycap>↓</Keycap> {t('palette.footer.navigate')}
             </span>
-            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1 text-[11px] text-fg-mute">
               <Keycap>⏎</Keycap> {t('palette.footer.select')}
             </span>
-            <span className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="ml-auto flex items-center gap-1 text-[11px] text-fg-mute">
               <Keycap>Esc</Keycap> {t('palette.footer.close')}
             </span>
           </div>
@@ -251,13 +251,13 @@ function ToolRow({
       title={!enabled ? disabledHint : undefined}
       className={cn(
         'flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm transition-colors',
-        active ? 'bg-acc-tint text-acc-ink' : 'text-foreground hover:bg-muted/50',
+        active ? 'bg-acc-tint text-acc-ink' : 'text-fg hover:bg-muted/50',
       )}
     >
-      <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc-ink' : 'text-muted-foreground')} />
+      <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc-ink' : 'text-fg-mute')} />
       <span className="min-w-0 flex-1 truncate">{tool.label}</span>
       {!enabled && (
-        <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-muted-foreground/40" aria-hidden />
+        <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-fg-mute/40" aria-hidden />
       )}
     </button>
   );
@@ -292,7 +292,7 @@ function ClipboardRow({
       )}
     >
       <span className="flex items-center gap-2.5">
-        <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc-ink' : 'text-muted-foreground')} />
+        <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc-ink' : 'text-fg-mute')} />
         <span className={cn('min-w-0 flex-1 truncate text-sm font-medium', active && 'text-acc-ink')}>
           {tool.label}
         </span>
@@ -300,7 +300,7 @@ function ClipboardRow({
           {t('palette.clipboardHint')}
         </StatusChip>
       </span>
-      <span className="truncate pl-[26px] text-[12px] text-muted-foreground">{t(reasonKey)}</span>
+      <span className="truncate pl-[26px] text-[12px] text-fg-mute">{t(reasonKey)}</span>
     </button>
   );
 }
@@ -331,14 +331,14 @@ function Preview({
         </div>
       </div>
       {tool.description && (
-        <p className="text-[13px] leading-relaxed text-muted-foreground">{tool.description}</p>
+        <p className="text-[13px] leading-relaxed text-fg-mute">{tool.description}</p>
       )}
       {tool.keywords && tool.keywords.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {tool.keywords.slice(0, 8).map((k) => (
             <span
               key={k}
-              className="rounded-xs bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+              className="rounded-xs bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute"
             >
               {k}
             </span>

@@ -72,7 +72,7 @@ export function ExplainBand({ tone, title, children, examples, className }: Expl
       {/* div, không phải p: một số chỗ gọi cần thêm dòng lỗi/cảnh báo phụ bên
           dưới câu giải thích chính (xem CronGenerator) — nội dung khối bên
           trong p sẽ bị trình duyệt tự đóng thẻ p sớm, làm rối DOM. */}
-      <div className="text-[13px] leading-relaxed text-foreground">
+      <div className="text-[13px] leading-relaxed text-fg">
         {title && <span className={cn('font-semibold', t.title)}>{title} · </span>}
         {children}
       </div>

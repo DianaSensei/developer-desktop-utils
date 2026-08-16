@@ -129,7 +129,7 @@ function applySavedOrder<T extends { featureId: string }>(tools: T[], savedOrder
 function ToolLoading() {
   return (
     <div className="flex h-full w-full items-center justify-center">
-      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+      <Loader2 className="h-5 w-5 animate-spin text-fg-mute/60" />
     </div>
   );
 }
@@ -142,7 +142,7 @@ type SidebarTool = (typeof allTools)[0];
 // Small uppercase group header used to separate Favorites from the rest.
 function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className={cn('px-2.5 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60', className)}>
+    <p className={cn('px-2.5 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/60', className)}>
       {children}
     </p>
   );
@@ -203,7 +203,7 @@ function NavScrollArea({
     <div className="relative flex-1 min-h-0">
       <nav ref={navRef} className="h-full overflow-y-auto px-1.5 py-2">
         {navEntries.length === 0 && disabledMatches.length === 0 && query && (
-          <p className="px-2 py-4 text-center text-[11px] text-muted-foreground">{t('shell.search.noMatch', { query })}</p>
+          <p className="px-2 py-4 text-center text-[11px] text-fg-mute">{t('shell.search.noMatch', { query })}</p>
         )}
         <div className="space-y-0.5">
           {navEntries.map((entry, i) => {
@@ -235,7 +235,7 @@ function NavScrollArea({
                       isCollapsed ? 'justify-center' : 'gap-2.5',
                       isActive
                         ? 'bg-acc-tint text-acc-ink font-medium'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
+                        : 'text-fg-mute hover:text-fg hover:bg-fg/[0.05]'
                     )}
                   >
                     <span className="relative flex-shrink-0">
@@ -244,7 +244,7 @@ function NavScrollArea({
                         // "Đang kết nối" là TRẠNG THÁI → xanh lá cố định, không
                         // theo accent. Xem design/RULES.md.
                         <span
-                          className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-[hsl(var(--sidebar))]"
+                          className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-[hsl(var(--chrome-c))]"
                           title="Connected"
                         />
                       )}
@@ -263,7 +263,7 @@ function NavScrollArea({
                       {/* Số tool trong nhóm — cho biết còn gì bên trong trước
                           khi bấm vào. */}
                       {entry.isGroup && (
-                        <span className="ml-1.5 text-[11px] tabular-nums text-muted-foreground/60">
+                        <span className="ml-1.5 text-[11px] tabular-nums text-fg-mute/60">
                           {entry.tools.length}
                         </span>
                       )}
@@ -294,7 +294,7 @@ function NavScrollArea({
                           'ml-auto shrink-0 rounded-xs p-0.5 transition-colors duration-150',
                           fav
                             ? 'text-warn opacity-100'
-                            : 'text-muted-foreground/50 opacity-0 hover:text-warn group-hover:opacity-100 focus-visible:opacity-100'
+                            : 'text-fg-mute/50 opacity-0 hover:text-warn group-hover:opacity-100 focus-visible:opacity-100'
                         )}
                       >
                         <Star className={cn('h-3.5 w-3.5', fav && 'fill-current')} />
@@ -312,7 +312,7 @@ function NavScrollArea({
             on, then navigates) rather than a plain link. */}
         {query && !isCollapsed && disabledMatches.length > 0 && (
           <div className="mt-3 space-y-0.5">
-            <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+            <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/60">
               {t('shell.section.disabled')}
             </p>
             {disabledMatches.map((tool) => {
@@ -323,7 +323,7 @@ function NavScrollArea({
                   <button
                     type="button"
                     onClick={() => onEnableTool(tool)}
-                    className="group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-muted-foreground/70 transition-[color,background-color] duration-200 ease-out hover:text-foreground hover:bg-foreground/[0.05]"
+                    className="group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-fg-mute/70 transition-[color,background-color] duration-200 ease-out hover:text-fg hover:bg-fg/[0.05]"
                   >
                     <Icon className="h-4 w-4 flex-shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
                     <span className="flex-1 truncate text-sm">{tool.label}</span>
@@ -351,7 +351,7 @@ function NavScrollArea({
               to={settingsTool.path}
               onClick={onClose}
               className={cn(
-                'mt-1.5 flex w-full items-center justify-center gap-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors',
+                'mt-1.5 flex w-full items-center justify-center gap-1 text-fg-mute/50 hover:text-fg-mute transition-colors',
                 isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[11px]'
               )}
             >
@@ -366,9 +366,9 @@ function NavScrollArea({
       {/* Fade + indicator when more items below */}
       {hasMore && (
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 flex items-end justify-center pb-1"
-          style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--sidebar)) 85%)' }}>
+          style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--chrome-c)) 85%)' }}>
           <span className={cn(
-            'flex items-center gap-0.5 text-[11px] text-muted-foreground/60',
+            'flex items-center gap-0.5 text-[11px] text-fg-mute/60',
             isCollapsed ? 'flex-col' : 'flex-row'
           )}>
             <ChevronDown className="h-2.5 w-2.5" />
@@ -526,7 +526,7 @@ function Sidebar({
             <button
               onClick={() => { pendingSearchFocus.current = true; onToggleCollapse(); }}
               title="Search tools"
-              className="flex items-center justify-center h-ctl w-ctl rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="flex items-center justify-center h-ctl w-ctl rounded-md text-fg-mute hover:text-fg hover:bg-muted transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
             </button>
@@ -534,7 +534,7 @@ function Sidebar({
         ) : (
           <div className="shrink-0 px-1.5 pt-2">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/60" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-fg-mute/60" />
               <Input
                 ref={searchRef}
                 value={query}
@@ -547,7 +547,7 @@ function Sidebar({
                   onClick={() => setQuery('')}
                   aria-label="Clear search"
                   title="Clear search"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-mute/60 hover:text-fg transition-colors"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -583,7 +583,7 @@ function Sidebar({
               onClick={onToggleCollapse}
               title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               className={cn(
-                'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-muted/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
@@ -606,7 +606,7 @@ function Sidebar({
               onClick={() => onThemeChange(NEXT_THEME[themePreference])}
               title={`Theme: ${activeThemeOption.label} (click to cycle)`}
               className={cn(
-                'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/60',
+                'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-muted/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
@@ -633,13 +633,13 @@ function Sidebar({
                 isCollapsed ? 'justify-center' : 'gap-2.5',
                 isSettingsActive
                   ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]'
+                  : 'text-fg-mute hover:text-fg hover:bg-fg/[0.05]'
               )}
             >
               <span className="relative shrink-0">
                 <SettingsIcon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
                 {updateAvailable && (
-                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-ok ring-1 ring-background" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-ok ring-1 ring-bg" />
                 )}
               </span>
               <span
@@ -792,7 +792,7 @@ function AppContent() {
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
                     on
                       ? 'bg-acc font-semibold text-acc-fg shadow-soft'
-                      : 'text-muted-foreground hover:text-foreground',
+                      : 'text-fg-mute hover:text-fg',
                   )}
                 >
                   {def.label}
@@ -817,7 +817,7 @@ function AppContent() {
     <Button
       variant="ghost"
       size="icon"
-      className="h-6 w-6 text-muted-foreground/70 hover:text-foreground"
+      className="h-6 w-6 text-fg-mute/70 hover:text-fg"
       onClick={openGuideManually}
       title={`How to use ${activeTool.label}`}
       aria-label={`How to use ${activeTool.label}`}
@@ -827,7 +827,7 @@ function AppContent() {
   );
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
+    <div className="flex h-full flex-col overflow-hidden bg-bg text-fg">
       {showCustomChrome && <ResizeHandles />}
       {/* Titlebar riêng — chỉ khi macOS overlay thật sự có hiệu lực. Logo/
           "DevTool" từng sống TRONG header của sidebar, đổi vị trí theo
@@ -888,16 +888,16 @@ function AppContent() {
                 titlebar, không có khoảng hở. Cũng tránh trùng ngưỡng
                 mixedControlHeights (h-7/8/9) của guard.test.ts vì đây không phải
                 một control kích thước cố định như button thường. */}
-            <Button variant="ghost" size="icon" className="h-full w-10 rounded-none text-muted-foreground/70 hover:text-foreground" onClick={winMinimize} title="Minimize">
+            <Button variant="ghost" size="icon" className="h-full w-10 rounded-none text-fg-mute/70 hover:text-fg" onClick={winMinimize} title="Minimize">
               <Minus className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-full w-10 rounded-none text-muted-foreground/70 hover:text-foreground" onClick={winToggleMaximize} title="Maximize / Restore">
+            <Button variant="ghost" size="icon" className="h-full w-10 rounded-none text-fg-mute/70 hover:text-fg" onClick={winToggleMaximize} title="Maximize / Restore">
               <Square className="h-3 w-3" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-full w-10 rounded-none text-muted-foreground/70 hover:bg-destructive hover:text-destructive-foreground"
+              className="h-full w-10 rounded-none text-fg-mute/70 hover:bg-destructive hover:text-destructive-foreground"
               onClick={winClose}
               title="Close"
             >
@@ -945,7 +945,7 @@ function AppContent() {
                     bấm vào hẳn. */}
                 {liveIds.includes(activeTool.featureId) && (
                   <span
-                    className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-background"
+                    className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-bg"
                     title="Running"
                   />
                 )}
@@ -982,7 +982,7 @@ function AppContent() {
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
                             on
                               ? 'bg-acc font-semibold text-acc-fg shadow-soft'
-                              : 'text-muted-foreground hover:text-foreground',
+                              : 'text-fg-mute hover:text-fg',
                           )}
                         >
                           {def.label}
@@ -1007,7 +1007,7 @@ function AppContent() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-ctl w-ctl text-muted-foreground/70 hover:text-foreground"
+                className="h-ctl w-ctl text-fg-mute/70 hover:text-fg"
                 onClick={openGuideManually}
                 title={`How to use ${activeTool.label}`}
                 aria-label={`How to use ${activeTool.label}`}

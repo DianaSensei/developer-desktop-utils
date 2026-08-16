@@ -47,7 +47,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
       <DialogContent className="flex max-w-3xl flex-col gap-0 p-0">
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>
-            {target.kind} settings — <span className="font-normal text-muted-foreground">{target.name}</span>
+            {target.kind} settings — <span className="font-normal text-fg-mute">{target.name}</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -58,7 +58,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
 
         {tab === 'scripts' ? (
           <div className="flex flex-col gap-4 p-4">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-fg-mute">
               These run for every request inside this {target.kind.toLowerCase()} — pre-request before each send, post-response after.
             </p>
             <div className="flex h-44 flex-col gap-1.5">
@@ -84,7 +84,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
           </div>
         ) : (
           <div className="flex flex-col gap-3 p-4">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-fg-mute">
               Requests with “Inherit” auth use this {target.kind.toLowerCase()}’s authorization.
             </p>
             <AuthEditor auth={auth} onChange={setAuth} allowInherit={false} vars={vars} />
@@ -109,7 +109,7 @@ function TabBtn({ id, label, active, onSelect }: {
   return (
     <button
       onClick={() => onSelect(id)}
-      className={cn('border-b-2 py-2 text-xs font-medium transition-colors', active === id ? 'border-acc text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
+      className={cn('border-b-2 py-2 text-xs font-medium transition-colors', active === id ? 'border-acc text-fg' : 'border-transparent text-fg-mute hover:text-fg')}
     >
       {label}
     </button>

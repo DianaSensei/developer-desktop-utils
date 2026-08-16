@@ -66,10 +66,10 @@ export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: Produc
     <div className="tool-full-height">
       <div className="flex items-center justify-between px-5 py-3 border-b shrink-0 gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <Send className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Send className="h-4 w-4 text-fg-mute shrink-0" />
           <div className="min-w-0">
             <h2 className="font-semibold text-sm">Produce</h2>
-            <p className="text-[11px] text-muted-foreground">Send a message to a topic</p>
+            <p className="text-[11px] text-fg-mute">Send a message to a topic</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
@@ -86,7 +86,7 @@ export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: Produc
 
           {details
             ? <ProduceTab key={`${brokerId}:${details.name}`} brokerId={brokerId} topic={details.name} partitions={details.partitions} />
-            : !loading && <p className="text-sm text-muted-foreground">Pick or type a topic above to produce a message.</p>}
+            : !loading && <p className="text-sm text-fg-mute">Pick or type a topic above to produce a message.</p>}
         </div>
       </div>
     </div>
@@ -121,7 +121,7 @@ function TopicCombobox({ brokerId, value, topics, onChange }: {
         className="font-mono text-sm h-ctl"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">
+        <div className="absolute z-20 mt-1 w-full rounded-md border bg-card shadow max-h-64 overflow-y-auto py-1">
           <RecentSuggestions items={recent} brokerId={brokerId} field="topic" value={value} onPick={pick} />
           {matches.map((t) => (
             <button

@@ -144,7 +144,7 @@ function Help({ text }: { text: string }) {
   return (
     <Tooltip label={text} side="bottom" width={224}>
       <span tabIndex={0} className="inline-flex align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-        <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground/50 transition-colors hover:text-foreground" />
+        <HelpCircle className="h-3.5 w-3.5 cursor-help text-fg-mute/50 transition-colors hover:text-fg" />
       </span>
     </Tooltip>
   );
@@ -388,14 +388,14 @@ export function ColorPicker() {
           : <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" />}
       </button>
     ) : (
-      <span className="px-1.5 py-1 text-xs text-muted-foreground">—</span>
+      <span className="px-1.5 py-1 text-xs text-fg-mute">—</span>
     )
   );
 
   // A label + the two views' values for one color format.
   const CompareRow = ({ label, field }: { label: string; field: 'hex' | 'rgb' | 'hsl' | 'cmyk' }) => (
     <>
-      <span className="self-center text-[11px] font-medium text-muted-foreground">{label}</span>
+      <span className="self-center text-[11px] font-medium text-fg-mute">{label}</span>
       <Cell id={`sel-${field}`} value={selFmt?.[field]} />
       <Cell id={`hov-${field}`} value={hovFmt?.[field]} />
     </>
@@ -463,7 +463,7 @@ export function ColorPicker() {
                   </span>
                 </ColorField>
               </div>
-              <span className="px-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="px-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
                 Hovering
               </span>
 
@@ -492,19 +492,19 @@ export function ColorPicker() {
                 <h2 className="text-sm font-semibold">Color Palette</h2>
                 <Help text="Colors extracted from the image. Click a swatch to select it. When there are more than fit, the strip scrolls sideways." />
                 {paletteScrollable && (
-                  <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-0.5 text-[11px] text-fg-mute">
                     <ArrowLeftRight className="h-3 w-3" /> scroll
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={downloadPalette}
-                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-border text-fg-mute transition-colors hover:bg-muted"
                   title="Download palette as PNG">
                   <Download className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={savePalette}
-                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-border text-fg-mute transition-colors hover:bg-muted"
                   title="Copy all hex codes">
                   {copied === 'palette' ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
@@ -512,7 +512,7 @@ export function ColorPicker() {
             </div>
             <div ref={paletteRef} className="flex h-10 w-full overflow-x-auto overflow-y-hidden no-scrollbar rounded-lg border">
               {palette.length > 0 ? palette.map((hex, i) => swatch(hex, i))
-                : <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">No colors</div>}
+                : <div className="flex flex-1 items-center justify-center text-xs text-fg-mute">No colors</div>}
             </div>
           </div>
 

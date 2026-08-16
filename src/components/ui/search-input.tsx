@@ -20,7 +20,7 @@ export interface SearchInputProps extends Omit<InputProps, 'onChange' | 'value' 
 export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
   ({ value, onChange, clearable = true, placeholder = 'Search', className, containerClassName, ...props }, ref) => (
     <div className={cn('relative', containerClassName)}>
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-mute/60" />
       <Input
         ref={ref}
         type="text"
@@ -35,7 +35,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           type="button"
           onClick={() => onChange('')}
           title="Clear"
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute transition-colors hover:text-fg"
         >
           <X className="h-3.5 w-3.5" />
         </button>

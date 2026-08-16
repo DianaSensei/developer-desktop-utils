@@ -620,7 +620,7 @@ export function CronGenerator() {
           <button
             type="button"
             aria-label={`${mode} cron rule`}
-            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute hover:bg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
           >
             <HelpCircle className="h-4 w-4" />
           </button>
@@ -633,9 +633,9 @@ export function CronGenerator() {
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="cron-expression">Expression</Label>
             {inferredMode !== mode ? (
-              <span className="text-xs text-muted-foreground">Looks like {inferredMode} cron</span>
+              <span className="text-xs text-fg-mute">Looks like {inferredMode} cron</span>
             ) : (
-              <span className="text-xs text-muted-foreground">{quickPasteHint}</span>
+              <span className="text-xs text-fg-mute">{quickPasteHint}</span>
             )}
           </div>
           <div className="flex gap-2">
@@ -666,10 +666,10 @@ export function CronGenerator() {
             const fieldErrors = validateField(fields[rule.key], rule);
 
             return (
-              <div key={rule.key} className="space-y-2 rounded-lg border border-border bg-background/50 px-3 py-2.5">
+              <div key={rule.key} className="space-y-2 rounded-lg border border-border bg-bg/50 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor={`cron-${rule.key}`}>{rule.label}</Label>
-                  <span className="text-xs text-muted-foreground">{rule.range}</span>
+                  <span className="text-xs text-fg-mute">{rule.range}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Input
@@ -689,7 +689,7 @@ export function CronGenerator() {
                     <SelectTrigger
                       aria-label={`${rule.label} suggestions`}
                       title="Suggestions"
-                      className="group relative h-ctl w-9 flex-none justify-center rounded-sm px-0 text-muted-foreground hover:text-foreground [&>span]:hidden [&>svg:last-child]:hidden"
+                      className="group relative h-ctl w-9 flex-none justify-center rounded-sm px-0 text-fg-mute hover:text-fg [&>span]:hidden [&>svg:last-child]:hidden"
                     >
                       <Lightbulb className="h-4 w-4" />
                       <SelectValue className="sr-only" placeholder="Suggestions" />
@@ -749,7 +749,7 @@ export function CronGenerator() {
             </span>
           ))}
           {analysis.warnings.map((warning) => (
-            <span key={warning} className="mt-1 block text-muted-foreground">
+            <span key={warning} className="mt-1 block text-fg-mute">
               {warning}
             </span>
           ))}

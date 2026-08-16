@@ -75,7 +75,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         tabs={tabs}
         active={tab}
         onSelect={(id) => onTabChange(id as Tab)}
-        activeClassName="border-acc text-foreground"
+        activeClassName="border-acc text-fg"
         right={tab === 'body' ? <BodyModeDropdown body={request.body} onChange={onChange} /> : undefined}
       />
 
@@ -87,7 +87,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'params' && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Query</Label>
+              <Label className="text-xs text-fg-mute">Query</Label>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
               <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params, url: urlWithParams(request.url, params) })} vars={vars} duplicateKeyHint="params" />
               <AuthQueryParamRow request={request} />
@@ -95,7 +95,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
             <PathParamsEditor request={request} onChange={onChange} vars={vars} />
             <div className="space-y-2">
               <div className="flex items-center gap-1.5">
-                <Label className="text-xs text-muted-foreground">Headers</Label>
+                <Label className="text-xs text-fg-mute">Headers</Label>
                 {enabledHeaders > 0 && <Badge tone="neutral" pill>{enabledHeaders}</Badge>}
               </div>
               <KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} duplicateKeyHint="headers" />
@@ -117,7 +117,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
                 <Label className="text-xs">Test Script</Label>
                 <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ tests: appendSnippet(request.tests, s) })} />
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-fg-mute">
                 Post-response — use <code className="rounded bg-muted px-1">test()</code> and <code className="rounded bg-muted px-1">expect()</code> with <code className="rounded bg-muted px-1">res</code>, <code className="rounded bg-muted px-1">bru</code>.
               </p>
               <JavaScriptEditor
@@ -153,7 +153,7 @@ function NetworkCallNotice() {
 function SnippetMenu({ snippets, onInsert }: { snippets: ScriptSnippet[]; onInsert: (s: ScriptSnippet) => void }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+      <DropdownMenuTrigger className="flex items-center gap-1 text-[11px] font-medium text-fg-mute transition-colors hover:text-fg">
         <Sparkles className="h-3 w-3" /> Snippet
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -183,7 +183,7 @@ function VarsSection({ label, rows, onChange, valuePlaceholder }: {
       defaultOpen={filled > 0}
       actions={filled > 0 ? <Badge tone="neutral" pill>{filled}</Badge> : undefined}
     >
-      <p className="mb-1.5 text-[11px] text-muted-foreground">{label}, set without writing a script.</p>
+      <p className="mb-1.5 text-[11px] text-fg-mute">{label}, set without writing a script.</p>
       <KeyValueEditor rows={rows} onChange={onChange} valuePlaceholder={valuePlaceholder} valueLabel={valuePlaceholder} bulkEdit={false} />
     </CollapsibleSection>
   );
@@ -228,7 +228,7 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           onInsert={(s) => onChange({ script: isReq ? { ...script, req: appendSnippet(script.req, s) } : { ...script, res: appendSnippet(script.res, s) } })}
         />
       </div>
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[11px] text-fg-mute">
         {isReq
           ? <>Runs before send; mutate <code className="rounded bg-muted px-1">req</code>, set <code className="rounded bg-muted px-1">bru</code> vars.</>
           : <>Runs after response; read <code className="rounded bg-muted px-1">res</code>, set <code className="rounded bg-muted px-1">bru</code> vars.</>}
@@ -345,7 +345,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
             {/* action cell */}
             <div className="flex items-center justify-center">
               {!isGhost && (
-                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-muted-foreground/50 transition-colors hover:text-destructive">
+                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-destructive">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -367,7 +367,7 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
   if (!derived) return null;
   return (
     <div className="overflow-hidden rounded-md border text-xs">
-      <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+      <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/70">
         <div />
         <div className="border-r px-3 py-1.5">From Auth (query)</div>
         <div className="px-3 py-1.5" />
@@ -377,8 +377,8 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
         <div className="flex items-center justify-center">
           <span className="h-2 w-2 shrink-0 rounded-full bg-acc" title="Sent, derived from the Auth tab" />
         </div>
-        <div className="flex h-ctl items-center border-r px-2.5 font-mono text-muted-foreground">{derived.key}</div>
-        <div className="flex h-ctl items-center px-2.5 font-mono text-muted-foreground">
+        <div className="flex h-ctl items-center border-r px-2.5 font-mono text-fg-mute">{derived.key}</div>
+        <div className="flex h-ctl items-center px-2.5 font-mono text-fg-mute">
           {derived.value || <span className="opacity-50">(empty)</span>}
         </div>
         <div />
@@ -431,7 +431,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-muted-foreground">Path</Label>
+      <Label className="text-xs text-fg-mute">Path</Label>
       <div className="overflow-hidden rounded-md border text-xs">
         <div className="grid grid-cols-[1rem_1fr_1fr] border-b bg-muted/30 font-semibold">
           <div />
@@ -448,12 +448,12 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   onClick={() => toggleEnabled(name)}
                   className={cn(
                     'h-2 w-2 shrink-0 rounded-full transition-colors',
-                    enabled ? 'bg-acc' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50',
+                    enabled ? 'bg-acc' : 'bg-fg-mute/30 hover:bg-fg-mute/50',
                   )}
                   title={enabled ? 'Disable' : 'Enable'}
                 />
               </div>
-              <div className={cn('flex items-center border-r px-3 py-1 font-mono text-muted-foreground', !enabled && 'opacity-40 line-through')}>:{name}</div>
+              <div className={cn('flex items-center border-r px-3 py-1 font-mono text-fg-mute', !enabled && 'opacity-40 line-through')}>:{name}</div>
               <div className="flex h-ctl items-center px-2">
                 <InlineCodeField
                   value={valueOf(name)}
@@ -485,16 +485,16 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
 
   return (
     <div className="max-w-xl space-y-6">
-      <p className="text-xs text-muted-foreground">Configure request settings for this item.</p>
+      <p className="text-xs text-fg-mute">Configure request settings for this item.</p>
 
       {/* Tags */}
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/40">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/40">
           {settings.tags.map((t) => (
             <span key={t} className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px]">
               {t}
-              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-muted-foreground hover:text-destructive">
+              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-fg-mute hover:text-destructive">
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -508,7 +508,7 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
             }}
             onBlur={() => addTag(tagDraft)}
             placeholder={settings.tags.length ? '' : 'e.g., smoke, regression'}
-            className="min-w-[8rem] flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            className="min-w-[8rem] flex-1 bg-transparent text-xs outline-none placeholder:text-fg-mute"
             spellCheck={false}
           />
         </div>
@@ -552,7 +552,7 @@ function ToggleRow({ title, hint, checked, onChange }: {
     <div className="flex items-center justify-between gap-4">
       <div className="space-y-0.5">
         <p className="text-xs font-medium">{title}</p>
-        <p className="text-[11px] text-muted-foreground">{hint}</p>
+        <p className="text-[11px] text-fg-mute">{hint}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} aria-label={title} />
     </div>
@@ -566,7 +566,7 @@ function NumberRow({ title, hint, value, onChange, disabled, clearable }: {
     <div className={cn('flex items-center justify-between gap-4', disabled && 'opacity-50')}>
       <div className="space-y-0.5">
         <p className="text-xs font-medium">{title}</p>
-        <p className="text-[11px] text-muted-foreground">{hint}</p>
+        <p className="text-[11px] text-fg-mute">{hint}</p>
       </div>
       <div className="relative w-28 shrink-0">
         <Input
@@ -578,7 +578,7 @@ function NumberRow({ title, hint, value, onChange, disabled, clearable }: {
           className="h-ctl text-xs"
         />
         {clearable && value > 0 && (
-          <button onClick={() => onChange(0)} title="Clear" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground">
+          <button onClick={() => onChange(0)} title="Clear" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute hover:text-fg">
             <X className="h-3.5 w-3.5" />
           </button>
         )}
@@ -650,7 +650,7 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
   const setBody = (patch: Partial<typeof body>) => onChange({ body: { ...body, ...patch } });
 
   if (body.mode === 'none') {
-    return <p className="text-sm text-muted-foreground">No Body</p>;
+    return <p className="text-sm text-fg-mute">No Body</p>;
   }
   if (body.mode === 'multipart') {
     return (
@@ -675,11 +675,11 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex min-h-0 flex-[2] flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Query</Label>
+          <Label className="text-xs text-fg-mute">Query</Label>
           <TextEditor value={g.query} onChange={(query) => setG({ query })} placeholder={'query {\n  field\n}'} vars={vars} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Variables</Label>
+          <Label className="text-xs text-fg-mute">Variables</Label>
           <JsonEditor value={g.variables} onChange={(variables) => setG({ variables })} placeholder={'{\n  "id": 1\n}'} vars={vars} />
         </div>
       </div>
@@ -722,14 +722,14 @@ function FileBody({ body, setBody }: { body: ApiRequest['body']; setBody: (p: Pa
     <div className="space-y-3 text-xs">
       {body.fileName ? (
         <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-          <File className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <File className="h-4 w-4 shrink-0 text-fg-mute" />
           <span className="truncate font-medium">{body.fileName}</span>
-          {body.fileType && <span className="text-muted-foreground">{body.fileType}</span>}
+          {body.fileType && <span className="text-fg-mute">{body.fileType}</span>}
           <div className="ml-auto flex items-center gap-1">
             <Button variant="outline" size="sm" className="h-ctl" onClick={pick}>Change</Button>
             <button
               onClick={() => setBody({ fileName: undefined, fileType: undefined, fileContent: undefined })}
-              className="rounded p-1 text-muted-foreground/60 hover:text-destructive"
+              className="rounded p-1 text-fg-mute/60 hover:text-destructive"
               title="Remove"
             >
               <Trash2 className="h-3.5 w-3.5" />

@@ -315,8 +315,8 @@ export function LuckyWheel() {
       <div className="flex min-h-0 flex-col gap-3 p-4">
         <div className="flex min-h-0 flex-[3] flex-col">
           <div className="mb-1.5 flex items-center justify-between">
-            <Label className="text-xs">Choices <span className="text-muted-foreground/60">— one per line · {quickPasteHint}</span></Label>
-            <span className="text-[11px] text-muted-foreground">{choices.length} {uniqueOnly ? 'unique' : 'slices'}</span>
+            <Label className="text-xs">Choices <span className="text-fg-mute/60">— one per line · {quickPasteHint}</span></Label>
+            <span className="text-[11px] text-fg-mute">{choices.length} {uniqueOnly ? 'unique' : 'slices'}</span>
           </div>
           <Textarea
             value={raw}
@@ -335,7 +335,7 @@ export function LuckyWheel() {
                 'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                 uniqueOnly
                   ? 'border-primary/30 bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+                  : 'border-border text-fg-mute hover:bg-muted hover:text-fg',
               )}
             >
               {uniqueOnly && <Check className="h-3 w-3" />}
@@ -350,7 +350,7 @@ export function LuckyWheel() {
                 'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                 removeOnWin
                   ? 'border-primary/30 bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+                  : 'border-border text-fg-mute hover:bg-muted hover:text-fg',
               )}
             >
               {removeOnWin && <Check className="h-3 w-3" />}
@@ -358,7 +358,7 @@ export function LuckyWheel() {
             </button>
           </div>
 
-          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-2 flex items-center gap-2 text-xs text-fg-mute">
             <Timer className="h-3.5 w-3.5" />
             <span>Spin time</span>
             <Select value={String(spinSec)} onValueChange={(v) => setSpinSec(Number(v))}>
@@ -374,26 +374,26 @@ export function LuckyWheel() {
         <div className="flex min-h-0 flex-[2] flex-col">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-xs font-medium">
-              Spin history <span className="text-muted-foreground/60">{history.length}</span>
+              Spin history <span className="text-fg-mute/60">{history.length}</span>
             </span>
             {history.length > 0 && (
               <button
                 type="button"
                 onClick={clearHistory}
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute transition-colors hover:bg-muted hover:text-fg"
               >
                 <Eraser className="h-3 w-3" /> Clear
               </button>
             )}
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border">
-            <div className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+            <div className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b border-border bg-muted/30 px-3 py-1.5 text-[11px] font-medium text-fg-mute">
               <span>#</span>
               <span>Winner</span>
               <button
                 type="button"
                 onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
-                className="flex items-center gap-1 transition-colors hover:text-foreground"
+                className="flex items-center gap-1 transition-colors hover:text-fg"
                 title="Sort by spin time"
               >
                 Time {sortDir === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
@@ -401,13 +401,13 @@ export function LuckyWheel() {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {sortedHistory.length === 0 ? (
-                <p className="px-3 py-6 text-center text-xs text-muted-foreground">No spins yet — spin the wheel to record a winner.</p>
+                <p className="px-3 py-6 text-center text-xs text-fg-mute">No spins yet — spin the wheel to record a winner.</p>
               ) : (
                 sortedHistory.map((row) => (
                   <div key={`${row.seq}-${row.time}`} className="grid grid-cols-[2.5rem_1fr_6rem] gap-2 border-b px-3 py-1.5 text-xs last:border-0">
-                    <span className="tabular-nums text-muted-foreground">{row.seq}</span>
+                    <span className="tabular-nums text-fg-mute">{row.seq}</span>
                     <span className="truncate font-medium" title={row.choice}>{row.choice}</span>
-                    <span className="tabular-nums text-muted-foreground">{formatTime(row.time)}</span>
+                    <span className="tabular-nums text-fg-mute">{formatTime(row.time)}</span>
                   </div>
                 ))
               )}
@@ -427,7 +427,7 @@ export function LuckyWheel() {
             >
               <Trophy className="h-5 w-5 shrink-0 text-ok" />
               <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">Latest winner</p>
+                <p className="text-[11px] text-fg-mute">Latest winner</p>
                 <p className="truncate text-base font-semibold">{winner}</p>
               </div>
             </div>
@@ -443,7 +443,7 @@ export function LuckyWheel() {
               style={{
                 borderLeft: '12px solid transparent',
                 borderRight: '12px solid transparent',
-                borderTop: '20px solid hsl(var(--foreground))',
+                borderTop: '20px solid hsl(var(--fg-c))',
               }}
             />
           </div>
@@ -486,9 +486,9 @@ export function LuckyWheel() {
           </div>
         </div>
         {choices.length < 2 ? (
-          <p className="text-xs text-muted-foreground">Add at least two choices to spin.</p>
+          <p className="text-xs text-fg-mute">Add at least two choices to spin.</p>
         ) : (
-          <p className="text-xs text-muted-foreground">Auto-spin draws up to {maxAuto} distinct winner{maxAuto === 1 ? '' : 's'}.</p>
+          <p className="text-xs text-fg-mute">Auto-spin draws up to {maxAuto} distinct winner{maxAuto === 1 ? '' : 's'}.</p>
         )}
         </div>
       </div>

@@ -30,7 +30,7 @@ export function CookieManager({ store, open, onClose }: Props) {
           <DialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2"><CookieIcon className="h-4 w-4" /> Cookies</span>
             <div className="flex items-center gap-4 text-xs font-normal">
-              <label className="flex items-center gap-2 text-muted-foreground">
+              <label className="flex items-center gap-2 text-fg-mute">
                 Enabled
                 <Switch checked={store.cookiesEnabled} onCheckedChange={store.setCookiesEnabled} aria-label="Cookie jar enabled" />
               </label>
@@ -49,7 +49,7 @@ export function CookieManager({ store, open, onClose }: Props) {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {groups.length === 0 ? (
-            <p className="px-4 py-10 text-center text-xs text-muted-foreground">
+            <p className="px-4 py-10 text-center text-xs text-fg-mute">
               No cookies yet. They're captured automatically from response <code className="rounded bg-muted px-1">Set-Cookie</code> headers, or add one below.
             </p>
           ) : (
@@ -60,7 +60,7 @@ export function CookieManager({ store, open, onClose }: Props) {
                   <button
                     onClick={() => store.clearDomainCookies(domain)}
                     title="Remove all cookies for this domain"
-                    className="rounded p-1 text-muted-foreground/60 hover:text-destructive"
+                    className="rounded p-1 text-fg-mute/60 hover:text-destructive"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -104,19 +104,19 @@ function CookieRow({ cookie, store }: { cookie: Cookie; store: ApiStore }) {
         />
       ) : (
         <span
-          className="min-w-0 flex-1 cursor-text truncate font-mono text-muted-foreground"
+          className="min-w-0 flex-1 cursor-text truncate font-mono text-fg-mute"
           title={cookie.value}
           onDoubleClick={() => setEditing(true)}
         >
           {cookie.value}
         </span>
       )}
-      <span className="shrink-0 font-mono text-[11px] text-muted-foreground/70" title="Path">{cookie.path}</span>
-      <span className="w-36 shrink-0 text-right text-[11px] text-muted-foreground/70" title="Expires">{fmtExpires(cookie)}</span>
+      <span className="shrink-0 font-mono text-[11px] text-fg-mute/70" title="Path">{cookie.path}</span>
+      <span className="w-36 shrink-0 text-right text-[11px] text-fg-mute/70" title="Expires">{fmtExpires(cookie)}</span>
       <div className="flex shrink-0 items-center gap-1">
-        {cookie.secure && <span className="rounded bg-muted px-1 text-[11px] uppercase text-muted-foreground">secure</span>}
-        {cookie.httpOnly && <span className="rounded bg-muted px-1 text-[11px] uppercase text-muted-foreground">http</span>}
-        <button onClick={() => store.deleteCookie(cookie)} title="Delete" className="rounded p-1 text-muted-foreground/50 hover:text-destructive">
+        {cookie.secure && <span className="rounded bg-muted px-1 text-[11px] uppercase text-fg-mute">secure</span>}
+        {cookie.httpOnly && <span className="rounded bg-muted px-1 text-[11px] uppercase text-fg-mute">http</span>}
+        <button onClick={() => store.deleteCookie(cookie)} title="Delete" className="rounded p-1 text-fg-mute/50 hover:text-destructive">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -155,7 +155,7 @@ function AddCookie({ store }: { store: ApiStore }) {
 function Field({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
     <div className={className}>
-      <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="mb-1 block text-[11px] uppercase tracking-wide text-fg-mute">{label}</Label>
       {children}
     </div>
   );

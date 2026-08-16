@@ -1,6 +1,6 @@
 // The busy indicator. `<Loader2 className="h-4 w-4 animate-spin" />` appears
 // ~50 times across the app, and the specific pairing of it with a muted
-// "Loading…" caption — `flex items-center gap-2 text-sm text-muted-foreground`
+// "Loading…" caption — `flex items-center gap-2 text-sm text-fg-mute`
 // — is duplicated verbatim in 13 Kafka/RabbitMQ views.
 //
 //   <Spinner />                          inside a Button, next to its label
@@ -52,7 +52,7 @@ export function LoadingRow({ label = 'Loading…', size = 'md', className }: Loa
     <div
       role="status"
       className={cn(
-        'flex items-center gap-2 text-muted-foreground',
+        'flex items-center gap-2 text-fg-mute',
         size === 'sm' ? 'text-[11px]' : 'text-sm',
         className,
       )}

@@ -14,7 +14,7 @@ function statusColor(status: number): string {
   if (status >= 400) return 'text-warn';
   if (status >= 300) return 'text-[var(--cat-3)]';
   if (status >= 200) return 'text-ok';
-  return 'text-muted-foreground';
+  return 'text-fg-mute';
 }
 
 interface Props {
@@ -40,7 +40,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
             type="button"
             variant="ghost"
             size="sm"
-            className="h-ctl text-xs text-muted-foreground"
+            className="h-ctl text-xs text-fg-mute"
             onClick={onClear}
             disabled={!log.length}
           >
@@ -51,7 +51,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
       />
 
       {log.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-fg-mute">
           <Inbox className="h-ctl w-ctl opacity-40" />
           <p className="text-xs">Incoming requests appear here while the server is running.</p>
         </div>
@@ -72,16 +72,16 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
                   {e.method}
                 </span>
                 <span className={'w-9 shrink-0 font-mono font-medium ' + statusColor(e.status)}>{e.status}</span>
-                <span className="min-w-0 flex-1 truncate font-mono text-foreground">
+                <span className="min-w-0 flex-1 truncate font-mono text-fg">
                   {e.path}
-                  {e.query ? <span className="text-muted-foreground">?{e.query}</span> : null}
+                  {e.query ? <span className="text-fg-mute">?{e.query}</span> : null}
                 </span>
                 {!e.matchedStubId && (
                   <span className="shrink-0 rounded-xs bg-warn-tint px-1 text-[11px] text-warn">
                     no match
                   </span>
                 )}
-                <span className="shrink-0 text-[11px] text-muted-foreground">{e.durationMs}ms</span>
+                <span className="shrink-0 text-[11px] text-fg-mute">{e.durationMs}ms</span>
               </button>
             ))}
           </div>
@@ -90,7 +90,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
             <div className="max-h-[45%] shrink-0 space-y-2 overflow-y-auto border-t border-border bg-muted/10 p-3 text-xs">
               <Detail label="Time" value={new Date(selected.ts).toLocaleTimeString()} />
               <div className="flex gap-2">
-                <span className="w-14 shrink-0 text-muted-foreground">Matched</span>
+                <span className="w-14 shrink-0 text-fg-mute">Matched</span>
                 {selected.matchedStubId ? (
                   <button
                     type="button"
@@ -106,7 +106,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
               </div>
               {selected.reqHeaders.length > 0 && (
                 <div>
-                  <div className="mb-0.5 text-muted-foreground">Request headers</div>
+                  <div className="mb-0.5 text-fg-mute">Request headers</div>
                   <pre className="whitespace-pre-wrap break-words font-mono text-[11px]">
                     {selected.reqHeaders.map((h) => `${h.key}: ${h.value}`).join('\n')}
                   </pre>
@@ -114,12 +114,12 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
               )}
               {selected.reqBody && (
                 <div>
-                  <div className="mb-0.5 text-muted-foreground">Request body</div>
+                  <div className="mb-0.5 text-fg-mute">Request body</div>
                   <pre className="whitespace-pre-wrap break-words font-mono text-[11px]">{selected.reqBody}</pre>
                 </div>
               )}
               <div>
-                <div className="mb-0.5 text-muted-foreground">Response body</div>
+                <div className="mb-0.5 text-fg-mute">Response body</div>
                 <pre className="whitespace-pre-wrap break-words font-mono text-[11px]">{selected.resBody}</pre>
               </div>
             </div>
@@ -133,7 +133,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-2">
-      <span className="w-14 shrink-0 text-muted-foreground">{label}</span>
+      <span className="w-14 shrink-0 text-fg-mute">{label}</span>
       <span className="font-mono text-[11px]">{value}</span>
     </div>
   );

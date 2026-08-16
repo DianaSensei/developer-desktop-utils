@@ -157,7 +157,7 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
       </button>
 
       {open && !disabled && (
-        <div className="absolute z-50 mt-1.5 w-56 rounded-lg border bg-popover p-3 shadow-xl">
+        <div className="absolute z-50 mt-1.5 w-56 rounded-lg border bg-card p-3 shadow-xl">
           {/* Saturation / Value field */}
           <div
             ref={sv.ref}

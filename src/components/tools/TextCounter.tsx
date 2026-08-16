@@ -162,15 +162,15 @@ export function TextCounter() {
         </StatGrid>
 
         <div className="border-t border-border pt-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Byte Size</p>
+          <p className="text-xs font-semibold text-fg-mute uppercase tracking-wider mb-3">Byte Size</p>
           <StatGrid columns={4} className="mb-4">
             <Stat variant="compact" label="UTF-8 bytes" value={stats.utf8Bytes} />
             <Stat variant="compact" label="UTF-16 bytes" value={stats.utf16Bytes} />
             <Stat variant="compact" label="UTF-32 bytes" value={stats.utf32Bytes} />
             <Stat variant="compact" label="Code points" value={stats.codePoints} />
           </StatGrid>
-          <p className="text-xs text-muted-foreground mb-2">
-            Smallest encoding: <span className="font-mono text-foreground">{smallestEncoding}</span>
+          <p className="text-xs text-fg-mute mb-2">
+            Smallest encoding: <span className="font-mono text-fg">{smallestEncoding}</span>
           </p>
           <ul className="space-y-1.5 text-sm">
             {encodingSupport.map((enc) => (
@@ -180,8 +180,8 @@ export function TextCounter() {
                 ) : (
                   <X className="h-3.5 w-3.5 text-bad shrink-0" />
                 )}
-                <span className={enc.fits ? 'text-foreground text-xs' : 'text-muted-foreground line-through text-xs'}>{enc.name}</span>
-                <span className="ml-auto font-mono text-[11px] text-muted-foreground">{enc.detail}</span>
+                <span className={enc.fits ? 'text-fg text-xs' : 'text-fg-mute line-through text-xs'}>{enc.name}</span>
+                <span className="ml-auto font-mono text-[11px] text-fg-mute">{enc.detail}</span>
               </li>
             ))}
           </ul>
@@ -190,18 +190,18 @@ export function TextCounter() {
         <div className="border-t pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
           <div>
             <p className="font-semibold text-sm mb-2">Text Details</p>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>Spaces: <span className="font-mono text-foreground">{stats.characters - stats.charactersNoSpaces}</span></li>
-              <li>Avg chars/word: <span className="font-mono text-foreground">{stats.words > 0 ? (stats.charactersNoSpaces / stats.words).toFixed(2) : 0}</span></li>
+            <ul className="space-y-1 text-fg-mute">
+              <li>Spaces: <span className="font-mono text-fg">{stats.characters - stats.charactersNoSpaces}</span></li>
+              <li>Avg chars/word: <span className="font-mono text-fg">{stats.words > 0 ? (stats.charactersNoSpaces / stats.words).toFixed(2) : 0}</span></li>
             </ul>
           </div>
           <div>
             <p className="font-semibold text-sm mb-2">Character Composition</p>
-            <ul className="space-y-1 text-muted-foreground">
-              <li>ASCII (U+0000–U+007F): <span className="font-mono text-foreground">{stats.asciiChars}</span></li>
-              <li>Latin-1 (U+0080–U+00FF): <span className="font-mono text-foreground">{stats.latin1Chars}</span></li>
-              <li>BMP (U+0100–U+FFFF): <span className="font-mono text-foreground">{stats.bmpChars}</span></li>
-              <li>Supplementary (U+10000+): <span className="font-mono text-foreground">{stats.astralChars}</span></li>
+            <ul className="space-y-1 text-fg-mute">
+              <li>ASCII (U+0000–U+007F): <span className="font-mono text-fg">{stats.asciiChars}</span></li>
+              <li>Latin-1 (U+0080–U+00FF): <span className="font-mono text-fg">{stats.latin1Chars}</span></li>
+              <li>BMP (U+0100–U+FFFF): <span className="font-mono text-fg">{stats.bmpChars}</span></li>
+              <li>Supplementary (U+10000+): <span className="font-mono text-fg">{stats.astralChars}</span></li>
             </ul>
           </div>
         </div>

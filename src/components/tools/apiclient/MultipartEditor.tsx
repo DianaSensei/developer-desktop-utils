@@ -97,9 +97,9 @@ export function MultipartEditor({ rows, onChange }: Props) {
             <div className="flex items-center gap-1 border-r px-2">
               {isFile ? (
                 <>
-                  <FileIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <FileIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
                   <span className="flex-1 truncate" title={row.fileName}>{row.fileName}</span>
-                  <button type="button" onClick={() => clearFile(row.id)} title="Remove file" className="rounded p-0.5 text-muted-foreground/60 hover:text-destructive">
+                  <button type="button" onClick={() => clearFile(row.id)} title="Remove file" className="rounded p-0.5 text-fg-mute/60 hover:text-destructive">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </>
@@ -112,7 +112,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
                     className={cn(inputCls, !isGhost && !row.enabled && 'opacity-50')}
                     spellCheck={false}
                   />
-                  <button type="button" onClick={() => attachFile(row.id)} title="Attach file" className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground">
+                  <button type="button" onClick={() => attachFile(row.id)} title="Attach file" className="rounded p-0.5 text-fg-mute/60 hover:text-fg">
                     <Upload className="h-3.5 w-3.5" />
                   </button>
                 </>
@@ -133,7 +133,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
             {/* action cell */}
             <div className="flex items-center justify-center">
               {!isGhost && (
-                <button type="button" onClick={() => removeRow(row.id)} title="Remove" className="rounded p-1 text-muted-foreground/50 transition-colors hover:text-destructive">
+                <button type="button" onClick={() => removeRow(row.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-destructive">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}

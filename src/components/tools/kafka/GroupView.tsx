@@ -30,7 +30,7 @@ function groupByTopic(assignments: Assignment[]): [string, Assignment[]][] {
 
 const STATE_DOT: Record<string, string> = {
   Stable: 'bg-ok',
-  Empty: 'bg-muted-foreground/40',
+  Empty: 'bg-fg-mute/40',
   Dead: 'bg-destructive',
   PreparingRebalance: 'bg-warn',
   CompletingRebalance: 'bg-warn',
@@ -71,7 +71,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
         title={<span className="font-mono">{groupId}</span>}
         subtitle={data ? (
           <span className="inline-flex items-center gap-1.5">
-            <span className={cn('h-1.5 w-1.5 rounded-full', STATE_DOT[data.state] ?? 'bg-muted-foreground/40')} />
+            <span className={cn('h-1.5 w-1.5 rounded-full', STATE_DOT[data.state] ?? 'bg-fg-mute/40')} />
             {data.state} · {data.memberCount} member{data.memberCount !== 1 ? 's' : ''}
           </span>
         ) : 'Consumer group'}
@@ -102,7 +102,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                   {data.members.map((m) => (
                     <div key={m.memberId} className="px-4 py-1.5 flex items-center gap-3 text-xs min-w-0">
                       <span className="font-mono truncate flex-1" title={m.memberId}>{m.clientId || m.memberId}</span>
-                      <span className="font-mono text-muted-foreground shrink-0">{m.clientHost}</span>
+                      <span className="font-mono text-fg-mute shrink-0">{m.clientHost}</span>
                     </div>
                   ))}
                 </div>
@@ -110,7 +110,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
             )}
 
             {data.assignments.length === 0 ? (
-              <div className="px-4 py-8 text-sm text-muted-foreground text-center">
+              <div className="px-4 py-8 text-sm text-fg-mute text-center">
                 No committed offsets — group may not be active yet
               </div>
             ) : (
@@ -126,8 +126,8 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                       onClick={() => toggleTopic(topic)}
                     >
                       {open
-                        ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                        : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                        ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-fg-mute" />
+                        : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-fg-mute" />}
                       <button
                         className="font-mono text-xs truncate flex-1 text-left hover:text-primary hover:underline"
                         onClick={(e) => { e.stopPropagation(); onSelectTopic(topic); }}
@@ -135,7 +135,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                       >
                         {topic}
                       </button>
-                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                      <span className="text-xs text-fg-mute tabular-nums shrink-0">
                         {parts.length} part{parts.length !== 1 ? 's' : ''}
                       </span>
                       <span className={`text-xs font-mono tabular-nums w-24 text-right shrink-0 ${hasLag ? 'text-warn' : 'text-ok'}`}>
@@ -146,7 +146,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                     {open && (
                       <div className="pb-1">
                         {/* Per-partition column headers */}
-                        <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-muted-foreground bg-muted/10">
+                        <div className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1 text-[11px] font-medium text-fg-mute bg-muted/10">
                           <span className="text-right">Part</span>
                           <span>Consumer</span>
                           <span className="text-right">Committed</span>
@@ -156,7 +156,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
 
                         {parts.map((a) => {
                           const lagColor = a.lag < 0
-                            ? 'text-muted-foreground'
+                            ? 'text-fg-mute'
                             : a.lag === 0
                             ? 'text-ok'
                             : 'text-warn';
@@ -169,23 +169,23 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                               key={a.partition}
                               className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-border/20 text-sm"
                             >
-                              <span className="text-right text-xs text-muted-foreground tabular-nums">{a.partition}</span>
+                              <span className="text-right text-xs text-fg-mute tabular-nums">{a.partition}</span>
                               <span className="min-w-0 truncate text-xs" title={a.memberId ?? undefined}>
                                 {a.clientId ? (
                                   <>
                                     <span className="font-mono">{a.clientId}</span>
                                     {a.clientHost && (
-                                      <span className="text-muted-foreground font-mono"> {a.clientHost}</span>
+                                      <span className="text-fg-mute font-mono"> {a.clientHost}</span>
                                     )}
                                   </>
                                 ) : (
-                                  <span className="text-muted-foreground italic">unassigned</span>
+                                  <span className="text-fg-mute italic">unassigned</span>
                                 )}
                               </span>
                               <span className="text-right font-mono text-xs tabular-nums">
                                 {a.committedOffset >= 0 ? a.committedOffset.toLocaleString() : '—'}
                               </span>
-                              <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                              <span className="text-right font-mono text-xs tabular-nums text-fg-mute">
                                 {latest >= 0 ? latest.toLocaleString() : '—'}
                               </span>
                               <span className={`text-right font-mono text-xs tabular-nums ${lagColor}`}>

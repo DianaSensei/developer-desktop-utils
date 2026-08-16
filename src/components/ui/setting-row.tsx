@@ -51,7 +51,7 @@ export function SettingRow({
         <span
           className={cn(
             'grid h-ctl w-ctl shrink-0 place-items-center rounded-sm border border-border bg-sunk',
-            'text-muted-foreground',
+            'text-fg-mute',
           )}
         >
           <Icon className="h-4 w-4" />
@@ -60,14 +60,14 @@ export function SettingRow({
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium leading-snug">{title}</span>
         {description && (
-          <span className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">
+          <span className="mt-0.5 block text-[12.5px] leading-snug text-fg-mute">
             {description}
           </span>
         )}
       </span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
         {control}
-        {interactive && <ChevronRight className="h-4 w-4 text-muted-foreground/70" />}
+        {interactive && <ChevronRight className="h-4 w-4 text-fg-mute/70" />}
       </span>
     </>
   );
@@ -116,7 +116,7 @@ export function SettingGroup({
   return (
     <section className={className}>
       {title && (
-        <h3 className="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <h3 className="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-wider text-fg-mute">
           {title}
         </h3>
       )}

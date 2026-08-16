@@ -27,9 +27,9 @@ export const pathParamTheme = EditorView.theme({
     padding: '0 1px',
   },
   '.cm-pathparamtip': { display: 'flex', flexDirection: 'column', gap: '2px', padding: '6px 8px', maxWidth: '340px' },
-  '.cm-pathparamtip-name': { fontSize: '10px', color: 'hsl(var(--muted-foreground))', fontFamily: 'var(--mono)' },
-  '.cm-pathparamtip-val': { fontSize: '12px', color: 'hsl(var(--foreground))', fontFamily: 'var(--mono)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' },
-  '.cm-pathparamtip-missing': { fontSize: '12px', color: 'hsl(var(--muted-foreground))' },
+  '.cm-pathparamtip-name': { fontSize: '10px', color: 'hsl(var(--fg-mute-c))', fontFamily: 'var(--mono)' },
+  '.cm-pathparamtip-val': { fontSize: '12px', color: 'hsl(var(--fg-c))', fontFamily: 'var(--mono)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' },
+  '.cm-pathparamtip-missing': { fontSize: '12px', color: 'hsl(var(--fg-mute-c))' },
 });
 
 // `getValues` returns the current pathParams table as a name → value map

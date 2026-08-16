@@ -21,7 +21,7 @@ export function FallbackEditor({ config, onChange }: Props) {
 
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Status</span>
+          <span className="text-xs text-fg-mute">Status</span>
           <Input
             type="number"
             value={config.notFoundStatus}
@@ -30,7 +30,7 @@ export function FallbackEditor({ config, onChange }: Props) {
           />
         </div>
         <div className="flex flex-1 items-center gap-1.5">
-          <span className="shrink-0 text-xs text-muted-foreground">Content-Type</span>
+          <span className="shrink-0 text-xs text-fg-mute">Content-Type</span>
           <Input
             value={config.notFoundContentType}
             onChange={(e) => onChange({ notFoundContentType: e.target.value })}
@@ -41,7 +41,7 @@ export function FallbackEditor({ config, onChange }: Props) {
       </div>
 
       <div className="space-y-1.5">
-        <span className="text-xs text-muted-foreground">Body</span>
+        <span className="text-xs text-fg-mute">Body</span>
         {isJson ? (
           <JsonEditor value={config.notFoundBody} onChange={(notFoundBody) => onChange({ notFoundBody })} placeholder="Fallback response body" />
         ) : (

@@ -422,8 +422,8 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
           <DialogTitle className="flex w-full items-center gap-2 pr-10">
             <Play className="h-4 w-4 shrink-0 text-acc-ink" />
             <span className="shrink-0 text-sm font-semibold">Runner</span>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
-            <span className="min-w-0 truncate text-sm font-normal text-muted-foreground">{title}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute/50" />
+            <span className="min-w-0 truncate text-sm font-normal text-fg-mute">{title}</span>
             {phase === 'results' && (
               <Button
                 variant="ghost" size="sm"
@@ -485,11 +485,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet className="h-3.5 w-3.5 shrink-0 text-ok" />
                         <span className="min-w-0 flex-1 truncate text-xs font-medium" title={dataFile.name}>{dataFile.name}</span>
-                        <button onClick={() => { setDataFile(null); resetRun(); }} title="Remove" className="rounded p-0.5 text-muted-foreground/60 hover:text-destructive">
+                        <button onClick={() => { setDataFile(null); resetRun(); }} title="Remove" className="rounded p-0.5 text-fg-mute/60 hover:text-destructive">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[11px] text-fg-mute">
                         {dataFile.parsed.rows.length} row{dataFile.parsed.rows.length === 1 ? '' : 's'}
                         {' · '}{dataFile.parsed.columns.length} column{dataFile.parsed.columns.length === 1 ? '' : 's'}
                         {dataFile.parsed.format === 'csv' && dataFile.parsed.delimiter
@@ -508,13 +508,13 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                   ) : (
                     <button
                       onClick={loadData}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2.5 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2.5 text-xs text-fg-mute transition-colors hover:border-fg/30 hover:text-fg"
                     >
                       <FileSpreadsheet className="h-3.5 w-3.5" /> Select CSV or JSON file
                     </button>
                   )}
                   {dataError && <p className="text-[11px] text-destructive">{dataError}</p>}
-                  {!dataFile && <p className="text-[11px] text-muted-foreground">Binds each row's columns to <code className="rounded bg-muted px-1">{'{{var}}'}</code>, one iteration per row.</p>}
+                  {!dataFile && <p className="text-[11px] text-fg-mute">Binds each row's columns to <code className="rounded bg-muted px-1">{'{{var}}'}</code>, one iteration per row.</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -530,7 +530,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
               {/* request selection */}
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center justify-between border-b px-4 py-2.5 text-xs">
-                  <span className="flex items-center gap-1.5 font-medium"><ListChecks className="h-3.5 w-3.5" /> Requests <span className="text-muted-foreground">· {selected.size}/{order.length}</span></span>
+                  <span className="flex items-center gap-1.5 font-medium"><ListChecks className="h-3.5 w-3.5" /> Requests <span className="text-fg-mute">· {selected.size}/{order.length}</span></span>
                   <button onClick={toggleAll} className="font-medium text-acc-ink hover:underline">
                     {allSelected ? 'Deselect all' : 'Select all'}
                   </button>
@@ -549,7 +549,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                         onClick={() => toggle(req.id)}
                         className={cn('group flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs hover:bg-accent/50', !checked && 'opacity-50')}
                       >
-                        <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground/30 group-hover:text-muted-foreground/60" />
+                        <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-fg-mute/30 group-hover:text-fg-mute/60" />
                         <span
                           className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
                             checked ? 'border-acc bg-acc text-acc-fg' : 'border-input')}
@@ -558,11 +558,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                         </span>
                         <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(req.method))}>{req.method}</span>
                         <span className="min-w-0 flex-1 truncate" title={req.url}>{req.name}</span>
-                        {filteredOut && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">filtered</span>}
+                        {filteredOut && <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] text-fg-mute">filtered</span>}
                       </div>
                     );
                   })}
-                  {order.length === 0 && <p className="px-4 py-6 text-center text-xs text-muted-foreground">No requests to run.</p>}
+                  {order.length === 0 && <p className="px-4 py-6 text-center text-xs text-fg-mute">No requests to run.</p>}
                 </div>
               </div>
             </div>
@@ -583,10 +583,10 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
               <Button onClick={run} disabled={plannedCount === 0} className="h-ctl-lg gap-1.5 px-4">
                 <Play className="h-4 w-4" /> Run {plannedCount} request{plannedCount === 1 ? '' : 's'}
               </Button>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-fg-mute">
                 {effective.length} selected × {iters} iteration{iters === 1 ? '' : 's'}
               </span>
-              <button onClick={resetAll} className="ml-auto flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+              <button onClick={resetAll} className="ml-auto flex items-center gap-1 text-xs font-medium text-fg-mute hover:text-fg">
                 <RotateCcw className="h-3.5 w-3.5" /> Reset
               </button>
             </div>
@@ -628,24 +628,24 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
 
             {/* full breakdown of what the run measured */}
             {totalRun > 0 && (
-              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-[11px] text-fg-mute">
                 <span className="flex flex-wrap items-center gap-x-2">
-                  <span className="font-medium text-foreground/70">Status</span>
+                  <span className="font-medium text-fg/70">Status</span>
                   {Object.entries(stats.byStatus)
                     .sort((a, b) => a[0].localeCompare(b[0]))
                     .map(([code, count]) => (
                       <span key={code} className="font-mono">
                         <span className={code === 'error' ? 'text-bad' : statusColor(Number(code))}>{code}</span>
-                        <span className="text-muted-foreground"> ×{count}</span>
+                        <span className="text-fg-mute"> ×{count}</span>
                       </span>
                     ))}
                 </span>
                 <span>
-                  <span className="font-medium text-foreground/70">Response time</span>{' '}
+                  <span className="font-medium text-fg/70">Response time</span>{' '}
                   min {stats.minMs} ms · avg {stats.avgMs} ms · max {stats.maxMs} ms
                 </span>
                 <span>
-                  <span className="font-medium text-foreground/70">Iterations</span>{' '}
+                  <span className="font-medium text-fg/70">Iterations</span>{' '}
                   {ranIters}/{iters}
                 </span>
               </div>
@@ -678,10 +678,10 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                           i === viewIter && 'bg-accent')}
                       >
                         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full',
-                          s.total === 0 ? 'bg-muted-foreground/30' : ok ? 'bg-ok' : 'bg-bad')} />
+                          s.total === 0 ? 'bg-fg-mute/30' : ok ? 'bg-ok' : 'bg-bad')} />
                         <span className="min-w-0 flex-1">
                           <span className="block font-medium">Iteration {i + 1}</span>
-                          {labelVals && <span className="block truncate text-[11px] text-muted-foreground" title={labelVals}>{labelVals}</span>}
+                          {labelVals && <span className="block truncate text-[11px] text-fg-mute" title={labelVals}>{labelVals}</span>}
                         </span>
                         {s.total > 0 && <span className={cn('shrink-0 text-[11px]', ok ? 'text-ok' : 'text-bad')}>{s.ok}/{s.total}</span>}
                       </button>
@@ -700,7 +700,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       <div className="flex flex-wrap items-center gap-1.5 border-b bg-muted/20 px-3 py-2">
                         <SectionLabel>Data</SectionLabel>
                         {Object.entries(dataRow).map(([k, v]) => (
-                          <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"><span className="text-muted-foreground">{k}=</span>{v}</span>
+                          <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"><span className="text-fg-mute">{k}=</span>{v}</span>
                         ))}
                       </div>
                     )}
@@ -712,12 +712,12 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                             key={f}
                             onClick={() => setFilter(f)}
                             className={cn('rounded px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
-                              filter === f ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')}
+                              filter === f ? 'bg-accent text-fg' : 'text-fg-mute hover:text-fg')}
                           >
                             {f}
                           </button>
                         ))}
-                        <span className="ml-auto text-[11px] text-muted-foreground">
+                        <span className="ml-auto text-[11px] text-fg-mute">
                           {shown.length} of {iterRecords.length}
                         </span>
                       </div>
@@ -729,16 +729,16 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       ))}
                       {running && current && current.iter === viewIter && (
                         <div className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs">
-                          <span className="w-5 shrink-0"><Spinner size="sm" className="text-muted-foreground" /></span>
+                          <span className="w-5 shrink-0"><Spinner size="sm" className="text-fg-mute" /></span>
                           <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(current.method))}>{current.method}</span>
-                          <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground">{current.name}</span>
+                          <span className="min-w-0 flex-1 truncate font-medium text-fg-mute">{current.name}</span>
                         </div>
                       )}
                       {iterRecords.length === 0 && !running && (
-                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">No requests ran.</p>
+                        <p className="px-4 py-6 text-center text-xs text-fg-mute">No requests ran.</p>
                       )}
                       {iterRecords.length > 0 && shown.length === 0 && (
-                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">Nothing matches this filter.</p>
+                        <p className="px-4 py-6 text-center text-xs text-fg-mute">Nothing matches this filter.</p>
                       )}
                       {cappedIters.has(viewIter) && (
                         <p className="px-3 py-2 text-[11px] text-destructive">
@@ -776,12 +776,12 @@ function RecordRow({ record: r, onOpen }: { record: RunRecord; onOpen: () => voi
         <span className="min-w-0 flex-1 truncate font-medium" title={r.url}>{r.name}</span>
         {r.total > 0 && <span className={cn('shrink-0', r.passed === r.total ? 'text-ok' : 'text-bad')}>{r.passed}/{r.total} tests</span>}
         <span className={cn('w-12 shrink-0 text-right font-semibold', r.error ? 'text-bad' : statusColor(r.status))}>{r.error ? 'ERR' : r.status}</span>
-        <span className="w-16 shrink-0 text-right text-muted-foreground">{r.ms} ms</span>
-        {r.detail && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground" />}
+        <span className="w-16 shrink-0 text-right text-fg-mute">{r.ms} ms</span>
+        {r.detail && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute/30 group-hover:text-fg-mute" />}
       </button>
       {r.jump && (
         <p className={cn('flex items-center gap-1.5 px-3 pb-1.5 pl-10 text-[11px]',
-          r.jump.missing ? 'text-destructive' : 'text-muted-foreground')}>
+          r.jump.missing ? 'text-destructive' : 'text-fg-mute')}>
           <CornerDownRight className="h-3 w-3 shrink-0" />
           {r.jump.to === null
             ? 'Script ended the iteration here.'
@@ -812,20 +812,20 @@ function DataPreview({ rows, columns }: { rows: DataRow[]; columns: string[] }) 
       <table className="w-full border-collapse text-[11px]">
         <thead className="sticky top-0 bg-muted/60">
           <tr>
-            <th className="border-b px-1.5 py-1 text-left font-semibold text-muted-foreground">#</th>
+            <th className="border-b px-1.5 py-1 text-left font-semibold text-fg-mute">#</th>
             {cols.map((c) => <th key={c} className="border-b px-1.5 py-1 text-left font-mono font-semibold">{c}</th>)}
           </tr>
         </thead>
         <tbody>
           {shown.map((row, i) => (
             <tr key={i} className="odd:bg-muted/20">
-              <td className="px-1.5 py-0.5 text-muted-foreground">{i + 1}</td>
+              <td className="px-1.5 py-0.5 text-fg-mute">{i + 1}</td>
               {cols.map((c) => <td key={c} className="max-w-[8rem] truncate px-1.5 py-0.5 font-mono" title={row[c]}>{row[c]}</td>)}
             </tr>
           ))}
         </tbody>
       </table>
-      {rows.length > shown.length && <p className="px-1.5 py-1 text-[11px] text-muted-foreground">+{rows.length - shown.length} more…</p>}
+      {rows.length > shown.length && <p className="px-1.5 py-1 text-[11px] text-fg-mute">+{rows.length - shown.length} more…</p>}
     </div>
   );
 }
@@ -840,7 +840,7 @@ function RunDetailView({ entry, onBack }: { entry: RunDetail; onBack: () => void
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
-        <button onClick={onBack} className="flex items-center gap-1 rounded px-1.5 py-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+        <button onClick={onBack} className="flex items-center gap-1 rounded px-1.5 py-1 text-fg-mute hover:bg-accent hover:text-fg">
           <ChevronLeft className="h-3.5 w-3.5" /> Back
         </button>
         <span className={cn('font-bold uppercase', methodColor(request.method))}>{request.method}</span>
@@ -848,7 +848,7 @@ function RunDetailView({ entry, onBack }: { entry: RunDetail; onBack: () => void
         <div className="ml-auto flex items-center gap-1.5">
           {result.response && <span className={cn('font-semibold', statusColor(status))}>{status}</span>}
           {result.error && <span className="font-semibold text-destructive">ERR</span>}
-          {result.response && <span className="text-muted-foreground">{result.response.timeMs} ms</span>}
+          {result.response && <span className="text-fg-mute">{result.response.timeMs} ms</span>}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-4 border-b px-3">
@@ -877,7 +877,7 @@ function DetailTab({ id, active, onClick, children }: {
     <button
       onClick={() => onClick(id)}
       className={cn('-mb-px border-b-2 py-2 text-xs font-medium transition-colors',
-        active === id ? 'border-acc text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
+        active === id ? 'border-acc text-fg' : 'border-transparent text-fg-mute hover:text-fg')}
     >
       {children}
     </button>
@@ -898,31 +898,31 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
     <div className="min-h-0 flex-1 space-y-4 overflow-auto p-3 text-xs">
       {dataVars && Object.keys(dataVars).length > 0 && (
         <div>
-          <p className="mb-1 font-semibold text-muted-foreground">Iteration data</p>
+          <p className="mb-1 font-semibold text-fg-mute">Iteration data</p>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(dataVars).map(([k, v]) => (
-              <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"><span className="text-muted-foreground">{k}=</span>{v}</span>
+              <span key={k} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]"><span className="text-fg-mute">{k}=</span>{v}</span>
             ))}
           </div>
         </div>
       )}
       <div>
-        <p className="mb-1 font-semibold text-muted-foreground">URL</p>
+        <p className="mb-1 font-semibold text-fg-mute">URL</p>
         <p className="break-all font-mono">{sentUrl || sub(request.url) || '—'}</p>
       </div>
       <div>
-        <p className="mb-1 font-semibold text-muted-foreground">Headers</p>
-        {headers.length === 0 ? <p className="text-muted-foreground">No headers.</p> : (
+        <p className="mb-1 font-semibold text-fg-mute">Headers</p>
+        {headers.length === 0 ? <p className="text-fg-mute">No headers.</p> : (
           <div className="space-y-0.5 font-mono">
             {headers.map((h) => (
-              <p key={h.id} className="break-all"><span className="text-muted-foreground">{sub(h.key)}:</span> {sub(h.value)}</p>
+              <p key={h.id} className="break-all"><span className="text-fg-mute">{sub(h.key)}:</span> {sub(h.value)}</p>
             ))}
           </div>
         )}
       </div>
       <div>
-        <p className="mb-1 font-semibold text-muted-foreground">Body <span className="font-normal">({body.mode})</span></p>
-        {bodyText ? <pre className="whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono">{sub(bodyText)}</pre> : <p className="text-muted-foreground">No body.</p>}
+        <p className="mb-1 font-semibold text-fg-mute">Body <span className="font-normal">({body.mode})</span></p>
+        {bodyText ? <pre className="whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono">{sub(bodyText)}</pre> : <p className="text-fg-mute">No body.</p>}
       </div>
     </div>
   );
@@ -938,7 +938,7 @@ function OptionRow({ label, hint, checked, onChange }: {
     <label className="flex cursor-pointer items-start justify-between gap-3 rounded-md border px-3 py-2">
       <span className="min-w-0">
         <span className="block text-xs font-medium">{label}</span>
-        {hint && <span className="mt-0.5 block text-[11px] text-muted-foreground">{hint}</span>}
+        {hint && <span className="mt-0.5 block text-[11px] text-fg-mute">{hint}</span>}
       </span>
       <Switch checked={checked} onCheckedChange={onChange} aria-label={label} className="shrink-0" />
     </label>
@@ -955,7 +955,7 @@ function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
   }
   return (
     <div className="overflow-hidden rounded border">
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-x-2 border-b bg-muted/40 px-1.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-x-2 border-b bg-muted/40 px-1.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
         <span>Column</span>
         <span>Variable</span>
         <span />
@@ -967,13 +967,13 @@ function ColumnMappingTable({ mappings }: { mappings: ColumnMapping[] }) {
             <span className="min-w-0">
               <span className="block truncate font-mono text-ok" title={m.token}>{m.token}</span>
               {m.sample && (
-                <span className="block truncate text-muted-foreground" title={m.sample}>e.g. {m.sample}</span>
+                <span className="block truncate text-fg-mute" title={m.sample}>e.g. {m.sample}</span>
               )}
             </span>
             {m.used ? (
               <Check className="h-3 w-3 shrink-0 text-ok" aria-label="Used by the run" />
             ) : (
-              <span className="shrink-0 rounded bg-muted px-1 text-[11px] text-muted-foreground" title="No selected request references this variable">
+              <span className="shrink-0 rounded bg-muted px-1 text-[11px] text-fg-mute" title="No selected request references this variable">
                 unused
               </span>
             )}

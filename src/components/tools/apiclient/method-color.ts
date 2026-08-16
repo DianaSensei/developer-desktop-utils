@@ -18,8 +18,8 @@ const TEXT: Record<HttpMethod, string> = {
   PUT:     'text-[var(--method-put)]',
   PATCH:   'text-[var(--method-patch)]',
   DELETE:  'text-[var(--method-delete)]',
-  HEAD:    'text-muted-foreground',
-  OPTIONS: 'text-muted-foreground',
+  HEAD:    'text-fg-mute',
+  OPTIONS: 'text-fg-mute',
 };
 
 // Subtle tint behind the method selector in the address bar — no text color.
@@ -40,10 +40,10 @@ const BADGE: Record<HttpMethod, string> = {
   PUT:     'bg-[hsl(var(--method-put-c)/0.16)]    text-[var(--method-put)]',
   PATCH:   'bg-[hsl(var(--method-patch-c)/0.16)]  text-[var(--method-patch)]',
   DELETE:  'bg-[hsl(var(--method-delete-c)/0.16)] text-[var(--method-delete)]',
-  HEAD:    'bg-muted/60 text-muted-foreground',
-  OPTIONS: 'bg-muted/60 text-muted-foreground',
+  HEAD:    'bg-muted/60 text-fg-mute',
+  OPTIONS: 'bg-muted/60 text-fg-mute',
 };
 
-export const methodColor      = (m: HttpMethod): string => TEXT[m]  ?? 'text-foreground';
+export const methodColor      = (m: HttpMethod): string => TEXT[m]  ?? 'text-fg';
 export const methodBg         = (m: HttpMethod): string => BG[m]   ?? 'bg-transparent';
-export const methodBadgeStyle = (m: HttpMethod): string => BADGE[m] ?? 'bg-muted/60 text-foreground';
+export const methodBadgeStyle = (m: HttpMethod): string => BADGE[m] ?? 'bg-muted/60 text-fg';

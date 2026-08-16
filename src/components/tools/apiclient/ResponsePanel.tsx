@@ -198,12 +198,12 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
     ];
     return (
       <Centered>
-        <Send className="h-20 w-20 -rotate-12 stroke-[1] text-muted-foreground/15" />
+        <Send className="h-20 w-20 -rotate-12 stroke-[1] text-fg-mute/15" />
         <div className="mt-6 space-y-2">
           {shortcuts.map(([label, keys]) => (
-            <div key={label} className="flex items-center justify-end gap-6 text-xs text-muted-foreground">
+            <div key={label} className="flex items-center justify-end gap-6 text-xs text-fg-mute">
               <span>{label}</span>
-              <span className="w-24 font-mono text-muted-foreground/80">{keys}</span>
+              <span className="w-24 font-mono text-fg-mute/80">{keys}</span>
             </div>
           ))}
         </div>
@@ -213,8 +213,8 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   if (blank && sending) {
     return (
       <Centered>
-        <Spinner size="lg" className="text-muted-foreground/60" />
-        <p className="text-xs text-muted-foreground">Sending request…</p>
+        <Spinner size="lg" className="text-fg-mute/60" />
+        <p className="text-xs text-fg-mute">Sending request…</p>
       </Centered>
     );
   }
@@ -222,7 +222,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   // Tab definitions (only the relevant ones for the current response state).
   const tabDefs: TabDef[] = [
     { id: 'body', label: 'Response' },
-    ...(response ? [{ id: 'headers', label: 'Headers', badge: <span className="text-[11px] text-muted-foreground">{response.headers.length}</span> }] : []),
+    ...(response ? [{ id: 'headers', label: 'Headers', badge: <span className="text-[11px] text-fg-mute">{response.headers.length}</span> }] : []),
     ...(response ? [{ id: 'timeline', label: 'Timeline' }] : []),
     {
       id: 'tests', label: 'Tests',
@@ -232,7 +232,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         </span>
       ) : undefined,
     },
-    { id: 'console', label: 'Console', badge: logs.length > 0 ? <span className="text-[11px] text-muted-foreground">{logs.length}</span> : undefined },
+    { id: 'console', label: 'Console', badge: logs.length > 0 ? <span className="text-[11px] text-fg-mute">{logs.length}</span> : undefined },
   ];
   // The active tab may vanish when a run ends without a response (Headers /
   // Timeline only exist alongside one) — fall back rather than render nothing.
@@ -244,14 +244,14 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         <FormatDropdown format={format} onChange={setFormat} preview={preview} onPreview={setPreview} kind={kind} />
       )}
       {sending ? (
-        <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+        <span className="flex items-center gap-1.5 font-medium text-fg-mute">
           <Spinner size="sm" /> Sending…
         </span>
       ) : response ? (
         <>
           <span className={cn('font-semibold', statusColor(response.status))}>{response.status} {response.statusText}</span>
-          <span className="text-muted-foreground">{response.timeMs} ms</span>
-          <span className="text-muted-foreground">{formatBytes(response.sizeBytes)}</span>
+          <span className="text-fg-mute">{response.timeMs} ms</span>
+          <span className="text-fg-mute">{formatBytes(response.sizeBytes)}</span>
         </>
       ) : (
         <span className="font-semibold text-destructive">No response</span>
@@ -276,7 +276,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         tabs={tabDefs}
         active={activeTab}
         onSelect={(id) => setTab(id as Tab)}
-        activeClassName="border-acc text-foreground"
+        activeClassName="border-acc text-fg"
         right={headerRight}
       />
 
@@ -330,7 +330,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
               <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} />
               {showFilter && kind === 'json' && (
                 <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5 focus-within:bg-muted/20">
-                  <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <Filter className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
                   <Input
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
@@ -340,20 +340,20 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                     autoFocus
                   />
                   {filter && filterResult && !filterResult.ok && <span className="shrink-0 text-[11px] text-destructive">invalid</span>}
-                  {filter && <button onClick={() => setFilter('')} title="Clear" className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
+                  {filter && <button onClick={() => setFilter('')} title="Clear" className="shrink-0 rounded p-0.5 text-fg-mute hover:text-fg"><X className="h-3.5 w-3.5" /></button>}
                 </div>
               )}
             </>
-          ) : <p className="p-3 text-xs text-muted-foreground">Empty response body.</p>
+          ) : <p className="p-3 text-xs text-fg-mute">Empty response body.</p>
         )}
         {activeTab === 'body' && !response && !error && (
-          <p className="p-3 text-xs text-muted-foreground">No response — see the Tests and Console tabs for what ran.</p>
+          <p className="p-3 text-xs text-fg-mute">No response — see the Tests and Console tabs for what ran.</p>
         )}
         {activeTab === 'headers' && response && (
           <div className="min-h-0 flex-1 divide-y overflow-auto text-xs">
             {response.headers.map(([k, v], i) => (
               <div key={i} className="flex gap-3 px-3 py-1.5">
-                <span className="w-48 shrink-0 break-words font-medium text-muted-foreground">{k}</span>
+                <span className="w-48 shrink-0 break-words font-medium text-fg-mute">{k}</span>
                 <span className="break-words font-mono">{v}</span>
               </div>
             ))}
@@ -363,7 +363,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         {activeTab === 'tests' && (
           <div className="min-h-0 flex-1 overflow-auto">
             {tests.length === 0
-              ? <p className="p-3 text-xs text-muted-foreground">No tests or assertions ran.</p>
+              ? <p className="p-3 text-xs text-fg-mute">No tests or assertions ran.</p>
               : (
                 <div className="divide-y text-xs">
                   {tests.map((t, i) => (
@@ -372,7 +372,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                         ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" />
                         : <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />}
                       <div className="min-w-0">
-                        <span className={cn('break-words', !t.passed && 'text-foreground')}>{t.name}</span>
+                        <span className={cn('break-words', !t.passed && 'text-fg')}>{t.name}</span>
                         {!t.passed && t.error && <p className="break-words text-[11px] text-destructive">{t.error}</p>}
                       </div>
                     </div>
@@ -384,7 +384,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         {activeTab === 'console' && (
           <div className="min-h-0 flex-1 overflow-auto">
             {logs.length === 0
-              ? <p className="p-3 text-xs text-muted-foreground">No console output.</p>
+              ? <p className="p-3 text-xs text-fg-mute">No console output.</p>
               : (
                 <div className="divide-y font-mono text-xs">
                   {logs.map((l, i) => (
@@ -430,7 +430,7 @@ function ActionsMenu({ copied, onCopy, onSave, onClear }: {
 }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger title="More" className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+      <DropdownMenuTrigger title="More" className="rounded p-1 text-fg-mute transition-colors hover:bg-accent hover:text-fg">
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[11rem]">
@@ -464,7 +464,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
       const b64 = response.bodyBase64;
       if (!b64) {
         return (
-          <div className="flex min-h-0 flex-1 items-center justify-center p-4 text-xs text-muted-foreground">
+          <div className="flex min-h-0 flex-1 items-center justify-center p-4 text-xs text-fg-mute">
             Image too large to preview.
           </div>
         );
@@ -479,11 +479,11 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
   if (response.binary && format !== 'hex' && format !== 'base64') {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-        <Binary className="h-ctl w-ctl text-muted-foreground/30" />
-        <p className="text-xs text-muted-foreground">
+        <Binary className="h-ctl w-ctl text-fg-mute/30" />
+        <p className="text-xs text-fg-mute">
           Binary response ({response.contentType || 'unknown type'}, {formatBytes(response.sizeBytes)}).
         </p>
-        <p className="text-[11px] text-muted-foreground/80">
+        <p className="text-[11px] text-fg-mute/80">
           Switch the format to Hex or Base64 to inspect it, or save it from the … menu.
         </p>
       </div>
@@ -505,7 +505,7 @@ function Timeline({ response }: { response: ApiResponse }) {
       <div>
         <p className={cn('font-semibold', statusColor(response.status))}>&lt; HTTP {response.status} {response.statusText}</p>
         {response.headers.map(([k, v], i) => (
-          <p key={i} className="break-words text-muted-foreground">&lt; {k}: {v}</p>
+          <p key={i} className="break-words text-fg-mute">&lt; {k}: {v}</p>
         ))}
       </div>
       {t && (
@@ -514,11 +514,11 @@ function Timeline({ response }: { response: ApiResponse }) {
           <TimingBar label="Download" ms={t.downloadMs} total={response.timeMs} tone="bg-[hsl(var(--cat-2-c)/0.85)]" />
         </div>
       )}
-      <div className="space-y-0.5 text-muted-foreground">
-        <p>Total time: <span className="text-foreground">{response.timeMs} ms</span></p>
-        <p>Size: <span className="text-foreground">{formatBytes(response.sizeBytes)}</span></p>
-        {response.contentType && <p>Content-Type: <span className="text-foreground">{response.contentType}</span></p>}
-        {response.url && <p className="break-all">URL: <span className="text-foreground">{response.url}</span></p>}
+      <div className="space-y-0.5 text-fg-mute">
+        <p>Total time: <span className="text-fg">{response.timeMs} ms</span></p>
+        <p>Size: <span className="text-fg">{formatBytes(response.sizeBytes)}</span></p>
+        {response.contentType && <p>Content-Type: <span className="text-fg">{response.contentType}</span></p>}
+        {response.url && <p className="break-all">URL: <span className="text-fg">{response.url}</span></p>}
       </div>
     </div>
   );
@@ -528,11 +528,11 @@ function TimingBar({ label, ms, total, tone }: { label: string; ms: number; tota
   const pct = total > 0 ? Math.max(2, Math.round((ms / total) * 100)) : 0;
   return (
     <div className="flex items-center gap-2">
-      <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+      <span className="w-28 shrink-0 text-fg-mute">{label}</span>
       <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
         <span className={cn('block h-full rounded-full', tone)} style={{ width: `${pct}%` }} />
       </span>
-      <span className="w-16 shrink-0 text-right text-foreground">{ms} ms</span>
+      <span className="w-16 shrink-0 text-right text-fg">{ms} ms</span>
     </div>
   );
 }
@@ -564,7 +564,7 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground">
+      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-bg px-1.5 py-0.5 font-mono text-[11px] text-fg-mute transition-colors hover:text-fg">
         <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
       </DropdownMenuTrigger>

@@ -26,7 +26,7 @@ export interface TabsProps {
   onSelect: (id: string) => void;
   right?: ReactNode;
   className?: string;
-  /** Active-tab underline + text color. Default 'border-primary text-foreground'
+  /** Active-tab underline + text color. Default 'border-primary text-fg'
    *  — override when a tool has an established alternate accent. */
   activeClassName?: string;
 }
@@ -169,8 +169,8 @@ function TabBtn({ def, active, activeClassName, onClick }: {
       className={cn(
         'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-medium transition-colors',
         active
-          ? (activeClassName ?? 'border-primary text-foreground')
-          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
+          ? (activeClassName ?? 'border-primary text-fg')
+          : 'border-transparent text-fg-mute hover:text-fg hover:border-border',
       )}
     >
       {def.label}{def.badge}
@@ -185,11 +185,11 @@ function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string
   const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   return (
     <div ref={ref} className="relative ml-3 shrink-0">
-      <button onClick={() => setOpen((o) => !o)} title="More tabs" className="-mb-px border-b-2 border-transparent py-2 text-muted-foreground hover:text-foreground">
+      <button onClick={() => setOpen((o) => !o)} title="More tabs" className="-mb-px border-b-2 border-transparent py-2 text-fg-mute hover:text-fg">
         <ChevronsRight className="h-4 w-4" />
       </button>
       {open && (
-        <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-popover p-1 shadow-md">
+        <div className="absolute left-0 z-50 mt-1 min-w-[10rem] rounded-lg border border-border bg-card p-1 shadow-md">
           {tabs.map((t) => (
             <button
               key={t.id}

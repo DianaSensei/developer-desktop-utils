@@ -72,9 +72,9 @@ const OP_META: Record<StepOp, OpMeta> = {
   hash:         { label: 'Hash',          hint: 'One-way fingerprint — MD5, SHA-256, SHA-512, …',       icon: Hash,            color: 'text-[var(--cat-2)]'    },
   encode:       { label: 'Encode',        hint: 'Base64, URL-encode, Hex, …',                           icon: Code2,           color: 'text-[var(--cat-5)]'    },
   decode:       { label: 'Decode',        hint: 'Reverse Base64, URL-encode, Hex, …',                   icon: Code2,           color: 'text-[var(--cat-5)]'    },
-  uppercase:    { label: 'Uppercase',     hint: 'UPPER CASE every letter',                              icon: Type,            color: 'text-muted-foreground'   },
-  lowercase:    { label: 'Lowercase',     hint: 'lower case every letter',                              icon: Type,            color: 'text-muted-foreground'   },
-  trim:         { label: 'Trim spaces',   hint: 'Remove leading / trailing whitespace',                 icon: Scissors,        color: 'text-muted-foreground'   },
+  uppercase:    { label: 'Uppercase',     hint: 'UPPER CASE every letter',                              icon: Type,            color: 'text-fg-mute'   },
+  lowercase:    { label: 'Lowercase',     hint: 'lower case every letter',                              icon: Type,            color: 'text-fg-mute'   },
+  trim:         { label: 'Trim spaces',   hint: 'Remove leading / trailing whitespace',                 icon: Scissors,        color: 'text-fg-mute'   },
   prepend:      { label: 'Prepend text',  hint: 'Add fixed text before the current value',              icon: CornerDownRight, color: 'text-[var(--cat-1)]'   },
   append:       { label: 'Append text',   hint: 'Add fixed text after the current value',               icon: CornerDownRight, color: 'text-[var(--cat-1)]'   },
   replace:      { label: 'Find & Replace',hint: 'Replace every occurrence of a string',                 icon: Search,          color: 'text-[var(--cat-1)]'   },
@@ -290,7 +290,7 @@ function HexToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
       type="button" onClick={() => onChange(!value)}
       className={cn(
         'text-[11px] font-mono px-2 h-ctl rounded-md border transition-colors',
-        value ? 'border-primary/50 bg-primary/10 text-primary' : 'border-border bg-muted/30 text-muted-foreground hover:text-foreground'
+        value ? 'border-primary/50 bg-primary/10 text-primary' : 'border-border bg-muted/30 text-fg-mute hover:text-fg'
       )}
     >
       {value ? 'ABC' : 'abc'}
@@ -307,7 +307,7 @@ function CopyBtn({ value, mini = false }: { value: string; mini?: boolean }) {
       variant="ghost"
       size="sm"
       className={cn(
-        'h-auto rounded-md font-medium text-muted-foreground',
+        'h-auto rounded-md font-medium text-fg-mute',
         mini ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs',
       )}
       iconClassName="h-3 w-3"
@@ -376,7 +376,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
           />
         ) : (
           <div className={cn('flex items-center gap-1.5 min-w-0', !field.enabled && 'opacity-40')}>
-            <span className="text-xs font-mono font-medium text-foreground truncate">{field.key}</span>
+            <span className="text-xs font-mono font-medium text-fg truncate">{field.key}</span>
             {missing && (
               <span className="shrink-0 rounded-xs border border-warn-edge bg-warn-tint px-1 py-px text-[11px] font-medium leading-none text-warn">
                 missing
@@ -398,8 +398,8 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
         ) : (
           <span className={cn(
             'block text-xs font-mono truncate',
-            field.enabled ? 'text-muted-foreground' : 'text-muted-foreground/30',
-            missing && 'text-muted-foreground/30 italic'
+            field.enabled ? 'text-fg-mute' : 'text-fg-mute/30',
+            missing && 'text-fg-mute/30 italic'
           )}>
             {jsonVal != null ? jsonVal : '—'}
           </span>
@@ -409,16 +409,16 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
       {/* Move / delete — visible on row hover */}
       <div className="shrink-0 flex items-center gap-px opacity-0 group-hover/row:opacity-100 transition-opacity">
         <button type="button" disabled={isFirst} onClick={() => onMove(-1)}
-          className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
+          className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors">
           <ChevronUp className="h-3.5 w-3.5" />
         </button>
         <button type="button" disabled={isLast} onClick={() => onMove(1)}
-          className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
+          className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors">
           <ChevronDown className="h-3.5 w-3.5" />
         </button>
         {field.type === 'custom' && (
           <button type="button" onClick={onRemove}
-            className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors">
+            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-destructive transition-colors">
             <Trash2 className="h-3 w-3" />
           </button>
         )}
@@ -518,7 +518,7 @@ function JsonInputSection({
       {/* ── Output options ── */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground font-medium">Sep</span>
+          <span className="text-[11px] text-fg-mute font-medium">Sep</span>
           <Select value={jsonSeparator} onValueChange={(v) => onUpdate({ jsonSeparator: v })}>
             <SelectTrigger className="h-ctl w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -527,7 +527,7 @@ function JsonInputSection({
           </Select>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground font-medium">Format</span>
+          <span className="text-[11px] text-fg-mute font-medium">Format</span>
           <Segmented
             value={jsonFormat}
             onValueChange={(v) => onUpdate({ jsonFormat: v })}
@@ -540,7 +540,7 @@ function JsonInputSection({
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground font-medium">Sort</span>
+          <span className="text-[11px] text-fg-mute font-medium">Sort</span>
           <Segmented
             value={jsonSort}
             onValueChange={(v) => onUpdate({ jsonSort: v })}
@@ -561,8 +561,8 @@ function JsonInputSection({
           {/* Header */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b border-border">
             <div className="w-4" />
-            <span className="w-36 shrink-0 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Field</span>
-            <span className="flex-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Value</span>
+            <span className="w-36 shrink-0 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">Field</span>
+            <span className="flex-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">Value</span>
           </div>
           {/* Rows */}
           <div className="px-3 divide-y divide-border/30">
@@ -585,7 +585,7 @@ function JsonInputSection({
       {/* Add custom field */}
       <button
         type="button" onClick={addCustomField}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 text-xs text-fg-mute hover:text-fg transition-colors"
       >
         <Plus className="h-3.5 w-3.5" />
         Add custom field
@@ -603,9 +603,9 @@ function StepOutputBar({ result }: { result: StepResult | undefined }) {
       'flex items-start gap-2 px-3 py-2 border-t text-xs font-mono',
       result.error
         ? 'bg-destructive/5 border-destructive/20 text-destructive'
-        : 'bg-muted/20 border-border/40 text-muted-foreground'
+        : 'bg-muted/20 border-border/40 text-fg-mute'
     )}>
-      <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-px text-muted-foreground/50" />
+      <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-px text-fg-mute/50" />
       <span className="flex-1 min-w-0">
         {result.error
           ? <span className="flex items-center gap-1.5"><AlertTriangle className="h-3 w-3 shrink-0" />{result.error}</span>
@@ -658,7 +658,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <SelectContent>
             {OP_GROUPS.map((group) => (
               <div key={group.label}>
-                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</div>
+                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{group.label}</div>
                 {group.ops.map((op) => {
                   const m = OP_META[op];
                   return (
@@ -675,13 +675,13 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         </Select>
 
         <div className="flex items-center gap-0.5 ml-auto">
-          <button type="button" disabled={index === 0} onClick={onMoveUp} className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
+          <button type="button" disabled={index === 0} onClick={onMoveUp} className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors">
             <ChevronUp className="h-3.5 w-3.5" />
           </button>
-          <button type="button" disabled={index === total - 1} onClick={onMoveDown} className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors">
+          <button type="button" disabled={index === total - 1} onClick={onMoveDown} className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors">
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
-          <button type="button" onClick={onRemove} className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors">
+          <button type="button" onClick={onRemove} className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-destructive transition-colors">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -747,7 +747,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
                 placeholder="Secret key…"
                 className="h-ctl pr-9 font-mono text-sm"
               />
-              <button type="button" onClick={onToggleKey} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+              <button type="button" onClick={onToggleKey} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg transition-colors">
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
@@ -767,7 +767,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {/* Prepend / Append */}
         {(step.op === 'prepend' || step.op === 'append') && (
           <div className="flex items-center gap-2">
-            <code className="text-[11px] text-muted-foreground bg-muted/40 border border-border/60 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
+            <code className="text-[11px] text-fg-mute bg-muted/40 border border-border/60 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
               {step.op === 'prepend' ? '[text] + value' : 'value + [text]'}
             </code>
             <Input
@@ -783,11 +783,11 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {step.op === 'replace' && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <p className="text-[11px] text-muted-foreground mb-1">Find (all occurrences)</p>
+              <p className="text-[11px] text-fg-mute mb-1">Find (all occurrences)</p>
               <Input value={step.find ?? ''} onChange={(e) => onUpdate({ find: e.target.value })} placeholder="Find…" className="h-ctl text-xs font-mono" />
             </div>
             <div>
-              <p className="text-[11px] text-muted-foreground mb-1">Replace with (empty = delete)</p>
+              <p className="text-[11px] text-fg-mute mb-1">Replace with (empty = delete)</p>
               <Input value={step.replacement ?? ''} onChange={(e) => onUpdate({ replacement: e.target.value })} placeholder="Replace with…" className="h-ctl text-xs font-mono" />
             </div>
           </div>
@@ -795,7 +795,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
 
         {/* No-param ops */}
         {(step.op === 'uppercase' || step.op === 'lowercase' || step.op === 'trim') && (
-          <p className="text-xs text-muted-foreground">{meta.hint}</p>
+          <p className="text-xs text-fg-mute">{meta.hint}</p>
         )}
       </div>
 
@@ -813,7 +813,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
       <div className="flex flex-col items-center gap-1">
         <div className="w-px h-3 bg-border/50" />
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}
-          className="h-ctl px-4 text-xs rounded-full border-dashed gap-1.5 text-muted-foreground hover:text-foreground">
+          className="h-ctl px-4 text-xs rounded-full border-dashed gap-1.5 text-fg-mute hover:text-fg">
           <Plus className="h-3 w-3" />Add step
         </Button>
       </div>
@@ -825,11 +825,11 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
       <div className="w-full rounded-lg border border-dashed border-primary/30 bg-primary/3 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold">Add a step</p>
-          <button type="button" onClick={() => setOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
+          <button type="button" onClick={() => setOpen(false)} className="text-xs text-fg-mute hover:text-fg">✕</button>
         </div>
         {OP_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{group.label}</p>
+            <p className="text-[11px] font-semibold text-fg-mute uppercase tracking-wide mb-1.5">{group.label}</p>
             <div className="flex flex-wrap gap-1.5">
               {group.ops.map((op) => {
                 const m = OP_META[op]; const Icon = m.icon;
@@ -864,10 +864,10 @@ function FinalResult({ result }: { result: StepResult | undefined }) {
         {ok && <CopyBtn value={result.output} />}
       </div>
       {ok
-        ? <p className="font-mono text-sm leading-relaxed break-all text-foreground">{result.output}</p>
+        ? <p className="font-mono text-sm leading-relaxed break-all text-fg">{result.output}</p>
         : <p className="text-sm text-destructive">{result.error}</p>
       }
-      {ok && <p className="text-[11px] text-muted-foreground/40 mt-1.5">{result.output.length} chars</p>}
+      {ok && <p className="text-[11px] text-fg-mute/40 mt-1.5">{result.output.length} chars</p>}
     </div>
   );
 }
@@ -943,7 +943,7 @@ export function PipelineTab({ active }: { active: boolean }) {
 
       {/* Empty state */}
       {steps.length === 0 && (
-        <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-2 py-10 text-center text-fg-mute">
           <p className="text-sm font-medium">No steps yet</p>
           <p className="text-xs">Add a node below to start building your pipeline.</p>
         </div>

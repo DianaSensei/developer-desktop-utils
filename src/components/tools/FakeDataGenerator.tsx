@@ -64,7 +64,7 @@ export function FakeDataGenerator() {
       {/* Toolbar */}
       <div className="shrink-0 header-chrome px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Rows</span>
+          <span className="text-xs text-fg-mute">Rows</span>
           <Input
             type="number"
             min={1}
@@ -75,7 +75,7 @@ export function FakeDataGenerator() {
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Seed</span>
+          <span className="text-xs text-fg-mute">Seed</span>
           <Input
             type="number"
             value={seed}
@@ -87,14 +87,14 @@ export function FakeDataGenerator() {
             size="icon"
             onClick={() => setSeed(Math.floor(Math.random() * 1e9))}
             title="New random seed"
-            className="h-ctl w-ctl rounded-sm text-muted-foreground hover:text-foreground"
+            className="h-ctl w-ctl rounded-sm text-fg-mute hover:text-fg"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </div>
         <div className="h-4 w-px bg-border" />
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Format</span>
+          <span className="text-xs text-fg-mute">Format</span>
           <Select value={format} onValueChange={(v) => setFormat(v as RowFormat)}>
             <SelectTrigger className="h-ctl w-28 text-xs rounded-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -104,7 +104,7 @@ export function FakeDataGenerator() {
         </div>
         {format === 'sql' && (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Table</span>
+            <span className="text-xs text-fg-mute">Table</span>
             <Input
               value={table}
               onChange={(e) => setTable(e.target.value)}
@@ -115,7 +115,7 @@ export function FakeDataGenerator() {
         )}
         {format === 'properties' && (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Prefix</span>
+            <span className="text-xs text-fg-mute">Prefix</span>
             <Input
               value={prefix}
               onChange={(e) => setPrefix(e.target.value)}
@@ -130,7 +130,7 @@ export function FakeDataGenerator() {
       <div className="flex flex-1 min-h-0 divide-x divide-border">
         {/* Schema builder */}
         <div className="flex w-[360px] shrink-0 flex-col min-h-0">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-muted-foreground">
+          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
             <span>Fields</span>
             <Button variant="ghost" size="sm" onClick={addField} className="h-6 gap-1 px-1.5 text-xs">
               <Plus className="h-3.5 w-3.5" /> Add
@@ -149,7 +149,7 @@ export function FakeDataGenerator() {
                   <button
                     onClick={() => removeField(f.id)}
                     title="Remove field"
-                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-bad/10 hover:text-bad"
+                    className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:bg-bad/10 hover:text-bad"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -160,7 +160,7 @@ export function FakeDataGenerator() {
                     <SelectContent>
                       {FAKER_TYPE_GROUPS.map((g) => (
                         <SelectGroup key={g.group}>
-                          <SelectLabel className="text-[11px] uppercase tracking-wide text-muted-foreground/70">{g.group}</SelectLabel>
+                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute/70">{g.group}</SelectLabel>
                           {g.types.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                         </SelectGroup>
                       ))}
@@ -184,7 +184,7 @@ export function FakeDataGenerator() {
                         <SelectItem key={d.value} value={d.value}>
                           <span className="flex items-baseline gap-2">
                             {d.label}
-                            <span className="font-mono text-[11px] text-muted-foreground">{d.example}</span>
+                            <span className="font-mono text-[11px] text-fg-mute">{d.example}</span>
                           </span>
                         </SelectItem>
                       ))}
@@ -202,17 +202,17 @@ export function FakeDataGenerator() {
               </div>
             ))}
             {fields.length === 0 && (
-              <p className="px-1 py-6 text-center text-xs text-muted-foreground">No fields — add one to start.</p>
+              <p className="px-1 py-6 text-center text-xs text-fg-mute">No fields — add one to start.</p>
             )}
           </div>
         </div>
 
         {/* Output */}
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-muted-foreground">
+          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
             <span>{safeCount.toLocaleString()} row{safeCount !== 1 ? 's' : ''}</span>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={handleDownload} disabled={!output} title="Download" className="h-6 w-6 rounded text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" onClick={handleDownload} disabled={!output} title="Download" className="h-6 w-6 rounded text-fg-mute hover:text-fg">
                 <Download className="h-3.5 w-3.5" />
               </Button>
               <CopyButton value={() => output} iconClassName="h-3.5 w-3.5" disabled={!output} />

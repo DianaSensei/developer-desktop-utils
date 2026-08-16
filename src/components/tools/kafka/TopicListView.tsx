@@ -63,7 +63,7 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
         {error && <Callout tone="error">{error}</Callout>}
         {topics && !error && (
           rows.length === 0
-            ? <p className="text-sm text-muted-foreground">{f ? 'No matching topics.' : 'No topics yet.'}</p>
+            ? <p className="text-sm text-fg-mute">{f ? 'No matching topics.' : 'No topics yet.'}</p>
             : (
               <DataTable>
                 <Thead>
