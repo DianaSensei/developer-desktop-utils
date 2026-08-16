@@ -95,13 +95,13 @@ export function TopicView({
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Produce / Consume open the global panels pre-targeted at this topic. */}
-          <Button variant="outline" size="sm" className="h-8 gap-1 text-xs rounded-sm" onClick={onProduce} title="Produce a message to this topic">
+          <Button variant="outline" size="sm" className="h-ctl gap-1 text-xs rounded-sm" onClick={onProduce} title="Produce a message to this topic">
             <Send className="w-3 h-3" /> Produce
           </Button>
-          <Button variant="outline" size="sm" className="h-8 gap-1 text-xs rounded-sm" onClick={onConsume} title="Watch this topic in realtime">
+          <Button variant="outline" size="sm" className="h-ctl gap-1 text-xs rounded-sm" onClick={onConsume} title="Watch this topic in realtime">
             <Radio className="w-3 h-3" /> Consume
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs rounded-sm" onClick={onRefresh}>
+          <Button variant="ghost" size="sm" className="h-ctl gap-1 text-xs rounded-sm" onClick={onRefresh}>
             <RefreshCw className="w-3 h-3" /> Refresh
           </Button>
         </div>

@@ -52,7 +52,7 @@ export function GroupListView({ brokerId, refreshKey, onRefresh, onSelectGroup }
       />
 
       <div className="px-5 pt-3 shrink-0">
-        <SearchInput value={filter} onChange={setFilter} placeholder="Search groups…" className="h-8 text-sm" containerClassName="max-w-sm" />
+        <SearchInput value={filter} onChange={setFilter} placeholder="Search groups…" className="h-ctl text-sm" containerClassName="max-w-sm" />
       </div>
 
       <div className="tool-scrollable px-5 py-4">

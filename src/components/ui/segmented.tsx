@@ -62,7 +62,7 @@ export function Segmented<T extends string>({
     refs.current[next]?.focus();
   }
 
-  const trackH = size === 'sm' ? 'h-8' : 'h-ctl';
+  const trackH = size === 'sm' ? 'h-ctl' : 'h-ctl';
   const textSize = size === 'sm' ? 'text-xs' : 'text-sm';
 
   return (

@@ -362,7 +362,7 @@ export function LuckyWheel() {
             <Timer className="h-3.5 w-3.5" />
             <span>Spin time</span>
             <Select value={String(spinSec)} onValueChange={(v) => setSpinSec(Number(v))}>
-              <SelectTrigger className="h-8 w-[4.5rem] text-xs rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-[4.5rem] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {SPIN_DURATIONS.map((s) => <SelectItem key={s} value={String(s)}>{s}s</SelectItem>)}
               </SelectContent>
@@ -471,14 +471,14 @@ export function LuckyWheel() {
                 if (!Number.isNaN(v)) setAutoCount(Math.min(Math.max(1, v), Math.max(1, maxAuto)));
               }}
               disabled={spinning}
-              className="h-8 w-14 text-center text-sm"
+              className="h-ctl w-14 text-center text-sm"
               title="Number of winners to draw"
             />
             <Button
               onClick={autoSpin}
               disabled={spinning || choices.length < 2 || autoCount < 1}
               variant="outline"
-              className="h-8 gap-1.5"
+              className="h-ctl gap-1.5"
             >
               {spinning && autoLeft ? <Spinner /> : <Repeat className="h-4 w-4" />}
               {spinning && autoLeft ? `Auto ${autoLeft} left` : 'Auto-spin'}

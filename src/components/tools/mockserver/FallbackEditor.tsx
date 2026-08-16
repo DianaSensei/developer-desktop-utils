@@ -26,7 +26,7 @@ export function FallbackEditor({ config, onChange }: Props) {
             type="number"
             value={config.notFoundStatus}
             onChange={(e) => onChange({ notFoundStatus: Number(e.target.value) || 0 })}
-            className="h-8 w-20 text-xs"
+            className="h-ctl w-20 text-xs"
           />
         </div>
         <div className="flex flex-1 items-center gap-1.5">
@@ -35,7 +35,7 @@ export function FallbackEditor({ config, onChange }: Props) {
             value={config.notFoundContentType}
             onChange={(e) => onChange({ notFoundContentType: e.target.value })}
             placeholder="application/json"
-            className="h-8 flex-1 font-mono text-xs"
+            className="h-ctl flex-1 font-mono text-xs"
           />
         </div>
       </div>

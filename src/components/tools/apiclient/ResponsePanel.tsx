@@ -335,7 +335,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                     placeholder="$.store.book[*].title"
-                    className="h-7 border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-ctl border-0 bg-transparent px-0 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                     spellCheck={false}
                     autoFocus
                   />
@@ -479,7 +479,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
   if (response.binary && format !== 'hex' && format !== 'base64') {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-        <Binary className="h-8 w-8 text-muted-foreground/30" />
+        <Binary className="h-ctl w-ctl text-muted-foreground/30" />
         <p className="text-xs text-muted-foreground">
           Binary response ({response.contentType || 'unknown type'}, {formatBytes(response.sizeBytes)}).
         </p>

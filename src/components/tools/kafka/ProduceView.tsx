@@ -118,7 +118,7 @@ function TopicCombobox({ brokerId, value, topics, onChange }: {
         onBlur={() => { blurTimer.current = setTimeout(() => setOpen(false), 120); }}
         onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
         placeholder="topic name — type to search"
-        className="font-mono text-sm h-9"
+        className="font-mono text-sm h-ctl"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">

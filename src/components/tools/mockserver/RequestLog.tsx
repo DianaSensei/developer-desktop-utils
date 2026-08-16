@@ -40,7 +40,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 text-xs text-muted-foreground"
+            className="h-ctl text-xs text-muted-foreground"
             onClick={onClear}
             disabled={!log.length}
           >
@@ -52,7 +52,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
 
       {log.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
-          <Inbox className="h-8 w-8 opacity-40" />
+          <Inbox className="h-ctl w-ctl opacity-40" />
           <p className="text-xs">Incoming requests appear here while the server is running.</p>
         </div>
       ) : (

@@ -64,7 +64,7 @@ export function MeetingNotes() {
           <Button onClick={createNew} size="sm" className="w-full gap-1.5">
             <Plus className="h-4 w-4" /> New note
           </Button>
-          <SearchInput value={query} onChange={setQuery} placeholder="Search notes…" className="h-8 text-xs" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search notes…" className="h-ctl text-xs" />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
           {filtered.length === 0 ? (

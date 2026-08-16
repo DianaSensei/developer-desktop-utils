@@ -224,13 +224,13 @@ export function CalendarView() {
     <div className="flex h-full flex-col">
       {/* Nav */}
       <div className="flex shrink-0 items-center gap-2 border-b p-3">
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? -1 : -7))}>
+        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? -1 : -7))}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="sm" className="h-8" onClick={() => setAnchor(now)}>
+        <Button variant="outline" size="sm" className="h-ctl" onClick={() => setAnchor(now)}>
           Today
         </Button>
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? 1 : 7))}>
+        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, view === 'day' ? 1 : 7))}>
           <ChevronRight className="h-4 w-4" />
         </Button>
         <span className="ml-2 text-sm font-medium">
@@ -243,7 +243,7 @@ export function CalendarView() {
         )}
         <Button
           size="sm"
-          className="ml-auto h-8 gap-1.5"
+          className="ml-auto h-ctl gap-1.5"
           onClick={() => {
             const day = dayStart(view === 'day' ? days[0] : now);
             const base = sameDay(day, now) ? Math.round(now / (30 * MS_MIN)) * (30 * MS_MIN) : day + 10 * 3600_000;
@@ -485,7 +485,7 @@ function EntryEditor({
             {entry.end !== null ? (
               <DateTimePicker value={entry.end} onChange={(ts) => onChange({ end: Math.max(ts, entry.start) })} />
             ) : (
-              <div className="flex h-9 items-center px-1 text-xs text-muted-foreground">Running…</div>
+              <div className="flex h-ctl-lg items-center px-1 text-xs text-muted-foreground">Running…</div>
             )}
           </div>
         </div>

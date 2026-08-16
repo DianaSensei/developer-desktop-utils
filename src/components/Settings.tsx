@@ -427,7 +427,7 @@ export function Settings() {
             value={toolQuery}
             onChange={(e) => setToolQuery(e.target.value)}
             placeholder="Search tools…"
-            className="pl-8 pr-8 h-8 text-xs bg-muted/40 border-muted focus-visible:ring-1"
+            className="pl-8 pr-8 h-ctl text-xs bg-muted/40 border-muted focus-visible:ring-1"
           />
           {toolQuery && (
             <button
@@ -664,7 +664,7 @@ export function Settings() {
               <div className="flex items-center gap-2">
                 {autoCheckEnabled && (
                   <Select value={String(checkHour)} onValueChange={(v) => setCheckHour(Number(v))}>
-                    <SelectTrigger className="h-8 w-28 text-xs rounded-lg">
+                    <SelectTrigger className="h-ctl w-28 text-xs rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -875,7 +875,7 @@ export function Settings() {
                         const v = e.target.value;
                         if (v !== '') setField(f, Number(v));
                       }}
-                      className="h-8 w-24 text-center text-xs rounded-lg"
+                      className="h-ctl w-24 text-center text-xs rounded-lg"
                     />
                     {f.unit && <span className="w-5 text-[11px] text-muted-foreground">{f.unit}</span>}
                   </div>

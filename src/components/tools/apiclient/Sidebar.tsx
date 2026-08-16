@@ -191,7 +191,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
 
       {/* search */}
       <div className="border-b border-border px-2 py-1.5">
-        <SearchInput ref={searchInputRef} value={query} onChange={setQuery} placeholder="Search" className="h-7 text-xs" />
+        <SearchInput ref={searchInputRef} value={query} onChange={setQuery} placeholder="Search" className="h-ctl text-xs" />
       </div>
 
       {error && (

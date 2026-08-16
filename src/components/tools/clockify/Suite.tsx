@@ -78,10 +78,10 @@ function SuiteInner() {
           </button>
         )}
 
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="Projects" onClick={() => setShowProjects(true)}>
+        <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0" title="Projects" onClick={() => setShowProjects(true)}>
           <FolderKanban className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" title="Settings" onClick={() => setShowSettings(true)}>
+        <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0" title="Settings" onClick={() => setShowSettings(true)}>
           <SettingsIcon className="h-4 w-4" />
         </Button>
       </div>
@@ -108,7 +108,7 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) { addProject(name.trim()); setName(''); } }}
             placeholder="New project name…"
-            className="h-9 flex-1"
+            className="h-ctl flex-1"
           />
           <Button size="sm" className="gap-1.5" onClick={() => { if (name.trim()) { addProject(name.trim()); setName(''); } }}>
             <Plus className="h-4 w-4" /> Add
@@ -120,7 +120,7 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
           {projects.map((p) => (
             <div key={p.id} className={cn('flex items-center gap-2 px-2.5 py-2', p.archived && 'opacity-50')}>
               <ColorMenu color={p.color} onPick={(c) => updateProject(p.id, { color: c })} />
-              <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-8 flex-1 text-sm rounded-sm" />
+              <Input value={p.name} onChange={(e) => updateProject(p.id, { name: e.target.value })} className="h-ctl flex-1 text-sm rounded-sm" />
               <button
                 onClick={() => updateProject(p.id, { archived: !p.archived })}
                 className="text-[11px] text-muted-foreground hover:text-foreground"

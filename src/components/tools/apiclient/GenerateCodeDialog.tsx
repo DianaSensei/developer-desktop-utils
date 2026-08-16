@@ -47,7 +47,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
         {/* toolbar */}
         <div className="flex items-center gap-3 px-4 py-3">
           <Select value={lang} onValueChange={pickLang}>
-            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl w-40 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {CODE_TARGETS.map((t) => <SelectItem key={t.lang} value={t.lang}>{t.lang}</SelectItem>)}
             </SelectContent>
@@ -93,7 +93,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
             title="Copy"
             variant="ghost"
             size="icon"
-            className="absolute right-3 top-3 h-8 w-8 text-muted-foreground"
+            className="absolute right-3 top-3 h-ctl w-ctl text-muted-foreground"
             iconClassName="h-4 w-4"
           />
         </div>

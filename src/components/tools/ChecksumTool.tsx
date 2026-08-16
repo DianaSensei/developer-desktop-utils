@@ -236,7 +236,7 @@ export function ChecksumTool() {
           {!isTauri && (
             <input ref={inputRef} type="file" className="hidden" onChange={handleFileChange} />
           )}
-          <Upload className="h-8 w-8 text-muted-foreground/50" />
+          <Upload className="h-ctl w-ctl text-muted-foreground/50" />
           <div className="text-center">
             <p className="text-sm font-medium">Drop a file here</p>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -310,7 +310,7 @@ export function ChecksumTool() {
                   value={verify}
                   onChange={(e) => setVerify(e.target.value)}
                   placeholder="Paste a known hash…"
-                  className="h-8 text-xs font-mono pr-8"
+                  className="h-ctl text-xs font-mono pr-8"
                 />
                 {verifyNorm && (
                   <span className="absolute right-2.5 top-1/2 -translate-y-1/2">

@@ -38,7 +38,7 @@ export function EmptyState({
       )}
     >
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/20">
-        <Icon className="h-8 w-8 text-muted-foreground/40" />
+        <Icon className="h-ctl w-ctl text-muted-foreground/40" />
       </div>
 
       <div className="space-y-2">
@@ -51,12 +51,12 @@ export function EmptyState({
       {(action || secondaryAction) && (
         <div className="mt-4 flex gap-2">
           {action && (
-            <Button onClick={action.onClick} variant={action.variant || 'default'} size="sm" className="h-8">
+            <Button onClick={action.onClick} variant={action.variant || 'default'} size="sm" className="h-ctl">
               {action.label}
             </Button>
           )}
           {secondaryAction && (
-            <Button onClick={secondaryAction.onClick} variant="outline" size="sm" className="h-8">
+            <Button onClick={secondaryAction.onClick} variant="outline" size="sm" className="h-ctl">
               {secondaryAction.label}
             </Button>
           )}

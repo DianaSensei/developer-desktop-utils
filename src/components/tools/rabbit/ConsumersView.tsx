@@ -126,7 +126,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: ConsumerSession; onO
         {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
       </span>
       <span onClick={(e) => e.stopPropagation()} className="shrink-0">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" title="Stop consumer" onClick={() => consumerStore.stop(s.connId, s.queue)}>
+        <Button variant="ghost" size="sm" className="h-ctl px-2 text-destructive" title="Stop consumer" onClick={() => consumerStore.stop(s.connId, s.queue)}>
           <Square className="h-3 w-3" />
         </Button>
       </span>
@@ -208,7 +208,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
           <Label htmlFor="cs-prefetch" className="text-xs">Prefetch</Label>
           <Input id="cs-prefetch" type="number" min={1} max={500} value={prefetch}
             onChange={(e) => setPrefetch(Math.max(1, Math.min(500, Number(e.target.value))))}
-            className="mt-1 h-9" />
+            className="mt-1 h-ctl" />
         </div>
       </div>
 
@@ -264,7 +264,7 @@ function StartConsumerForm({ conn, queues, sessions, prefill, onStarted }: {
           )}
           <div>
             <Label className="text-xs">Reply content type</Label>
-            <Input value={replyContentType} onChange={(e) => setReplyContentType(e.target.value)} placeholder="application/json" className="mt-1 font-mono text-xs h-8" />
+            <Input value={replyContentType} onChange={(e) => setReplyContentType(e.target.value)} placeholder="application/json" className="mt-1 font-mono text-xs h-ctl" />
           </div>
         </div>
       )}
@@ -358,7 +358,7 @@ function ConsumerDetail({ session: s, onBack }: { session: ConsumerSession; onBa
           value={query}
           onChange={setQuery}
           placeholder="Search payload, routing key, exchange, correlation id…"
-          className="h-8 text-xs"
+          className="h-ctl text-xs"
           containerClassName="flex-1 min-w-0 max-w-md"
         />
         <Segmented<ValueFormat>
@@ -492,7 +492,7 @@ function QueueCombobox({ connId, value, queues, onChange }: {
         onBlur={() => { blurTimer.current = setTimeout(() => setOpen(false), 120); }}
         onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
         placeholder="queue name — type to search"
-        className="font-mono text-sm h-9"
+        className="font-mono text-sm h-ctl"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">

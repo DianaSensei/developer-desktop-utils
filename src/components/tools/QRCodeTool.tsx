@@ -393,7 +393,7 @@ function QrGenerator() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={`Enter text or URL — ${quickPasteHint}`}
-            className="h-9"
+            className="h-ctl-lg"
           />
         </div>
 

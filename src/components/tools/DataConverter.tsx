@@ -171,7 +171,7 @@ export function DataConverter() {
           {/* From → To */}
           <div className="flex items-center gap-2">
             <Select value={from} onValueChange={(v) => setFrom(v as Format)}>
-              <SelectTrigger className="h-8 w-[104px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-[104px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {FORMATS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
               </SelectContent>
@@ -181,12 +181,12 @@ export function DataConverter() {
               size="icon"
               onClick={handleSwap}
               title="Swap directions"
-              className="h-8 w-8 shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
+              className="h-ctl w-ctl shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
             >
               <ArrowLeftRight className="h-4 w-4" />
             </Button>
             <Select value={to} onValueChange={(v) => setTo(v as Format)}>
-              <SelectTrigger className="h-8 w-[104px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-[104px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {FORMATS.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
               </SelectContent>
@@ -199,7 +199,7 @@ export function DataConverter() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Indent</span>
             <Select value={indent} onValueChange={(v) => setIndent(v as '2' | '4')}>
-              <SelectTrigger className="h-8 w-[88px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-[88px] text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="2">2 spaces</SelectItem>
                 <SelectItem value="4">4 spaces</SelectItem>

@@ -16,7 +16,7 @@ interface Props {
 
 const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '' || !!r.fileName;
 
-const inputCls = 'h-8 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0';
+const inputCls = 'h-ctl border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0';
 
 export function MultipartEditor({ rows, onChange }: Props) {
   const ghostRef = useRef(newKeyValue());

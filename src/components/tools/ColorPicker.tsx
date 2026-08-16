@@ -499,12 +499,12 @@ export function ColorPicker() {
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={downloadPalette}
-                  className="flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:bg-muted"
                   title="Download palette as PNG">
                   <Download className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={savePalette}
-                  className="flex h-8 w-8 items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:bg-muted"
+                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:bg-muted"
                   title="Copy all hex codes">
                   {copied === 'palette' ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>

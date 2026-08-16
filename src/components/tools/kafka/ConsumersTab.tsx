@@ -69,7 +69,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span className="break-all">{error}</span>
         </div>
-        <Button variant="outline" size="sm" className="mt-3 h-8 gap-1.5 text-xs" onClick={load}>
+        <Button variant="outline" size="sm" className="mt-3 h-ctl gap-1.5 text-xs" onClick={load}>
           <RefreshCw className="w-3 h-3" /> Retry
         </Button>
       </div>
@@ -80,7 +80,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
     return (
       <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
         <p className="text-sm text-muted-foreground">No consumer groups committed to this topic</p>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={load} disabled={loading}>
+        <Button variant="outline" size="sm" className="h-ctl gap-1.5 text-xs" onClick={load} disabled={loading}>
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
@@ -95,7 +95,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
         <span className="text-xs text-muted-foreground">
           {grouped.length} group{grouped.length !== 1 ? 's' : ''}
         </span>
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={load} disabled={loading}>
+        <Button variant="ghost" size="sm" className="h-ctl gap-1.5 text-xs" onClick={load} disabled={loading}>
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>

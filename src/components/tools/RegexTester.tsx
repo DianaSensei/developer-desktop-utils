@@ -280,10 +280,10 @@ export function RegexTester() {
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
             placeholder="[a-z]+"
-            className={cn('flex-1 h-8 font-mono text-sm rounded-lg', result.error && 'border-destructive')}
+            className={cn('flex-1 h-ctl font-mono text-sm rounded-lg', result.error && 'border-destructive')}
           />
           <span className="font-mono text-sm text-muted-foreground select-none">/</span>
-          <div className="inline-flex h-8 rounded-lg border border-border bg-muted/50 p-0.5 gap-px">
+          <div className="inline-flex h-ctl rounded-lg border border-border bg-muted/50 p-0.5 gap-px">
             {FLAG_DEFS.map(({ flag, title }) => (
               <button
                 key={flag}
@@ -582,7 +582,7 @@ export function RegexTester() {
                     value={replacement}
                     onChange={(e) => setReplacement(e.target.value)}
                     placeholder="Type replacement text here, or leave empty to delete matches"
-                    className="h-8 font-mono text-sm rounded-lg"
+                    className="h-ctl font-mono text-sm rounded-lg"
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Advanced: <code className="font-mono">$1</code>, <code className="font-mono">$2</code>… insert captured groups · <code className="font-mono">$&</code> inserts the whole match · <code className="font-mono">{'$<name>'}</code> for named groups

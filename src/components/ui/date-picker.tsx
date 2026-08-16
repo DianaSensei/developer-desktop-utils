@@ -75,13 +75,13 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         {monthYearNav ? (
           <div className="flex flex-1 gap-1">
             <Select value={String(viewMonth.getMonth())} onValueChange={(v) => setViewMonth(new Date(viewMonth.getFullYear(), Number(v), 1))}>
-              <SelectTrigger className="h-7 flex-1 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl flex-1 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {MONTHS.map((mn, i) => <SelectItem key={i} value={String(i)}>{mn}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={String(viewMonth.getFullYear())} onValueChange={(v) => setViewMonth(new Date(Number(v), viewMonth.getMonth(), 1))}>
-              <SelectTrigger className="h-7 w-[74px] text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-[74px] text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
               </SelectContent>
@@ -119,7 +119,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
               type="button"
               onClick={() => pick(d)}
               className={cn(
-                'h-7 rounded-md text-xs transition-colors',
+                'h-ctl rounded-md text-xs transition-colors',
                 !inMonth && 'text-muted-foreground/40',
                 isSel
                   ? 'bg-primary font-semibold text-primary-foreground'
@@ -155,7 +155,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         disabled={disabled}
         onClick={() => !disabled && setOpen((v) => !v)}
         className={cn(
-          'flex h-9 items-center gap-2 rounded-md border border-input bg-card px-2.5 text-sm shadow-sm',
+          'flex h-ctl-lg items-center gap-2 rounded-md border border-input bg-card px-2.5 text-sm shadow-sm',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
           disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-muted/50',
           className,

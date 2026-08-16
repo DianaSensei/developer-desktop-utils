@@ -198,7 +198,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         <div className="flex items-center gap-3">
           <div>
             <Label className="text-xs">Partition</Label>
-            <div className="flex rounded-md border border-input overflow-hidden text-xs h-8 mt-1">
+            <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl mt-1">
               <button
                 className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted'}`}
                 onClick={() => setPartitionMode('auto')}
@@ -216,7 +216,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
           {partitionMode === 'manual' && (
             <div className="mt-auto">
               <Select value={String(partition)} onValueChange={(v) => setPartition(Number(v))}>
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger className="h-ctl text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -243,7 +243,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="message key"
-            className="mt-1 h-8 text-xs font-mono"
+            className="mt-1 h-ctl text-xs font-mono"
           />
         </div>
         )}
@@ -269,13 +269,13 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
                 value={h.key}
                 onChange={(e) => updateHeader(i, 'key', e.target.value)}
                 placeholder="key"
-                className="h-7 text-xs font-mono flex-1"
+                className="h-ctl text-xs font-mono flex-1"
               />
               <Input
                 value={h.value}
                 onChange={(e) => updateHeader(i, 'value', e.target.value)}
                 placeholder="value"
-                className="h-7 text-xs font-mono flex-[2]"
+                className="h-ctl text-xs font-mono flex-[2]"
               />
               <button
                 className="text-muted-foreground hover:text-destructive px-1"

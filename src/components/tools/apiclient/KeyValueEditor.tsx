@@ -186,14 +186,14 @@ export function KeyValueEditor({
                   value={row.key}
                   onChange={(e) => editRow(row.id, { key: e.target.value })}
                   placeholder={keyPlaceholder}
-                  className={cn('h-9 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', disabled && 'opacity-40 line-through')}
+                  className={cn('h-ctl border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', disabled && 'opacity-40 line-through')}
                   spellCheck={false}
                 />
               </div>
               {/* Value cell */}
               <div className="border-r px-1.5">
                 {vars ? (
-                  <div className={cn('flex h-9 items-center', disabled && 'opacity-40')}>
+                  <div className={cn('flex h-ctl items-center', disabled && 'opacity-40')}>
                     <InlineCodeField
                       value={row.value}
                       onChange={(v) => editRow(row.id, { value: v })}
@@ -202,13 +202,13 @@ export function KeyValueEditor({
                     />
                   </div>
                 ) : secret ? (
-                  <div className={cn('flex h-9 items-center gap-0.5', disabled && 'opacity-40')}>
+                  <div className={cn('flex h-ctl items-center gap-0.5', disabled && 'opacity-40')}>
                     <Input
                       type={revealed.has(row.id) ? 'text' : 'password'}
                       value={row.value}
                       onChange={(e) => editRow(row.id, { value: e.target.value })}
                       placeholder={valuePlaceholder}
-                      className="h-9 border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                      className="h-ctl border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       spellCheck={false}
                       autoComplete="off"
                     />
@@ -228,7 +228,7 @@ export function KeyValueEditor({
                     value={row.value}
                     onChange={(e) => editRow(row.id, { value: e.target.value })}
                     placeholder={valuePlaceholder}
-                    className={cn('h-9 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', disabled && 'opacity-40')}
+                    className={cn('h-ctl border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', disabled && 'opacity-40')}
                     spellCheck={false}
                   />
                 )}
