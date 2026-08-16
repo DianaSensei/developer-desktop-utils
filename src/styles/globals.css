@@ -131,9 +131,6 @@
   .tool-spacer {
     @apply space-y-6 sm:space-y-7;
   }
-  .tool-section-premium {
-    @apply space-y-3;
-  }
   .tool-input-row {
     @apply space-y-2.5;
   }

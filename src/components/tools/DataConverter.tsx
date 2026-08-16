@@ -166,7 +166,7 @@ export function DataConverter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-premium px-4 py-2.5">
+      <div className="shrink-0 header-chrome px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* From → To */}
           <div className="flex items-center gap-2">

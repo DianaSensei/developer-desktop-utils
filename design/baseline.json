@@ -1,12 +1,12 @@
 {
   "_": "Ngưỡng vi phạm thiết kế trong src/. Chỉ được GIẢM, không được tăng.",
   "_how": "Dọn xong một đợt thì hạ số tương ứng — guard.test.ts sẽ nhắc khi số thực thấp hơn ngưỡng.",
-  "_phase": "Hạ ở G4 đợt 4.4 — kết thúc G4. Guard giờ bỏ comment trước khi đếm.",
+  "_phase": "Hạ ở G5a.1 — premiumUtilities về 0 (xoá bí danh shadow-*-premium, đổi tên header/sidebar-premium → header/sidebar-chrome).",
   "limits": {
     "rawColors": 0,
     "tinyText": 30,
     "mixedControlHeights": 349,
-    "premiumUtilities": 39,
+    "premiumUtilities": 0,
     "hoverLift": 0,
     "handRolledTooltip": 0
   }

@@ -82,9 +82,9 @@ xem [`design/TOKENS.md`](../../design/TOKENS.md).
 ## Utility classes
 
 - **Glass**: `.glass`, `.glass-strong`, `.glass-chrome`, `.glass-sheen`
-- **Elevation**: `.shadow-primary`, `.shadow-primary-lg`; `.shadow-sm-premium … .shadow-2xl-premium` là **bí danh tạm** ánh xạ xuống 3 bậc của kit
+- **Elevation**: `.shadow-primary`, `.shadow-primary-lg`; dùng thẳng `shadow-sm`/`shadow`/`shadow-lg` (đã ánh xạ xuống 3 bậc của kit trong `tailwind-preset.cjs`)
 - **Motion**: `.hover-elevate` (không còn nhấc phần tử), `.press`, `.animate-fade-in-up`, `.animate-scale-in`
-- **Chrome**: `.sidebar-premium`, `.header-premium`, `.content-wrapper`
+- **Chrome**: `.sidebar-chrome`, `.header-chrome`, `.content-wrapper`
 - **Typography**: `.heading-xl…xs`, `.text-body`, `.text-caption`
 
 > Đã xoá ở G1 (0 lượt dùng trong code): `.card-premium`, `.card-interactive`,

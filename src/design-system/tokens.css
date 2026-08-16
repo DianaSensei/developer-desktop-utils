@@ -202,15 +202,6 @@
     display: none;
   }
 
-  /* ── Bí danh bóng đổ (đang còn 15 chỗ dùng) ────────────────────────────
-     Hệ cũ có 6 bậc, kit có 3. Ánh xạ xuống 3 bậc thật; G5 xoá bí danh khi
-     các chỗ gọi đã chuyển sang `shadow` / `shadow-soft` / `shadow-lift`. */
-  .shadow-sm-premium { box-shadow: var(--sh-sm); }
-  .shadow-md-premium { box-shadow: var(--sh); }
-  .shadow-lg-premium { box-shadow: var(--sh); }
-  .shadow-xl-premium { box-shadow: var(--sh-lg); }
-  .shadow-2xl-premium { box-shadow: var(--sh-lg); }
-
   /* Bóng ngả sắc accent dưới hành động chính. */
   .shadow-primary {
     box-shadow: 0 2px 8px -2px hsl(var(--acc-c) / 0.35),
@@ -250,8 +241,8 @@
      dưới con trỏ. */
   .hover-elevate {
     @apply transition-[box-shadow,border-color,background-color] duration-200 ease-out
-           hover:shadow-md-premium hover:border-border/70
-           active:shadow-sm-premium;
+           hover:shadow hover:border-border/70
+           active:shadow-sm;
   }
   .press {
     @apply transition-transform duration-150 ease-out motion-safe:active:scale-[0.96];
@@ -281,10 +272,10 @@
   .text-caption { @apply text-xs leading-relaxed text-muted-foreground; }
 
   /* ── App chrome ───────────────────────────────────────────────────── */
-  .sidebar-premium {
+  .sidebar-chrome {
     @apply glass-chrome glass-sheen border-r border-border/70;
   }
-  .header-premium {
+  .header-chrome {
     @apply glass-chrome border-b border-border/70;
   }
   .content-wrapper {
