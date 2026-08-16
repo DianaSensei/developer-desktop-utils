@@ -95,7 +95,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
         type="number"
         value={stub.delayMs}
         onChange={(e) => onChange({ delayMs: Math.max(0, Number(e.target.value) || 0) })}
-        className="h-8 w-20 text-xs"
+        className="h-ctl w-20 text-xs"
       />
       <span className="text-xs text-muted-foreground">ms</span>
     </div>
@@ -109,7 +109,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
           value={stub.name}
           onChange={(e) => onChange({ name: e.target.value })}
           placeholder="Stub name"
-          className="h-9 flex-1 text-sm font-medium"
+          className="h-ctl flex-1 text-sm font-medium"
         />
         <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           {stub.enabled ? 'Enabled' : 'Disabled'}
@@ -120,7 +120,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
       {/* Method + path — the primary request matcher */}
       <div className="flex items-center gap-1.5">
         <Select value={stub.method} onValueChange={(v) => onChange({ method: v as StubMethod })}>
-          <SelectTrigger className="h-9 w-[100px] shrink-0 text-xs font-semibold">
+          <SelectTrigger className="h-ctl w-[100px] shrink-0 text-xs font-semibold">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -135,7 +135,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
           value={stub.path}
           onChange={(e) => onChange({ path: e.target.value })}
           placeholder="/path/:id"
-          className="h-9 flex-1 font-mono text-sm"
+          className="h-ctl flex-1 font-mono text-sm"
         />
       </div>
       <ToolHint className="-mt-3">
@@ -172,7 +172,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                   type="number"
                   value={stub.status}
                   onChange={(e) => onChange({ status: Number(e.target.value) || 0 })}
-                  className="h-8 w-20 text-xs"
+                  className="h-ctl w-20 text-xs"
                 />
               </div>
               {delayField}
@@ -231,7 +231,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-8 text-xs"
+                      className="h-ctl text-xs"
                       onClick={() => fileInput.current?.click()}
                     >
                       <Upload className="mr-1 h-3.5 w-3.5" />
@@ -260,7 +260,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                       value={stub.fileName}
                       onChange={(e) => onChange({ fileName: e.target.value })}
                       placeholder="file.bin"
-                      className="h-8 flex-1 font-mono text-xs"
+                      className="h-ctl flex-1 font-mono text-xs"
                     />
                   </div>
                   <textarea
@@ -315,7 +315,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
             </ToolHint>
             <JavaScriptEditor value={stub.script} onChange={(script) => onChange({ script })} placeholder="Rhai script" />
             <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={runTest} disabled={testing}>
+              <Button type="button" variant="outline" size="sm" className="h-ctl text-xs" onClick={runTest} disabled={testing}>
                 <FlaskConical className="mr-1 h-3.5 w-3.5" />
                 {testing ? 'Running…' : 'Test script'}
               </Button>

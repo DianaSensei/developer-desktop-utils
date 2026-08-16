@@ -57,7 +57,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
           <div key={m.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-2">
             {/* What to look at */}
             <Select value={m.target} onValueChange={onTargetChange}>
-              <SelectTrigger className="h-9 w-[112px] shrink-0 text-xs">
+              <SelectTrigger className="h-ctl w-[112px] shrink-0 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -77,7 +77,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
                   v === 'whole' ? update(m.id, { bodyMode: 'whole', key: '' }) : update(m.id, { bodyMode: 'field' })
                 }
               >
-                <SelectTrigger className="h-9 w-[132px] shrink-0 text-xs">
+                <SelectTrigger className="h-ctl w-[132px] shrink-0 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -93,13 +93,13 @@ export function MatcherEditor({ matchers, onChange }: Props) {
                 value={m.key}
                 onChange={(e) => update(m.id, { key: e.target.value })}
                 placeholder={keyPlaceholder}
-                className={cn('h-9 min-w-0 font-mono text-xs', isBody ? 'flex-1 basis-[160px]' : 'w-[150px] shrink-0')}
+                className={cn('h-ctl min-w-0 font-mono text-xs', isBody ? 'flex-1 basis-[160px]' : 'w-[150px] shrink-0')}
               />
             )}
 
             {/* Operator */}
             <Select value={m.op} onValueChange={(v) => update(m.id, { op: v as MatcherOp })}>
-              <SelectTrigger className="h-9 w-[112px] shrink-0 text-xs">
+              <SelectTrigger className="h-ctl w-[112px] shrink-0 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -117,7 +117,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
                 value={m.value}
                 onChange={(e) => update(m.id, { value: e.target.value })}
                 placeholder={m.op === 'regex' ? '^pattern$' : 'expected value'}
-                className="h-9 min-w-0 flex-1 basis-[140px] font-mono text-xs"
+                className="h-ctl min-w-0 flex-1 basis-[140px] font-mono text-xs"
               />
             ) : (
               <div className="flex-1 basis-[140px]" />
@@ -127,7 +127,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+              className="h-ctl w-ctl shrink-0 text-muted-foreground hover:text-destructive"
               onClick={() => remove(m.id)}
               aria-label="Remove matcher"
             >
@@ -143,7 +143,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
         </p>
       )}
 
-      <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={add}>
+      <Button type="button" variant="outline" size="sm" className="h-ctl text-xs" onClick={add}>
         <Plus className="mr-1 h-3.5 w-3.5" />
         Add matcher
       </Button>

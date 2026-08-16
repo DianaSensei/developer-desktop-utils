@@ -260,7 +260,7 @@ const fromKv = (rows: KeyValue[]): VarDef[] =>
 
 // ─── assertions (declarative) ─────────────────────────────────────────────────
 
-const assertInputCls = 'h-8 border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0';
+const assertInputCls = 'h-ctl border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0';
 
 function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
   const { assertions } = request;
@@ -322,7 +322,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
             {/* operator cell */}
             <div className="flex items-center border-r">
               <Select value={a.operator} onValueChange={(v) => editRow(a.id, { operator: v as AssertOperator })}>
-                <SelectTrigger className="h-8 w-full border-0 bg-transparent px-2 text-xs shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-ctl w-full border-0 bg-transparent px-2 text-xs shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
                 <SelectContent className="max-h-72">
                   {ASSERT_OPERATORS.map((op) => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                 </SelectContent>
@@ -377,8 +377,8 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
         <div className="flex items-center justify-center">
           <span className="h-2 w-2 shrink-0 rounded-full bg-acc" title="Sent, derived from the Auth tab" />
         </div>
-        <div className="flex h-9 items-center border-r px-2.5 font-mono text-muted-foreground">{derived.key}</div>
-        <div className="flex h-9 items-center px-2.5 font-mono text-muted-foreground">
+        <div className="flex h-ctl items-center border-r px-2.5 font-mono text-muted-foreground">{derived.key}</div>
+        <div className="flex h-ctl items-center px-2.5 font-mono text-muted-foreground">
           {derived.value || <span className="opacity-50">(empty)</span>}
         </div>
         <div />
@@ -454,7 +454,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                 />
               </div>
               <div className={cn('flex items-center border-r px-3 py-1 font-mono text-muted-foreground', !enabled && 'opacity-40 line-through')}>:{name}</div>
-              <div className="flex h-8 items-center px-2">
+              <div className="flex h-ctl items-center px-2">
                 <InlineCodeField
                   value={valueOf(name)}
                   onChange={(v) => setValue(name, v)}
@@ -575,7 +575,7 @@ function NumberRow({ title, hint, value, onChange, disabled, clearable }: {
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-          className="h-8 text-xs"
+          className="h-ctl text-xs"
         />
         {clearable && value > 0 && (
           <button onClick={() => onChange(0)} title="Clear" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground">
@@ -726,7 +726,7 @@ function FileBody({ body, setBody }: { body: ApiRequest['body']; setBody: (p: Pa
           <span className="truncate font-medium">{body.fileName}</span>
           {body.fileType && <span className="text-muted-foreground">{body.fileType}</span>}
           <div className="ml-auto flex items-center gap-1">
-            <Button variant="outline" size="sm" className="h-7" onClick={pick}>Change</Button>
+            <Button variant="outline" size="sm" className="h-ctl" onClick={pick}>Change</Button>
             <button
               onClick={() => setBody({ fileName: undefined, fileType: undefined, fileContent: undefined })}
               className="rounded p-1 text-muted-foreground/60 hover:text-destructive"

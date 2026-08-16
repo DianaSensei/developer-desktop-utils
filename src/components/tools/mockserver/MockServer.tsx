@@ -152,7 +152,7 @@ export function MockServer() {
             iconClassName="h-3.5 w-3.5"
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-ctl w-ctl"
             label=""
             title="Copy all stubs as JSON"
           />
@@ -160,14 +160,14 @@ export function MockServer() {
             type="button"
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-ctl w-ctl"
             onClick={() => { setImportText(''); setImportError(null); setImportOpen(true); }}
             aria-label="Import stubs"
             title="Import stubs from JSON"
           >
             <Upload className="h-3.5 w-3.5" />
           </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={addStub} aria-label="Add stub" title="Add stub">
+          <Button type="button" variant="ghost" size="icon" className="h-ctl w-ctl" onClick={addStub} aria-label="Add stub" title="Add stub">
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -260,7 +260,7 @@ export function MockServer() {
         </div>
 
         <Select value={config.host} onValueChange={(v) => setConfig((p) => ({ ...p, host: v }))} disabled={status.running}>
-          <SelectTrigger className="h-8 w-[150px] text-xs">
+          <SelectTrigger className="h-ctl w-[150px] text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -274,17 +274,17 @@ export function MockServer() {
           value={config.port}
           onChange={(e) => setConfig((p) => ({ ...p, port: Math.max(0, Number(e.target.value) || 0) }))}
           disabled={status.running}
-          className="h-8 w-24 text-xs"
+          className="h-ctl w-24 text-xs"
           aria-label="Port"
         />
 
         {status.running ? (
-          <Button type="button" variant="destructive" size="sm" className="h-8 text-xs" onClick={stop} disabled={busy}>
+          <Button type="button" variant="destructive" size="sm" className="h-ctl text-xs" onClick={stop} disabled={busy}>
             <Square className="mr-1 h-3.5 w-3.5" />
             Stop
           </Button>
         ) : (
-          <Button type="button" size="sm" className="h-8 text-xs" onClick={start} disabled={busy || !isTauri}>
+          <Button type="button" size="sm" className="h-ctl text-xs" onClick={start} disabled={busy || !isTauri}>
             <Play className="mr-1 h-3.5 w-3.5" />
             Start
           </Button>
@@ -309,7 +309,7 @@ export function MockServer() {
           type="button"
           variant="ghost"
           size="sm"
-          className="ml-auto h-8 text-xs text-muted-foreground"
+          className="ml-auto h-ctl text-xs text-muted-foreground"
           onClick={() => setLogVisible((v) => !v)}
         >
           {logVisible ? <PanelRightClose className="mr-1 h-3.5 w-3.5" /> : <PanelRightOpen className="mr-1 h-3.5 w-3.5" />}
