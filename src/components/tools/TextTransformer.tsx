@@ -190,7 +190,7 @@ export function TextTransformer() {
       <ToolToolbar>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
-            <SelectTrigger className="h-8 w-52 text-xs rounded-sm">
+            <SelectTrigger className="h-ctl w-52 text-xs rounded-sm">
               <SelectValue placeholder="Select transform" />
             </SelectTrigger>
             <SelectContent>
@@ -209,7 +209,7 @@ export function TextTransformer() {
                 aria-pressed={removeLineWhitespace}
                 onClick={() => setRemoveLineWhitespace((v) => !v)}
                 className={cn(
-                  'h-8 text-xs rounded-sm',
+                  'h-ctl text-xs rounded-sm',
                   removeLineWhitespace &&
                     'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
                 )}
@@ -222,7 +222,7 @@ export function TextTransformer() {
                   value={removeChars}
                   onChange={(e) => setRemoveChars(e.target.value)}
                   placeholder="e.g. ,.;!?"
-                  className="h-8 w-32 font-mono text-xs rounded-sm"
+                  className="h-ctl w-32 font-mono text-xs rounded-sm"
                 />
               </div>
             </>
@@ -235,7 +235,7 @@ export function TextTransformer() {
                 value={delimiters}
                 onChange={(e) => setDelimiters(e.target.value)}
                 placeholder=",;"
-                className="h-8 w-24 font-mono text-xs rounded-sm"
+                className="h-ctl w-24 font-mono text-xs rounded-sm"
               />
             </div>
           )}

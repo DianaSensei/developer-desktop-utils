@@ -313,7 +313,7 @@ function TzSelect({ label, value, onChange, availableTzs }: {
     <div className="flex items-center gap-2 flex-1">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="flex-1 h-8 text-xs rounded-sm">
+        <SelectTrigger className="flex-1 h-ctl text-xs rounded-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -356,7 +356,7 @@ function DiffDateInput({ value, onChange, tz }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Unix timestamp, ISO 8601, YYYY-MM-DD HH:mm:ss, …"
-        className={cn('font-mono text-xs h-8 pr-9', hasError && 'border-destructive')}
+        className={cn('font-mono text-xs h-ctl pr-9', hasError && 'border-destructive')}
       />
       <button
         onClick={() => {

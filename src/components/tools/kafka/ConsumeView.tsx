@@ -103,7 +103,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: KafkaConsumerSession
         {s.starting ? 'starting…' : `${s.received.toLocaleString()} received`}
       </span>
       <span onClick={(e) => e.stopPropagation()} className="shrink-0">
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" title="Stop consumer" onClick={() => kafkaConsumerStore.stop(s.brokerId, s.topic)}>
+        <Button variant="ghost" size="sm" className="h-ctl px-2 text-destructive" title="Stop consumer" onClick={() => kafkaConsumerStore.stop(s.brokerId, s.topic)}>
           <Square className="h-3 w-3" />
         </Button>
       </span>
@@ -257,7 +257,7 @@ function ConsumerDetail({ session: s, onBack }: { session: KafkaConsumerSession;
           value={query}
           onChange={setQuery}
           placeholder="Search value, key, partition, offset…"
-          className="h-8 text-xs"
+          className="h-ctl text-xs"
           containerClassName="flex-1 min-w-0 max-w-md"
         />
         <Segmented<ValueFormat>
@@ -458,7 +458,7 @@ function TopicCombobox({ brokerId, value, topics, onChange }: {
         onBlur={() => { blurTimer.current = setTimeout(() => setOpen(false), 120); }}
         onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
         placeholder="topic name — type to search"
-        className="font-mono text-sm h-9"
+        className="font-mono text-sm h-ctl"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
         <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">

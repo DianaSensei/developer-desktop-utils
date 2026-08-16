@@ -47,13 +47,13 @@ export function Timesheet() {
     <div className="flex h-full flex-col">
       {/* Week nav */}
       <div className="flex shrink-0 items-center gap-2 border-b p-3">
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAnchor((a) => addDays(a, -7))}>
+        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, -7))}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="sm" className="h-8" onClick={() => setAnchor(now)}>
+        <Button variant="outline" size="sm" className="h-ctl" onClick={() => setAnchor(now)}>
           Today
         </Button>
-        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setAnchor((a) => addDays(a, 7))}>
+        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, 7))}>
           <ChevronRight className="h-4 w-4" />
         </Button>
         <span className="ml-2 text-sm font-medium">{weekRangeLabel(anchor, settings.weekStartsMon)}</span>
@@ -103,7 +103,7 @@ export function Timesheet() {
                   </td>
                   {days.map((d) => (
                     <td key={d} className="px-0.5 py-1">
-                      <DurationInput ms={cell(r.p, r.t, d)} onCommit={(ms) => setDayTotal(r.p, r.t, d, ms)} className="h-8 w-full" />
+                      <DurationInput ms={cell(r.p, r.t, d)} onCommit={(ms) => setDayTotal(r.p, r.t, d, ms)} className="h-ctl w-full" />
                     </td>
                   ))}
                   <td className="px-2 py-1 text-center font-mono text-sm tabular-nums">{fmtHM(rowTotal(r.p, r.t))}</td>

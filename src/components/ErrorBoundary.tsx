@@ -38,7 +38,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.error) {
       return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center">
-          <AlertTriangle className="h-8 w-8 text-warn" />
+          <AlertTriangle className="h-ctl w-ctl text-warn" />
           <div>
             <p className="text-sm font-semibold">This tool hit an error</p>
             <p className="mt-1 max-w-md text-xs text-muted-foreground break-words">

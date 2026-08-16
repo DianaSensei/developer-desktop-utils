@@ -65,7 +65,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         <Select value={request.method} onValueChange={(v) => onChange({ method: v as ApiRequest['method'] })}>
           <SelectTrigger
             className={cn(
-              'h-9 w-[6.5rem] shrink-0 border-0 font-bold shadow-none focus:ring-0 rounded-r-none',
+              'h-ctl-lg w-[6.5rem] shrink-0 border-0 font-bold shadow-none focus:ring-0 rounded-r-none',
               methodColor(request.method),
               methodBg(request.method),
             )}
@@ -84,7 +84,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         {/* Divider between method and URL */}
         <span className="h-5 w-px shrink-0 bg-border" />
 
-        <div className="flex h-9 min-w-0 flex-1 items-center px-3">
+        <div className="flex h-ctl-lg min-w-0 flex-1 items-center px-3">
           <InlineCodeField
             value={request.url}
             onChange={handleUrl}
@@ -102,7 +102,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
 
         {/* Send / Cancel */}
         {sending ? (
-          <Button variant="destructive" size="sm" onClick={onCancel} className="m-1 h-8 gap-1.5 rounded-sm">
+          <Button variant="destructive" size="sm" onClick={onCancel} className="m-1 h-ctl gap-1.5 rounded-sm">
             <X className="h-3.5 w-3.5" /> Cancel
           </Button>
         ) : (
@@ -110,7 +110,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
             size="sm"
             onClick={onSend}
             disabled={!request.url.trim()}
-            className="m-1 h-8 gap-1.5 rounded-sm shadow-sm active:scale-[0.97] transition-transform"
+            className="m-1 h-ctl gap-1.5 rounded-sm shadow-sm active:scale-[0.97] transition-transform"
           >
             <Send className="h-3.5 w-3.5" /> Send
           </Button>

@@ -519,7 +519,7 @@ export function SqlFormatter() {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Indent</span>
             <Select value={indentSize} onValueChange={(v) => setIndentSize(v as '2' | '4')}>
-              <SelectTrigger className="h-8 w-[88px] text-xs rounded-sm">
+              <SelectTrigger className="h-ctl w-[88px] text-xs rounded-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -563,7 +563,7 @@ export function SqlFormatter() {
           variant="ghost"
           size="sm"
           onClick={handleClear}
-          className="h-8 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground rounded-sm"
+          className="h-ctl gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground rounded-sm"
         >
           <Trash2 className="h-3 w-3" />
           Clear
@@ -574,10 +574,10 @@ export function SqlFormatter() {
             label="Copy"
             variant="outline"
             size="sm"
-            className="h-8 gap-1.5 text-xs rounded-sm"
+            className="h-ctl gap-1.5 text-xs rounded-sm"
             iconClassName="h-3 w-3"
           />
-          <Button size="sm" onClick={handleFormat} className="h-8 gap-1.5 text-xs rounded-sm">
+          <Button size="sm" onClick={handleFormat} className="h-ctl gap-1.5 text-xs rounded-sm">
             <Wand2 className="h-3 w-3" />
             Format
           </Button>

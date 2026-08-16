@@ -93,7 +93,7 @@ export function DropZone({
           onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); }}
         />
       )}
-      <Icon className={cn('h-8 w-8 transition-colors', dragging ? 'text-primary' : 'text-muted-foreground/50')} />
+      <Icon className={cn('h-ctl w-ctl transition-colors', dragging ? 'text-primary' : 'text-muted-foreground/50')} />
       <div>
         <p className="text-sm font-medium">{title}</p>
         {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}

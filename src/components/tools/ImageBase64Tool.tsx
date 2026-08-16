@@ -223,7 +223,7 @@ export function ImageBase64Tool() {
                     label="Copy image"
                     variant="ghost"
                     size="sm"
-                    className="absolute top-2 right-2 h-7 bg-background/80 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                    className="absolute top-2 right-2 h-ctl bg-background/80 px-2 text-[11px] text-muted-foreground hover:text-foreground"
                     iconClassName="h-3 w-3"
                   />
                 )}

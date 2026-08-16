@@ -55,7 +55,7 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter name or value…"
-          className="h-7 text-xs border-0 shadow-none focus-visible:ring-0 px-0"
+          className="h-ctl text-xs border-0 shadow-none focus-visible:ring-0 px-0"
         />
         {filter && (
           <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">

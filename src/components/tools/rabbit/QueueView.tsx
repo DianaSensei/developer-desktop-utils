@@ -241,10 +241,10 @@ export function NewBindingForm({ sourceLabel, sourcePlaceholder, onBind }: {
     <div className="rounded-lg border p-3 space-y-2">
       <div className="flex items-end gap-2">
         <Field label={sourceLabel} className="flex-1">
-          <Input value={source} onChange={(e) => { setSource(e.target.value); setError(null); }} placeholder={sourcePlaceholder} className="font-mono text-xs h-8" />
+          <Input value={source} onChange={(e) => { setSource(e.target.value); setError(null); }} placeholder={sourcePlaceholder} className="font-mono text-xs h-ctl" />
         </Field>
         <Field label="Routing key" className="flex-1">
-          <Input value={routingKey} onChange={(e) => setRoutingKey(e.target.value)} placeholder="(optional)" className="font-mono text-xs h-8" />
+          <Input value={routingKey} onChange={(e) => setRoutingKey(e.target.value)} placeholder="(optional)" className="font-mono text-xs h-ctl" />
         </Field>
         <Button size="sm" onClick={bind} disabled={busy}>{busy ? 'Binding…' : 'Bind'}</Button>
       </div>

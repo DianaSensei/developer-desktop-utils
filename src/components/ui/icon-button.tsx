@@ -23,7 +23,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         'hover:bg-accent hover:text-foreground',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
         'disabled:pointer-events-none disabled:opacity-50',
-        size === 'sm' ? 'h-7 w-7' : 'h-ctl w-ctl',
+        size === 'sm' ? 'h-ctl w-ctl' : 'h-ctl w-ctl',
         active && 'bg-primary/10 text-primary hover:bg-primary/15',
         className,
       )}

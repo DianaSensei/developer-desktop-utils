@@ -32,7 +32,7 @@ const buttonVariants = cva(
         // Một chiều cao control cho cả app: --h (34px). `lg` dùng --h-lg (40px)
         // cho hành động chính của trang. `sm` giữ lại cho toolbar dày đặc.
         default: 'h-ctl px-3 py-2',
-        sm: 'h-8 rounded-sm px-2.5',
+        sm: 'h-ctl rounded-sm px-2.5',
         lg: 'h-ctl-lg rounded-sm px-5',
         icon: 'h-ctl w-ctl',
       },

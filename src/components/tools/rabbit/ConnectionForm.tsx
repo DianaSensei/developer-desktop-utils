@@ -279,7 +279,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                   type="number"
                   value={form.port}
                   onChange={(e) => set('port', Number(e.target.value))}
-                  className="mt-1 font-mono text-sm h-8 w-32"
+                  className="mt-1 font-mono text-sm h-ctl w-32"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Default <span className="font-mono">15672</span> on <span className="font-mono">{form.host || 'host'}</span> ({form.useTls ? 'https' : 'http'}).
@@ -304,7 +304,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                 <Input
                   id="rb-hb" type="number" value={form.heartbeat ?? ''}
                   onChange={(e) => set('heartbeat', e.target.value ? Number(e.target.value) : null)}
-                  placeholder="30" className="mt-1 font-mono text-xs h-8"
+                  placeholder="30" className="mt-1 font-mono text-xs h-ctl"
                 />
               </div>
               <div>
@@ -312,7 +312,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                 <Input
                   id="rb-cn" value={form.connectionName ?? ''}
                   onChange={(e) => set('connectionName', e.target.value || null)}
-                  placeholder="devtool" className="mt-1 font-mono text-xs h-8"
+                  placeholder="devtool" className="mt-1 font-mono text-xs h-ctl"
                 />
               </div>
             </div>
@@ -323,7 +323,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                 value={form.vhost}
                 onChange={(e) => set('vhost', e.target.value)}
                 placeholder="/"
-                className="mt-1 font-mono text-xs h-8"
+                className="mt-1 font-mono text-xs h-ctl"
               />
               <p className="text-[11px] text-muted-foreground mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Addresses field above for HA failover.</p>
             </div>
@@ -349,7 +349,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
               <Input
                 id="rb-p12pw" type="password" value={form.clientPkcs12Password ?? ''}
                 onChange={(e) => set('clientPkcs12Password', e.target.value || null)}
-                className="mt-1 font-mono text-xs h-8"
+                className="mt-1 font-mono text-xs h-ctl"
               />
             </div>
           </CollapsibleSection>

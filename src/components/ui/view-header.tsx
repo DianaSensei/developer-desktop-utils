@@ -30,12 +30,12 @@ export function ViewHeader({ icon: Icon, title, subtitle, actions, onBack, class
             type="button"
             onClick={() => onBack()}
             title="Back"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
         )}
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground">
+        <div className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground">
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">

@@ -64,7 +64,7 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
       />
 
       <div className="px-5 pt-3 shrink-0">
-        <SearchInput value={filter} onChange={setFilter} placeholder="Search exchanges…" className="h-8 text-sm" containerClassName="max-w-sm" />
+        <SearchInput value={filter} onChange={setFilter} placeholder="Search exchanges…" className="h-ctl text-sm" containerClassName="max-w-sm" />
       </div>
 
       <div className="tool-scrollable px-5 py-4">
@@ -154,7 +154,7 @@ function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
             onChange={(e) => setAdding(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') addName(); }}
             placeholder="Track an existing exchange by name…"
-            className="h-8 text-sm font-mono"
+            className="h-ctl text-sm font-mono"
           />
           <Button variant="outline" size="sm" onClick={addName} disabled={!adding.trim()}>Track</Button>
         </div>
@@ -267,7 +267,7 @@ export function CreateExchangeDialog({ open, onOpenChange, conn, onCreated }: {
           </Field>
           <Field label="Type">
             <Select value={type} onValueChange={setType}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {EXCHANGE_TYPES.map((t) => (<SelectItem key={t} value={t} className="text-sm">{t}</SelectItem>))}
               </SelectContent>

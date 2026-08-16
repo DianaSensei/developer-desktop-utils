@@ -55,7 +55,7 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
       />
 
       <div className="px-5 pt-3 shrink-0">
-        <SearchInput value={filter} onChange={setFilter} placeholder="Search topics…" className="h-8 text-sm" containerClassName="max-w-sm" />
+        <SearchInput value={filter} onChange={setFilter} placeholder="Search topics…" className="h-ctl text-sm" containerClassName="max-w-sm" />
       </div>
 
       <div className="tool-scrollable px-5 py-4">
@@ -144,10 +144,10 @@ function CreateTopicDialog({ open, onOpenChange, brokerId, onCreated }: {
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Partitions" htmlFor="kf-parts">
-              <Input id="kf-parts" type="number" min={1} value={partitions} onChange={(e) => setPartitions(e.target.value)} className="h-9" />
+              <Input id="kf-parts" type="number" min={1} value={partitions} onChange={(e) => setPartitions(e.target.value)} className="h-ctl" />
             </Field>
             <Field label="Replication factor" htmlFor="kf-rf">
-              <Input id="kf-rf" type="number" min={1} value={rf} onChange={(e) => setRf(e.target.value)} className="h-9" />
+              <Input id="kf-rf" type="number" min={1} value={rf} onChange={(e) => setRf(e.target.value)} className="h-ctl" />
             </Field>
           </div>
           {error && <Callout tone="error" size="sm">{error}</Callout>}

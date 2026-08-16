@@ -147,11 +147,11 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <Input
                     value={selected.name}
                     onChange={(e) => store.updateEnvironment(selected.id, { name: e.target.value })}
-                    className="h-8 text-sm font-medium"
+                    className="h-ctl text-sm font-medium"
                   />
                   <Button
                     variant={store.activeEnvId === selected.id ? 'secondary' : 'outline'}
-                    className="h-8 shrink-0 text-xs"
+                    className="h-ctl shrink-0 text-xs"
                     onClick={() => store.setActiveEnvId(store.activeEnvId === selected.id ? null : selected.id)}
                   >
                     {store.activeEnvId === selected.id ? 'Active' : 'Set active'}
@@ -159,7 +159,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       title="Export environment"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       <Download className="h-4 w-4" />
                     </DropdownMenuTrigger>
@@ -171,7 +171,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                    className="h-ctl w-ctl shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={() => store.deleteEnvironment(selected.id)}
                     title="Delete environment"
                   >

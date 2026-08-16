@@ -83,7 +83,7 @@ export function LeftPanel({
       <div className="p-3 border-b shrink-0 space-y-2">
         <div className="flex items-center gap-1.5">
           <Select value={selectedBrokerId} onValueChange={onSelectBroker}>
-            <SelectTrigger className="h-8 text-xs">
+            <SelectTrigger className="h-ctl text-xs">
               <SelectValue placeholder={loading ? 'Loading…' : 'Select broker'} />
             </SelectTrigger>
             <SelectContent>
@@ -93,7 +93,7 @@ export function LeftPanel({
             </SelectContent>
           </Select>
           <Button
-            variant="ghost" size="icon" className="h-8 w-8 shrink-0"
+            variant="ghost" size="icon" className="h-ctl w-ctl shrink-0"
             title="Add broker"
             onClick={() => { setEditing(null); setFormOpen(true); }}
           >
@@ -124,11 +124,11 @@ export function LeftPanel({
               </div>
             </div>
             {connected ? (
-              <Button variant="outline" size="sm" className="w-full h-7 text-xs" onClick={onDisconnect}>
+              <Button variant="outline" size="sm" className="w-full h-ctl text-xs" onClick={onDisconnect}>
                 <Plug className="h-3.5 w-3.5 mr-1.5" /> Disconnect
               </Button>
             ) : (
-              <Button size="sm" className="w-full h-7 text-xs" onClick={onConnect} disabled={connecting}>
+              <Button size="sm" className="w-full h-ctl text-xs" onClick={onConnect} disabled={connecting}>
                 {connecting ? <Spinner size="sm" className="mr-1.5" /> : <PlugZap className="h-3.5 w-3.5 mr-1.5" />}
                 {connecting ? 'Connecting…' : 'Connect'}
               </Button>
