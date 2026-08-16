@@ -30,7 +30,7 @@ trước. Chúng nằm ở đây để không ai cấm lại lần nữa.
 | **Emoji thay icon** | Render khác nhau trên ba nền tảng Tauri, không chỉnh được nét và màu. |
 | **Nhấc phần tử khi rê chuột** (`hover:-translate-y-*`) | Rê chuột đổi nền/viền, không đổi vị trí. Layout không được nhảy. |
 | **Màu Tailwind thô** (`text-green-500`, `bg-red-50`…) | Không theo được theme, không đổi được tone. Dùng token. **Ngưỡng hiện tại: 0** — thêm một cái là guard đỏ. |
-| **Chữ dưới 11px** | Không đọc được ở HiDPI. Từ 379 xuống còn 30, đang dọn tiếp. |
+| **Chữ dưới 11px** | Không đọc được ở HiDPI. **Ngưỡng hiện tại: 0.** |
 | **Thẻ cảnh báo rời cho trạng thái thường trực** | Layout nhảy khi chuyển hợp lệ ↔ lỗi. Dùng chip + dải nhuộm trong panel. |
 | **Hai hệ shadow song song** | Chỉ `--sh-sm` / `--sh` / `--sh-lg`. |
 | **Nhiều hơn hai chiều cao control** | Chỉ `--h` (34px) và `--h-lg` (40px). |

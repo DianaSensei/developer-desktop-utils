@@ -31,7 +31,7 @@ The single reference for how DevTool looks and feels: **swappable accent · soft
 
 ## Principles
 
-- **Accent used sparingly.** Selections and active states are a light **tint** (`bg-primary/10` + accent text), never a saturated fill. Reserve solid blue for primary buttons, focus rings, and the single key action on a screen. Flooding a view with blue cheapens it.
+- **Accent used sparingly.** Selections and active states are a light **tint** (`bg-acc/10` + accent text), never a saturated fill. Reserve solid blue for primary buttons, focus rings, and the single key action on a screen. Flooding a view with blue cheapens it.
 - **Semantic colors stay semantic.** Warnings (amber), errors (red), success (green), HTTP-method colors, and editor syntax highlighting are **not** accent-themed — they carry meaning and must stay recognizable.
 - **Soft, layered depth.** Elevation comes from multi-layer, low-alpha shadows (never hard 1px borders alone). Surfaces feel like paper stacked in light.
 - **Legible glass.** Chrome (sidebar, headers, popovers) uses heavy blur + saturation but **high fill opacity** so content on top stays crisp — Apple-style vibrancy without the mud.
@@ -66,14 +66,14 @@ Answer these first; if unknown, ask or state the assumption inline:
 
 ### Typography
 
-- Use the typography utilities, never ad-hoc sizes: labels `text-xs font-medium`, hints `text-[11px] text-muted-foreground`, body `text-sm`, mono `font-mono text-sm`, headings via `.heading-xl…xs`. (See the type scale below.)
+- Use the typography utilities, never ad-hoc sizes: labels `text-xs font-medium`, hints `text-[11px] text-fg-mute`, body `text-sm`, mono `font-mono text-sm`, headings via `.heading-xl…xs`. (See the type scale below.)
 - One sans family (Be Vietnam Pro) plus one mono (IBM Plex Mono); express hierarchy through weight and size, not new fonts.
 - Left-align body and long-form text; never justify or center it.
 
 ### Color
 
 - Color communicates meaning (state, action, status), not decoration. **Never use color as the only signal** — pair it with text, icon, or shape (e.g. error = red + icon + message) for colorblind users.
-- Pull every color from tokens (`bg-card`, `text-muted-foreground`, …); no raw hex when a token exists. Reserve solid accent blue for the single primary action; use `bg-primary/10` + `text-primary` for selected/active states. Keep semantic palettes (amber/red/green, HTTP-method, syntax) un-tinted by the accent.
+- Pull every color from tokens (`bg-card`, `text-fg-mute`, …); no raw hex when a token exists. Reserve solid accent blue for the single primary action; use `bg-acc/10` + `text-acc` for selected/active states. Keep semantic palettes (amber/red/green, HTTP-method, syntax) un-tinted by the accent.
 
 ### Affordances & interaction
 
@@ -109,7 +109,7 @@ Answer these first; if unknown, ask or state the assumption inline:
 
 ### Color tokens
 
-All colors are CSS variables (HSL component triples) defined in `tokens.css` under `:root` (light) and `.dark`. Reference them through Tailwind classes (`bg-card`, `text-muted-foreground`, `border-border`, …) — never hard-code hex.
+All colors are CSS variables (HSL component triples) defined in `tokens.css` under `:root` (light) and `.dark`. Reference them through Tailwind classes (`bg-card`, `text-fg-mute`, `border-line`, …) — never hard-code hex.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
@@ -203,7 +203,7 @@ import { Button, Card, Input, Select, Segmented, ToolSection, PaneHeader, cn } f
 
 These patterns kept getting reimplemented per-tool with small drifting variations. Use the shared version:
 
-- **`IconButton`** — the icon-only action button (`rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground`). Always pass `title` since there's no visible label.
+- **`IconButton`** — the icon-only action button (`rounded p-1.5 text-fg-mute hover:bg-acc/10 hover:text-fg`). Always pass `title` since there's no visible label.
   ```tsx
   <IconButton title="More" onClick={...}><MoreVertical className="h-4 w-4" /></IconButton>
   ```
@@ -274,13 +274,13 @@ These patterns kept getting reimplemented per-tool with small drifting variation
     right={<StatusReadout />}
   />
   ```
-  Uses `border-primary` for the active-tab underline by default (per the "reserve accent for the key action/state" color rule) — override via `className` if a tool has an established alternate accent.
+  Uses `border-acc` for the active-tab underline by default (per the "reserve accent for the key action/state" color rule) — override via `className` if a tool has an established alternate accent.
 
 ### Display foundation — one answer per pattern
 
 The second pass covered the things tools *show* rather than the things users click. Same rule: reach for these before writing the class string again.
 
-- **`Callout`** — the inline status banner (`tone`: `error` / `warning` / `success` / `info`). The single answer to "how does a view show an error". Sizes `sm` (11px, inside a panel) and `md` (14px, default). Pass `icon` to override the tone glyph or `icon={false}` to drop it; `title` for a bold first line; `actions` for a retry button. Do not hand-write `border-destructive/40 bg-destructive/10` again, and do not fall back to a bare `<p className="text-sm text-destructive">` — a failure should look the same in every tool.
+- **`Callout`** — the inline status banner (`tone`: `error` / `warning` / `success` / `info`). The single answer to "how does a view show an error". Sizes `sm` (11px, inside a panel) and `md` (14px, default). Pass `icon` to override the tone glyph or `icon={false}` to drop it; `title` for a bold first line; `actions` for a retry button. Do not hand-write `border-bad/40 bg-bad/10` again, and do not fall back to a bare `<p className="text-sm text-bad">` — a failure should look the same in every tool.
   ```tsx
   {error && <Callout tone="error">{error}</Callout>}
   <Callout tone="warning" size="sm" title="Credential storage">Profiles are saved on this device.</Callout>
@@ -361,7 +361,7 @@ A small purpose-specific overlay on top of the shared theme is fine (`varTheme` 
 
 **Do**
 - Build tools from the scaffolding (`ToolSection`/`ToolToolbar`/`ToolPanes`) so every tool shares the same rhythm and headers.
-- Use `bg-primary/10` + `text-primary` for selected/active states; reserve solid `bg-primary` for the one primary action.
+- Use `bg-acc/10` + `text-acc` for selected/active states; reserve solid `bg-acc` for the one primary action.
 - Use semantic palettes for status: amber = warning, red = destructive, green = success.
 - Lean on `rounded-lg`, the shadow scale, and `.hover-elevate` for interactive cards.
 - Test every change in **both** light and dark before calling it done.
