@@ -151,7 +151,7 @@ export function LeftPanel({
           <div
             className={cn(
               'group w-full flex items-center gap-2 px-2 rounded-md text-xs transition-colors',
-              view === 'consume' ? 'bg-primary/10 text-primary font-medium' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
+              view === 'consume' ? 'bg-acc/10 text-acc font-medium' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
             )}
           >
             <button type="button" className="flex-1 min-w-0 flex items-center gap-2 py-1.5 text-left" onClick={() => onShowConsumers()}>
@@ -214,7 +214,7 @@ function NavItem({ icon: Icon, label, active, onClick }: {
       onClick={onClick}
       className={cn(
         'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors',
-        active ? 'bg-primary/10 text-primary font-medium' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
+        active ? 'bg-acc/10 text-acc font-medium' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />

@@ -144,7 +144,7 @@ export function DateTimePanel({
         <button
           type="button"
           onClick={handleConfirm}
-          className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground transition-colors hover:bg-primary/90"
+          className="flex-1 rounded-md bg-acc px-3 py-1.5 text-xs text-acc-fg transition-colors hover:bg-acc/90"
         >
           {confirmLabel}
         </button>

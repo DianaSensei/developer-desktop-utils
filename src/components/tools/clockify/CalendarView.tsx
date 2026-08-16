@@ -273,7 +273,7 @@ export function CalendarView() {
           return (
             <div key={d} className="flex flex-1 flex-col items-center gap-0.5 py-1.5">
               <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute">{weekdayShort(d)}</span>
-              <span className={cn('flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-sm font-semibold', today ? 'bg-primary text-primary-foreground' : 'text-fg')}>
+              <span className={cn('flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-sm font-semibold', today ? 'bg-acc text-acc-fg' : 'text-fg')}>
                 {new Date(d).getDate()}
               </span>
               <span className={cn('font-mono text-[11px] tabular-nums', total > 0 ? totalColor(total) : 'text-transparent')}>
@@ -313,7 +313,7 @@ export function CalendarView() {
               <div
                 key={d}
                 data-col
-                className={cn('relative flex-1 border-l', isToday && 'bg-primary/[0.03]')}
+                className={cn('relative flex-1 border-l', isToday && 'bg-acc/[0.03]')}
                 onMouseDown={(e) => onColMouseDown(d, e)}
               >
                 {/* hour + half-hour gridlines */}
@@ -337,7 +337,7 @@ export function CalendarView() {
                   const hi = Math.max(drag.aMin, drag.bMin);
                   return (
                     <div
-                      className="pointer-events-none absolute left-1 right-1 z-10 overflow-hidden rounded-md bg-primary/25 px-1.5 py-0.5 text-[11px] font-medium text-primary ring-1 ring-primary"
+                      className="pointer-events-none absolute left-1 right-1 z-10 overflow-hidden rounded-md bg-acc/25 px-1.5 py-0.5 text-[11px] font-medium text-acc ring-1 ring-acc"
                       style={{ top: (lo / 60) * HOUR_PX, height: Math.max(2, ((hi - lo) / 60) * HOUR_PX) }}
                     >
                       {hm(lo)} – {hm(hi >= lo + SNAP_MIN ? hi : lo + 60)}

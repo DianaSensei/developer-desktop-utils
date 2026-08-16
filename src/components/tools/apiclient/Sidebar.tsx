@@ -178,7 +178,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
             <Plus className="h-4 w-4" />
           </IconButton>
           <DropdownMenu>
-            <DropdownMenuTrigger title="More" className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-accent hover:text-fg">
+            <DropdownMenuTrigger title="More" className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-acc hover:text-fg">
               <MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
@@ -452,10 +452,10 @@ function Row({
       }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onDrop(); }}
       className={cn(
-        'group relative flex items-center gap-1.5 py-[5px] pr-1 text-xs cursor-pointer transition-colors hover:bg-accent/60',
-        active && 'bg-accent/80 text-fg',
+        'group relative flex items-center gap-1.5 py-[5px] pr-1 text-xs cursor-pointer transition-colors hover:bg-acc/60',
+        active && 'bg-acc/80 text-fg',
         dragging && 'opacity-40',
-        dt?.where === 'inside' && 'bg-primary/10 ring-1 ring-inset ring-primary/40',
+        dt?.where === 'inside' && 'bg-acc/10 ring-1 ring-inset ring-acc/40',
       )}
       style={{ paddingLeft: 6 + depth * 12 }}
       onClick={hasChildren ? onToggle : onClick}
@@ -463,8 +463,8 @@ function Row({
     >
       {/* Bruno-style left accent stripe on the active request */}
       {active && <span className="pointer-events-none absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-acc" />}
-      {dt?.where === 'before' && <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-primary" />}
-      {dt?.where === 'after' && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
+      {dt?.where === 'before' && <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-acc" />}
+      {dt?.where === 'after' && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-acc" />}
       {hasChildren ? (
         collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
           : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" />

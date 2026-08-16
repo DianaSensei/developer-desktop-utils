@@ -119,7 +119,7 @@ function Pill({ children, tone = 'primary', className }: {
   className?: string;
 }) {
   const tones = {
-    primary: 'bg-primary/10 text-primary',
+    primary: 'bg-acc/10 text-acc',
     muted: 'bg-muted text-fg-mute',
     amber: 'bg-warn-tint text-warn',
   };
@@ -1073,7 +1073,7 @@ function PortsView() {
     );
   };
 
-  const favBtnActive = favOnly && 'border-primary/40 bg-primary/10 text-primary';
+  const favBtnActive = favOnly && 'border-acc/40 bg-acc/10 text-acc';
 
   return (
     <ViewShell
@@ -1324,7 +1324,7 @@ export function NetworkTools() {
                 {cat.label}
                 <span
                   className={cn(
-                    'absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-primary transition-opacity duration-200',
+                    'absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-acc transition-opacity duration-200',
                     active ? 'opacity-100' : 'opacity-0',
                   )}
                 />
@@ -1347,7 +1347,7 @@ export function NetworkTools() {
                 className={cn(
                   'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
                   active
-                    ? 'bg-primary/10 text-primary'
+                    ? 'bg-acc/10 text-acc'
                     : 'text-fg-mute hover:text-fg hover:bg-fg/[0.06]',
                 )}
               >

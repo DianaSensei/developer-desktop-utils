@@ -60,7 +60,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
                 onClick={() => setVariant(v.id)}
                 className={cn(
                   'rounded-md border px-3 py-1 text-xs font-medium transition-colors',
-                  variant === v.id ? 'border-primary/30 bg-primary/10 text-primary' : 'hover:bg-accent',
+                  variant === v.id ? 'border-acc/30 bg-acc/10 text-acc' : 'hover:bg-acc',
                 )}
               >
                 {v.label}
@@ -76,7 +76,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
               onClick={() => setInterpolate((i) => !i)}
               className={cn(
                 'flex h-4 w-4 items-center justify-center rounded border transition-colors',
-                interpolate ? 'border-primary bg-primary text-primary-foreground' : 'border-input',
+                interpolate ? 'border-acc bg-acc text-acc-fg' : 'border-input',
               )}
             >
               {interpolate && <Check className="h-3 w-3" />}

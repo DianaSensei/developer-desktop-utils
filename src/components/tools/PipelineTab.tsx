@@ -290,7 +290,7 @@ function HexToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
       type="button" onClick={() => onChange(!value)}
       className={cn(
         'text-[11px] font-mono px-2 h-ctl rounded-md border transition-colors',
-        value ? 'border-primary/50 bg-primary/10 text-primary' : 'border-border bg-muted/30 text-fg-mute hover:text-fg'
+        value ? 'border-acc/50 bg-acc/10 text-acc' : 'border-border bg-muted/30 text-fg-mute hover:text-fg'
       )}
     >
       {value ? 'ABC' : 'abc'}
@@ -324,7 +324,7 @@ function OutputText({ value }: { value: string }) {
       {long && !expanded ? value.slice(0, LIMIT) : value}
       {long && (
         <button type="button" onClick={() => setExpanded((v) => !v)}
-          className="ml-1 text-primary text-[11px] font-sans underline underline-offset-2">
+          className="ml-1 text-acc text-[11px] font-sans underline underline-offset-2">
           {expanded ? 'less' : `+${value.length - LIMIT} more`}
         </button>
       )}
@@ -356,10 +356,10 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
         onClick={() => onChange({ enabled: !field.enabled })}
         className={cn(
           'shrink-0 h-4 w-4 rounded border transition-colors flex items-center justify-center',
-          field.enabled ? 'bg-primary border-primary' : 'border-border bg-card'
+          field.enabled ? 'bg-acc border-acc' : 'border-border bg-card'
         )}
       >
-        {field.enabled && <span className="text-[11px] font-black text-primary-foreground leading-none">✓</span>}
+        {field.enabled && <span className="text-[11px] font-black text-acc-fg leading-none">✓</span>}
       </button>
 
       {/* Key */}
@@ -646,7 +646,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
       <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 border-b border-border/40">
         <div className={cn(
           'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold',
-          result?.error ? 'bg-destructive/20 text-destructive' : 'bg-primary/15 text-primary'
+          result?.error ? 'bg-destructive/20 text-destructive' : 'bg-acc/15 text-acc'
         )}>
           {index + 1}
         </div>
@@ -822,7 +822,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="w-px h-3 bg-border/50" />
-      <div className="w-full rounded-lg border border-dashed border-primary/30 bg-primary/3 p-3 space-y-3">
+      <div className="w-full rounded-lg border border-dashed border-acc/30 bg-acc/3 p-3 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold">Add a step</p>
           <button type="button" onClick={() => setOpen(false)} className="text-xs text-fg-mute hover:text-fg">✕</button>
@@ -836,7 +836,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
                 return (
                   <button key={op} type="button"
                     onClick={() => { onAdd(op); setOpen(false); }}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs font-medium hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all">
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs font-medium hover:border-acc/40 hover:bg-acc/5 hover:text-acc transition-all">
                     <Icon className={cn('h-3.5 w-3.5', m.color)} />{m.label}
                   </button>
                 );
@@ -855,10 +855,10 @@ function FinalResult({ result }: { result: StepResult | undefined }) {
   if (!result || (!result.output && !result.error)) return null;
   const ok = !!result.output && !result.error;
   return (
-    <div className={cn('rounded-lg border p-4', ok ? 'border-primary/25 bg-primary/5' : 'border-destructive/25 bg-destructive/5')}>
+    <div className={cn('rounded-lg border p-4', ok ? 'border-acc/25 bg-acc/5' : 'border-destructive/25 bg-destructive/5')}>
       <div className="flex items-center justify-between mb-2.5">
         <span className="flex items-center gap-1.5 text-xs font-semibold">
-          {ok ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <AlertTriangle className="h-4 w-4 text-destructive" />}
+          {ok ? <CheckCircle2 className="h-4 w-4 text-acc" /> : <AlertTriangle className="h-4 w-4 text-destructive" />}
           {ok ? 'Final Result' : 'Pipeline Error'}
         </span>
         {ok && <CopyBtn value={result.output} />}

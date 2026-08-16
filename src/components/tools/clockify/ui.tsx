@@ -348,8 +348,8 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-        checked ? 'bg-primary' : 'bg-fg-mute/25'
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
+        checked ? 'bg-acc' : 'bg-fg-mute/25'
       )}
     >
       <span
@@ -593,7 +593,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
           {tags.length === 0 && <p className="px-2 py-1.5 text-xs text-fg-mute">No tags yet</p>}
           {tags.map((t) => (
             <button key={t.id} onClick={() => toggle(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-              <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', value.includes(t.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-fg-mute/40')}>
+              <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', value.includes(t.id) ? 'border-acc bg-acc text-acc-fg' : 'border-fg-mute/40')}>
                 {value.includes(t.id) && <Check className="h-2.5 w-2.5" />}
               </span>
               <span className="truncate">{t.name}</span>

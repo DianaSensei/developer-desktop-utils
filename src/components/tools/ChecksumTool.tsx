@@ -228,7 +228,7 @@ export function ChecksumTool() {
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 cursor-pointer transition-colors',
             dragging
-              ? 'border-primary bg-primary/5'
+              ? 'border-acc bg-acc/5'
               : 'border-fg-mute/25 hover:border-fg-mute/50 hover:bg-muted/30',
           )}
         >
@@ -266,14 +266,14 @@ export function ChecksumTool() {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-fg-mute">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                <span className="inline-block h-3 w-3 rounded-full border-2 border-acc border-t-transparent animate-spin" />
                 Computing {algoLabel}…
               </span>
               <span className="tabular-nums">{progress}%</span>
             </div>
             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
+                className="h-full rounded-full bg-acc transition-[width] duration-150 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>

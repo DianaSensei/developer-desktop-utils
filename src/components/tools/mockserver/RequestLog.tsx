@@ -95,7 +95,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
                   <button
                     type="button"
                     onClick={() => selected.matchedStubId && onSelectStub?.(selected.matchedStubId)}
-                    className="truncate text-left font-medium text-primary hover:underline"
+                    className="truncate text-left font-medium text-acc hover:underline"
                     title="Open this stub"
                   >
                     {stubName?.(selected.matchedStubId) ?? '(deleted stub)'}

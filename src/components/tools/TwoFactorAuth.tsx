@@ -532,8 +532,8 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center">
           <ShieldCheck className="h-ctl w-ctl text-fg-mute/40" />
         </div>
-        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-          <KeyRound className="h-3 w-3 text-primary-foreground" />
+        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-acc flex items-center justify-center">
+          <KeyRound className="h-3 w-3 text-acc-fg" />
         </div>
       </div>
       <div className="space-y-1">
@@ -736,7 +736,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); }}
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-colors',
-            dragOver ? 'border-primary bg-primary/5' : 'border-input hover:border-fg-mute/40 hover:bg-muted/30',
+            dragOver ? 'border-acc bg-acc/5' : 'border-input hover:border-fg-mute/40 hover:bg-muted/30',
           )}
         >
           {busy ? (
@@ -785,7 +785,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
               <span className="text-xs font-medium">
                 Found {parsed.length} account{parsed.length === 1 ? '' : 's'}
               </span>
-              <button onClick={toggleAll} className="text-[11px] text-primary hover:underline">
+              <button onClick={toggleAll} className="text-[11px] text-acc hover:underline">
                 {allSelected ? 'Deselect all' : 'Select all'}
               </button>
             </div>
@@ -800,9 +800,9 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
                   >
                     <span className={cn(
                       'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
-                      checked ? 'bg-primary border-primary' : 'border-input',
+                      checked ? 'bg-acc border-acc' : 'border-input',
                     )}>
-                      {checked && <Check className="h-3 w-3 text-primary-foreground" />}
+                      {checked && <Check className="h-3 w-3 text-acc-fg" />}
                     </span>
                     <div
                       className="w-ctl h-ctl rounded-sm flex items-center justify-center text-white text-[11px] font-bold shrink-0"
@@ -1004,8 +1004,8 @@ export function TwoFactorAuth() {
                     className={cn(
                       'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
                       filter === key
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-fg-mute hover:text-fg hover:bg-accent/50',
+                        ? 'bg-acc text-acc-fg'
+                        : 'text-fg-mute hover:text-fg hover:bg-acc/50',
                     )}
                   >
                     {label}

@@ -172,12 +172,12 @@ function FilterControls({
           title={activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active` : 'Filter tasks'}
           className={cn(
             'relative flex h-ctl w-ctl items-center justify-center rounded-md border transition-colors hover:bg-muted hover:text-fg',
-            activeCount > 0 ? 'border-primary/50 text-fg' : 'text-fg-mute'
+            activeCount > 0 ? 'border-acc/50 text-fg' : 'text-fg-mute'
           )}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
           {activeCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground">
+            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-acc px-1 text-[11px] font-semibold text-acc-fg">
               {activeCount}
             </span>
           )}
@@ -218,7 +218,7 @@ function FilterControls({
               <div className="max-h-40 overflow-y-auto">
                 {tags.map((t) => (
                   <button key={t.id} onClick={() => toggleTag(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted">
-                    <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', tagIds.includes(t.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-fg-mute/40')}>
+                    <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded border', tagIds.includes(t.id) ? 'border-acc bg-acc text-acc-fg' : 'border-fg-mute/40')}>
                       {tagIds.includes(t.id) && <Check className="h-2.5 w-2.5" />}
                     </span>
                     <span className="truncate">{t.name}</span>
@@ -665,9 +665,9 @@ export function TimeTracker() {
                   key={g.key}
                   onClick={() => resumeGroup(g)}
                   title={`Resume “${g.name}”`}
-                  className="group flex max-w-[220px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-fg-mute transition-colors hover:border-primary/50 hover:bg-muted hover:text-fg"
+                  className="group flex max-w-[220px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-fg-mute transition-colors hover:border-acc/50 hover:bg-muted hover:text-fg"
                 >
-                  <Play className="h-3 w-3 shrink-0 fill-current text-primary" />
+                  <Play className="h-3 w-3 shrink-0 fill-current text-acc" />
                   <ColorDot color={project?.color} />
                   <span className="truncate">{g.name}</span>
                 </button>

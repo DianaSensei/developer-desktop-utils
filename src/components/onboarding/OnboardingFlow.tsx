@@ -72,7 +72,7 @@ export function OnboardingFlow() {
               key={s}
               className={cn(
                 'h-1.5 rounded-full transition-all',
-                i === stepIndex ? 'w-6 bg-primary' : 'w-1.5 bg-fg-mute/25'
+                i === stepIndex ? 'w-6 bg-acc' : 'w-1.5 bg-fg-mute/25'
               )}
             />
           ))}
@@ -116,13 +116,13 @@ export function OnboardingFlow() {
                     className={cn(
                       'flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors',
                       active
-                        ? 'border-primary/50 bg-primary/10 text-fg'
+                        ? 'border-acc/50 bg-acc/10 text-fg'
                         : 'border-border hover:bg-muted/50 text-fg-mute hover:text-fg'
                     )}
                   >
-                    <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : 'text-fg-mute')} />
+                    <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-acc' : 'text-fg-mute')} />
                     <span className="min-w-0 flex-1 truncate font-medium">{group.label}</span>
-                    {active && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                    {active && <Check className="h-3.5 w-3.5 shrink-0 text-acc" />}
                   </button>
                 );
               })}
@@ -137,8 +137,8 @@ export function OnboardingFlow() {
         {step === 'done' && (
           <>
             <DialogHeader className="items-center text-center">
-              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <Sparkles className="h-6 w-6 text-primary" />
+              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-acc/10">
+                <Sparkles className="h-6 w-6 text-acc" />
               </div>
               <DialogTitle className="text-lg">Sẵn sàng rồi!</DialogTitle>
               <DialogDescription>

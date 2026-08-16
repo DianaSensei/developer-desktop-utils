@@ -91,8 +91,8 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                 <button
                   onClick={() => setSelection({ kind: 'collectionVars' })}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent/60',
-                    selection?.kind === 'collectionVars' && 'bg-accent',
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-acc/60',
+                    selection?.kind === 'collectionVars' && 'bg-acc',
                   )}
                 >
                   <Layers className="h-3 w-3 shrink-0 text-fg-mute" />
@@ -159,7 +159,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       title="Export environment"
-                      className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-accent hover:text-fg"
+                      className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-acc hover:text-fg"
                     >
                       <Download className="h-4 w-4" />
                     </DropdownMenuTrigger>
@@ -227,8 +227,8 @@ function EnvRow({ env, active, selected, onClick }: {
     <button
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent/60',
-        selected && 'bg-accent',
+        'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-acc/60',
+        selected && 'bg-acc',
       )}
     >
       {active && <StatusDot tone="live" size="xs" />}

@@ -200,13 +200,13 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
             <Label className="text-xs">Partition</Label>
             <div className="flex rounded-md border border-input overflow-hidden text-xs h-ctl mt-1">
               <button
-                className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted'}`}
+                className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted'}`}
                 onClick={() => setPartitionMode('auto')}
               >
                 Auto
               </button>
               <button
-                className={`px-3 py-1 transition-colors ${partitionMode === 'manual' ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted'}`}
+                className={`px-3 py-1 transition-colors ${partitionMode === 'manual' ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted'}`}
                 onClick={() => setPartitionMode('manual')}
               >
                 Manual
@@ -229,7 +229,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
           )}
           {previewPartition !== null && (
             <span className="mt-auto mb-1 text-xs text-fg-mute" title="Computed with Kafka's murmur2 default partitioner">
-              key routes to <span className="font-mono font-medium text-primary">P{previewPartition}</span>
+              key routes to <span className="font-mono font-medium text-acc">P{previewPartition}</span>
             </span>
           )}
         </div>

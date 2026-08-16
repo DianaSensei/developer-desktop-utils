@@ -35,10 +35,10 @@ export function HistoryView({ store }: { store: ApiStore }) {
           <Clock className="h-3.5 w-3.5" /> History
         </span>
         <div className="flex items-center gap-0.5">
-          <button onClick={() => setSelectedId(history[0]?.id ?? null)} title="Jump to latest" className="rounded p-1 text-fg-mute hover:bg-accent hover:text-fg">
+          <button onClick={() => setSelectedId(history[0]?.id ?? null)} title="Jump to latest" className="rounded p-1 text-fg-mute hover:bg-acc hover:text-fg">
             <RotateCw className="h-3.5 w-3.5" />
           </button>
-          <button onClick={() => store.clearHistory()} title="Clear history" className="rounded p-1 text-fg-mute hover:bg-accent hover:text-destructive">
+          <button onClick={() => store.clearHistory()} title="Clear history" className="rounded p-1 text-fg-mute hover:bg-acc hover:text-destructive">
             <Eraser className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -52,8 +52,8 @@ export function HistoryView({ store }: { store: ApiStore }) {
               key={h.id}
               onClick={() => setSelectedId(h.id)}
               className={cn(
-                'flex w-full items-center gap-3 border-b px-3 py-2.5 text-left text-xs hover:bg-accent/50',
-                selectedId === h.id && 'bg-accent',
+                'flex w-full items-center gap-3 border-b px-3 py-2.5 text-left text-xs hover:bg-acc/50',
+                selectedId === h.id && 'bg-acc',
               )}
             >
               <span className="w-24 shrink-0 text-fg-mute">{timeAgo(h.at)}</span>

@@ -183,7 +183,7 @@ export function MockServer() {
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setSelectedId(s.id)}
             className={cn(
               'group flex cursor-pointer items-center gap-2 border-l-2 px-3 py-2 transition-colors hover:bg-muted/40',
-              s.id === selectedId ? 'border-l-primary bg-muted/60' : 'border-l-transparent',
+              s.id === selectedId ? 'border-l-acc bg-muted/60' : 'border-l-transparent',
               !s.enabled && 'opacity-50',
             )}
           >
@@ -227,7 +227,7 @@ export function MockServer() {
         onClick={() => setSelectedId(FALLBACK_ID)}
         className={cn(
           'flex shrink-0 items-center gap-2 border-l-2 border-t border-border px-3 py-2 text-left transition-colors hover:bg-muted/40',
-          selectedId === FALLBACK_ID ? 'border-l-primary bg-muted/60' : 'border-l-transparent',
+          selectedId === FALLBACK_ID ? 'border-l-acc bg-muted/60' : 'border-l-transparent',
         )}
       >
         <span className="flex w-11 shrink-0 items-center justify-center rounded bg-muted/60 py-0.5 text-fg-mute">
@@ -325,8 +325,8 @@ export function MockServer() {
         <div
           onPointerDown={startSidebarDrag}
           className={cn(
-            'group relative w-px shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/40',
-            dragging && 'bg-primary/60',
+            'group relative w-px shrink-0 cursor-col-resize bg-border transition-colors hover:bg-acc/40',
+            dragging && 'bg-acc/60',
           )}
         >
           <span className="absolute -inset-x-1 inset-y-0" />
@@ -369,7 +369,7 @@ export function MockServer() {
             onChange={(e) => setImportText(e.target.value)}
             placeholder='{ "stubs": [ … ], "host": "127.0.0.1", "port": 8787, … }'
             spellCheck={false}
-            className="h-56 w-full resize-none rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="h-56 w-full resize-none rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
           />
           {importError && <Callout tone="error" size="sm">{importError}</Callout>}
           <DialogFooter>

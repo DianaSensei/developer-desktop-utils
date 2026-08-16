@@ -97,8 +97,8 @@
     transition: background-color 150ms, color 150ms;
   }
   .diff-merge-view .cm-merge-revert button:hover {
-    background-color: hsl(var(--accent));
-    color: hsl(var(--accent-foreground));
+    background-color: hsl(var(--acc-c));
+    color: hsl(var(--acc-fg-c));
   }
 
   /* Inputs and buttons don't inherit the font by default in some webviews */

@@ -153,7 +153,7 @@ export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoMod
           </button>
           <button
             onClick={onClose}
-            className="text-xs font-medium bg-primary text-primary-foreground px-4 py-1.5 rounded-md hover:bg-primary/90 transition-colors"
+            className="text-xs font-medium bg-acc text-acc-fg px-4 py-1.5 rounded-md hover:bg-acc/90 transition-colors"
           >
             Got it
           </button>

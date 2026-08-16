@@ -159,8 +159,8 @@ export function KafkaExplorer() {
       >
         <div className={cn(
           'absolute inset-y-0 left-[2px] w-px bg-border transition-all duration-100',
-          'group-hover:w-[3px] group-hover:left-[1px] group-hover:bg-primary/50',
-          isResizing && 'w-[3px] left-[1px] bg-primary/70',
+          'group-hover:w-[3px] group-hover:left-[1px] group-hover:bg-acc/50',
+          isResizing && 'w-[3px] left-[1px] bg-acc/70',
         )} />
       </div>
 

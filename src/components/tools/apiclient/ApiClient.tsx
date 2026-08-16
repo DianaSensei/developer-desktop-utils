@@ -349,8 +349,8 @@ export function ApiClient() {
         <div
           onPointerDown={startSidebarResize}
           className={cn(
-            'group relative w-px shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/40',
-            resizing && 'bg-primary/60',
+            'group relative w-px shrink-0 cursor-col-resize bg-border transition-colors hover:bg-acc/40',
+            resizing && 'bg-acc/60',
           )}
         >
           {/* wider invisible hit area for easier grabbing */}

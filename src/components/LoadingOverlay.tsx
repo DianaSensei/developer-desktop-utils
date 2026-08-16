@@ -26,7 +26,7 @@ export function LoadingOverlay({
         className
       )}
     >
-      <Spinner size="lg" className="text-primary" />
+      <Spinner size="lg" className="text-acc" />
       {message && <p className="text-sm text-fg-mute loading-text">{message}</p>}
     </div>
   );

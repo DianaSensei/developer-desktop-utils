@@ -60,7 +60,7 @@ function Column({
               onClick={() => onPick(n)}
               className={cn(
                 'block w-full rounded-md py-1 text-center font-mono text-sm tabular-nums transition-colors',
-                isSel ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted',
+                isSel ? 'bg-acc font-semibold text-acc-fg' : 'hover:bg-muted',
               )}
             >
               {pad2(n)}
@@ -150,7 +150,7 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
         onClick={() => !disabled && setOpen((v) => !v)}
         className={cn(
           'flex h-ctl-lg items-center gap-2 rounded-md border border-input bg-card px-2.5 text-sm shadow-sm tabular-nums',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
           disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-muted/50',
           className,
         )}

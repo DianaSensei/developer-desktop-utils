@@ -26,7 +26,7 @@ export interface TabsProps {
   onSelect: (id: string) => void;
   right?: ReactNode;
   className?: string;
-  /** Active-tab underline + text color. Default 'border-primary text-fg'
+  /** Active-tab underline + text color. Default 'border-acc text-fg'
    *  — override when a tool has an established alternate accent. */
   activeClassName?: string;
 }
@@ -169,7 +169,7 @@ function TabBtn({ def, active, activeClassName, onClick }: {
       className={cn(
         'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-medium transition-colors',
         active
-          ? (activeClassName ?? 'border-primary text-fg')
+          ? (activeClassName ?? 'border-acc text-fg')
           : 'border-transparent text-fg-mute hover:text-fg hover:border-border',
       )}
     >
@@ -194,7 +194,7 @@ function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string
             <button
               key={t.id}
               onClick={() => { onSelect(t.id); setOpen(false); }}
-              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-acc"
             >
               {t.label}{t.badge}
             </button>

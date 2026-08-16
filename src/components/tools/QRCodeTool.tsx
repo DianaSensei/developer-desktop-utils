@@ -383,8 +383,8 @@ function QrGenerator() {
   const chip = (active: boolean) =>
     cn('rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none',
       active
-        ? 'border-primary/30 bg-primary/10 text-primary'
-        : 'border-border bg-bg hover:border-primary/60 hover:bg-muted/50');
+        ? 'border-acc/30 bg-acc/10 text-acc'
+        : 'border-border bg-bg hover:border-acc/60 hover:bg-muted/50');
 
   return (
     <div className="space-y-4">
@@ -609,7 +609,7 @@ function QrReader() {
         onDrop={handleDrop}
         className={cn(
           'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors',
-          dragging ? 'border-primary bg-primary/5' : 'hover:border-primary/60 hover:bg-muted/40',
+          dragging ? 'border-acc bg-acc/5' : 'hover:border-acc/60 hover:bg-muted/40',
         )}
       >
         {loading

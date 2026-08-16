@@ -150,7 +150,7 @@ function ColHeader({ label, col, align = 'left', sortCol, sortDir, onSort, onRes
           className="absolute right-0 top-0 bottom-0 w-2 translate-x-full cursor-col-resize flex items-center justify-center z-10 group"
           onMouseDown={onResizeStart}
         >
-          <div className="w-px h-4 bg-border group-hover:bg-primary/70 transition-colors" />
+          <div className="w-px h-4 bg-border group-hover:bg-acc/70 transition-colors" />
         </div>
       )}
     </div>
@@ -309,7 +309,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
                       key={m}
                       className={cn(
                         'px-2 py-0.5 font-mono transition-colors',
-                        valueMode === m ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted/60',
+                        valueMode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted/60',
                       )}
                       onClick={() => setValueMode(m)}
                     >
@@ -635,7 +635,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 key={m}
                 className={cn(
                   'px-2.5 transition-colors whitespace-nowrap',
-                  mode === m ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted',
+                  mode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted',
                 )}
                 onClick={() => setMode(m)}
               >
@@ -724,7 +724,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                 key={m}
                 className={cn(
                   'px-2.5 transition-colors font-mono',
-                  defaultValueMode === m ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted',
+                  defaultValueMode === m ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-muted',
                 )}
                 onClick={() => setDefaultValueMode(m)}
               >
@@ -769,7 +769,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           onClick={() => setUseRegex((v) => !v)}
           className={cn(
             'p-1 rounded transition-colors shrink-0',
-            useRegex ? 'bg-primary/10 text-primary' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
+            useRegex ? 'bg-acc/10 text-acc' : 'text-fg-mute hover:text-fg hover:bg-muted/60',
           )}
         >
           <Regex className="w-3.5 h-3.5" />
@@ -851,8 +851,8 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                     className={cn(
                       'group w-full grid cursor-pointer px-3 py-1.5 text-left border-b border-border/30 transition-colors border-l-2',
                       isSelected
-                        ? 'bg-primary/10 border-l-primary'
-                        : 'border-l-transparent hover:bg-muted/40 hover:border-l-primary/40',
+                        ? 'bg-acc/10 border-l-acc'
+                        : 'border-l-transparent hover:bg-muted/40 hover:border-l-acc/40',
                     )}
                     style={{ gridTemplateColumns: gridCols, gap: '0.5rem' }}
                     onClick={() => handleRowClick(msg)}
@@ -874,7 +874,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                       <ChevronRight
                         className={cn(
                           'w-3 h-3 shrink-0 transition-opacity',
-                          isSelected ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-50',
+                          isSelected ? 'opacity-100 text-acc' : 'opacity-0 group-hover:opacity-50',
                         )}
                       />
                     </span>
@@ -909,10 +909,10 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           >
             {/* Drag handle on left edge */}
             <div
-              className="w-1 shrink-0 cursor-col-resize border-l group hover:border-primary/50 transition-colors"
+              className="w-1 shrink-0 cursor-col-resize border-l group hover:border-acc/50 transition-colors"
               onMouseDown={startDetailResize}
             >
-              <div className="h-full w-full group-hover:bg-primary/10 transition-colors" />
+              <div className="h-full w-full group-hover:bg-acc/10 transition-colors" />
             </div>
 
             {/* Panel content */}

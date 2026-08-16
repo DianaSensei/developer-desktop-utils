@@ -430,7 +430,7 @@ function ActionsMenu({ copied, onCopy, onSave, onClear }: {
 }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger title="More" className="rounded p-1 text-fg-mute transition-colors hover:bg-accent hover:text-fg">
+      <DropdownMenuTrigger title="More" className="rounded p-1 text-fg-mute transition-colors hover:bg-acc hover:text-fg">
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[11rem]">

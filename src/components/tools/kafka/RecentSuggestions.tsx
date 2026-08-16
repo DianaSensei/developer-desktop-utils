@@ -25,7 +25,7 @@ export function RecentSuggestions({ items, brokerId, field, value, onPick }: {
           role="button"
           tabIndex={0}
           onMouseDown={(e) => { e.preventDefault(); onPick(v); }}
-          className={cn('group/recent w-full flex items-center gap-2 px-2.5 py-1.5 text-left cursor-pointer hover:bg-muted/60', value === v && 'text-primary')}
+          className={cn('group/recent w-full flex items-center gap-2 px-2.5 py-1.5 text-left cursor-pointer hover:bg-muted/60', value === v && 'text-acc')}
         >
           <Clock className="h-3 w-3 shrink-0 text-fg-mute/60" />
           <span className="font-mono text-sm flex-1 truncate">{v}</span>

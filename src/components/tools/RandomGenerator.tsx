@@ -175,7 +175,7 @@ export function RandomGenerator() {
               {(Object.keys(CHARSETS) as CharsetKey[]).map((k) => (
                 <button key={k} onClick={() => toggleCharset(k)}
                   className={cn('rounded-lg border px-2 py-0.5 text-xs font-medium transition-colors',
-                    charsets[k] ? 'bg-primary/10 text-primary border-primary/30' : 'text-fg-mute hover:text-fg')}>
+                    charsets[k] ? 'bg-acc/10 text-acc border-acc/30' : 'text-fg-mute hover:text-fg')}>
                   {k === 'lower' ? 'a–z' : k === 'upper' ? 'A–Z' : k === 'digits' ? '0–9' : '!@#'}
                 </button>
               ))}
@@ -186,7 +186,7 @@ export function RandomGenerator() {
 
         <button
           onClick={handleGenerate}
-          className="ml-auto flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+          className="ml-auto flex items-center gap-1.5 rounded-lg bg-acc px-3 py-1.5 text-xs font-medium text-acc-fg hover:bg-acc/90 transition-colors shrink-0"
         >
           <RefreshCw className="h-3 w-3" />Generate
         </button>

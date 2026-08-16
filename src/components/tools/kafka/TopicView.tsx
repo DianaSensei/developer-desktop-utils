@@ -79,7 +79,7 @@ export function TopicView({
           )}
           <button
             onClick={onBackToTopics}
-            className="font-mono font-semibold truncate hover:text-primary transition-colors"
+            className="font-mono font-semibold truncate hover:text-acc transition-colors"
             title="Back to topics"
           >
             {topic}
@@ -123,7 +123,7 @@ export function TopicView({
             className={cn(
               'px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0',
               activeTab === tab.id
-                ? 'border-primary text-fg'
+                ? 'border-acc text-fg'
                 : 'border-transparent text-fg-mute hover:text-fg',
             )}
             onClick={() => onSelectTab(tab.id)}

@@ -334,7 +334,7 @@ export function LuckyWheel() {
               className={cn(
                 'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                 uniqueOnly
-                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  ? 'border-acc/30 bg-acc/10 text-acc'
                   : 'border-border text-fg-mute hover:bg-muted hover:text-fg',
               )}
             >
@@ -349,7 +349,7 @@ export function LuckyWheel() {
               className={cn(
                 'flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors',
                 removeOnWin
-                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  ? 'border-acc/30 bg-acc/10 text-acc'
                   : 'border-border text-fg-mute hover:bg-muted hover:text-fg',
               )}
             >
