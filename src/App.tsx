@@ -710,11 +710,11 @@ function AppContent() {
           (…)}` quanh header đó) — không render trùng hai nơi. */}
       {showMacOverlayChrome && (
         <div
-          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[64px] pr-3"
+          className="flex h-[38px] shrink-0 items-center justify-between border-b border-border bg-chrome pl-[70px] pr-3"
           data-tauri-drag-region="deep"
         >
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2">
               <AppLogo size={18} />
               <h1 className="whitespace-nowrap text-xs font-semibold leading-none">DevTool</h1>
             </div>
@@ -771,7 +771,13 @@ function AppContent() {
               </div>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-0.5">
+          {/* Vùng trống này ĐÃ kéo được cửa sổ nhờ "deep" trên container cha
+              (click vào khoảng trống không con nào phủ tới thì target chính
+              là container). Vẫn đặt data-tauri-drag-region="deep" lặp lại ở
+              đây cho rõ ràng, tránh phải suy luận ngược khi đọc code — vùng
+              kéo chính giữa hai cụm trái/phải, không lẫn với nút nào. */}
+          <div className="flex-1" data-tauri-drag-region="deep" />
+          <div className="flex shrink-0 items-center gap-1">
             {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
             <Button
