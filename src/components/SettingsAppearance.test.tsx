@@ -59,7 +59,7 @@ describe('Settings — Appearance — ngôn ngữ', () => {
 });
 
 describe('Settings — Appearance — tone chủ đạo', () => {
-  it('hiện đủ 6 swatch, đúng số preset của kit', () => {
+  it('hiện đủ 4 swatch, đúng số preset của kit', () => {
     renderSettings();
     // Mỗi radio không có aria-label riêng nên tên truy cập của nó rơi về
     // `title` (tên tone) — "Accent tone" là tên của cả NHÓM, không phải từng nút.
@@ -69,23 +69,23 @@ describe('Settings — Appearance — tone chủ đạo', () => {
 
   it('bấm một swatch: đánh dấu checked, lưu lại, và ghi lên <html data-accent>', () => {
     renderSettings();
-    const oxblood = screen.getByRole('radio', { name: 'oxblood' });
-    fireEvent.click(oxblood);
+    const teal = screen.getByRole('radio', { name: 'teal' });
+    fireEvent.click(teal);
 
-    expect(oxblood.getAttribute('aria-checked')).toBe('true');
-    expect(storageGet('devtool-accent')).toBe('oxblood');
-    expect(document.documentElement.dataset.accent).toBe('oxblood');
+    expect(teal.getAttribute('aria-checked')).toBe('true');
+    expect(storageGet('devtool-accent')).toBe('teal');
+    expect(document.documentElement.dataset.accent).toBe('teal');
   });
 
   it('chỉ một swatch được chọn tại một thời điểm', () => {
     renderSettings();
     fireEvent.click(screen.getByRole('radio', { name: 'amber' }));
-    fireEvent.click(screen.getByRole('radio', { name: 'moss' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'teal' }));
 
     const checked = screen
       .getAllByRole('radio')
       .filter((el) => el.getAttribute('aria-checked') === 'true');
     expect(checked).toHaveLength(1);
-    expect(checked[0].getAttribute('title')).toBe('moss');
+    expect(checked[0].getAttribute('title')).toBe('teal');
   });
 });

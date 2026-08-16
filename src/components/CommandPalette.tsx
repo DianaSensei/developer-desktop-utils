@@ -133,7 +133,7 @@ export function CommandPalette() {
             'data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           )}
         >
-          <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
+          <DialogPrimitive.Title className="sr-only">{t('palette.title')}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
             {t('palette.placeholder')}
           </DialogPrimitive.Description>

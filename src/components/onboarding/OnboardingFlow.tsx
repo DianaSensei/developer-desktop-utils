@@ -6,24 +6,32 @@ import { AppLogo } from '@/components/AppLogo';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useFeatures } from '@/contexts/FeatureContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { ONBOARDING_TOOL_GROUPS } from '@/lib/onboardingToolGroups';
 
 type Step = 'welcome' | 'tools' | 'done';
 const STEPS: Step[] = ['welcome', 'tools', 'done'];
 
-function selectedGroupsFromCurrentFeatures(isFeatureEnabled: (id: string) => boolean, isFavorite: (id: string) => boolean) {
+// Pre-check a group only when EVERY tool in it is already enabled — using
+// `.some(...)` here used to pre-check a group from a single default-on tool
+// (e.g. api-client) and then, on plain "Continue", force-enable+favorite the
+// rest of that group's tools too (kafka-explorer, rabbit-client…) even though
+// they default to off. Since 6 of the 7 groups have at least one default-on
+// tool, that blanket-selected almost the entire catalog on a fresh install.
+function selectedGroupsFromCurrentFeatures(isFeatureEnabled: (id: string) => boolean) {
   return new Set(
-    ONBOARDING_TOOL_GROUPS.filter((g) => g.toolIds.some((id) => isFeatureEnabled(id) || isFavorite(id))).map((g) => g.id)
+    ONBOARDING_TOOL_GROUPS.filter((g) => g.toolIds.every((id) => isFeatureEnabled(id))).map((g) => g.id)
   );
 }
 
 export function OnboardingFlow() {
   const { show, completed, close } = useOnboarding();
   const { toggleFeature, toggleFavorite, isFeatureEnabled, isFavorite } = useFeatures();
+  const { t } = useLocale();
   const [step, setStep] = useState<Step>('welcome');
-  // Pre-check groups whose tools are already enabled/favorited, so re-opening
-  // from Settings after customization doesn't look like a reset.
-  const [selected, setSelected] = useState<Set<string>>(() => selectedGroupsFromCurrentFeatures(isFeatureEnabled, isFavorite));
+  // Pre-check groups that are ALREADY fully enabled, so re-opening from
+  // Settings after customization doesn't look like a reset.
+  const [selected, setSelected] = useState<Set<string>>(() => selectedGroupsFromCurrentFeatures(isFeatureEnabled));
 
   // Re-sync on every open (not just first mount, since this component stays
   // mounted for the app's lifetime): a reopen from Settings skips straight to
@@ -32,7 +40,7 @@ export function OnboardingFlow() {
   useEffect(() => {
     if (!show) return;
     setStep(completed ? 'tools' : 'welcome');
-    setSelected(selectedGroupsFromCurrentFeatures(isFeatureEnabled, isFavorite));
+    setSelected(selectedGroupsFromCurrentFeatures(isFeatureEnabled));
     // Only re-sync when the dialog transitions to open, not on every keystroke/toggle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show]);
@@ -82,15 +90,14 @@ export function OnboardingFlow() {
           <>
             <DialogHeader className="items-center text-center">
               <AppLogo size={48} className="mb-2" />
-              <DialogTitle className="text-lg">Chào mừng đến với DevTool</DialogTitle>
+              <DialogTitle className="text-lg">{t('onboarding.welcome.title')}</DialogTitle>
               <DialogDescription>
-                Bộ công cụ dành cho developer: xử lý text, encode/hash, API client, mock server,
-                Kafka/RabbitMQ và nhiều hơn nữa — tất cả chạy ngay trên máy bạn, không cần server.
+                {t('onboarding.welcome.description')}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="sm:justify-between">
-              <Button variant="ghost" onClick={close}>Bỏ qua</Button>
-              <Button onClick={() => setStep('tools')}>Bắt đầu</Button>
+              <Button variant="ghost" onClick={close}>{t('onboarding.skip')}</Button>
+              <Button onClick={() => setStep('tools')}>{t('onboarding.start')}</Button>
             </DialogFooter>
           </>
         )}
@@ -98,9 +105,9 @@ export function OnboardingFlow() {
         {step === 'tools' && (
           <>
             <DialogHeader>
-              <DialogTitle>Bạn quan tâm tới nhóm công cụ nào?</DialogTitle>
+              <DialogTitle>{t('onboarding.tools.title')}</DialogTitle>
               <DialogDescription>
-                Các tool trong nhóm bạn chọn sẽ được bật và ghim lên đầu sidebar. Bạn có thể đổi lại bất cứ lúc nào trong Settings.
+                {t('onboarding.tools.description')}
               </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-2">
@@ -128,8 +135,8 @@ export function OnboardingFlow() {
               })}
             </div>
             <DialogFooter className="sm:justify-between">
-              <Button variant="ghost" onClick={close}>Bỏ qua</Button>
-              <Button onClick={applySelection}>Tiếp tục</Button>
+              <Button variant="ghost" onClick={close}>{t('onboarding.skip')}</Button>
+              <Button onClick={applySelection}>{t('onboarding.continue')}</Button>
             </DialogFooter>
           </>
         )}
@@ -140,14 +147,13 @@ export function OnboardingFlow() {
               <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-acc/10">
                 <Sparkles className="h-6 w-6 text-acc" />
               </div>
-              <DialogTitle className="text-lg">Sẵn sàng rồi!</DialogTitle>
+              <DialogTitle className="text-lg">{t('onboarding.done.title')}</DialogTitle>
               <DialogDescription>
-                Các tool bạn chọn đã lên đầu sidebar. Bấm nút <span className="font-medium text-fg">?</span> ở góc trên mỗi tool bất
-                cứ lúc nào để xem hướng dẫn sử dụng chi tiết.
+                {t('onboarding.done.before')} <span className="font-medium text-fg">?</span> {t('onboarding.done.after')}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button onClick={close} className="w-full">Bắt đầu sử dụng DevTool</Button>
+              <Button onClick={close} className="w-full">{t('onboarding.done.cta')}</Button>
             </DialogFooter>
           </>
         )}

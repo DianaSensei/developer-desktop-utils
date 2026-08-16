@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
 import { LocaleProvider, useLocale } from '@/contexts/LocaleContext';
+import type { TranslationKey } from '@/lib/i18n';
 import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { MeetingsProvider } from '@/lib/meetings';
@@ -226,7 +227,7 @@ function NavScrollArea({
                 {/* Group headers — only when favourites are pinned at the top */}
                 {showSections && i === 0 && <SectionLabel>{t('shell.section.favorites')}</SectionLabel>}
                 {showSections && i === favoriteCount && <SectionLabel className="mt-2">{t('shell.section.allTools')}</SectionLabel>}
-                <Tooltip side="right" triggerClassName="block" label={isLive ? `${entry.label} — connected` : entry.label} description={desc}>
+                <Tooltip side="right" triggerClassName="block" label={isLive ? t('shell.sidebar.connectedLabel', { label: entry.label }) : entry.label} description={desc}>
                   <Link
                     to={path}
                     onClick={onClose}
@@ -245,7 +246,7 @@ function NavScrollArea({
                         // theo accent. Xem design/RULES.md.
                         <span
                           className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-[hsl(var(--chrome-c))]"
-                          title="Connected"
+                          title={t('shell.sidebar.connected')}
                         />
                       )}
                     </span>
@@ -279,8 +280,8 @@ function NavScrollArea({
                     {!isCollapsed && (
                       <button
                         type="button"
-                        aria-label={fav ? `Unfavorite ${entry.label}` : `Favorite ${entry.label}`}
-                        title={fav ? 'Remove from favorites' : 'Add to favorites'}
+                        aria-label={fav ? t('common.unfavoriteAria', { label: entry.label }) : t('common.favoriteAria', { label: entry.label })}
+                        title={fav ? t('common.unfavorite') : t('common.favorite')}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -319,7 +320,7 @@ function NavScrollArea({
               const Icon = tool.icon;
               const desc = TOOL_DEF_MAP.get(tool.featureId)?.description ?? '';
               return (
-                <Tooltip key={tool.path} side="right" triggerClassName="block" label={`${tool.label} — turned off`} description={desc}>
+                <Tooltip key={tool.path} side="right" triggerClassName="block" label={t('shell.sidebar.disabledLabel', { label: tool.label })} description={desc}>
                   <button
                     type="button"
                     onClick={() => onEnableTool(tool)}
@@ -328,7 +329,7 @@ function NavScrollArea({
                     <Icon className="h-4 w-4 flex-shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
                     <span className="flex-1 truncate text-sm">{tool.label}</span>
                     <span className="flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium text-acc opacity-0 transition-opacity group-hover:opacity-100">
-                      <Plus className="h-3 w-3" /> Enable
+                      <Plus className="h-3 w-3" /> {t('shell.sidebar.enable')}
                     </span>
                   </button>
                 </Tooltip>
@@ -344,8 +345,8 @@ function NavScrollArea({
           <Tooltip
             side="right"
             triggerClassName="block"
-            label={`${hiddenCount} more tool${hiddenCount > 1 ? 's' : ''} available`}
-            description="Turn on more tools from the Settings page."
+            label={t('shell.sidebar.moreAvailable', { count: hiddenCount })}
+            description={t('shell.sidebar.turnOnHint')}
           >
             <Link
               to={settingsTool.path}
@@ -357,7 +358,7 @@ function NavScrollArea({
             >
               <Plus className={isCollapsed ? 'h-3 w-3' : 'h-2.5 w-2.5 flex-shrink-0'} />
               {!isCollapsed && (
-                <span className="whitespace-nowrap">{hiddenCount} more in Settings</span>
+                <span className="whitespace-nowrap">{t('shell.sidebar.moreInSettings', { count: hiddenCount })}</span>
               )}
             </Link>
           </Tooltip>
@@ -372,7 +373,7 @@ function NavScrollArea({
             isCollapsed ? 'flex-col' : 'flex-row'
           )}>
             <ChevronDown className="h-2.5 w-2.5" />
-            {!isCollapsed && 'more'}
+            {!isCollapsed && t('shell.sidebar.moreScrollHint')}
           </span>
         </div>
       )}
@@ -380,10 +381,10 @@ function NavScrollArea({
   );
 }
 
-const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
-  { value: 'light', label: 'Light mode', icon: Sun },
-  { value: 'dark', label: 'Dark mode', icon: Moon },
-  { value: 'system', label: 'Match system', icon: Monitor },
+const THEME_OPTIONS: { value: ThemePreference; labelKey: TranslationKey; icon: typeof Sun }[] = [
+  { value: 'light', labelKey: 'shell.theme.light', icon: Sun },
+  { value: 'dark', labelKey: 'shell.theme.dark', icon: Moon },
+  { value: 'system', labelKey: 'shell.theme.system', icon: Monitor },
 ];
 
 // Compact single-button cycle order used by the mobile header toggle.
@@ -514,7 +515,7 @@ function Sidebar({
                 DevTool
               </h1>
             </div>
-            <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0 lg:hidden" onClick={onClose} title="Close menu">
+            <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0 lg:hidden" onClick={onClose} title={t('shell.sidebar.closeMenu')}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -525,7 +526,7 @@ function Sidebar({
           <div className="shrink-0 flex justify-center px-2 pt-2">
             <button
               onClick={() => { pendingSearchFocus.current = true; onToggleCollapse(); }}
-              title="Search tools"
+              title={t('shell.sidebar.searchToolsTitle')}
               className="flex items-center justify-center h-ctl w-ctl rounded-md text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
@@ -545,8 +546,8 @@ function Sidebar({
               {query && (
                 <button
                   onClick={() => setQuery('')}
-                  aria-label="Clear search"
-                  title="Clear search"
+                  aria-label={t('shell.sidebar.clearSearch')}
+                  title={t('shell.sidebar.clearSearch')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-mute/60 hover:text-fg transition-colors"
                 >
                   <X className="h-3 w-3" />
@@ -578,10 +579,10 @@ function Sidebar({
               tự chế bằng group-hover:block, không xử lý được bàn phím hay
               tràn viewport (xem design/RULES.md). Dùng chung `Tooltip` như
               các dòng nav bên trên. */}
-          <Tooltip side="right" label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} disabled={!isCollapsed} triggerClassName="block w-full">
+          <Tooltip side="right" label={isCollapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')} disabled={!isCollapsed} triggerClassName="block w-full">
             <button
               onClick={onToggleCollapse}
-              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={isCollapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
               className={cn(
                 'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
@@ -594,17 +595,17 @@ function Sidebar({
                   isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
                 )}
               >
-                Collapse
+                {t('shell.sidebar.collapseLabel')}
               </span>
             </button>
           </Tooltip>
 
           {/* Theme preference — single cycling toggle (Light → Dark → System),
               styled to match the Collapse/Settings rows instead of a boxed segmented control */}
-          <Tooltip side="right" label={activeThemeOption.label} disabled={!isCollapsed} triggerClassName="block w-full">
+          <Tooltip side="right" label={t(activeThemeOption.labelKey)} disabled={!isCollapsed} triggerClassName="block w-full">
             <button
               onClick={() => onThemeChange(NEXT_THEME[themePreference])}
-              title={`Theme: ${activeThemeOption.label} (click to cycle)`}
+              title={t('shell.sidebar.themeCycle', { theme: t(activeThemeOption.labelKey) })}
               className={cn(
                 'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
@@ -617,17 +618,17 @@ function Sidebar({
                   isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
                 )}
               >
-                {activeThemeOption.label}
+                {t(activeThemeOption.labelKey)}
               </span>
             </button>
           </Tooltip>
 
           {/* Settings — always last */}
-          <Tooltip side="right" label="Settings" disabled={!isCollapsed} triggerClassName="block w-full">
+          <Tooltip side="right" label={t('shell.sidebar.settings')} disabled={!isCollapsed} triggerClassName="block w-full">
             <Link
               to={settingsTool.path}
               onClick={onClose}
-              title="Settings"
+              title={t('shell.sidebar.settings')}
               className={cn(
                 'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-200 ease-out',
                 isCollapsed ? 'justify-center' : 'gap-2.5',
@@ -649,7 +650,7 @@ function Sidebar({
                   isSettingsActive && 'font-medium'
                 )}
               >
-                Settings
+                {t('shell.sidebar.settings')}
               </span>
             </Link>
           </Tooltip>
@@ -663,6 +664,7 @@ function AppContent() {
   const location = useLocation();
   const { isFeatureEnabled } = useFeatures();
   const liveIds = useLiveConnections();
+  const { t } = useLocale();
   useDesktopChrome();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -778,7 +780,7 @@ function AppContent() {
         <h1 className="whitespace-nowrap text-xs font-semibold leading-none">DevTool</h1>
       </div>
       <span className="h-4 w-px shrink-0 bg-line" />
-      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(true)} title="Open menu">
+      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')}>
         <Menu className="h-3.5 w-3.5" />
       </Button>
       <div
@@ -787,7 +789,7 @@ function AppContent() {
       >
         <ActiveIcon className="h-3.5 w-3.5 text-acc" />
         {liveIds.includes(activeTool.featureId) && (
-          <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-ok ring-2 ring-chrome" title="Running" />
+          <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-ok ring-2 ring-chrome" title={t('shell.titlebar.running')} />
         )}
       </div>
       {activeGroupTabs.length > 1 ? (
@@ -838,8 +840,8 @@ function AppContent() {
       size="icon"
       className="h-6 w-6 text-fg-mute/70 hover:text-fg"
       onClick={openGuideManually}
-      title={`How to use ${activeTool.label}`}
-      aria-label={`How to use ${activeTool.label}`}
+      title={t('shell.titlebar.howToUse', { label: activeTool.label })}
+      aria-label={t('shell.titlebar.howToUse', { label: activeTool.label })}
     >
       <HelpCircle className="h-3.5 w-3.5" />
     </Button>
@@ -880,7 +882,7 @@ function AppContent() {
             {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
             {titlebarHelpAction}
-            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(false)} title="Close menu">
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(false)} title={t('shell.sidebar.closeMenu')}>
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -921,7 +923,7 @@ function AppContent() {
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-fg/10 hover:text-fg active:scale-100 active:bg-fg/15 focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winMinimize}
-              title="Minimize"
+              title={t('shell.titlebar.minimize')}
             >
               <Minus className="h-3 w-3" strokeWidth={1.5} />
             </Button>
@@ -930,7 +932,7 @@ function AppContent() {
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-fg/10 hover:text-fg active:scale-100 active:bg-fg/15 focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winToggleMaximize}
-              title={isMaximized ? 'Restore' : 'Maximize'}
+              title={isMaximized ? t('shell.titlebar.restore') : t('shell.titlebar.maximize')}
             >
               {isMaximized ? (
                 <Copy className="h-3 w-3 -scale-x-100" strokeWidth={1.5} />
@@ -943,7 +945,7 @@ function AppContent() {
               size="icon"
               className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-[#e81123] hover:text-white active:scale-100 active:bg-[#c42b1c] active:text-white dark:hover:bg-[#c42b1c] dark:active:bg-[#8c2318] focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winClose}
-              title="Close"
+              title={t('shell.titlebar.close')}
             >
               <X className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Button>
@@ -990,7 +992,7 @@ function AppContent() {
                 {liveIds.includes(activeTool.featureId) && (
                   <span
                     className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-bg"
-                    title="Running"
+                    title={t('shell.titlebar.running')}
                   />
                 )}
               </div>
@@ -1053,8 +1055,8 @@ function AppContent() {
                 size="icon"
                 className="h-ctl w-ctl text-fg-mute/70 hover:text-fg"
                 onClick={openGuideManually}
-                title={`How to use ${activeTool.label}`}
-                aria-label={`How to use ${activeTool.label}`}
+                title={t('shell.titlebar.howToUse', { label: activeTool.label })}
+                aria-label={t('shell.titlebar.howToUse', { label: activeTool.label })}
               >
                 <HelpCircle className="h-4 w-4" />
               </Button>
@@ -1063,7 +1065,7 @@ function AppContent() {
                 size="icon"
                 className="lg:hidden h-ctl w-ctl"
                 onClick={() => changeTheme(NEXT_THEME[themePreference])}
-                title={`Theme: ${themePreference} (tap to cycle)`}
+                title={t('shell.titlebar.themeCycleTap', { theme: t(THEME_OPTIONS.find((o) => o.value === themePreference)!.labelKey) })}
               >
                 {themePreference === 'system' ? (
                   <Monitor className="h-4 w-4" />

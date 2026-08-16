@@ -25,7 +25,7 @@ export interface SegmentedProps<T extends string> {
  * Bản trước dùng thẻ trắng (`bg-card`) trên nền xám nhạt (`bg-bg-2`). Trong
  * bảng màu mới hai màu đó gần nhau, nên tương phản gần bằng không — nhìn không
  * ra đang chọn cái nào. Nền đặc + chữ nghịch đảo thì không thể nhầm được, ở cả
- * light lẫn dark, ở cả sáu tone accent.
+ * light lẫn dark, ở cả bốn tone accent.
  *
  * ── Máng lõm ────────────────────────────────────────────────────────────────
  * Máng dùng `bg-sunk` + bóng inset để đọc ra là một RÃNH mà con trượt chạy

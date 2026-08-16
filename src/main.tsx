@@ -42,7 +42,7 @@ async function bootstrap() {
   }
 
   // Áp dụng tone chủ đạo TRƯỚC lần vẽ đầu tiên — nếu không, người dùng đã chọn
-  // petrol sẽ thấy đúng một khung hình azure mặc định trước khi kịp đổi.
+  // teal sẽ thấy đúng một khung hình azure mặc định trước khi kịp đổi.
   // Không cần hook: tone không có tín hiệu bên ngoài nào để theo dõi liên tục
   // như dark-mode hệ thống, chỉ cần áp một lần lúc khởi động; đổi tại chỗ về
   // sau do Settings tự set thẳng lên <html> khi người dùng bấm chọn.

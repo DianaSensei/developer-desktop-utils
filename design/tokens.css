@@ -219,18 +219,15 @@
    accent-tint chứ không phải nền đặc; SubTab và Segmented (đã sửa) đều dùng
    nền đặc + chữ trắng nên phải hạ `--a-l` để đạt ngưỡng. Đo bằng Chromium
    thật, xem `design/preview/index.html` mục Segmented. */
-[data-accent="petrol"]  { --a-h: 190; --a-s: 68%; --a-l: 33%; }
-/* Xanh lá ngả VÀNG, không phải xanh lá thuần: --ok nằm ở hue ~155. Bản đầu
-   ("forest", h152) chỉ cách --ok 18 đơn vị RGB — accent và "hợp lệ" gần như
-   cùng một màu. h96 đẩy khoảng cách lên 61. */
-[data-accent="moss"]    { --a-h:  96; --a-s: 40%; --a-l: 28%; }
+[data-accent="teal"]    { --a-h: 196; --a-s: 65%; --a-l: 32%; }
+/* Thay cho petrol/moss/oxblood (bản G3): ba tone đó đạt AA nhưng phải hạ
+   `--a-l` khá sâu để qua ngưỡng, nên nhìn xỉn/tối so với azure — bốn tone
+   còn lại (đo bằng Chromium thật) đều đạt AA ở mức sáng, sống động hơn hẳn:
+   azure 5.57:1, teal 6.04:1, iris 5.77:1, amber 4.94:1. teal cách --ok 58
+   đơn vị RGB và cách --bad 184 đơn vị (ngưỡng tối thiểu 45 — xem
+   designKit.test.ts), nên không lẫn với chip "hợp lệ" hay "lỗi". */
 [data-accent="iris"]    { --a-h: 258; --a-s: 62%; --a-l: 56%; }
-/* Oxblood phải TỐI và NGẢ TÍA, không được là đỏ tươi: --bad nằm ở hue ~3.
-   Bản đầu (h2 s58 l42) cho ra rgb(169,49,45) — cách màu lỗi rgb(179,50,44)
-   đúng 10 đơn vị, tức là mắt thường không phân biệt được nút chính với báo lỗi.
-   Bản này cách 80. Bất kỳ tone đỏ nào thêm sau cũng phải qua phép đo đó. */
-[data-accent="oxblood"] { --a-h: 355; --a-s: 38%; --a-l: 28%; }
-/* amber là tone SÁNG NHẤT trong sáu tone — dễ hỏng chữ trắng nhất. Bản đầu
+/* amber là tone SÁNG NHẤT trong bốn tone — dễ hỏng chữ trắng nhất. Bản đầu
    (l44) chỉ đạt 3.31:1, không đạt cả ngưỡng phi văn bản 3:1 lẫn văn bản
    4.5:1. l35 đạt 4.94:1, còn dư biên so với 4.5. */
 [data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 35%; }

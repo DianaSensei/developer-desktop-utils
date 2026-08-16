@@ -27,26 +27,32 @@ Mọi biến thể accent **tính ra** từ ba số này, không mã hex nào vi
 | `--acc-ring` | `hsl(h s l / .22)` | vòng focus |
 
 **Thêm một tone = thêm ba con số.** Xem khối `[data-accent="…"]` cuối `tokens.css`.
-Sáu tone có sẵn: azure (mặc định), petrol, moss, iris, oxblood, amber.
+Bốn tone có sẵn: azure (mặc định), teal, iris, amber.
+
+> **G3 từng có sáu tone** (thêm `petrol`/`moss`/`oxblood`), nhưng cả ba đều phải hạ
+> `--a-l` khá sâu để qua ngưỡng tương phản AA (xem mục tiếp theo) — kết quả là ba
+> tone tối, xỉn, khó ưa hơn hẳn ba tone còn lại. Đã gộp lại thành một tone `teal`
+> duy nhất (h196 s65% l32%) đạt tương phản 6.04:1 (light) / 8.54:1 (dark) mà vẫn
+> sống động, cộng với azure/iris/amber — bốn tone đều đo được ≥4.94:1.
 
 > ⚠️ **Tone mới phải đo khoảng cách tới `--ok` và `--bad`.** Vì màu trạng thái cố
-> định, accent không được lấn vào chỗ của chúng. Hai tone đầu tiên đều vướng lỗi này
-> và chỉ lộ ra khi đo bằng trình duyệt thật:
+> định, accent không được lấn vào chỗ của chúng. Hai tone đầu tiên của G1 đều vướng
+> lỗi này và chỉ lộ ra khi đo bằng trình duyệt thật:
 >
 > | Tone bản đầu | Khoảng cách RGB | Hậu quả |
 > |---|---|---|
 > | `oxblood` h2 s58 l42 | **10** tới `--bad` | nút chính trông y hệt báo lỗi |
 > | `forest` h152 s52 l32 | **18** tới `--ok` | accent trông y hệt chip "hợp lệ" |
 >
-> Đã sửa thành `oxblood` h355 (cách 80) và `moss` h96 (cách 61). Ngưỡng tối thiểu
-> là **45**, được canh tự động trong `designKit.test.ts` — thêm tone mới mà quá gần
-> thì test đỏ ngay.
+> Ngưỡng tối thiểu là **45**, được canh tự động trong `designKit.test.ts` — thêm
+> tone mới mà quá gần thì test đỏ ngay. `teal` h196 đo được 58 đơn vị tới `--ok`
+> và 184 tới `--bad`, dư biên thoải mái.
 
 Đổi lúc chạy:
 ```js
-document.documentElement.dataset.accent = 'petrol';
+document.documentElement.dataset.accent = 'teal';
 // hoặc chỉnh trực tiếp ba kênh:
-document.documentElement.style.setProperty('--a-h', '190');
+document.documentElement.style.setProperty('--a-h', '196');
 ```
 
 ---
@@ -74,7 +80,8 @@ Hệ quả tiện lợi: đổi `--a-h` là *cả trang* đổi theo, kể cả 
 `--ok` / `--warn` / `--bad` / `--info`, mỗi cái ba biến thể (`base` / `-tint` / `-edge`),
 **là mã hex cố định**, không dẫn xuất từ accent. Đây là chủ ý, không phải thiếu sót.
 
-Nếu trạng thái dẫn xuất từ accent thì đổi tone sang oxblood → thẻ "hợp lệ" hoá đỏ.
+Nếu trạng thái dẫn xuất từ accent thì đổi sang một tone ngả đỏ (như `oxblood` ở G3,
+trước khi bị gộp — xem mục Accent) sẽ khiến thẻ "hợp lệ" hoá đỏ theo.
 Khả năng đổi tone và tính nhất quán ngữ nghĩa xung đột nhau; hệ này chọn giữ ngữ nghĩa.
 
 Bản tối không phải bản sáng đảo ngược — mỗi tông được chọn lại cho nền tối, nhưng
