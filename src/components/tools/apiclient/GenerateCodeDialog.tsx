@@ -86,7 +86,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
         </div>
 
         {/* code preview */}
-        <div className="relative min-h-0 flex-1 border-t">
+        <div className="relative flex min-h-0 flex-1 flex-col border-t">
           <CodeViewer value={code} language="text" />
           <CopyButton
             value={() => code}
