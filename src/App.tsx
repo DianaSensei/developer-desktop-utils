@@ -19,6 +19,7 @@ import {
   Star,
   Minus,
   Square,
+  Copy,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
@@ -672,6 +673,25 @@ function AppContent() {
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() =>
     getThemePreference()
   );
+  // Nút maximize/restore của titlebar tự vẽ (Windows/Linux) phải đổi ICON theo
+  // đúng trạng thái cửa sổ — Windows thật đổi từ ô vuông đơn (□) sang hai ô
+  // chồng nhau (⧉) khi đã maximize. Không theo dõi việc này thì nút luôn hiện
+  // sai một trong hai trạng thái, lộ ngay ra là chrome tự vẽ chứ không phải hệ
+  // điều hành thật.
+  const [isMaximized, setIsMaximized] = useState(false);
+  useEffect(() => {
+    if (!showCustomChrome) return;
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    tauriWindow().then(async (win) => {
+      const initial = await win.isMaximized();
+      if (!cancelled) setIsMaximized(initial);
+      unlisten = await win.onResized(async () => {
+        if (!cancelled) setIsMaximized(await win.isMaximized());
+      });
+    });
+    return () => { cancelled = true; unlisten?.(); };
+  }, []);
   // Resolves `system` -> actual dark/light, applies the `dark` class to
   // <html>, and (while preference === 'system') keeps it in sync in real
   // time as the OS theme changes.
@@ -883,25 +903,47 @@ function AppContent() {
             <div id="tool-header-actions" className="flex items-center gap-0.5" />
             {titlebarHelpAction}
             <span className="mx-1 h-4 w-px shrink-0 bg-line" />
-            {/* h-full (không phải h-9 cố định) — hàng titlebar cao 38px, ba nút
-                caption theo đúng quy ước Windows/Linux là chạm sát mép trên/dưới
-                titlebar, không có khoảng hở. Cũng tránh trùng ngưỡng
-                mixedControlHeights (h-7/8/9) của guard.test.ts vì đây không phải
-                một control kích thước cố định như button thường. */}
-            <Button variant="ghost" size="icon" className="h-full w-10 rounded-none text-fg-mute/70 hover:text-fg" onClick={winMinimize} title="Minimize">
-              <Minus className="h-3.5 w-3.5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-full w-10 rounded-none text-fg-mute/70 hover:text-fg" onClick={winToggleMaximize} title="Maximize / Restore">
-              <Square className="h-3 w-3" />
+            {/* Ba nút caption Windows/Linux — cố tình LỆCH khỏi token app (accent/
+                bad) và các hiệu ứng chuẩn của <Button> (bấm lún active:scale,
+                viền focus accent, con trỏ pointer): đây là chrome của HỆ ĐIỀU
+                HÀNH, không phải UI của app — macOS traffic light cũng không theo
+                accent app vì cùng lý do. Bám đúng thông số Fluent của Windows
+                11 để không lộ ra là hàng tự vẽ.
+
+                h-full (không phải h-9 cố định) — hàng titlebar cao 38px, ba nút
+                chạm sát mép trên/dưới titlebar, không có khoảng hở. Cũng tránh
+                trùng ngưỡng mixedControlHeights (h-7/8/9) của guard.test.ts vì
+                đây không phải control kích thước cố định như button thường. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-fg/10 hover:text-fg active:scale-100 active:bg-fg/15 focus-visible:ring-0 focus-visible:ring-offset-0"
+              onClick={winMinimize}
+              title="Minimize"
+            >
+              <Minus className="h-3 w-3" strokeWidth={1.5} />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-full w-10 rounded-none text-fg-mute/70 hover:bg-bad hover:text-white"
+              className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-fg/10 hover:text-fg active:scale-100 active:bg-fg/15 focus-visible:ring-0 focus-visible:ring-offset-0"
+              onClick={winToggleMaximize}
+              title={isMaximized ? 'Restore' : 'Maximize'}
+            >
+              {isMaximized ? (
+                <Copy className="h-3 w-3 -scale-x-100" strokeWidth={1.5} />
+              ) : (
+                <Square className="h-2.5 w-2.5" strokeWidth={1.5} />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-full w-10 shrink-0 cursor-default rounded-none text-fg/90 hover:bg-[#e81123] hover:text-white active:scale-100 active:bg-[#c42b1c] active:text-white dark:hover:bg-[#c42b1c] dark:active:bg-[#8c2318] focus-visible:ring-0 focus-visible:ring-offset-0"
               onClick={winClose}
               title="Close"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" strokeWidth={1.5} />
             </Button>
           </div>
         </div>
