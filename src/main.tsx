@@ -22,6 +22,7 @@ import '@fontsource/ibm-plex-mono/latin-600.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
 import { applyAccentToDocument, getAccentPreference } from './lib/accentPreference';
+import { isTauri } from './lib/platform';
 
 // The app's module graph (App.tsx and everything it imports, e.g.
 // src/lib/liveConnections.ts) reads persisted state synchronously at
@@ -36,7 +37,6 @@ async function bootstrap() {
   // DEV ONLY: wipe all persisted app state on each `npm run tauri:dev` launch
   // so features can be tested from a clean slate. Stripped from production
   // builds (import.meta.env.DEV is false), and skipped on the web dev server.
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
   if (import.meta.env.DEV && isTauri) {
     await clearPersistentStore();
   }

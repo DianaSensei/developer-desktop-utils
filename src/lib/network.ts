@@ -8,6 +8,8 @@
 //   • DNS:   cloudflare-dns.com, dns.google, dns.quad9.net, dns.adguard-dns.com
 //   • IP:    ipapi.co, ipwho.is, freeipapi.com (tried in order, fallback chain)
 
+import { isTauri } from '@/lib/platform';
+
 // ─── DNS record types ───────────────────────────────────────────────────────
 
 export const DNS_RECORD_TYPES = [
@@ -51,7 +53,6 @@ export interface DohProvider {
 
 const q = (s: string) => encodeURIComponent(s.trim());
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 // Fetch wrapper: in the Tauri desktop app, route through the HTTP plugin so the
 // request is made from Rust (no browser `Origin` header, no CORS). Some public

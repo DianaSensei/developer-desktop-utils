@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { isTauri, IS_MAC as isMac } from '@/lib/platform';
 
-export const isMac =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
+export { isMac };
 export const quickPasteHint = isMac ? 'Press ⌘V to paste' : 'Press Ctrl+V to paste';
 
 async function readClipboard(): Promise<string> {
-  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+  if (isTauri) {
     const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
     return (await readText()) ?? '';
   }

@@ -7,6 +7,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import {
   Copy, Check, Pipette, Image as ImageIcon, Download, SlidersHorizontal, HelpCircle, ArrowLeftRight,
 } from 'lucide-react';
+import { isTauri } from '@/lib/platform';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -108,7 +109,6 @@ function quantize(pixels: Px[], count: number): string[] {
 }
 
 const hasEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in window;
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 // A built-in sample image so the tool is usable before the user uploads one.
 function makeSampleImage(): string {

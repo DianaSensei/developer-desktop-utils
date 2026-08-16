@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
+import { isTauri } from '@/lib/platform';
 
 export type UpdateStatus =
   | 'idle'
@@ -45,7 +46,6 @@ const STORAGE_AUTO_CHECK = 'devtool-auto-update';
 const STORAGE_LAST_CHECK = 'devtool-last-update-check';
 const STORAGE_PENDING_UPDATE = 'devtool-pending-update'; // persisted UpdateInfo while an update is known to be available
 const STORAGE_CHECK_HOUR = 'devtool-update-check-hour';
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function loadCheckHour(fallbackHour: number): number {
   const raw = parseInt(storageGet(STORAGE_CHECK_HOUR) ?? '', 10);

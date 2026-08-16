@@ -2,7 +2,8 @@
 // build. Desktop uses the dialog + fs plugins (native pickers); the web build
 // falls back to an <input type=file> read and a Blob download.
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+import { isTauri } from '@/lib/platform';
+
 
 // Open a picker and return the chosen file's text contents, or null if cancelled.
 export async function pickJsonFile(): Promise<string | null> {

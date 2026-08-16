@@ -44,9 +44,8 @@ import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
 import { useToolGuideTracking } from '@/hooks/useToolGuideTracking';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppLogo } from '@/components/AppLogo';
-import { IS_MAC } from '@/components/ui/keycap';
+import { isTauri, IS_MAC } from '@/lib/platform';
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 /** `titleBarStyle: "Overlay"` (tauri.conf.json) chỉ có tác dụng trên macOS —
  *  Windows/Linux giữ nguyên titlebar hệ thống, `decorations` không đổi. Chỉ
  *  khi cả hai đúng thì cửa sổ mới thật sự không còn thanh tiêu đề riêng và

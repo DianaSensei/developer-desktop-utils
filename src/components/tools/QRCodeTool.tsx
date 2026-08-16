@@ -17,6 +17,7 @@ import { useImagePaste } from '@/hooks/useImagePaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { copyImageToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
+import { isTauri } from '@/lib/platform';
 
 type FrameStyle = 'none' | 'border' | 'scan-bottom' | 'scan-top';
 type LogoPreset = 'none' | 'scan-me' | '📱' | '🔗' | '📶' | 'custom';
@@ -243,7 +244,7 @@ async function renderToCanvas(opts: RenderOpts): Promise<HTMLCanvasElement | nul
 
 async function downloadPng(canvas: HTMLCanvasElement) {
   const dataUrl = canvas.toDataURL('image/png');
-  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+  if (isTauri) {
     const { save }      = await import('@tauri-apps/plugin-dialog');
     const { writeFile } = await import('@tauri-apps/plugin-fs');
     const path = await save({ filters: [{ name: 'PNG Image', extensions: ['png'] }], defaultPath: 'qrcode.png' });
@@ -265,7 +266,7 @@ async function downloadPng(canvas: HTMLCanvasElement) {
 
 async function pickImageFile(): Promise<{ dataUrl: string; img: HTMLImageElement } | null> {
   let dataUrl = '';
-  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+  if (isTauri) {
     const { open }      = await import('@tauri-apps/plugin-dialog');
     const { readFile }  = await import('@tauri-apps/plugin-fs');
     const selected = await open({ filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
@@ -592,7 +593,7 @@ function QrReader() {
   const isUrl = /^https?:\/\//i.test(result.trim());
   const openLink = async () => {
     const url = result.trim();
-    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    if (isTauri) {
       const { openUrl } = await import('@tauri-apps/plugin-opener');
       await openUrl(url);
     } else {

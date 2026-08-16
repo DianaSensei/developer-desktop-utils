@@ -6,13 +6,13 @@
 // the standard `fetch` (subject to the target's CORS policy). Requests only ever
 // fire when the user clicks Send.
 
+import { isTauri } from '@/lib/platform';
 import type { ApiRequest, ApiResponse, KeyValue, OAuth2Auth, VarMap } from './types';
 import { newKeyValue } from './types';
 import { substituteVars } from './vars';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
 import { type Cookie, cookieHeader } from './cookies';
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 async function netFetch(input: string, init: RequestInit): Promise<Response> {
   if (isTauri) {
