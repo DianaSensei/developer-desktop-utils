@@ -20,11 +20,11 @@ const buttonVariants = cva(
         // hành động phụ vẫn cần trọng lượng — "Định dạng lại", "Chạy thử".
         tint: 'bg-acc-tint text-acc-ink hover:bg-acc-tint-2',
         destructive:
-          'bg-destructive text-destructive-foreground shadow-sm-premium hover:bg-destructive/90 hover:shadow-md-premium',
+          'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:shadow',
         outline:
-          'border border-input bg-background shadow-sm-premium hover:bg-accent/10 hover:text-foreground hover:border-border/70 hover:shadow-md-premium',
+          'border border-input bg-background shadow-sm hover:bg-accent/10 hover:text-foreground hover:border-border/70 hover:shadow',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-sm-premium',
+          'bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-sm',
         ghost: 'hover:bg-accent/15 hover:text-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
       },

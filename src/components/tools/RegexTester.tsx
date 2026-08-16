@@ -273,7 +273,7 @@ export function RegexTester() {
   return (
     <div className="flex flex-col h-full">
       {/* Pattern + Flags row */}
-      <div className="shrink-0 header-premium px-4 py-2.5 space-y-2">
+      <div className="shrink-0 header-chrome px-4 py-2.5 space-y-2">
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm text-muted-foreground select-none">/</span>
           <Input

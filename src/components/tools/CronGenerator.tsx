@@ -606,7 +606,7 @@ export function CronGenerator() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-premium px-4 py-2.5 flex items-center gap-3">
+      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={changeMode}

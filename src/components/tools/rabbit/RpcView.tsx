@@ -542,7 +542,7 @@ function RoutingKeyCombobox({ conn, exchange, value, onChange }: {
         className="font-mono text-sm h-9"
       />
       {open && (recent.length > 0 || matches.length > 0) && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">
           <RecentSuggestions items={recent} connId={conn.id} field="routingKey" value={value} onPick={pick} />
           {matches.map((s) => (
             <button
@@ -594,7 +594,7 @@ function ExchangeCombobox({ connId, value, exchanges, onChange }: {
         className="font-mono text-sm h-9"
       />
       {open && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow-md-premium max-h-64 overflow-y-auto py-1">
+        <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover shadow max-h-64 overflow-y-auto py-1">
           <RecentSuggestions items={recent} connId={connId} field="exchange" value={value} onPick={pick} />
           <button
             type="button"

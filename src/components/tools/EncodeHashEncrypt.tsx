@@ -611,7 +611,7 @@ export function EncodeHashEncrypt() {
     <div className="tool-full-height">
 
       {/* Top-level tab navigation */}
-      <div className="shrink-0 header-premium px-4 py-2.5 flex items-center gap-3">
+      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
         <Segmented
           value={tab}
           onValueChange={setTab}

@@ -483,7 +483,7 @@ function Sidebar({
       />
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-premium transition-[width,transform] duration-300 ease-in-out flex flex-col',
+          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-chrome transition-[width,transform] duration-300 ease-in-out flex flex-col',
           isCollapsed ? 'w-14' : 'w-56',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
@@ -922,7 +922,7 @@ function AppContent() {
             tránh trùng #tool-header-actions (portal target phải là DUY NHẤT
             trong DOM). */}
         {!showMergedTitlebar && (
-        <div className="z-30 header-premium shrink-0">
+        <div className="z-30 header-chrome shrink-0">
           {/* py-2 đưa tổng chiều cao về đúng 50px (2×8 + h-ctl 34) — khớp hàng
               header sidebar bên trái (2×10 + logo 30 = 50px), để đường viền
               dưới của cả hai nối thẳng thành một đường ngang liền mạch thay vì

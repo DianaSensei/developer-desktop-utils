@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 // Fixed top control row — frosted glass chrome, matches the app header.
 const ToolToolbar = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('shrink-0 header-premium px-4 py-2.5', className)} {...props} />
+    <div ref={ref} className={cn('shrink-0 header-chrome px-4 py-2.5', className)} {...props} />
   )
 );
 ToolToolbar.displayName = 'ToolToolbar';

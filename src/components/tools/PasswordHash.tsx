@@ -106,7 +106,7 @@ export function PasswordHash() {
   return (
     <div className="tool-full-height">
       {/* Mode switcher */}
-      <div className="shrink-0 header-premium px-4 py-2.5 flex items-center gap-3">
+      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={(v) => { setMode(v); setError(null); }}
