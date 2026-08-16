@@ -55,7 +55,7 @@ export function UpdateDialog() {
           <button
             onClick={installUpdate}
             disabled={isDownloading}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-md bg-acc px-3 py-1.5 text-xs font-medium text-acc-fg transition-colors hover:bg-acc/90 disabled:opacity-50"
           >
             {isDownloading ? (
               <>

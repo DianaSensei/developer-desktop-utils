@@ -147,7 +147,7 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
         style={{ backgroundColor: value }}
         className={cn(
           'rounded-md border border-border shadow-sm transition-shadow',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow',
           'h-6 w-6',
           className,
@@ -204,7 +204,7 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
               onBlur={commitHex}
               onKeyDown={(e) => { if (e.key === 'Enter') { commitHex(); (e.target as HTMLInputElement).blur(); } }}
               spellCheck={false}
-              className="h-ctl w-full rounded-md border bg-card px-2 font-mono text-xs uppercase focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="h-ctl w-full rounded-md border bg-card px-2 font-mono text-xs uppercase focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
             />
           </div>
         </div>

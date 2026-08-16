@@ -102,7 +102,7 @@ export function DropdownMenuContent({ align = 'start', className, children }: Dr
 
 export interface DropdownMenuItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: React.ReactNode;
-  /** Tints the row as the current selection (bg-primary/10 + text-primary). */
+  /** Tints the row as the current selection (bg-acc/10 + text-acc). */
   active?: boolean;
   /** Tints the row for a destructive action (text-destructive). */
   danger?: boolean;
@@ -121,8 +121,8 @@ export const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenu
         role="menuitem"
         onClick={(e) => { onClick?.(e); if (closeOnSelect) setOpen(false); }}
         className={cn(
-          'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent',
-          active && 'bg-primary/10 text-primary',
+          'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-acc',
+          active && 'bg-acc/10 text-acc',
           danger && 'text-destructive hover:bg-destructive/10',
           className,
         )}

@@ -327,7 +327,7 @@ function NavScrollArea({
                   >
                     <Icon className="h-4 w-4 flex-shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
                     <span className="flex-1 truncate text-sm">{tool.label}</span>
-                    <span className="flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                    <span className="flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium text-acc opacity-0 transition-opacity group-hover:opacity-100">
                       <Plus className="h-3 w-3" /> Enable
                     </span>
                   </button>
@@ -632,7 +632,7 @@ function Sidebar({
                 'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-200 ease-out',
                 isCollapsed ? 'justify-center' : 'gap-2.5',
                 isSettingsActive
-                  ? 'bg-primary/10 text-primary font-medium'
+                  ? 'bg-acc/10 text-acc font-medium'
                   : 'text-fg-mute hover:text-fg hover:bg-fg/[0.05]'
               )}
             >
@@ -764,9 +764,9 @@ function AppContent() {
       </Button>
       <div
         key={activeTool.path}
-        className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+        className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
       >
-        <ActiveIcon className="h-3.5 w-3.5 text-primary" />
+        <ActiveIcon className="h-3.5 w-3.5 text-acc" />
         {liveIds.includes(activeTool.featureId) && (
           <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-ok ring-2 ring-chrome" title="Running" />
         )}
@@ -789,7 +789,7 @@ function AppContent() {
                   aria-selected={on}
                   className={cn(
                     'inline-flex h-full items-center whitespace-nowrap rounded-sm px-2 text-xs leading-none transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
                     on
                       ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                       : 'text-fg-mute hover:text-fg',
@@ -934,9 +934,9 @@ function AppContent() {
               </Button>
               <div
                 key={activeTool.path}
-                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-primary/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
               >
-                <ActiveIcon className="h-4 w-4 text-primary" />
+                <ActiveIcon className="h-4 w-4 text-acc" />
                 {/* Mock Server / Kafka / RabbitMQ… đang chạy nền — cùng chấm
                     xanh sidebar đã dùng cho "đang kết nối" (bg-ok cố định,
                     không theo accent, xem RULES.md). Header trước đây không
@@ -979,7 +979,7 @@ function AppContent() {
                           aria-selected={on}
                           className={cn(
                             'inline-flex h-full items-center whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
                             on
                               ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                               : 'text-fg-mute hover:text-fg',

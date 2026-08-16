@@ -293,7 +293,7 @@ export function RegexTester() {
                 className={cn(
                   'w-6 rounded-md font-mono text-xs font-medium transition-all duration-150',
                   flags.includes(flag)
-                    ? 'bg-primary/10 text-primary'
+                    ? 'bg-acc/10 text-acc'
                     : 'text-fg-mute hover:text-fg'
                 )}
               >
@@ -315,7 +315,7 @@ export function RegexTester() {
               className={cn(
                 'h-6 text-xs rounded-lg transition-all',
                 activePreset?.label === p.label &&
-                  'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
+                  'border-acc/30 bg-acc/10 text-acc hover:bg-acc/15 hover:text-acc'
               )}
             >
               {p.label}
@@ -371,7 +371,7 @@ export function RegexTester() {
                       className={cn(
                         'shrink-0 px-3 py-1.5 text-xs font-medium transition-colors border-b-2',
                         resultView === id
-                          ? 'text-fg border-primary'
+                          ? 'text-fg border-acc'
                           : 'text-fg-mute hover:text-fg border-transparent'
                       )}
                     >

@@ -620,7 +620,7 @@ export function CronGenerator() {
           <button
             type="button"
             aria-label={`${mode} cron rule`}
-            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute hover:bg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute hover:bg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/35"
           >
             <HelpCircle className="h-4 w-4" />
           </button>
@@ -726,7 +726,7 @@ export function CronGenerator() {
         </div>
 
         {/*
-          Bản cũ: viền/nền dùng border-primary/bg-accent (tức là ACCENT, đổi
+          Bản cũ: viền/nền dùng border-acc/bg-acc (tức là ACCENT, đổi
           theo tone chủ đạo) trong khi icon lại cứng text-green-500 — đúng lỗi
           trộn hai hệ màu mà design/RULES.md cảnh báo. Đổi tone chủ đạo sang đỏ
           thì cả khối "hợp lệ" sẽ nhuộm đỏ trong khi icon vẫn xanh lá. ExplainBand

@@ -72,7 +72,7 @@ export function RequestTabs({
               <button
                 onClick={(e) => { e.stopPropagation(); store.closeTab(req.id); }}
                 className={cn(
-                  'ml-1 rounded-md p-0.5 text-fg-mute/70 hover:bg-accent hover:text-fg',
+                  'ml-1 rounded-md p-0.5 text-fg-mute/70 hover:bg-acc hover:text-fg',
                   active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
                 )}
                 title="Close tab"
@@ -87,7 +87,7 @@ export function RequestTabs({
             <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />
             <Clock className="h-3.5 w-3.5 text-acc-ink" />
             <span>History</span>
-            <button onClick={onCloseHistory} className="ml-1 rounded p-0.5 text-fg-mute/70 hover:bg-accent hover:text-fg" title="Close history">
+            <button onClick={onCloseHistory} className="ml-1 rounded p-0.5 text-fg-mute/70 hover:bg-acc hover:text-fg" title="Close history">
               <X className="h-3 w-3" />
             </button>
           </div>

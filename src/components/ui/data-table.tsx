@@ -114,7 +114,7 @@ export function Tr({ interactive, selected, className, ...props }: TrProps) {
       className={cn(
         'transition-colors',
         interactive && 'cursor-pointer hover:bg-muted/40',
-        selected && 'bg-accent/10',
+        selected && 'bg-acc/10',
         className,
       )}
       {...props}

@@ -185,8 +185,8 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         transition: 'background-color 150ms, color 150ms',
       },
       '.cm-foldGutter span:hover': {
-        backgroundColor: 'hsl(var(--accent))',
-        color: 'hsl(var(--accent-foreground))',
+        backgroundColor: 'hsl(var(--acc-c))',
+        color: 'hsl(var(--acc-fg-c))',
       },
 
       // Folded-region placeholder ("{…}"). CodeMirror's base theme hard-codes
@@ -202,21 +202,21 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         padding: '0 4px',
       },
 
-      '.cm-activeLine': { backgroundColor: activeLine ? 'hsl(var(--primary) / 0.05)' : 'transparent' },
-      '.cm-activeLineGutter': { backgroundColor: activeLine ? 'hsl(var(--primary) / 0.08)' : 'transparent' },
+      '.cm-activeLine': { backgroundColor: activeLine ? 'hsl(var(--acc-c) / 0.05)' : 'transparent' },
+      '.cm-activeLineGutter': { backgroundColor: activeLine ? 'hsl(var(--acc-c) / 0.08)' : 'transparent' },
 
       // Selection has to be stated for both the focused and unfocused case —
       // CodeMirror styles them with separate rules, and the unfocused one is
       // what a read-only viewer shows while the user copies out of it.
       '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': {
-        backgroundColor: 'hsl(var(--primary) / 0.2)',
+        backgroundColor: 'hsl(var(--acc-c) / 0.2)',
       },
-      '.cm-selectionMatch': { backgroundColor: 'hsl(var(--primary) / 0.12)' },
-      '.cm-searchMatch': { backgroundColor: 'hsl(var(--primary) / 0.18)' },
-      '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'hsl(var(--primary) / 0.32)' },
+      '.cm-selectionMatch': { backgroundColor: 'hsl(var(--acc-c) / 0.12)' },
+      '.cm-searchMatch': { backgroundColor: 'hsl(var(--acc-c) / 0.18)' },
+      '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'hsl(var(--acc-c) / 0.32)' },
       '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
-        backgroundColor: 'hsl(var(--primary) / 0.15)',
-        outline: '1px solid hsl(var(--primary) / 0.35)',
+        backgroundColor: 'hsl(var(--acc-c) / 0.15)',
+        outline: '1px solid hsl(var(--acc-c) / 0.35)',
       },
 
       // Popups. Every editor gets these — an unthemed autocomplete list was the
@@ -236,8 +236,8 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         color: 'hsl(var(--fg-c))',
       },
       '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
-        backgroundColor: 'hsl(var(--accent))',
-        color: 'hsl(var(--accent-foreground))',
+        backgroundColor: 'hsl(var(--acc-c))',
+        color: 'hsl(var(--acc-fg-c))',
       },
       '.cm-completionLabel': { color: 'inherit' },
       '.cm-completionDetail': { color: 'hsl(var(--fg-mute-c))' },

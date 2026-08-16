@@ -8,12 +8,12 @@ const buttonVariants = cva(
   // Rê chuột đổi màu/bóng, KHÔNG đổi vị trí — design/RULES.md. `transform` vẫn
   // nằm trong transition cho hiệu ứng lún khi bấm (active:scale), là phản hồi
   // trực tiếp dưới ngón tay chứ không phải chuyển động khi chỉ lướt qua.
-  'inline-flex items-center justify-center whitespace-nowrap rounded-sm text-sm font-medium ring-offset-bg transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-sm text-sm font-medium ring-offset-bg transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-primary hover:bg-primary/95 hover:shadow-primary-lg active:shadow-primary',
+          'bg-acc text-acc-fg shadow-primary hover:bg-acc/95 hover:shadow-primary-lg active:shadow-primary',
         // `tint` — nền nhuộm nhạt, chữ đậm cùng tông. Đây là bậc còn THIẾU giữa
         // `default` (đặc, chói) và `outline`/`ghost` (gần như vô hình): không có
         // nó, mọi màn chỉ còn hai thái cực và giao diện đọc ra tẻ nhạt. Dùng cho
@@ -22,11 +22,11 @@ const buttonVariants = cva(
         destructive:
           'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:shadow',
         outline:
-          'border border-input bg-bg shadow-sm hover:bg-accent/10 hover:text-fg hover:border-border/70 hover:shadow',
+          'border border-input bg-bg shadow-sm hover:bg-acc/10 hover:text-fg hover:border-border/70 hover:shadow',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-sm',
-        ghost: 'hover:bg-accent/15 hover:text-fg',
-        link: 'text-primary underline-offset-4 hover:underline',
+        ghost: 'hover:bg-acc/15 hover:text-fg',
+        link: 'text-acc underline-offset-4 hover:underline',
       },
       size: {
         // Một chiều cao control cho cả app: --h (34px). `lg` dùng --h-lg (40px)

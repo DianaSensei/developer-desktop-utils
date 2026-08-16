@@ -211,7 +211,7 @@ export function TextTransformer() {
                 className={cn(
                   'h-ctl text-xs rounded-sm',
                   removeLineWhitespace &&
-                    'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
+                    'border-acc/30 bg-acc/10 text-acc hover:bg-acc/15 hover:text-acc'
                 )}
               >
                 Remove whitespace between lines

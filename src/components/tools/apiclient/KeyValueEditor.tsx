@@ -135,7 +135,7 @@ export function KeyValueEditor({
     return (
       <div className="space-y-1.5">
         <div className="flex justify-end">
-          <button onClick={() => setBulk(false)} className="text-[11px] font-medium text-primary hover:underline">
+          <button onClick={() => setBulk(false)} className="text-[11px] font-medium text-acc hover:underline">
             Key-Value Edit
           </button>
         </div>
@@ -167,7 +167,7 @@ export function KeyValueEditor({
           const disabled = !isGhost && !row.enabled;
           const secret = isMasked(row);
           return (
-            <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-muted/20 focus-within:bg-muted/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/40 transition-colors', gridCols)}>
+            <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-muted/20 focus-within:bg-muted/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors', gridCols)}>
               {/* Enable/disable toggle dot */}
               <div className="flex items-center justify-center">
                 <button

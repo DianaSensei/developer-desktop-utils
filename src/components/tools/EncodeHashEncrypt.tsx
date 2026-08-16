@@ -706,7 +706,7 @@ export function EncodeHashEncrypt() {
               className={cn(
                 'text-[11px] font-mono px-2 py-0.5 rounded border transition-colors',
                 upperHex
-                  ? 'border-primary/40 bg-primary/10 text-primary'
+                  ? 'border-acc/40 bg-acc/10 text-acc'
                   : 'border-border bg-muted/30 text-fg-mute hover:text-fg hover:border-border/80'
               )}
             >

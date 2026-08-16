@@ -57,7 +57,7 @@ export function MeetingFields({
           onChange={(e) => onChange({ title: e.target.value })}
           placeholder="Untitled meeting"
           autoFocus={!meeting.title}
-          className="h-auto rounded-none border-0 border-b bg-transparent px-0 py-1.5 text-base font-semibold shadow-none focus-visible:border-ring/60 focus-visible:ring-0"
+          className="h-auto rounded-none border-0 border-b bg-transparent px-0 py-1.5 text-base font-semibold shadow-none focus-visible:border-acc/60 focus-visible:ring-0"
         />
 
         {/* When — one tidy row */}

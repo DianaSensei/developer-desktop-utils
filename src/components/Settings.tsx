@@ -107,8 +107,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
       aria-checked={checked}
       onClick={onChange}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
-        checked ? 'bg-primary' : 'bg-fg-mute/25'
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
+        checked ? 'bg-acc' : 'bg-fg-mute/25'
       )}
     >
       <span className={cn(
@@ -129,7 +129,7 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
   const Icon = tool.icon;
   return (
     <>
-      <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-primary' : 'text-fg-mute')} />
+      <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-acc' : 'text-fg-mute')} />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium leading-none">{tool.label}</p>
         <p className="text-[11px] text-fg-mute mt-1 leading-relaxed">{tool.description}</p>
@@ -170,7 +170,7 @@ function AccentSwatches({ value, onChange }: { value: AccentTone; onChange: (ton
           onClick={() => onChange(tone)}
           className={cn(
             'h-5 w-5 shrink-0 rounded-full border-2 transition-transform',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40 focus-visible:ring-offset-1',
             value === tone ? 'scale-110 border-fg' : 'border-transparent hover:scale-105',
           )}
           style={ACCENT_PREVIEW[tone]}
@@ -447,7 +447,7 @@ export function Settings() {
             const nodes: React.ReactNode[] = [];
             let slot = 0; // running index among non-dragged rows
             const line = (key: string) => (
-              <div key={key} className="pointer-events-none mx-3 h-0.5 rounded-full bg-primary" />
+              <div key={key} className="pointer-events-none mx-3 h-0.5 rounded-full bg-acc" />
             );
             // Hàng LOGIC là đơn vị kéo-thả: một nhóm (≥2 thành viên liền nhau,
             // tìm kiếm lọc còn 1 thì thoái thành hàng đơn — cùng quy tắc
@@ -476,7 +476,7 @@ export function Settings() {
                       style={isDragging ? { transform: `translateY(${drag!.dy}px)` } : undefined}
                       className={cn(
                         'flex items-center gap-2 bg-muted/30 px-3 py-1.5 cursor-default',
-                        isDragging && 'relative z-20 rounded-lg bg-muted shadow-lg ring-1 ring-primary/50'
+                        isDragging && 'relative z-20 rounded-lg bg-muted shadow-lg ring-1 ring-acc/50'
                       )}
                     >
                       {/* Kéo cả nhóm — con bên trong không có tay cầm riêng,
@@ -534,7 +534,7 @@ export function Settings() {
                   className={cn(
                     'flex items-center gap-3 px-3 py-3 cursor-default bg-bg',
                     !enabled && 'opacity-50',
-                    isDragging && 'relative z-20 rounded-lg bg-muted opacity-100 shadow-lg ring-1 ring-primary/50'
+                    isDragging && 'relative z-20 rounded-lg bg-muted opacity-100 shadow-lg ring-1 ring-acc/50'
                   )}
                 >
                   {/* Drag handle — hidden while searching */}
@@ -592,7 +592,7 @@ export function Settings() {
             const Icon = PERMISSION_NAMESPACE_ICONS[namespace] ?? Cog;
             return (
               <div key={namespace} className="flex items-start gap-3 px-4 py-3">
-                <Icon className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+                <Icon className="h-4 w-4 shrink-0 mt-0.5 text-acc" />
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <p className="text-xs font-medium">
                     {name} <span className="font-mono text-fg-mute/60">{namespace}</span>
@@ -720,7 +720,7 @@ export function Settings() {
                       <>
                         <span className="relative h-1 w-16 overflow-hidden rounded-full bg-muted">
                           <span
-                            className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all duration-150"
+                            className="absolute inset-y-0 left-0 rounded-full bg-acc transition-all duration-150"
                             style={{ width: `${downloadProgress}%` }}
                           />
                         </span>
@@ -752,7 +752,7 @@ export function Settings() {
                     </button>
                     <button
                       onClick={installUpdate}
-                      className="flex items-center gap-1 rounded-lg bg-primary text-primary-foreground px-2 py-1 text-[11px] font-medium hover:bg-primary/90 transition-colors"
+                      className="flex items-center gap-1 rounded-lg bg-acc text-acc-fg px-2 py-1 text-[11px] font-medium hover:bg-acc/90 transition-colors"
                     >
                       <Download className="h-3 w-3" />
                       Install

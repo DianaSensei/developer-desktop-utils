@@ -115,7 +115,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
                 ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-fg-mute" />
                 : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-fg-mute" />}
               <button
-                className="font-mono text-xs truncate flex-1 text-left hover:text-primary hover:underline"
+                className="font-mono text-xs truncate flex-1 text-left hover:text-acc hover:underline"
                 onClick={(e) => { e.stopPropagation(); onSelectGroup(groupId); }}
                 title={`View group: ${groupId}`}
               >

@@ -122,9 +122,9 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
                 'h-ctl rounded-md text-xs transition-colors',
                 !inMonth && 'text-fg-mute/40',
                 isSel
-                  ? 'bg-primary font-semibold text-primary-foreground'
+                  ? 'bg-acc font-semibold text-acc-fg'
                   : 'hover:bg-muted',
-                !isSel && isToday && 'font-semibold text-primary ring-1 ring-primary/40',
+                !isSel && isToday && 'font-semibold text-acc ring-1 ring-acc/40',
               )}
             >
               {d.getDate()}
@@ -156,7 +156,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         onClick={() => !disabled && setOpen((v) => !v)}
         className={cn(
           'flex h-ctl-lg items-center gap-2 rounded-md border border-input bg-card px-2.5 text-sm shadow-sm',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
           disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-muted/50',
           className,
         )}

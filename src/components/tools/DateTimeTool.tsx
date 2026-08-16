@@ -537,8 +537,8 @@ export function DateTimeTool() {
             <div className="flex items-center gap-2">
               <Label className="text-xs">Date / Time</Label>
               {isLive && (
-                <span className="flex items-center gap-1 text-[11px] text-primary font-medium">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                <span className="flex items-center gap-1 text-[11px] text-acc font-medium">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-acc animate-pulse" />
                   LIVE
                 </span>
               )}

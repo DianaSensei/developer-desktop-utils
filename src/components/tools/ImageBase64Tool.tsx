@@ -196,7 +196,7 @@ export function ImageBase64Tool() {
                 value={decodeInput}
                 onChange={(e) => { setDecodeInput(e.target.value); setDecodeError(false); }}
                 placeholder="data:image/png;base64,iVBORw0KGgo… or raw base64"
-                className="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-ring placeholder:text-fg-mute/50"
+                className="w-full rounded-lg border border-border bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-acc placeholder:text-fg-mute/50"
               />
             </div>
 

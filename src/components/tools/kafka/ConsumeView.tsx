@@ -314,7 +314,7 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
         <span className="text-[11px] font-mono px-1 py-0.5 rounded bg-muted text-fg-mute shrink-0">p{m.partition}</span>
         <span className="text-[11px] font-mono text-fg-mute tabular-nums shrink-0 w-14">@{m.offset}</span>
         {m.key != null && m.key !== '' && (
-          <span className="text-[11px] font-mono text-primary/80 truncate max-w-[9rem] shrink-0" title={`key: ${m.key}`}>{m.key}</span>
+          <span className="text-[11px] font-mono text-acc/80 truncate max-w-[9rem] shrink-0" title={`key: ${m.key}`}>{m.key}</span>
         )}
         <span className="flex-1 min-w-0 font-mono text-xs text-fg/80 truncate">{previewValue(m, format)}</span>
         {headerEntries.length > 0 && (
@@ -468,7 +468,7 @@ function TopicCombobox({ brokerId, value, topics, onChange }: {
               key={t}
               type="button"
               onMouseDown={(ev) => { ev.preventDefault(); pick(t); }}
-              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === t && 'text-primary')}
+              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === t && 'text-acc')}
             >
               <span className="font-mono text-sm flex-1 truncate">{t}</span>
               {value === t && <Check className="h-3.5 w-3.5 shrink-0" />}

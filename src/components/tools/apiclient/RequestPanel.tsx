@@ -296,7 +296,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         const isGhost = a.id === ghost.id;
         const unary = UNARY_ASSERT_OPERATORS.includes(a.operator);
         return (
-          <div key={a.id} className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/40">
+          <div key={a.id} className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
             {/* expr cell with enable checkbox */}
             <div className="flex items-center gap-1.5 border-r px-2">
               <button
@@ -304,7 +304,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
                 onClick={() => !isGhost && editRow(a.id, { enabled: !a.enabled })}
                 className={cn(
                   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-                  isGhost ? 'invisible' : a.enabled ? 'border-primary bg-primary text-primary-foreground' : 'border-input',
+                  isGhost ? 'invisible' : a.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-input',
                 )}
                 title={a.enabled ? 'Enabled' : 'Disabled'}
               >
@@ -441,7 +441,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
         {names.map((name) => {
           const enabled = enabledOf(name);
           return (
-            <div key={name} className="grid grid-cols-[1rem_1fr_1fr] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/40">
+            <div key={name} className="grid grid-cols-[1rem_1fr_1fr] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
               <div className="flex items-center justify-center">
                 <button
                   type="button"
@@ -490,7 +490,7 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
       {/* Tags */}
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/40">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-2 focus-within:ring-acc/40">
           {settings.tags.map((t) => (
             <span key={t} className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px]">
               {t}

@@ -70,7 +70,7 @@ export function ImportReviewDialog({
               <div key={i} className="border-b last:border-b-0">
                 <button
                   onClick={() => toggle(i)}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs transition-colors hover:bg-accent/50"
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs transition-colors hover:bg-acc/50"
                 >
                   {open
                     ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" />

@@ -361,7 +361,7 @@ function ToggleChip({ active, onClick, children }: {
       className={cn(
         'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none',
         active
-          ? 'border-primary/50 bg-primary/10 text-primary'
+          ? 'border-acc/50 bg-acc/10 text-acc'
           : 'border-input bg-transparent text-fg-mute hover:bg-muted hover:text-fg'
       )}
     >

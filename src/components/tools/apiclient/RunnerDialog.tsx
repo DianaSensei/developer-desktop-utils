@@ -547,7 +547,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => onDrop(req.id)}
                         onClick={() => toggle(req.id)}
-                        className={cn('group flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs hover:bg-accent/50', !checked && 'opacity-50')}
+                        className={cn('group flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs hover:bg-acc/50', !checked && 'opacity-50')}
                       >
                         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-fg-mute/30 group-hover:text-fg-mute/60" />
                         <span
@@ -674,8 +674,8 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                       <button
                         key={i}
                         onClick={() => { followIterRef.current = false; setViewIter(i); }}
-                        className={cn('flex w-full items-center gap-2 border-b px-3 py-2 text-left text-xs transition-colors hover:bg-accent/50',
-                          i === viewIter && 'bg-accent')}
+                        className={cn('flex w-full items-center gap-2 border-b px-3 py-2 text-left text-xs transition-colors hover:bg-acc/50',
+                          i === viewIter && 'bg-acc')}
                       >
                         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full',
                           s.total === 0 ? 'bg-fg-mute/30' : ok ? 'bg-ok' : 'bg-bad')} />
@@ -712,7 +712,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
                             key={f}
                             onClick={() => setFilter(f)}
                             className={cn('rounded px-2 py-0.5 text-[11px] font-medium capitalize transition-colors',
-                              filter === f ? 'bg-accent text-fg' : 'text-fg-mute hover:text-fg')}
+                              filter === f ? 'bg-acc text-fg' : 'text-fg-mute hover:text-fg')}
                           >
                             {f}
                           </button>
@@ -767,7 +767,7 @@ function RecordRow({ record: r, onOpen }: { record: RunRecord; onOpen: () => voi
         disabled={!r.detail}
         onClick={onOpen}
         className={cn('group flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-xs transition-colors',
-          r.detail ? 'cursor-pointer hover:bg-accent/50' : 'cursor-default')}
+          r.detail ? 'cursor-pointer hover:bg-acc/50' : 'cursor-default')}
       >
         <span className="w-5 shrink-0">
           {ok ? <Check className="h-3.5 w-3.5 text-ok" /> : <X className="h-3.5 w-3.5 text-bad" />}
@@ -840,7 +840,7 @@ function RunDetailView({ entry, onBack }: { entry: RunDetail; onBack: () => void
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
-        <button onClick={onBack} className="flex items-center gap-1 rounded px-1.5 py-1 text-fg-mute hover:bg-accent hover:text-fg">
+        <button onClick={onBack} className="flex items-center gap-1 rounded px-1.5 py-1 text-fg-mute hover:bg-acc hover:text-fg">
           <ChevronLeft className="h-3.5 w-3.5" /> Back
         </button>
         <span className={cn('font-bold uppercase', methodColor(request.method))}>{request.method}</span>

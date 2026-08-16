@@ -415,7 +415,7 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
         <span className="text-[11px] font-mono text-fg-mute truncate max-w-[12rem] shrink-0" title={`${m.exchange ? m.exchange + ' · ' : ''}${m.routingKey || '—'}`}>
           {m.exchange ? `${m.exchange}/` : ''}{m.routingKey || '—'}
         </span>
-        {m.correlationId && <span className="text-[11px] font-mono text-primary/80 truncate max-w-[8rem] shrink-0" title={`correlation id: ${m.correlationId}`}>corr {m.correlationId}</span>}
+        {m.correlationId && <span className="text-[11px] font-mono text-acc/80 truncate max-w-[8rem] shrink-0" title={`correlation id: ${m.correlationId}`}>corr {m.correlationId}</span>}
         {m.redelivered && <span className="text-[11px] text-warn shrink-0">redelivered</span>}
         <span className="flex-1 min-w-0 font-mono text-xs text-fg/80 truncate">{preview}</span>
         {headerEntries.length > 0 && <span className="text-[11px] text-fg-mute shrink-0" title={`${headerEntries.length} header(s)`}>⌗{headerEntries.length}</span>}
@@ -502,7 +502,7 @@ function QueueCombobox({ connId, value, queues, onChange }: {
               key={x.name}
               type="button"
               onMouseDown={(ev) => { ev.preventDefault(); pick(x.name); }}
-              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === x.name && 'text-primary')}
+              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60', value === x.name && 'text-acc')}
             >
               <span className="font-mono text-sm flex-1 truncate">{x.name}</span>
               <span className="text-[11px] text-fg-mute shrink-0 tabular-nums">{x.messages ?? 0}</span>
