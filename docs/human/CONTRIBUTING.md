@@ -118,14 +118,14 @@ Tailwind CSS only — no custom CSS. Common patterns:
 <div className="space-y-4">          // vertical spacing
 <div className="flex gap-2">         // horizontal gap
 <div className="rounded-lg border p-4">  // card-style container
-<p className="text-xs text-muted-foreground"> // secondary text
+<p className="text-xs text-fg-mute"> // secondary text
 ```
 
 Use `cn()` from `@/lib/utils` for conditional classes:
 
 ```tsx
 import { cn } from '@/lib/utils';
-className={cn('base', isActive && 'text-primary')}
+className={cn('base', isActive && 'text-acc')}
 ```
 
 ---

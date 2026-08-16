@@ -2,8 +2,8 @@
 
 > **Giá trị không nằm ở đây.** Nguồn sự thật là [`design/`](../../design/) —
 > bộ design kit dùng chung với trang mẫu tĩnh. Thư mục này chỉ là lớp app:
-> nó `@import` token của kit, bắc cầu từ vựng cũ sang từ vựng kit, và giữ những
-> thứ cần Tailwind xử lý (`@layer` / `@apply`).
+> nó `@import` token của kit và giữ những thứ cần Tailwind xử lý
+> (`@layer` / `@apply`).
 >
 > Sửa màu, bo góc, chiều cao control → sửa `design/tokens.css`.
 > Luật thiết kế → [`design/RULES.md`](../../design/RULES.md).
@@ -12,17 +12,14 @@
 
 | File | Purpose |
 |---|---|
-| `tokens.css` | `@import` kit; **lớp bắc cầu** ánh xạ token cũ (`--background`, `--primary`…) sang kênh của kit (`--bg-c`, `--acc-c`…); base resets; cross-platform scrollbar; utility cần Tailwind. |
-| `tailwind-preset.cjs` | Kế thừa preset của kit rồi giữ lại 13 tên màu cũ để ~2430 chỗ gọi không phải sửa. |
+| `tokens.css` | `@import` kit; base resets; cross-platform scrollbar; utility cần Tailwind. |
+| `tailwind-preset.cjs` | Kế thừa preset của kit; giữ bí danh `boxShadow` cho `shadow-sm/md/lg/xl/2xl` gốc. |
 | `index.ts` | One import surface for all React primitives + `cn`. |
 
-### Hai từ vựng cùng tồn tại
-
-Code **mới** dùng từ vựng của kit: `bg-acc`, `text-fg-mute`, `border-line`,
-`bg-ok-tint`, `h-ctl`, `rounded-md`, `shadow`.
-
-Code **cũ** vẫn dùng `bg-primary`, `text-muted-foreground`, `border-border` — chúng
-vẫn chạy và đã nhận bảng màu mới, nhưng là lớp tạm. G4 di cư theo từng tool, G5 xoá.
+Toàn bộ `src/` dùng MỘT từ vựng — tên của kit: `bg-acc`, `text-fg-mute`,
+`border-line`, `bg-ok-tint`, `h-ctl`, `rounded-md`, `shadow`. Lớp bắc cầu từ
+vựng cũ (`bg-primary`, `text-muted-foreground`, `border-border`…) từng tồn
+tại tạm thời trong G1–G4 đã bị xoá ở G5 sau khi đổi tên hết mọi chỗ gọi.
 
 > Components themselves live in `src/components/ui/` (shadcn-style, Radix-based)
 > and are re-exported by `index.ts`. To lift the whole system into another
@@ -67,17 +64,13 @@ vẫn chạy và đã nhận bảng màu mới, nhưng là lớp tạm. G4 di c�
    import { Button, Card, Segmented, ToolToolbar, PaneHeader, cn } from '@/design-system';
    ```
 
-## Token reference (set via CSS variables in `tokens.css`)
+## Token reference
 
-- **Surfaces**: `--background`, `--sidebar`, `--card`, `--popover`, `--elevated`
-- **Text**: `--foreground`, `--muted-foreground`
-- **Accent**: `--primary`, `--accent`, `--ring`, `--accent-glow` (HSL components)
-- **Lines/fields**: `--border`, `--input`, `--secondary`, `--muted`
-- **Status**: `--destructive` — giờ trỏ vào `--bad-c` của hệ trạng thái
-- **Editor syntax**: `--sql-*`, `--js-*` (hệ riêng, không theo accent)
-
-Bo góc, bóng, chuyển động, chiều cao control nay do kit quản:
-xem [`design/TOKENS.md`](../../design/TOKENS.md).
+Toàn bộ bảng token (bề mặt, chữ, accent, trạng thái, bo góc, bóng, chuyển
+động, chiều cao control) do kit quản lý — xem
+[`design/TOKENS.md`](../../design/TOKENS.md). File này chỉ còn giữ riêng
+bảng màu cú pháp editor (`--sql-*`, `--js-*`, hệ riêng không theo accent)
+và màu HTTP method (`--method-*-c`).
 
 ## Utility classes
 
@@ -95,7 +88,7 @@ xem [`design/TOKENS.md`](../../design/TOKENS.md).
 ## Principles
 
 - **Accent used sparingly.** Selections/active states are a light **tint**
-  (`bg-primary/10` + accent text), never a saturated fill. Reserve solid blue for
+  (`bg-acc/10` + accent text), never a saturated fill. Reserve solid blue for
   primary buttons, focus rings, and key emphasis.
 - **Semantic colors stay semantic** — warnings (amber), errors (red), success
   (green), HTTP method colors, and syntax highlighting are not accent-themed.
