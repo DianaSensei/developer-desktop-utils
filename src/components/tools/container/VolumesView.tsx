@@ -1,0 +1,150 @@
+import { useEffect, useMemo, useState } from 'react';
+import { HardDrive, RefreshCw, Trash2, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ViewHeader } from '@/components/ui/view-header';
+import { SearchInput } from '@/components/ui/search-input';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { IconButton } from '@/components/ui/icon-button';
+import { containerApi, type ContainerConnection, type VolumeInfo } from './types';
+
+export function VolumesView({ connection, refreshKey, onRefresh }: {
+  connection: ContainerConnection;
+  refreshKey: number;
+  onRefresh: () => void;
+}) {
+  const [filter, setFilter] = useState('');
+  const [volumes, setVolumes] = useState<VolumeInfo[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<VolumeInfo | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    containerApi.volumeList(connection)
+      .then(setVolumes)
+      .catch((e) => { setVolumes([]); setError(String(e instanceof Error ? e.message : e)); })
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, [connection, refreshKey]); // eslint-disable-line
+
+  const f = filter.trim().toLowerCase();
+  const rows = useMemo(() => (volumes ?? []).filter((v) => v.Name.toLowerCase().includes(f)), [volumes, f]);
+
+  return (
+    <div className="tool-full-height">
+      <ViewHeader
+        icon={HardDrive}
+        title="Volumes"
+        subtitle={volumes ? `${volumes.length} volumes` : connection.name}
+        actions={(
+          <>
+            <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New volume</Button>
+            <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+          </>
+        )}
+      />
+
+      <div className="px-5 pt-3 shrink-0">
+        <SearchInput value={filter} onChange={setFilter} placeholder="Search volumes…" className="h-ctl text-sm" containerClassName="max-w-sm" />
+      </div>
+
+      <div className="tool-scrollable px-5 py-4">
+        {loading && !volumes && <LoadingRow />}
+        {error && <Callout tone="error">{error}</Callout>}
+        {volumes && !error && (
+          rows.length === 0
+            ? <p className="text-sm text-fg-mute">{f ? 'No matching volumes.' : 'No volumes.'}</p>
+            : (
+              <DataTable>
+                <Thead>
+                  <Tr>
+                    <Th>Name</Th>
+                    <Th>Driver</Th>
+                    <Th>Mountpoint</Th>
+                    <Th align="right"></Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {rows.map((v) => (
+                    <Tr key={v.Name}>
+                      <Td mono>{v.Name}</Td>
+                      <Td>{v.Driver}</Td>
+                      <Td mono>{v.Mountpoint}</Td>
+                      <Td align="right">
+                        <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(v)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </IconButton>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </DataTable>
+            )
+        )}
+      </div>
+
+      <CreateVolumeDialog open={createOpen} onOpenChange={setCreateOpen} connection={connection} onCreated={load} />
+
+      <ConfirmDialog
+        open={!!removeTarget}
+        onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}
+        title="Remove volume?"
+        description={removeTarget ? `Remove "${removeTarget.Name}". Data on this volume is lost.` : ''}
+        confirmLabel="Remove"
+        onConfirm={async () => {
+          if (!removeTarget) return;
+          await containerApi.volumeRemove(connection, removeTarget.Name, true);
+          setRemoveTarget(null);
+          load();
+        }}
+      />
+    </div>
+  );
+}
+
+function CreateVolumeDialog({ open, onOpenChange, connection, onCreated }: {
+  open: boolean; onOpenChange: (o: boolean) => void; connection: ContainerConnection; onCreated: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const create = async () => {
+    if (!name.trim()) { setError('Name is required'); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      await containerApi.volumeCreate(connection, name.trim());
+      onCreated();
+      onOpenChange(false);
+      setName('');
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>New volume</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <Input placeholder="my-volume" value={name} onChange={(e) => setName(e.target.value)} disabled={busy} className="font-mono text-sm" />
+          {error && <Callout tone="error" size="sm">{error}</Callout>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

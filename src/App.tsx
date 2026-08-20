@@ -20,6 +20,7 @@ import {
   Minus,
   Square,
   Copy,
+  FlaskConical,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
@@ -30,6 +31,8 @@ import { buildNavEntries, countFavoriteEntries, GROUP_OF_TOOL, type NavEntry } f
 import { toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { CommandPalette } from '@/components/CommandPalette';
+import { ExperimentalGate } from '@/components/ExperimentalGate';
+import { ExperimentalBadge, ExperimentalDot } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
@@ -216,6 +219,7 @@ function NavScrollArea({
             const path = memberPaths[0];
             const isActive = memberPaths.includes(location.pathname);
             const isLive = entry.tools.some((t) => liveIds.includes(t.id));
+            const isExperimental = entry.tools.some((t) => t.experimental);
             const fav = entry.tools.some((t) => isFavorite(t.id));
             // Nhóm mô tả bằng tên các tool bên trong — hữu ích hơn là cố viết
             // một câu bao trùm cả ba.
@@ -227,7 +231,18 @@ function NavScrollArea({
                 {/* Group headers — only when favourites are pinned at the top */}
                 {showSections && i === 0 && <SectionLabel>{t('shell.section.favorites')}</SectionLabel>}
                 {showSections && i === favoriteCount && <SectionLabel className="mt-2">{t('shell.section.allTools')}</SectionLabel>}
-                <Tooltip side="right" triggerClassName="block" label={isLive ? t('shell.sidebar.connectedLabel', { label: entry.label }) : entry.label} description={desc}>
+                <Tooltip
+                  side="right"
+                  triggerClassName="block"
+                  label={
+                    isLive
+                      ? t('shell.sidebar.connectedLabel', { label: entry.label })
+                      : isExperimental
+                        ? t('shell.experimental.sidebarLabel', { label: entry.label })
+                        : entry.label
+                  }
+                  description={desc}
+                >
                   <Link
                     to={path}
                     onClick={onClose}
@@ -249,6 +264,9 @@ function NavScrollArea({
                           title={t('shell.sidebar.connected')}
                         />
                       )}
+                      {isExperimental && isCollapsed && (
+                        <ExperimentalDot title={t('shell.experimental.badge')} />
+                      )}
                     </span>
                     {/* Label is always mounted and fades/collapses with the sidebar
                         (300ms, matching the aside width animation) so it glides
@@ -268,6 +286,7 @@ function NavScrollArea({
                           {entry.tools.length}
                         </span>
                       )}
+                      {isExperimental && !isCollapsed && <ExperimentalBadge className="ml-1.5 align-middle" />}
                     </span>
                     {/* Favourite toggle — pins the entry to the top of the list.
                         Hidden when collapsed (no room); a starred entry shows a
@@ -761,7 +780,15 @@ function AppContent() {
       <Suspense fallback={<ToolLoading />}>
         <Routes>
           {enabledTools.map((tool) => (
-            <Route key={tool.path} path={tool.path} element={<tool.component />} />
+            <Route
+              key={tool.path}
+              path={tool.path}
+              element={tool.experimental ? (
+                <ExperimentalGate label={tool.label}><tool.component /></ExperimentalGate>
+              ) : (
+                <tool.component />
+              )}
+            />
           ))}
           <Route path="/settings" element={<SettingsComponent />} />
         </Routes>
@@ -826,8 +853,13 @@ function AppContent() {
           key={`${activeTool.path}-label`}
           className="inline-flex h-6 shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
         >
-          <h2 className="inline-flex h-full min-w-0 items-center whitespace-nowrap rounded-sm bg-acc px-2 text-xs font-semibold leading-none text-acc-fg shadow-soft">
+          <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap rounded-sm bg-acc px-2 text-xs font-semibold leading-none text-acc-fg shadow-soft">
             {activeTool.label}
+            {activeTool.experimental && (
+              <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
+                <FlaskConical className="h-3 w-3 opacity-80" />
+              </span>
+            )}
           </h2>
         </div>
       )}
@@ -1041,8 +1073,13 @@ function AppContent() {
                   key={`${activeTool.path}-label`}
                   className="inline-flex h-ctl shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
                 >
-                  <h2 className="inline-flex h-full min-w-0 items-center whitespace-nowrap rounded-sm bg-acc px-3.5 text-sm font-semibold leading-none text-acc-fg shadow-soft sm:text-base">
+                  <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap rounded-sm bg-acc px-3.5 text-sm font-semibold leading-none text-acc-fg shadow-soft sm:text-base">
                     {activeTool.label}
+                    {activeTool.experimental && (
+                      <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
+                        <FlaskConical className="h-3.5 w-3.5 opacity-80" />
+                      </span>
+                    )}
                   </h2>
                 </div>
               )}

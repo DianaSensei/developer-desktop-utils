@@ -101,6 +101,17 @@ export const DICTIONARY = {
   'shell.sidebar.settings': { vi: 'Cài đặt', en: 'Settings' },
   'shell.sidebar.moreScrollHint': { vi: 'thêm', en: 'more' },
 
+  // ── Experimental tools — badge + mỗi-lần-mở consent gate ────────────────
+  'shell.experimental.badge': { vi: 'Thử nghiệm', en: 'Experimental' },
+  'shell.experimental.sidebarLabel': { vi: '{{label}} — thử nghiệm', en: '{{label}} — experimental' },
+  'shell.experimental.consentTitle': { vi: '{{label}} là tính năng thử nghiệm', en: '{{label}} is an experimental feature' },
+  'shell.experimental.consentBody': {
+    vi: 'Tính năng này còn đang thay đổi và có thể có hành vi chưa ổn định. Bạn sẽ được hỏi xác nhận lại mỗi lần mở tool này.',
+    en: 'This feature is still evolving and may behave unpredictably. You will be asked to confirm again every time you open this tool.',
+  },
+  'shell.experimental.continue': { vi: 'Tiếp tục', en: 'Continue' },
+  'shell.experimental.cancel': { vi: 'Quay lại', en: 'Go back' },
+
   // ── Theme options — dùng chung cho sidebar + toggle mobile ──────────────
   'shell.theme.light': { vi: 'Chế độ sáng', en: 'Light mode' },
   'shell.theme.dark': { vi: 'Chế độ tối', en: 'Dark mode' },

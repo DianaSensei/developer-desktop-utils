@@ -24,6 +24,7 @@ import {
   ArrowLeftRight,
   Rabbit,
   MemoryStick,
+  Container,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -38,6 +39,16 @@ export interface ToolDef {
    * (e.g. "epoch" → Date/Time, "guid" → Generator, "postman" → API Client).
    */
   keywords?: string[];
+  /**
+   * Marks the tool as experimental: it gets a visible "Experimental" badge
+   * everywhere it's listed (sidebar, Settings, the app titlebar) and — unlike
+   * every other flag here — re-asks the user to confirm on EVERY visit, not
+   * just once, via `ExperimentalGate` in App.tsx's route rendering. Reach for
+   * this for a tool whose backend/behavior is still likely to change (new
+   * runtime integrations, anything shelling out, unreviewed data-loss risk)
+   * rather than one that's merely new but already stable.
+   */
+  experimental?: boolean;
 }
 
 export const TOOL_DEFS: ToolDef[] = [
@@ -178,6 +189,16 @@ export const TOOL_DEFS: ToolDef[] = [
     description:
       "Redis client: browse and edit keys (string, hash, list, set, sorted set), inspect server info, and run raw commands from a CLI console.",
     keywords: ["redis", "cache", "key-value", "kv", "hash", "sorted set", "zset", "ttl", "expire", "scan", "cli", "in-memory"],
+    experimental: true,
+  },
+  {
+    id: "container-manager",
+    label: "Containers",
+    icon: Container,
+    description:
+      "Manage containers, images, volumes, and networks across Docker-compatible runtimes (colima, Docker Desktop, Rancher Desktop, OrbStack, Podman), with Compose projects grouped read-only by container label.",
+    keywords: ["docker", "colima", "podman", "rancher desktop", "orbstack", "container", "compose", "docker-compose", "image", "volume", "network", "dockerfile", "containerd"],
+    experimental: true,
   },
   {
     id: "sql-formatter",
@@ -260,6 +281,7 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "kafka-explorer",
   "rabbit-client",
   "redis-client",
+  "container-manager",
   "qrcode",
   "color-picker",
   "jwt",

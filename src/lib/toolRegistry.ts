@@ -35,6 +35,7 @@ const Settings = lazy(() => named(import('@/components/Settings'), 'Settings'));
 const KafkaExplorer = lazy(() => named(import('@/components/tools/kafka/KafkaExplorer'), 'KafkaExplorer'));
 const RabbitClient = lazy(() => named(import('@/components/tools/rabbit/RabbitClient'), 'RabbitClient'));
 const RedisClient = lazy(() => named(import('@/components/tools/redis/RedisClient'), 'RedisClient'));
+const ContainerManager = lazy(() => named(import('@/components/tools/container/ContainerManager'), 'ContainerManager'));
 const SqlFormatter = lazy(() => named(import('@/components/tools/SqlFormatter'), 'SqlFormatter'));
 const TimeTracker = lazy(() => named(import('@/components/tools/clockify/Suite'), 'ClockifySuite'));
 const NetworkTools = lazy(() => named(import('@/components/tools/NetworkTools'), 'NetworkTools'));
@@ -62,6 +63,7 @@ export const TOOL_ROUTES: Record<string, { path: string; component: ComponentTyp
   'kafka-explorer': { path: '/kafka-explorer', component: KafkaExplorer,     fullHeight: true },
   'rabbit-client':  { path: '/rabbit-client',  component: RabbitClient,      fullHeight: true },
   'redis-client':   { path: '/redis-client',   component: RedisClient,       fullHeight: true },
+  'container-manager': { path: '/container-manager', component: ContainerManager, fullHeight: true },
   'sql-formatter':  { path: '/sql-formatter',  component: SqlFormatter,      fullHeight: true },
   'task-tracker':   { path: '/task-tracker',   component: TimeTracker,       fullHeight: true },
   'network':        { path: '/network',        component: NetworkTools,      fullHeight: true },
@@ -78,9 +80,10 @@ export const allTools = [
     icon: def.icon,
     description: def.description,
     keywords: def.keywords ?? [],
+    experimental: def.experimental ?? false,
     ...TOOL_ROUTES[def.id],
   })),
-  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', keywords: ['preferences', 'options', 'config'], path: '/settings', component: Settings },
+  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', keywords: ['preferences', 'options', 'config'], experimental: false, path: '/settings', component: Settings },
 ];
 
 /** id tool → đường dẫn route. Bao gồm cả 'settings', không có trong TOOL_DEFS. */

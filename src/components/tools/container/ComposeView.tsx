@@ -1,0 +1,180 @@
+import { useEffect, useMemo, useState } from 'react';
+import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ViewHeader } from '@/components/ui/view-header';
+import { Callout } from '@/components/ui/callout';
+import { LoadingRow } from '@/components/ui/spinner';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { Badge, type BadgeTone } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { IconButton } from '@/components/ui/icon-button';
+import {
+  containerApi, groupByComposeProject, COMPOSE_LABELS,
+  type ContainerConnection, type ContainerSummary,
+} from './types';
+import { LogsPanel } from './LogsPanel';
+
+function stateTone(state?: string): BadgeTone {
+  switch (state) {
+    case 'running': return 'success';
+    case 'paused': return 'warning';
+    case 'exited':
+    case 'dead': return 'danger';
+    default: return 'neutral';
+  }
+}
+
+function containerName(c: ContainerSummary): string {
+  return c.Names?.[0]?.replace(/^\//, '') ?? c.Id.slice(0, 12);
+}
+
+/**
+ * Compose projects are not a Docker Engine API object — there is no daemon
+ * endpoint for "list compose projects", so this view is deliberately
+ * read/act-only: it groups the containers container_list already returns by
+ * the com.docker.compose.project label docker compose stamps on them (the
+ * same technique tools like OrbStack use for their compose grouping), and
+ * every action (start/stop/restart/remove/logs) reuses the plain per-
+ * container bollard commands from container_tool.rs.
+ *
+ * What's intentionally missing: `up`/`down`/`build`/`pull` for a project.
+ * Those require parsing and orchestrating a compose YAML file client-side —
+ * logic the Docker Engine API has no equivalent for — so they are out of
+ * scope until that's built natively (see conversation/ADR for the
+ * shell-vs-native tradeoff).
+ */
+export function ComposeView({ connection, refreshKey, onRefresh }: {
+  connection: ContainerConnection;
+  refreshKey: number;
+  onRefresh: () => void;
+}) {
+  const [containers, setContainers] = useState<ContainerSummary[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    containerApi.list(connection, true)
+      .then(setContainers)
+      .catch((e) => { setContainers([]); setError(String(e instanceof Error ? e.message : e)); })
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, [connection, refreshKey]); // eslint-disable-line
+
+  const projects = useMemo(() => groupByComposeProject(containers ?? []), [containers]);
+
+  const runAction = async (id: string, action: () => Promise<void>) => {
+    setBusyId(id);
+    setError(null);
+    try {
+      await action();
+      load();
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="tool-full-height">
+      <ViewHeader
+        icon={FileStack}
+        title="Compose"
+        subtitle={`${projects.length} projects · grouped by container label, read-only for now`}
+        actions={<Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>}
+      />
+
+      <div className="tool-scrollable px-5 py-4 space-y-4">
+        {loading && !containers && <LoadingRow />}
+        {error && <Callout tone="error">{error}</Callout>}
+
+        {containers && !error && projects.length === 0 && (
+          <p className="text-sm text-fg-mute">
+            No containers with a <span className="font-mono text-[11px]">com.docker.compose.project</span> label found —
+            start a project with <span className="font-mono text-[11px]">docker compose up</span> from your terminal to see it here.
+          </p>
+        )}
+
+        {projects.map((p) => (
+          <div key={p.name} className="rounded-lg border border-line/50 overflow-hidden">
+            <div className="px-3.5 py-2.5 bg-bg-2/20 border-b border-line/50">
+              <p className="text-sm font-medium">{p.name}</p>
+              {p.workingDir && <p className="text-[11px] text-fg-mute font-mono truncate">{p.workingDir}</p>}
+            </div>
+            <DataTable density="compact" containerClassName="rounded-none border-0">
+              <Thead>
+                <Tr><Th>Service</Th><Th>State</Th><Th>Status</Th><Th align="right"></Th></Tr>
+              </Thead>
+              <Tbody>
+                {p.containers.map((c) => (
+                  <Tr key={c.Id}>
+                    <Td mono>{c.Labels?.[COMPOSE_LABELS.service] ?? containerName(c)}</Td>
+                    <Td><Badge tone={stateTone(c.State)}>{c.State ?? 'unknown'}</Badge></Td>
+                    <Td>{c.Status}</Td>
+                    <Td align="right">
+                      <div className="flex items-center justify-end gap-1">
+                        {c.State === 'running' ? (
+                          <IconButton size="sm" title="Stop" disabled={busyId === c.Id} onClick={() => runAction(c.Id, () => containerApi.stop(connection, c.Id))}>
+                            <Square className="h-3.5 w-3.5" />
+                          </IconButton>
+                        ) : (
+                          <IconButton size="sm" title="Start" disabled={busyId === c.Id} onClick={() => runAction(c.Id, () => containerApi.start(connection, c.Id))}>
+                            <Play className="h-3.5 w-3.5" />
+                          </IconButton>
+                        )}
+                        <IconButton size="sm" title="Restart" disabled={busyId === c.Id} onClick={() => runAction(c.Id, () => containerApi.restart(connection, c.Id))}>
+                          <RotateCw className="h-3.5 w-3.5" />
+                        </IconButton>
+                        <IconButton size="sm" title="Logs" onClick={() => setLogsTarget(c)}>
+                          <FileText className="h-3.5 w-3.5" />
+                        </IconButton>
+                        <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(c)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </IconButton>
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </DataTable>
+          </div>
+        ))}
+      </div>
+
+      {logsTarget && (
+        <Dialog open onOpenChange={(o) => { if (!o) setLogsTarget(null); }}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="font-mono text-sm">{containerName(logsTarget)}</DialogTitle>
+            </DialogHeader>
+            <div className="h-[50vh] flex flex-col">
+              <LogsPanel
+                start={(onLog) => containerApi.logsStart(connection, logsTarget.Id, '500', onLog)}
+                stop={containerApi.logsStop}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <ConfirmDialog
+        open={!!removeTarget}
+        onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}
+        title="Remove container?"
+        description={removeTarget ? `Remove "${containerName(removeTarget)}". This cannot be undone.` : ''}
+        confirmLabel="Remove"
+        onConfirm={async () => {
+          if (!removeTarget) return;
+          await runAction(removeTarget.Id, () => containerApi.remove(connection, removeTarget.Id, true));
+          setRemoveTarget(null);
+        }}
+      />
+    </div>
+  );
+}
