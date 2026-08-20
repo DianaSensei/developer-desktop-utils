@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Gauge, Plug, PlugZap, KeyRound, Terminal } from 'lucide-react';
+import { Plus, Pencil, Trash2, Gauge, Plug, PlugZap, KeyRound, Terminal, Radio, Wrench } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +32,8 @@ interface LeftPanelProps {
   onShowOverview: () => void;
   onShowKeys: () => void;
   onShowCli: () => void;
+  onShowPubSub: () => void;
+  onShowAdmin: () => void;
 }
 
 export function LeftPanel(props: LeftPanelProps) {
@@ -39,7 +41,7 @@ export function LeftPanel(props: LeftPanelProps) {
     connections, connectionsLoading, selectedConnId, onSelectConn, onConnectionsChanged,
     connected, connecting, onConnect, onDisconnect,
     db, onSelectDb,
-    view, onShowOverview, onShowKeys, onShowCli,
+    view, onShowOverview, onShowKeys, onShowCli, onShowPubSub, onShowAdmin,
   } = props;
 
   const [formOpen, setFormOpen] = useState(false);
@@ -137,6 +139,8 @@ export function LeftPanel(props: LeftPanelProps) {
           <NavItem icon={Gauge} label="Overview" active={view === 'overview'} onClick={onShowOverview} />
           <NavItem icon={KeyRound} label="Keys" active={view === 'keys' || view === 'key'} onClick={onShowKeys} />
           <NavItem icon={Terminal} label="CLI Console" active={view === 'cli'} onClick={onShowCli} />
+          <NavItem icon={Radio} label="Pub/Sub" active={view === 'pubsub'} onClick={onShowPubSub} />
+          <NavItem icon={Wrench} label="Admin" active={view === 'admin'} onClick={onShowAdmin} />
         </div>
       )}
 

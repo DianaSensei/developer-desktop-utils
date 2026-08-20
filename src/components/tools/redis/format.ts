@@ -35,6 +35,21 @@ export function formatBytesHuman(human?: string): string {
   return human?.trim() || '—';
 }
 
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
+
+/** Formats a raw byte count (e.g. from `MEMORY USAGE`) as `1.2 MB`. */
+export function formatBytes(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n < 0) return '—';
+  if (n < 1024) return `${n} B`;
+  let value = n;
+  let unit = 0;
+  while (value >= 1024 && unit < BYTE_UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value < 10 ? 2 : 1)} ${BYTE_UNITS[unit]}`;
+}
+
 export function formatNumber(n?: string | number | null): string {
   if (n == null) return '—';
   const v = Number(n);
