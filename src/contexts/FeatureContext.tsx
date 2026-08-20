@@ -44,6 +44,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'kafka-explorer': false,
   'rabbit-client': false,
   'redis-client': false,
+  'container-manager': false,
   'sql-formatter': false,
   'network': false,
   'lucky-wheel': false,

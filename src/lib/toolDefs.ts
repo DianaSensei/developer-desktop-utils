@@ -24,6 +24,7 @@ import {
   ArrowLeftRight,
   Rabbit,
   MemoryStick,
+  Container,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -180,6 +181,14 @@ export const TOOL_DEFS: ToolDef[] = [
     keywords: ["redis", "cache", "key-value", "kv", "hash", "sorted set", "zset", "ttl", "expire", "scan", "cli", "in-memory"],
   },
   {
+    id: "container-manager",
+    label: "Containers",
+    icon: Container,
+    description:
+      "Manage containers, images, volumes, and networks across Docker-compatible runtimes (colima, Docker Desktop, Rancher Desktop, OrbStack, Podman), plus full Docker Compose project management.",
+    keywords: ["docker", "colima", "podman", "rancher desktop", "orbstack", "container", "compose", "docker-compose", "image", "volume", "network", "dockerfile", "containerd"],
+  },
+  {
     id: "sql-formatter",
     label: "SQL Formatter",
     icon: Database,
@@ -260,6 +269,7 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "kafka-explorer",
   "rabbit-client",
   "redis-client",
+  "container-manager",
   "qrcode",
   "color-picker",
   "jwt",

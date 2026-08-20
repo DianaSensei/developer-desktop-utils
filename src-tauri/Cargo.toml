@@ -48,6 +48,10 @@ futures-util = "0.3"
 percent-encoding = "2"
 base64 = "0.21"
 redis = { version = "1.6.0", features = ["tokio-comp", "tls-rustls", "tokio-rustls-comp"] }
+# Docker Engine API client (async, over Unix socket / Windows named pipe). Talks
+# to any daemon exposing a docker-compatible socket: Docker Desktop, Colima
+# (docker runtime), Rancher Desktop (moby), OrbStack, Podman (docker-compat).
+bollard = "0.21"
 
 [features]
 default = ["custom-protocol"]

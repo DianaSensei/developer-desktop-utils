@@ -9,6 +9,8 @@ mod mockserver;
 mod ports;
 mod rabbit;
 mod redis_tool;
+mod container_tool;
+mod compose_tool;
 
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
@@ -51,6 +53,8 @@ fn main() {
         .manage(rabbit::ConsumerRegistry::default())
         .manage(kafka::KafkaConsumerRegistry::default())
         .manage(redis_tool::PubSubRegistry::default())
+        .manage(container_tool::StreamRegistry::default())
+        .manage(compose_tool::ComposeLogRegistry::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -137,6 +141,47 @@ fn main() {
             redis_tool::redis_slowlog,
             redis_tool::redis_config_get,
             redis_tool::redis_config_set,
+            container_tool::container_list_configs,
+            container_tool::container_save_config,
+            container_tool::container_delete_config,
+            container_tool::container_detect_sockets,
+            container_tool::container_test_connection,
+            container_tool::container_list,
+            container_tool::container_inspect,
+            container_tool::container_start,
+            container_tool::container_stop,
+            container_tool::container_restart,
+            container_tool::container_pause,
+            container_tool::container_unpause,
+            container_tool::container_remove,
+            container_tool::container_logs_start,
+            container_tool::container_logs_stop,
+            container_tool::container_stats_start,
+            container_tool::image_list,
+            container_tool::image_inspect,
+            container_tool::image_remove,
+            container_tool::image_pull,
+            container_tool::volume_list,
+            container_tool::volume_remove,
+            container_tool::volume_create,
+            container_tool::network_list,
+            container_tool::network_remove,
+            container_tool::network_create,
+            container_tool::container_system_info,
+            container_tool::container_system_df,
+            compose_tool::compose_list_projects,
+            compose_tool::compose_list_known,
+            compose_tool::compose_add_project,
+            compose_tool::compose_remove_project,
+            compose_tool::compose_ps,
+            compose_tool::compose_up,
+            compose_tool::compose_down,
+            compose_tool::compose_restart,
+            compose_tool::compose_stop,
+            compose_tool::compose_pull,
+            compose_tool::compose_config,
+            compose_tool::compose_logs_start,
+            compose_tool::compose_logs_stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
