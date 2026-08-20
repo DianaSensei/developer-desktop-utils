@@ -692,7 +692,7 @@ const isLive = liveIds.includes(tool.featureId);
 
 When `isLive` is true, `App.tsx` renders a small emerald dot absolutely positioned on the tool's icon (`-top-1 -right-1`), visible both in collapsed and expanded sidebar mode.
 
-Currently registered feature IDs: `'rabbit-client'` (seeded from `devtool:rabbit:connectedConnId`), `'kafka-explorer'` (seeded from `devtool:kafka:connectedBrokerId`).
+Currently registered feature IDs: `'rabbit-client'` (seeded from `devtool:rabbit:connectedConnId`), `'kafka-explorer'` (seeded from `devtool:kafka:connectedBrokerId`), `'redis-client'` (seeded from `devtool:redis:connectedConnId`).
 
 ---
 
@@ -809,6 +809,7 @@ git push origin main --tags
 | `deduplicate` | Deduplicate | ❌ | Remove duplicate lines, Web Worker |
 | `kafka-explorer` | Kafka Explorer | ❌ | Topics, partitions, consumer groups, live produce/consume |
 | `rabbit-client` | RabbitMQ | ❌ | Management REST + AMQP via Rust (lapin), live consume/RPC |
+| `redis-client` | Redis | ❌ | Key browser (SCAN-based), type-aware editors, CLI console, server INFO overview |
 | `sql-formatter` | SQL Formatter | ❌ | SQL + MongoDB aggregation formatting |
 | `network` | Network Tools | ❌ | DNS, propagation, DNSSEC, IP, listening ports |
 | `lucky-wheel` | Lucky Wheel | ❌ | Random winner spinner |
@@ -1044,6 +1045,7 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 - `js-yaml` — YAML parse/serialize
 - `rskafka` (Rust, v0.6) — Kafka client (via `rustls 0.23`)
 - `lapin` (Rust, v4.x) — AMQP 0-9-1 client; TLS via `rustls-platform-verifier` (OS trust store) + optional CA PEM / PKCS#12 mTLS
+- `redis` (Rust, v1.x / redis-rs) — Redis client, `tokio-comp` (async) + `tls-rustls`/`tokio-rustls-comp` (OS trust store); every command opens its own multiplexed connection (no pool)
 - `local-ip-address` + `hostname` (Rust) — back `local_network_info` for Network tool Local Network view
 - `netstat2` + `sysinfo` (Rust) — back `list_listening_ports` for Network tool Ports view
 - `@codemirror/merge` — side-by-side diff/merge view (Diff tool's `DiffMergeView`)
