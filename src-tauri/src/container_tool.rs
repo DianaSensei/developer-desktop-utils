@@ -176,13 +176,34 @@ fn dirs_home() -> std::path::PathBuf {
         .unwrap_or_default()
 }
 
+/// Expands a leading `~` (or `~/...`) to the user's home directory, the same
+/// shorthand every shell supports — the OS/bollard socket connector never
+/// does this itself, so a path pasted straight from a terminal (`~/.colima/
+/// default/docker.sock`) would otherwise fail to resolve.
+#[cfg(unix)]
+fn expand_socket_path(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix("~/") {
+        let home = dirs_home();
+        if !home.as_os_str().is_empty() {
+            return home.join(rest).to_string_lossy().to_string();
+        }
+    } else if path == "~" {
+        let home = dirs_home();
+        if !home.as_os_str().is_empty() {
+            return home.to_string_lossy().to_string();
+        }
+    }
+    path.to_string()
+}
+
 // ── Connect ──────────────────────────────────────────────────────────────
 
 const CONNECT_TIMEOUT_SECS: u64 = 6;
 
 #[cfg(unix)]
 fn connect(c: &ContainerConnection) -> Result<Docker, String> {
-    Docker::connect_with_unix(&c.socket_path, CONNECT_TIMEOUT_SECS, bollard::API_DEFAULT_VERSION)
+    let path = expand_socket_path(&c.socket_path);
+    Docker::connect_with_unix(&path, CONNECT_TIMEOUT_SECS, bollard::API_DEFAULT_VERSION)
         .map_err(|e| e.to_string())
 }
 
@@ -270,6 +291,155 @@ pub async fn container_remove(
         ..Default::default()
     };
     docker.remove_container(&container_id, Some(opts)).await.map_err(|e| e.to_string())
+}
+
+// ── Container details (curated projection of the full inspect payload) ────
+//
+// `inspect_container` returns dozens of mostly-irrelevant fields (resolv.conf
+// path, exec ids, graph driver internals, …). Rather than push that whole
+// shape to the frontend as `unknown` and let a dialog component pick fields
+// out of it by hand, project down to the handful actually worth showing —
+// same reasoning as ContainerSummary/ImageSummary already being thin views
+// over the raw Docker API shape, just curated instead of passthrough because
+// the inspect payload is an order of magnitude bigger than a list summary.
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerMountInfo {
+    #[serde(rename = "type")]
+    pub typ: Option<String>,
+    pub name: Option<String>,
+    pub source: Option<String>,
+    pub destination: Option<String>,
+    pub mode: Option<String>,
+    pub rw: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerPortBinding {
+    pub container_port: String,
+    pub host_ip: Option<String>,
+    pub host_port: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerNetworkInfo {
+    pub name: String,
+    pub ip_address: Option<String>,
+    pub gateway: Option<String>,
+    pub mac_address: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerDetails {
+    pub id: String,
+    pub name: String,
+    pub image: String,
+    pub platform: Option<String>,
+    pub created: Option<String>,
+    pub status: Option<String>,
+    pub running: bool,
+    pub paused: bool,
+    pub restarting: bool,
+    pub exit_code: Option<i64>,
+    pub started_at: Option<String>,
+    pub finished_at: Option<String>,
+    pub health_status: Option<String>,
+    pub command: Option<String>,
+    pub entrypoint: Vec<String>,
+    pub restart_policy: Option<String>,
+    pub restart_max_retry: Option<i64>,
+    pub env: Vec<String>,
+    pub labels: HashMap<String, String>,
+    pub mounts: Vec<ContainerMountInfo>,
+    pub ports: Vec<ContainerPortBinding>,
+    pub networks: Vec<ContainerNetworkInfo>,
+}
+
+#[tauri::command]
+pub async fn container_details(
+    config: ContainerConnection,
+    container_id: String,
+) -> Result<ContainerDetails, String> {
+    let docker = connect(&config)?;
+    let insp = docker
+        .inspect_container(&container_id, None)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let state = insp.state.unwrap_or_default();
+    let cfg = insp.config.unwrap_or_default();
+    let host_config = insp.host_config.unwrap_or_default();
+    let net = insp.network_settings.unwrap_or_default();
+    let restart_policy = host_config.restart_policy.unwrap_or_default();
+
+    let mounts = insp
+        .mounts
+        .unwrap_or_default()
+        .into_iter()
+        .map(|m| ContainerMountInfo {
+            typ: m.typ,
+            name: m.name,
+            source: m.source,
+            destination: m.destination,
+            mode: m.mode,
+            rw: m.rw,
+        })
+        .collect();
+
+    let ports = net
+        .ports
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|(container_port, bindings)| {
+            bindings.unwrap_or_default().into_iter().map(move |b| ContainerPortBinding {
+                container_port: container_port.clone(),
+                host_ip: b.host_ip,
+                host_port: b.host_port,
+            })
+        })
+        .collect();
+
+    let mut networks: Vec<ContainerNetworkInfo> = net
+        .networks
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(name, ep)| ContainerNetworkInfo {
+            name,
+            ip_address: ep.ip_address,
+            gateway: ep.gateway,
+            mac_address: ep.mac_address,
+        })
+        .collect();
+    networks.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(ContainerDetails {
+        id: insp.id.unwrap_or_default(),
+        name: insp.name.unwrap_or_default().trim_start_matches('/').to_string(),
+        image: insp.image.unwrap_or_default(),
+        platform: insp.platform,
+        created: insp.created,
+        status: state.status.map(|s| s.to_string()),
+        running: state.running.unwrap_or(false),
+        paused: state.paused.unwrap_or(false),
+        restarting: state.restarting.unwrap_or(false),
+        exit_code: state.exit_code,
+        started_at: state.started_at,
+        finished_at: state.finished_at,
+        health_status: state.health.and_then(|h| h.status).map(|s| s.to_string()),
+        command: cfg.cmd.map(|c| c.join(" ")),
+        entrypoint: cfg.entrypoint.unwrap_or_default(),
+        restart_policy: restart_policy.name.map(|n| n.to_string()),
+        restart_max_retry: restart_policy.maximum_retry_count,
+        env: cfg.env.unwrap_or_default(),
+        labels: cfg.labels.unwrap_or_default(),
+        mounts,
+        ports,
+        networks,
+    })
 }
 
 // ── Registry shared by logs + stats streams ─────────────────────────────────
@@ -507,6 +677,53 @@ pub async fn image_pull(
     Ok(())
 }
 
+// ── Image details (curated projection, same reasoning as ContainerDetails) ─
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageDetails {
+    pub id: String,
+    pub repo_tags: Vec<String>,
+    pub repo_digests: Vec<String>,
+    pub created: Option<String>,
+    pub size: i64,
+    pub architecture: Option<String>,
+    pub os: Option<String>,
+    pub author: Option<String>,
+    pub cmd: Vec<String>,
+    pub entrypoint: Vec<String>,
+    pub env: Vec<String>,
+    pub working_dir: Option<String>,
+    pub exposed_ports: Vec<String>,
+    pub labels: HashMap<String, String>,
+    pub layer_count: usize,
+}
+
+#[tauri::command]
+pub async fn image_details(config: ContainerConnection, image_id: String) -> Result<ImageDetails, String> {
+    let docker = connect(&config)?;
+    let insp = docker.inspect_image(&image_id).await.map_err(|e| e.to_string())?;
+    let cfg = insp.config.unwrap_or_default();
+
+    Ok(ImageDetails {
+        id: insp.id.unwrap_or_default(),
+        repo_tags: insp.repo_tags.unwrap_or_default(),
+        repo_digests: insp.repo_digests.unwrap_or_default(),
+        created: insp.created,
+        size: insp.size.unwrap_or(0),
+        architecture: insp.architecture,
+        os: insp.os,
+        author: insp.author,
+        cmd: cfg.cmd.unwrap_or_default(),
+        entrypoint: cfg.entrypoint.unwrap_or_default(),
+        env: cfg.env.unwrap_or_default(),
+        working_dir: cfg.working_dir,
+        exposed_ports: cfg.exposed_ports.unwrap_or_default(),
+        labels: cfg.labels.unwrap_or_default(),
+        layer_count: insp.root_fs.and_then(|r| r.layers).map(|l| l.len()).unwrap_or(0),
+    })
+}
+
 // ── Volumes ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -534,6 +751,58 @@ pub async fn volume_create(config: ContainerConnection, name: String) -> Result<
         ..Default::default()
     };
     docker.create_volume(req).await.map_err(|e| e.to_string())
+}
+
+/// Per-volume disk usage (bytes), keyed by volume name — `docker system df`'s
+/// numbers, which only exist because the daemon walks every volume's
+/// mountpoint on disk; there's no cheaper way to get a real size. `bollard`'s
+/// typed `df()` response (`bollard::models::SystemDataUsageResponse`, this
+/// version) only carries the aggregate counters (ActiveCount/TotalCount/
+/// Reclaimable/TotalSize) — it drops the per-item `Volumes[]` array the raw
+/// `/system/df` JSON actually includes, so getting `UsageData.Size` per
+/// volume means reading that JSON ourselves. Issued as a plain request over
+/// the same Unix socket `connect()` uses (`hyperlocal`/`hyper-util`, both
+/// already pulled in transitively by bollard's own "pipe" feature — see
+/// Cargo.toml) rather than hand-rolling HTTP parsing.
+#[cfg(unix)]
+#[tauri::command]
+pub async fn volume_sizes(config: ContainerConnection) -> Result<HashMap<String, i64>, String> {
+    use http_body_util::{BodyExt, Full};
+    use hyper_util::{client::legacy::Client, rt::TokioExecutor};
+
+    let path = expand_socket_path(&config.socket_path);
+    let client: Client<hyperlocal::UnixConnector, Full<bytes::Bytes>> =
+        Client::builder(TokioExecutor::new()).build(hyperlocal::UnixConnector);
+    let uri: hyper::Uri = hyperlocal::Uri::new(&path, "/system/df?type=volume").into();
+
+    let resp = client.get(uri).await.map_err(|e| e.to_string())?;
+    let body = resp
+        .into_body()
+        .collect()
+        .await
+        .map_err(|e| e.to_string())?
+        .to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&body).map_err(|e| e.to_string())?;
+
+    let mut sizes = HashMap::new();
+    if let Some(volumes) = json.get("Volumes").and_then(|v| v.as_array()) {
+        for v in volumes {
+            let name = v.get("Name").and_then(|n| n.as_str());
+            let size = v.get("UsageData").and_then(|u| u.get("Size")).and_then(|s| s.as_i64());
+            if let (Some(name), Some(size)) = (name, size) {
+                sizes.insert(name.to_string(), size);
+            }
+        }
+    }
+    Ok(sizes)
+}
+
+/// Windows named-pipe transport isn't wired up for this raw request (only the
+/// Unix socket path is) — the Size column just shows unknown there.
+#[cfg(windows)]
+#[tauri::command]
+pub async fn volume_sizes(_config: ContainerConnection) -> Result<HashMap<String, i64>, String> {
+    Ok(HashMap::new())
 }
 
 // ── Networks ────────────────────────────────────────────────────────────

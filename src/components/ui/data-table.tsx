@@ -26,6 +26,7 @@
 // dots) far more than they need automatic rendering.
 
 import * as React from 'react';
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Align = 'left' | 'right' | 'center';
@@ -122,11 +123,17 @@ export function Tr({ interactive, selected, className, ...props }: TrProps) {
   );
 }
 
+export type SortDirection = 'asc' | 'desc';
+
 export interface ThProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
   align?: Align;
+  /** Current sort direction for this column, or null/undefined when unsorted. */
+  sortDirection?: SortDirection | null;
+  /** Presence makes the header clickable to sort; called on click. */
+  onSortClick?: () => void;
 }
 
-export function Th({ align = 'left', className, ...props }: ThProps) {
+export function Th({ align = 'left', className, sortDirection, onSortClick, children, ...props }: ThProps) {
   const density = React.useContext(DensityContext);
   return (
     <th
@@ -137,7 +144,27 @@ export function Th({ align = 'left', className, ...props }: ThProps) {
         className,
       )}
       {...props}
-    />
+    >
+      {onSortClick ? (
+        <button
+          type="button"
+          onClick={onSortClick}
+          className={cn(
+            'inline-flex items-center gap-1 hover:text-fg transition-colors -mx-1 px-1',
+            align === 'right' && 'flex-row-reverse',
+          )}
+        >
+          {children}
+          {sortDirection === 'asc' ? (
+            <ChevronUp className="h-3 w-3 shrink-0" />
+          ) : sortDirection === 'desc' ? (
+            <ChevronDown className="h-3 w-3 shrink-0" />
+          ) : (
+            <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />
+          )}
+        </button>
+      ) : children}
+    </th>
   );
 }
 

@@ -114,6 +114,8 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
             />
             <p className="text-[11px] text-fg-mute mt-1">
               Unix socket path (or Windows named pipe, e.g. <span className="font-mono">\\.\pipe\docker_engine</span>) — not a host:port.
+              <br />
+              <span className="font-mono">~</span> expands to your home directory, e.g. <span className="font-mono">~/.colima/default/docker.sock</span>.
             </p>
           </div>
 
