@@ -821,14 +821,15 @@ function AppContent() {
       <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')}>
         <Menu className="h-3.5 w-3.5" />
       </Button>
+      {/* No live dot here: this icon sits outside the switch-tool tablist
+          below (it's a single fixed badge, not one of the clickable tabs),
+          and the selected tab already carries its own live dot — showing it
+          twice for the same tool was redundant. */}
       <div
         key={activeTool.path}
         className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
       >
         <ActiveIcon className="h-3.5 w-3.5 text-acc" />
-        {liveIds.includes(activeTool.featureId) && (
-          <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-ok ring-2 ring-chrome" title={t('shell.titlebar.running')} />
-        )}
       </div>
       {activeGroupTabs.length > 1 ? (
         <div
@@ -1040,23 +1041,15 @@ function AppContent() {
               <Button variant="ghost" size="icon" className="lg:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)}>
                 <Menu className="h-4 w-4" />
               </Button>
+              {/* Không chấm live ở đây: icon này nằm ngoài tablist switch-tool
+                  bên cạnh (nó là badge cố định, không phải một tab bấm được),
+                  và tab đang chọn trong tablist đã tự có chấm live của nó —
+                  hiện hai chấm cho cùng một tool là thừa. */}
               <div
                 key={activeTool.path}
                 className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
               >
                 <ActiveIcon className="h-4 w-4 text-acc" />
-                {/* Mock Server / Kafka / RabbitMQ… đang chạy nền — cùng chấm
-                    xanh sidebar đã dùng cho "đang kết nối" (bg-ok cố định,
-                    không theo accent, xem RULES.md). Header trước đây không
-                    có chỗ nào nói điều này: mở tool khác rồi quay lại Mock
-                    Server không có cách nào biết nó vẫn đang chạy nếu không
-                    bấm vào hẳn. */}
-                {liveIds.includes(activeTool.featureId) && (
-                  <span
-                    className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-ok ring-2 ring-bg"
-                    title={t('shell.titlebar.running')}
-                  />
-                )}
               </div>
               {/* Tên NHÓM ("Generate") không nói cái gì đang mở — tab con đã liệt
                   kê đúng thứ đó rồi ("Generator" đang bật). Giữ cả hai là lặp:
