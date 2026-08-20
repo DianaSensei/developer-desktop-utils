@@ -8,12 +8,21 @@
 // Key browsing always goes through SCAN/HSCAN/SSCAN/ZSCAN (never KEYS/SMEMBERS/
 // HGETALL unbounded), so a huge keyspace or a huge collection can't block the
 // server or stall the UI.
+//
+// The one exception is Pub/Sub: a subscription is inherently long-lived (it
+// has to keep receiving messages after the command returns), so it gets its
+// own registry-tracked background task — same `Arc<Notify>`-keyed-by-id
+// pattern as rabbit.rs's `ConsumerRegistry` / kafka.rs's consumer registry.
 
 use redis::Value;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
+use futures_util::StreamExt;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 
 // ── Connection profile ─────────────────────────────────────────────────────
@@ -114,11 +123,17 @@ fn redis_url(c: &RedisConnection) -> String {
     format!("{scheme}://{auth}{}:{}/0", c.host, c.port)
 }
 
+/// Bound on establishing the TCP/TLS connection — without this, connecting to
+/// an unreachable host (wrong port, firewalled, dead server) hangs the async
+/// task indefinitely and the UI spinner never resolves, since neither Tokio's
+/// TCP connect nor rustls' handshake have a default timeout of their own.
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(6);
+
 async fn connect(c: &RedisConnection, db: u8) -> Result<redis::aio::MultiplexedConnection, String> {
     let client = redis::Client::open(redis_url(c)).map_err(|e| e.to_string())?;
-    let mut con = client
-        .get_multiplexed_async_connection()
+    let mut con = tokio::time::timeout(CONNECT_TIMEOUT, client.get_multiplexed_async_connection())
         .await
+        .map_err(|_| format!("Connection to {}:{} timed out after {}s", c.host, c.port, CONNECT_TIMEOUT.as_secs()))?
         .map_err(|e| e.to_string())?;
     if db != 0 {
         redis::cmd("SELECT")
@@ -264,6 +279,8 @@ pub enum KeyValue {
     #[serde(rename_all = "camelCase")]
     Zset { members: Vec<(String, f64)>, ttl_ms: i64, truncated: bool },
     #[serde(rename_all = "camelCase")]
+    Stream { entries: Vec<(String, Vec<(String, String)>)>, ttl_ms: i64, truncated: bool },
+    #[serde(rename_all = "camelCase")]
     Unsupported { redis_type: String, ttl_ms: i64 },
 }
 
@@ -354,8 +371,49 @@ pub async fn redis_get_key(
                 .collect();
             Ok(KeyValue::Zset { truncated: next != 0, members, ttl_ms })
         }
+        "stream" => {
+            let len: i64 = redis::cmd("XLEN")
+                .arg(&key)
+                .query_async(&mut con)
+                .await
+                .map_err(|e| e.to_string())?;
+            let raw: Vec<(String, Vec<String>)> = redis::cmd("XRANGE")
+                .arg(&key)
+                .arg("-")
+                .arg("+")
+                .arg("COUNT")
+                .arg(VALUE_CAP)
+                .query_async(&mut con)
+                .await
+                .map_err(|e| e.to_string())?;
+            let entries = raw
+                .into_iter()
+                .map(|(id, flat)| {
+                    let fields = flat.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0].clone(), c[1].clone())).collect();
+                    (id, fields)
+                })
+                .collect();
+            Ok(KeyValue::Stream { entries, ttl_ms, truncated: len > VALUE_CAP })
+        }
         other => Ok(KeyValue::Unsupported { redis_type: other.to_string(), ttl_ms }),
     }
+}
+
+#[tauri::command]
+pub async fn redis_memory_usage(
+    app: AppHandle,
+    config_id: String,
+    db: u8,
+    key: String,
+) -> Result<Option<i64>, String> {
+    let config = find_config(&app, &config_id)?;
+    let mut con = connect(&config, db).await?;
+    redis::cmd("MEMORY")
+        .arg("USAGE")
+        .arg(&key)
+        .query_async(&mut con)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -524,4 +582,225 @@ pub async fn redis_exec(
     }
     let value: Value = cmd.query_async(&mut con).await.map_err(|e| e.to_string())?;
     Ok(value_to_reply(value))
+}
+
+// ── Pub/Sub ──────────────────────────────────────────────────────────────
+
+/// Tracks running Pub/Sub subscriptions so they can be stopped. Same shape as
+/// rabbit.rs's `ConsumerRegistry` — the `Arc<Notify>` lets the frontend signal
+/// the background task to stop without holding the Tauri `State` itself.
+#[derive(Default, Clone)]
+pub struct PubSubRegistry {
+    inner: Arc<Mutex<HashMap<String, Arc<tokio::sync::Notify>>>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PubSubMessage {
+    pub channel: String,
+    /// Set only when the message arrived via a pattern subscription (PMESSAGE).
+    pub pattern: Option<String>,
+    pub payload: String,
+}
+
+/// Subscribe to one or more channels and/or glob patterns and stream messages
+/// back over `on_message` until `redis_pubsub_unsubscribe` is called or the
+/// frontend drops the channel. Pub/Sub is server-wide, not per-db — Redis
+/// does not scope channels to a logical db — so there is no `db` argument.
+#[tauri::command]
+pub async fn redis_pubsub_subscribe(
+    app: AppHandle,
+    registry: tauri::State<'_, PubSubRegistry>,
+    config_id: String,
+    channels: Vec<String>,
+    patterns: Vec<String>,
+    on_message: Channel<PubSubMessage>,
+) -> Result<String, String> {
+    if channels.is_empty() && patterns.is_empty() {
+        return Err("Provide at least one channel or pattern".to_string());
+    }
+    let config = find_config(&app, &config_id)?;
+    let client = redis::Client::open(redis_url(&config)).map_err(|e| e.to_string())?;
+    let mut pubsub = tokio::time::timeout(CONNECT_TIMEOUT, client.get_async_pubsub())
+        .await
+        .map_err(|_| format!("Connection to {}:{} timed out after {}s", config.host, config.port, CONNECT_TIMEOUT.as_secs()))?
+        .map_err(|e| e.to_string())?;
+
+    for ch in &channels {
+        pubsub.subscribe(ch).await.map_err(|e| e.to_string())?;
+    }
+    for pat in &patterns {
+        pubsub.psubscribe(pat).await.map_err(|e| e.to_string())?;
+    }
+
+    let id = Uuid::new_v4().to_string();
+    let notify = Arc::new(tokio::sync::Notify::new());
+    let reg = registry.inner.clone();
+    reg.lock().unwrap().insert(id.clone(), notify.clone());
+
+    let reg_task = reg.clone();
+    let id_task = id.clone();
+    tokio::spawn(async move {
+        let mut stream = pubsub.into_on_message();
+        loop {
+            tokio::select! {
+                _ = notify.notified() => break,
+                next = stream.next() => match next {
+                    Some(msg) => {
+                        let out = PubSubMessage {
+                            channel: msg.get_channel_name().to_string(),
+                            pattern: msg.get_pattern::<String>().ok(),
+                            payload: msg.get_payload().unwrap_or_default(),
+                        };
+                        if on_message.send(out).is_err() {
+                            break; // frontend dropped the channel
+                        }
+                    }
+                    None => break,
+                }
+            }
+        }
+        reg_task.lock().unwrap().remove(&id_task);
+    });
+
+    Ok(id)
+}
+
+#[tauri::command]
+pub async fn redis_pubsub_unsubscribe(
+    registry: tauri::State<'_, PubSubRegistry>,
+    subscription_id: String,
+) -> Result<(), String> {
+    if let Some(notify) = registry.inner.lock().unwrap().remove(&subscription_id) {
+        notify.notify_one();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn redis_publish(
+    app: AppHandle,
+    config_id: String,
+    channel: String,
+    message: String,
+) -> Result<i64, String> {
+    let config = find_config(&app, &config_id)?;
+    let mut con = connect(&config, 0).await?;
+    redis::cmd("PUBLISH")
+        .arg(&channel)
+        .arg(&message)
+        .query_async(&mut con)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ── Server admin ─────────────────────────────────────────────────────────
+
+/// One row of `CLIENT LIST` output, kept as a loose key→value map since the
+/// set of fields varies across Redis versions — a fixed struct would silently
+/// drop or fail to parse fields on a server this app hasn't been tested
+/// against. Each line of the reply is space-separated `key=value` pairs.
+#[tauri::command]
+pub async fn redis_client_list(
+    app: AppHandle,
+    config_id: String,
+) -> Result<Vec<std::collections::BTreeMap<String, String>>, String> {
+    let config = find_config(&app, &config_id)?;
+    let mut con = connect(&config, 0).await?;
+    let raw: String = redis::cmd("CLIENT")
+        .arg("LIST")
+        .query_async(&mut con)
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let mut row = std::collections::BTreeMap::new();
+        for kv in line.split_whitespace() {
+            if let Some((k, v)) = kv.split_once('=') {
+                row.insert(k.to_string(), v.to_string());
+            }
+        }
+        out.push(row);
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SlowLogEntry {
+    pub id: i64,
+    /// Unix timestamp (seconds) the command ran at.
+    pub timestamp: i64,
+    pub duration_micros: i64,
+    pub command: Vec<String>,
+    pub client_addr: Option<String>,
+    pub client_name: Option<String>,
+}
+
+#[tauri::command]
+pub async fn redis_slowlog(app: AppHandle, config_id: String, count: i64) -> Result<Vec<SlowLogEntry>, String> {
+    let config = find_config(&app, &config_id)?;
+    let mut con = connect(&config, 0).await?;
+    let value: Value = redis::cmd("SLOWLOG")
+        .arg("GET")
+        .arg(count)
+        .query_async(&mut con)
+        .await
+        .map_err(|e| e.to_string())?;
+    let Value::Array(entries) = value else { return Ok(Vec::new()) };
+    let mut out = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let Value::Array(fields) = entry else { continue };
+        let id = fields.first().cloned().and_then(value_to_i64).unwrap_or(0);
+        let timestamp = fields.get(1).cloned().and_then(value_to_i64).unwrap_or(0);
+        let duration_micros = fields.get(2).cloned().and_then(value_to_i64).unwrap_or(0);
+        let command = match fields.get(3) {
+            Some(Value::Array(args)) => args.iter().cloned().map(value_to_status_string).collect(),
+            _ => Vec::new(),
+        };
+        let client_addr = fields.get(4).cloned().map(value_to_status_string).filter(|s| !s.is_empty());
+        let client_name = fields.get(5).cloned().map(value_to_status_string).filter(|s| !s.is_empty());
+        out.push(SlowLogEntry { id, timestamp, duration_micros, command, client_addr, client_name });
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub async fn redis_config_get(
+    app: AppHandle,
+    config_id: String,
+    pattern: String,
+) -> Result<Vec<(String, String)>, String> {
+    let config = find_config(&app, &config_id)?;
+    let mut con = connect(&config, 0).await?;
+    let pattern = if pattern.trim().is_empty() { "*".to_string() } else { pattern };
+    let flat: Vec<String> = redis::cmd("CONFIG")
+        .arg("GET")
+        .arg(pattern)
+        .query_async(&mut con)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(flat.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0].clone(), c[1].clone())).collect())
+}
+
+#[tauri::command]
+pub async fn redis_config_set(
+    app: AppHandle,
+    config_id: String,
+    param: String,
+    value: String,
+) -> Result<(), String> {
+    let config = find_config(&app, &config_id)?;
+    let mut con = connect(&config, 0).await?;
+    redis::cmd("CONFIG")
+        .arg("SET")
+        .arg(&param)
+        .arg(&value)
+        .query_async::<()>(&mut con)
+        .await
+        .map_err(|e| e.to_string())
 }

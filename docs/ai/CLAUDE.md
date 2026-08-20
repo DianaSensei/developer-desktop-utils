@@ -809,7 +809,7 @@ git push origin main --tags
 | `deduplicate` | Deduplicate | ❌ | Remove duplicate lines, Web Worker |
 | `kafka-explorer` | Kafka Explorer | ❌ | Topics, partitions, consumer groups, live produce/consume |
 | `rabbit-client` | RabbitMQ | ❌ | Management REST + AMQP via Rust (lapin), live consume/RPC |
-| `redis-client` | Redis | ❌ | Key browser (SCAN-based), type-aware editors, CLI console, server INFO overview |
+| `redis-client` | Redis | ❌ | Key browser (SCAN-based), type-aware editors incl. streams, CLI console w/ autocomplete, Pub/Sub, server admin (clients/slowlog/config), INFO overview |
 | `sql-formatter` | SQL Formatter | ❌ | SQL + MongoDB aggregation formatting |
 | `network` | Network Tools | ❌ | DNS, propagation, DNSSEC, IP, listening ports |
 | `lucky-wheel` | Lucky Wheel | ❌ | Random winner spinner |
@@ -882,6 +882,38 @@ Key files:
 - `inputHistoryStore.ts` — per-connection exchange/routingKey/queue history
 - `knownNamesStore.ts` — AMQP-only typed queue/exchange names per connection
 - `useRabbitData.ts` — load-once SWR-style data cache
+
+---
+
+### Redis Client (`src/components/tools/redis/`)
+
+**Connect/Disconnect flow:** same shape as Kafka/RabbitMQ — `handleConnect` in `RedisClient.tsx` runs `redis_test_connection` (PING) before setting `connectedConnId` (`localStorage`, `devtool:redis:connectedConnId`). Selecting a different connection always navigates back to Overview first (`useRedisState`'s `setSelectedConnId`), so a view that assumes a live `conn`/`db` never keeps rendering against a stale one.
+
+**Views (left-nav):** Overview (`INFO` + `DBSIZE`), Keys (SCAN-based browser), Key detail (type-aware editors), CLI Console, Pub/Sub, Admin (Clients / Slow Log / Config) — routed in `RedisClient.tsx` off `RedisView` (`useRedisState.ts`).
+
+**Keys view (`KeysListView.tsx`):** SCAN-paginated (200/page), debounced filter auto-promoted to a prefix match (`toScanPattern` — `user:1` → `user:1*`) unless the input already has glob syntax, a client-side type filter over the loaded page(s), and row checkboxes + a bulk-delete bar. "New key" creates any type (not just string) — hash/list/set/zset/stream content is typed as free-text lines (`field = value`, `score member`, etc.) parsed by `buildCreateCommand` into the matching `HSET`/`RPUSH`/`SADD`/`ZADD`/`XADD` call.
+
+**Key detail view (`KeyDetailView.tsx`):** type-aware editors for string/hash/list/set/zset/stream, plus TTL and `MEMORY USAGE` rows. Mutations (`onSetField`, `onPush`, `onSet`, …) apply an **optimistic local update** to the already-fetched `KeyValue` instead of re-running `load()` (a full HSCAN/SSCAN/ZSCAN/XRANGE) after every single field edit — important for a large collection, where a full reload per keystroke-blur would be slow. Errors from a mutation are caught by a shared `runMutation` wrapper and shown inline rather than becoming an unhandled promise rejection. The zset editor's optimistic update deliberately does **not** re-sort by score: the initial fetch comes from `ZSCAN`, whose order isn't guaranteed sorted, so sorting only on edit would make the list visibly reorder itself in a way a plain Refresh wouldn't reproduce.
+
+**Pub/Sub (`PubSubView.tsx`):** subscribes to channels/patterns via `redis_pubsub_subscribe`, which streams `PubSubMessage`s back over a Tauri `Channel` (same `new Channel<T>()` + `onmessage` pattern as `consumerStore.ts`/Kafka's consumer). Unlike Kafka/RabbitMQ's live consumers, there's no module-scope store keeping the subscription alive across view switches — it's owned by the component and stopped on unmount (a `useRef`-held subscription id, cleaned up in a `useEffect` cleanup). This is a deliberate scope call: Pub/Sub here is an ad-hoc debug helper, not a persistent monitor.
+
+**Admin (`AdminView.tsx`):** three `Tabs`-switched sub-views — Clients (`CLIENT LIST`, parsed into loose `key=value` rows so the table survives field-set differences across Redis versions), Slow Log (`SLOWLOG GET`), Config (`CONFIG GET` search + inline edit, `CONFIG SET` gated behind `MathConfirmDialog` since it changes live server behavior for every connected client, not just this one).
+
+**CLI Console (`CliConsole.tsx`):** autocomplete dropdown over `commands.ts` (~90 common commands) while typing the command name, a syntax hint once it's fully typed, and multi-line paste — pasting text containing `\n` runs each line as a sequential command instead of being silently dropped by the single-line `<input>`.
+
+**Rust backend (`src-tauri/src/redis_tool.rs`):** every command opens its own fresh `MultiplexedConnection` (SELECTs `db`, runs, drops) — **except Pub/Sub**, which is inherently long-lived and gets a registry-tracked background task (`PubSubRegistry`, `Mutex<HashMap<String, Arc<Notify>>>`, same shape as `rabbit.rs`'s `ConsumerRegistry`). `connect()` wraps connection establishment in a 6s `tokio::time::timeout` so an unreachable host fails fast instead of hanging the UI. Key browsing always goes through SCAN/HSCAN/SSCAN/ZSCAN/XRANGE (capped at `VALUE_CAP` = 2000), never KEYS/SMEMBERS/HGETALL unbounded. `redis_exec` runs an arbitrary command (args passed as separate RESP protocol arguments, never string-concatenated) and backs both the CLI Console and every type editor's mutate actions, so there's one generic command surface instead of one bespoke Tauri command per Redis command.
+
+**Live indicator:** `useEffect(() => { liveConnections.set('redis-client', isConnected); }, [isConnected])` in `RedisClient.tsx`.
+
+Key files:
+- `RedisClient.tsx` — root component, connect/disconnect, resize, routing
+- `LeftPanel.tsx` — connection selector + status dot + Connect/Disconnect button + view nav
+- `useRedisState.ts` — navigation state (`RedisView`) + persisted `connectedConnId`/`db`
+- `ConnectionForm.tsx` — host/port/username/password/TLS form
+- `types.ts` — `RedisConnection`, `KeyValue`, `PubSubMessage`, `redisApi` Tauri invoke wrappers
+- `useRedisData.ts` — stale-while-revalidate data cache (Overview, Admin tabs)
+- `format.ts` — `INFO` output parsing, byte/uptime/number formatting
+- `commands.ts` — CLI Console autocomplete reference list
 
 ---
 

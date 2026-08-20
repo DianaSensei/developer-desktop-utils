@@ -12,9 +12,10 @@ import { CopyButton } from '@/components/ui/copy-button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import type { RedisConnection, KeyValue } from './types';
+import type { RedisConnection, KeyValue, StreamEntry } from './types';
 import { redisApi } from './types';
 import { MathConfirmDialog } from './MathConfirmDialog';
+import { formatBytes } from './format';
 
 interface KeyDetailViewProps {
   conn: RedisConnection;
@@ -35,10 +36,15 @@ export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed 
   const [error, setError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [memoryBytes, setMemoryBytes] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
     setError(null);
+    // Fires independently of the key-value fetch below: MEMORY USAGE isn't
+    // available on every Redis build (older versions, some managed
+    // services), and a failure there shouldn't block showing the key itself.
+    redisApi.memoryUsage(conn.id, db, keyName).then(setMemoryBytes).catch(() => setMemoryBytes(null));
     try {
       const v = await redisApi.getKey(conn.id, db, keyName);
       setValue(v);
@@ -55,6 +61,21 @@ export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed 
   const deleteKey = async () => {
     await redisApi.deleteKeys(conn.id, db, [keyName]);
     onDeleted();
+  };
+
+  // Mutations update `value` in place instead of re-fetching the whole key —
+  // a hash/list/set/zset can hold up to VALUE_CAP (2000) entries, and
+  // re-running HSCAN/SSCAN/etc. after every single field edit made editing a
+  // large collection field-by-field noticeably slow. It also catches
+  // failures here so a rejected HSET/SADD/etc. surfaces as an error instead
+  // of an unhandled promise rejection with no visible feedback.
+  const runMutation = async (apply: () => Promise<void>) => {
+    try {
+      await apply();
+      setError(null);
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    }
   };
 
   const ttlMs = value && value.type !== 'none' ? value.ttlMs : -1;
@@ -82,52 +103,129 @@ export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed 
 
         {value && value.type !== 'none' && (
           <>
-            <TtlRow
-              seconds={ttlToSeconds(ttlMs)}
-              onSet={async (seconds) => { await redisApi.setTtl(conn.id, db, keyName, seconds); void load(); }}
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <TtlRow
+                seconds={ttlToSeconds(ttlMs)}
+                onSet={(seconds) => runMutation(async () => {
+                  await redisApi.setTtl(conn.id, db, keyName, seconds);
+                  setValue((prev) => (prev && prev.type !== 'none' ? { ...prev, ttlMs: seconds != null ? seconds * 1000 : -1 } : prev));
+                })}
+              />
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <span className="text-xs text-fg-mute w-16 shrink-0">Memory</span>
+                <span className="text-xs font-mono">{formatBytes(memoryBytes)}</span>
+              </div>
+            </div>
 
             {value.type === 'string' && (
               <StringEditor
                 initial={value.value}
-                onSave={async (v) => { await redisApi.setString(conn.id, db, keyName, v, ttlToSeconds(ttlMs)); void load(); }}
+                onSave={(v) => runMutation(async () => {
+                  await redisApi.setString(conn.id, db, keyName, v, ttlToSeconds(ttlMs));
+                  setValue((prev) => (prev && prev.type === 'string' ? { ...prev, value: v } : prev));
+                })}
               />
             )}
             {value.type === 'hash' && (
               <HashEditor
                 fields={value.fields}
                 truncated={value.truncated}
-                onSetField={async (f, v) => { await redisApi.exec(conn.id, db, ['HSET', keyName, f, v]); void load(); }}
-                onDeleteField={async (f) => { await redisApi.exec(conn.id, db, ['HDEL', keyName, f]); void load(); }}
+                onSetField={(f, v) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['HSET', keyName, f, v]);
+                  setValue((prev) => {
+                    if (!prev || prev.type !== 'hash') return prev;
+                    const idx = prev.fields.findIndex(([ff]) => ff === f);
+                    const fields: [string, string][] = idx === -1
+                      ? [...prev.fields, [f, v]]
+                      : prev.fields.map((entry, i) => (i === idx ? [f, v] as [string, string] : entry));
+                    return { ...prev, fields };
+                  });
+                })}
+                onDeleteField={(f) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['HDEL', keyName, f]);
+                  setValue((prev) => (prev && prev.type === 'hash' ? { ...prev, fields: prev.fields.filter(([ff]) => ff !== f) } : prev));
+                })}
               />
             )}
             {value.type === 'list' && (
               <ListEditor
                 items={value.items}
                 truncated={value.truncated}
-                onPush={async (v, front) => { await redisApi.exec(conn.id, db, [front ? 'LPUSH' : 'RPUSH', keyName, v]); void load(); }}
-                onRemove={async (v) => { await redisApi.exec(conn.id, db, ['LREM', keyName, '1', v]); void load(); }}
+                onPush={(v, front) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, [front ? 'LPUSH' : 'RPUSH', keyName, v]);
+                  setValue((prev) => (prev && prev.type === 'list' ? { ...prev, items: front ? [v, ...prev.items] : [...prev.items, v] } : prev));
+                })}
+                onRemove={(v) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['LREM', keyName, '1', v]);
+                  setValue((prev) => {
+                    if (!prev || prev.type !== 'list') return prev;
+                    const idx = prev.items.indexOf(v);
+                    if (idx === -1) return prev;
+                    const items = [...prev.items];
+                    items.splice(idx, 1);
+                    return { ...prev, items };
+                  });
+                })}
               />
             )}
             {value.type === 'set' && (
               <SetEditor
                 members={value.members}
                 truncated={value.truncated}
-                onAdd={async (v) => { await redisApi.exec(conn.id, db, ['SADD', keyName, v]); void load(); }}
-                onRemove={async (v) => { await redisApi.exec(conn.id, db, ['SREM', keyName, v]); void load(); }}
+                onAdd={(v) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['SADD', keyName, v]);
+                  setValue((prev) => (prev && prev.type === 'set' && !prev.members.includes(v) ? { ...prev, members: [...prev.members, v] } : prev));
+                })}
+                onRemove={(v) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['SREM', keyName, v]);
+                  setValue((prev) => (prev && prev.type === 'set' ? { ...prev, members: prev.members.filter((m) => m !== v) } : prev));
+                })}
               />
             )}
             {value.type === 'zset' && (
               <ZsetEditor
                 members={value.members}
                 truncated={value.truncated}
-                onSet={async (member, score) => { await redisApi.exec(conn.id, db, ['ZADD', keyName, String(score), member]); void load(); }}
-                onRemove={async (member) => { await redisApi.exec(conn.id, db, ['ZREM', keyName, member]); void load(); }}
+                onSet={(member, score) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['ZADD', keyName, String(score), member]);
+                  // Not re-sorted: the initial fetch comes from ZSCAN, whose
+                  // order isn't guaranteed to be score-sorted, so sorting
+                  // only on edit would make the list suddenly reorder itself
+                  // in a way a plain Refresh wouldn't reproduce.
+                  setValue((prev) => {
+                    if (!prev || prev.type !== 'zset') return prev;
+                    const idx = prev.members.findIndex(([m]) => m === member);
+                    const members: [string, number][] = idx === -1
+                      ? [...prev.members, [member, score]]
+                      : prev.members.map((entry, i) => (i === idx ? [member, score] as [string, number] : entry));
+                    return { ...prev, members };
+                  });
+                })}
+                onRemove={(member) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['ZREM', keyName, member]);
+                  setValue((prev) => (prev && prev.type === 'zset' ? { ...prev, members: prev.members.filter(([m]) => m !== member) } : prev));
+                })}
+              />
+            )}
+            {value.type === 'stream' && (
+              <StreamEditor
+                entries={value.entries}
+                truncated={value.truncated}
+                onAdd={(fields) => runMutation(async () => {
+                  const flat = fields.flatMap(([f, v]) => [f, v]);
+                  const reply = await redisApi.exec(conn.id, db, ['XADD', keyName, '*', ...flat]);
+                  const id = reply.kind === 'Bulk' || reply.kind === 'Status' ? reply.data : null;
+                  setValue((prev) => (prev && prev.type === 'stream' && id ? { ...prev, entries: [...prev.entries, [id, fields]] } : prev));
+                })}
+                onDelete={(id) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['XDEL', keyName, id]);
+                  setValue((prev) => (prev && prev.type === 'stream' ? { ...prev, entries: prev.entries.filter(([eid]) => eid !== id) } : prev));
+                })}
               />
             )}
             {value.type === 'unsupported' && (
               <Callout tone="info">
-                Editing type <span className="font-mono">{value.redisType}</span> isn't supported here yet — use the CLI Console (e.g. <span className="font-mono">XRANGE {keyName} - +</span> for a stream).
+                Editing type <span className="font-mono">{value.redisType}</span> isn't supported here yet — use the CLI Console (e.g. <span className="font-mono">GEOPOS {keyName} member</span> for a geospatial index).
               </Callout>
             )}
           </>
@@ -165,6 +263,17 @@ function TtlRow({ seconds, onSet }: { seconds: number | null; onSet: (seconds: n
 
   useEffect(() => { setInput(seconds != null ? String(seconds) : ''); }, [seconds]);
 
+  // Blank input means "no expiry" (PERSIST); anything else — including "0" —
+  // is a real TTL in seconds. `Number(input) || null` used to treat "0" the
+  // same as blank because 0 is falsy, so typing 0 silently persisted the key
+  // instead of expiring it immediately.
+  const parseInput = (): number | null => {
+    const trimmed = input.trim();
+    if (trimmed === '') return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const apply = async (next: number | null) => {
     setBusy(true);
     try { await onSet(next); setEditing(false); } finally { setBusy(false); }
@@ -181,9 +290,9 @@ function TtlRow({ seconds, onSet }: { seconds: number | null; onSet: (seconds: n
             placeholder="seconds"
             className="h-ctl w-32 font-mono text-xs"
             autoFocus
-            onKeyDown={(e) => { if (e.key === 'Enter') apply(Number(input) || null); if (e.key === 'Escape') setEditing(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') apply(parseInput()); if (e.key === 'Escape') setEditing(false); }}
           />
-          <Button size="sm" className="h-ctl" disabled={busy} onClick={() => apply(Number(input) || null)}>Set</Button>
+          <Button size="sm" className="h-ctl" disabled={busy} onClick={() => apply(parseInput())}>Set</Button>
           <Button size="sm" variant="outline" className="h-ctl" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
         </>
       ) : (
@@ -401,6 +510,83 @@ function ZsetEditor({ members, truncated, onSet, onRemove }: {
         >
           <Plus className="h-3.5 w-3.5" />
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Stream ───────────────────────────────────────────────────────────────────
+
+function StreamEditor({ entries, truncated, onAdd, onDelete }: {
+  entries: StreamEntry[];
+  truncated: boolean;
+  onAdd: (fields: [string, string][]) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const addEntry = async () => {
+    const lines = draft.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) { setError('Add at least one field = value line'); return; }
+    const fields: [string, string][] = [];
+    for (const line of lines) {
+      const idx = line.indexOf('=');
+      if (idx === -1) { setError(`Line "${line}" is missing "=" — use field = value`); return; }
+      fields.push([line.slice(0, idx).trim(), line.slice(idx + 1).trim()]);
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await onAdd(fields);
+      setDraft('');
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {truncated && <Callout tone="warning" size="sm">Showing the first 2000 entries — this stream has more.</Callout>}
+      <DataTable>
+        <Thead><Tr><Th className="w-40">ID</Th><Th>Fields</Th><Th className="w-8" /></Tr></Thead>
+        <Tbody>
+          {entries.map(([id, fields]) => (
+            <Tr key={id} className="group align-top">
+              <Td mono className="whitespace-nowrap">{id}</Td>
+              <Td mono>
+                <div className="space-y-0.5">
+                  {fields.map(([f, v]) => (
+                    <div key={f} className="truncate"><span className="text-fg-mute">{f}</span> = {v}</div>
+                  ))}
+                </div>
+              </Td>
+              <Td align="right">
+                <button className="text-fg-mute hover:text-bad opacity-0 group-hover:opacity-100 transition-opacity" title="Delete entry" onClick={() => void onDelete(id)}>
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </DataTable>
+      <div className="space-y-1.5">
+        <Textarea
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); setError(null); }}
+          placeholder="field = value"
+          className="font-mono text-xs min-h-16 resize-y"
+        />
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] text-fg-mute">One field = value per line, added as one entry (<span className="font-mono">XADD {'{key}'} *</span>).</p>
+          <Button size="sm" variant="outline" disabled={!draft.trim() || busy} onClick={addEntry}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> {busy ? 'Adding…' : 'Add entry'}
+          </Button>
+        </div>
+        {error && <Callout tone="error" size="sm">{error}</Callout>}
       </div>
     </div>
   );

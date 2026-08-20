@@ -13,6 +13,8 @@ import { OverviewView } from './OverviewView';
 import { KeysListView } from './KeysListView';
 import { KeyDetailView } from './KeyDetailView';
 import { CliConsole } from './CliConsole';
+import { PubSubView } from './PubSubView';
+import { AdminView } from './AdminView';
 
 const LEFT_MIN = 200;
 const LEFT_MAX = 480;
@@ -27,7 +29,7 @@ export function RedisClient() {
   const {
     selectedConnId, setSelectedConnId, connectedConnId, setConnectedConnId,
     db, setDb, view, selectedKey,
-    showOverview, showKeys, showCli, selectKey,
+    showOverview, showKeys, showCli, showPubSub, showAdmin, selectKey,
     refreshKey, refresh,
   } = useRedisState();
 
@@ -108,6 +110,8 @@ export function RedisClient() {
           onShowOverview={showOverview}
           onShowKeys={showKeys}
           onShowCli={showCli}
+          onShowPubSub={showPubSub}
+          onShowAdmin={showAdmin}
         />
       </div>
 
@@ -150,6 +154,10 @@ export function RedisClient() {
           <KeysListView conn={conn} db={db} refreshKey={refreshKey} onRefresh={refresh} onSelectKey={selectKey} />
         ) : view === 'cli' ? (
           <CliConsole conn={conn} db={db} />
+        ) : view === 'pubsub' ? (
+          <PubSubView conn={conn} />
+        ) : view === 'admin' ? (
+          <AdminView conn={conn} />
         ) : (
           <OverviewView conn={conn} db={db} refreshKey={refreshKey} onRefresh={refresh} />
         )}

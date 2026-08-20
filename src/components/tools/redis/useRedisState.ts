@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 
-export type RedisView = 'overview' | 'keys' | 'key' | 'cli';
+export type RedisView = 'overview' | 'keys' | 'key' | 'cli' | 'pubsub' | 'admin';
 
 export interface RedisState {
   selectedConnId: string;
@@ -17,6 +17,8 @@ export interface RedisState {
   showOverview: () => void;
   showKeys: () => void;
   showCli: () => void;
+  showPubSub: () => void;
+  showAdmin: () => void;
   selectKey: (key: string) => void;
   refreshKey: number;
   refresh: () => void;
@@ -47,6 +49,8 @@ export function useRedisState(): RedisState {
   const showOverview = () => { setView('overview'); setSelectedKey(null); };
   const showKeys = () => { setView('keys'); setSelectedKey(null); };
   const showCli = () => { setView('cli'); setSelectedKey(null); };
+  const showPubSub = () => { setView('pubsub'); setSelectedKey(null); };
+  const showAdmin = () => { setView('admin'); setSelectedKey(null); };
   const selectKey = (key: string) => { setView('key'); setSelectedKey(key); };
 
   return {
@@ -54,7 +58,7 @@ export function useRedisState(): RedisState {
     connectedConnId, setConnectedConnId,
     db, setDb,
     view, selectedKey,
-    showOverview, showKeys, showCli, selectKey,
+    showOverview, showKeys, showCli, showPubSub, showAdmin, selectKey,
     refreshKey, refresh,
   };
 }

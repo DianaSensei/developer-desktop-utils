@@ -50,6 +50,7 @@ fn main() {
         .manage(mockserver::MockState::default())
         .manage(rabbit::ConsumerRegistry::default())
         .manage(kafka::KafkaConsumerRegistry::default())
+        .manage(redis_tool::PubSubRegistry::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -128,6 +129,14 @@ fn main() {
             redis_tool::redis_delete_keys,
             redis_tool::redis_rename_key,
             redis_tool::redis_exec,
+            redis_tool::redis_memory_usage,
+            redis_tool::redis_pubsub_subscribe,
+            redis_tool::redis_pubsub_unsubscribe,
+            redis_tool::redis_publish,
+            redis_tool::redis_client_list,
+            redis_tool::redis_slowlog,
+            redis_tool::redis_config_get,
+            redis_tool::redis_config_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
