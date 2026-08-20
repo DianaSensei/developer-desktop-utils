@@ -53,6 +53,20 @@ redis = { version = "1.6.0", features = ["tokio-comp", "tls-rustls", "tokio-rust
 # (docker runtime), Rancher Desktop (moby), OrbStack, Podman (docker-compat).
 bollard = "0.21"
 
+[target.'cfg(unix)'.dependencies]
+# Direct handles onto crates bollard already pulls in transitively (its own
+# "pipe" feature depends on exactly these, at these versions — see
+# container_tool.rs's `volume_sizes`) so we can issue one raw request over the
+# same Unix socket `bollard::Docker` connects with. Needed because bollard's
+# typed `SystemDataUsageResponse` model (this version) only exposes the
+# aggregate df counters, not the per-volume `UsageData.Size` the raw JSON
+# response actually carries.
+hyperlocal = "0.9"
+hyper = "1"
+hyper-util = { version = "0.1", features = ["client-legacy", "tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

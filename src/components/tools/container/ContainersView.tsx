@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, RefreshCw, MoreHorizontal, Play, Square, RotateCw, Trash2, Pause, PlayCircle, Check } from 'lucide-react';
+import { Box, RefreshCw, MoreHorizontal, Play, Square, RotateCw, Trash2, Pause, PlayCircle, Check, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { containerApi, type ContainerConnection, type ContainerSummary } from './types';
 import { LogsPanel } from './LogsPanel';
 import { useSort } from './useSort';
+import { ContainerDetailsDialog } from './ContainerDetailsDialog';
 
 function stateTone(state?: string): BadgeTone {
   switch (state) {
@@ -51,6 +52,7 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
   const [error, setError] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
+  const [detailsTarget, setDetailsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
@@ -196,7 +198,7 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
                 </Thead>
                 <Tbody>
                   {rows.map((c) => (
-                    <Tr key={c.Id} selected={selected.has(c.Id)}>
+                    <Tr key={c.Id} interactive selected={selected.has(c.Id)} onClick={() => setDetailsTarget(c)}>
                       <Td onClick={(e) => e.stopPropagation()}>
                         <RowCheckbox checked={selected.has(c.Id)} onClick={() => toggleSelected(c.Id)} title="Select container" />
                       </Td>
@@ -205,8 +207,11 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
                       <Td><Badge tone={stateTone(c.State)}>{c.State ?? 'unknown'}</Badge></Td>
                       <Td>{c.Status}</Td>
                       <Td mono>{formatPorts(c)}</Td>
-                      <Td align="right">
+                      <Td align="right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(c)}>
+                            <Info className="h-3.5 w-3.5" />
+                          </IconButton>
                           {c.State === 'running' ? (
                             <IconButton size="sm" title="Stop" disabled={busyIds.has(c.Id)} onClick={() => runAction(c.Id, () => containerApi.stop(connection, c.Id))}>
                               <Square className="h-3.5 w-3.5" />
@@ -224,7 +229,7 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
                               <MoreHorizontal className="h-3.5 w-3.5" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setLogsTarget(c)}>Logs & details</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setLogsTarget(c)}>Logs</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => runAction(c.Id, () => containerApi.restart(connection, c.Id))}>Restart</DropdownMenuItem>
                               {c.State === 'running' ? (
                                 <DropdownMenuItem onClick={() => runAction(c.Id, () => containerApi.pause(connection, c.Id))}>Pause</DropdownMenuItem>
@@ -314,6 +319,13 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
           await runBulk(ids, (id) => containerApi.remove(connection, id, true));
           setSelected(new Set());
         }}
+      />
+
+      <ContainerDetailsDialog
+        open={!!detailsTarget}
+        onOpenChange={(o) => { if (!o) setDetailsTarget(null); }}
+        connection={connection}
+        container={detailsTarget}
       />
     </div>
   );

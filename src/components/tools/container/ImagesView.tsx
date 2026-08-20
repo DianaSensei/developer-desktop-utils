@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Channel } from '@tauri-apps/api/core';
-import { Layers, RefreshCw, Trash2, Download } from 'lucide-react';
+import { Layers, RefreshCw, Trash2, Download, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ViewHeader } from '@/components/ui/view-header';
@@ -13,15 +13,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { containerApi, type ContainerConnection, type ImageSummary, type PullProgress } from './types';
 import { useSort } from './useSort';
-
-function formatBytes(n?: number): string {
-  if (!n) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-  return `${v.toFixed(1)} ${units[i]}`;
-}
+import { formatBytes } from './format';
+import { ImageDetailsDialog } from './ImageDetailsDialog';
 
 export function ImagesView({ connection, refreshKey, onRefresh }: {
   connection: ContainerConnection;
@@ -34,6 +27,7 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
   const [error, setError] = useState<string | null>(null);
   const [pullOpen, setPullOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<ImageSummary | null>(null);
+  const [detailsTarget, setDetailsTarget] = useState<ImageSummary | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -92,14 +86,19 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
                 </Thead>
                 <Tbody>
                   {rows.map((img) => (
-                    <Tr key={img.Id}>
+                    <Tr key={img.Id} interactive onClick={() => setDetailsTarget(img)}>
                       <Td mono>{(img.RepoTags ?? ['<none>:<none>']).join(', ')}</Td>
                       <Td mono>{img.Id.replace('sha256:', '').slice(0, 12)}</Td>
                       <Td numeric>{formatBytes(img.Size)}</Td>
-                      <Td align="right">
-                        <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(img)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </IconButton>
+                      <Td align="right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(img)}>
+                            <Info className="h-3.5 w-3.5" />
+                          </IconButton>
+                          <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(img)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </IconButton>
+                        </div>
                       </Td>
                     </Tr>
                   ))}
@@ -110,6 +109,13 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
       </div>
 
       <PullDialog open={pullOpen} onOpenChange={setPullOpen} connection={connection} onDone={load} />
+
+      <ImageDetailsDialog
+        open={!!detailsTarget}
+        onOpenChange={(o) => { if (!o) setDetailsTarget(null); }}
+        connection={connection}
+        image={detailsTarget}
+      />
 
       <ConfirmDialog
         open={!!removeTarget}

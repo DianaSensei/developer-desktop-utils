@@ -25,8 +25,13 @@ export function useSort<T>(rows: T[], getters: Record<string, (row: T) => string
       return a.index - b.index; // stable tie-break
     });
     return withIndex.map((w) => w.row);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, sortKey, sortDir]);
+    // `getters` is deliberately excluded: callers pass a fresh object literal
+    // every render, so including it would make this memo never hit — but its
+    // closures (e.g. a size map still loading in) can change independently of
+    // `rows`/`sortKey`/`sortDir`, so skip the memo instead of risking a stale
+    // sort order. Sorting a docker-scale list (rarely thousands of rows) on
+    // every render is cheap enough that this isn't a real perf cost.
+  }, [rows, sortKey, sortDir, getters]);
 
   const toggleSort = (key: string) => {
     setSortKey((prev) => {

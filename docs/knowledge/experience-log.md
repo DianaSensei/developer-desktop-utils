@@ -1,5 +1,66 @@
 # Experience log
 
+## [2026-08-20] container tool — bollard 0.21's `SystemDataUsageResponse` silently drops the per-item lists the raw Docker API returns
+- Nguyên nhân: cần hiển thị dung lượng (Size) từng volume ở VolumesView. Kế hoạch ban đầu là
+  tái dùng `container_system_df` (đã có sẵn, gọi `bollard::Docker::df()`) — Docker Engine API
+  thật `/system/df` trả về cả `LayersSize`, `Images[]`, `Containers[]`, `Volumes[]` (mỗi phần
+  tử volume có `UsageData.Size`), và `Docker`'s `SystemDataUsageResponse` FE type trong
+  `types.ts` (viết từ trước, không do session này tạo) đã giả định đúng shape đó
+  (`LayersSize?`, `Images?: ImageSummary[]`, ...). Nhưng `bollard-stubs 1.53.1-rc.29.3.1` (bản
+  bollard 0.21 dùng) định nghĩa `SystemDataUsageResponse` KHÁC hẳn: chỉ có 4 field tổng hợp
+  (`ImageUsage`/`ContainerUsage`/`VolumeUsage`/`BuildCacheUsage`, mỗi field là
+  `{ActiveCount, TotalCount, Reclaimable, TotalSize}`) — không có field `Volumes`/`Images`
+  nào chứa danh sách từng phần tử. serde bỏ qua field lạ trong JSON khi deserialize (không
+  báo lỗi), nên nếu daemon Docker thật vẫn trả `Volumes: [...]` trong JSON, nó bị ÂM THẦM
+  vứt bỏ ngay tại bước deserialize — không có exception, không cảnh báo, kết quả Rust chỉ là
+  `None`/rỗng ở field không tồn tại đó. Vì `containerApi.systemDf` chưa được gọi ở bất kỳ đâu
+  trong FE trước session này (`OverviewView.tsx` dùng `systemInfo`, không dùng `systemDf`),
+  bug shape-mismatch này chưa từng bị phát hiện dù đã tồn tại từ trước.
+- Số lần thử: 1/1 — phát hiện chủ động bằng cách đọc thẳng source `bollard-stubs` trong
+  `~/.cargo/registry` (`grep -n "pub struct SystemDataUsageResponse"`) trước khi viết code
+  dựa theo field name đoán từ tài liệu Docker API hoặc từ TS type có sẵn, đúng lúc nhận ra TS
+  type cũ không khớp gì với Rust struct thật.
+- Kết quả: Đã fix — bỏ hẳn hướng lấy Size volume qua `container_system_df`. Thêm command mới
+  `volume_sizes` (chỉ `#[cfg(unix)]`) gọi thẳng `/system/df?type=volume` qua HTTP thô trên
+  cùng Unix socket mà `bollard::Docker` đang dùng — tái sử dụng `hyperlocal`/`hyper-util`/
+  `http-body-util` (đã có sẵn dạng transitive dep qua feature "pipe" của bollard, chỉ cần khai
+  báo lại làm dependency trực tiếp trong `Cargo.toml`, không kéo thêm version mới nào — xem
+  diff `Cargo.lock` chỉ +5 dòng) — rồi tự đọc `Volumes[].Name`/`Volumes[].UsageData.Size` từ
+  `serde_json::Value` thô thay vì ép vào struct bollard đã biết là thiếu field. Đồng thời sửa
+  luôn TS type `SystemDataUsageResponse` cho khớp shape THẬT (4 field tổng hợp) — dù vẫn chưa
+  nơi nào dùng — để không để lại type sai làm bẫy cho lần sau.
+- Bài học chung: một dependency dùng chung một cái tên "giống hệt" tài liệu API public
+  (`SystemDataUsageResponse`, `docker system df`) không có nghĩa là field bên trong khớp với
+  tài liệu đó — client library có thể chỉ map một tập con field mà tác giả binding thấy cần,
+  và serde IM LẶNG bỏ field JSON không khớp thay vì báo lỗi. Trước khi viết code Rust dựa theo
+  field name của một struct từ crate ngoài (đặc biệt struct ứng với JSON của API bên thứ ba),
+  luôn `grep` thẳng source đã tải về trong `~/.cargo/registry` để xác nhận field thật, đừng
+  suy đoán từ tên struct hay từ một TS type có sẵn — TS type đó có thể ĐÃ SAI từ trước và
+  chưa ai phát hiện chỉ vì chưa có chỗ nào thực sự gọi tới nó.
+
+## [2026-08-20] container tool — a `<p>` wrapping block-level content silently corrupts the DOM instead of erroring
+- Nguyên nhân: `DetailField` (component dùng chung cho ContainerDetailsDialog/
+  ImageDetailsDialog, hiển thị một cặp nhãn/giá trị) ban đầu bọc `value` trong `<p
+  className="text-xs break-words">{value}</p>`. Với các trường text thuần (Created, Status…)
+  không sao, nhưng "All tags"/"Exposed ports" truyền vào một `<div className="flex flex-wrap
+  gap-1">` chứa nhiều `<Badge>` — tức nội dung block-level lồng trong `<p>`. HTML spec không
+  cho phép `<p>` chứa flow content như `<div>`; trình duyệt tự động ĐÓNG `<p>` sớm ngay trước
+  `<div>` con và đẩy phần còn lại ra ngoài — không phải lỗi JS, không cảnh báo React runtime
+  rõ ràng nào bắt buộc phải thấy ngay (React 18 chỉ log hydration warning khi SSR, ứng dụng
+  Tauri này thuần CSR nên có thể không log gì cả) — chỉ lộ ra khi NHÌN THẬT layout render (căn
+  lề vỡ, badge tràn ra ngoài vị trí đáng lẽ).
+- Số lần thử: 1/1 — phát hiện bằng cách tự đọc lại JSX vừa viết theo đúng nghĩa đen của cấu
+  trúc thẻ (đặt câu hỏi "component con nào có thể render ra div/block-level rồi lồng vào đây
+  không") thay vì chỉ tin tưởng `npm run build` xanh — TypeScript/Vite hoàn toàn không bắt
+  được lớp lỗi này vì nó hợp lệ về mặt cú pháp JSX, chỉ sai về ngữ nghĩa HTML.
+- Kết quả: Đã fix — đổi `<p>` bọc ngoài `value` thành `<div>` trong `DetailRows.tsx`.
+- Bài học chung: bất kỳ component dùng chung nào nhận `value: ReactNode` (không phải
+  `string`) và tự bọc nó trong `<p>` đều là một quả bom hẹn giờ — sớm muộn sẽ có caller
+  truyền vào JSX (Badge, div, list) mà `<p>` không được chứa hợp lệ. Ưu tiên bọc bằng `<div>`
+  trừ khi bản thân component đã ép kiểu `value` về `string`/`ReactNode` thuần văn bản; và khi
+  review code hiển thị dữ liệu tuỳ ý, luôn tự hỏi phần tử bọc ngoài có hợp lệ với MỌI loại nội
+  dung caller có thể truyền vào hay không, chứ không chỉ với case đầu tiên mình test bằng mắt.
+
 ## [2026-08-20] container tool — `cargo check` on Linux CAN be unblocked by installing GTK/WebKit dev libs as root
 - Nguyên nhân: một entry log trước đó (redis-tool, cùng ngày) khẳng định "sandbox này không
   dựng được toàn bộ Tauri app trên Linux vì thiếu GTK/WebKit system libs" và né tránh bằng

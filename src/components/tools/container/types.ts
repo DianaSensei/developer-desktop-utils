@@ -55,6 +55,56 @@ export interface StatsFrame {
   netTxBytes: number;
 }
 
+// Curated projection of `inspect_container` — see ContainerDetails in
+// container_tool.rs for why this isn't the raw bollard ContainerInspectResponse
+// shape (dozens of fields, most never worth showing in the UI).
+export interface ContainerMountInfo {
+  type?: string;
+  name?: string;
+  source?: string;
+  destination?: string;
+  mode?: string;
+  rw?: boolean;
+}
+
+export interface ContainerPortBinding {
+  containerPort: string;
+  hostIp?: string;
+  hostPort?: string;
+}
+
+export interface ContainerNetworkInfo {
+  name: string;
+  ipAddress?: string;
+  gateway?: string;
+  macAddress?: string;
+}
+
+export interface ContainerDetails {
+  id: string;
+  name: string;
+  image: string;
+  platform?: string;
+  created?: string;
+  status?: string;
+  running: boolean;
+  paused: boolean;
+  restarting: boolean;
+  exitCode?: number;
+  startedAt?: string;
+  finishedAt?: string;
+  healthStatus?: string;
+  command?: string;
+  entrypoint: string[];
+  restartPolicy?: string;
+  restartMaxRetry?: number;
+  env: string[];
+  labels: Record<string, string>;
+  mounts: ContainerMountInfo[];
+  ports: ContainerPortBinding[];
+  networks: ContainerNetworkInfo[];
+}
+
 // ── Images ──────────────────────────────────────────────────────────────
 
 export interface ImageSummary {
@@ -69,6 +119,26 @@ export interface PullProgress {
   id?: string | null;
   progressCurrent?: number | null;
   progressTotal?: number | null;
+}
+
+// Curated projection of `inspect_image` — see ImageDetails in container_tool.rs
+// for why this isn't the raw bollard ImageInspect shape.
+export interface ImageDetails {
+  id: string;
+  repoTags: string[];
+  repoDigests: string[];
+  created?: string;
+  size: number;
+  architecture?: string;
+  os?: string;
+  author?: string;
+  cmd: string[];
+  entrypoint: string[];
+  env: string[];
+  workingDir?: string;
+  exposedPorts: string[];
+  labels: Record<string, string>;
+  layerCount: number;
 }
 
 // ── Volumes / Networks ─────────────────────────────────────────────────────
@@ -104,11 +174,23 @@ export interface SystemInfo {
   Name?: string;
 }
 
+export interface DiskUsageSummary {
+  ActiveCount?: number;
+  TotalCount?: number;
+  Reclaimable?: number;
+  TotalSize?: number;
+}
+
+// Matches bollard's `SystemDataUsageResponse` in this bollard version:
+// aggregate counters per resource type only — no per-item lists (the raw
+// Docker Engine API response does include those, but this bollard version's
+// typed model drops them on deserialize). See volume_sizes in
+// container_tool.rs for how per-volume size is obtained instead.
 export interface SystemDataUsageResponse {
-  LayersSize?: number;
-  Images?: ImageSummary[];
-  Containers?: ContainerSummary[];
-  Volumes?: VolumeInfo[];
+  ImageUsage?: DiskUsageSummary;
+  ContainerUsage?: DiskUsageSummary;
+  VolumeUsage?: DiskUsageSummary;
+  BuildCacheUsage?: DiskUsageSummary;
 }
 
 // ── Compose ─────────────────────────────────────────────────────────────
@@ -182,6 +264,8 @@ export const containerApi = {
     invoke<void>('container_unpause', { config, containerId }),
   remove: (config: ContainerConnection, containerId: string, force: boolean) =>
     invoke<void>('container_remove', { config, containerId, force }),
+  details: (config: ContainerConnection, containerId: string) =>
+    invoke<ContainerDetails>('container_details', { config, containerId }),
 
   logsStart: (config: ContainerConnection, containerId: string, tail: string, onLog: Channel<LogLine>) =>
     invoke<string>('container_logs_start', { config, containerId, tail, onLog }),
@@ -192,6 +276,7 @@ export const containerApi = {
 
   imageList: (config: ContainerConnection) => invoke<ImageSummary[]>('image_list', { config }),
   imageInspect: (config: ContainerConnection, imageId: string) => invoke<unknown>('image_inspect', { config, imageId }),
+  imageDetails: (config: ContainerConnection, imageId: string) => invoke<ImageDetails>('image_details', { config, imageId }),
   imageRemove: (config: ContainerConnection, imageId: string, force: boolean) =>
     invoke<void>('image_remove', { config, imageId, force }),
   imagePull: (config: ContainerConnection, image: string, tag: string, onProgress: Channel<PullProgress>) =>
@@ -202,6 +287,9 @@ export const containerApi = {
     invoke<void>('volume_remove', { config, name, force }),
   volumeCreate: (config: ContainerConnection, name: string) =>
     invoke<VolumeInfo>('volume_create', { config, name }),
+  /** Per-volume disk usage in bytes, keyed by name — `{}` on Windows (named
+   *  pipe transport isn't wired up for this raw request, see backend). */
+  volumeSizes: (config: ContainerConnection) => invoke<Record<string, number>>('volume_sizes', { config }),
 
   networkList: (config: ContainerConnection) => invoke<NetworkInfo[]>('network_list', { config }),
   networkRemove: (config: ContainerConnection, name: string) => invoke<void>('network_remove', { config, name }),

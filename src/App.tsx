@@ -270,23 +270,32 @@ function NavScrollArea({
                     </span>
                     {/* Label is always mounted and fades/collapses with the sidebar
                         (300ms, matching the aside width animation) so it glides
-                        rather than popping in/out on collapse-expand. */}
+                        rather than popping in/out on collapse-expand.
+
+                        `inline-flex` + `min-w-0` on both this row and the label
+                        text below (not just `overflow-hidden` on one shared span)
+                        so a long label truncates with an ellipsis while the group
+                        count / Experimental badge stay `shrink-0` and always render
+                        in full — a long label ("Containers") + the Experimental
+                        badge together used to exceed max-w-[160px] and get hard
+                        clipped mid-badge (no ellipsis), reading as a broken/
+                        overflowing pill instead of a trimmed label. */}
                     <span
                       className={cn(
-                        'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                        'inline-flex min-w-0 items-center text-sm transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
                         isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
                         isActive && 'font-medium'
                       )}
                     >
-                      {entry.label}
+                      <span className="min-w-0 flex-1 truncate">{entry.label}</span>
                       {/* Số tool trong nhóm — cho biết còn gì bên trong trước
                           khi bấm vào. */}
                       {entry.isGroup && (
-                        <span className="ml-1.5 text-[11px] tabular-nums text-fg-mute/60">
+                        <span className="ml-1.5 shrink-0 text-[11px] tabular-nums text-fg-mute/60">
                           {entry.tools.length}
                         </span>
                       )}
-                      {isExperimental && !isCollapsed && <ExperimentalBadge className="ml-1.5 align-middle" />}
+                      {isExperimental && !isCollapsed && <ExperimentalBadge className="ml-1.5 shrink-0 align-middle" />}
                     </span>
                     {/* Favourite toggle — pins the entry to the top of the list.
                         Hidden when collapsed (no room); a starred entry shows a
@@ -829,6 +838,7 @@ function AppContent() {
           {activeGroupTabs.map((def) => {
               const p = toolPath(def.id);
               const on = p === location.pathname;
+              const live = liveIds.includes(def.id);
               return (
                 <Link
                   key={def.id}
@@ -836,13 +846,18 @@ function AppContent() {
                   role="tab"
                   aria-selected={on}
                   className={cn(
-                    'inline-flex h-full items-center whitespace-nowrap rounded-sm px-2 text-xs leading-none transition-colors',
+                    'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-2 text-xs leading-none transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
                     on
                       ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                       : 'text-fg-mute hover:text-fg',
                   )}
                 >
+                  {/* Sibling tool tabs (Kafka/RabbitMQ/Redis…) can each be live
+                      independently of which one is currently open — without
+                      this dot, switching away from a connected tool hides any
+                      sign it's still running until you click back into it. */}
+                  {live && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" title={t('shell.titlebar.running')} />}
                   {def.label}
                 </Link>
               );
@@ -1049,6 +1064,7 @@ function AppContent() {
                   {activeGroupTabs.map((def) => {
                       const p = toolPath(def.id);
                       const on = p === location.pathname;
+                      const live = liveIds.includes(def.id);
                       return (
                         <Link
                           key={def.id}
@@ -1056,13 +1072,17 @@ function AppContent() {
                           role="tab"
                           aria-selected={on}
                           className={cn(
-                            'inline-flex h-full items-center whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
+                            'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
                             on
                               ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                               : 'text-fg-mute hover:text-fg',
                           )}
                         >
+                          {/* Xem chú thích ở khối titlebarNav phía trên — cùng lý
+                              do: tab anh em (Kafka/RabbitMQ/Redis…) có thể đang
+                              live độc lập với tab đang mở. */}
+                          {live && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" title={t('shell.titlebar.running')} />}
                           {def.label}
                         </Link>
                       );

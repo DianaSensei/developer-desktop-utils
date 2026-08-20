@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText, PowerOff } from 'lucide-react';
+import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText, PowerOff, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ViewHeader } from '@/components/ui/view-header';
 import { Callout } from '@/components/ui/callout';
@@ -14,6 +14,7 @@ import {
   type ContainerConnection, type ContainerSummary, type ComposeProjectGroup,
 } from './types';
 import { LogsPanel } from './LogsPanel';
+import { ContainerDetailsDialog } from './ContainerDetailsDialog';
 
 function stateTone(state?: string): BadgeTone {
   switch (state) {
@@ -58,6 +59,7 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyProject, setBusyProject] = useState<string | null>(null);
   const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
+  const [detailsTarget, setDetailsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
   const [downTarget, setDownTarget] = useState<ComposeProjectGroup | null>(null);
   const [sortKey, setSortKey] = useState<'service' | 'state' | 'status' | null>(null);
@@ -172,12 +174,15 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
               </Thead>
               <Tbody>
                 {sortContainers(p.containers).map((c) => (
-                  <Tr key={c.Id}>
+                  <Tr key={c.Id} interactive onClick={() => setDetailsTarget(c)}>
                     <Td mono>{c.Labels?.[COMPOSE_LABELS.service] ?? containerName(c)}</Td>
                     <Td><Badge tone={stateTone(c.State)}>{c.State ?? 'unknown'}</Badge></Td>
                     <Td>{c.Status}</Td>
-                    <Td align="right">
+                    <Td align="right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
+                        <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(c)}>
+                          <Info className="h-3.5 w-3.5" />
+                        </IconButton>
                         {c.State === 'running' ? (
                           <IconButton size="sm" title="Stop" disabled={busyId === c.Id} onClick={() => runAction(c.Id, () => containerApi.stop(connection, c.Id))}>
                             <Square className="h-3.5 w-3.5" />
@@ -246,6 +251,13 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
           await runDown(downTarget);
           setDownTarget(null);
         }}
+      />
+
+      <ContainerDetailsDialog
+        open={!!detailsTarget}
+        onOpenChange={(o) => { if (!o) setDetailsTarget(null); }}
+        connection={connection}
+        container={detailsTarget}
       />
     </div>
   );

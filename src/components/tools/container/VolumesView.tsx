@@ -5,13 +5,14 @@ import { Input } from '@/components/ui/input';
 import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
 import { Callout } from '@/components/ui/callout';
-import { LoadingRow } from '@/components/ui/spinner';
+import { LoadingRow, Spinner } from '@/components/ui/spinner';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { containerApi, type ContainerConnection, type VolumeInfo } from './types';
 import { useSort } from './useSort';
+import { formatBytes } from './format';
 
 export function VolumesView({ connection, refreshKey, onRefresh }: {
   connection: ContainerConnection;
@@ -24,6 +25,14 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<VolumeInfo | null>(null);
+  // Volume size isn't part of the plain volume-list endpoint — the daemon has
+  // to walk every volume's mountpoint on disk to compute it, which is
+  // noticeably slower (`volume_sizes` — see container_tool.rs for why that
+  // isn't just `container_system_df`). Fetched separately so the volume list
+  // itself still renders instantly; the Size column just shows a spinner
+  // until this resolves. Empty on Windows (not wired up there).
+  const [sizesLoading, setSizesLoading] = useState(false);
+  const [sizeByName, setSizeByName] = useState<Record<string, number>>({});
 
   const load = () => {
     setLoading(true);
@@ -32,6 +41,12 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
       .then(setVolumes)
       .catch((e) => { setVolumes([]); setError(String(e instanceof Error ? e.message : e)); })
       .finally(() => setLoading(false));
+
+    setSizesLoading(true);
+    containerApi.volumeSizes(connection)
+      .then(setSizeByName)
+      .catch(() => setSizeByName({}))
+      .finally(() => setSizesLoading(false));
   };
   useEffect(() => { load(); }, [connection, refreshKey]); // eslint-disable-line
 
@@ -41,6 +56,7 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
     name: (v) => v.Name,
     driver: (v) => v.Driver,
     mountpoint: (v) => v.Mountpoint,
+    size: (v) => sizeByName[v.Name] ?? -1,
   });
 
   return (
@@ -73,6 +89,7 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
                   <Tr>
                     <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
                     <Th sortDirection={directionFor('driver')} onSortClick={() => toggleSort('driver')}>Driver</Th>
+                    <Th align="right" sortDirection={directionFor('size')} onSortClick={() => toggleSort('size')}>Size</Th>
                     <Th sortDirection={directionFor('mountpoint')} onSortClick={() => toggleSort('mountpoint')}>Mountpoint</Th>
                     <Th align="right"></Th>
                   </Tr>
@@ -82,6 +99,9 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
                     <Tr key={v.Name}>
                       <Td mono>{v.Name}</Td>
                       <Td>{v.Driver}</Td>
+                      <Td numeric>
+                        {sizesLoading && !(v.Name in sizeByName) ? <Spinner size="sm" /> : formatBytes(sizeByName[v.Name])}
+                      </Td>
                       <Td mono>{v.Mountpoint}</Td>
                       <Td align="right">
                         <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(v)}>
