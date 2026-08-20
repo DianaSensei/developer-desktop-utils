@@ -113,35 +113,48 @@ export interface SystemDataUsageResponse {
 
 // ── Compose ─────────────────────────────────────────────────────────────
 
-export interface ComposeProject {
-  id: string;
+// Compose projects are not a first-class bollard/Docker Engine API concept —
+// there is no daemon-side "project" object. What exists is a handful of
+// well-known labels docker compose stamps on every container it creates
+// (com.docker.compose.project, .service, .project.working_dir,
+// .project.config_files). Grouping ContainerSummary rows by those labels
+// gives project/service structure using only data container_list already
+// returns — the same read-only technique GUI tools like OrbStack use for
+// their compose grouping. There is deliberately no up/down/build here: that
+// requires the compose spec's client-side orchestration logic, which has no
+// Docker Engine API equivalent (see ComposeView.tsx for the full rationale).
+export const COMPOSE_LABELS = {
+  project: 'com.docker.compose.project',
+  service: 'com.docker.compose.service',
+  workingDir: 'com.docker.compose.project.working_dir',
+  configFiles: 'com.docker.compose.project.config_files',
+} as const;
+
+export interface ComposeProjectGroup {
   name: string;
-  connectionId: string;
-  composeFiles: string[];
-  workingDir: string;
+  workingDir: string | null;
+  configFiles: string | null;
+  containers: ContainerSummary[];
 }
 
-export const EMPTY_COMPOSE_PROJECT: ComposeProject = {
-  id: '',
-  name: '',
-  connectionId: '',
-  composeFiles: [],
-  workingDir: '',
-};
-
-export interface ComposeProjectStatus {
-  Name: string;
-  Status: string;
-  ConfigFiles: string;
-}
-
-export interface ComposeServiceStatus {
-  ID: string;
-  Name: string;
-  Service: string;
-  State: string;
-  Health: string;
-  Publishers: unknown;
+export function groupByComposeProject(containers: ContainerSummary[]): ComposeProjectGroup[] {
+  const groups = new Map<string, ComposeProjectGroup>();
+  for (const c of containers) {
+    const project = c.Labels?.[COMPOSE_LABELS.project];
+    if (!project) continue;
+    let group = groups.get(project);
+    if (!group) {
+      group = {
+        name: project,
+        workingDir: c.Labels?.[COMPOSE_LABELS.workingDir] ?? null,
+        configFiles: c.Labels?.[COMPOSE_LABELS.configFiles] ?? null,
+        containers: [],
+      };
+      groups.set(project, group);
+    }
+    group.containers.push(c);
+  }
+  return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ── Invoke wrappers ─────────────────────────────────────────────────────────
@@ -197,36 +210,4 @@ export const containerApi = {
 
   systemInfo: (config: ContainerConnection) => invoke<SystemInfo>('container_system_info', { config }),
   systemDf: (config: ContainerConnection) => invoke<SystemDataUsageResponse>('container_system_df', { config }),
-};
-
-export const composeApi = {
-  listKnown: () => invoke<ComposeProject[]>('compose_list_known'),
-  addProject: (project: ComposeProject) => invoke<ComposeProject>('compose_add_project', { project }),
-  removeProject: (projectId: string) => invoke<void>('compose_remove_project', { projectId }),
-
-  listProjects: (connection: ContainerConnection) =>
-    invoke<ComposeProjectStatus[]>('compose_list_projects', { connection }),
-  ps: (connection: ContainerConnection, composeFiles: string[], workingDir: string) =>
-    invoke<ComposeServiceStatus[]>('compose_ps', { connection, composeFiles, workingDir }),
-  up: (connection: ContainerConnection, composeFiles: string[], workingDir: string) =>
-    invoke<string>('compose_up', { connection, composeFiles, workingDir }),
-  down: (connection: ContainerConnection, composeFiles: string[], workingDir: string, removeVolumes: boolean) =>
-    invoke<string>('compose_down', { connection, composeFiles, workingDir, removeVolumes }),
-  restart: (connection: ContainerConnection, composeFiles: string[], workingDir: string, service: string | null) =>
-    invoke<string>('compose_restart', { connection, composeFiles, workingDir, service }),
-  stop: (connection: ContainerConnection, composeFiles: string[], workingDir: string, service: string | null) =>
-    invoke<string>('compose_stop', { connection, composeFiles, workingDir, service }),
-  pull: (connection: ContainerConnection, composeFiles: string[], workingDir: string) =>
-    invoke<string>('compose_pull', { connection, composeFiles, workingDir }),
-  config: (connection: ContainerConnection, composeFiles: string[], workingDir: string) =>
-    invoke<unknown>('compose_config', { connection, composeFiles, workingDir }),
-
-  logsStart: (
-    connection: ContainerConnection,
-    composeFiles: string[],
-    workingDir: string,
-    service: string | null,
-    onLog: Channel<LogLine>,
-  ) => invoke<string>('compose_logs_start', { connection, composeFiles, workingDir, service, onLog }),
-  logsStop: (streamId: string) => invoke<void>('compose_logs_stop', { streamId }),
 };

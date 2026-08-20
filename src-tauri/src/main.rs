@@ -10,7 +10,6 @@ mod ports;
 mod rabbit;
 mod redis_tool;
 mod container_tool;
-mod compose_tool;
 
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
@@ -54,7 +53,6 @@ fn main() {
         .manage(kafka::KafkaConsumerRegistry::default())
         .manage(redis_tool::PubSubRegistry::default())
         .manage(container_tool::StreamRegistry::default())
-        .manage(compose_tool::ComposeLogRegistry::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -169,19 +167,6 @@ fn main() {
             container_tool::network_create,
             container_tool::container_system_info,
             container_tool::container_system_df,
-            compose_tool::compose_list_projects,
-            compose_tool::compose_list_known,
-            compose_tool::compose_add_project,
-            compose_tool::compose_remove_project,
-            compose_tool::compose_ps,
-            compose_tool::compose_up,
-            compose_tool::compose_down,
-            compose_tool::compose_restart,
-            compose_tool::compose_stop,
-            compose_tool::compose_pull,
-            compose_tool::compose_config,
-            compose_tool::compose_logs_start,
-            compose_tool::compose_logs_stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

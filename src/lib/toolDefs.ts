@@ -185,7 +185,7 @@ export const TOOL_DEFS: ToolDef[] = [
     label: "Containers",
     icon: Container,
     description:
-      "Manage containers, images, volumes, and networks across Docker-compatible runtimes (colima, Docker Desktop, Rancher Desktop, OrbStack, Podman), plus full Docker Compose project management.",
+      "Manage containers, images, volumes, and networks across Docker-compatible runtimes (colima, Docker Desktop, Rancher Desktop, OrbStack, Podman), with Compose projects grouped read-only by container label.",
     keywords: ["docker", "colima", "podman", "rancher desktop", "orbstack", "container", "compose", "docker-compose", "image", "volume", "network", "dockerfile", "containerd"],
   },
   {

@@ -192,15 +192,6 @@ fn connect(c: &ContainerConnection) -> Result<Docker, String> {
         .map_err(|e| e.to_string())
 }
 
-/// `DOCKER_HOST`-shaped URL for this connection, used by compose_tool.rs to
-/// point the `docker compose` CLI at the same daemon the user selected here.
-pub fn docker_host_url(c: &ContainerConnection) -> String {
-    #[cfg(unix)]
-    { format!("unix://{}", c.socket_path) }
-    #[cfg(windows)]
-    { format!("npipe://{}", c.socket_path.replace('\\', "/")) }
-}
-
 #[tauri::command]
 pub async fn container_test_connection(config: ContainerConnection) -> Result<(), String> {
     let docker = connect(&config)?;
