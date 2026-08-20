@@ -52,6 +52,13 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
   const [error, setError] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
+  // Kept one render behind `logsTarget`: the Dialog itself stays mounted and
+  // driven by `open={!!logsTarget}` so Radix can play the exit animation
+  // (matching ContainerDetailsDialog below) instead of the whole subtree
+  // vanishing instantly when `logsTarget` goes back to null — this is what
+  // used to make the logs dialog feel inconsistent/laggy next to Details.
+  const [logsDialogTarget, setLogsDialogTarget] = useState<ContainerSummary | null>(null);
+  useEffect(() => { if (logsTarget) setLogsDialogTarget(logsTarget); }, [logsTarget]);
   const [detailsTarget, setDetailsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -250,49 +257,52 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
         )}
       </div>
 
-      {logsTarget && (
-        <Dialog open onOpenChange={(o) => { if (!o) setLogsTarget(null); }}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle className="font-mono text-sm">{containerName(logsTarget)}</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-end gap-1">
-                {logsTarget.State === 'running' ? (
-                  <Button variant="outline" size="sm" onClick={() => runAction(logsTarget.Id, () => containerApi.stop(connection, logsTarget.Id))}>
-                    <Square className="h-3.5 w-3.5 mr-1.5" /> Stop
+      <Dialog open={!!logsTarget} onOpenChange={(o) => { if (!o) setLogsTarget(null); }}>
+        <DialogContent className="max-w-3xl">
+          {logsDialogTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-mono text-sm">{containerName(logsDialogTarget)}</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-end gap-1">
+                  {logsDialogTarget.State === 'running' ? (
+                    <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.stop(connection, logsDialogTarget.Id))}>
+                      <Square className="h-3.5 w-3.5 mr-1.5" /> Stop
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.start(connection, logsDialogTarget.Id))}>
+                      <Play className="h-3.5 w-3.5 mr-1.5" /> Start
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.restart(connection, logsDialogTarget.Id))}>
+                    <RotateCw className="h-3.5 w-3.5 mr-1.5" /> Restart
                   </Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => runAction(logsTarget.Id, () => containerApi.start(connection, logsTarget.Id))}>
-                    <Play className="h-3.5 w-3.5 mr-1.5" /> Start
+                  {logsDialogTarget.State === 'running' ? (
+                    <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.pause(connection, logsDialogTarget.Id))}>
+                      <Pause className="h-3.5 w-3.5 mr-1.5" /> Pause
+                    </Button>
+                  ) : logsDialogTarget.State === 'paused' ? (
+                    <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.unpause(connection, logsDialogTarget.Id))}>
+                      <PlayCircle className="h-3.5 w-3.5 mr-1.5" /> Unpause
+                    </Button>
+                  ) : null}
+                  <Button variant="outline" size="sm" className="hover:text-bad" onClick={() => setRemoveTarget(logsDialogTarget)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove
                   </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => runAction(logsTarget.Id, () => containerApi.restart(connection, logsTarget.Id))}>
-                  <RotateCw className="h-3.5 w-3.5 mr-1.5" /> Restart
-                </Button>
-                {logsTarget.State === 'running' ? (
-                  <Button variant="outline" size="sm" onClick={() => runAction(logsTarget.Id, () => containerApi.pause(connection, logsTarget.Id))}>
-                    <Pause className="h-3.5 w-3.5 mr-1.5" /> Pause
-                  </Button>
-                ) : logsTarget.State === 'paused' ? (
-                  <Button variant="outline" size="sm" onClick={() => runAction(logsTarget.Id, () => containerApi.unpause(connection, logsTarget.Id))}>
-                    <PlayCircle className="h-3.5 w-3.5 mr-1.5" /> Unpause
-                  </Button>
-                ) : null}
-                <Button variant="outline" size="sm" className="hover:text-bad" onClick={() => setRemoveTarget(logsTarget)}>
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove
-                </Button>
+                </div>
+                <div className="h-[50vh] flex flex-col">
+                  <LogsPanel
+                    key={logsDialogTarget.Id}
+                    start={(tail, since, until, onLog) => containerApi.logsStart(connection, logsDialogTarget.Id, tail, since, until, onLog)}
+                    stop={containerApi.logsStop}
+                  />
+                </div>
               </div>
-              <div className="h-[50vh] flex flex-col">
-                <LogsPanel
-                  start={(onLog) => containerApi.logsStart(connection, logsTarget.Id, '500', onLog)}
-                  stop={containerApi.logsStop}
-                />
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={!!removeTarget}

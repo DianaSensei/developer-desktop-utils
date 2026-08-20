@@ -267,8 +267,9 @@ export const containerApi = {
   details: (config: ContainerConnection, containerId: string) =>
     invoke<ContainerDetails>('container_details', { config, containerId }),
 
-  logsStart: (config: ContainerConnection, containerId: string, tail: string, onLog: Channel<LogLine>) =>
-    invoke<string>('container_logs_start', { config, containerId, tail, onLog }),
+  /** `since`/`until` are Unix seconds; pass 0 for "no bound" on either. */
+  logsStart: (config: ContainerConnection, containerId: string, tail: string, since: number, until: number, onLog: Channel<LogLine>) =>
+    invoke<string>('container_logs_start', { config, containerId, tail, since, until, onLog }),
   logsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
 
   statsStart: (config: ContainerConnection, containerId: string, onStat: Channel<StatsFrame>) =>

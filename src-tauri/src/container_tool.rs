@@ -480,6 +480,8 @@ pub async fn container_logs_start(
     config: ContainerConnection,
     container_id: String,
     tail: String,
+    since: i32,
+    until: i32,
     on_log: Channel<LogLine>,
 ) -> Result<String, String> {
     let docker = connect(&config)?;
@@ -488,8 +490,9 @@ pub async fn container_logs_start(
         stdout: true,
         stderr: true,
         tail,
+        since,
+        until,
         timestamps: false,
-        ..Default::default()
     };
 
     let id = Uuid::new_v4().to_string();

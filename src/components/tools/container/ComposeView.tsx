@@ -59,6 +59,11 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyProject, setBusyProject] = useState<string | null>(null);
   const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
+  // See ContainersView for why this trails `logsTarget` by one render: it lets
+  // the Dialog stay mounted (`open={!!logsTarget}`) and animate its close
+  // instead of vanishing instantly when `logsTarget` clears.
+  const [logsDialogTarget, setLogsDialogTarget] = useState<ContainerSummary | null>(null);
+  useEffect(() => { if (logsTarget) setLogsDialogTarget(logsTarget); }, [logsTarget]);
   const [detailsTarget, setDetailsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
   const [downTarget, setDownTarget] = useState<ComposeProjectGroup | null>(null);
@@ -211,21 +216,24 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
         ))}
       </div>
 
-      {logsTarget && (
-        <Dialog open onOpenChange={(o) => { if (!o) setLogsTarget(null); }}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle className="font-mono text-sm">{containerName(logsTarget)}</DialogTitle>
-            </DialogHeader>
-            <div className="h-[50vh] flex flex-col">
-              <LogsPanel
-                start={(onLog) => containerApi.logsStart(connection, logsTarget.Id, '500', onLog)}
-                stop={containerApi.logsStop}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <Dialog open={!!logsTarget} onOpenChange={(o) => { if (!o) setLogsTarget(null); }}>
+        <DialogContent className="max-w-3xl">
+          {logsDialogTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-mono text-sm">{containerName(logsDialogTarget)}</DialogTitle>
+              </DialogHeader>
+              <div className="h-[50vh] flex flex-col">
+                <LogsPanel
+                  key={logsDialogTarget.Id}
+                  start={(tail, since, until, onLog) => containerApi.logsStart(connection, logsDialogTarget.Id, tail, since, until, onLog)}
+                  stop={containerApi.logsStop}
+                />
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={!!removeTarget}

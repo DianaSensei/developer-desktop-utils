@@ -63,9 +63,9 @@ export function LeftPanel(props: LeftPanelProps) {
       {/* Connection picker */}
       <div className="p-3 border-b shrink-0 space-y-2">
         <div className="flex items-center gap-1.5">
-          <Select value={selectedConnId} onValueChange={onSelectConn}>
+          <Select value={selectedConnId} onValueChange={onSelectConn} disabled={!connectionsLoading && connections.length === 0}>
             <SelectTrigger className="h-ctl text-xs">
-              <SelectValue placeholder={connectionsLoading ? 'Loading…' : 'Select connection'} />
+              <SelectValue placeholder={connectionsLoading ? 'Loading…' : connections.length === 0 ? 'No connections yet' : 'Select connection'} />
             </SelectTrigger>
             <SelectContent>
               {connections.map((c) => (
