@@ -176,13 +176,16 @@ export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed 
                 truncated={value.truncated}
                 onSet={(member, score) => runMutation(async () => {
                   await redisApi.exec(conn.id, db, ['ZADD', keyName, String(score), member]);
+                  // Not re-sorted: the initial fetch comes from ZSCAN, whose
+                  // order isn't guaranteed to be score-sorted, so sorting
+                  // only on edit would make the list suddenly reorder itself
+                  // in a way a plain Refresh wouldn't reproduce.
                   setValue((prev) => {
                     if (!prev || prev.type !== 'zset') return prev;
                     const idx = prev.members.findIndex(([m]) => m === member);
                     const members: [string, number][] = idx === -1
                       ? [...prev.members, [member, score]]
                       : prev.members.map((entry, i) => (i === idx ? [member, score] as [string, number] : entry));
-                    members.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
                     return { ...prev, members };
                   });
                 })}
