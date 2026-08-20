@@ -32,7 +32,7 @@ import { toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ExperimentalGate } from '@/components/ExperimentalGate';
-import { ExperimentalBadge, ExperimentalDot } from '@/components/ExperimentalBadge';
+import { ExperimentalDot, ExperimentalMark } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
@@ -275,11 +275,13 @@ function NavScrollArea({
                         `inline-flex` + `min-w-0` on both this row and the label
                         text below (not just `overflow-hidden` on one shared span)
                         so a long label truncates with an ellipsis while the group
-                        count / Experimental badge stay `shrink-0` and always render
-                        in full — a long label ("Containers") + the Experimental
-                        badge together used to exceed max-w-[160px] and get hard
-                        clipped mid-badge (no ellipsis), reading as a broken/
-                        overflowing pill instead of a trimmed label. */}
+                        count / Experimental mark stay `shrink-0` and always render
+                        in full — a long label ("Containers") + the old text badge
+                        together used to exceed max-w-[160px] and squeeze the label
+                        down to a sliver (no ellipsis), reading as the badge
+                        covering the item instead of a trimmed label. Now that the
+                        experimental flag is a bare glyph instead of a padded
+                        uppercase badge, it stays out of the label's way. */}
                     <span
                       className={cn(
                         'inline-flex min-w-0 items-center text-sm transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
@@ -295,7 +297,7 @@ function NavScrollArea({
                           {entry.tools.length}
                         </span>
                       )}
-                      {isExperimental && !isCollapsed && <ExperimentalBadge className="ml-1.5 shrink-0 align-middle" />}
+                      {isExperimental && !isCollapsed && <ExperimentalMark className="ml-1.5" />}
                     </span>
                     {/* Favourite toggle — pins the entry to the top of the list.
                         Hidden when collapsed (no room); a starred entry shows a

@@ -28,3 +28,14 @@ export function ExperimentalDot({ title }: { title?: string }) {
     />
   );
 }
+
+/** Expanded-sidebar equivalent: a bare flask glyph next to the label instead
+ *  of the full text badge. The row's label column is only ~160px and shares
+ *  it with the group count, so the uppercase "Experimental" badge (icon +
+ *  text + padding) could run 70-90px wide and squeeze the label down to a
+ *  sliver — reading as if the badge were covering the item. The tooltip on
+ *  the row already spells out "<label> — experimental" on hover, so the
+ *  glyph only needs to flag the state, not restate it. */
+export function ExperimentalMark({ className }: { className?: string }) {
+  return <FlaskConical className={cn('h-3 w-3 shrink-0 text-warn', className)} />;
+}
