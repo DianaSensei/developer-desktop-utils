@@ -108,7 +108,6 @@ pub struct DetectedSocket {
 #[tauri::command]
 pub async fn container_detect_sockets() -> Result<Vec<DetectedSocket>, String> {
     let mut found = Vec::new();
-    let home = dirs_home();
 
     if let Ok(host) = std::env::var("DOCKER_HOST") {
         let path = host
@@ -122,6 +121,7 @@ pub async fn container_detect_sockets() -> Result<Vec<DetectedSocket>, String> {
 
     #[cfg(unix)]
     {
+        let home = dirs_home();
         let candidates: Vec<(String, std::path::PathBuf)> = {
             let mut v = vec![
                 ("Docker Desktop".to_string(), home.join(".docker/run/docker.sock")),
@@ -169,9 +169,9 @@ pub async fn container_detect_sockets() -> Result<Vec<DetectedSocket>, String> {
     Ok(found)
 }
 
+#[cfg(unix)]
 fn dirs_home() -> std::path::PathBuf {
     std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
         .map(std::path::PathBuf::from)
         .unwrap_or_default()
 }
