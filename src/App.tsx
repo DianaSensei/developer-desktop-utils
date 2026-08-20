@@ -247,7 +247,7 @@ function NavScrollArea({
                     to={path}
                     onClick={onClose}
                     className={cn(
-                      'group relative flex w-full items-center rounded-sm px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-200 ease-out',
+                      'group relative flex w-full items-center rounded-sm px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                       isCollapsed ? 'justify-center' : 'gap-2.5',
                       isActive
                         ? 'bg-acc-tint text-acc-ink font-medium'
@@ -284,7 +284,7 @@ function NavScrollArea({
                         uppercase badge, it stays out of the label's way. */}
                     <span
                       className={cn(
-                        'inline-flex min-w-0 items-center text-sm transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                        'inline-flex min-w-0 items-center text-sm transition-[max-width,opacity] duration-slow ease-out-soft motion-reduce:transition-none',
                         isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
                         isActive && 'font-medium'
                       )}
@@ -322,7 +322,7 @@ function NavScrollArea({
                           }
                         }}
                         className={cn(
-                          'ml-auto shrink-0 rounded-xs p-0.5 transition-colors duration-150',
+                          'ml-auto shrink-0 rounded-xs p-0.5 transition-colors duration-fast ease-out-soft',
                           fav
                             ? 'text-warn opacity-100'
                             : 'text-fg-mute/50 opacity-0 hover:text-warn group-hover:opacity-100 focus-visible:opacity-100'
@@ -354,7 +354,7 @@ function NavScrollArea({
                   <button
                     type="button"
                     onClick={() => onEnableTool(tool)}
-                    className="group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-fg-mute/70 transition-[color,background-color] duration-200 ease-out hover:text-fg hover:bg-fg/[0.05]"
+                    className="group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-fg-mute/70 transition-[color,background-color] duration-base ease-out-soft hover:text-fg hover:bg-fg/[0.05]"
                   >
                     <Icon className="h-4 w-4 flex-shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
                     <span className="flex-1 truncate text-sm">{tool.label}</span>
@@ -506,7 +506,7 @@ function Sidebar({
           Always rendered so the fade plays on close too, not just open. */}
       <div
         className={cn(
-          'fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 lg:hidden transition-opacity duration-300 ease-in-out',
+          'fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 lg:hidden transition-opacity duration-slow ease-out-soft',
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         )}
         onClick={onClose}
@@ -514,7 +514,7 @@ function Sidebar({
       />
       <aside
         className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-chrome transition-[width,transform] duration-300 ease-in-out flex flex-col',
+          'fixed lg:sticky top-0 left-0 z-50 h-full sidebar-chrome transition-[width,transform] duration-slow ease-out-soft flex flex-col',
           isCollapsed ? 'w-14' : 'w-56',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
@@ -538,7 +538,7 @@ function Sidebar({
               <AppLogo size={30} />
               <h1
                 className={cn(
-                  'whitespace-nowrap overflow-hidden text-sm font-semibold leading-none transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                  'whitespace-nowrap overflow-hidden text-sm font-semibold leading-none transition-[max-width,opacity] duration-slow ease-out-soft motion-reduce:transition-none',
                   isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'
                 )}
               >
@@ -621,7 +621,7 @@ function Sidebar({
               {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronLeft className="h-4 w-4 shrink-0" />}
               <span
                 className={cn(
-                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-slow ease-out-soft motion-reduce:transition-none',
                   isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
                 )}
               >
@@ -644,7 +644,7 @@ function Sidebar({
               <ThemeIcon className="h-4 w-4 shrink-0" />
               <span
                 className={cn(
-                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-slow ease-out-soft motion-reduce:transition-none',
                   isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
                 )}
               >
@@ -660,7 +660,7 @@ function Sidebar({
               onClick={onClose}
               title={t('shell.sidebar.settings')}
               className={cn(
-                'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-200 ease-out',
+                'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                 isCollapsed ? 'justify-center' : 'gap-2.5',
                 isSettingsActive
                   ? 'bg-acc/10 text-acc font-medium'
@@ -668,14 +668,14 @@ function Sidebar({
               )}
             >
               <span className="relative shrink-0">
-                <SettingsIcon className="h-4 w-4 transition-transform duration-200 ease-out motion-safe:group-hover:scale-110" />
+                <SettingsIcon className="h-4 w-4 transition-transform duration-base ease-out-soft motion-safe:group-hover:scale-110" />
                 {updateAvailable && (
                   <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-ok ring-1 ring-bg" />
                 )}
               </span>
               <span
                 className={cn(
-                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out motion-reduce:transition-none',
+                  'text-sm whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-slow ease-out-soft motion-reduce:transition-none',
                   isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100',
                   isSettingsActive && 'font-medium'
                 )}
@@ -827,7 +827,7 @@ function AppContent() {
           twice for the same tool was redundant. */}
       <div
         key={activeTool.path}
-        className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+        className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
       >
         <ActiveIcon className="h-3.5 w-3.5 text-acc" />
       </div>
@@ -836,7 +836,7 @@ function AppContent() {
           key={`${activeTool.path}-tabs`}
           role="tablist"
           aria-label={activeGroup!.label}
-          className="inline-flex h-6 shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+          className="inline-flex h-6 shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
         >
           {activeGroupTabs.map((def) => {
               const p = toolPath(def.id);
@@ -882,7 +882,7 @@ function AppContent() {
       ) : (
         <div
           key={`${activeTool.path}-label`}
-          className="inline-flex h-6 shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+          className="inline-flex h-6 shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
         >
           <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap rounded-sm bg-acc px-2 text-xs font-semibold leading-none text-acc-fg shadow-soft">
             {activeTool.label}
@@ -1047,7 +1047,7 @@ function AppContent() {
                   hiện hai chấm cho cùng một tool là thừa. */}
               <div
                 key={activeTool.path}
-                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-200"
+                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
               >
                 <ActiveIcon className="h-4 w-4 text-acc" />
               </div>
@@ -1067,7 +1067,7 @@ function AppContent() {
                   key={`${activeTool.path}-tabs`}
                   role="tablist"
                   aria-label={activeGroup!.label}
-                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
                 >
                   {activeGroupTabs.map((def) => {
                       const p = toolPath(def.id);
@@ -1106,7 +1106,7 @@ function AppContent() {
               ) : (
                 <div
                   key={`${activeTool.path}-label`}
-                  className="inline-flex h-ctl shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200"
+                  className="inline-flex h-ctl shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
                 >
                   <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap rounded-sm bg-acc px-3.5 text-sm font-semibold leading-none text-acc-fg shadow-soft sm:text-base">
                     {activeTool.label}
@@ -1154,7 +1154,7 @@ function AppContent() {
         {isFullHeight ? (
           <div className="flex-1 min-h-0 overflow-hidden">
             {/* key on pathname re-triggers the entrance animation on each tool switch */}
-            <div key={location.pathname} className="h-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200 motion-safe:ease-out">
+            <div key={location.pathname} className="h-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft">
               {routes}
             </div>
           </div>
@@ -1162,7 +1162,7 @@ function AppContent() {
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div
               key={location.pathname}
-              className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 motion-safe:ease-out"
+              className="mx-auto w-full max-w-6xl p-3 sm:p-4 lg:p-5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-slow motion-safe:ease-out-soft"
             >
               {routes}
             </div>

@@ -178,7 +178,7 @@ export function DropdownMenuContent({ align = 'start', className, children }: Dr
       style={{ position: 'fixed', top: pos.top, left: pos.left, right: pos.right }}
       className={cn(
         'z-50 min-w-[10rem] rounded-lg border border-line bg-card p-1 shadow-md',
-        'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-150',
+        'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-fast motion-safe:ease-out-soft',
         className,
       )}
     >

@@ -95,7 +95,7 @@ export function LogsPanel({ start, stop }: {
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder="Search logs…"
-            className="h-7 w-full rounded-sm border border-sunk bg-card pl-7 pr-7 text-xs placeholder:text-fg-mute focus:outline-none focus:border-acc/60 focus:ring-2 focus:ring-acc/35"
+            className="h-ctl w-full rounded-sm border border-sunk bg-card pl-7 pr-7 text-xs placeholder:text-fg-mute focus:outline-none focus:border-acc/60 focus:ring-2 focus:ring-acc/35"
           />
           {keyword && (
             <button
@@ -112,7 +112,7 @@ export function LogsPanel({ start, stop }: {
           value={tail}
           onChange={(e) => setTail(e.target.value)}
           title="Lines to load"
-          className="h-7 rounded-sm border border-sunk bg-card px-1.5 text-[11px] focus:outline-none focus:border-acc/60 focus:ring-2 focus:ring-acc/35"
+          className="h-ctl rounded-sm border border-sunk bg-card px-1.5 text-[11px] focus:outline-none focus:border-acc/60 focus:ring-2 focus:ring-acc/35"
         >
           {TAIL_OPTIONS.map((t) => (
             <option key={t} value={t}>{t === 'all' ? 'All lines' : `Last ${t}`}</option>
@@ -123,7 +123,7 @@ export function LogsPanel({ start, stop }: {
           value={sinceLocal}
           onChange={(e) => setSinceLocal(e.target.value)}
           title="Only show logs since"
-          className="h-7 rounded-sm border border-sunk bg-card px-1.5 text-[11px] text-fg-mute focus:outline-none focus:border-acc/60 focus:ring-2 focus:ring-acc/35"
+          className="h-ctl rounded-sm border border-sunk bg-card px-1.5 text-[11px] text-fg-mute focus:outline-none focus:border-acc/60 focus:ring-2 focus:ring-acc/35"
         />
         <span className="text-[11px] text-fg-mute">–</span>
         <input
@@ -131,7 +131,7 @@ export function LogsPanel({ start, stop }: {
           value={untilLocal}
           onChange={(e) => setUntilLocal(e.target.value)}
           title="Only show logs until"
-          className="h-7 rounded-sm border border-sunk bg-card px-1.5 text-[11px] text-fg-mute focus:outline-none focus:border-acc/60 focus:ring-2 focus:ring-acc/35"
+          className="h-ctl rounded-sm border border-sunk bg-card px-1.5 text-[11px] text-fg-mute focus:outline-none focus:border-acc/60 focus:ring-2 focus:ring-acc/35"
         />
         <LogToggleButton
           active={follow}
@@ -188,7 +188,7 @@ function LogToggleButton({ active, onClick, title, children }: {
       title={title}
       onClick={onClick}
       className={cn(
-        'inline-flex h-7 shrink-0 items-center gap-1 rounded-sm border px-2 text-[11px] font-medium transition-colors',
+        'inline-flex h-ctl shrink-0 items-center gap-1 rounded-sm border px-2 text-[11px] font-medium transition-colors duration-fast ease-out-soft',
         active ? 'border-acc/40 bg-acc/10 text-acc' : 'border-sunk text-fg-mute hover:text-fg',
       )}
     >

@@ -423,7 +423,7 @@ export function LuckyWheel() {
           {winner && (
             <div
               key={`${winner}-${history.length}`}
-              className="flex h-full items-center gap-2.5 rounded-md border border-ok-edge bg-ok-tint px-3 animate-in fade-in zoom-in-95 duration-300"
+              className="flex h-full items-center gap-2.5 rounded-md border border-ok-edge bg-ok-tint px-3 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-base motion-safe:ease-spring"
             >
               <Trophy className="h-5 w-5 shrink-0 text-ok" />
               <div className="min-w-0">

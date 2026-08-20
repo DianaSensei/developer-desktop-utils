@@ -110,8 +110,13 @@ module.exports = {
         },
       },
       animation: {
-        'accordion-down': 'accordion-down .2s ease-out',
-        'accordion-up': 'accordion-up .2s ease-out',
+        // One tempo scale: reference the same --dur-base/--ease-out-soft
+        // tokens everything else uses, instead of a hardcoded .2s ease-out
+        // that drifts from them by coincidence rather than by reference.
+        'accordion-down': 'accordion-down var(--dur-base) var(--ease-out-soft)',
+        'accordion-up': 'accordion-up var(--dur-base) var(--ease-out-soft)',
+        // Continuous indeterminate sweep, not an entrance/exit — its 1.1s
+        // linear-ish loop is a deliberate pace unrelated to the UI tempo scale.
         'progress-indeterminate': 'progress-indeterminate 1.1s ease-in-out infinite',
       },
     },
