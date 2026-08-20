@@ -27,6 +27,7 @@ import { useAppConfig } from '@/contexts/AppConfigContext';
 import { CONFIG_FIELDS, SECTION_LABELS, type ConfigSection } from '@/config/appConfig';
 import { useUpdate } from '@/contexts/UpdateContext';
 import { AppLogo } from '@/components/AppLogo';
+import { ExperimentalBadge } from '@/components/ExperimentalBadge';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 
 /** Format an hour (0–23) as a friendly 12-hour label, e.g. 6 → "6:00 AM". */
@@ -133,7 +134,10 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
     <>
       <Icon className={cn('h-4 w-4 shrink-0', enabled ? 'text-acc' : 'text-fg-mute')} />
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium leading-none">{tool.label}</p>
+        <p className="text-xs font-medium leading-none flex items-center gap-1.5">
+          {tool.label}
+          {tool.experimental && <ExperimentalBadge />}
+        </p>
         <p className="text-[11px] text-fg-mute mt-1 leading-relaxed">{tool.description}</p>
       </div>
       {/* Favourite — pins the tool to the top of the sidebar */}

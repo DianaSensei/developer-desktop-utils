@@ -80,9 +80,10 @@ export const allTools = [
     icon: def.icon,
     description: def.description,
     keywords: def.keywords ?? [],
+    experimental: def.experimental ?? false,
     ...TOOL_ROUTES[def.id],
   })),
-  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', keywords: ['preferences', 'options', 'config'], path: '/settings', component: Settings },
+  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', keywords: ['preferences', 'options', 'config'], experimental: false, path: '/settings', component: Settings },
 ];
 
 /** id tool → đường dẫn route. Bao gồm cả 'settings', không có trong TOOL_DEFS. */
