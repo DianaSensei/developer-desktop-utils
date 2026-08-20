@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { containerApi, type ContainerConnection, type ImageSummary, type PullProgress } from './types';
+import { useSort } from './useSort';
 
 function formatBytes(n?: number): string {
   if (!n) return '0 B';
@@ -45,10 +46,15 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
   useEffect(() => { load(); }, [connection, refreshKey]); // eslint-disable-line
 
   const f = filter.trim().toLowerCase();
-  const rows = useMemo(
+  const filtered = useMemo(
     () => (images ?? []).filter((img) => (img.RepoTags ?? []).some((t) => t.toLowerCase().includes(f)) || img.Id.toLowerCase().includes(f)),
     [images, f],
   );
+  const { sorted: rows, toggleSort, directionFor } = useSort(filtered, {
+    repo: (img) => (img.RepoTags ?? ['<none>:<none>']).join(', '),
+    id: (img) => img.Id,
+    size: (img) => img.Size ?? 0,
+  });
 
   return (
     <div className="tool-full-height">
@@ -78,9 +84,9 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
               <DataTable>
                 <Thead>
                   <Tr>
-                    <Th>Repository:Tag</Th>
-                    <Th>Image ID</Th>
-                    <Th align="right">Size</Th>
+                    <Th sortDirection={directionFor('repo')} onSortClick={() => toggleSort('repo')}>Repository:Tag</Th>
+                    <Th sortDirection={directionFor('id')} onSortClick={() => toggleSort('id')}>Image ID</Th>
+                    <Th align="right" sortDirection={directionFor('size')} onSortClick={() => toggleSort('size')}>Size</Th>
                     <Th align="right"></Th>
                   </Tr>
                 </Thead>

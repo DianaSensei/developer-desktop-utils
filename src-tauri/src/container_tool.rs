@@ -176,13 +176,34 @@ fn dirs_home() -> std::path::PathBuf {
         .unwrap_or_default()
 }
 
+/// Expands a leading `~` (or `~/...`) to the user's home directory, the same
+/// shorthand every shell supports — the OS/bollard socket connector never
+/// does this itself, so a path pasted straight from a terminal (`~/.colima/
+/// default/docker.sock`) would otherwise fail to resolve.
+#[cfg(unix)]
+fn expand_socket_path(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix("~/") {
+        let home = dirs_home();
+        if !home.as_os_str().is_empty() {
+            return home.join(rest).to_string_lossy().to_string();
+        }
+    } else if path == "~" {
+        let home = dirs_home();
+        if !home.as_os_str().is_empty() {
+            return home.to_string_lossy().to_string();
+        }
+    }
+    path.to_string()
+}
+
 // ── Connect ──────────────────────────────────────────────────────────────
 
 const CONNECT_TIMEOUT_SECS: u64 = 6;
 
 #[cfg(unix)]
 fn connect(c: &ContainerConnection) -> Result<Docker, String> {
-    Docker::connect_with_unix(&c.socket_path, CONNECT_TIMEOUT_SECS, bollard::API_DEFAULT_VERSION)
+    let path = expand_socket_path(&c.socket_path);
+    Docker::connect_with_unix(&path, CONNECT_TIMEOUT_SECS, bollard::API_DEFAULT_VERSION)
         .map_err(|e| e.to_string())
 }
 

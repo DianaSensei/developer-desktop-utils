@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { containerApi, type ContainerConnection, type VolumeInfo } from './types';
+import { useSort } from './useSort';
 
 export function VolumesView({ connection, refreshKey, onRefresh }: {
   connection: ContainerConnection;
@@ -35,7 +36,12 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
   useEffect(() => { load(); }, [connection, refreshKey]); // eslint-disable-line
 
   const f = filter.trim().toLowerCase();
-  const rows = useMemo(() => (volumes ?? []).filter((v) => v.Name.toLowerCase().includes(f)), [volumes, f]);
+  const filtered = useMemo(() => (volumes ?? []).filter((v) => v.Name.toLowerCase().includes(f)), [volumes, f]);
+  const { sorted: rows, toggleSort, directionFor } = useSort(filtered, {
+    name: (v) => v.Name,
+    driver: (v) => v.Driver,
+    mountpoint: (v) => v.Mountpoint,
+  });
 
   return (
     <div className="tool-full-height">
@@ -65,9 +71,9 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
               <DataTable>
                 <Thead>
                   <Tr>
-                    <Th>Name</Th>
-                    <Th>Driver</Th>
-                    <Th>Mountpoint</Th>
+                    <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
+                    <Th sortDirection={directionFor('driver')} onSortClick={() => toggleSort('driver')}>Driver</Th>
+                    <Th sortDirection={directionFor('mountpoint')} onSortClick={() => toggleSort('mountpoint')}>Mountpoint</Th>
                     <Th align="right"></Th>
                   </Tr>
                 </Thead>

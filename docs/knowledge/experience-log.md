@@ -1,5 +1,27 @@
 # Experience log
 
+## [2026-08-20] container tool — `cargo check` on Linux CAN be unblocked by installing GTK/WebKit dev libs as root
+- Nguyên nhân: một entry log trước đó (redis-tool, cùng ngày) khẳng định "sandbox này không
+  dựng được toàn bộ Tauri app trên Linux vì thiếu GTK/WebKit system libs" và né tránh bằng
+  cách viết crate scratch riêng ngoài `src-tauri`. Khi thêm tính năng mới cho container tool
+  (multi-select bulk actions, compose "Down", sort cột, mở rộng `~` cho socket path trong
+  `container_tool.rs`), `cargo check` thất bại ngay ở bước build `gdk-sys` với lỗi pkg-config
+  không tìm thấy `gdk-3.0`.
+- Số lần thử: 1/1 — trước khi chấp nhận lại giới hạn "không compile được", đã thử
+  `apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+  librsvg2-dev libsoup-3.0-dev` (session chạy với uid=0/root, có `apt-get`/`sudo`) trước khi
+  bỏ cuộc.
+- Kết quả: Đã fix — `cargo check` compile sạch toàn bộ crate (kể cả `container_tool.rs`,
+  `redis_tool.rs`, `rabbit.rs`, `kafka.rs`, ...) không còn lỗi/cảnh báo.
+- Cách fix: cài các Tauri Linux build deps chuẩn (GTK3, WebKit2GTK 4.1, libayatana-appindicator3,
+  librsvg2, libsoup-3.0) bằng `apt-get` trước khi chạy `cargo check`/`cargo build`. `npm run
+  build` (frontend) không cần bước này — nó luôn chạy được độc lập.
+- Bài học chung: đừng coi một giới hạn môi trường ghi trong log trước là vĩnh viễn đúng cho
+  mọi session — nếu session hiện tại chạy quyền root và có `apt-get`, hãy thử cài system
+  dependency còn thiếu (chi phí một lần cài, ~1-2 phút) trước khi né tránh bằng cách không
+  compile-test code Rust thật. Xác minh bằng compile thật luôn đáng tin hơn đọc code tĩnh,
+  đặc biệt với thay đổi Rust có thể có lỗi type/borrow không lộ ra khi chỉ đọc diff.
+
 ## [2026-08-14] api-client — placeholder/hint rendering broken across CodeSurface editors
 - Nguyên nhân: `CodeSurface` (`code-editor-base.tsx`, dùng cho JsonEditor/JavaScriptEditor/
   TextEditor — tức Body JSON, Script pre/post-request, Tests, GraphQL query/variables) tự vẽ

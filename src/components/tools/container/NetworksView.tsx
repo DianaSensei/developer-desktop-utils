@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { containerApi, type ContainerConnection, type NetworkInfo } from './types';
+import { useSort } from './useSort';
 
 const BUILTIN_NETWORKS = new Set(['bridge', 'host', 'none']);
 
@@ -37,7 +38,12 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
   useEffect(() => { load(); }, [connection, refreshKey]); // eslint-disable-line
 
   const f = filter.trim().toLowerCase();
-  const rows = useMemo(() => (networks ?? []).filter((n) => n.Name.toLowerCase().includes(f)), [networks, f]);
+  const filtered = useMemo(() => (networks ?? []).filter((n) => n.Name.toLowerCase().includes(f)), [networks, f]);
+  const { sorted: rows, toggleSort, directionFor } = useSort(filtered, {
+    name: (n) => n.Name,
+    driver: (n) => n.Driver ?? '',
+    scope: (n) => n.Scope ?? '',
+  });
 
   return (
     <div className="tool-full-height">
@@ -67,9 +73,9 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
               <DataTable>
                 <Thead>
                   <Tr>
-                    <Th>Name</Th>
-                    <Th>Driver</Th>
-                    <Th>Scope</Th>
+                    <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
+                    <Th sortDirection={directionFor('driver')} onSortClick={() => toggleSort('driver')}>Driver</Th>
+                    <Th sortDirection={directionFor('scope')} onSortClick={() => toggleSort('scope')}>Scope</Th>
                     <Th align="right"></Th>
                   </Tr>
                 </Thead>

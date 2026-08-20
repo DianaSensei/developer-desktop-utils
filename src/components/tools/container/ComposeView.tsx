@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText } from 'lucide-react';
+import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText, PowerOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ViewHeader } from '@/components/ui/view-header';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
-import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { DataTable, Thead, Tbody, Tr, Th, Td, type SortDirection } from '@/components/ui/data-table';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import {
   containerApi, groupByComposeProject, COMPOSE_LABELS,
-  type ContainerConnection, type ContainerSummary,
+  type ContainerConnection, type ContainerSummary, type ComposeProjectGroup,
 } from './types';
 import { LogsPanel } from './LogsPanel';
 
@@ -32,17 +32,20 @@ function containerName(c: ContainerSummary): string {
 /**
  * Compose projects are not a Docker Engine API object — there is no daemon
  * endpoint for "list compose projects", so this view is deliberately
- * read/act-only: it groups the containers container_list already returns by
+ * grouping-only: it groups the containers container_list already returns by
  * the com.docker.compose.project label docker compose stamps on them (the
  * same technique tools like OrbStack use for their compose grouping), and
  * every action (start/stop/restart/remove/logs) reuses the plain per-
- * container bollard commands from container_tool.rs.
+ * container bollard commands from container_tool.rs. The project-level
+ * "Down" action is the same technique applied to every container in the
+ * group — stop then force-remove — not `docker compose down`, so it never
+ * touches compose-managed networks/volumes, only the containers.
  *
- * What's intentionally missing: `up`/`down`/`build`/`pull` for a project.
- * Those require parsing and orchestrating a compose YAML file client-side —
- * logic the Docker Engine API has no equivalent for — so they are out of
- * scope until that's built natively (see conversation/ADR for the
- * shell-vs-native tradeoff).
+ * What's intentionally missing: `up`/`build`/`pull` for a project. Those
+ * require parsing and orchestrating a compose YAML file client-side — logic
+ * the Docker Engine API has no equivalent for — so they are out of scope
+ * until that's built natively (see conversation/ADR for the shell-vs-native
+ * tradeoff).
  */
 export function ComposeView({ connection, refreshKey, onRefresh }: {
   connection: ContainerConnection;
@@ -53,8 +56,12 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyProject, setBusyProject] = useState<string | null>(null);
   const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
+  const [downTarget, setDownTarget] = useState<ComposeProjectGroup | null>(null);
+  const [sortKey, setSortKey] = useState<'service' | 'state' | 'status' | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>('asc');
 
   const load = () => {
     setLoading(true);
@@ -81,12 +88,50 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
     }
   };
 
+  const runDown = async (project: ComposeProjectGroup) => {
+    setBusyProject(project.name);
+    setError(null);
+    const results = await Promise.allSettled(project.containers.map(async (c) => {
+      if (c.State === 'running' || c.State === 'paused') {
+        await containerApi.stop(connection, c.Id).catch(() => {});
+      }
+      await containerApi.remove(connection, c.Id, true);
+    }));
+    const failed = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (failed.length > 0) {
+      const first = failed[0].reason;
+      setError(`${failed.length} of ${project.containers.length} failed — ${String(first instanceof Error ? first.message : first)}`);
+    }
+    setBusyProject(null);
+    load();
+  };
+
+  const toggleSort = (key: 'service' | 'state' | 'status') => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+  const directionFor = (key: 'service' | 'state' | 'status'): SortDirection | null => (sortKey === key ? sortDir : null);
+  const sortValue = (c: ContainerSummary, key: 'service' | 'state' | 'status'): string => {
+    if (key === 'service') return c.Labels?.[COMPOSE_LABELS.service] ?? containerName(c);
+    if (key === 'state') return c.State ?? '';
+    return c.Status ?? '';
+  };
+  const sortContainers = (list: ContainerSummary[]): ContainerSummary[] => {
+    if (!sortKey) return list;
+    const copy = [...list];
+    copy.sort((a, b) => {
+      const cmp = sortValue(a, sortKey).localeCompare(sortValue(b, sortKey));
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return copy;
+  };
+
   return (
     <div className="tool-full-height">
       <ViewHeader
         icon={FileStack}
         title="Compose"
-        subtitle={`${projects.length} projects · grouped by container label, read-only for now`}
+        subtitle={`${projects.length} projects · grouped by container label`}
         actions={<Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>}
       />
 
@@ -103,16 +148,30 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
 
         {projects.map((p) => (
           <div key={p.name} className="rounded-lg border border-line/50 overflow-hidden">
-            <div className="px-3.5 py-2.5 bg-bg-2/20 border-b border-line/50">
-              <p className="text-sm font-medium">{p.name}</p>
-              {p.workingDir && <p className="text-[11px] text-fg-mute font-mono truncate">{p.workingDir}</p>}
+            <div className="px-3.5 py-2.5 bg-bg-2/20 border-b border-line/50 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{p.name}</p>
+                {p.workingDir && <p className="text-[11px] text-fg-mute font-mono truncate">{p.workingDir}</p>}
+              </div>
+              <Button
+                variant="outline" size="sm" className="shrink-0 hover:text-bad"
+                disabled={busyProject === p.name}
+                onClick={() => setDownTarget(p)}
+              >
+                <PowerOff className="h-3.5 w-3.5 mr-1.5" /> Down
+              </Button>
             </div>
             <DataTable density="compact" containerClassName="rounded-none border-0">
               <Thead>
-                <Tr><Th>Service</Th><Th>State</Th><Th>Status</Th><Th align="right"></Th></Tr>
+                <Tr>
+                  <Th sortDirection={directionFor('service')} onSortClick={() => toggleSort('service')}>Service</Th>
+                  <Th sortDirection={directionFor('state')} onSortClick={() => toggleSort('state')}>State</Th>
+                  <Th sortDirection={directionFor('status')} onSortClick={() => toggleSort('status')}>Status</Th>
+                  <Th align="right"></Th>
+                </Tr>
               </Thead>
               <Tbody>
-                {p.containers.map((c) => (
+                {sortContainers(p.containers).map((c) => (
                   <Tr key={c.Id}>
                     <Td mono>{c.Labels?.[COMPOSE_LABELS.service] ?? containerName(c)}</Td>
                     <Td><Badge tone={stateTone(c.State)}>{c.State ?? 'unknown'}</Badge></Td>
@@ -173,6 +232,19 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
           if (!removeTarget) return;
           await runAction(removeTarget.Id, () => containerApi.remove(connection, removeTarget.Id, true));
           setRemoveTarget(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!downTarget}
+        onOpenChange={(o) => { if (!o) setDownTarget(null); }}
+        title="Down this project?"
+        description={downTarget ? `Stop and remove all ${downTarget.containers.length} container(s) in "${downTarget.name}". This cannot be undone.` : ''}
+        confirmLabel="Down"
+        onConfirm={async () => {
+          if (!downTarget) return;
+          await runDown(downTarget);
+          setDownTarget(null);
         }}
       />
     </div>
