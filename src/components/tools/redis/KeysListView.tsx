@@ -14,7 +14,7 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
 import type { RedisConnection, KeySummary } from './types';
 import { redisApi } from './types';
-import { ConfirmDialog } from './ConfirmDialog';
+import { MathConfirmDialog } from './MathConfirmDialog';
 
 interface KeysListViewProps {
   conn: RedisConnection;
@@ -163,7 +163,7 @@ export function KeysListView({ conn, db, refreshKey, onRefresh, onSelectKey }: K
         onCreated={(key) => { onRefresh(); onSelectKey(key); }}
       />
 
-      <ConfirmDialog
+      <MathConfirmDialog
         open={pendingDelete != null}
         onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
         title="Delete key?"

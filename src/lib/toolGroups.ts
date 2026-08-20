@@ -83,7 +83,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
     id: 'g-brokers',
     label: 'Brokers',
     icon: Radio,
-    toolIds: ['kafka-explorer', 'rabbit-client'],
+    toolIds: ['kafka-explorer', 'rabbit-client', 'redis-client'],
   },
 ];
 

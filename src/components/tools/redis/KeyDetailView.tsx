@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import type { RedisConnection, KeyValue } from './types';
 import { redisApi } from './types';
-import { ConfirmDialog } from './ConfirmDialog';
+import { MathConfirmDialog } from './MathConfirmDialog';
 
 interface KeyDetailViewProps {
   conn: RedisConnection;
@@ -134,7 +134,7 @@ export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed 
         )}
       </div>
 
-      <ConfirmDialog
+      <MathConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete key?"
@@ -250,7 +250,7 @@ function HashEditor({ fields, truncated, onSetField, onDeleteField }: {
               <Td mono>
                 <Input
                   defaultValue={v}
-                  className="h-7 font-mono text-xs"
+                  className="h-ctl font-mono text-xs"
                   onBlur={(e) => { if (e.target.value !== v) void onSetField(f, e.target.value); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                 />
@@ -378,7 +378,7 @@ function ZsetEditor({ members, truncated, onSet, onRemove }: {
               <Td align="right">
                 <Input
                   defaultValue={s}
-                  className="h-7 w-24 font-mono text-xs text-right ml-auto"
+                  className="h-ctl w-24 font-mono text-xs text-right ml-auto"
                   onBlur={(e) => { const n = Number(e.target.value); if (Number.isFinite(n) && n !== s) void onSet(m, n); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                 />
