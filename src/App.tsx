@@ -858,8 +858,21 @@ function AppContent() {
                   {/* Sibling tool tabs (Kafka/RabbitMQ/Redis…) can each be live
                       independently of which one is currently open — without
                       this dot, switching away from a connected tool hides any
-                      sign it's still running until you click back into it. */}
-                  {live && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" title={t('shell.titlebar.running')} />}
+                      sign it's still running until you click back into it.
+
+                      The ring only shows on the SELECTED tab: that's the one
+                      sitting on a full-strength `bg-acc` fill, where an
+                      accent tone close to --ok's green hue can nearly swallow
+                      the plain dot. `ring-acc-fg` is the same token the tab
+                      label's own text already leans on for contrast against
+                      that fill, so the ring stays legible for every accent
+                      color instead of just the ones far enough from green. */}
+                  {live && (
+                    <span
+                      className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-ok', on && 'ring-2 ring-acc-fg/70')}
+                      title={t('shell.titlebar.running')}
+                    />
+                  )}
                   {def.label}
                 </Link>
               );
@@ -1083,8 +1096,15 @@ function AppContent() {
                         >
                           {/* Xem chú thích ở khối titlebarNav phía trên — cùng lý
                               do: tab anh em (Kafka/RabbitMQ/Redis…) có thể đang
-                              live độc lập với tab đang mở. */}
-                          {live && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" title={t('shell.titlebar.running')} />}
+                              live độc lập với tab đang mở, và cùng cách sửa:
+                              viền ring-acc-fg chỉ khi được chọn, để chấm không
+                              chìm vào nền bg-acc khi accent ngả sắc xanh lá. */}
+                          {live && (
+                            <span
+                              className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-ok', on && 'ring-2 ring-acc-fg/70')}
+                              title={t('shell.titlebar.running')}
+                            />
+                          )}
                           {def.label}
                         </Link>
                       );
