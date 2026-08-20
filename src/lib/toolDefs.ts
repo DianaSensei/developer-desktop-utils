@@ -189,6 +189,7 @@ export const TOOL_DEFS: ToolDef[] = [
     description:
       "Redis client: browse and edit keys (string, hash, list, set, sorted set), inspect server info, and run raw commands from a CLI console.",
     keywords: ["redis", "cache", "key-value", "kv", "hash", "sorted set", "zset", "ttl", "expire", "scan", "cli", "in-memory"],
+    experimental: true,
   },
   {
     id: "container-manager",
