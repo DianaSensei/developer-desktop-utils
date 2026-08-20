@@ -23,6 +23,7 @@ import {
   ServerCog,
   ArrowLeftRight,
   Rabbit,
+  MemoryStick,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -171,6 +172,14 @@ export const TOOL_DEFS: ToolDef[] = [
     keywords: ["rabbitmq", "rabbit", "amqp", "queue", "exchange", "message broker", "management", "vhost", "binding", "publish", "consume", "broker"],
   },
   {
+    id: "redis-client",
+    label: "Redis",
+    icon: MemoryStick,
+    description:
+      "Redis client: browse and edit keys (string, hash, list, set, sorted set), inspect server info, and run raw commands from a CLI console.",
+    keywords: ["redis", "cache", "key-value", "kv", "hash", "sorted set", "zset", "ttl", "expire", "scan", "cli", "in-memory"],
+  },
+  {
     id: "sql-formatter",
     label: "SQL Formatter",
     icon: Database,
@@ -250,6 +259,7 @@ export const DEFAULT_TOOL_ORDER: string[] = [
   "cron-generator",
   "kafka-explorer",
   "rabbit-client",
+  "redis-client",
   "qrcode",
   "color-picker",
   "jwt",

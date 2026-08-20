@@ -43,6 +43,7 @@ const DEFAULT_FEATURES: FeatureSettings = {
   'generator': true,
   'kafka-explorer': false,
   'rabbit-client': false,
+  'redis-client': false,
   'sql-formatter': false,
   'network': false,
   'lucky-wheel': false,

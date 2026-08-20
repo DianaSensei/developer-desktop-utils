@@ -26,6 +26,7 @@ function seed(featureId: string, storageKey: string) {
 }
 seed('rabbit-client', 'devtool:rabbit:connectedConnId');
 seed('kafka-explorer', 'devtool:kafka:connectedBrokerId');
+seed('redis-client', 'devtool:redis:connectedConnId');
 snapshot = Array.from(live);
 
 export const liveConnections = {

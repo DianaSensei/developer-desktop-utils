@@ -8,6 +8,7 @@ mod files;
 mod mockserver;
 mod ports;
 mod rabbit;
+mod redis_tool;
 
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
@@ -114,6 +115,19 @@ fn main() {
             rabbit::rabbit_amqp_declare_queue,
             rabbit::rabbit_amqp_declare_exchange,
             rabbit::rabbit_amqp_bind_queue,
+            redis_tool::redis_list_configs,
+            redis_tool::redis_save_config,
+            redis_tool::redis_delete_config,
+            redis_tool::redis_test_connection,
+            redis_tool::redis_overview,
+            redis_tool::redis_scan_keys,
+            redis_tool::redis_key_summary,
+            redis_tool::redis_get_key,
+            redis_tool::redis_set_string,
+            redis_tool::redis_set_ttl,
+            redis_tool::redis_delete_keys,
+            redis_tool::redis_rename_key,
+            redis_tool::redis_exec,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

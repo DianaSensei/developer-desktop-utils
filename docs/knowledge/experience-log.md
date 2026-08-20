@@ -119,3 +119,34 @@
   runtime, không lỗi build, editor vẫn "hoạt động" — chỉ là chạy nhầm lệnh khác, nên
   reviewer/AI code review dựa trên đọc code tĩnh rất dễ bỏ sót, phải test tay bằng phím
   thật hoặc đọc kỹ thứ tự extensions + tài liệu upstream.
+
+## [2026-08-20] redis-tool — serde internally-tagged enum panics at runtime (not compile time) on a tuple/newtype variant of a primitive
+- Nguyên nhân: `redis_tool.rs`'s `RedisReply` enum (mirrors `redis::Value` for the CLI Console
+  và key-editor mutations, gửi qua Tauri IPC dưới dạng JSON) ban đầu dùng
+  `#[serde(tag = "kind")]` (internally tagged) với các variant kiểu tuple chứa giá trị nguyên
+  thủy — `Int(i64)`, `Bulk(String)`, `Array(Vec<RedisReply>)`, `Error(String)`. `cargo check`
+  compile sạch không báo lỗi gì. Chỉ khi thực sự serialize (`serde_json::to_string`) mới panic
+  runtime: `"cannot serialize tagged newtype variant RedisReply::Int containing an integer"`.
+  Lý do: serde's internally-tagged representation yêu cầu nội dung mỗi variant phải tự
+  serialize thành JSON object (map) để gắn thêm field tag vào — một variant tuple chứa
+  primitive/String/Vec thì không serialize ra object được, nên serde từ chối ở runtime thay vì
+  báo lỗi ở compile time (derive macro không biết trước output shape của field type).
+- Số lần thử: 1/5 (phát hiện chủ động bằng cách viết crate scratch riêng ngoài `src-tauri` để
+  compile-test logic Redis thật — sandbox này không dựng được toàn bộ Tauri app trên Linux vì
+  thiếu GTK/WebKit system libs — và viết `#[test]` gọi `serde_json::to_string` thật cho từng
+  variant trước khi tin tưởng shape JSON khớp với type TypeScript phía frontend).
+- Kết quả: Đã fix
+- Cách fix: đổi sang adjacently-tagged: `#[serde(tag = "kind", content = "data")]` — hoạt động
+  với MỌI variant shape (tuple, newtype primitive, struct), ra `{"kind":"Int","data":5}` thay
+  vì lỗi. Đồng thời phát hiện thêm: `#[serde(rename_all = "camelCase")]` đặt ở CẤP ENUM chỉ đổi
+  tên variant tag (`String` → `"string"`), KHÔNG tự động áp dụng xuống field bên trong struct
+  variant (`ttl_ms` vẫn ra `"ttl_ms"`, không phải `"ttlMs"`) — phải thêm `rename_all` riêng cho
+  từng struct variant (`KeyValue::String { .. }`, `::Hash { .. }`, v.v.) mới đổi được tên field.
+  Verify cả hai bằng test thật (`serde_json::to_string`) trước khi khớp type TS, không suy đoán
+  từ đọc doc.
+- Bài học chung: derive `Serialize` compile được KHÔNG có nghĩa là serialize được — với enum
+  gắn tag (internally/adjacently tagged) và với `rename_all`, chỉ có chạy thật
+  `serde_json::to_string` trên từng variant mới lộ ra shape JSON thật. Khi Rust struct/enum có
+  tag phải khớp 1-1 với type ở phía TypeScript/frontend (Tauri IPC, hay bất kỳ ranh giới JSON
+  nào), luôn viết một test nhỏ in ra JSON thật của từng variant trước khi viết type phía kia,
+  thay vì đoán theo tên field/derive attribute.

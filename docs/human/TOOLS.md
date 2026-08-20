@@ -28,6 +28,7 @@ This document describes every tool in the app: what computation it performs, wha
 | QR Code | ✓ (image) | ✓ | ✓ | — | Mode (localStorage) |
 | Kafka Explorer | ✓ | — | — | **✓ TCP** | Broker configs (app data); produce draft in-memory |
 | RabbitMQ | ✓ | — | — | **✓ HTTP/HTTPS (mgmt API, browse/create) + AMQP 5672/5671 (publish/consume/RPC)** | Connection profiles incl. password & client identity (app data) |
+| Redis | ✓ | — | — | **✓ TCP 6379/6380 (RESP protocol)** | Connection profiles incl. password (app data) |
 | Network Tools | ✓ | — | — | **✓ HTTPS** + local read | In-memory session, cleared on app restart |
 | API Client | ✓ | ✓ (import) | ✓ (export) | **✓ HTTP/HTTPS — any URL you send to** | Collections, environments & history (localStorage) |
 | Mock Server | ✓ | — | — | **✓ Local HTTP listener you start (127.0.0.1, or 0.0.0.0 = LAN)** | Stubs + server settings (localStorage); request log in-memory, cleared on restart |
@@ -342,6 +343,44 @@ Written by Rust (`fs::write`) whenever you save or delete a connection. It is **
 | Consume — Consume (ack) | **Permanent** — acknowledges and removes the messages it receives |
 | Respond (RPC server) | **Permanent** — acks (removes) each request and publishes a reply to its `reply_to` |
 | Purge / delete queue or exchange | **Not available** — the tool never purges or deletes |
+
+**Permissions (Tauri):** `core:default` (for Tauri IPC), outbound TCP via Rust (no Tauri capability needed — Rust has unrestricted network access).
+
+---
+
+### Redis
+
+You must **Connect** a connection profile before any views are accessible — there is no auto-connect on launch. Every command (Overview, Keys, CLI Console) opens its own short-lived TCP connection to the configured host over the Redis **RESP protocol** (default port `6379`, or `6380` when TLS is on) — there is **no persistent connection pool and no background polling**; a view only talks to the server when you open it, refresh it, or run a command.
+
+**Key Browser** always paginates with `SCAN`/`HSCAN`/`SSCAN`/`ZSCAN` (never `KEYS` or an unbounded `HGETALL`/`SMEMBERS`), so browsing a large keyspace or a large collection can't block the server. A single collection key is read up to **2,000 elements** per fetch; larger collections show a **truncated** notice.
+
+**Key editors** are type-aware (String, Hash, List, Set, Sorted Set) — field/member add, remove, and TTL edits run as targeted commands (`HSET`/`HDEL`/`SADD`/`SREM`/`ZADD`/`ZREM`/`LPUSH`/`RPUSH`/`LREM`/`EXPIRE`/`PERSIST`), each a **real, immediate write** with no undo. List item removal uses `LREM key 1 <value>`, which removes the first matching value — not safe with duplicate values in the list. Stream and other unsupported types are shown read-only with a pointer to the CLI Console.
+
+**CLI Console** runs **any** command you type, including destructive ones (`DEL`, `FLUSHDB`, `FLUSHALL`) — there is no allow-list. Commands run against the database selected in the left panel's DB switcher; a typed `SELECT n` does not persist across commands (each command opens a fresh connection and re-selects the configured db) — use the switcher instead.
+
+TLS uses the OS trust store (`rediss://`, no custom CA / mutual TLS support yet).
+
+#### Connection profile storage
+
+Connection profiles (name, host, port, username, **password**, TLS flag) are saved to:
+
+```
+macOS:    ~/Library/Application Support/devtool/redis-connections.json
+Windows:  %APPDATA%\devtool\redis-connections.json
+Linux:    ~/.local/share/devtool/redis-connections.json
+```
+
+Written by Rust (`fs::write`) whenever you save or delete a connection. It is **not** encrypted and **includes the password** — do not store credentials you would not want readable by other processes on the same machine. The file is local-only; it is never transmitted anywhere except to the Redis server you configured.
+
+#### Risk levels at a glance
+
+| Action | Risk |
+|--------|------|
+| Overview, browse keys | Read-only — safe on production |
+| View a key's value | Read-only, capped at 2,000 elements per collection |
+| Edit a field/member, set TTL, rename | **Permanent write** — no undo |
+| Delete a key | **Permanent** — no undo |
+| CLI Console | **Anything** — no allow-list; includes `DEL`, `FLUSHDB`, `FLUSHALL` |
 
 **Permissions (Tauri):** `core:default` (for Tauri IPC), outbound TCP via Rust (no Tauri capability needed — Rust has unrestricted network access).
 
