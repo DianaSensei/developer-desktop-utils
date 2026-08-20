@@ -114,11 +114,17 @@ fn redis_url(c: &RedisConnection) -> String {
     format!("{scheme}://{auth}{}:{}/0", c.host, c.port)
 }
 
+/// Bound on establishing the TCP/TLS connection — without this, connecting to
+/// an unreachable host (wrong port, firewalled, dead server) hangs the async
+/// task indefinitely and the UI spinner never resolves, since neither Tokio's
+/// TCP connect nor rustls' handshake have a default timeout of their own.
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(6);
+
 async fn connect(c: &RedisConnection, db: u8) -> Result<redis::aio::MultiplexedConnection, String> {
     let client = redis::Client::open(redis_url(c)).map_err(|e| e.to_string())?;
-    let mut con = client
-        .get_multiplexed_async_connection()
+    let mut con = tokio::time::timeout(CONNECT_TIMEOUT, client.get_multiplexed_async_connection())
         .await
+        .map_err(|_| format!("Connection to {}:{} timed out after {}s", c.host, c.port, CONNECT_TIMEOUT.as_secs()))?
         .map_err(|e| e.to_string())?;
     if db != 0 {
         redis::cmd("SELECT")

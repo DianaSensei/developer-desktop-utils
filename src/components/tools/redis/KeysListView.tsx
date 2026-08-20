@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshCw, Plus, KeyRound, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Callout } from '@/components/ui/callout';
 import { Spinner, LoadingRow } from '@/components/ui/spinner';
@@ -32,6 +33,15 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
+/** Turns plain filter text into a SCAN MATCH pattern: a bare `user:1` becomes
+ * a prefix match (`user:1*`) so typing without glob syntax still finds keys,
+ * while a pattern that already uses glob metacharacters is passed through
+ * untouched. */
+function toScanPattern(filter: string): string {
+  if (!filter) return '*';
+  return /[*?[]/.test(filter) ? filter : `${filter}*`;
+}
+
 const TYPE_TONE: Record<string, 'neutral' | 'success' | 'warning' | 'info' | 'accent'> = {
   string: 'info',
   hash: 'accent',
@@ -52,7 +62,8 @@ function ttlLabel(ttlMs: number): string {
 
 export function KeysListView({ conn, db, refreshKey, onRefresh, onSelectKey }: KeysListViewProps) {
   const [filter, setFilter] = useState('');
-  const pattern = useDebounced(filter.trim(), 300) || '*';
+  const debouncedFilter = useDebounced(filter.trim(), 300);
+  const pattern = toScanPattern(debouncedFilter);
 
   const [rows, setRows] = useState<KeySummary[]>([]);
   const [cursor, setCursor] = useState(0);
@@ -104,7 +115,7 @@ export function KeysListView({ conn, db, refreshKey, onRefresh, onSelectKey }: K
       />
 
       <div className="px-5 pt-3 shrink-0">
-        <SearchInput value={filter} onChange={setFilter} placeholder="Match pattern, e.g. user:*" className="h-ctl text-sm font-mono" containerClassName="max-w-sm" />
+        <SearchInput value={filter} onChange={setFilter} placeholder="Filter by prefix or glob, e.g. user: or user:*" className="h-ctl text-sm font-mono" containerClassName="max-w-sm" />
       </div>
 
       <div className="tool-scrollable px-5 py-4">
@@ -218,11 +229,11 @@ function CreateKeyDialog({ open, onOpenChange, conn, db, onCreated }: {
             />
           </Field>
           <Field label="Value">
-            <Input
+            <Textarea
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') create(); }}
-              placeholder="" className="font-mono text-sm"
+              onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') create(); }}
+              placeholder="" className="font-mono text-sm min-h-24 resize-y"
             />
           </Field>
           {error && <Callout tone="error" size="sm">{error}</Callout>}

@@ -57,6 +57,21 @@ export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed 
     onDeleted();
   };
 
+  // Mutations update `value` in place instead of re-fetching the whole key —
+  // a hash/list/set/zset can hold up to VALUE_CAP (2000) entries, and
+  // re-running HSCAN/SSCAN/etc. after every single field edit made editing a
+  // large collection field-by-field noticeably slow. It also catches
+  // failures here so a rejected HSET/SADD/etc. surfaces as an error instead
+  // of an unhandled promise rejection with no visible feedback.
+  const runMutation = async (apply: () => Promise<void>) => {
+    try {
+      await apply();
+      setError(null);
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    }
+  };
+
   const ttlMs = value && value.type !== 'none' ? value.ttlMs : -1;
 
   return (
@@ -84,45 +99,97 @@ export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed 
           <>
             <TtlRow
               seconds={ttlToSeconds(ttlMs)}
-              onSet={async (seconds) => { await redisApi.setTtl(conn.id, db, keyName, seconds); void load(); }}
+              onSet={(seconds) => runMutation(async () => {
+                await redisApi.setTtl(conn.id, db, keyName, seconds);
+                setValue((prev) => (prev && prev.type !== 'none' ? { ...prev, ttlMs: seconds != null ? seconds * 1000 : -1 } : prev));
+              })}
             />
 
             {value.type === 'string' && (
               <StringEditor
                 initial={value.value}
-                onSave={async (v) => { await redisApi.setString(conn.id, db, keyName, v, ttlToSeconds(ttlMs)); void load(); }}
+                onSave={(v) => runMutation(async () => {
+                  await redisApi.setString(conn.id, db, keyName, v, ttlToSeconds(ttlMs));
+                  setValue((prev) => (prev && prev.type === 'string' ? { ...prev, value: v } : prev));
+                })}
               />
             )}
             {value.type === 'hash' && (
               <HashEditor
                 fields={value.fields}
                 truncated={value.truncated}
-                onSetField={async (f, v) => { await redisApi.exec(conn.id, db, ['HSET', keyName, f, v]); void load(); }}
-                onDeleteField={async (f) => { await redisApi.exec(conn.id, db, ['HDEL', keyName, f]); void load(); }}
+                onSetField={(f, v) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['HSET', keyName, f, v]);
+                  setValue((prev) => {
+                    if (!prev || prev.type !== 'hash') return prev;
+                    const idx = prev.fields.findIndex(([ff]) => ff === f);
+                    const fields: [string, string][] = idx === -1
+                      ? [...prev.fields, [f, v]]
+                      : prev.fields.map((entry, i) => (i === idx ? [f, v] as [string, string] : entry));
+                    return { ...prev, fields };
+                  });
+                })}
+                onDeleteField={(f) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['HDEL', keyName, f]);
+                  setValue((prev) => (prev && prev.type === 'hash' ? { ...prev, fields: prev.fields.filter(([ff]) => ff !== f) } : prev));
+                })}
               />
             )}
             {value.type === 'list' && (
               <ListEditor
                 items={value.items}
                 truncated={value.truncated}
-                onPush={async (v, front) => { await redisApi.exec(conn.id, db, [front ? 'LPUSH' : 'RPUSH', keyName, v]); void load(); }}
-                onRemove={async (v) => { await redisApi.exec(conn.id, db, ['LREM', keyName, '1', v]); void load(); }}
+                onPush={(v, front) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, [front ? 'LPUSH' : 'RPUSH', keyName, v]);
+                  setValue((prev) => (prev && prev.type === 'list' ? { ...prev, items: front ? [v, ...prev.items] : [...prev.items, v] } : prev));
+                })}
+                onRemove={(v) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['LREM', keyName, '1', v]);
+                  setValue((prev) => {
+                    if (!prev || prev.type !== 'list') return prev;
+                    const idx = prev.items.indexOf(v);
+                    if (idx === -1) return prev;
+                    const items = [...prev.items];
+                    items.splice(idx, 1);
+                    return { ...prev, items };
+                  });
+                })}
               />
             )}
             {value.type === 'set' && (
               <SetEditor
                 members={value.members}
                 truncated={value.truncated}
-                onAdd={async (v) => { await redisApi.exec(conn.id, db, ['SADD', keyName, v]); void load(); }}
-                onRemove={async (v) => { await redisApi.exec(conn.id, db, ['SREM', keyName, v]); void load(); }}
+                onAdd={(v) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['SADD', keyName, v]);
+                  setValue((prev) => (prev && prev.type === 'set' && !prev.members.includes(v) ? { ...prev, members: [...prev.members, v] } : prev));
+                })}
+                onRemove={(v) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['SREM', keyName, v]);
+                  setValue((prev) => (prev && prev.type === 'set' ? { ...prev, members: prev.members.filter((m) => m !== v) } : prev));
+                })}
               />
             )}
             {value.type === 'zset' && (
               <ZsetEditor
                 members={value.members}
                 truncated={value.truncated}
-                onSet={async (member, score) => { await redisApi.exec(conn.id, db, ['ZADD', keyName, String(score), member]); void load(); }}
-                onRemove={async (member) => { await redisApi.exec(conn.id, db, ['ZREM', keyName, member]); void load(); }}
+                onSet={(member, score) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['ZADD', keyName, String(score), member]);
+                  setValue((prev) => {
+                    if (!prev || prev.type !== 'zset') return prev;
+                    const idx = prev.members.findIndex(([m]) => m === member);
+                    const members: [string, number][] = idx === -1
+                      ? [...prev.members, [member, score]]
+                      : prev.members.map((entry, i) => (i === idx ? [member, score] as [string, number] : entry));
+                    members.sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+                    return { ...prev, members };
+                  });
+                })}
+                onRemove={(member) => runMutation(async () => {
+                  await redisApi.exec(conn.id, db, ['ZREM', keyName, member]);
+                  setValue((prev) => (prev && prev.type === 'zset' ? { ...prev, members: prev.members.filter(([m]) => m !== member) } : prev));
+                })}
               />
             )}
             {value.type === 'unsupported' && (
@@ -165,6 +232,17 @@ function TtlRow({ seconds, onSet }: { seconds: number | null; onSet: (seconds: n
 
   useEffect(() => { setInput(seconds != null ? String(seconds) : ''); }, [seconds]);
 
+  // Blank input means "no expiry" (PERSIST); anything else — including "0" —
+  // is a real TTL in seconds. `Number(input) || null` used to treat "0" the
+  // same as blank because 0 is falsy, so typing 0 silently persisted the key
+  // instead of expiring it immediately.
+  const parseInput = (): number | null => {
+    const trimmed = input.trim();
+    if (trimmed === '') return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const apply = async (next: number | null) => {
     setBusy(true);
     try { await onSet(next); setEditing(false); } finally { setBusy(false); }
@@ -181,9 +259,9 @@ function TtlRow({ seconds, onSet }: { seconds: number | null; onSet: (seconds: n
             placeholder="seconds"
             className="h-ctl w-32 font-mono text-xs"
             autoFocus
-            onKeyDown={(e) => { if (e.key === 'Enter') apply(Number(input) || null); if (e.key === 'Escape') setEditing(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') apply(parseInput()); if (e.key === 'Escape') setEditing(false); }}
           />
-          <Button size="sm" className="h-ctl" disabled={busy} onClick={() => apply(Number(input) || null)}>Set</Button>
+          <Button size="sm" className="h-ctl" disabled={busy} onClick={() => apply(parseInput())}>Set</Button>
           <Button size="sm" variant="outline" className="h-ctl" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
         </>
       ) : (
