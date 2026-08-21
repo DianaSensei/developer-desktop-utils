@@ -101,9 +101,12 @@
   .theme-transition *,
   .theme-transition *::before,
   .theme-transition *::after {
-    transition: background-color 220ms ease, border-color 220ms ease,
-      color 220ms ease, fill 220ms ease, stroke 220ms ease,
-      box-shadow 220ms ease !important;
+    transition: background-color var(--dur-base) var(--ease-out-soft),
+      border-color var(--dur-base) var(--ease-out-soft),
+      color var(--dur-base) var(--ease-out-soft),
+      fill var(--dur-base) var(--ease-out-soft),
+      stroke var(--dur-base) var(--ease-out-soft),
+      box-shadow var(--dur-base) var(--ease-out-soft) !important;
   }
 
   /* ── Cross-platform custom scrollbar ───────────────────────────────────
@@ -127,7 +130,8 @@
     background-clip: padding-box;
     min-height: 40px;
     min-width: 40px;
-    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    transition: background-color var(--dur-base) var(--ease-out-soft),
+      box-shadow var(--dur-base) var(--ease-out-soft);
   }
   ::-webkit-scrollbar-thumb:hover {
     background-color: hsl(var(--fg-mute-c) / 0.55);
@@ -191,18 +195,18 @@
      .hover-elevate dịch phần tử lên 2px khi rê; đã bỏ vì nó làm layout nhảy
      dưới con trỏ. */
   .hover-elevate {
-    @apply transition-[box-shadow,border-color,background-color] duration-200 ease-out
+    @apply transition-[box-shadow,border-color,background-color] duration-base ease-out-soft
            hover:shadow hover:border-line/70
            active:shadow-sm;
   }
   .press {
-    @apply transition-transform duration-150 ease-out motion-safe:active:scale-[0.96];
+    @apply transition-transform duration-fast ease-out-soft motion-safe:active:scale-[0.96];
   }
   .animate-fade-in-up {
-    animation: fadeInUp 0.3s ease-out;
+    animation: fadeInUp var(--dur-slow) var(--ease-out-soft);
   }
   .animate-scale-in {
-    animation: scaleIn 0.2s ease-out;
+    animation: scaleIn var(--dur-base) var(--ease-out-soft);
   }
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(10px); }

@@ -229,9 +229,12 @@ export function Modal({
 
   if (!open) return null;
   return createPortal(
-    <div className="fixed inset-0 z-[9998] flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[10vh] backdrop-blur-[1px]" onMouseDown={onClose}>
+    <div
+      className="fixed inset-0 z-[9998] flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[10vh] backdrop-blur-[1px] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-fast motion-safe:ease-out-soft"
+      onMouseDown={onClose}
+    >
       <div
-        className={cn('w-full rounded-lg border bg-card shadow-xl animate-in fade-in-0 zoom-in-95 duration-100', width)}
+        className={cn('w-full rounded-lg border bg-card shadow-xl motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-base motion-safe:ease-out-soft', width)}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
@@ -324,7 +327,7 @@ export function Popover({
             minWidth: pos.width,
           }}
           className={cn(
-            'z-[9999] min-w-[200px] rounded-lg border border-line bg-card p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95 duration-100',
+            'z-[9999] min-w-[200px] rounded-lg border border-line bg-card p-1.5 shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-fast motion-safe:ease-out-soft',
             className
           )}
         >

@@ -182,7 +182,7 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         height: '15px',
         borderRadius: '4px',
         color: 'hsl(var(--fg-mute-c) / 0.75)',
-        transition: 'background-color 150ms, color 150ms',
+        transition: 'background-color var(--dur-fast) var(--ease-out-soft), color var(--dur-fast) var(--ease-out-soft)',
       },
       '.cm-foldGutter span:hover': {
         backgroundColor: 'hsl(var(--acc-c))',

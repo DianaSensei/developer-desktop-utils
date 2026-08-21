@@ -392,7 +392,7 @@ function CreateKeyDialog({ open, onOpenChange, conn, db, onCreated }: {
             </Field>
             <Field label="Type">
               <Select value={type} onValueChange={(v) => { setType(v as NewKeyType); setError(null); }}>
-                <SelectTrigger className="h-9 text-sm w-28"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-ctl text-sm w-28"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {NEW_KEY_TYPES.map((t) => <SelectItem key={t} value={t} className="text-sm">{t}</SelectItem>)}
                 </SelectContent>

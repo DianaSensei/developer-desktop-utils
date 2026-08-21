@@ -94,7 +94,7 @@
   .diff-merge-view .cm-merge-revert button {
     color: hsl(var(--fg-mute-c));
     border-radius: 4px;
-    transition: background-color 150ms, color 150ms;
+    transition: background-color var(--dur-fast) var(--ease-out-soft), color var(--dur-fast) var(--ease-out-soft);
   }
   .diff-merge-view .cm-merge-revert button:hover {
     background-color: hsl(var(--acc-c));

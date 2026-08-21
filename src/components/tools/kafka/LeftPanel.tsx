@@ -82,9 +82,9 @@ export function LeftPanel({
       {/* Broker picker */}
       <div className="p-3 border-b shrink-0 space-y-2">
         <div className="flex items-center gap-1.5">
-          <Select value={selectedBrokerId} onValueChange={onSelectBroker}>
+          <Select value={selectedBrokerId} onValueChange={onSelectBroker} disabled={!loading && configs.length === 0}>
             <SelectTrigger className="h-ctl text-xs">
-              <SelectValue placeholder={loading ? 'Loading…' : 'Select broker'} />
+              <SelectValue placeholder={loading ? 'Loading…' : configs.length === 0 ? 'No brokers yet' : 'Select broker'} />
             </SelectTrigger>
             <SelectContent>
               {configs.map((c) => (

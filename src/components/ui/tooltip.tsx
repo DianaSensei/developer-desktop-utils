@@ -98,7 +98,7 @@ export function Tooltip({
           role="tooltip"
           className={cn(
             'fixed z-[9999] pointer-events-none rounded-md border border-line/70 glass-strong px-3 py-2 shadow',
-            'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-150 ease-out',
+            'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-fast motion-safe:ease-out-soft',
             enterFrom,
             transform,
             className
