@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HardDrive, RefreshCw, Trash2, Plus } from 'lucide-react';
+import { HardDrive, RefreshCw, Trash2, Plus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ViewHeader } from '@/components/ui/view-header';
@@ -10,6 +10,7 @@ import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
+import { cn } from '@/lib/utils';
 import { containerApi, type ContainerConnection, type VolumeInfo } from './types';
 import { useSort } from './useSort';
 import { formatBytes } from './format';
@@ -25,6 +26,9 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<VolumeInfo | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   // Volume size isn't part of the plain volume-list endpoint — the daemon has
   // to walk every volume's mountpoint on disk to compute it, which is
   // noticeably slower (`volume_sizes` — see container_tool.rs for why that
@@ -48,7 +52,7 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
       .catch(() => setSizeByName({}))
       .finally(() => setSizesLoading(false));
   };
-  useEffect(() => { load(); }, [connection, refreshKey]); // eslint-disable-line
+  useEffect(() => { load(); setSelected(new Set()); }, [connection, refreshKey]); // eslint-disable-line
 
   const f = filter.trim().toLowerCase();
   const filtered = useMemo(() => (volumes ?? []).filter((v) => v.Name.toLowerCase().includes(f)), [volumes, f]);
@@ -58,6 +62,42 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
     mountpoint: (v) => v.Mountpoint,
     size: (v) => sizeByName[v.Name] ?? -1,
   });
+
+  const toggleSelected = (name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
+  const allVisibleSelected = rows.length > 0 && rows.every((v) => selected.has(v.Name));
+  const toggleSelectAllVisible = () => {
+    setSelected((prev) => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        rows.forEach((v) => next.delete(v.Name));
+        return next;
+      }
+      const next = new Set(prev);
+      rows.forEach((v) => next.add(v.Name));
+      return next;
+    });
+  };
+
+  const removeBulk = async (names: string[]) => {
+    setBulkBusy(true);
+    setError(null);
+    const results = await Promise.allSettled(names.map((name) => containerApi.volumeRemove(connection, name, true)));
+    const failed = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (failed.length > 0) {
+      const first = failed[0].reason;
+      setError(`${failed.length} of ${names.length} failed — ${String(first instanceof Error ? first.message : first)}`);
+    }
+    setBulkBusy(false);
+    setSelected(new Set());
+    load();
+  };
 
   return (
     <div className="tool-full-height">
@@ -77,6 +117,18 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
         <SearchInput value={filter} onChange={setFilter} placeholder="Search volumes…" className="h-ctl text-sm" containerClassName="max-w-sm" />
       </div>
 
+      {selected.size > 0 && (
+        <div className="mx-5 mt-3 shrink-0 flex items-center justify-between gap-2 rounded-md border border-acc/30 bg-acc/5 px-3 py-2">
+          <span className="text-xs text-fg-mute">{selected.size.toLocaleString()} selected</span>
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="outline" className="h-ctl" onClick={() => setSelected(new Set())}>Clear</Button>
+            <Button size="sm" variant="destructive" className="h-ctl" disabled={bulkBusy} onClick={() => setBulkRemoveOpen(true)}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove {selected.size.toLocaleString()}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="tool-scrollable px-5 py-4">
         {loading && !volumes && <LoadingRow />}
         {error && <Callout tone="error">{error}</Callout>}
@@ -87,6 +139,9 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
               <DataTable>
                 <Thead>
                   <Tr>
+                    <Th className="w-8">
+                      <RowCheckbox checked={allVisibleSelected} onClick={toggleSelectAllVisible} title="Select all shown" />
+                    </Th>
                     <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
                     <Th sortDirection={directionFor('driver')} onSortClick={() => toggleSort('driver')}>Driver</Th>
                     <Th align="right" sortDirection={directionFor('size')} onSortClick={() => toggleSort('size')}>Size</Th>
@@ -96,7 +151,10 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
                 </Thead>
                 <Tbody>
                   {rows.map((v) => (
-                    <Tr key={v.Name}>
+                    <Tr key={v.Name} selected={selected.has(v.Name)}>
+                      <Td>
+                        <RowCheckbox checked={selected.has(v.Name)} onClick={() => toggleSelected(v.Name)} title="Select volume" />
+                      </Td>
                       <Td mono>{v.Name}</Td>
                       <Td>{v.Driver}</Td>
                       <Td numeric>
@@ -131,7 +189,32 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
           load();
         }}
       />
+
+      <ConfirmDialog
+        open={bulkRemoveOpen}
+        onOpenChange={setBulkRemoveOpen}
+        title={`Remove ${selected.size} volumes?`}
+        description={`Remove ${selected.size.toLocaleString()} selected volume(s). Data on these volumes is lost.`}
+        confirmLabel="Remove"
+        onConfirm={() => removeBulk(Array.from(selected))}
+      />
     </div>
+  );
+}
+
+function RowCheckbox({ checked, onClick, title }: { checked: boolean; onClick: () => void; title: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={cn(
+        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+        checked ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
+      )}
+    >
+      {checked && <Check className="h-2.5 w-2.5" />}
+    </button>
   );
 }
 
