@@ -1,0 +1,123 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, Monday 03:00 UTC — catches advisories published after the last commit.
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Known-vulnerable npm packages ────────────────────────────────────────
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # Fail the build on high/critical advisories; moderate ones are reported
+      # in the log so they are visible without blocking every PR.
+      - name: Report all advisories
+        run: npm audit --audit-level=moderate || true
+      - name: Fail on high/critical
+        run: npm audit --audit-level=high
+
+  # ── Known-vulnerable Rust crates (RustSec advisory DB) ───────────────────
+  cargo-audit:
+    name: cargo audit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-audit
+      - name: Audit Cargo.lock
+        working-directory: src-tauri
+        run: cargo audit --deny warnings
+
+  # ── Static taint analysis of the frontend ────────────────────────────────
+  codeql:
+    name: CodeQL (TypeScript)
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
+
+  # ── Leaked credentials, in the tree and in history ───────────────────────
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history on the scheduled run; a shallow tree is enough per-push.
+          fetch-depth: ${{ github.event_name == 'schedule' && 0 || 1 }}
+      - name: TruffleHog (verified secrets only)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --results=verified,unknown --fail
+
+  # ── Block risky dependency changes at review time ────────────────────────
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  # ── Publish an SBOM of the full dependency tree ──────────────────────────
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate SPDX SBOM (npm + Cargo)
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: devtool-sbom.spdx.json
+          output-file: devtool-sbom.spdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: devtool-sbom.spdx.json
+
+  # ── The claims in SECURITY.md, asserted as a test ────────────────────────
+  claims:
+    name: Verify SECURITY.md claims
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert the documented guarantees still hold
+        run: ./scripts/check-security-claims.sh

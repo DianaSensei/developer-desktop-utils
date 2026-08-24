@@ -32,6 +32,11 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
 
+    permissions:
+      contents: write      # publish the release and upload assets
+      id-token: write      # OIDC token used to sign the provenance attestation
+      attestations: write  # write the attestation to the repo's attestation store
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,6 +144,7 @@ jobs:
       #       ${{ runner.os }}-tauri-bundler-
 
       - name: Build and publish release
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -154,3 +160,70 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      # ── Verifiable supply chain ─────────────────────────────────────────
+      # Everything below turns "trust us" into something a user can check with
+      # `gh attestation verify` / `shasum -c`. See SECURITY.md and
+      # scripts/verify-release.sh.
+
+      - name: Collect built artifact paths
+        id: artifacts
+        shell: bash
+        env:
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          # tauri-action reports the bundles it produced as a JSON array.
+          # Keep only the installers/bundles: the .sig files are already covered
+          # by the updater's own minisign signature.
+          node -e '
+            const paths = JSON.parse(process.env.ARTIFACT_PATHS || "[]")
+              .filter((p) => !p.endsWith(".sig"));
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT,
+              `paths<<__EOF__\n${paths.join("\n")}\n__EOF__\n`);
+            console.log(paths.join("\n"));
+          '
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.artifacts.outputs.paths }}
+
+      - name: Publish SHA256 checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_LIST: ${{ steps.artifacts.outputs.paths }}
+        run: |
+          set -euo pipefail
+          sums="SHA256SUMS-${{ matrix.platform }}${{ matrix.rust-target && format('-{0}', matrix.rust-target) || '' }}.txt"
+          : > "$sums"
+          while IFS= read -r artifact; do
+            [ -n "$artifact" ] || continue
+            [ -f "$artifact" ] || continue
+            if command -v sha256sum >/dev/null 2>&1; then
+              (cd "$(dirname "$artifact")" && sha256sum "$(basename "$artifact")")
+            else
+              (cd "$(dirname "$artifact")" && shasum -a 256 "$(basename "$artifact")")
+            fi >> "$sums"
+          done <<< "$ARTIFACT_LIST"
+          cat "$sums"
+          gh release upload "${GITHUB_REF_NAME}" "$sums" --clobber --repo "${GITHUB_REPOSITORY}"
+
+      # One SBOM per release is enough — the dependency tree is the same on
+      # every platform, so only the Linux job publishes it.
+      - name: Generate SBOM
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: devtool-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Publish SBOM
+        if: matrix.platform == 'ubuntu-22.04'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" devtool-sbom.spdx.json --clobber --repo "${GITHUB_REPOSITORY}"
