@@ -167,6 +167,12 @@ that). Everything else only fires from a tool you invoked.
 
 ### 5. Check the repo's own security posture
 
+- **OpenSSF Scorecard** grades this repo automatically every week — the badge in
+  the README links to the full breakdown at
+  <https://scorecard.dev/viewer/?uri=github.com/DianaSensei/developer-desktop-utils>.
+  It is scored by the OpenSSF, not by us.
+- **Snyk's public report** for this repository:
+  <https://snyk.io/test/github/DianaSensei/developer-desktop-utils>
 - Actions runs are public: <https://github.com/DianaSensei/developer-desktop-utils/actions>
 - The security workflow's results are visible in the Actions log and in the
   repository's Security tab (CodeQL alerts).
