@@ -25,7 +25,19 @@ function toWordArray(ab: ArrayBuffer): CryptoJS.lib.WordArray {
   return CryptoJS.lib.WordArray.create(words as unknown as number[], u8.length);
 }
 
-self.onmessage = async ({ data }: MessageEvent<{ file: File; algo: AlgoId }>) => {
+const ALGOS: AlgoId[] = ['md5', 'sha1', 'sha256', 'sha512'];
+
+// A dedicated worker has no `event.origin` to check (it is always empty, and the
+// port is only reachable from the page that constructed the worker), so validate
+// the shape instead: an unexpected message is dropped rather than destructured.
+function isRequest(v: unknown): v is { file: File; algo: AlgoId } {
+  if (typeof v !== 'object' || v === null) return false;
+  const m = v as { file?: unknown; algo?: unknown };
+  return m.file instanceof Blob && ALGOS.includes(m.algo as AlgoId);
+}
+
+self.onmessage = async ({ data }: MessageEvent<unknown>) => {
+  if (!isRequest(data)) return;
   try {
     const { file, algo } = data;
     const hasher = createHasher(algo);

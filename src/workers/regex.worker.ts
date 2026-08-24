@@ -25,7 +25,20 @@ interface RegexResponse {
 
 const MAX_MATCHES = 500;
 
-self.onmessage = ({ data }: MessageEvent<RegexRequest>) => {
+// A dedicated worker has no `event.origin` to check (it is always empty, and the
+// port is only reachable from the page that constructed the worker), so validate
+// the shape instead: an unexpected message is dropped rather than destructured.
+function isRegexRequest(v: unknown): v is RegexRequest {
+  if (typeof v !== 'object' || v === null) return false;
+  const m = v as Partial<RegexRequest>;
+  return typeof m.id === 'number' && Number.isFinite(m.id)
+    && typeof m.pattern === 'string' && typeof m.flags === 'string'
+    && typeof m.input === 'string' && typeof m.replacement === 'string'
+    && typeof m.doReplace === 'boolean';
+}
+
+self.onmessage = ({ data }: MessageEvent<unknown>) => {
+  if (!isRegexRequest(data)) return;
   const { id, pattern, flags, input, replacement, doReplace } = data;
   const res: RegexResponse = { id, matches: [], replaceOutput: '', error: '' };
 

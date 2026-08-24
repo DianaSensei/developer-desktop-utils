@@ -260,8 +260,24 @@ function parseBody(res: ApiResponse): unknown {
   return res.body;
 }
 
+// Keys that would walk up to Object.prototype instead of landing on the map.
+// Variable names reach `bru.setVar` from scripts and from collection files that
+// may have been imported from somewhere untrusted, so a write keyed on one of
+// these is prototype pollution rather than a variable. Spelled out as a
+// disjunction rather than a Set lookup so the guard is visible at the point it
+// is applied, to a reader and to a taint-tracking analyser alike.
+export function isSafeKey(k: string): boolean {
+  return k !== '__proto__' && k !== 'constructor' && k !== 'prototype';
+}
+
+// Null-prototype, because header names come straight off the wire: on a plain
+// `{}` a response header called `__proto__` writes through to Object.prototype,
+// and `getHeader('constructor')` hands a script the Object constructor for a
+// header that was never sent. With no prototype there is nothing to pollute and
+// nothing to leak — every key is an ordinary own property, including the odd
+// ones — while lookup, spread and structured clone all behave as before.
 function headersObject(pairs: [string, string][]): Record<string, string> {
-  const obj: Record<string, string> = {};
+  const obj: Record<string, string> = Object.create(null) as Record<string, string>;
   for (const [k, v] of pairs) obj[k.toLowerCase()] = v;
   return obj;
 }
@@ -369,11 +385,11 @@ export function makeBru(stores: VarStores) {
   const allVars = (): VarMap => ({ ...stores.env, ...(stores.data ?? {}), ...stores.runtime });
   return {
     getVar: (k: string) => (k in stores.runtime ? stores.runtime[k] : stores.data?.[k]),
-    setVar: (k: string, v: unknown) => { stores.runtime[k] = v == null ? '' : String(v); },
+    setVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.runtime[k] = v == null ? '' : String(v); },
     deleteVar: (k: string) => { delete stores.runtime[k]; },
     hasVar: (k: string) => k in stores.runtime || (!!stores.data && k in stores.data),
     getEnvVar: (k: string) => stores.env[k],
-    setEnvVar: (k: string, v: unknown) => { stores.env[k] = v == null ? '' : String(v); },
+    setEnvVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.env[k] = v == null ? '' : String(v); },
     hasEnvVar: (k: string) => k in stores.env,
     deleteEnvVar: (k: string) => { delete stores.env[k]; },
     getEnvName: () => stores.envName,
@@ -628,12 +644,35 @@ export async function runScript(
 
 // ─── declarative vars ───────────────────────────────────────────────────────
 
+// Ambient worker capabilities shadowed out of Vars/Assert expressions. These
+// fields are declarative — `res.body.token`, `bru.getVar('x')`, `res.status > 0`
+// — but they travel inside the collection file, so opening a collection someone
+// sent you would otherwise run whatever they put in a Vars row. Passing each
+// name as an extra (undefined) parameter shadows the worker global of the same
+// name for the body of the expression. The Script tab is the deliberately
+// powerful surface and is unaffected: `runScript` keeps its full sandbox.
+//
+// Defence in depth, not a boundary — `({}).constructor.constructor` still
+// reaches Function, and `eval` cannot be shadowed at all (it is not a legal
+// parameter name in strict mode). The worker itself remains the real
+// containment: no DOM, no app storage, killable on timeout.
+const SHADOWED_GLOBALS = [
+  'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts',
+  'self', 'globalThis', 'postMessage', 'Worker', 'SharedWorker',
+  'indexedDB', 'caches', 'navigator', 'location', 'Function',
+];
+
 // Evaluate a Vars-tab expression. Tries JS evaluation (so `res.body.token` or
 // `bru.getVar('x')` work); falls back to the literal string on parse error.
 function evalVarExpr(expr: string, scope: Record<string, unknown>): unknown {
   const names = Object.keys(scope);
+  // Anything the scope itself provides wins — never shadow a real binding.
+  const shadowed = SHADOWED_GLOBALS.filter((g) => !names.includes(g));
   try {
-    const fn = new Function(...names, `return (${expr});`);
+    // 'use strict' also stops an expression assigning to an undeclared name,
+    // which in sloppy mode would create a worker global.
+    const fn = new Function(...names, ...shadowed, `'use strict'; return (${expr});`);
+    // Only the scope values are passed; the shadow parameters receive undefined.
     return fn(...names.map((n) => scope[n]));
   } catch {
     return expr;
@@ -642,9 +681,13 @@ function evalVarExpr(expr: string, scope: Record<string, unknown>): unknown {
 
 export function applyVars(defs: VarDef[], stores: VarStores, scope: Record<string, unknown>): void {
   for (const d of defs) {
-    if (!d.enabled || !d.name.trim()) continue;
+    const name = d.name;
+    if (!d.enabled || !name.trim()) continue;
+    // Var names travel inside the collection file; a row named __proto__ would
+    // otherwise write through this plain store onto Object.prototype.
+    if (name === '__proto__' || name === 'constructor' || name === 'prototype') continue;
     const val = evalVarExpr(d.value, scope);
-    stores.runtime[d.name] = val == null ? '' : String(val);
+    stores.runtime[name] = val == null ? '' : String(val);
   }
 }
 
