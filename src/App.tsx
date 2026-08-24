@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback, useLayoutEffect, Suspense } from 'react';
 import { cn } from '@/lib/utils';
 import { storageGet, storageSet, getThemePreference, setThemePreference, type ThemePreference } from '@/lib/persistentStore';
@@ -692,7 +692,7 @@ function Sidebar({
 
 function AppContent() {
   const location = useLocation();
-  const { isFeatureEnabled } = useFeatures();
+  const { isFeatureEnabled, toolOrder } = useFeatures();
   const liveIds = useLiveConnections();
   const { t } = useLocale();
   useDesktopChrome();
@@ -744,6 +744,12 @@ function AppContent() {
 
   const enabledTools = allTools.filter((tool) => isFeatureEnabled(tool.featureId));
   const SettingsComponent = allTools.find((t) => t.featureId === 'settings')!.component;
+  // Đích rơi về khi URL hiện tại không khớp route nào — xem <Route path="*">
+  // bên dưới. Theo đúng thứ tự sidebar để "màn hình đầu tiên" của app là tool
+  // người dùng đã kéo lên trên cùng, không phải tool đầu bảng cứng.
+  const fallbackPath =
+    applySavedOrder(enabledTools, toolOrder).find((t) => t.featureId !== 'settings')?.path
+    ?? '/settings';
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
   const ActiveIcon = activeTool.icon;
   // Tool đang mở có nằm trong nhóm nhiều tool không? Nếu có, header hiện tên
@@ -802,6 +808,12 @@ function AppContent() {
             />
           ))}
           <Route path="/settings" element={<SettingsComponent />} />
+          {/* Không có route nào khớp → về tool đầu tiên đang bật, không để
+              trống. Trường hợp thật hay gặp: '/' thuộc về Cron Generator, tắt
+              tool đó trong Settings rồi mở lại app là rơi thẳng vào một vùng
+              nội dung trắng trơn (header vẫn vẽ tên tool đã tắt). `replace` để
+              URL hỏng không nằm lại trong lịch sử điều hướng. */}
+          <Route path="*" element={<Navigate to={fallbackPath} replace />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

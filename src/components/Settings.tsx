@@ -102,11 +102,18 @@ function toLogicalRows(tools: ToolDef[]): LogicalRow[] {
   return rows;
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+/** `label` là BẮT BUỘC: công tắc này chỉ có hình tròn trượt, không có chữ nào
+ *  bên trong, nên thiếu nhãn thì trình đọc màn hình đọc ra một "switch" trống
+ *  trơn — người dùng không biết mình đang bật/tắt cái gì. Nhãn hiển thị nằm ở
+ *  hàng bên cạnh chứ không bọc lấy nút, nên phải nối bằng aria-label. */
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
+      title={label}
       onClick={onChange}
       className={cn(
         'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
@@ -153,7 +160,11 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
       >
         <Star className={cn('h-3.5 w-3.5', favorite && 'fill-current')} />
       </button>
-      <Toggle checked={enabled} onChange={onToggleEnabled} />
+      <Toggle
+        checked={enabled}
+        onChange={onToggleEnabled}
+        label={enabled ? t('settings.tools.disableAria', { label: tool.label }) : t('settings.tools.enableAria', { label: tool.label })}
+      />
     </>
   );
 }
@@ -679,7 +690,7 @@ export function Settings() {
                     </SelectContent>
                   </Select>
                 )}
-                <Toggle checked={autoCheckEnabled} onChange={toggleAutoCheck} />
+                <Toggle checked={autoCheckEnabled} onChange={toggleAutoCheck} label={t('settings.about.autoCheckTitle')} />
               </div>
             </div>
           )}

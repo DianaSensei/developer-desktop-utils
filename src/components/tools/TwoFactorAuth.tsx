@@ -83,6 +83,13 @@ function timeRemaining(period: number): number {
   return period - (Math.floor(Date.now() / 1000) % period);
 }
 
+/** Số thứ tự của cửa sổ TOTP hiện tại — cùng công thức `computeTOTP` dùng làm
+ *  counter. Đổi số này ⇔ mã đã hết hạn, nên nó là tín hiệu đáng tin để làm mới,
+ *  thay cho việc rình đúng một giây ranh giới. */
+function totpWindow(period: number): number {
+  return Math.floor(Date.now() / 1000 / period);
+}
+
 // ─── Circular countdown ring ──────────────────────────────────────────────────
 
 function CountdownRing({ remaining, period }: { remaining: number; period: number }) {
@@ -176,10 +183,18 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
     generate();
     if (account.type === 'totp') {
       setRemaining(timeRemaining(account.period));
+      // Làm mới khi CỬA SỔ TOTP đổi, không phải khi đồng hồ đếm ngược chạm đúng
+      // `period`. `setInterval(…, 1000)` không đảm bảo rơi vào mọi giây: webview
+      // bị hãm nhịp lúc ẩn cửa sổ, máy ngủ dậy, hay chỉ là trôi nhịp thông
+      // thường đều có thể nhảy cóc qua đúng giây ranh giới — và khi đó điều
+      // kiện cũ `r === period` không bao giờ đúng, thẻ tiếp tục hiển thị một mã
+      // ĐÃ HẾT HẠN cho tới tận chu kỳ sau ngẫu nhiên nào đó khớp lại. So sánh
+      // số cửa sổ thì bỏ lỡ bao nhiêu nhịp cũng vẫn phát hiện được.
+      let lastWindow = totpWindow(account.period);
       timerRef.current = setInterval(() => {
-        const r = timeRemaining(account.period);
-        setRemaining(r);
-        if (r === account.period) generate();
+        setRemaining(timeRemaining(account.period));
+        const w = totpWindow(account.period);
+        if (w !== lastWindow) { lastWindow = w; generate(); }
       }, 1000);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
