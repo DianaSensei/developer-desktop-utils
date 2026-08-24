@@ -8,7 +8,6 @@ A fast, **offline-first** desktop toolbox for developers — 24 everyday utiliti
 [![Security](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/security.yml/badge.svg)](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/security.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/DianaSensei/developer-desktop-utils/badge)](https://scorecard.dev/viewer/?uri=github.com/DianaSensei/developer-desktop-utils)
 [![Known vulnerabilities](https://snyk.io/test/github/DianaSensei/developer-desktop-utils/badge.svg)](https://snyk.io/test/github/DianaSensei/developer-desktop-utils)
-[![Build provenance](https://img.shields.io/badge/build%20provenance-attested-brightgreen?logo=github)](SECURITY.md#1-verify-the-binary-you-downloaded)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
