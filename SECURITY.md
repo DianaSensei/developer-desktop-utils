@@ -76,8 +76,8 @@ push to `main`, every pull request, and weekly:
 | Check | Tool | Covers |
 |---|---|---|
 | Known-vulnerable npm packages | `npm audit` | frontend dependency tree |
-| Known-vulnerable Rust crates | `cargo audit` (RustSec) | backend dependency tree |
-| Code vulnerabilities (taint analysis) | GitHub CodeQL | TypeScript/JavaScript |
+| Known-vulnerable Rust crates | `cargo audit` (RustSec) | backend dependency tree; unmaintained/unsound notices are reported, vulnerabilities block |
+| Code vulnerabilities (taint analysis) | GitHub CodeQL (default setup, configured in repo settings) | TypeScript/JavaScript, Rust, Actions |
 | Leaked secrets/keys in history | TruffleHog (verified secrets only) | whole repo, full history on schedule |
 | Risky new dependencies in a PR | `dependency-review-action` | the PR diff |
 
