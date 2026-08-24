@@ -1,0 +1,120 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, Monday 03:00 UTC — catches advisories published after the last commit.
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Known-vulnerable npm packages ────────────────────────────────────────
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # Fail the build on high/critical advisories; moderate ones are reported
+      # in the log so they are visible without blocking every PR.
+      - name: Report all advisories
+        run: npm audit --audit-level=moderate || true
+      - name: Fail on high/critical
+        run: npm audit --audit-level=high
+
+  # ── Known-vulnerable Rust crates (RustSec advisory DB) ───────────────────
+  cargo-audit:
+    name: cargo audit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable branch
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
+        with:
+          tool: cargo-audit
+      # Plain `cargo audit` prints unmaintained/unsound/yanked notices as
+      # warnings but exits non-zero only for actual vulnerabilities. Those
+      # warnings come from crates pulled in by tauri/lapin/glib — not ours to
+      # fix, and not a reason to block every PR (`--deny warnings` would).
+      - name: Audit Cargo.lock
+        working-directory: src-tauri
+        run: cargo audit
+
+  # NOTE: CodeQL is not run from this workflow. The repository has CodeQL
+  # "default setup" enabled, which already analyses javascript-typescript, rust,
+  # actions, python and java-kotlin — broader coverage than an advanced config
+  # here would give. GitHub refuses SARIF from an advanced configuration while
+  # default setup is on, so a job here could only ever fail. Manage CodeQL in
+  # Settings -> Code security.
+
+  # ── Leaked credentials, in the tree and in history ───────────────────────
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Full history on the scheduled run; a shallow tree is enough per-push.
+          fetch-depth: ${{ github.event_name == 'schedule' && 0 || 1 }}
+      - name: TruffleHog (verified secrets only)
+        uses: trufflesecurity/trufflehog@bcfcf73aaf4759d4dadc2783177c245a02792318 # v3.97.0
+        with:
+          path: ./
+          extra_args: --results=verified
+
+  # ── Block risky dependency changes at review time ────────────────────────
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  # ── Publish an SBOM of the full dependency tree ──────────────────────────
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Generate SPDX SBOM (npm + Cargo)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: devtool-sbom.spdx.json
+          output-file: devtool-sbom.spdx.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom
+          path: devtool-sbom.spdx.json
+
+  # ── The claims in SECURITY.md, asserted as a test ────────────────────────
+  claims:
+    name: Verify SECURITY.md claims
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Assert the documented guarantees still hold
+        run: ./scripts/check-security-claims.sh

@@ -5,6 +5,9 @@ A fast, **offline-first** desktop toolbox for developers — 24 everyday utiliti
 [![Latest release](https://img.shields.io/github/v/release/DianaSensei/developer-desktop-utils?sort=semver&display_name=tag&logo=github&label=release)](https://github.com/DianaSensei/developer-desktop-utils/releases/latest)
 [![Release](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml/badge.svg)](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/release.yml)
 [![Coverage](https://codecov.io/gh/DianaSensei/developer-desktop-utils/branch/main/graph/badge.svg)](https://codecov.io/gh/DianaSensei/developer-desktop-utils)
+[![Security](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/security.yml/badge.svg)](https://github.com/DianaSensei/developer-desktop-utils/actions/workflows/security.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/DianaSensei/developer-desktop-utils/badge)](https://scorecard.dev/viewer/?uri=github.com/DianaSensei/developer-desktop-utils)
+[![Known vulnerabilities](https://snyk.io/test/github/DianaSensei/developer-desktop-utils/badge.svg)](https://snyk.io/test/github/DianaSensei/developer-desktop-utils)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -103,6 +106,29 @@ A full per-tool breakdown (clipboard, file, network, what's stored) is in [docs/
 - **Signed updates.** Release binaries and the update manifest are cryptographically signed; the in-app updater verifies the signature before applying an update.
 - **Open source & auditable.** The entire codebase is public — nothing closed is fetched or executed at runtime.
 
+### Don't trust it — verify it
+
+Every claim above is checkable without reading the whole codebase:
+
+```bash
+# 1. Prove the binary you downloaded was built by this repo's CI, from this source.
+gh attestation verify ./DevTool_1.0.0_aarch64.dmg --repo DianaSensei/developer-desktop-utils
+
+# 2. Or check provenance + published SHA256 checksums in one go.
+./scripts/verify-release.sh v1.0.0
+
+# 3. Re-run the assertions behind every security claim we make.
+./scripts/check-security-claims.sh
+```
+
+Each release also ships an **SPDX SBOM** of the full npm + Cargo dependency tree,
+and every push is scanned by CodeQL, `npm audit`, `cargo audit`, and a secret
+scanner ([Security workflow](.github/workflows/security.yml)).
+
+**[SECURITY.md](SECURITY.md)** has the full threat model, the verification steps
+in detail, and an honest list of the limitations — including the ones that are
+uncomfortable to write down.
+
 Found a security issue? Please open a private report via the repository's **Security → Report a vulnerability** tab rather than a public issue.
 
 ---
@@ -138,6 +164,7 @@ To build distributable installers: `npm run tauri:build` → output in `src-taur
 
 ## Contributing & docs
 
+- **[SECURITY.md](SECURITY.md)** — threat model, supply-chain guarantees & how to verify a build
 - **[docs/human/SETUP.md](docs/human/SETUP.md)** — setup, build & troubleshooting
 - **[docs/human/CONTRIBUTING.md](docs/human/CONTRIBUTING.md)** — how to add a tool, step by step
 - **[docs/human/TOOLS.md](docs/human/TOOLS.md)** — per-tool system access, permissions & storage
