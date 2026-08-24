@@ -77,6 +77,17 @@ else
   pass "no private key material in the repository"
 fi
 
+# ── Every GitHub Action is pinned to an immutable commit SHA ────────────────
+# A tag like @v4 can be repointed by whoever owns the action, which would run
+# their new code inside the release job — next to the updater signing key.
+unpinned="$(grep -rhn 'uses: .*@' .github/workflows/ | grep -vE '@[0-9a-f]{40}' || true)"
+if [ -n "$unpinned" ]; then
+  bad "every action in .github/workflows is pinned to a commit SHA"
+  printf '        %s\n' "$unpinned"
+else
+  pass "every action in .github/workflows is pinned to a commit SHA"
+fi
+
 # ── The release pipeline still produces verifiable output ───────────────────
 rel=.github/workflows/release.yml
 check "release workflow emits build provenance attestations" \

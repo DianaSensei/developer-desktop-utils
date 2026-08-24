@@ -59,6 +59,11 @@ between you and content you choose to load. See
 - **SHA256SUMS** are published with each release, per platform.
 - **SBOM** (SPDX) is published with each release, covering both the npm and the
   Cargo dependency trees.
+- **Every GitHub Action is pinned to a commit SHA**, not a mutable tag. A tag
+  like `@v4` can be repointed by whoever controls the action's repository — as
+  happened to `tj-actions/changed-files` in March 2025 — which would run their
+  code inside the release job, next to the updater signing key. Pinned SHAs
+  cannot be swapped; Dependabot proposes upgrades as reviewable PRs.
 - **Updater signing** uses a minisign keypair; the private half lives only in
   `secrets.TAURI_SIGNING_PRIVATE_KEY`. The app refuses an update whose signature
   does not verify against the embedded public key.
