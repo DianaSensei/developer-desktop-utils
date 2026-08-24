@@ -47,13 +47,22 @@ jobs:
       - uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
         with:
           tool: cargo-audit
-      # Plain `cargo audit` prints unmaintained/unsound/yanked notices as
-      # warnings but exits non-zero only for actual vulnerabilities. Those
-      # warnings come from crates pulled in by tauri/lapin/glib — not ours to
-      # fix, and not a reason to block every PR (`--deny warnings` would).
+      # `cargo audit` fails on vulnerabilities; unmaintained/unsound/yanked
+      # notices are reported as warnings and do not block (`--deny warnings`
+      # would, and those crates come from tauri/lapin/glib — not ours to fix).
+      #
+      # The two ignores below are vulnerabilities with no reachable fix. Both
+      # are denial-of-service on parsing attacker-supplied XML in quick-xml
+      # 0.39.4, which enters only via plist -> tauri-utils -> tauri: the only
+      # XML parsed on that path is our own Info.plist, at compile time. The fix
+      # needs quick-xml >= 0.41 and upstream `plist` has not adopted it. Drop
+      # these the next time Tauri is upgraded and re-check.
       - name: Audit Cargo.lock
         working-directory: src-tauri
-        run: cargo audit
+        run: |
+          cargo audit \
+            --ignore RUSTSEC-2026-0194 \
+            --ignore RUSTSEC-2026-0195
 
   # NOTE: CodeQL is not run from this workflow. The repository has CodeQL
   # "default setup" enabled, which already analyses javascript-typescript, rust,
