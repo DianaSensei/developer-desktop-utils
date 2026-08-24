@@ -144,6 +144,8 @@ export const DICTIONARY = {
   'settings.tools.enableAll': { vi: 'Bật tất cả', en: 'Enable all' },
   'settings.tools.disableAll': { vi: 'Tắt tất cả', en: 'Disable all' },
   'settings.tools.count': { vi: '{{count}} tool', en: '{{count}} tools' },
+  'settings.tools.enableAria': { vi: 'Bật {{label}}', en: 'Enable {{label}}' },
+  'settings.tools.disableAria': { vi: 'Tắt {{label}}', en: 'Disable {{label}}' },
   'settings.tools.dragReorder': { vi: 'Kéo để sắp xếp lại', en: 'Drag to reorder' },
   'settings.tools.dragReorderGroup': { vi: 'Kéo để sắp xếp lại {{label}}', en: 'Drag to reorder {{label}}' },
 
