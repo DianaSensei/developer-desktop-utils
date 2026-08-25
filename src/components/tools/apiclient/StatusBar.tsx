@@ -18,11 +18,11 @@ export function StatusBar({ onSearch, onCookies, cookieCount, onRuntimeVars, run
         <span className="font-medium tracking-wide">API Client</span>
         {sandboxDegraded && (
           <span
-            title="The script sandbox worker failed to load — scripts are running unsandboxed on the main thread with no timeout, so an infinite loop will freeze the app. Retrying periodically."
+            title="The script sandbox worker failed to load, so scripts, vars and assertions are being skipped. They are not run on the main thread, where a script from an imported collection could read local files and send them out. Retrying periodically."
             className="flex items-center gap-1"
           >
             <Badge tone="danger" variant="soft" className="flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> Script sandbox degraded
+              <AlertTriangle className="h-3 w-3" /> Scripts paused — no sandbox
             </Badge>
           </span>
         )}

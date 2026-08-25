@@ -3,6 +3,7 @@
 
 mod kafka;
 mod checksum;
+mod dropped;
 mod netinfo;
 mod files;
 mod mockserver;
@@ -10,6 +11,8 @@ mod ports;
 mod rabbit;
 mod redis_tool;
 mod container_tool;
+
+use tauri::Manager;
 
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
@@ -47,6 +50,23 @@ fn main() {
                 _app.set_menu(menu)?;
             }
             Ok(())
+        })
+        .manage(dropped::DroppedPaths::default())
+        // Record what the user drags onto the window, so `read_file_data_url`
+        // and `hash_file` can serve dropped files without accepting any path
+        // the frontend cares to name. `Enter` matters as much as `Drop`: Tauri
+        // notifies the webview before these listeners run, and only `Enter`
+        // reliably precedes the frontend's invoke. See dropped.rs.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(drag) = event {
+                match drag {
+                    tauri::DragDropEvent::Enter { paths, .. }
+                    | tauri::DragDropEvent::Drop { paths, .. } => {
+                        window.state::<dropped::DroppedPaths>().remember(paths);
+                    }
+                    _ => {}
+                }
+            }
         })
         .manage(mockserver::MockState::default())
         .manage(rabbit::ConsumerRegistry::default())

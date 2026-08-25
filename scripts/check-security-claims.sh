@@ -70,6 +70,16 @@ check "fs scope is limited to appdata" \
 check "no fs:scope-home / fs:scope-document grants" \
   not grep -qE '"fs:scope-(home|document|desktop|download)' src-tauri/capabilities/default.json
 
+# The two commands that bypass the fs plugin and take a raw path must each
+# check it against the paths Rust saw in the native drag event. Without this
+# they are a read-any-file primitive for whatever runs in the webview.
+check "read_file_data_url only reads dragged-in paths" \
+  grep -q 'DroppedPaths>().is_allowed' src-tauri/src/files.rs
+check "hash_file only reads dragged-in paths" \
+  grep -q 'DroppedPaths>().is_allowed' src-tauri/src/checksum.rs
+check "the drag listener that feeds that allowlist is registered" \
+  grep -q 'DroppedPaths>().remember' src-tauri/src/main.rs
+
 # ── No secrets committed to the tree ────────────────────────────────────────
 if grep -rn -- '-----BEGIN [A-Z ]*PRIVATE KEY-----' --exclude-dir=.git --exclude-dir=node_modules . >/dev/null 2>&1; then
   bad "no private key material in the repository"

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  ScriptTimeoutError, __setSandboxWorkerFactory, runPhaseSandboxed, stopScriptSandbox,
+  ScriptSandboxUnavailableError, ScriptTimeoutError, __setSandboxWorkerFactory,
+  runPhaseSandboxed, stopScriptSandbox,
 } from './scriptHost';
 import type { PhaseInput, PhaseOutput } from './scriptPhases';
 import { newRequest } from './types';
@@ -51,21 +52,35 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('runPhaseSandboxed — fallback', () => {
-  it('runs in-process when no worker is available', async () => {
+describe('runPhaseSandboxed — no sandbox means no execution', () => {
+  // The point of these three: a collection script must never execute on the
+  // main thread, where it would reach window, app storage and the Tauri IPC
+  // bridge. Refusing the phase is the correct outcome, not a fallback.
+
+  it('refuses to run when no worker is available', async () => {
     // jsdom provides no Worker, and no factory is installed.
-    const out = await runPhaseSandboxed(prePhase('bru.setVar("x", "1");'));
-    expect(out.stores.runtime.x).toBe('1');
-    expect(out.errors).toEqual([]);
+    await expect(runPhaseSandboxed(prePhase('bru.setVar("x", "1");')))
+      .rejects.toBeInstanceOf(ScriptSandboxUnavailableError);
   });
 
-  it('falls back for the rest of the session when the worker fails to construct', async () => {
+  it('refuses to run when the worker fails to construct', async () => {
     __setSandboxWorkerFactory(() => { throw new Error('no workers here'); });
-    const out = await runPhaseSandboxed(prePhase('bru.setVar("y", "2");'));
-    expect(out.stores.runtime.y).toBe('2');
+    await expect(runPhaseSandboxed(prePhase('bru.setVar("y", "2");')))
+      .rejects.toBeInstanceOf(ScriptSandboxUnavailableError);
   });
 
-  it('keeps falling back within the reprobe window, then retries construction once it elapses', async () => {
+  it('does not evaluate the script it refuses', async () => {
+    // A script with a visible side effect: if the refusal ever regressed into a
+    // main-thread fallback, this global would be set.
+    const g = globalThis as Record<string, unknown>;
+    delete g.__sandboxEscape;
+    __setSandboxWorkerFactory(() => { throw new Error('no workers here'); });
+    await expect(runPhaseSandboxed(prePhase('globalThis.__sandboxEscape = true;')))
+      .rejects.toBeInstanceOf(ScriptSandboxUnavailableError);
+    expect(g.__sandboxEscape).toBeUndefined();
+  });
+
+  it('keeps refusing within the reprobe window, then retries construction once it elapses', async () => {
     vi.useFakeTimers();
     let attempts = 0;
     __setSandboxWorkerFactory(() => {
@@ -74,15 +89,16 @@ describe('runPhaseSandboxed — fallback', () => {
       return new FakeWorker('reply') as unknown as Worker;
     });
 
-    await runPhaseSandboxed(prePhase('// a'));
+    await expect(runPhaseSandboxed(prePhase('// a'))).rejects.toThrow();
     expect(attempts).toBe(1);
 
-    // Still inside the 30s reprobe window: no retry, stays on the fallback.
-    await runPhaseSandboxed(prePhase('// b'));
+    // Still inside the 30s reprobe window: no retry, still refusing.
+    await expect(runPhaseSandboxed(prePhase('// b'))).rejects.toThrow();
     expect(attempts).toBe(1);
 
     vi.advanceTimersByTime(30_001);
 
+    // Sandbox is back, so scripts run again.
     const out = await runPhaseSandboxed(prePhase('// c'));
     expect(attempts).toBe(2);
     expect(out.tests).toEqual([{ name: 'from worker', passed: true }]);
