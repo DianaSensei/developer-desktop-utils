@@ -191,7 +191,7 @@ import { Button, Card, Input, Select, Segmented, ToolSection, PaneHeader, cn } f
 ```
 
 **Primitives** (shadcn-style, Radix-based, in `src/components/ui/`, re-exported by `src/design-system/index.ts`):
-`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`, `StatusDot`, `ContextMenu` (+ `useContextMenu`), `ConfirmDialog`, `SearchInput`, `Tabs`, `Callout`, `Badge`, `Spinner` (+ `LoadingRow`), `SectionLabel`, `CollapsibleSection`, `Stat` (+ `StatGrid`).
+`Button`, `Card`(+ parts), `Input`, `Textarea`, `Label`, `Select`(+ parts), `Switch`, `Dialog`(+ parts), `ModalShell`, `Tooltip`, `Segmented`, `CopyButton`, `EmptyState`, `DropZone`, `IconButton`, `DropdownMenu`(+ parts), `SplitPane`, `StatusDot`, `ContextMenu` (+ `useContextMenu`), `ConfirmDialog`, `SearchInput`, `Tabs`, `Callout`, `Badge`, `Spinner` (+ `LoadingRow`), `SectionLabel`, `CollapsibleSection`, `Stat` (+ `StatGrid`).
 
 **Data display:**
 `DataTable`, `Thead`, `Tbody`, `Tr`, `Th`, `Td`.
@@ -260,6 +260,16 @@ These patterns kept getting reimplemented per-tool with small drifting variation
     confirmLabel="Delete"
     onConfirm={() => store.deleteCollection(id)}
   />
+  ```
+- **`ModalShell`** — centred modal chrome for a modal rendered conditionally by its parent (no trigger element to bind to; with a trigger, reach for `Dialog`). Supplies the whole dialog contract in one place: backdrop, `role="dialog"` + `aria-modal`, an `aria-labelledby` header, an `aria-label`led close button, Escape, a Tab trap, and focus restored on close. Do not hand-roll `createPortal` + a fixed `<div>`.
+  ```tsx
+  <ModalShell
+    onClose={onCancel}
+    title={form.id ? 'Edit Connection' : 'Add Connection'}
+    footer={<Button onClick={handleSubmit}>Save</Button>}
+  >
+    {/* form fields */}
+  </ModalShell>
   ```
 - **`SearchInput`** — the icon-in-input search box (sidebar filters, list-view search, collection search). Wraps `Input`; do not reposition a `Search` icon by hand again.
   ```tsx

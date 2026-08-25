@@ -140,8 +140,11 @@ export function ImageBase64Tool() {
                 <div className="relative rounded-lg border bg-bg-2/20 p-3 flex items-center justify-center min-h-[160px]">
                   <img src={encodeDataUrl} alt="preview" className="max-h-48 max-w-full rounded object-contain" />
                   <button
+                    type="button"
                     onClick={clearEncode}
-                    className="absolute top-2 right-2 p-1 rounded-md bg-bg/80 border hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors"
+                    aria-label="Remove image"
+                    title="Remove image"
+                    className="absolute top-2 right-2 p-1 rounded-md bg-bg/80 border hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

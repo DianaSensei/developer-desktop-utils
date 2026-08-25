@@ -168,7 +168,14 @@ export function PasswordHash() {
                   className="h-ctl-lg pr-9 font-mono text-sm"
                   onKeyDown={(e) => { if (e.key === 'Enter' && password) void runHash(); }}
                 />
-                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg">
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  title={showPw ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPw}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+                >
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
@@ -207,7 +214,14 @@ export function PasswordHash() {
                   placeholder="Enter the password…"
                   className="h-ctl-lg pr-9 font-mono text-sm"
                 />
-                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg">
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  title={showPw ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPw}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+                >
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>

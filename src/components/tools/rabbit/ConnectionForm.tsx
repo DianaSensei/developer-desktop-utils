@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { X, Info, CheckCircle2 } from 'lucide-react';
+import { Info, CheckCircle2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Callout } from '@/components/ui/callout';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
@@ -158,213 +158,15 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
     }
   };
 
-  // Portal to <body> so the fixed overlay escapes the tool's entrance-animation
-  // wrapper (an animating `transform` ancestor would offset a fixed child).
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
-    >
-      <div className="bg-bg border rounded-lg shadow-xl w-full max-w-md mx-4 p-6 max-h-[88vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-semibold text-base">
-            {form.id ? 'Edit Connection' : 'Add Connection'}
-          </h2>
-          <button onClick={onCancel} className="text-fg-mute hover:text-fg">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="rb-name">Name</Label>
-            <Input
-              id="rb-name"
-              value={form.name}
-              onChange={(e) => set('name', e.target.value)}
-              placeholder="Local RabbitMQ"
-              className="mt-1"
-            />
-          </div>
-
-          {/* AMQP addresses — the only required part. Accepts a comma-separated list. */}
-          <div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="rb-hosts">Addresses</Label>
-              <button
-                type="button"
-                onClick={() => setShowUri((s) => !s)}
-                className="text-[11px] text-fg-mute hover:text-fg"
-                title="Fill the fields from an amqp:// URI"
-              >
-                {showUri ? 'Hide URI' : 'Paste URI'}
-              </button>
-            </div>
-            <Input
-              id="rb-hosts"
-              value={hostsText}
-              onChange={(e) => onHostsChange(e.target.value)}
-              placeholder="127.0.0.1:5672, broker2:5672"
-              className="mt-1 font-mono text-sm"
-            />
-            <p className="text-xs text-fg-mute mt-1">
-              <span className="font-mono">host:port</span>, comma-separated. The first is primary; the rest are tried on failover. Default port <span className="font-mono">{defaultPort(form.useTls)}</span> ({form.useTls ? 'amqps' : 'amqp'}).
-            </p>
-            {showUri && (
-              <div className="mt-2 flex gap-1">
-                <Input
-                  id="rb-uri"
-                  value={uri}
-                  onChange={(e) => setUri(e.target.value)}
-                  placeholder="amqp://user:pass@host1:5672,host2:5672/vhost"
-                  className="font-mono text-xs"
-                  autoFocus
-                />
-                <Button type="button" variant="outline" size="sm" onClick={applyUri} disabled={!uri.trim()}>Fill</Button>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="rb-user">Username</Label>
-              <Input
-                id="rb-user"
-                value={form.username}
-                onChange={(e) => set('username', e.target.value)}
-                placeholder="guest"
-                className="mt-1 font-mono text-sm"
-              />
-            </div>
-            <div>
-              <Label htmlFor="rb-pass">Password</Label>
-              <Input
-                id="rb-pass"
-                type="password"
-                value={form.password}
-                onChange={(e) => set('password', e.target.value)}
-                placeholder="guest"
-                className="mt-1 font-mono text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
-            <div>
-              <Label htmlFor="rb-tls" className="cursor-pointer">Use TLS</Label>
-              <p className="text-[11px] text-fg-mute mt-0.5">
-                Connect over <span className="font-mono">amqps</span> (and <span className="font-mono">https</span> for the management API).
-              </p>
-            </div>
-            <Switch checked={form.useTls} onCheckedChange={onTlsChange} aria-label="Use TLS" />
-          </div>
-
-          {/* Management API — optional. Powers browse-all lists, overview and
-              connections; never required to publish/consume/request over AMQP. */}
-          <div className="rounded-md border">
-            <div className="flex items-center justify-between px-3 py-2.5">
-              <div className="pr-2">
-                <Label className="cursor-pointer">Management API <span className="font-normal text-fg-mute">— optional</span></Label>
-                <p className="text-[11px] text-fg-mute mt-0.5">
-                  Adds browse-all queues &amp; exchanges, the overview dashboard and connections — needs the RabbitMQ <span className="font-medium">management</span> plugin. Leave off to work over AMQP with typed names.
-                </p>
-              </div>
-              <Switch checked={!amqpOnly} onCheckedChange={(v) => set('amqpOnly', !v)} aria-label="Enable management API" />
-            </div>
-            {!amqpOnly && (
-              <div className="px-3 pb-3 border-t pt-3">
-                <Label htmlFor="rb-port" className="text-xs">Management port</Label>
-                <Input
-                  id="rb-port"
-                  type="number"
-                  value={form.port}
-                  onChange={(e) => set('port', Number(e.target.value))}
-                  className="mt-1 font-mono text-sm h-ctl w-32"
-                />
-                <p className="text-[11px] text-fg-mute mt-1">
-                  Default <span className="font-mono">15672</span> on <span className="font-mono">{form.host || 'host'}</span> ({form.useTls ? 'https' : 'http'}).
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Advanced / TLS */}
-          <CollapsibleSection
-            variant="bordered"
-            title="Advanced / TLS"
-            hint="— vhost, heartbeat, name, CA, client cert"
-            open={showAdvanced}
-            onOpenChange={setShowAdvanced}
-            headerClassName="-mx-3 px-3"
-            bodyClassName="-mx-3 border-t px-3 pb-3 pt-3 space-y-3"
-          >
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="rb-hb" className="text-xs">Heartbeat (s)</Label>
-                <Input
-                  id="rb-hb" type="number" value={form.heartbeat ?? ''}
-                  onChange={(e) => set('heartbeat', e.target.value ? Number(e.target.value) : null)}
-                  placeholder="30" className="mt-1 font-mono text-xs h-ctl"
-                />
-              </div>
-              <div>
-                <Label htmlFor="rb-cn" className="text-xs">Connection name</Label>
-                <Input
-                  id="rb-cn" value={form.connectionName ?? ''}
-                  onChange={(e) => set('connectionName', e.target.value || null)}
-                  placeholder="devtool" className="mt-1 font-mono text-xs h-ctl"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="rb-vhost" className="text-xs">Virtual host</Label>
-              <Input
-                id="rb-vhost"
-                value={form.vhost}
-                onChange={(e) => set('vhost', e.target.value)}
-                placeholder="/"
-                className="mt-1 font-mono text-xs h-ctl"
-              />
-              <p className="text-[11px] text-fg-mute mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Addresses field above for HA failover.</p>
-            </div>
-            <div>
-              <Label htmlFor="rb-ca" className="text-xs">Trust CA certificate (PEM)</Label>
-              <Textarea
-                id="rb-ca" value={form.tlsCaPem ?? ''}
-                onChange={(e) => set('tlsCaPem', e.target.value || null)}
-                placeholder="-----BEGIN CERTIFICATE-----" className="mt-1 font-mono text-[11px] min-h-16"
-              />
-              <p className="text-[11px] text-fg-mute mt-1">For self-signed / private brokers (amqps). The proper alternative to disabling verification.</p>
-            </div>
-            <div>
-              <Label htmlFor="rb-p12" className="text-xs">Client identity — PKCS#12 (base64)</Label>
-              <Textarea
-                id="rb-p12" value={form.clientPkcs12B64 ?? ''}
-                onChange={(e) => set('clientPkcs12B64', e.target.value || null)}
-                placeholder="MII… (base64 of a .p12/.pfx for mutual TLS)" className="mt-1 font-mono text-[11px] min-h-16"
-              />
-            </div>
-            <div>
-              <Label htmlFor="rb-p12pw" className="text-xs">PKCS#12 password</Label>
-              <Input
-                id="rb-p12pw" type="password" value={form.clientPkcs12Password ?? ''}
-                onChange={(e) => set('clientPkcs12Password', e.target.value || null)}
-                className="mt-1 font-mono text-xs h-ctl"
-              />
-            </div>
-          </CollapsibleSection>
-
-          <Callout tone="warning" size="sm" icon={Info}>
-            Credentials are stored on this device. {amqpOnly
-              ? <>They're used only over AMQP ({form.useTls ? 'amqps' : 'amqp'}); no management API is contacted.</>
-              : <>They're used over AMQP and also sent as HTTP Basic auth to the management API.</>}
-          </Callout>
-
-          {error && <Callout tone="error" size="sm">{error}</Callout>}
-          {tested === 'ok' && <Callout tone="success" size="sm" icon={CheckCircle2}>Connection successful</Callout>}
-        </div>
-
-        <div className="flex justify-between gap-2 mt-6">
+  // ModalShell portals to <body>, so the fixed overlay escapes the tool's
+  // entrance-animation wrapper (an animating `transform` ancestor would offset
+  // a fixed child).
+  return (
+    <ModalShell
+      onClose={onCancel}
+      title={form.id ? 'Edit Connection' : 'Add Connection'}
+      footer={
+        <>
           <Button variant="outline" onClick={handleTest} disabled={testing || saving}>
             {testing ? <><Spinner className="mr-1.5" />Testing…</> : 'Test'}
           </Button>
@@ -374,9 +176,197 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="rb-name">Name</Label>
+          <Input
+            id="rb-name"
+            value={form.name}
+            onChange={(e) => set('name', e.target.value)}
+            placeholder="Local RabbitMQ"
+            className="mt-1"
+          />
         </div>
+
+        {/* AMQP addresses — the only required part. Accepts a comma-separated list. */}
+        <div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="rb-hosts">Addresses</Label>
+            <button
+              type="button"
+              onClick={() => setShowUri((s) => !s)}
+              className="text-[11px] text-fg-mute hover:text-fg"
+              title="Fill the fields from an amqp:// URI"
+            >
+              {showUri ? 'Hide URI' : 'Paste URI'}
+            </button>
+          </div>
+          <Input
+            id="rb-hosts"
+            value={hostsText}
+            onChange={(e) => onHostsChange(e.target.value)}
+            placeholder="127.0.0.1:5672, broker2:5672"
+            className="mt-1 font-mono text-sm"
+          />
+          <p className="text-xs text-fg-mute mt-1">
+            <span className="font-mono">host:port</span>, comma-separated. The first is primary; the rest are tried on failover. Default port <span className="font-mono">{defaultPort(form.useTls)}</span> ({form.useTls ? 'amqps' : 'amqp'}).
+          </p>
+          {showUri && (
+            <div className="mt-2 flex gap-1">
+              <Input
+                id="rb-uri"
+                value={uri}
+                onChange={(e) => setUri(e.target.value)}
+                placeholder="amqp://user:pass@host1:5672,host2:5672/vhost"
+                className="font-mono text-xs"
+                autoFocus
+              />
+              <Button type="button" variant="outline" size="sm" onClick={applyUri} disabled={!uri.trim()}>Fill</Button>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="rb-user">Username</Label>
+            <Input
+              id="rb-user"
+              value={form.username}
+              onChange={(e) => set('username', e.target.value)}
+              placeholder="guest"
+              className="mt-1 font-mono text-sm"
+            />
+          </div>
+          <div>
+            <Label htmlFor="rb-pass">Password</Label>
+            <Input
+              id="rb-pass"
+              type="password"
+              value={form.password}
+              onChange={(e) => set('password', e.target.value)}
+              placeholder="guest"
+              className="mt-1 font-mono text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
+          <div>
+            <Label htmlFor="rb-tls" className="cursor-pointer">Use TLS</Label>
+            <p className="text-[11px] text-fg-mute mt-0.5">
+              Connect over <span className="font-mono">amqps</span> (and <span className="font-mono">https</span> for the management API).
+            </p>
+          </div>
+          <Switch checked={form.useTls} onCheckedChange={onTlsChange} aria-label="Use TLS" />
+        </div>
+
+        {/* Management API — optional. Powers browse-all lists, overview and
+            connections; never required to publish/consume/request over AMQP. */}
+        <div className="rounded-md border">
+          <div className="flex items-center justify-between px-3 py-2.5">
+            <div className="pr-2">
+              <Label className="cursor-pointer">Management API <span className="font-normal text-fg-mute">— optional</span></Label>
+              <p className="text-[11px] text-fg-mute mt-0.5">
+                Adds browse-all queues &amp; exchanges, the overview dashboard and connections — needs the RabbitMQ <span className="font-medium">management</span> plugin. Leave off to work over AMQP with typed names.
+              </p>
+            </div>
+            <Switch checked={!amqpOnly} onCheckedChange={(v) => set('amqpOnly', !v)} aria-label="Enable management API" />
+          </div>
+          {!amqpOnly && (
+            <div className="px-3 pb-3 border-t pt-3">
+              <Label htmlFor="rb-port" className="text-xs">Management port</Label>
+              <Input
+                id="rb-port"
+                type="number"
+                value={form.port}
+                onChange={(e) => set('port', Number(e.target.value))}
+                className="mt-1 font-mono text-sm h-ctl w-32"
+              />
+              <p className="text-[11px] text-fg-mute mt-1">
+                Default <span className="font-mono">15672</span> on <span className="font-mono">{form.host || 'host'}</span> ({form.useTls ? 'https' : 'http'}).
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Advanced / TLS */}
+        <CollapsibleSection
+          variant="bordered"
+          title="Advanced / TLS"
+          hint="— vhost, heartbeat, name, CA, client cert"
+          open={showAdvanced}
+          onOpenChange={setShowAdvanced}
+          headerClassName="-mx-3 px-3"
+          bodyClassName="-mx-3 border-t px-3 pb-3 pt-3 space-y-3"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="rb-hb" className="text-xs">Heartbeat (s)</Label>
+              <Input
+                id="rb-hb" type="number" value={form.heartbeat ?? ''}
+                onChange={(e) => set('heartbeat', e.target.value ? Number(e.target.value) : null)}
+                placeholder="30" className="mt-1 font-mono text-xs h-ctl"
+              />
+            </div>
+            <div>
+              <Label htmlFor="rb-cn" className="text-xs">Connection name</Label>
+              <Input
+                id="rb-cn" value={form.connectionName ?? ''}
+                onChange={(e) => set('connectionName', e.target.value || null)}
+                placeholder="devtool" className="mt-1 font-mono text-xs h-ctl"
+              />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="rb-vhost" className="text-xs">Virtual host</Label>
+            <Input
+              id="rb-vhost"
+              value={form.vhost}
+              onChange={(e) => set('vhost', e.target.value)}
+              placeholder="/"
+              className="mt-1 font-mono text-xs h-ctl"
+            />
+            <p className="text-[11px] text-fg-mute mt-1">Default <span className="font-mono">/</span>. Add multiple hosts in the Addresses field above for HA failover.</p>
+          </div>
+          <div>
+            <Label htmlFor="rb-ca" className="text-xs">Trust CA certificate (PEM)</Label>
+            <Textarea
+              id="rb-ca" value={form.tlsCaPem ?? ''}
+              onChange={(e) => set('tlsCaPem', e.target.value || null)}
+              placeholder="-----BEGIN CERTIFICATE-----" className="mt-1 font-mono text-[11px] min-h-16"
+            />
+            <p className="text-[11px] text-fg-mute mt-1">For self-signed / private brokers (amqps). The proper alternative to disabling verification.</p>
+          </div>
+          <div>
+            <Label htmlFor="rb-p12" className="text-xs">Client identity — PKCS#12 (base64)</Label>
+            <Textarea
+              id="rb-p12" value={form.clientPkcs12B64 ?? ''}
+              onChange={(e) => set('clientPkcs12B64', e.target.value || null)}
+              placeholder="MII… (base64 of a .p12/.pfx for mutual TLS)" className="mt-1 font-mono text-[11px] min-h-16"
+            />
+          </div>
+          <div>
+            <Label htmlFor="rb-p12pw" className="text-xs">PKCS#12 password</Label>
+            <Input
+              id="rb-p12pw" type="password" value={form.clientPkcs12Password ?? ''}
+              onChange={(e) => set('clientPkcs12Password', e.target.value || null)}
+              className="mt-1 font-mono text-xs h-ctl"
+            />
+          </div>
+        </CollapsibleSection>
+
+        <Callout tone="warning" size="sm" icon={Info}>
+          Credentials are stored on this device. {amqpOnly
+            ? <>They're used only over AMQP ({form.useTls ? 'amqps' : 'amqp'}); no management API is contacted.</>
+            : <>They're used over AMQP and also sent as HTTP Basic auth to the management API.</>}
+        </Callout>
+
+        {error && <Callout tone="error" size="sm">{error}</Callout>}
+        {tested === 'ok' && <Callout tone="success" size="sm" icon={CheckCircle2}>Connection successful</Callout>}
       </div>
-    </div>,
-    document.body,
+    </ModalShell>
   );
 }

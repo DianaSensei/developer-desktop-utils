@@ -200,21 +200,42 @@ We would rather write these down than have you find them.
    can issue arbitrary outbound HTTP requests. The mitigation is the CSP (no
    remote code can get into the webview to abuse it) plus the fact that requests
    are user-initiated.
-2. **API Client scripts are not sandboxed.** Pre/post-request scripts run through
-   the `AsyncFunction` constructor in the app's own JS context
-   (`src/components/tools/apiclient/runtime.ts`). This is the same trust model as
-   Postman and Bruno: the scripts are *your* scripts. **Do not paste or import a
-   collection containing scripts you have not read** — treat a `.bru`/Postman
-   collection from a stranger like an executable.
-3. **macOS builds are ad-hoc signed, not notarized.** `signingIdentity: "-"` —
+2. **API Client scripts still execute — the sandbox bounds them, it does not
+   vet them.** Pre/post-request scripts, `vars` expressions and assertions are
+   real JavaScript, built with the `AsyncFunction` constructor. They run inside
+   a dedicated Web Worker (`src/components/tools/apiclient/scriptSandbox.worker.ts`,
+   driven by `scriptHost.ts`), which buys three things: a runaway script can be
+   killed by terminating the worker instead of freezing the app; a script has no
+   `window`, no `document`, no `localStorage`, and no `__TAURI_INTERNALS__`, so
+   it cannot invoke a Tauri command or read a local file; and if the worker
+   cannot start, phases are **refused** rather than quietly re-run on the main
+   thread (`ScriptSandboxUnavailableError` — the UI says so, and it re-probes).
+   What a script *does* get is the `bru`/`req`/`res`/`pm` surface, the curated
+   `require()` list in `modules.ts`, and — in a browser build without the app's
+   CSP — worker `fetch`. So the trust model is still Postman's and Bruno's: the
+   scripts are *your* scripts. **Do not import a collection containing scripts
+   you have not read** — treat a `.bru`/Postman collection from a stranger like
+   an executable. Importing a collection that carries scripts stops on a consent
+   screen that lists every script and defaults to *import without scripts*
+   (`ImportReviewDialog.tsx`); read that screen rather than clicking through it.
+   Verify the worker boundary yourself: `grep -n "new Worker" src/components/tools/apiclient/scriptHost.ts`.
+3. **Most of the Encrypt tab is interop, not protection.** `AES-256 GCM` is the
+   default and the real one: PBKDF2-HMAC-SHA256 at 600k iterations into
+   AES-256-GCM, through WebCrypto (`src/lib/aesGcm.ts`), with a fresh salt and
+   IV per message and a tag that catches tampering. Every *other* mode in that
+   list goes through `crypto-js` on purpose — they exist so you can read what a
+   `crypto-js` caller wrote — and `crypto-js` stretches a passphrase with
+   OpenSSL's EvpKDF: **MD5, one iteration**, and authenticates nothing. The UI
+   says so on every one of them. Do not protect anything real with those modes.
+4. **macOS builds are ad-hoc signed, not notarized.** `signingIdentity: "-"` —
    we do not yet have an Apple Developer certificate, which is why Gatekeeper
    complains and `xattr -cr` is needed. Verify the attestation (step 1) before
    you clear the quarantine flag. Windows builds are likewise not
    Authenticode-signed, so SmartScreen may warn.
-4. **Third-party services you point tools at** (DNS-over-HTTPS resolvers, IP
+5. **Third-party services you point tools at** (DNS-over-HTTPS resolvers, IP
    geolocation, your Kafka/RabbitMQ/Redis/Docker endpoints) see the queries you
    send them. That is the tool doing its job, not the app phoning home.
-5. **Credentials you enter** (broker passwords, API tokens) are stored by the
+6. **Credentials you enter** (broker passwords, API tokens) are stored by the
    Tauri `store` plugin as files under the OS app-data directory, not in an OS
    keychain, and not encrypted at rest. Anyone with your user account can read
    them. Treat that like a `.env` file.

@@ -7,6 +7,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { randomInt, randomString, randomUnitFloat } from '@/lib/secureRandom';
 
 type Mode = 'uuid' | 'number' | 'text';
 
@@ -19,21 +20,12 @@ const CHARSETS = {
 
 type CharsetKey = keyof typeof CHARSETS;
 
-function randomText(length: number, charset: string): string {
-  if (!charset) return '';
-  let result = '';
-  const arr = new Uint32Array(length);
-  crypto.getRandomValues(arr);
-  for (let i = 0; i < length; i++) {
-    result += charset[arr[i] % charset.length];
-  }
-  return result;
-}
-
 function randomNumber(min: number, max: number, decimals: number): string {
-  const range = max - min;
-  const val = min + Math.random() * range;
-  return decimals === 0 ? Math.floor(val).toString() : val.toFixed(decimals);
+  // Integers are drawn inclusively across [min, max] — a "Min 1 / Max 6" die
+  // has to be able to roll a 6. Decimal draws stay half-open at the top, which
+  // is what a continuous range means.
+  if (decimals === 0) return randomInt(min, max).toString();
+  return (min + randomUnitFloat() * (max - min)).toFixed(decimals);
 }
 
 function ResultList({ items }: { items: string[] }) {
@@ -107,7 +99,7 @@ export function RandomGenerator() {
     let charset = (Object.keys(CHARSETS) as CharsetKey[]).filter((k) => charsets[k]).map((k) => CHARSETS[k]).join('');
     if (customChars) charset += customChars;
     if (!charset) return;
-    setResults(Array.from({ length: clamp(count, 1, maxTextCount) }, () => randomText(clamp(textLen, 1, maxTextLength), charset)));
+    setResults(Array.from({ length: clamp(count, 1, maxTextCount) }, () => randomString(clamp(textLen, 1, maxTextLength), charset)));
   }, [count, charsets, customChars, textLen, maxTextCount, maxTextLength]);
 
   const handleGenerate = () => {

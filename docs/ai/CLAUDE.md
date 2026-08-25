@@ -1001,6 +1001,7 @@ import { IconButton, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, Dro
 - `StatusDot` — connection/live/recording indicator dot (`tone`: `live`/`starting`/`paused`/`idle`/`error`/`recording`).
 - `ContextMenu` + `useContextMenu` — right-click menu for tree/list rows; same entry shape as `DropdownMenu`.
 - `ConfirmDialog` — confirmation for any destructive/irreversible action. Every delete/purge/disconnect-losing-state action must go through this.
+- `ModalShell` — centred modal chrome (backdrop, `role="dialog"` + `aria-modal`, named header, labelled close button, Escape, Tab trap, focus restore) for a modal the parent renders conditionally with no trigger element. With a trigger, use Radix `Dialog` instead. Never hand-roll `createPortal` + a fixed `<div>` again — every copy that did was missing a different piece of the dialog contract.
 - `SearchInput` — icon-in-input search box; wraps `Input`, don't reposition a `Search` icon by hand.
 - `Tabs` — horizontal tab strip that auto-collapses overflow into a `»` menu; use for any multi-tab view instead of a plain non-responsive tab row.
 

@@ -800,7 +800,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
               <span className="text-xs font-medium">
                 Found {parsed.length} account{parsed.length === 1 ? '' : 's'}
               </span>
-              <button onClick={toggleAll} className="text-[11px] text-acc hover:underline">
+              <button type="button" onClick={toggleAll} className="text-[11px] text-acc hover:underline">
                 {allSelected ? 'Deselect all' : 'Select all'}
               </button>
             </div>

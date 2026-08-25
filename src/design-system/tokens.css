@@ -237,3 +237,40 @@
     @apply mx-auto w-full max-w-7xl;
   }
 }
+
+/* ── Reduce motion (chốt chặn toàn cục) ──────────────────────────────────────
+   `design-system/README.md` hứa "mọi animation biến đổi transform đều nằm sau
+   `motion-safe:` và một chốt chặn `prefers-reduced-motion` toàn cục". Phần
+   `motion-safe:` thì các call site đã làm; chốt chặn toàn cục thì trước đây
+   không tồn tại — nên các animation Radix gắn sẵn trong `ui/dialog.tsx`,
+   `dropdown-menu.tsx`, `context-menu.tsx` (zoom-in-95, slide-in-from-*) vẫn
+   chạy đủ với người đã bật giảm chuyển động trong hệ điều hành. Đây là chốt đó.
+
+   Nằm ngoài `@layer` để không bị Tailwind sắp xếp lại thứ tự, và dùng
+   `!important` vì phải thắng cả utility lẫn style inline.
+
+   Hai ngoại lệ được giữ nguyên bên dưới: chúng là CHỈ BÁO TRẠNG THÁI, không
+   phải trang trí — đứng im thì mất luôn thông tin (xem ghi chú đầu
+   `ui/spinner.tsx`). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Spinner "đang bận" và chấm nhịp của kết nối live vẫn phải nhúc nhích. */
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+  .animate-pulse {
+    animation-duration: 2s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

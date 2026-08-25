@@ -1,9 +1,9 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, Workflow, FileCheck, ImageIcon, Fingerprint } from 'lucide-react';
+import { Eye, EyeOff, Lock, ArrowLeftRight, Check, X, KeyRound, Code, AlertTriangle, ShieldCheck, Workflow, FileCheck, ImageIcon, Fingerprint } from 'lucide-react';
 import { PipelineTab } from './PipelineTab';
 import { ChecksumTool } from './ChecksumTool';
 import { ImageBase64Tool } from './ImageBase64Tool';
@@ -13,12 +13,14 @@ import { Segmented } from '@/components/ui/segmented';
 import { Callout } from '@/components/ui/callout';
 import { ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import CryptoJS from 'crypto-js';
+import { EnvelopeFormatError, decryptAesGcm, encryptAesGcm, isAesGcmEnvelope } from '@/lib/aesGcm';
 import { cn } from '@/lib/utils';
 import { SectionLabel } from '@/components/ui/section-label';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Spinner } from '@/components/ui/spinner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -425,19 +427,37 @@ function computeHmac(id: AlgoId, input: string, key: string): string {
 
 // ─── Encryption algorithms ────────────────────────────────────────────────────
 
+// `family` is the honest axis, not `safe`.
+//
+//   'webcrypto' — PBKDF2-SHA256 (600k) → AES-256-GCM, via the platform. The
+//                 only option here that resists an offline guess at your
+//                 passphrase, and the only one that detects tampering.
+//   'crypto-js' — everything the `crypto-js` library produces. These exist for
+//                 INTEROP: to read what a crypto-js caller wrote and write what
+//                 one can read. They all stretch a passphrase with OpenSSL's
+//                 EvpKDF — MD5, ONE iteration — and none of them authenticate
+//                 the ciphertext. Fine for a fixture, wrong for a secret.
+//
+// ECB additionally leaks plaintext structure, which is a separate problem from
+// the KDF, so it keeps its own louder warning.
 const ENCRYPT_ALGOS = [
-  { id: 'aes-cbc',   label: 'AES-256 CBC',  desc: 'Recommended · strong symmetric encryption with random IV per message', safe: true  },
-  { id: 'aes-ctr',   label: 'AES-256 CTR',  desc: 'Stream mode · no padding needed, efficient for large data',            safe: true  },
-  { id: 'aes-ecb',   label: 'AES-256 ECB',  desc: 'Weak · identical blocks produce identical ciphertext, avoid',          safe: false },
-  { id: 'aes-cfb',   label: 'AES-256 CFB',  desc: 'Cipher feedback · stream-like, propagates errors',                    safe: true  },
-  { id: 'aes-ofb',   label: 'AES-256 OFB',  desc: 'Output feedback · stream cipher, errors do not propagate',            safe: true  },
-  { id: 'tripledes', label: 'Triple DES',   desc: 'Legacy 3DES · 112-bit effective security, widely supported',           safe: true  },
-  { id: 'rabbit',    label: 'Rabbit',       desc: 'Fast stream cipher · compact key setup, 128-bit key',                  safe: true  },
+  { id: 'aes-gcm',   label: 'AES-256 GCM',  family: 'webcrypto', desc: 'Recommended · PBKDF2-SHA256 (600k) key stretching, authenticated, random salt + IV per message', weak: false },
+  { id: 'aes-cbc',   label: 'AES-256 CBC',  family: 'crypto-js', desc: 'crypto-js interop · random IV per message, but MD5 key stretching and no authentication',        weak: false },
+  { id: 'aes-ctr',   label: 'AES-256 CTR',  family: 'crypto-js', desc: 'crypto-js interop · stream mode, no padding needed',                                             weak: false },
+  { id: 'aes-ecb',   label: 'AES-256 ECB',  family: 'crypto-js', desc: 'Weak · identical blocks produce identical ciphertext, avoid',                                    weak: true  },
+  { id: 'aes-cfb',   label: 'AES-256 CFB',  family: 'crypto-js', desc: 'crypto-js interop · cipher feedback, stream-like',                                               weak: false },
+  { id: 'aes-ofb',   label: 'AES-256 OFB',  family: 'crypto-js', desc: 'crypto-js interop · output feedback, errors do not propagate',                                   weak: false },
+  { id: 'tripledes', label: 'Triple DES',   family: 'crypto-js', desc: 'Legacy 3DES · 112-bit effective security, widely supported',                                     weak: false },
+  { id: 'rabbit',    label: 'Rabbit',       family: 'crypto-js', desc: 'Fast stream cipher · compact key setup, 128-bit key',                                            weak: false },
 ] as const;
 
 type EncryptAlgo = (typeof ENCRYPT_ALGOS)[number]['id'];
 
-function doEncrypt(algo: EncryptAlgo, plaintext: string, key: string): string {
+// The crypto-js half of the table. `aes-gcm` never reaches here — it is async
+// and goes through `lib/aesGcm.ts` instead.
+type CryptoJsAlgo = Exclude<EncryptAlgo, 'aes-gcm'>;
+
+function doEncrypt(algo: CryptoJsAlgo, plaintext: string, key: string): string {
   switch (algo) {
     case 'aes-cbc':
       return CryptoJS.AES.encrypt(plaintext, key).toString();
@@ -459,7 +479,7 @@ function doEncrypt(algo: EncryptAlgo, plaintext: string, key: string): string {
   }
 }
 
-function doDecrypt(algo: EncryptAlgo, ciphertext: string, key: string): string {
+function doDecrypt(algo: CryptoJsAlgo, ciphertext: string, key: string): string {
   switch (algo) {
     case 'aes-cbc': {
       const b = CryptoJS.AES.decrypt(ciphertext, key);
@@ -518,7 +538,7 @@ export function EncodeHashEncrypt() {
   const [encryptInput, setEncryptInput] = usePersistentState('devtool:hash:encryptInput', '');
   const [encryptKey, setEncryptKey]     = usePersistentState('devtool:hash:key', '');
   const [cryptoMode, setCryptoMode]     = usePersistentState<CryptoMode>('devtool:hash:aesMode', 'encrypt');
-  const [encryptAlgo, setEncryptAlgo]   = usePersistentState<EncryptAlgo>('devtool:hash:encryptAlgo', 'aes-cbc');
+  const [encryptAlgo, setEncryptAlgo]   = usePersistentState<EncryptAlgo>('devtool:hash:encryptAlgo', 'aes-gcm');
   const [showKey, setShowKey]           = useState(false);
 
   // Hooks (always called; enabled param gates the listener)
@@ -581,17 +601,64 @@ export function EncodeHashEncrypt() {
     [encryptAlgo]
   );
 
-  const cryptoResult = useMemo(() => {
-    if (!deferredEncrypt || !encryptKey) return { output: '', error: '' };
-    try {
-      if (cryptoMode === 'encrypt') {
-        return { output: doEncrypt(encryptAlgo, deferredEncrypt, encryptKey), error: '' };
-      }
-      const text = doDecrypt(encryptAlgo, deferredEncrypt, encryptKey);
-      return text ? { output: text, error: '' } : { output: '', error: 'Invalid key or ciphertext' };
-    } catch {
-      return { output: '', error: 'Decryption failed — check your key and ciphertext' };
+  // AES-GCM is async (WebCrypto) and deliberately slow — 600k PBKDF2 rounds is
+  // the point of it — so the encrypt tab can no longer resolve in a `useMemo`.
+  // The crypto-js modes stay synchronous and land on the very first tick, so
+  // only the GCM path ever shows the busy state.
+  const [cryptoResult, setCryptoResult] = useState<{ output: string; error: string }>({ output: '', error: '' });
+  const [cryptoBusy, setCryptoBusy] = useState(false);
+
+  useEffect(() => {
+    if (!deferredEncrypt || !encryptKey) {
+      setCryptoResult({ output: '', error: '' });
+      setCryptoBusy(false);
+      return;
     }
+
+    if (encryptAlgo !== 'aes-gcm') {
+      try {
+        if (cryptoMode === 'encrypt') {
+          setCryptoResult({ output: doEncrypt(encryptAlgo, deferredEncrypt, encryptKey), error: '' });
+        } else {
+          const text = doDecrypt(encryptAlgo, deferredEncrypt, encryptKey);
+          setCryptoResult(text
+            ? { output: text, error: '' }
+            : { output: '', error: 'Invalid key or ciphertext' });
+        }
+      } catch {
+        setCryptoResult({ output: '', error: 'Decryption failed — check your key and ciphertext' });
+      }
+      setCryptoBusy(false);
+      return;
+    }
+
+    // Every keystroke restarts the derivation; `stale` drops the answer from a
+    // run the user has already typed past, so results can't arrive out of order.
+    let stale = false;
+    setCryptoBusy(true);
+    (async () => {
+      try {
+        const output = cryptoMode === 'encrypt'
+          ? await encryptAesGcm(deferredEncrypt, encryptKey)
+          : await decryptAesGcm(deferredEncrypt, encryptKey);
+        if (!stale) setCryptoResult({ output, error: '' });
+      } catch (err) {
+        if (stale) return;
+        setCryptoResult({
+          output: '',
+          error: err instanceof EnvelopeFormatError
+            ? err.message
+            : isAesGcmEnvelope(deferredEncrypt)
+              // The tag failed, and the envelope really is ours — so it is the
+              // passphrase or the message, and GCM cannot tell you which.
+              ? 'Wrong passphrase, or the ciphertext has been altered.'
+              : 'Decryption failed — check your passphrase and ciphertext.',
+        });
+      } finally {
+        if (!stale) setCryptoBusy(false);
+      }
+    })();
+    return () => { stale = true; };
   }, [deferredEncrypt, encryptKey, cryptoMode, encryptAlgo]);
 
   // Inline hash verification
@@ -790,7 +857,10 @@ export function EncodeHashEncrypt() {
               <button
                 type="button"
                 onClick={() => setShowHmacKey((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg transition-colors"
+                aria-label={showHmacKey ? 'Hide HMAC key' : 'Show HMAC key'}
+                title={showHmacKey ? 'Hide HMAC key' : 'Show HMAC key'}
+                aria-pressed={showHmacKey}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
               >
                 {showHmacKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -861,7 +931,8 @@ export function EncodeHashEncrypt() {
                 {ENCRYPT_ALGOS.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
                     <span className="flex items-center gap-2">
-                      {!a.safe && <AlertTriangle className="h-3 w-3 shrink-0 text-warn" />}
+                      {a.weak && <AlertTriangle className="h-3 w-3 shrink-0 text-warn" />}
+                      {a.family === 'webcrypto' && <ShieldCheck className="h-3 w-3 shrink-0 text-ok" />}
                       {a.label}
                     </span>
                   </SelectItem>
@@ -881,15 +952,34 @@ export function EncodeHashEncrypt() {
             />
           </div>
 
-          {/* Algorithm description banner */}
-          {selectedEncryptAlgo.safe ? (
-            <Callout tone="info" size="sm" icon={ArrowLeftRight} title="Reversible">
+          {/* One banner per mode, saying the thing that actually matters about it.
+              Every crypto-js mode carries the same caveat, because it is the same
+              caveat: they are here so you can exchange ciphertext with a crypto-js
+              caller, not because they are a good way to protect something. */}
+          {selectedEncryptAlgo.family === 'webcrypto' ? (
+            <Callout tone="success" size="sm" icon={ShieldCheck} title="Authenticated">
               {selectedEncryptAlgo.desc}
             </Callout>
           ) : (
-            <Callout tone="warning" size="sm" title="Insecure">
-              ECB mode encrypts identical 16-byte blocks to the same ciphertext, leaking data
-              patterns. Use AES-256 CBC or CTR instead.
+            <Callout
+              tone="warning"
+              size="sm"
+              icon={selectedEncryptAlgo.weak ? undefined : ArrowLeftRight}
+              title={selectedEncryptAlgo.weak
+                ? 'Insecure — and interop-only'
+                : 'Interop mode — not for real secrets'}
+            >
+              {selectedEncryptAlgo.weak && (
+                <>
+                  ECB encrypts identical 16-byte blocks to the same ciphertext, leaking the
+                  structure of your data.{' '}
+                </>
+              )}
+              crypto-js stretches your passphrase with OpenSSL's EvpKDF: <span className="font-mono">MD5</span>,
+              a single iteration — one guess costs an attacker one MD5 — and nothing here
+              authenticates the ciphertext, so tampering is undetectable. Use{' '}
+              <span className="font-medium text-fg">AES-256 GCM</span> unless you specifically
+              need to interoperate with crypto-js.
             </Callout>
           )}
 
@@ -907,7 +997,10 @@ export function EncodeHashEncrypt() {
               <button
                 type="button"
                 onClick={() => setShowKey((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg transition-colors"
+                aria-label={showKey ? 'Hide passphrase' : 'Show passphrase'}
+                title={showKey ? 'Hide passphrase' : 'Show passphrase'}
+                aria-pressed={showKey}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -925,20 +1018,34 @@ export function EncodeHashEncrypt() {
             />
           </ToolSection>
 
-          {(cryptoResult.output || cryptoResult.error) && (
+          {(cryptoBusy || cryptoResult.output || cryptoResult.error) && (
             <ToolSection>
               <div className="flex items-center justify-between">
                 <ToolLabel>{cryptoMode === 'encrypt' ? 'Ciphertext' : 'Plaintext'}</ToolLabel>
-                {cryptoResult.output && (
-                  <CopyButton value={cryptoResult.output} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
-                )}
+                {cryptoBusy
+                  ? (
+                    // 600k PBKDF2 rounds take a beat; say so rather than leaving
+                    // the previous answer on screen looking current.
+                    <span className="flex items-center gap-1.5 text-[11px] text-fg-mute">
+                      <Spinner size="xs" />
+                      Deriving key…
+                    </span>
+                  )
+                  : cryptoResult.output && (
+                    <CopyButton value={cryptoResult.output} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
+                  )}
               </div>
-              {cryptoResult.error ? (
+              {cryptoResult.error && !cryptoBusy ? (
                 <div className="px-3 py-2.5 bg-bad/8 border border-bad/20 rounded-lg">
                   <p className="text-sm text-bad">{cryptoResult.error}</p>
                 </div>
               ) : (
-                <Textarea value={cryptoResult.output} readOnly className="min-h-[80px] font-mono text-xs" />
+                <Textarea
+                  value={cryptoBusy ? '' : cryptoResult.output}
+                  readOnly
+                  placeholder={cryptoBusy ? 'Working…' : undefined}
+                  className="min-h-[80px] font-mono text-xs"
+                />
               )}
             </ToolSection>
           )}

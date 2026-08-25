@@ -27,6 +27,12 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        // None of the ~20 call sites pairs this with a visible <Label> — the
+        // magnifier and the placeholder are the whole affordance — so without a
+        // fallback name a screen reader reaches an unlabelled text field. The
+        // placeholder is the name the sighted user gets; use it, and let a call
+        // site pass its own `aria-label` to win.
+        aria-label={props['aria-label'] ?? (typeof placeholder === 'string' ? placeholder : undefined)}
         className={cn('pl-8', clearable && value && 'pr-7', className)}
         {...props}
       />
@@ -34,8 +40,9 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         <button
           type="button"
           onClick={() => onChange('')}
+          aria-label="Clear search"
           title="Clear"
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute transition-colors hover:text-fg"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
         >
           <X className="h-3.5 w-3.5" />
         </button>

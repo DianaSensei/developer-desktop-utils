@@ -252,8 +252,11 @@ export function ChecksumTool() {
               <p className="text-[11px] text-fg-mute">{formatBytes(fileInfo.size)}</p>
             </div>
             <button
+              type="button"
               onClick={clear}
-              className="ml-3 shrink-0 p-1 rounded hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors"
+              aria-label="Remove file"
+              title="Remove file"
+              className="ml-3 shrink-0 p-1 rounded hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
             >
               <X className="h-3.5 w-3.5" />
             </button>
