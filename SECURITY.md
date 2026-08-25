@@ -94,8 +94,14 @@ Dependency updates arrive as reviewable PRs via
   permissions listed there. Anything absent — arbitrary shell execution, for
   instance — is not reachable from the frontend at all. Note there is **no**
   `shell` plugin and **no** `shell:allow-execute` in this app.
-- **Filesystem scope** is limited to the app-data directory plus files you
-  explicitly pick through the OS open/save dialog.
+- **Filesystem scope** is limited to the app-data directory
+  (`fs:scope-appdata-recursive`) plus files you explicitly pick through the OS
+  open/save dialog, or drag onto the window. Two commands take a path directly
+  rather than going through the `fs` plugin — `read_file_data_url` and
+  `hash_file`, which exist because a drop gives the frontend a path and not a
+  readable File. Both check the path against the paths Rust saw in the native
+  drag event (`src-tauri/src/dropped.rs`), so the frontend cannot name a file
+  you did not drag in.
 - **Memory-safe backend.** The Rust side has no `unsafe` blocks in app code
   (`grep -rn "unsafe" src-tauri/src/`).
 

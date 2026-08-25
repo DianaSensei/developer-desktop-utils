@@ -1,7 +1,8 @@
+use crate::dropped::{self, DroppedPaths};
 use std::io::Read;
 use std::path::Path;
 use std::time::Instant;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 // 256 KB per read — constant memory regardless of file size
 const CHUNK: usize = 256 * 1024;
@@ -12,6 +13,12 @@ pub async fn hash_file(
     path: String,
     algo: String,
 ) -> Result<String, String> {
+    // Only files the user actually dragged onto the window; see dropped.rs.
+    // Without this the command reports the size of, and confirms the existence
+    // of, any path the webview cares to name.
+    if !window.state::<DroppedPaths>().is_allowed(&path) {
+        return Err(dropped::DENIED.to_string());
+    }
     // spawn_blocking keeps the tokio runtime free; hashing is pure CPU work
     tokio::task::spawn_blocking(move || compute(&window, &path, &algo))
         .await

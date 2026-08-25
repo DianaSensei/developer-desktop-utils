@@ -1,11 +1,17 @@
-// Reads an explicit file path (e.g. one the user dragged in from Finder /
-// Explorer) and returns it as a data URL. OS drag-drop only gives the frontend
-// a path, not a readable web File, and the fs plugin's scope doesn't cover
-// arbitrary dropped paths — so, like the checksum tool's hash_file, we read the
-// user-chosen path directly in Rust.
+// Reads a file the user dragged in from Finder / Explorer and returns it as a
+// data URL. OS drag-drop only gives the frontend a path, not a readable web
+// File, and the fs plugin's scope doesn't cover dropped paths — so, like the
+// checksum tool's hash_file, this reads the path directly in Rust.
+//
+// "Directly" is not "blindly": the path is checked against the ones Rust saw in
+// the native drag event before anything is opened, so this stays a
+// read-what-was-dropped command rather than a read-anything one. See
+// dropped.rs.
 
+use crate::dropped::{self, DroppedPaths};
 use serde::Serialize;
 use std::path::Path;
+use tauri::Manager;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +29,15 @@ pub struct FileData {
 const MAX_BYTES: u64 = 64 * 1024 * 1024;
 
 #[tauri::command]
-pub async fn read_file_data_url(path: String) -> Result<FileData, String> {
+pub async fn read_file_data_url(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<FileData, String> {
+    // Only files the user actually dragged onto the window. Without this the
+    // command is a read-any-file primitive for anything running in the webview.
+    if !app.state::<DroppedPaths>().is_allowed(&path) {
+        return Err(dropped::DENIED.to_string());
+    }
     // Reading + base64 is blocking CPU/IO work; keep the async runtime free.
     tokio::task::spawn_blocking(move || read_data_url(&path))
         .await
