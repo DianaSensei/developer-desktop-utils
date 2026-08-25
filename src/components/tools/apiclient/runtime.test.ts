@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { makeBru, makeReq, makeRes, runScript, type ScriptRun, type VarStores } from './runtime';
+import { applyVars, makeBru, makeReq, makeRes, runScript, type ScriptRun, type VarStores } from './runtime';
 import { newRequest, type ApiResponse } from './types';
 
 const emptyRun = (): ScriptRun => ({ logs: [], tests: [], error: null });
@@ -221,5 +221,91 @@ describe('console capture', () => {
       { level: 'error', text: '{"c":1}' },
       { level: 'log', text: '[1]' },
     ]);
+  });
+});
+
+describe('prototype pollution', () => {
+  it('keeps a response header named __proto__ off Object.prototype', () => {
+    const res = makeRes(response({
+      headers: [['content-type', 'application/json'], ['__proto__', 'polluted']],
+    }));
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(res.getHeaders())).toBeNull();
+    // Stored as an ordinary own property — the header really was sent.
+    expect(res.getHeader('__proto__')).toBe('polluted');
+    expect(res.getHeader('Content-Type')).toBe('application/json');
+  });
+
+  it('does not hand scripts Object.prototype members as if they were headers', () => {
+    const res = makeRes(response());
+    expect(res.getHeader('constructor')).toBeUndefined();
+    expect(res.getHeader('toString')).toBeUndefined();
+  });
+
+  it('keeps a request header named constructor off the prototype chain', () => {
+    const req = makeReq(newRequest());
+    req.setHeader('constructor', 'polluted');
+    req.setHeader('authorization', 'Bearer t');
+    expect(Object.getPrototypeOf(req.getHeaders())).toBeNull();
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+    expect(req.getHeaders().authorization).toBe('Bearer t');
+  });
+
+  it('refuses bru.setVar / setEnvVar on a prototype key', () => {
+    const s = stores();
+    const bru = makeBru(s);
+    bru.setVar('__proto__', 'polluted');
+    bru.setEnvVar('constructor', 'polluted');
+    bru.setVar('token', 'abc');
+    expect(Object.prototype.hasOwnProperty.call(s.runtime, '__proto__')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(s.env, 'constructor')).toBe(false);
+    expect(s.runtime.token).toBe('abc');
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it('refuses a Vars row named __proto__ but keeps the rows around it', () => {
+    const s = stores();
+    applyVars(
+      [
+        { id: '1', name: '__proto__', value: '"polluted"', enabled: true },
+        { id: '2', name: 'token', value: 'res.body.token', enabled: true },
+      ],
+      s,
+      { res: makeRes(response()) },
+    );
+    expect(Object.prototype.hasOwnProperty.call(s.runtime, '__proto__')).toBe(false);
+    expect(s.runtime.token).toBe('abc');
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});
+
+describe('Vars/Assert expression containment', () => {
+  const evalVia = (expr: string): unknown => {
+    const s = stores();
+    applyVars([{ id: '1', name: 'out', value: expr, enabled: true }], s, {
+      res: makeRes(response()),
+    });
+    return s.runtime.out;
+  };
+
+  it('still evaluates the declarative expressions the tab is for', () => {
+    expect(evalVia('res.body.token')).toBe('abc');
+    expect(evalVia('res.body.items.length')).toBe('3');
+    expect(evalVia('res.status')).toBe('200');
+  });
+
+  it('shadows the ambient network globals a collection could otherwise reach', () => {
+    // An imported collection must not be able to phone home from a Vars row.
+    expect(evalVia('typeof fetch')).toBe('undefined');
+    expect(evalVia('typeof XMLHttpRequest')).toBe('undefined');
+    expect(evalVia('typeof WebSocket')).toBe('undefined');
+    expect(evalVia('typeof importScripts')).toBe('undefined');
+    expect(evalVia('typeof globalThis')).toBe('undefined');
+  });
+
+  it('runs strict, so an expression cannot create a global by assignment', () => {
+    // Falls back to the literal: the assignment throws under 'use strict'.
+    expect(evalVia('leaked = 1')).toBe('leaked = 1');
+    expect((globalThis as Record<string, unknown>).leaked).toBeUndefined();
   });
 });

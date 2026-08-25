@@ -23,7 +23,21 @@ export type OutMessage = WorkerDone | WorkerFailed;
 // helpers stop promptly when the user cancels the send.
 const inFlight = new Map<number, AbortController>();
 
-self.onmessage = async (event: MessageEvent<InMessage>) => {
+// A dedicated worker cannot check `event.origin` — it is always empty, and the
+// port is only reachable from the page that constructed the worker. What can be
+// checked is the shape, so a malformed or unexpected message is dropped here
+// rather than being destructured into `runPhase` further down.
+function isInMessage(v: unknown): v is InMessage {
+  if (typeof v !== 'object' || v === null) return false;
+  const m = v as Partial<InMessage>;
+  if (typeof m.id !== 'number' || !Number.isFinite(m.id)) return false;
+  if (m.type === 'abort') return true;
+  return m.type === 'run' && typeof (m as RunMessage).input === 'object'
+    && (m as RunMessage).input !== null;
+}
+
+self.onmessage = async (event: MessageEvent<unknown>) => {
+  if (!isInMessage(event.data)) return;
   const msg = event.data;
 
   if (msg.type === 'abort') {

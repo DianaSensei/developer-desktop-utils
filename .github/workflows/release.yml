@@ -5,8 +5,11 @@ on:
     tags:
       - 'v*'
 
+# Least privilege at the top level: the only job here declares the write scopes
+# it actually needs (contents/id-token/attestations). Anything added later
+# starts read-only and has to opt in explicitly.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   publish:

@@ -1,0 +1,7 @@
+# Pinned by version and hash so the image build is reproducible and a compromised
+# index cannot swap the artifact underneath us (`pip install --require-hashes`).
+# kafka-python-ng is the maintained fork of kafka-python (same `kafka` import API)
+# that works on Python 3.12 — the old kafka-python 2.0.2 crashes on its vendored six.
+kafka-python-ng==2.2.3 \
+    --hash=sha256:adc6e82147c441ca4ae1f22e291fc08efab0d10971cbd4aa1481d2ffa38e9480 \
+    --hash=sha256:f79f28e10ade9b5a9860b2ec15b7cc8dc510d5702f5a399430478cff5f93a05a

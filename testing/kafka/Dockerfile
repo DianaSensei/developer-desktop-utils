@@ -1,6 +1,7 @@
-FROM python:3.12-slim
-# kafka-python-ng is the maintained fork of kafka-python (same `kafka` import API)
-# that works on Python 3.12 — the old kafka-python 2.0.2 crashes on its vendored six.
-RUN pip install --no-cache-dir kafka-python-ng==2.2.3
+# Base image pinned by digest, not just by tag: a tag can be re-pointed at any
+# time, a digest cannot. Bump both together when moving to a new Python patch.
+FROM python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
 WORKDIR /app
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 COPY . /app
