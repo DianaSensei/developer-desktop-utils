@@ -51,18 +51,15 @@ jobs:
       # notices are reported as warnings and do not block (`--deny warnings`
       # would, and those crates come from tauri/lapin/glib — not ours to fix).
       #
-      # The two ignores below are vulnerabilities with no reachable fix. Both
-      # are denial-of-service on parsing attacker-supplied XML in quick-xml
-      # 0.39.4, which enters only via plist -> tauri-utils -> tauri: the only
-      # XML parsed on that path is our own Info.plist, at compile time. The fix
-      # needs quick-xml >= 0.41 and upstream `plist` has not adopted it. Drop
-      # these the next time Tauri is upgraded and re-check.
+      # No `--ignore` entries: the tree is clean of vulnerabilities. The two
+      # quick-xml denial-of-service advisories (RUSTSEC-2026-0194/0195) that
+      # used to be ignored here are fixed — `plist` 1.10 adopted quick-xml
+      # 0.41, so the lockfile carries the fixed version. Keep this list empty;
+      # if a new advisory has no reachable fix, add it back with a comment
+      # saying why it is not exploitable here.
       - name: Audit Cargo.lock
         working-directory: src-tauri
-        run: |
-          cargo audit \
-            --ignore RUSTSEC-2026-0194 \
-            --ignore RUSTSEC-2026-0195
+        run: cargo audit
 
   # NOTE: CodeQL is not run from this workflow. The repository has CodeQL
   # "default setup" enabled, which already analyses javascript-typescript, rust,

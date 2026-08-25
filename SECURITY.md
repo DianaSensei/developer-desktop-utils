@@ -84,6 +84,29 @@ push to `main`, every pull request, and weekly:
 Dependency updates arrive as reviewable PRs via
 [`.github/dependabot.yml`](.github/dependabot.yml) (npm, Cargo, GitHub Actions).
 
+Both audits are currently clean: `npm audit` reports zero advisories, and
+`cargo audit` reports zero **vulnerabilities**. What it does report is 19
+*warnings* — crates flagged unmaintained or unsound that are pulled in
+transitively and cannot be upgraded away from here:
+
+| Crates | Advisory kind | Reached through | Why it stays |
+|---|---|---|---|
+| `atk`, `gdk*`, `gtk*`, `glib`, `proc-macro-error` | unmaintained (the gtk-rs GTK3 bindings), plus `glib` 0.18 unsound iterator (RUSTSEC-2024-0429) | `tauri` → `wry`/`webkit2gtk`, Linux only | Tauri 2 targets GTK3; the fixed `glib` is 0.20+, which the GTK3 bindings do not use. Goes away when Tauri moves to GTK4 |
+| `smartstring` | unmaintained (RUSTSEC-2026-0249) | `rhai` (Transform tool scripting) | A non-optional dependency of `rhai` 1.x |
+| `unic-*` | unmaintained (RUSTSEC-2025-0075/0080/0081/0098/0100) | `tauri-plugin-http`/`tauri-utils` → `urlpattern` 0.3 | Pinned by Tauri; build-time Unicode tables only |
+| `paste` | unmaintained (RUSTSEC-2024-0436) | `netstat2` → `netlink-packet-utils` | A proc-macro used at compile time only |
+
+None of these is a known exploitable vulnerability — they are "nobody is
+shipping fixes for this crate any more" notices, on code we do not call
+directly. They are reported in every run rather than suppressed, so a real
+vulnerability landing in one of them is not silently inherited. Reproduce the
+list yourself:
+
+```bash
+cd src-tauri && cargo audit    # exits 0: 0 vulnerabilities, 19 warnings
+npm audit                      # 0 advisories
+```
+
 ### Runtime hardening
 
 - **Content Security Policy** (`app.security.csp` in `src-tauri/tauri.conf.json`):
