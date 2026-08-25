@@ -24,6 +24,7 @@ export {
   Dialog, DialogTrigger, DialogPortal, DialogClose, DialogOverlay, DialogContent,
   DialogHeader, DialogFooter, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+export { ModalShell, type ModalShellProps } from '@/components/ui/modal-shell';
 export { Tooltip, type TooltipProps } from '@/components/ui/tooltip';
 export { Segmented, type SegmentedProps, type SegmentedOption } from '@/components/ui/segmented';
 export { CopyButton, type CopyButtonProps } from '@/components/ui/copy-button';

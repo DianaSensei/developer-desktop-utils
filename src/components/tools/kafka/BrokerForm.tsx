@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { X, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import type { BrokerConfig } from './types';
 
@@ -55,63 +55,56 @@ export function BrokerForm({ initial, onSave, onCancel }: BrokerFormProps) {
     }
   };
 
-  // Portal to <body> so the fixed overlay escapes the tool's entrance-animation
-  // wrapper (an animating `transform` ancestor would offset a fixed child).
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-bg border rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-semibold text-base">
-            {form.id ? 'Edit Broker' : 'Add Broker'}
-          </h2>
-          <button onClick={onCancel} className="text-fg-mute hover:text-fg">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="kf-name">Name</Label>
-            <Input
-              id="kf-name"
-              value={form.name}
-              onChange={(e) => set('name', e.target.value)}
-              placeholder="My Kafka Cluster"
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="kf-brokers">Bootstrap Servers</Label>
-            <Input
-              id="kf-brokers"
-              value={form.bootstrapServers}
-              onChange={(e) => set('bootstrapServers', e.target.value)}
-              placeholder="localhost:9092"
-              className="mt-1 font-mono text-sm"
-            />
-            <p className="text-xs text-fg-mute mt-1">Kafka broker ports only — not ZooKeeper (2181)</p>
-          </div>
-
-          <Callout tone="warning" size="sm" icon={Info}>
-            Connections are <span className="font-medium">plaintext</span>. TLS/SSL and SASL
-            authentication are not yet supported — don't point this at a broker that requires
-            encryption or credentials.
-          </Callout>
-
-          {error && (
-            <p className="text-sm text-bad">{error}</p>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 mt-6">
+  // ModalShell portals to <body>, so the fixed overlay escapes the tool's
+  // entrance-animation wrapper (an animating `transform` ancestor would offset
+  // a fixed child).
+  return (
+    <ModalShell
+      onClose={onCancel}
+      title={form.id ? 'Edit Broker' : 'Add Broker'}
+      footer={
+        <div className="ml-auto flex gap-2">
           <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="kf-name">Name</Label>
+          <Input
+            id="kf-name"
+            value={form.name}
+            onChange={(e) => set('name', e.target.value)}
+            placeholder="My Kafka Cluster"
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="kf-brokers">Bootstrap Servers</Label>
+          <Input
+            id="kf-brokers"
+            value={form.bootstrapServers}
+            onChange={(e) => set('bootstrapServers', e.target.value)}
+            placeholder="localhost:9092"
+            className="mt-1 font-mono text-sm"
+          />
+          <p className="text-xs text-fg-mute mt-1">Kafka broker ports only — not ZooKeeper (2181)</p>
+        </div>
+
+        <Callout tone="warning" size="sm" icon={Info}>
+          Connections are <span className="font-medium">plaintext</span>. TLS/SSL and SASL
+          authentication are not yet supported — don't point this at a broker that requires
+          encryption or credentials.
+        </Callout>
+
+        {error && (
+          <p className="text-sm text-bad">{error}</p>
+        )}
       </div>
-    </div>,
-    document.body,
+    </ModalShell>
   );
 }

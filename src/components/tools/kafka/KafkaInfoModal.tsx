@@ -1,5 +1,5 @@
-import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+
+import { ModalShell } from '@/components/ui/modal-shell';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Callout } from '@/components/ui/callout';
 import { SectionLabel } from '@/components/ui/section-label';
@@ -42,160 +42,143 @@ function Row({ action, when, calls, badge, note }: RowProps) {
 }
 
 export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModalProps) {
-  // Portal to <body> so the fixed overlay isn't positioned relative to the tool's
-  // entrance-animation wrapper (an animating `transform` ancestor would make the
-  // modal jump to viewport coords when the animation ends — a visible flicker).
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-bg border rounded-lg shadow-2xl w-full max-w-xl max-h-[88vh] flex flex-col mx-4">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b shrink-0">
-          <div>
-            <p className="text-sm font-semibold">How Kafka Explorer accesses your cluster</p>
-            <p className="text-[11px] text-fg-mute mt-0.5">
-              Every action that contacts the broker is listed below.
-            </p>
-          </div>
+  // ModalShell portals to <body>, which also keeps the fixed overlay out of the
+  // tool's entrance-animation wrapper: an animating `transform` ancestor would
+  // make the modal jump to viewport coords when the animation ends.
+  return (
+    <ModalShell
+      onClose={onClose}
+      title="How Kafka Explorer accesses your cluster"
+      description="Every action that contacts the broker is listed below."
+      width="max-w-xl"
+      scrim="strong"
+      bodyClassName="py-3"
+      footer={
+        <>
           <button
-            onClick={onClose}
-            className="p-1 rounded text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors ml-3 shrink-0"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto min-h-0 px-5 py-3">
-
-          {/* Connection model */}
-          <p className="text-[11px] text-fg-mute leading-relaxed mb-3">
-            <span className="font-semibold text-fg">No persistent connection.</span>{' '}
-            Each action opens one TCP connection to your broker and closes it when done.
-            The connection starts with a short probe (MetadataRequest, to confirm this is a Kafka port)
-            and is then reused for the command. The app identifies itself to brokers as
-            client ID <span className="font-mono">devtool</span>. There is no background polling —
-            data loads when you open a view and refreshes only when you navigate or click Refresh.
-          </p>
-
-          {/* Security note */}
-          <Callout tone="warning" size="sm" title="Plaintext only" className="mb-4">
-            Connections are unencrypted — TLS/SSL and SASL authentication are not implemented.
-            Don't point this at a broker that requires encryption or credentials.
-          </Callout>
-
-          {/* Operations table */}
-          <div className="rounded-lg border border-line/50 overflow-hidden mb-4">
-            <div className="px-3 py-2 bg-bg-2/20 border-b border-line/40">
-              <SectionLabel>Operations</SectionLabel>
-            </div>
-            <div className="px-3 divide-y divide-line/20">
-              <Row
-                action="Select broker / Test connection"
-                when="on broker select or Refresh"
-                calls="MetadataRequest v0 (API 3)"
-                badge={{ label: 'Read', variant: 'read' }}
-              />
-              <Row
-                action="Topic list"
-                when="on broker select or Refresh"
-                calls="MetadataRequest v0 (all topics)"
-                badge={{ label: 'Read', variant: 'read' }}
-              />
-              <Row
-                action="Open topic"
-                when="on topic click"
-                calls="MetadataRequest + 2× ListOffsets v0 (earliest & latest)"
-                badge={{ label: 'Read', variant: 'read' }}
-              />
-              <Row
-                action="Config tab"
-                when="on tab open"
-                calls="DescribeConfigs v0 (API 32) — all config keys"
-                badge={{ label: 'Read', variant: 'read' }}
-              />
-              <Row
-                action="Fetch messages / Load more"
-                when="auto on open (latest), then Fetch or Load more"
-                calls="FetchRequest via rskafka — up to 10 MB per call"
-                badge={{ label: 'Read', variant: 'read' }}
-                note="The latest page loads automatically when you open a topic. No consumer group is created, no offset is committed, and existing consumers are not affected."
-              />
-              <Row
-                action="Consume (realtime)"
-                when="while a consumer is running"
-                calls="FetchRequest long-poll per partition (~1s waits)"
-                badge={{ label: 'Read', variant: 'read' }}
-                note="Anonymous: it does NOT join a consumer group or commit offsets, so real consumers' lag is untouched. Streams new messages (or from the earliest offset) over all partitions until you Stop or leave the tool; the value renders as JSON, plain text, or a hex dump and is searchable. Managed in the Consume panel."
-              />
-              <Row
-                action="Consumer groups list"
-                when="on broker select or Refresh"
-                calls="ListGroups v0 + DescribeGroups v0 (all groups)"
-                badge={{ label: 'Read', variant: 'read' }}
-              />
-              <Row
-                action="Topic → Consumers tab"
-                when="auto on tab open, or Refresh"
-                calls="ListGroups + 1× OffsetFetch v2 per group (capped at 500 groups)"
-                badge={{ label: 'Read', variant: 'read' }}
-                note="Scans groups for committed offsets on this topic. Bounded to the first 500 groups so large clusters aren't hammered."
-              />
-              <Row
-                action="Consumer group details"
-                when="on group click"
-                calls="DescribeGroups + 1× OffsetFetch v2 (all committed offsets) + 1× ListOffsets per committed topic"
-                badge={{ label: 'Read', variant: 'read' }}
-                note="A single OffsetFetch returns the group's committed offsets; ListOffsets is then batched once per topic (not per partition)."
-              />
-              <Row
-                action="Produce message"
-                when="on Send Message click"
-                calls="ProduceRequest (no compression)"
-                badge={{ label: 'Write', variant: 'write' }}
-                note="Permanently writes a message to the topic. Retained per topic retention policy. Cannot be undone."
-              />
-              <Row
-                action="Create topic"
-                when="on create confirm"
-                calls="CreateTopicsRequest via rskafka controller"
-                badge={{ label: 'Write', variant: 'write' }}
-              />
-              <Row
-                action="Delete topic"
-                when="on delete confirm"
-                calls="DeleteTopicsRequest via rskafka controller"
-                badge={{ label: 'Destructive', variant: 'destructive' }}
-                note="Permanently deletes the topic and all its data. Irreversible."
-              />
-            </div>
-          </div>
-
-          <p className="text-[11px] text-fg-mute">
-            Full documentation: <span className="font-mono text-fg/70">docs/human/kafka-explorer.md</span>
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t shrink-0 bg-bg-2/10">
-          <button
+            type="button"
             onClick={onDismissPermanently}
-            className="text-xs text-fg-mute hover:text-fg transition-colors"
+            className="rounded text-xs text-fg-mute transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
           >
             Don't show again
           </button>
           <button
+            type="button"
             onClick={onClose}
-            className="text-xs font-medium bg-acc text-acc-fg px-4 py-1.5 rounded-md hover:bg-acc/90 transition-colors"
+            className="rounded-md bg-acc px-4 py-1.5 text-xs font-medium text-acc-fg transition-colors hover:bg-acc/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
           >
             Got it
           </button>
+        </>
+      }
+    >
+
+      {/* Connection model */}
+      <p className="text-[11px] text-fg-mute leading-relaxed mb-3">
+        <span className="font-semibold text-fg">No persistent connection.</span>{' '}
+        Each action opens one TCP connection to your broker and closes it when done.
+        The connection starts with a short probe (MetadataRequest, to confirm this is a Kafka port)
+        and is then reused for the command. The app identifies itself to brokers as
+        client ID <span className="font-mono">devtool</span>. There is no background polling —
+        data loads when you open a view and refreshes only when you navigate or click Refresh.
+      </p>
+
+      {/* Security note */}
+      <Callout tone="warning" size="sm" title="Plaintext only" className="mb-4">
+        Connections are unencrypted — TLS/SSL and SASL authentication are not implemented.
+        Don't point this at a broker that requires encryption or credentials.
+      </Callout>
+
+      {/* Operations table */}
+      <div className="rounded-lg border border-line/50 overflow-hidden mb-4">
+        <div className="px-3 py-2 bg-bg-2/20 border-b border-line/40">
+          <SectionLabel>Operations</SectionLabel>
+        </div>
+        <div className="px-3 divide-y divide-line/20">
+          <Row
+            action="Select broker / Test connection"
+            when="on broker select or Refresh"
+            calls="MetadataRequest v0 (API 3)"
+            badge={{ label: 'Read', variant: 'read' }}
+          />
+          <Row
+            action="Topic list"
+            when="on broker select or Refresh"
+            calls="MetadataRequest v0 (all topics)"
+            badge={{ label: 'Read', variant: 'read' }}
+          />
+          <Row
+            action="Open topic"
+            when="on topic click"
+            calls="MetadataRequest + 2× ListOffsets v0 (earliest & latest)"
+            badge={{ label: 'Read', variant: 'read' }}
+          />
+          <Row
+            action="Config tab"
+            when="on tab open"
+            calls="DescribeConfigs v0 (API 32) — all config keys"
+            badge={{ label: 'Read', variant: 'read' }}
+          />
+          <Row
+            action="Fetch messages / Load more"
+            when="auto on open (latest), then Fetch or Load more"
+            calls="FetchRequest via rskafka — up to 10 MB per call"
+            badge={{ label: 'Read', variant: 'read' }}
+            note="The latest page loads automatically when you open a topic. No consumer group is created, no offset is committed, and existing consumers are not affected."
+          />
+          <Row
+            action="Consume (realtime)"
+            when="while a consumer is running"
+            calls="FetchRequest long-poll per partition (~1s waits)"
+            badge={{ label: 'Read', variant: 'read' }}
+            note="Anonymous: it does NOT join a consumer group or commit offsets, so real consumers' lag is untouched. Streams new messages (or from the earliest offset) over all partitions until you Stop or leave the tool; the value renders as JSON, plain text, or a hex dump and is searchable. Managed in the Consume panel."
+          />
+          <Row
+            action="Consumer groups list"
+            when="on broker select or Refresh"
+            calls="ListGroups v0 + DescribeGroups v0 (all groups)"
+            badge={{ label: 'Read', variant: 'read' }}
+          />
+          <Row
+            action="Topic → Consumers tab"
+            when="auto on tab open, or Refresh"
+            calls="ListGroups + 1× OffsetFetch v2 per group (capped at 500 groups)"
+            badge={{ label: 'Read', variant: 'read' }}
+            note="Scans groups for committed offsets on this topic. Bounded to the first 500 groups so large clusters aren't hammered."
+          />
+          <Row
+            action="Consumer group details"
+            when="on group click"
+            calls="DescribeGroups + 1× OffsetFetch v2 (all committed offsets) + 1× ListOffsets per committed topic"
+            badge={{ label: 'Read', variant: 'read' }}
+            note="A single OffsetFetch returns the group's committed offsets; ListOffsets is then batched once per topic (not per partition)."
+          />
+          <Row
+            action="Produce message"
+            when="on Send Message click"
+            calls="ProduceRequest (no compression)"
+            badge={{ label: 'Write', variant: 'write' }}
+            note="Permanently writes a message to the topic. Retained per topic retention policy. Cannot be undone."
+          />
+          <Row
+            action="Create topic"
+            when="on create confirm"
+            calls="CreateTopicsRequest via rskafka controller"
+            badge={{ label: 'Write', variant: 'write' }}
+          />
+          <Row
+            action="Delete topic"
+            when="on delete confirm"
+            calls="DeleteTopicsRequest via rskafka controller"
+            badge={{ label: 'Destructive', variant: 'destructive' }}
+            note="Permanently deletes the topic and all its data. Irreversible."
+          />
         </div>
       </div>
-    </div>,
-    document.body,
+
+      <p className="text-[11px] text-fg-mute">
+        Full documentation: <span className="font-mono text-fg/70">docs/human/kafka-explorer.md</span>
+      </p>
+    </ModalShell>
   );
 }

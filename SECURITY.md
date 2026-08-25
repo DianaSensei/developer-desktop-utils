@@ -200,12 +200,25 @@ We would rather write these down than have you find them.
    can issue arbitrary outbound HTTP requests. The mitigation is the CSP (no
    remote code can get into the webview to abuse it) plus the fact that requests
    are user-initiated.
-2. **API Client scripts are not sandboxed.** Pre/post-request scripts run through
-   the `AsyncFunction` constructor in the app's own JS context
-   (`src/components/tools/apiclient/runtime.ts`). This is the same trust model as
-   Postman and Bruno: the scripts are *your* scripts. **Do not paste or import a
-   collection containing scripts you have not read** — treat a `.bru`/Postman
-   collection from a stranger like an executable.
+2. **API Client scripts still execute — the sandbox bounds them, it does not
+   vet them.** Pre/post-request scripts, `vars` expressions and assertions are
+   real JavaScript, built with the `AsyncFunction` constructor. They run inside
+   a dedicated Web Worker (`src/components/tools/apiclient/scriptSandbox.worker.ts`,
+   driven by `scriptHost.ts`), which buys three things: a runaway script can be
+   killed by terminating the worker instead of freezing the app; a script has no
+   `window`, no `document`, no `localStorage`, and no `__TAURI_INTERNALS__`, so
+   it cannot invoke a Tauri command or read a local file; and if the worker
+   cannot start, phases are **refused** rather than quietly re-run on the main
+   thread (`ScriptSandboxUnavailableError` — the UI says so, and it re-probes).
+   What a script *does* get is the `bru`/`req`/`res`/`pm` surface, the curated
+   `require()` list in `modules.ts`, and — in a browser build without the app's
+   CSP — worker `fetch`. So the trust model is still Postman's and Bruno's: the
+   scripts are *your* scripts. **Do not import a collection containing scripts
+   you have not read** — treat a `.bru`/Postman collection from a stranger like
+   an executable. Importing a collection that carries scripts stops on a consent
+   screen that lists every script and defaults to *import without scripts*
+   (`ImportReviewDialog.tsx`); read that screen rather than clicking through it.
+   Verify the worker boundary yourself: `grep -n "new Worker" src/components/tools/apiclient/scriptHost.ts`.
 3. **macOS builds are ad-hoc signed, not notarized.** `signingIdentity: "-"` —
    we do not yet have an Apple Developer certificate, which is why Gatekeeper
    complains and `xattr -cr` is needed. Verify the attestation (step 1) before

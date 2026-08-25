@@ -431,7 +431,13 @@ function QrGenerator() {
               {customImageUrl
                 ? <div className={cn(chip(logo === 'custom'), 'flex items-center gap-1 px-1.5 py-1')}>
                     <img src={customImageUrl} alt="logo" className="h-5 w-5 object-contain rounded" />
-                    <button onClick={clearCustomImage} className="text-fg-mute hover:text-fg">
+                    <button
+                      type="button"
+                      onClick={clearCustomImage}
+                      aria-label="Remove custom logo"
+                      title="Remove custom logo"
+                      className="rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+                    >
                       <X className="h-3 w-3" />
                     </button>
                   </div>
