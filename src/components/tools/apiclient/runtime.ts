@@ -652,28 +652,113 @@ export async function runScript(
 // name for the body of the expression. The Script tab is the deliberately
 // powerful surface and is unaffected: `runScript` keeps its full sandbox.
 //
-// Defence in depth, not a boundary — `({}).constructor.constructor` still
-// reaches Function, and `eval` cannot be shadowed at all (it is not a legal
-// parameter name in strict mode). The worker itself remains the real
-// containment: no DOM, no app storage, killable on timeout.
-const SHADOWED_GLOBALS = [
-  'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'importScripts',
-  'self', 'globalThis', 'postMessage', 'Worker', 'SharedWorker',
-  'indexedDB', 'caches', 'navigator', 'location', 'Function',
-];
+function splitArgs(raw: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuote: "'" | '"' | null = null;
+  let esc = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (esc) {
+      cur += ch;
+      esc = false;
+      continue;
+    }
+    if (ch === '\\') {
+      cur += ch;
+      esc = true;
+      continue;
+    }
+    if (inQuote) {
+      cur += ch;
+      if (ch === inQuote) inQuote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      cur += ch;
+      inQuote = ch;
+      continue;
+    }
+    if (ch === ',') {
+      out.push(cur.trim());
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  if (cur.trim() || raw.trim().endsWith(',')) out.push(cur.trim());
+  return out;
+}
 
-// Evaluate a Vars-tab expression. Tries JS evaluation (so `res.body.token` or
-// `bru.getVar('x')` work); falls back to the literal string on parse error.
+function parseLiteral(token: string): unknown {
+  const t = token.trim();
+  if (/^'(?:\\.|[^'\\])*'$/.test(t) || /^"(?:\\.|[^"\\])*"$/.test(t)) {
+    return t.slice(1, -1).replace(/\\(['"\\])/g, '$1');
+  }
+  if (t === 'true') return true;
+  if (t === 'false') return false;
+  if (t === 'null') return null;
+  if (t !== '' && !Number.isNaN(Number(t))) return Number(t);
+  throw new Error('Unsupported literal');
+}
+
+function readPath(path: string, scope: Record<string, unknown>): unknown {
+  const parts: string[] = [];
+  const re = /([A-Za-z_$][A-Za-z0-9_$]*)|\[\s*('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")\s*\]/g;
+  let m: RegExpExecArray | null;
+  let consumed = '';
+  while ((m = re.exec(path)) !== null) {
+    consumed += m[0];
+    if (m[1]) {
+      parts.push(m[1]);
+    } else if (m[2]) {
+      parts.push(String(parseLiteral(m[2])));
+    }
+    if (path[re.lastIndex] === '.') {
+      consumed += '.';
+      re.lastIndex++;
+    }
+  }
+  if (consumed !== path || parts.length === 0) throw new Error('Invalid path');
+
+  let cur: unknown = scope[parts[0]];
+  for (let i = 1; i < parts.length; i++) {
+    if (cur == null || (typeof cur !== 'object' && typeof cur !== 'function')) {
+      throw new Error('Path access failed');
+    }
+    cur = (cur as Record<string, unknown>)[parts[i]];
+  }
+  return cur;
+}
+
+// Evaluate a Vars-tab expression safely. Supports property paths
+// (`res.body.token`, `res.body['token']`) and simple method calls like
+// `bru.getVar('x')`; falls back to the literal string for unsupported forms.
 function evalVarExpr(expr: string, scope: Record<string, unknown>): unknown {
-  const names = Object.keys(scope);
-  // Anything the scope itself provides wins — never shadow a real binding.
-  const shadowed = SHADOWED_GLOBALS.filter((g) => !names.includes(g));
+  const s = expr.trim();
   try {
-    // 'use strict' also stops an expression assigning to an undeclared name,
-    // which in sloppy mode would create a worker global.
-    const fn = new Function(...names, ...shadowed, `'use strict'; return (${expr});`);
-    // Only the scope values are passed; the shadow parameters receive undefined.
-    return fn(...names.map((n) => scope[n]));
+    const call = /^(.+)\((.*)\)$/.exec(s);
+    if (call) {
+      const callee = call[1].trim();
+      const argsRaw = call[2];
+      const lastDot = callee.lastIndexOf('.');
+      if (lastDot <= 0) throw new Error('Invalid callee');
+      const objPath = callee.slice(0, lastDot);
+      const methodName = callee.slice(lastDot + 1);
+      if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(methodName)) throw new Error('Invalid method');
+
+      const obj = readPath(objPath, scope);
+      if (obj == null || (typeof obj !== 'object' && typeof obj !== 'function')) {
+        throw new Error('Invalid receiver');
+      }
+      const fn = (obj as Record<string, unknown>)[methodName];
+      if (typeof fn !== 'function') throw new Error('Not callable');
+
+      const args = splitArgs(argsRaw).map(parseLiteral);
+      return (fn as (...a: unknown[]) => unknown).apply(obj, args);
+    }
+
+    return readPath(s, scope);
   } catch {
     return expr;
   }
