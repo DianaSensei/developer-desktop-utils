@@ -6,18 +6,24 @@
 // whole point, since a synchronous infinite loop cannot be interrupted any
 // other way.
 //
-// If Workers are unavailable, or the worker fails to start, execution falls back
-// to the main thread: scripts keep working exactly as before, just without the
-// timeout guarantee.
+// If Workers are unavailable, or the worker fails to start, the phase is
+// REFUSED rather than run on the main thread. Scripts and Vars/Assert
+// expressions come out of the collection file, which may have been imported
+// from anywhere; on the main thread they would reach `window`, app storage and
+// `window.__TAURI_INTERNALS__.invoke` — and through it `read_file_data_url` on
+// any path plus the `https://**` http grant, i.e. read a local file and post it
+// out. Losing the timeout was never the only thing the worker was buying.
+//
+// The sandbox re-probes every REPROBE_INTERVAL_MS, so this state self-heals;
+// the UI surfaces it meanwhile.
 
-import { runPhase, type PhaseInput, type PhaseOutput } from './scriptPhases';
+import type { PhaseInput, PhaseOutput } from './scriptPhases';
 import type { OutMessage } from './scriptSandbox.worker';
 
 export const DEFAULT_SCRIPT_TIMEOUT_MS = 5000;
 // A worker that fails to load once is very likely a transient bundling/CSP
 // hiccup, not a permanent platform limitation — give it another chance after
-// this long instead of running every script unsandboxed for the rest of the
-// session.
+// this long instead of refusing every script for the rest of the session.
 const REPROBE_INTERVAL_MS = 30_000;
 
 interface Pending {
@@ -39,7 +45,7 @@ let workerFactory: WorkerFactory | null = null;
 type SandboxStatusListener = (degraded: boolean) => void;
 const statusListeners = new Set<SandboxStatusListener>();
 
-/** True while scripts are running unsandboxed on the main thread (no timeout/interrupt). */
+/** True while the sandbox worker is unavailable, so script phases are refused. */
 export function isScriptSandboxDegraded(): boolean {
   return workerUsable === false;
 }
@@ -108,8 +114,8 @@ function getWorker(): Worker | null {
       else p.reject(new Error(msg.message));
     };
     w.onerror = () => {
-      // A load/parse failure in the worker bundle: fall back until the next
-      // reprobe window instead of failing every request from here on.
+      // A load/parse failure in the worker bundle: refuse script phases until
+      // the next reprobe window rather than retrying on every request.
       markUnusable();
       disposeWorker();
     };
@@ -134,7 +140,8 @@ export async function runPhaseSandboxed(
   signal?: AbortSignal,
 ): Promise<PhaseOutput> {
   const w = getWorker();
-  if (!w) return runPhase(input, signal);
+  // Fail closed: no sandbox, no execution. See the note at the top of the file.
+  if (!w) throw new ScriptSandboxUnavailableError();
 
   const id = nextId++;
   const forwardAbort = () => w.postMessage({ type: 'abort', id });
@@ -159,6 +166,17 @@ export async function runPhaseSandboxed(
     if (timer) clearTimeout(timer);
     pending.delete(id);
     signal?.removeEventListener('abort', forwardAbort);
+  }
+}
+
+export class ScriptSandboxUnavailableError extends Error {
+  constructor() {
+    super(
+      'Script sandbox unavailable — scripts, vars and assertions were skipped. '
+      + 'They are not run on the main thread, where a script from an imported '
+      + 'collection could read local files and send them out. Retrying shortly.',
+    );
+    this.name = 'ScriptSandboxUnavailableError';
   }
 }
 

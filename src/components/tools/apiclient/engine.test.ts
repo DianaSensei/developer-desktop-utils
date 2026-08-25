@@ -1,7 +1,42 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { executeRequest } from './engine';
 import { __setSandboxWorkerFactory } from './scriptHost';
+import { runPhase, type PhaseInput, type PhaseOutput } from './scriptPhases';
 import { newRequest, type ApiRequest, type Environment } from './types';
+
+// jsdom has no Worker, and the sandbox now refuses to run a phase without one
+// (a collection script must never touch the main thread). These tests are about
+// engine behaviour rather than the sandbox, so stand in a worker that runs the
+// real `runPhase` in-process and answers over the same message protocol.
+class InProcessWorker {
+  onmessage: ((e: MessageEvent) => void) | null = null;
+  onerror: ((e: unknown) => void) | null = null;
+  private controllers = new Map<number, AbortController>();
+
+  postMessage(msg: { type: string; id: number; input?: PhaseInput }) {
+    if (msg.type === 'abort') {
+      this.controllers.get(msg.id)?.abort();
+      return;
+    }
+    const controller = new AbortController();
+    this.controllers.set(msg.id, controller);
+    void runPhase(msg.input!, controller.signal)
+      .then((output: PhaseOutput) => {
+        this.onmessage?.({ data: { type: 'done', id: msg.id, output } } as MessageEvent);
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e);
+        this.onmessage?.({ data: { type: 'failed', id: msg.id, message } } as MessageEvent);
+      })
+      .finally(() => { this.controllers.delete(msg.id); });
+  }
+
+  terminate() { this.controllers.forEach((c) => c.abort()); }
+}
+
+beforeEach(() => {
+  __setSandboxWorkerFactory(() => new InProcessWorker() as unknown as Worker);
+});
 
 function stubJson(body: string, status = 200) {
   const bytes = new TextEncoder().encode(body);
