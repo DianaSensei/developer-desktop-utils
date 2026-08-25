@@ -33,6 +33,10 @@ export interface ModalShellProps {
   bodyClassName?: string;
   /** Darker scrim, for modals that need to read as a stronger interrupt. */
   scrim?: 'default' | 'strong';
+  /** Vertical placement. `top` sits the panel below the viewport top edge. */
+  align?: 'center' | 'top';
+  /** Extra classes for the backdrop — a z-index override, an extra blur. */
+  overlayClassName?: string;
   children: ReactNode;
 }
 
@@ -50,6 +54,8 @@ export function ModalShell({
   className,
   bodyClassName,
   scrim = 'default',
+  align = 'center',
+  overlayClassName,
   children,
 }: ModalShellProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -98,9 +104,11 @@ export function ModalShell({
   return createPortal(
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center p-4',
+        'fixed inset-0 z-50 flex justify-center p-4',
+        align === 'top' ? 'items-start pt-[10vh]' : 'items-center',
         scrim === 'strong' ? 'bg-black/60' : 'bg-black/40',
         'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-fast motion-safe:ease-out-soft',
+        overlayClassName,
       )}
       // mousedown rather than click: a selection drag that starts inside an
       // input and releases over the backdrop should not close the modal.

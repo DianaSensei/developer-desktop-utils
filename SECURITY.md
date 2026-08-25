@@ -219,15 +219,23 @@ We would rather write these down than have you find them.
    screen that lists every script and defaults to *import without scripts*
    (`ImportReviewDialog.tsx`); read that screen rather than clicking through it.
    Verify the worker boundary yourself: `grep -n "new Worker" src/components/tools/apiclient/scriptHost.ts`.
-3. **macOS builds are ad-hoc signed, not notarized.** `signingIdentity: "-"` —
+3. **Most of the Encrypt tab is interop, not protection.** `AES-256 GCM` is the
+   default and the real one: PBKDF2-HMAC-SHA256 at 600k iterations into
+   AES-256-GCM, through WebCrypto (`src/lib/aesGcm.ts`), with a fresh salt and
+   IV per message and a tag that catches tampering. Every *other* mode in that
+   list goes through `crypto-js` on purpose — they exist so you can read what a
+   `crypto-js` caller wrote — and `crypto-js` stretches a passphrase with
+   OpenSSL's EvpKDF: **MD5, one iteration**, and authenticates nothing. The UI
+   says so on every one of them. Do not protect anything real with those modes.
+4. **macOS builds are ad-hoc signed, not notarized.** `signingIdentity: "-"` —
    we do not yet have an Apple Developer certificate, which is why Gatekeeper
    complains and `xattr -cr` is needed. Verify the attestation (step 1) before
    you clear the quarantine flag. Windows builds are likewise not
    Authenticode-signed, so SmartScreen may warn.
-4. **Third-party services you point tools at** (DNS-over-HTTPS resolvers, IP
+5. **Third-party services you point tools at** (DNS-over-HTTPS resolvers, IP
    geolocation, your Kafka/RabbitMQ/Redis/Docker endpoints) see the queries you
    send them. That is the tool doing its job, not the app phoning home.
-5. **Credentials you enter** (broker passwords, API tokens) are stored by the
+6. **Credentials you enter** (broker passwords, API tokens) are stored by the
    Tauri `store` plugin as files under the OS app-data directory, not in an OS
    keychain, and not encrypted at rest. Anyone with your user account can read
    them. Treat that like a `.env` file.

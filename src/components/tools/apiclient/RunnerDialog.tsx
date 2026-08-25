@@ -531,7 +531,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center justify-between border-b px-4 py-2.5 text-xs">
                   <span className="flex items-center gap-1.5 font-medium"><ListChecks className="h-3.5 w-3.5" /> Requests <span className="text-fg-mute">· {selected.size}/{order.length}</span></span>
-                  <button onClick={toggleAll} className="font-medium text-acc-ink hover:underline">
+                  <button type="button" onClick={toggleAll} className="font-medium text-acc-ink hover:underline">
                     {allSelected ? 'Deselect all' : 'Select all'}
                   </button>
                 </div>

@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, ChevronUp, Clock, Minus, Plus, Tag as TagIcon, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clock, Minus, Plus, Tag as TagIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { useClockify } from './store';
 import { fmtHM, pad, parseDuration } from './time';
 
@@ -204,7 +205,7 @@ export function TimeStepperField({
 }
 
 // ---------------------------------------------------------------------------
-// Modal — lightweight portal dialog (no extra dependency)
+// Modal — the time tracker's dialogs, on the shared ModalShell chrome
 // ---------------------------------------------------------------------------
 
 export function Modal({
@@ -220,38 +221,21 @@ export function Modal({
   children: ReactNode;
   width?: string;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
   if (!open) return null;
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9998] flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-[10vh] backdrop-blur-[1px] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-fast motion-safe:ease-out-soft"
-      onMouseDown={onClose}
+  // Top-aligned and above the tracker's own popovers, which is the only way
+  // these differ from every other modal in the app.
+  return (
+    <ModalShell
+      onClose={onClose}
+      title={title}
+      width={width}
+      align="top"
+      overlayClassName="z-[9998] backdrop-blur-[1px]"
+      className="bg-card"
+      bodyClassName="p-4"
     >
-      <div
-        className={cn('w-full rounded-lg border bg-card shadow-xl motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-base motion-safe:ease-out-soft', width)}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h3 className="text-sm font-semibold">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="p-4">{children}</div>
-      </div>
-    </div>,
-    document.body
+      {children}
+    </ModalShell>
   );
 }
 
