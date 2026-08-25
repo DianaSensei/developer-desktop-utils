@@ -644,121 +644,260 @@ export async function runScript(
 
 // ─── declarative vars ───────────────────────────────────────────────────────
 
-// Ambient worker capabilities shadowed out of Vars/Assert expressions. These
-// fields are declarative — `res.body.token`, `bru.getVar('x')`, `res.status > 0`
-// — but they travel inside the collection file, so opening a collection someone
-// sent you would otherwise run whatever they put in a Vars row. Passing each
-// name as an extra (undefined) parameter shadows the worker global of the same
-// name for the body of the expression. The Script tab is the deliberately
-// powerful surface and is unaffected: `runScript` keeps its full sandbox.
+// Vars/Assert expressions are parsed, never evaluated. These fields are
+// declarative — `res.body.token`, `res.body.items[0].id`, `bru.getVar('x')` —
+// but they travel inside the collection file, so opening a collection someone
+// sent you would otherwise run whatever they put in a Vars row. Earlier this
+// was a `new Function(...)` with the dangerous globals shadowed out by extra
+// parameters, which was defence in depth rather than a boundary:
+// `({}).constructor.constructor` still reached Function and `eval` cannot be
+// shadowed at all. The grammar below removes code construction entirely — it
+// resolves property paths and at most one method call, so there is no string
+// that becomes code. The Script tab is the deliberately powerful surface and is
+// unaffected: `runScript` keeps its full sandbox, and the worker remains the
+// real containment there — no DOM, no app storage, killable on timeout.
 //
-function splitArgs(raw: string): string[] {
-  const out: string[] = [];
-  let cur = '';
-  let inQuote: "'" | '"' | null = null;
-  let esc = false;
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (esc) {
-      cur += ch;
-      esc = false;
-      continue;
-    }
-    if (ch === '\\') {
-      cur += ch;
-      esc = true;
-      continue;
-    }
-    if (inQuote) {
-      cur += ch;
-      if (ch === inQuote) inQuote = null;
-      continue;
-    }
+// The grammar covers what the tab is actually used for: paths, indices, method
+// calls on the scope objects, literals, and the arithmetic/comparison/logical
+// operators (`40 + 2`, `res.status === 200`). It deliberately stops short of
+// assignment, `in`/`instanceof`, and free identifiers — anything not in it
+// falls back to the literal string, as a parse error always did.
+
+// Property keys that are never worth traversing from a collection file: they
+// are the reachable route to Function and to Object.prototype. `applyVars`
+// refuses the same three as var *names* below.
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+// Callables that turn data back into code. Unreachable via UNSAFE_KEYS today;
+// refused here too so the property denylist is not the only thing standing
+// between a collection file and an evaluator.
+const UNSAFE_CALLEES: unknown[] = [
+  Function, Function.prototype.call, Function.prototype.apply, Function.prototype.bind,
+];
+
+type Tok =
+  | { k: 'num'; v: number }
+  | { k: 'str'; v: string }
+  | { k: 'name'; v: string }
+  | { k: 'op'; v: string };
+
+const PUNCT = [
+  '===', '!==', '==', '!=', '<=', '>=', '&&', '||', '??',
+  '.', '(', ')', '[', ']', ',', '!', '+', '-', '*', '/', '%', '<', '>',
+];
+
+function tokenize(src: string): Tok[] {
+  const toks: Tok[] = [];
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (/\s/.test(ch)) { i++; continue; }
     if (ch === "'" || ch === '"') {
-      cur += ch;
-      inQuote = ch;
-      continue;
-    }
-    if (ch === ',') {
-      out.push(cur.trim());
-      cur = '';
-      continue;
-    }
-    cur += ch;
-  }
-  if (cur.trim() || raw.trim().endsWith(',')) out.push(cur.trim());
-  return out;
-}
-
-function parseLiteral(token: string): unknown {
-  const t = token.trim();
-  if (/^'(?:\\.|[^'\\])*'$/.test(t) || /^"(?:\\.|[^"\\])*"$/.test(t)) {
-    return t.slice(1, -1).replace(/\\(['"\\])/g, '$1');
-  }
-  if (t === 'true') return true;
-  if (t === 'false') return false;
-  if (t === 'null') return null;
-  if (t !== '' && !Number.isNaN(Number(t))) return Number(t);
-  throw new Error('Unsupported literal');
-}
-
-function readPath(path: string, scope: Record<string, unknown>): unknown {
-  const parts: string[] = [];
-  const re = /([A-Za-z_$][A-Za-z0-9_$]*)|\[\s*('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")\s*\]/g;
-  let m: RegExpExecArray | null;
-  let consumed = '';
-  while ((m = re.exec(path)) !== null) {
-    consumed += m[0];
-    if (m[1]) {
-      parts.push(m[1]);
-    } else if (m[2]) {
-      parts.push(String(parseLiteral(m[2])));
-    }
-    if (path[re.lastIndex] === '.') {
-      consumed += '.';
-      re.lastIndex++;
-    }
-  }
-  if (consumed !== path || parts.length === 0) throw new Error('Invalid path');
-
-  let cur: unknown = scope[parts[0]];
-  for (let i = 1; i < parts.length; i++) {
-    if (cur == null || (typeof cur !== 'object' && typeof cur !== 'function')) {
-      throw new Error('Path access failed');
-    }
-    cur = (cur as Record<string, unknown>)[parts[i]];
-  }
-  return cur;
-}
-
-// Evaluate a Vars-tab expression safely. Supports property paths
-// (`res.body.token`, `res.body['token']`) and simple method calls like
-// `bru.getVar('x')`; falls back to the literal string for unsupported forms.
-function evalVarExpr(expr: string, scope: Record<string, unknown>): unknown {
-  const s = expr.trim();
-  try {
-    const call = /^(.+)\((.*)\)$/.exec(s);
-    if (call) {
-      const callee = call[1].trim();
-      const argsRaw = call[2];
-      const lastDot = callee.lastIndexOf('.');
-      if (lastDot <= 0) throw new Error('Invalid callee');
-      const objPath = callee.slice(0, lastDot);
-      const methodName = callee.slice(lastDot + 1);
-      if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(methodName)) throw new Error('Invalid method');
-
-      const obj = readPath(objPath, scope);
-      if (obj == null || (typeof obj !== 'object' && typeof obj !== 'function')) {
-        throw new Error('Invalid receiver');
+      let out = '';
+      let j = i + 1;
+      for (; j < src.length && src[j] !== ch; j++) {
+        if (src[j] === '\\') { out += src[++j] ?? ''; continue; }
+        out += src[j];
       }
-      const fn = (obj as Record<string, unknown>)[methodName];
-      if (typeof fn !== 'function') throw new Error('Not callable');
-
-      const args = splitArgs(argsRaw).map(parseLiteral);
-      return (fn as (...a: unknown[]) => unknown).apply(obj, args);
+      if (j >= src.length) throw new Error('Unterminated string');
+      toks.push({ k: 'str', v: out });
+      i = j + 1;
+      continue;
     }
+    const num = /^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(src.slice(i));
+    if (num) { toks.push({ k: 'num', v: Number(num[0]) }); i += num[0].length; continue; }
+    const name = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(src.slice(i));
+    if (name) { toks.push({ k: 'name', v: name[0] }); i += name[0].length; continue; }
+    const op = PUNCT.find((o) => src.startsWith(o, i));
+    if (!op) throw new Error(`Unexpected character ${ch}`);
+    toks.push({ k: 'op', v: op });
+    i += op.length;
+  }
+  return toks;
+}
 
-    return readPath(s, scope);
+// Left-associative binary operators, tightest first. Deliberately no
+// assignment, no comma, no `in`/`instanceof` — nothing that mutates or probes.
+const BINOPS: Record<string, number> = {
+  '*': 6, '/': 6, '%': 6,
+  '+': 5, '-': 5,
+  '<': 4, '<=': 4, '>': 4, '>=': 4,
+  '==': 3, '!=': 3, '===': 3, '!==': 3,
+  '&&': 2, '||': 1, '??': 1,
+};
+
+function applyBinop(op: string, a: unknown, b: unknown): unknown {
+  switch (op) {
+    case '*': return (a as number) * (b as number);
+    case '/': return (a as number) / (b as number);
+    case '%': return (a as number) % (b as number);
+    case '+': return (a as number) + (b as number);
+    case '-': return (a as number) - (b as number);
+    case '<': return (a as number) < (b as number);
+    case '<=': return (a as number) <= (b as number);
+    case '>': return (a as number) > (b as number);
+    case '>=': return (a as number) >= (b as number);
+    // eslint-disable-next-line eqeqeq
+    case '==': return a == b;
+    // eslint-disable-next-line eqeqeq
+    case '!=': return a != b;
+    case '===': return a === b;
+    case '!==': return a !== b;
+    default: throw new Error(`Unsupported operator ${op}`);
+  }
+}
+
+// Reads a member key, refusing the ones that lead back to Function.
+function member(obj: unknown, key: unknown): unknown {
+  if (obj == null) throw new Error('Path access failed');
+  const k = String(key);
+  if (UNSAFE_KEYS.has(k)) throw new Error('Refused key');
+  return (obj as Record<string, unknown>)[k];
+}
+
+// Recursive-descent evaluator over the token stream. It resolves values as it
+// parses — there is no code-generation step at any point, which is the whole
+// reason this exists rather than a `new Function(...)`.
+class VarExprParser {
+  private pos = 0;
+  private depth = 0;
+  // >0 while parsing the untaken side of a short-circuit: the tokens still have
+  // to be consumed, but nothing is read or called.
+  private skipping = 0;
+
+  constructor(private toks: Tok[], private scope: Record<string, unknown>) {}
+
+  private peek(): Tok | undefined { return this.toks[this.pos]; }
+
+  private eatOp(v: string): boolean {
+    const t = this.peek();
+    if (t && t.k === 'op' && t.v === v) { this.pos++; return true; }
+    return false;
+  }
+
+  private expectOp(v: string): void {
+    if (!this.eatOp(v)) throw new Error(`Expected ${v}`);
+  }
+
+  parse(): unknown {
+    const v = this.expr(0);
+    if (this.pos !== this.toks.length) throw new Error('Trailing input');
+    return v;
+  }
+
+  private expr(minPrec: number): unknown {
+    if (++this.depth > 32) throw new Error('Expression too deep');
+    try {
+      let left = this.unary();
+      for (;;) {
+        const t = this.peek();
+        if (!t || t.k !== 'op') break;
+        const prec = BINOPS[t.v];
+        if (prec === undefined || prec < minPrec) break;
+        this.pos++;
+        // Short-circuit the way JS does, so `res.body && res.body.token` is
+        // safe on a missing body: the untaken side is parsed, not evaluated.
+        const dead = this.skipping > 0
+          || (t.v === '&&' && !left)
+          || (t.v === '||' && !!left)
+          || (t.v === '??' && left != null);
+        if (dead) {
+          this.skipping++;
+          try { this.expr(prec + 1); } finally { this.skipping--; }
+          continue;
+        }
+        const right = this.expr(prec + 1);
+        left = t.v === '&&' || t.v === '||' || t.v === '??' ? right : applyBinop(t.v, left, right);
+      }
+      return left;
+    } finally {
+      this.depth--;
+    }
+  }
+
+  private unary(): unknown {
+    if (this.eatOp('!')) return !this.unary();
+    if (this.eatOp('-')) return -(this.unary() as number);
+    if (this.eatOp('+')) return +(this.unary() as number);
+    return this.postfix();
+  }
+
+  private postfix(): unknown {
+    let val = this.primary();
+    // `receiver` tracks the object a method was read from, so a call binds
+    // `this` correctly for `bru.getVar('x')` / `res.getStatus()`.
+    let receiver: unknown = undefined;
+    for (;;) {
+      if (this.eatOp('.')) {
+        const t = this.peek();
+        if (!t || t.k !== 'name') throw new Error('Expected property name');
+        this.pos++;
+        receiver = val;
+        val = this.skipping > 0 ? undefined : member(val, t.v);
+      } else if (this.eatOp('[')) {
+        const key = this.expr(0);
+        this.expectOp(']');
+        receiver = val;
+        val = this.skipping > 0 ? undefined : member(val, key);
+      } else if (this.eatOp('(')) {
+        // A bare `foo()` has no receiver: every callable here is reached as a
+        // method on a scope object, never as a free identifier.
+        const live = this.skipping === 0;
+        if (live) {
+          if (receiver === undefined) throw new Error('Invalid callee');
+          if (typeof val !== 'function') throw new Error('Not callable');
+          if (UNSAFE_CALLEES.includes(val)) throw new Error('Refused callee');
+        }
+        const args: unknown[] = [];
+        if (!this.eatOp(')')) {
+          do { args.push(this.expr(0)); } while (this.eatOp(','));
+          this.expectOp(')');
+        }
+        val = live ? (val as (...a: unknown[]) => unknown).apply(receiver, args) : undefined;
+        receiver = undefined;
+      } else {
+        return val;
+      }
+    }
+  }
+
+  private primary(): unknown {
+    const t = this.peek();
+    if (!t) throw new Error('Unexpected end of expression');
+    if (t.k === 'num' || t.k === 'str') { this.pos++; return t.v; }
+    if (t.k === 'name') {
+      this.pos++;
+      if (t.v === 'true') return true;
+      if (t.v === 'false') return false;
+      if (t.v === 'null') return null;
+      if (t.v === 'undefined') return undefined;
+      // The root has to be a binding the scope actually owns. Reaching it
+      // through the prototype chain would hand back Object.prototype members
+      // (`toString`, `hasOwnProperty`) as if they were scope roots, and an
+      // ambient worker global must never resolve at all.
+      if (!Object.prototype.hasOwnProperty.call(this.scope, t.v)) {
+        if (this.skipping > 0) return undefined;
+        throw new Error('Unknown root');
+      }
+      return this.scope[t.v];
+    }
+    if (t.k === 'op' && t.v === '(') {
+      this.pos++;
+      const v = this.expr(0);
+      this.expectOp(')');
+      return v;
+    }
+    throw new Error(`Unexpected token ${t.v}`);
+  }
+}
+
+// Evaluate a Vars/Assert expression. Supports property paths, indices, method
+// calls on the scope objects, literals and the operators above. Anything
+// outside that grammar falls back to the literal string, matching the previous
+// evaluator's behaviour on a parse error.
+function evalVarExpr(expr: string, scope: Record<string, unknown>): unknown {
+  try {
+    return new VarExprParser(tokenize(expr), scope).parse();
   } catch {
     return expr;
   }

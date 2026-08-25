@@ -294,18 +294,64 @@ describe('Vars/Assert expression containment', () => {
     expect(evalVia('res.status')).toBe('200');
   });
 
-  it('shadows the ambient network globals a collection could otherwise reach', () => {
-    // An imported collection must not be able to phone home from a Vars row.
-    expect(evalVia('typeof fetch')).toBe('undefined');
-    expect(evalVia('typeof XMLHttpRequest')).toBe('undefined');
-    expect(evalVia('typeof WebSocket')).toBe('undefined');
-    expect(evalVia('typeof importScripts')).toBe('undefined');
-    expect(evalVia('typeof globalThis')).toBe('undefined');
+  it('reads bracket keys, numeric indices and paths through them', () => {
+    expect(evalVia("res.body['token']")).toBe('abc');
+    expect(evalVia('res.body.items[1]')).toBe('2');
+    expect(evalVia("res.body['items'][2]")).toBe('3');
+    // Reads through a primitive: JS boxes it, so this must resolve too.
+    expect(evalVia('res.body.token.length')).toBe('3');
   });
 
-  it('runs strict, so an expression cannot create a global by assignment', () => {
-    // Falls back to the literal: the assignment throws under 'use strict'.
+  it('tolerates whitespace inside a path', () => {
+    expect(evalVia('res . body . token')).toBe('abc');
+    expect(evalVia("res.body [ 'token' ]")).toBe('abc');
+  });
+
+  it('evaluates operators, literals and grouping', () => {
+    expect(evalVia('40 + 2')).toBe('42');
+    expect(evalVia('res.status === 200')).toBe('true');
+    expect(evalVia('res.status >= 200 && res.status < 300')).toBe('true');
+    expect(evalVia("res.body.token + '!'")).toBe('abc!');
+    expect(evalVia('(1 + 2) * 3')).toBe('9');
+    expect(evalVia('!res.body.missing')).toBe('true');
+    // Short-circuits like JS, so a missing left side is not a path error.
+    expect(evalVia('res.body.missing && res.body.missing.deep')).toBe('');
+  });
+
+  it('calls a method on an object or a primitive receiver', () => {
+    expect(evalVia('res.getStatus()')).toBe('200');
+    expect(evalVia('res.body.token.toUpperCase()')).toBe('ABC');
+    expect(evalVia("res.getHeader('content-type')")).toBe('application/json');
+  });
+
+  it('never turns an expression into code', () => {
+    // The old evaluator built a Function; nothing here compiles a string.
+    (globalThis as Record<string, unknown>).leaked = undefined;
+    for (const expr of [
+      "res.body.constructor.constructor('globalThis.leaked = 1')()",
+      "res.body.constructor.constructor.call(null, 'globalThis.leaked = 1')",
+      'res.body.constructor.constructor',
+      'res.body.__proto__.constructor',
+      'res.body.token.constructor.prototype',
+    ]) {
+      // Refused by the key denylist or the grammar — returns the literal back.
+      expect(evalVia(expr)).toBe(expr);
+    }
+    expect((globalThis as Record<string, unknown>).leaked).toBeUndefined();
+  });
+
+  it('falls back to the literal for anything outside the grammar', () => {
+    // No ambient global is reachable: only a name the scope itself owns
+    // resolves, so these come back unparsed rather than as the worker global.
+    expect(evalVia('fetch')).toBe('fetch');
+    expect(evalVia('globalThis')).toBe('globalThis');
+    expect(evalVia('importScripts')).toBe('importScripts');
+    // Nor does the scope object's own prototype chain leak in as a root.
+    expect(evalVia('toString')).toBe('toString');
+    expect(evalVia('hasOwnProperty')).toBe('hasOwnProperty');
+    // Assignment is deliberately outside the grammar; it parses to nothing.
     expect(evalVia('leaked = 1')).toBe('leaked = 1');
+    expect(evalVia('res.body.token++')).toBe('res.body.token++');
     expect((globalThis as Record<string, unknown>).leaked).toBeUndefined();
   });
 });
