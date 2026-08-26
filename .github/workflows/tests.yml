@@ -1,0 +1,42 @@
+name: Tests
+
+# The frontend test suite had no CI coverage at all: coverage.yml builds the
+# frontend and measures the Rust crate, and nothing ran `npm test`. A parser
+# regression in the API client's Vars/Assert evaluator therefore landed with
+# every check green, because the two tests that caught it never ran here.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Typecheck and unit tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: lts/*
+          cache: npm
+
+      # Node-only job: no Tauri system libraries and no Rust toolchain, so this
+      # reports in about a minute rather than waiting on the coverage build.
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test
