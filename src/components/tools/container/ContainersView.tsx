@@ -174,7 +174,8 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
   );
 
   return (
-    <div className="tool-full-height">
+    // `relative` anchors the floating SelectionBar (see SelectionBar.tsx).
+    <div className="tool-full-height relative">
       <ViewHeader
         icon={Box}
         title="Containers"
@@ -226,7 +227,7 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
         </Button>
       </SelectionBar>
 
-      <div className="tool-scrollable px-5 py-4">
+      <div className={cn('tool-scrollable px-5 py-4', selection.count > 0 && 'pb-20')}>
         {loading && !containers && <LoadingRow />}
         {error && <Callout tone="error">{error}</Callout>}
         {containers && !error && (

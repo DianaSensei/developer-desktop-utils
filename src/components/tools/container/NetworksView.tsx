@@ -10,6 +10,7 @@ import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
+import { cn } from '@/lib/utils';
 import { containerApi, type ContainerConnection, type NetworkInfo } from './types';
 import { useSort } from './useSort';
 import { useRowSelection } from './useRowSelection';
@@ -73,7 +74,8 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
   };
 
   return (
-    <div className="tool-full-height">
+    // `relative` anchors the floating SelectionBar (see SelectionBar.tsx).
+    <div className="tool-full-height relative">
       <ViewHeader
         icon={NetworkIcon}
         title="Networks"
@@ -101,7 +103,7 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
         </Button>
       </SelectionBar>
 
-      <div className="tool-scrollable px-5 py-4">
+      <div className={cn('tool-scrollable px-5 py-4', selection.count > 0 && 'pb-20')}>
         {loading && !networks && <LoadingRow />}
         {error && <Callout tone="error">{error}</Callout>}
         {networks && !error && (

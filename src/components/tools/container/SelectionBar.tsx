@@ -4,17 +4,24 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 /**
- * Row / header checkbox for the container tool's tables. The header instance
- * takes `indeterminate` so a partial selection reads as a dash rather than as
- * "nothing selected" — without it, clicking a half-filled header checkbox
- * looks like it should clear when it actually selects.
+ * Row / header checkbox for the container tool's tables.
+ *
+ * The unchecked box is outlined in `fg-mute/70` rather than `sunk`: `sunk` is
+ * 97% lightness on light and 11% on dark, i.e. within a hair of the surface it
+ * sits on, which made the box effectively invisible in both themes. This
+ * clears the 3:1 non-text contrast minimum against the card in both.
+ *
+ * The header instance takes `indeterminate` so a partial selection reads as a
+ * dash rather than as "nothing selected" — without it, clicking a half-filled
+ * header checkbox looks like it should clear when it actually selects.
  */
-export function RowCheckbox({ checked, indeterminate, onToggle, title }: {
+export function RowCheckbox({ checked, indeterminate, onToggle, title, disabled }: {
   checked: boolean;
   indeterminate?: boolean;
   /** Receives the raw event so callers can honour shift-click range select. */
   onToggle: (e: React.MouseEvent) => void;
   title: string;
+  disabled?: boolean;
 }) {
   const active = checked || !!indeterminate;
   return (
@@ -23,22 +30,33 @@ export function RowCheckbox({ checked, indeterminate, onToggle, title }: {
       role="checkbox"
       aria-checked={indeterminate ? 'mixed' : checked}
       aria-label={title}
+      disabled={disabled}
       onClick={onToggle}
       title={title}
       className={cn(
-        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-        active ? 'border-acc bg-acc text-acc-fg' : 'border-sunk hover:border-acc/60',
+        'flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-fast',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/35 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
+        'active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40',
+        active
+          ? 'border-acc bg-acc text-acc-fg hover:bg-acc-hi hover:border-acc-hi'
+          : 'border-fg-mute/70 bg-card hover:border-acc hover:bg-acc/10',
       )}
     >
-      {checked ? <Check className="h-2.5 w-2.5" /> : indeterminate ? <Minus className="h-2.5 w-2.5" /> : null}
+      {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : indeterminate ? <Minus className="h-3 w-3" strokeWidth={3} /> : null}
     </button>
   );
 }
 
 /**
- * The bar that appears above a table once anything is selected: the count, a
- * "select every visible row" shortcut for when the current filter shows more
- * than what's ticked, Clear, and whatever bulk actions the view passes in.
+ * Bulk-action bar for a selection.
+ *
+ * It floats over the bottom of the list instead of being inserted above the
+ * table: as an in-flow element it appeared and disappeared as rows were
+ * ticked and unticked, shoving the whole table down and back a row's height
+ * on every click. Absolutely positioned, ticking a row changes nothing about
+ * the table's geometry. The parent view must be `relative` for the anchor to
+ * resolve; the short fade/slide-in is the state transition (suppressed by the
+ * global prefers-reduced-motion rule).
  */
 export function SelectionBar({ count, unselectedVisibleCount, onSelectAllVisible, onClear, children }: {
   count: number;
@@ -49,18 +67,32 @@ export function SelectionBar({ count, unselectedVisibleCount, onSelectAllVisible
 }) {
   if (count === 0) return null;
   return (
-    <div className="mx-5 mt-3 shrink-0 flex flex-wrap items-center justify-between gap-2 rounded-md border border-acc/30 bg-acc/5 px-3 py-2">
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-fg-mute">{count.toLocaleString()} selected</span>
-        {unselectedVisibleCount > 0 && (
-          <button type="button" className="text-xs text-acc hover:underline" onClick={onSelectAllVisible}>
-            Select all {(count + unselectedVisibleCount).toLocaleString()} shown
-          </button>
+    <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-5">
+      <div
+        role="toolbar"
+        aria-label={`${count} selected`}
+        className={cn(
+          'pointer-events-auto flex max-w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-lg',
+          'border border-acc/40 bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm',
+          'animate-in fade-in-0 slide-in-from-bottom-2 duration-base ease-out-soft',
         )}
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {children}
-        <Button size="sm" variant="outline" className="h-ctl" onClick={onClear}>Clear</Button>
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium">{count.toLocaleString()} selected</span>
+          {unselectedVisibleCount > 0 && (
+            <button
+              type="button"
+              className="rounded-sm text-xs text-acc underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/35"
+              onClick={onSelectAllVisible}
+            >
+              Select all {(count + unselectedVisibleCount).toLocaleString()} shown
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {children}
+          <Button size="sm" variant="outline" className="h-ctl" onClick={onClear}>Clear</Button>
+        </div>
       </div>
     </div>
   );

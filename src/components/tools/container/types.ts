@@ -172,6 +172,10 @@ export interface VolumeInfo {
   Driver: string;
   Mountpoint: string;
   CreatedAt?: string;
+  /** Compose stamps `com.docker.compose.project` on volumes and networks it
+   *  creates, the same way it does on containers — that is how the Compose
+   *  view's "Down" finds what belongs to a project. */
+  Labels?: Record<string, string> | null;
 }
 
 export interface NetworkInfo {
@@ -179,6 +183,7 @@ export interface NetworkInfo {
   Name: string;
   Driver?: string;
   Scope?: string;
+  Labels?: Record<string, string> | null;
 }
 
 // ── System overview ─────────────────────────────────────────────────────
