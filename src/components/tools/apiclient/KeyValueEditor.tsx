@@ -10,7 +10,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
+import { Check, Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { InlineCodeField, TextEditor } from '@/design-system';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
@@ -182,18 +182,18 @@ export function KeyValueEditor({
           return (
             <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors', gridCols)}>
               {/* Enable/disable. The button IS the cell — clicking anywhere in
-                  the leading column toggles the row. It used to be the 8px dot
-                  itself, a target smaller than the pointer's own hotspot for
-                  the control people reach for most in this table; the dot is
-                  now just what the button draws. The Name/Value cells stay
-                  editors: a click there has to place the caret. */}
+                  the leading column toggles the row, not just the checkbox
+                  glyph itself, so the target stays the full ~34px cell people
+                  actually aim for. The Name/Value cells keep their normal
+                  behavior: they're editors, so a click there has to place the
+                  caret, not toggle the row. */}
               <div className="flex items-stretch">
                 {isGhost ? (
                   <span className="w-full" />
                 ) : (
                   <button
                     type="button"
-                    role="switch"
+                    role="checkbox"
                     aria-checked={row.enabled}
                     aria-label={`${row.key || keyPlaceholder} — ${row.enabled ? 'enabled' : 'disabled'}`}
                     onClick={() => editRow(row.id, { enabled: !row.enabled })}
@@ -202,10 +202,14 @@ export function KeyValueEditor({
                   >
                     <span
                       className={cn(
-                        'h-2 w-2 shrink-0 rounded-full transition-colors',
-                        row.enabled ? 'bg-acc group-hover/toggle:bg-acc-hi' : 'bg-fg-mute/30 group-hover/toggle:bg-fg-mute/60',
+                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+                        row.enabled
+                          ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
+                          : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
                       )}
-                    />
+                    >
+                      {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                    </span>
                   </button>
                 )}
               </div>

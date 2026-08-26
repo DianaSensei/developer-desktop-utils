@@ -458,15 +458,15 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
           const enabled = enabledOf(name);
           return (
             <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
-              {/* Toggle target is the whole cell, not the 8px dot — same change
-                  as KeyValueEditor's, and the Name cell below joins it: unlike
-                  the Name column there, this one is read-only text (the name
-                  comes from the URL), so a click on it has nothing to edit and
-                  can mean "toggle this param" instead. */}
+              {/* Toggle target is the whole cell, not just the checkbox glyph —
+                  same change as KeyValueEditor's, and the Name cell below joins
+                  it: unlike the Name column there, this one is read-only text
+                  (the name comes from the URL), so a click on it has nothing to
+                  edit and can mean "toggle this param" instead. */}
               <div className="flex items-stretch">
                 <button
                   type="button"
-                  role="switch"
+                  role="checkbox"
                   aria-checked={enabled}
                   aria-label={`:${name} — ${enabled ? 'enabled' : 'disabled'}`}
                   onClick={() => toggleEnabled(name)}
@@ -475,10 +475,14 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                 >
                   <span
                     className={cn(
-                      'h-2 w-2 shrink-0 rounded-full transition-colors',
-                      enabled ? 'bg-acc group-hover/toggle:bg-acc-hi' : 'bg-fg-mute/30 group-hover/toggle:bg-fg-mute/60',
+                      'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+                      enabled
+                        ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
+                        : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
                     )}
-                  />
+                  >
+                    {enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                  </span>
                 </button>
               </div>
               {/* Same reason as AuthQueryParamRow above: a long placeholder name
