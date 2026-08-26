@@ -39,7 +39,7 @@ function Column({
   selected: number;
   onPick: (n: number) => void;
   onStep: (d: number) => void;
-  selRef: React.RefObject<HTMLButtonElement>;
+  selRef: React.RefObject<HTMLButtonElement | null>;
   listClass: string;
   fill?: boolean;
 }) {
