@@ -24,3 +24,32 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+
+  # The docker-compose test fixtures under testing/ are not shipped in the app,
+  # but they are still code in this repo and they still go stale. Without these
+  # entries only npm and cargo were kept current, and the Spring fixture sat a
+  # year behind its parent BOM until a security alert surfaced it. Dependabot
+  # security alerts fire for every detected manifest regardless of this file —
+  # version updates do not, which is the gap these close.
+  - package-ecosystem: maven
+    directory: /testing/rabbitmq/spring-rpc
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # Both requirements.txt files are pinned with --require-hashes; Dependabot
+  # regenerates the hashes along with the version.
+  - package-ecosystem: pip
+    directory: /testing/kafka
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pip
+    directory: /testing/rabbitmq
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
