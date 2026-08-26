@@ -57,7 +57,11 @@ export function MultipartEditor({ rows, onChange }: Props) {
     editRow(id, { kind: 'text', fileName: undefined, fileType: undefined, fileContent: undefined });
 
   return (
-    <div className="overflow-hidden rounded-md border text-xs">
+    // Content-Type is a fixed 10rem column, so a narrow pane squeezes Key and
+    // Value instead; scroll sideways below the min width rather than shrink
+    // them to unusable slivers.
+    <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
+      <div className="min-w-[24rem]">
       {/* header */}
       <div className="grid grid-cols-[1fr_1fr_10rem_2rem] border-b bg-bg-2/30 font-semibold">
         <div className="border-r px-3 py-1.5">Key</div>
@@ -141,6 +145,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

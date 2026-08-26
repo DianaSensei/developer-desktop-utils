@@ -283,7 +283,13 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
   const removeRow = (id: string) => onChange({ assertions: realRows.filter((a) => a.id !== id) });
 
   return (
-    <div className="overflow-hidden rounded-md border text-xs">
+    // The Operator column is a fixed 12rem Select, so in a narrow request pane
+    // the two `1fr` text columns are what give way — at a ~300px pane they
+    // collapse to ~30px, too small to read an expression in. Below the min
+    // width the table scrolls sideways instead (the pattern docs/ai/CLAUDE.md
+    // prescribes for horizontal data tables) so every cell stays usable.
+    <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
+      <div className="min-w-[26rem]">
       {/* header */}
       <div className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b bg-bg-2/30 font-semibold">
         <div className="border-r px-3 py-1.5">Expr</div>
@@ -353,6 +359,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -377,9 +384,18 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
         <div className="flex items-center justify-center">
           <span className="h-2 w-2 shrink-0 rounded-full bg-acc" title="Sent, derived from the Auth tab" />
         </div>
-        <div className="flex h-ctl items-center border-r px-2.5 font-mono text-fg-mute">{derived.key}</div>
-        <div className="flex h-ctl items-center px-2.5 font-mono text-fg-mute">
-          {derived.value || <span className="opacity-50">(empty)</span>}
+        {/* min-w-0 + truncate: these cells hold raw text, and a grid `1fr`
+            track's automatic minimum is its content's width — an API key long
+            enough (a JWT, say) would otherwise stretch the Value track past the
+            pane, squeeze Name to nothing, and get clipped by the wrapper's
+            overflow-hidden with no way to scroll to it. */}
+        <div className="flex h-ctl min-w-0 items-center border-r px-2.5 font-mono text-fg-mute">
+          <span className="truncate" title={derived.key}>{derived.key}</span>
+        </div>
+        <div className="flex h-ctl min-w-0 items-center px-2.5 font-mono text-fg-mute">
+          {derived.value
+            ? <span className="truncate" title={derived.value}>{derived.value}</span>
+            : <span className="opacity-50">(empty)</span>}
         </div>
         <div />
       </div>
@@ -453,7 +469,12 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   title={enabled ? 'Disable' : 'Enable'}
                 />
               </div>
-              <div className={cn('flex items-center border-r px-3 py-1 font-mono text-fg-mute', !enabled && 'opacity-40 line-through')}>:{name}</div>
+              {/* Same reason as AuthQueryParamRow above: a long placeholder name
+                  (OpenAPI specs produce plenty) would otherwise claim the whole
+                  row and leave the Value field unusably narrow. */}
+              <div className={cn('flex min-w-0 items-center border-r px-3 py-1 font-mono text-fg-mute', !enabled && 'opacity-40 line-through')}>
+                <span className="truncate" title={`:${name}`}>:{name}</span>
+              </div>
               <div className="flex h-ctl items-center px-2">
                 <InlineCodeField
                   value={valueOf(name)}
