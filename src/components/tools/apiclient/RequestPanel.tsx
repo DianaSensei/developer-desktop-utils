@@ -291,7 +291,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
     <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
       <div className="min-w-[26rem]">
       {/* header */}
-      <div className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b bg-bg-2/30 font-semibold">
+      <div className="grid grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)_2rem] border-b bg-bg-2/30 font-semibold">
         <div className="border-r px-3 py-1.5">Expr</div>
         <div className="border-r px-3 py-1.5">Operator</div>
         <div className="border-r px-3 py-1.5">Value</div>
@@ -302,9 +302,9 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         const isGhost = a.id === ghost.id;
         const unary = UNARY_ASSERT_OPERATORS.includes(a.operator);
         return (
-          <div key={a.id} className="grid grid-cols-[1fr_12rem_1fr_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+          <div key={a.id} className="grid grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
             {/* expr cell with enable checkbox */}
-            <div className="flex items-center gap-1.5 border-r px-2">
+            <div className="flex min-w-0 items-center gap-1.5 border-r px-2">
               <button
                 type="button"
                 onClick={() => !isGhost && editRow(a.id, { enabled: !a.enabled })}
@@ -374,13 +374,13 @@ function AuthQueryParamRow({ request }: { request: ApiRequest }) {
   if (!derived) return null;
   return (
     <div className="overflow-hidden rounded-md border text-xs">
-      <div className="grid grid-cols-[1rem_1fr_1fr_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/70">
+      <div className="grid grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/70">
         <div />
         <div className="border-r px-3 py-1.5">From Auth (query)</div>
         <div className="px-3 py-1.5" />
         <div />
       </div>
-      <div className="grid grid-cols-[1rem_1fr_1fr_2rem]">
+      <div className="grid grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)_2rem]">
         <div className="flex items-center justify-center">
           <span className="h-2 w-2 shrink-0 rounded-full bg-acc" title="Sent, derived from the Auth tab" />
         </div>
@@ -449,7 +449,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
     <div className="space-y-2">
       <Label className="text-xs text-fg-mute">Path</Label>
       <div className="overflow-hidden rounded-md border text-xs">
-        <div className="grid grid-cols-[1rem_1fr_1fr] border-b bg-bg-2/30 font-semibold">
+        <div className="grid grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)] border-b bg-bg-2/30 font-semibold">
           <div />
           <div className="border-r px-3 py-1.5">Name</div>
           <div className="px-3 py-1.5">Value</div>
@@ -457,7 +457,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
         {names.map((name) => {
           const enabled = enabledOf(name);
           return (
-            <div key={name} className="grid grid-cols-[1rem_1fr_1fr] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+            <div key={name} className="grid grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
               <div className="flex items-center justify-center">
                 <button
                   type="button"
@@ -475,7 +475,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
               <div className={cn('flex min-w-0 items-center border-r px-3 py-1 font-mono text-fg-mute', !enabled && 'opacity-40 line-through')}>
                 <span className="truncate" title={`:${name}`}>:{name}</span>
               </div>
-              <div className="flex h-ctl items-center px-2">
+              <div className="flex h-ctl min-w-0 items-center px-2">
                 <InlineCodeField
                   value={valueOf(name)}
                   onChange={(v) => setValue(name, v)}
