@@ -108,7 +108,8 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       </GuideSection>
       <GuideSection icon={FolderTree} title="Organize, import & export">
         <p>Group requests into collections and folders in the left sidebar; open several in tabs — each remembers the tab you were working in. History records every send you make by hand.</p>
-        <p>Import a <strong className="text-fg">Postman v2.1</strong> collection or a <strong className="text-fg">cURL</strong> command; export the collection or generate a code snippet with the <Tok>{'</>'}</Tok> button.</p>
+        <p>Import a <strong className="text-fg">Postman v2.1</strong> collection, an <strong className="text-fg">OpenAPI 3.x / Swagger 2.0</strong> spec (JSON or YAML), or a <strong className="text-fg">cURL</strong> command; export the collection or generate a code snippet with the <Tok>{'</>'}</Tok> button.</p>
+        <p>An OpenAPI import turns each operation into a request, folders them by <strong className="text-fg">tag</strong>, prefixes every URL with a <Var>{'{{baseUrl}}'}</Var> variable from <Tok>servers</Tok>, pre-fills params and a body from the schema’s examples, and maps security schemes to auth with the secrets left as collection variables to fill in. Anything with no equivalent here is listed above the tree instead of dropped silently.</p>
         <p>If an imported collection carries <strong className="text-fg">scripts</strong>, they’d run the next time you press Send — so the import pauses and shows you each one and its source. Choose <strong className="text-fg">Import without scripts</strong> to keep the requests and drop the executable parts, or import them as-is if you trust the source.</p>
       </GuideSection>
       <GuideSection icon={Keyboard} title="Shortcuts">

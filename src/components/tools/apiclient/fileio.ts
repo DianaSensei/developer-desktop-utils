@@ -34,6 +34,38 @@ export async function pickJsonFile(): Promise<string | null> {
   });
 }
 
+// Open a picker for a collection file — a Postman export (JSON) or an OpenAPI /
+// Swagger spec, which is just as often YAML. Returns the file's text contents
+// and its name (the extension is a hint the importer uses), or null if
+// cancelled.
+export async function pickCollectionFile(): Promise<{ name: string; text: string } | null> {
+  if (isTauri) {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const path = await open({
+      multiple: false,
+      filters: [{ name: 'Collection or OpenAPI spec', extensions: ['json', 'yaml', 'yml'] }],
+    });
+    if (!path || typeof path !== 'string') return null;
+    const { readTextFile } = await import('@tauri-apps/plugin-fs');
+    return { name: path.split(/[\\/]/).pop() ?? path, text: await readTextFile(path) };
+  }
+
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json,.yaml,.yml,application/yaml,text/yaml';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = () => resolve({ name: file.name, text: String(reader.result ?? '') });
+      reader.onerror = () => resolve(null);
+      reader.readAsText(file);
+    };
+    input.click();
+  });
+}
+
 // Pick a CSV or JSON data file (for data-driven runs); returns its name + text.
 // Reads through the webview's FileReader in both web and Tauri — unlike the fs
 // plugin, this needs no path-scope permission, so any file the user picks works.
