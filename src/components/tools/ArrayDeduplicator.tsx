@@ -127,9 +127,9 @@ export function ArrayDeduplicator() {
   }, [result]);
 
   const workerRef = useRef<Worker | null>(null);
-  const workerTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const histTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const lineCountTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const workerTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const histTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lineCountTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const historyRef = useRef<string[]>(['']);
   const histIdxRef = useRef(0);

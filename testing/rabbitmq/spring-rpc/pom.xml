@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.5</version>
+        <version>3.5.16</version>
         <relativePath/>
     </parent>
 
@@ -19,6 +19,37 @@
 
     <properties>
         <java.version>17</java.version>
+        <!--
+          Three dependencies that Spring Boot's BOM still manages at a version
+          with open advisories, overridden here to the fixed releases. Each is a
+          plain version bump inside the same major line, so the BOM's other
+          managed versions stay authoritative. Drop an override once the BOM
+          catches up past the version pinned here.
+
+          amqp-client: the Boot 3.5 BOM pins 5.25.0, which is affected by
+          CVE-2026-69219 / CVE-2026-69220 (unchecked allocation and unbounded
+          recursion in ValueReader -> OOM / StackOverflow from a malicious or
+          malfunctioning broker), CVE-2026-63337 (unvalidated Class.forName in
+          the JSON-RPC helper), CVE-2026-63336 (useSslProtocol() defaulting to a
+          trust-everything trust manager), CVE-2026-63335 and CVE-2026-61634.
+          Fixed in 5.33.1; 5.35.0 is the current release of the same line.
+        -->
+        <rabbit-amqp-client.version>5.35.0</rabbit-amqp-client.version>
+        <!--
+          log4j2: the BOM pins 2.24.3, affected by CVE-2026-49844 (improper
+          encoding of non-finite floats in MapMessage JSON serialization). Only
+          log4j-api and the log4j-to-slf4j bridge are on this classpath — Logback
+          is the actual backend — but the bump is free. Fixed in 2.25.5.
+        -->
+        <log4j2.version>2.26.1</log4j2.version>
+        <!--
+          netty: amqp-client 5.35.0 brings Netty in transitively (it is not a
+          dependency of the 5.25.0 the BOM pins). The Boot 3.5 BOM manages Netty
+          at 4.1.135.Final, which is affected by CVE-2026-59901 (infinite loop in
+          the Bzip2Decoder RLE state machine, hanging an event-loop thread).
+          Fixed in 4.1.136.Final; 4.1.137.Final is the current release.
+        -->
+        <netty.version>4.1.137.Final</netty.version>
     </properties>
 
     <dependencies>

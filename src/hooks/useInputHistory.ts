@@ -47,7 +47,7 @@ export function useInputHistory(value: string, applyValue: (next: string) => voi
   const { config } = useAppConfig();
   const history = useRef<string[]>([value]);
   const index = useRef(0);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isApplying = useRef(false);
 
   const valueRef = useRef(value);

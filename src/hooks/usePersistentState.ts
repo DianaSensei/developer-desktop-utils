@@ -34,7 +34,7 @@ export function usePersistentState<T>(key: string, initial: T | (() => T), optio
 
   const stateRef = useRef(state);
   stateRef.current = state;
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const write = useCallback(() => {
     try {
