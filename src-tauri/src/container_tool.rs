@@ -656,6 +656,28 @@ pub async fn container_logs_stop(registry: tauri::State<'_, StreamRegistry>, str
 pub struct LogLine {
     pub stream: String, // "stdout" | "stderr"
     pub message: String,
+    /// RFC3339 timestamp the daemon prefixed to the line, split off here so
+    /// the frontend can render it in its own column and — more importantly —
+    /// so a keyword search never matches inside a timestamp. `None` when the
+    /// caller asked for no timestamps, or when a line arrives without one.
+    pub timestamp: Option<String>,
+}
+
+/// Docker writes `2026-08-26T09:41:02.123456789Z the message` when timestamps
+/// are on. Split on the first space and only accept the prefix as a timestamp
+/// if it actually looks like one — a log line that happens to start with a
+/// word must not lose that word.
+fn split_timestamp(line: &str) -> (Option<String>, &str) {
+    let Some((head, rest)) = line.split_once(' ') else { return (None, line) };
+    let looks_like_ts = head.len() >= 20
+        && head.as_bytes()[4] == b'-'
+        && head.contains('T')
+        && head[..4].chars().all(|c| c.is_ascii_digit());
+    if looks_like_ts {
+        (Some(head.to_string()), rest)
+    } else {
+        (None, line)
+    }
 }
 
 #[tauri::command]
@@ -666,6 +688,7 @@ pub async fn container_logs_start(
     tail: String,
     since: i32,
     until: i32,
+    timestamps: bool,
     on_log: Channel<LogLine>,
 ) -> Result<String, String> {
     let docker = connect(&config)?;
@@ -676,7 +699,7 @@ pub async fn container_logs_start(
         tail,
         since,
         until,
-        timestamps: false,
+        timestamps,
     };
 
     let id = Uuid::new_v4().to_string();
@@ -697,9 +720,15 @@ pub async fn container_logs_start(
                             bollard::container::LogOutput::Console { message } => ("stdout", message),
                             bollard::container::LogOutput::StdIn { message } => ("stdin", message),
                         };
+                        let raw = String::from_utf8_lossy(&bytes).to_string();
+                        // Trailing newline is the record separator, not content —
+                        // keeping it made every rendered row carry a blank line.
+                        let raw = raw.strip_suffix('\n').unwrap_or(&raw);
+                        let (ts, message) = if timestamps { split_timestamp(raw) } else { (None, raw) };
                         let line = LogLine {
                             stream: stream_name.to_string(),
-                            message: String::from_utf8_lossy(&bytes).to_string(),
+                            message: message.to_string(),
+                            timestamp: ts,
                         };
                         if on_log.send(line).is_err() {
                             break; // frontend dropped the channel
@@ -1226,4 +1255,45 @@ pub async fn container_system_info(config: ContainerConnection) -> Result<bollar
 pub async fn container_system_df(config: ContainerConnection) -> Result<bollard::models::SystemDataUsageResponse, String> {
     let docker = connect(&config)?;
     docker.df(None).await.map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_timestamp;
+
+    #[test]
+    fn splits_a_docker_rfc3339_prefix() {
+        let (ts, msg) = split_timestamp("2026-08-26T09:41:02.123456789Z hello world");
+        assert_eq!(ts.as_deref(), Some("2026-08-26T09:41:02.123456789Z"));
+        assert_eq!(msg, "hello world");
+    }
+
+    #[test]
+    fn keeps_a_plain_line_intact() {
+        // A line whose first word is not a timestamp must not lose that word.
+        let (ts, msg) = split_timestamp("INFO starting server on :8080");
+        assert!(ts.is_none());
+        assert_eq!(msg, "INFO starting server on :8080");
+    }
+
+    #[test]
+    fn handles_a_line_with_no_space_at_all() {
+        let (ts, msg) = split_timestamp("panic!");
+        assert!(ts.is_none());
+        assert_eq!(msg, "panic!");
+    }
+
+    #[test]
+    fn rejects_a_prefix_that_is_merely_long() {
+        let (ts, msg) = split_timestamp("aaaaaaaaaaaaaaaaaaaaaaaa rest of the line");
+        assert!(ts.is_none());
+        assert_eq!(msg, "aaaaaaaaaaaaaaaaaaaaaaaa rest of the line");
+    }
+
+    #[test]
+    fn keeps_an_empty_message_after_the_timestamp() {
+        let (ts, msg) = split_timestamp("2026-08-26T09:41:02.000000000Z ");
+        assert_eq!(ts.as_deref(), Some("2026-08-26T09:41:02.000000000Z"));
+        assert_eq!(msg, "");
+    }
 }

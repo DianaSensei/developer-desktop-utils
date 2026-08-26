@@ -51,6 +51,9 @@ export interface ContainerSummary {
 export interface LogLine {
   stream: string;
   message: string;
+  /** Present only when the stream was started with timestamps on; split off
+   *  from the message backend-side so searches never match inside it. */
+  timestamp?: string | null;
 }
 
 export interface StatsFrame {
@@ -345,9 +348,13 @@ export const containerApi = {
   details: (config: ContainerConnection, containerId: string) =>
     invoke<ContainerDetails>('container_details', { config, containerId }),
 
-  /** `since`/`until` are Unix seconds; pass 0 for "no bound" on either. */
-  logsStart: (config: ContainerConnection, containerId: string, tail: string, since: number, until: number, onLog: Channel<LogLine>) =>
-    invoke<string>('container_logs_start', { config, containerId, tail, since, until, onLog }),
+  /** `since`/`until` are Unix seconds; pass 0 for "no bound" on either.
+   *  `timestamps` asks the daemon to prefix each line — it can only be chosen
+   *  when the stream starts, so toggling it restarts the stream. */
+  logsStart: (
+    config: ContainerConnection, containerId: string, tail: string,
+    since: number, until: number, timestamps: boolean, onLog: Channel<LogLine>,
+  ) => invoke<string>('container_logs_start', { config, containerId, tail, since, until, timestamps, onLog }),
   logsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
 
   statsStart: (config: ContainerConnection, containerId: string, onStat: Channel<StatsFrame>) =>

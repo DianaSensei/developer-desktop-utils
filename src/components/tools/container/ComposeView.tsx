@@ -6,7 +6,6 @@ import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { DataTable, Thead, Tbody, Tr, Th, Td, type SortDirection } from '@/components/ui/data-table';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { IconButton } from '@/components/ui/icon-button';
@@ -15,7 +14,7 @@ import {
   type ContainerConnection, type ContainerSummary, type ComposeProjectGroup,
 } from './types';
 import { cn } from '@/lib/utils';
-import { LogsPanel } from './LogsPanel';
+import { ContainerLogsDialog } from './ContainerLogsDialog';
 import { ContainerDetailsDialog } from './ContainerDetailsDialog';
 import { ContainerResourcesDialog } from './ContainerResourcesDialog';
 
@@ -73,11 +72,6 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyProject, setBusyProject] = useState<string | null>(null);
   const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
-  // See ContainersView for why this trails `logsTarget` by one render: it lets
-  // the Dialog stay mounted (`open={!!logsTarget}`) and animate its close
-  // instead of vanishing instantly when `logsTarget` clears.
-  const [logsDialogTarget, setLogsDialogTarget] = useState<ContainerSummary | null>(null);
-  useEffect(() => { if (logsTarget) setLogsDialogTarget(logsTarget); }, [logsTarget]);
   const [detailsTarget, setDetailsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
   const [downTarget, setDownTarget] = useState<{ project: ComposeProjectGroup; removeVolumes: boolean } | null>(null);
@@ -329,24 +323,14 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
         ))}
       </div>
 
-      <Dialog open={!!logsTarget} onOpenChange={(o) => { if (!o) setLogsTarget(null); }}>
-        <DialogContent className="max-w-3xl">
-          {logsDialogTarget && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="font-mono text-sm">{containerName(logsDialogTarget)}</DialogTitle>
-              </DialogHeader>
-              <div className="h-[50vh] flex flex-col">
-                <LogsPanel
-                  key={logsDialogTarget.Id}
-                  start={(tail, since, until, onLog) => containerApi.logsStart(connection, logsDialogTarget.Id, tail, since, until, onLog)}
-                  stop={containerApi.logsStop}
-                />
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ContainerLogsDialog
+        open={!!logsTarget}
+        onOpenChange={(o) => { if (!o) setLogsTarget(null); }}
+        connection={connection}
+        container={logsTarget}
+        onAction={runAction}
+        onRemove={setRemoveTarget}
+      />
 
       <ConfirmDialog
         open={!!removeTarget}

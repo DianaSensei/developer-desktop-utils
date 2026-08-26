@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, RefreshCw, MoreHorizontal, Play, Square, RotateCw, Trash2, Pause, PlayCircle, Info, Cpu } from 'lucide-react';
+import { Box, RefreshCw, MoreHorizontal, Play, Square, RotateCw, Trash2, Info, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
@@ -8,13 +8,12 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
 import { containerApi, type ContainerConnection, type ContainerSummary, type StatsFrame } from './types';
-import { LogsPanel } from './LogsPanel';
+import { ContainerLogsDialog } from './ContainerLogsDialog';
 import { useSort } from './useSort';
 import { useRowSelection } from './useRowSelection';
 import { RowCheckbox, SelectionBar } from './SelectionBar';
@@ -64,13 +63,6 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
   const [error, setError] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
-  // Kept one render behind `logsTarget`: the Dialog itself stays mounted and
-  // driven by `open={!!logsTarget}` so Radix can play the exit animation
-  // (matching ContainerDetailsDialog below) instead of the whole subtree
-  // vanishing instantly when `logsTarget` goes back to null — this is what
-  // used to make the logs dialog feel inconsistent/laggy next to Details.
-  const [logsDialogTarget, setLogsDialogTarget] = useState<ContainerSummary | null>(null);
-  useEffect(() => { if (logsTarget) setLogsDialogTarget(logsTarget); }, [logsTarget]);
   const [detailsTarget, setDetailsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
   const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
@@ -342,52 +334,14 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
         )}
       </div>
 
-      <Dialog open={!!logsTarget} onOpenChange={(o) => { if (!o) setLogsTarget(null); }}>
-        <DialogContent className="max-w-3xl">
-          {logsDialogTarget && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="font-mono text-sm">{containerName(logsDialogTarget)}</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-end gap-1">
-                  {logsDialogTarget.State === 'running' ? (
-                    <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.stop(connection, logsDialogTarget.Id))}>
-                      <Square className="h-3.5 w-3.5 mr-1.5" /> Stop
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.start(connection, logsDialogTarget.Id))}>
-                      <Play className="h-3.5 w-3.5 mr-1.5" /> Start
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.restart(connection, logsDialogTarget.Id))}>
-                    <RotateCw className="h-3.5 w-3.5 mr-1.5" /> Restart
-                  </Button>
-                  {logsDialogTarget.State === 'running' ? (
-                    <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.pause(connection, logsDialogTarget.Id))}>
-                      <Pause className="h-3.5 w-3.5 mr-1.5" /> Pause
-                    </Button>
-                  ) : logsDialogTarget.State === 'paused' ? (
-                    <Button variant="outline" size="sm" onClick={() => runAction(logsDialogTarget.Id, () => containerApi.unpause(connection, logsDialogTarget.Id))}>
-                      <PlayCircle className="h-3.5 w-3.5 mr-1.5" /> Unpause
-                    </Button>
-                  ) : null}
-                  <Button variant="outline" size="sm" className="hover:text-bad" onClick={() => setRemoveTarget(logsDialogTarget)}>
-                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove
-                  </Button>
-                </div>
-                <div className="h-[50vh] flex flex-col">
-                  <LogsPanel
-                    key={logsDialogTarget.Id}
-                    start={(tail, since, until, onLog) => containerApi.logsStart(connection, logsDialogTarget.Id, tail, since, until, onLog)}
-                    stop={containerApi.logsStop}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ContainerLogsDialog
+        open={!!logsTarget}
+        onOpenChange={(o) => { if (!o) setLogsTarget(null); }}
+        connection={connection}
+        container={logsTarget}
+        onAction={runAction}
+        onRemove={setRemoveTarget}
+      />
 
       <ConfirmDialog
         open={!!removeTarget}
