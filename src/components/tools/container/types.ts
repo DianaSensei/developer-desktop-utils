@@ -40,6 +40,12 @@ export interface ContainerSummary {
   Status?: string;
   Ports?: ContainerPort[];
   Labels?: Record<string, string>;
+  // The list endpoint already reports each container's mounts and attached
+  // networks. Declaring them here is what lets the Images/Volumes/Networks
+  // views answer "is this in use, and by what?" from the container list they
+  // can load anyway, instead of inspecting every resource one by one.
+  Mounts?: { Type?: string; Name?: string; Source?: string; Destination?: string }[];
+  NetworkSettings?: { Networks?: Record<string, { NetworkID?: string; IPAddress?: string }> };
 }
 
 export interface LogLine {
@@ -165,6 +171,13 @@ export interface ImageDetails {
   layerCount: number;
 }
 
+/** Result of any of the four prune endpoints. Networks free no disk, so
+ *  `spaceReclaimed` is always 0 there. */
+export interface PruneResult {
+  deleted: number;
+  spaceReclaimed: number;
+}
+
 // ── Volumes / Networks ─────────────────────────────────────────────────────
 
 export interface VolumeInfo {
@@ -184,6 +197,42 @@ export interface NetworkInfo {
   Driver?: string;
   Scope?: string;
   Labels?: Record<string, string> | null;
+}
+
+// Curated projections of `inspect_network` / `inspect_volume`, same approach
+// as ContainerDetails/ImageDetails.
+export interface NetworkIpamConfig {
+  subnet?: string;
+  ipRange?: string;
+  gateway?: string;
+}
+
+export interface NetworkDetails {
+  id: string;
+  name: string;
+  driver?: string;
+  scope?: string;
+  created?: string;
+  internal: boolean;
+  attachable: boolean;
+  ingress: boolean;
+  ipv6: boolean;
+  ipamDriver?: string;
+  ipamConfig: NetworkIpamConfig[];
+  options: Record<string, string>;
+  labels: Record<string, string>;
+}
+
+export interface VolumeDetails {
+  name: string;
+  driver: string;
+  mountpoint: string;
+  createdAt?: string;
+  scope?: string;
+  labels: Record<string, string>;
+  options: Record<string, string>;
+  sizeBytes?: number | null;
+  refCount?: number | null;
 }
 
 // ── System overview ─────────────────────────────────────────────────────
@@ -316,6 +365,8 @@ export const containerApi = {
   updateResources: (config: ContainerConnection, containerId: string, resources: ContainerResourceUpdate) =>
     invoke<void>('container_update_resources', { config, containerId, resources }),
 
+  prune: (config: ContainerConnection) => invoke<PruneResult>('container_prune', { config }),
+
   imageList: (config: ContainerConnection) => invoke<ImageSummary[]>('image_list', { config }),
   imageInspect: (config: ContainerConnection, imageId: string) => invoke<unknown>('image_inspect', { config, imageId }),
   imageDetails: (config: ContainerConnection, imageId: string) => invoke<ImageDetails>('image_details', { config, imageId }),
@@ -323,6 +374,11 @@ export const containerApi = {
     invoke<void>('image_remove', { config, imageId, force }),
   imagePull: (config: ContainerConnection, image: string, tag: string, onProgress: Channel<PullProgress>) =>
     invoke<void>('image_pull', { config, image, tag, onProgress }),
+  /** `danglingOnly` = `docker image prune`; `false` = `docker image prune -a`. */
+  imagePrune: (config: ContainerConnection, danglingOnly: boolean) =>
+    invoke<PruneResult>('image_prune', { config, danglingOnly }),
+  imageTag: (config: ContainerConnection, imageId: string, repo: string, tag: string) =>
+    invoke<void>('image_tag', { config, imageId, repo, tag }),
 
   volumeList: (config: ContainerConnection) => invoke<VolumeInfo[]>('volume_list', { config }),
   volumeRemove: (config: ContainerConnection, name: string, force: boolean) =>
@@ -332,11 +388,17 @@ export const containerApi = {
   /** Per-volume disk usage in bytes, keyed by name — `{}` on Windows (named
    *  pipe transport isn't wired up for this raw request, see backend). */
   volumeSizes: (config: ContainerConnection) => invoke<Record<string, number>>('volume_sizes', { config }),
+  volumePrune: (config: ContainerConnection) => invoke<PruneResult>('volume_prune', { config }),
+  volumeDetails: (config: ContainerConnection, name: string) =>
+    invoke<VolumeDetails>('volume_details', { config, name }),
 
   networkList: (config: ContainerConnection) => invoke<NetworkInfo[]>('network_list', { config }),
   networkRemove: (config: ContainerConnection, name: string) => invoke<void>('network_remove', { config, name }),
   networkCreate: (config: ContainerConnection, name: string, driver: string) =>
     invoke<void>('network_create', { config, name, driver }),
+  networkPrune: (config: ContainerConnection) => invoke<PruneResult>('network_prune', { config }),
+  networkDetails: (config: ContainerConnection, networkId: string) =>
+    invoke<NetworkDetails>('network_details', { config, networkId }),
 
   systemInfo: (config: ContainerConnection) => invoke<SystemInfo>('container_system_info', { config }),
   systemDf: (config: ContainerConnection) => invoke<SystemDataUsageResponse>('container_system_df', { config }),

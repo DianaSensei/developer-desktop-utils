@@ -18,6 +18,7 @@ import { LogsPanel } from './LogsPanel';
 import { useSort } from './useSort';
 import { useRowSelection } from './useRowSelection';
 import { RowCheckbox, SelectionBar } from './SelectionBar';
+import { PruneButton } from './PruneButton';
 import { ContainerDetailsDialog } from './ContainerDetailsDialog';
 import { ContainerResourcesDialog } from './ContainerResourcesDialog';
 import { formatBytes } from './format';
@@ -78,6 +79,8 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
   const [limitsTarget, setLimitsTarget] = useState<ContainerSummary | null>(null);
   const [bulkLimitsOpen, setBulkLimitsOpen] = useState(false);
   const [stats, setStats] = useState<Record<string, StatsFrame>>({});
+  /** Result line from the last prune — informational, not an error. */
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -180,7 +183,21 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
         icon={Box}
         title="Containers"
         subtitle={containers ? `${containers.length} containers` : connection.name}
-        actions={<Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>}
+        actions={(
+          <>
+            <PruneButton
+              noun="containers"
+              variants={[{
+                label: 'Prune stopped containers',
+                description: 'Remove every container that is not running (docker container prune). Their writable layers and any data not on a volume are lost.',
+                run: () => containerApi.prune(connection),
+              }]}
+              onDone={(m) => { setNotice(m); setError(null); load(); }}
+              onError={(m) => { setNotice(null); setError(m); }}
+            />
+            <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+          </>
+        )}
       />
 
       <div className="px-5 pt-3 shrink-0 flex items-center gap-3">
@@ -230,6 +247,7 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
       <div className={cn('tool-scrollable px-5 py-4', selection.count > 0 && 'pb-20')}>
         {loading && !containers && <LoadingRow />}
         {error && <Callout tone="error">{error}</Callout>}
+        {notice && !error && <Callout tone="info" className="mb-3">{notice}</Callout>}
         {containers && !error && (
           rows.length === 0
             ? <p className="text-sm text-fg-mute">{f ? 'No matching containers.' : 'No containers.'}</p>

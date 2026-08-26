@@ -191,6 +191,13 @@ fn main() {
             container_tool::network_list,
             container_tool::network_remove,
             container_tool::network_create,
+            container_tool::container_prune,
+            container_tool::image_prune,
+            container_tool::image_tag,
+            container_tool::volume_prune,
+            container_tool::volume_details,
+            container_tool::network_prune,
+            container_tool::network_details,
             container_tool::container_system_info,
             container_tool::container_system_df,
         ])

@@ -1025,6 +1025,197 @@ pub async fn network_create(config: ContainerConnection, name: String, driver: S
 
 // ── System overview ─────────────────────────────────────────────────────
 
+// ── Prune (reclaiming disk) ───────────────────────────────────────────────
+//
+// One shape for all four prune endpoints: the daemon answers each with "what
+// was deleted" plus "how many bytes came back" (networks report no byte
+// count — nothing on disk is freed by removing one — so it stays 0 there).
+// The UI shows the same confirmation and result line for each, so collapsing
+// the four differently-named responses into one struct here keeps that from
+// being four near-identical frontend branches.
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PruneResult {
+    pub deleted: usize,
+    pub space_reclaimed: i64,
+}
+
+#[tauri::command]
+pub async fn container_prune(config: ContainerConnection) -> Result<PruneResult, String> {
+    let docker = connect(&config)?;
+    let resp = docker
+        .prune_containers(None::<bollard::query_parameters::PruneContainersOptions>)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PruneResult {
+        deleted: resp.containers_deleted.map(|v| v.len()).unwrap_or(0),
+        space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+    })
+}
+
+/// `dangling_only: true` matches `docker image prune` (untagged layers only);
+/// `false` matches `docker image prune -a` (every image no container uses).
+/// The distinction is a filter the daemon applies, not something the frontend
+/// can approximate by picking rows.
+#[tauri::command]
+pub async fn image_prune(config: ContainerConnection, dangling_only: bool) -> Result<PruneResult, String> {
+    let docker = connect(&config)?;
+    let mut filters: HashMap<String, Vec<String>> = HashMap::new();
+    filters.insert(
+        "dangling".to_string(),
+        vec![if dangling_only { "true" } else { "false" }.to_string()],
+    );
+    let opts = bollard::query_parameters::PruneImagesOptions { filters: Some(filters) };
+    let resp = docker.prune_images(Some(opts)).await.map_err(|e| e.to_string())?;
+    Ok(PruneResult {
+        deleted: resp.images_deleted.map(|v| v.len()).unwrap_or(0),
+        space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+    })
+}
+
+#[tauri::command]
+pub async fn volume_prune(config: ContainerConnection) -> Result<PruneResult, String> {
+    let docker = connect(&config)?;
+    let resp = docker
+        .prune_volumes(None::<bollard::query_parameters::PruneVolumesOptions>)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PruneResult {
+        deleted: resp.volumes_deleted.map(|v| v.len()).unwrap_or(0),
+        space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+    })
+}
+
+#[tauri::command]
+pub async fn network_prune(config: ContainerConnection) -> Result<PruneResult, String> {
+    let docker = connect(&config)?;
+    let resp = docker
+        .prune_networks(None::<bollard::query_parameters::PruneNetworksOptions>)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PruneResult {
+        deleted: resp.networks_deleted.map(|v| v.len()).unwrap_or(0),
+        space_reclaimed: 0,
+    })
+}
+
+// ── Tagging ───────────────────────────────────────────────────────────────
+
+/// `docker tag`. The daemon only ever adds a name to an existing image, so
+/// this can't overwrite anything except another tag of the same repo:tag pair.
+#[tauri::command]
+pub async fn image_tag(
+    config: ContainerConnection,
+    image_id: String,
+    repo: String,
+    tag: String,
+) -> Result<(), String> {
+    let docker = connect(&config)?;
+    let opts = bollard::query_parameters::TagImageOptions {
+        repo: Some(repo),
+        tag: Some(tag),
+    };
+    docker.tag_image(&image_id, Some(opts)).await.map_err(|e| e.to_string())
+}
+
+// ── Network / volume details (curated projections, as for containers) ─────
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkIpamConfig {
+    pub subnet: Option<String>,
+    pub ip_range: Option<String>,
+    pub gateway: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkDetails {
+    pub id: String,
+    pub name: String,
+    pub driver: Option<String>,
+    pub scope: Option<String>,
+    pub created: Option<String>,
+    pub internal: bool,
+    pub attachable: bool,
+    pub ingress: bool,
+    pub ipv6: bool,
+    pub ipam_driver: Option<String>,
+    pub ipam_config: Vec<NetworkIpamConfig>,
+    pub options: HashMap<String, String>,
+    pub labels: HashMap<String, String>,
+}
+
+/// Note: which containers are attached is deliberately NOT read here. This
+/// bollard version's `Network` model drops the daemon's `Containers` map on
+/// deserialize, and the same information is already in the container list the
+/// views load anyway (each summary carries its NetworkSettings), so the
+/// attachment list is computed frontend-side instead of with a second call.
+#[tauri::command]
+pub async fn network_details(config: ContainerConnection, network_id: String) -> Result<NetworkDetails, String> {
+    let docker = connect(&config)?;
+    let net = docker
+        .inspect_network(&network_id, None::<bollard::query_parameters::InspectNetworkOptions>)
+        .await
+        .map_err(|e| e.to_string())?;
+    let ipam = net.ipam.unwrap_or_default();
+    Ok(NetworkDetails {
+        id: net.id.unwrap_or_default(),
+        name: net.name.unwrap_or_default(),
+        driver: net.driver,
+        scope: net.scope,
+        created: net.created.map(|d| d.to_string()),
+        internal: net.internal.unwrap_or(false),
+        attachable: net.attachable.unwrap_or(false),
+        ingress: net.ingress.unwrap_or(false),
+        ipv6: net.enable_ipv6.unwrap_or(false),
+        ipam_driver: ipam.driver,
+        ipam_config: ipam
+            .config
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| NetworkIpamConfig { subnet: c.subnet, ip_range: c.ip_range, gateway: c.gateway })
+            .collect(),
+        options: net.options.unwrap_or_default(),
+        labels: net.labels.unwrap_or_default(),
+    })
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeDetails {
+    pub name: String,
+    pub driver: String,
+    pub mountpoint: String,
+    pub created_at: Option<String>,
+    pub scope: Option<String>,
+    pub labels: HashMap<String, String>,
+    pub options: HashMap<String, String>,
+    /// From the daemon's UsageData, which most drivers leave unset — `-1` is
+    /// docker's own "not available" marker and is passed through as such.
+    pub size_bytes: Option<i64>,
+    pub ref_count: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn volume_details(config: ContainerConnection, name: String) -> Result<VolumeDetails, String> {
+    let docker = connect(&config)?;
+    let vol = docker.inspect_volume(&name).await.map_err(|e| e.to_string())?;
+    let usage = vol.usage_data;
+    Ok(VolumeDetails {
+        name: vol.name,
+        driver: vol.driver,
+        mountpoint: vol.mountpoint,
+        created_at: vol.created_at.map(|d| d.to_string()),
+        scope: vol.scope.map(|s| s.to_string()),
+        labels: vol.labels,
+        options: vol.options,
+        size_bytes: usage.as_ref().map(|u| u.size),
+        ref_count: usage.as_ref().map(|u| u.ref_count),
+    })
+}
+
 #[tauri::command]
 pub async fn container_system_info(config: ContainerConnection) -> Result<bollard::models::SystemInfo, String> {
     let docker = connect(&config)?;
