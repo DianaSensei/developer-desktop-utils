@@ -67,11 +67,15 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
             an 11-12px bold uppercase label, and at 14px this one read a size
             larger than everything around it while eating the bar's width. The
             trigger keeps h-ctl-lg so it still fills the pill; only the type and
-            the horizontal footprint shrink. */}
+            the horizontal footprint shrink.
+            w-[5.5rem]: fixed, not auto — an auto width would shift the URL field
+            sideways on every method change. 88px is what the longest label
+            (OPTIONS) needs at this size, so nothing truncates and GET no longer
+            sits in a 6rem box with a 30px hole before the chevron. */}
         <Select value={request.method} onValueChange={(v) => onChange({ method: v as ApiRequest['method'] })}>
           <SelectTrigger
             className={cn(
-              'h-ctl-lg w-[6rem] shrink-0 gap-1 border-0 px-2 text-xs font-bold uppercase shadow-none focus:ring-0 rounded-r-none [&>svg]:h-3.5 [&>svg]:w-3.5',
+              'h-ctl-lg w-[5.5rem] shrink-0 gap-0.5 border-0 pl-2.5 pr-1.5 text-xs font-bold uppercase tracking-wide shadow-none focus:ring-0 rounded-r-none [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-70',
               methodColor(request.method),
               methodBg(request.method),
             )}
