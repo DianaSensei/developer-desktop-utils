@@ -75,10 +75,16 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl gap-0 p-0">
-        <DialogHeader className="flex-row items-center justify-between border-b px-4 py-3">
+        {/* h-14 + pr-12, not py-3 + mr-6: DialogContent pins its own close X at
+            `right-4 top-4` as a 24px box, so its centre is a fixed 28px from
+            the top and right. A 56px header centres this button on the same
+            line, at the same 24px size, and pr-12 leaves an 8px gap before the
+            X — instead of a 34px button sitting 7px higher than the 24px one
+            next to it. */}
+        <DialogHeader className="h-14 flex-row items-center justify-between space-y-0 border-b px-4 pr-12">
           <DialogTitle>Environments</DialogTitle>
-          <IconButton onClick={handleImport} title="Import environment (Postman or this app's export)" className="mr-6">
-            <Upload className="h-4 w-4" />
+          <IconButton size="xs" onClick={handleImport} title="Import environment (Postman or this app's export)">
+            <Upload className="h-3.5 w-3.5" />
           </IconButton>
         </DialogHeader>
         {error && <Callout tone="error" size="sm" className="mx-4 mt-3">{error}</Callout>}
@@ -90,12 +96,9 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
               <div className="mb-2">
                 <button
                   onClick={() => setSelection({ kind: 'collectionVars' })}
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-acc/60',
-                    selection?.kind === 'collectionVars' && 'bg-acc',
-                  )}
+                  className={cn(LIST_ROW, selection?.kind === 'collectionVars' && 'bg-acc')}
                 >
-                  <Layers className="h-3 w-3 shrink-0 text-fg-mute" />
+                  <span className={LIST_SLOT}><Layers className="h-3 w-3 text-fg-mute" /></span>
                   <span className="truncate">Collection Variables</span>
                 </button>
               </div>
@@ -103,13 +106,14 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             <Section
               title={activeCollection?.name ?? 'Collection'}
               disabled={!store.activeCollectionId}
+              empty={collectionEnvs.length === 0}
               onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(store.activeCollectionId) })}
             >
               {collectionEnvs.map((e) => (
                 <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
               ))}
             </Section>
-            <Section title="Global" onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(null) })}>
+            <Section title="Global" empty={globalEnvs.length === 0} onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(null) })}>
               {globalEnvs.map((e) => (
                 <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
               ))}
@@ -193,8 +197,18 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-xs text-fg-mute">
-                Create an environment to add variables.
+              // "Create an environment" with nothing to click left the user
+              // hunting for the + beside a section caption. Put the action here.
+              <div className="flex h-full flex-col items-center justify-center gap-3">
+                <p className="text-xs text-fg-mute">No environments yet.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => setSelection({ kind: 'env', id: store.addEnvironment(store.activeCollectionId) })}
+                >
+                  <Plus className="h-3.5 w-3.5" /> New environment
+                </Button>
               </div>
             )}
           </div>
@@ -204,18 +218,33 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   );
 }
 
-function Section({ title, onAdd, disabled, children }: {
-  title: string; onAdd: () => void; disabled?: boolean; children: React.ReactNode;
+// Every line in the left list — the Collection Variables entry, the section
+// captions, and each environment — is laid out on these two classes, so their
+// labels share one left edge. The 12px slot always exists, holding an icon, the
+// active dot, or nothing; before this the entry with an icon started 20px right
+// of the captions and the rows without a dot, and the column read as ragged.
+const LIST_ROW = 'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-acc/60';
+const LIST_SLOT = 'flex w-3 shrink-0 items-center justify-center';
+
+function Section({ title, onAdd, disabled, empty, children }: {
+  title: string; onAdd: () => void; disabled?: boolean; empty?: boolean; children: React.ReactNode;
 }) {
   return (
     <div className="mb-2">
-      <div className="flex items-center justify-between px-3 py-1">
-        <SectionLabel className="min-w-0 truncate">{title}</SectionLabel>
-        <IconButton size="sm" onClick={onAdd} disabled={disabled} title={`New ${title} environment`} className="h-6 w-6">
+      <div className="flex items-center justify-between py-1 px-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={LIST_SLOT} aria-hidden />
+          <SectionLabel className="min-w-0 truncate">{title}</SectionLabel>
+        </div>
+        <IconButton size="xs" onClick={onAdd} disabled={disabled} title={`New ${title} environment`}>
           <Plus className="h-3.5 w-3.5" />
         </IconButton>
       </div>
-      {children}
+      {/* An empty section used to render a caption, a +, and then nothing —
+          which reads as broken rather than as "there is nothing here yet". */}
+      {empty
+        ? <p className="py-1 pl-8 pr-3 text-[11px] text-fg-mute/70">No environments</p>
+        : children}
     </div>
   );
 }
@@ -224,14 +253,8 @@ function EnvRow({ env, active, selected, onClick }: {
   env: { id: string; name: string }; active: boolean; selected: boolean; onClick: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-acc/60',
-        selected && 'bg-acc',
-      )}
-    >
-      {active && <StatusDot tone="live" size="xs" />}
+    <button onClick={onClick} className={cn(LIST_ROW, selected && 'bg-acc')}>
+      <span className={LIST_SLOT}>{active && <StatusDot tone="live" size="xs" />}</span>
       <span className="truncate">{env.name}</span>
     </button>
   );

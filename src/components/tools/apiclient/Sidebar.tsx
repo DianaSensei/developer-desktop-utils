@@ -33,7 +33,8 @@ import { type ApiRequest, type Auth, type Collection, type Folder, type RequestS
 import { importPostman, exportPostman } from './postman';
 import { type ScriptFinding, findScripts, stripScripts } from './collectionScripts';
 import { ImportReviewDialog } from './ImportReviewDialog';
-import { pickJsonFile, saveJsonFile } from './fileio';
+import { importOpenApi, isOpenApiDocument, parseSpecText } from './openapi';
+import { pickCollectionFile, saveJsonFile } from './fileio';
 import { methodBadgeStyle } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
 import { ImportCurlDialog } from './ImportCurlDialog';
@@ -104,6 +105,9 @@ interface Props {
 
 export function Sidebar({ store, searchInputRef, onRun }: Props) {
   const [error, setError] = useState<string | null>(null);
+  // Non-fatal notes from the last import (parts of a spec with no equivalent
+  // here). Shown until dismissed so an import is never quietly lossy.
+  const [notices, setNotices] = useState<string[]>([]);
   const [settings, setSettings] = useState<NodeSettingsTarget | null>(null);
   const [curlOpen, setCurlOpen] = useState(false);
   // Set while the user decides what to do about an import that carries scripts.
@@ -134,10 +138,23 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   // landing silently. Script-free collections import as before.
   const handleImport = async () => {
     setError(null);
+    setNotices([]);
     try {
-      const text = await pickJsonFile();
-      if (!text) return;
-      const collection = importPostman(text);
+      const file = await pickCollectionFile();
+      if (!file) return;
+      // A Postman export and an OpenAPI spec are both usually named `.json`, so
+      // the format is decided by what the document contains, not its extension.
+      const doc = await parseSpecText(file.text);
+      let collection: Collection;
+      if (isOpenApiDocument(doc)) {
+        const result = importOpenApi(doc);
+        collection = result.collection;
+        setNotices(result.warnings);
+      } else if (doc && typeof doc === 'object' && Array.isArray((doc as { item?: unknown }).item)) {
+        collection = importPostman(file.text);
+      } else {
+        throw new Error(`${file.name} is neither a Postman collection nor an OpenAPI/Swagger spec`);
+      }
       const findings = findScripts(collection);
       if (findings.length === 0) {
         store.importCollection(collection);
@@ -182,7 +199,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
               <MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection / OpenAPI</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCurlOpen(true)} icon={<Code2 className="h-3.5 w-3.5" />}>Import cURL</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -198,11 +215,22 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
         <div className="border-b border-bad/20 bg-bad/8 px-3 py-1.5 text-[11px] text-bad">{error}</div>
       )}
 
+      {notices.length > 0 && (
+        <div className="flex items-start gap-2 border-b border-warn/20 bg-warn/8 px-3 py-1.5 text-[11px] text-fg-mute">
+          <ul className="max-h-32 min-w-0 flex-1 space-y-1 overflow-y-auto">
+            {notices.map((n) => <li key={n} className="break-words">{n}</li>)}
+          </ul>
+          <IconButton size="sm" title="Dismiss" onClick={() => setNotices([])}>
+            <X className="h-3.5 w-3.5" />
+          </IconButton>
+        </div>
+      )}
+
       {/* tree */}
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {store.collections.length === 0 ? (
           <p className="px-3 py-6 text-center text-xs text-fg-mute">
-            No collections yet. Create one or import a Postman file.
+            No collections yet. Create one, or import a Postman file or OpenAPI spec.
           </p>
         ) : visible.length === 0 ? (
           <p className="px-3 py-6 text-center text-xs text-fg-mute">No matches.</p>

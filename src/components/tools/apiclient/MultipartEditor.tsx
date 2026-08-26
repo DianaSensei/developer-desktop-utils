@@ -57,9 +57,13 @@ export function MultipartEditor({ rows, onChange }: Props) {
     editRow(id, { kind: 'text', fileName: undefined, fileType: undefined, fileContent: undefined });
 
   return (
-    <div className="overflow-hidden rounded-md border text-xs">
+    // Content-Type is a fixed 10rem column, so a narrow pane squeezes Key and
+    // Value instead; scroll sideways below the min width rather than shrink
+    // them to unusable slivers.
+    <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
+      <div className="min-w-[24rem]">
       {/* header */}
-      <div className="grid grid-cols-[1fr_1fr_10rem_2rem] border-b bg-bg-2/30 font-semibold">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem_2rem] border-b bg-bg-2/30 font-semibold">
         <div className="border-r px-3 py-1.5">Key</div>
         <div className="border-r px-3 py-1.5">Value</div>
         <div className="border-r px-3 py-1.5">Content-Type</div>
@@ -70,9 +74,9 @@ export function MultipartEditor({ rows, onChange }: Props) {
         const isGhost = row.id === ghost.id;
         const isFile = row.kind === 'file' && !!row.fileName;
         return (
-          <div key={row.id} className="grid grid-cols-[1fr_1fr_10rem_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+          <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
             {/* key cell with enable checkbox */}
-            <div className="flex items-center gap-1.5 border-r px-2">
+            <div className="flex min-w-0 items-center gap-1.5 border-r px-2">
               <button
                 type="button"
                 onClick={() => !isGhost && editRow(row.id, { enabled: !row.enabled })}
@@ -94,7 +98,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
             </div>
 
             {/* value cell: text input + upload, or a file chip */}
-            <div className="flex items-center gap-1 border-r px-2">
+            <div className="flex min-w-0 items-center gap-1 border-r px-2">
               {isFile ? (
                 <>
                   <FileIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
@@ -120,7 +124,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
             </div>
 
             {/* content-type cell */}
-            <div className="border-r px-2">
+            <div className="min-w-0 border-r px-2">
               <Input
                 value={row.contentType ?? ''}
                 onChange={(e) => editRow(row.id, { contentType: e.target.value })}
@@ -141,6 +145,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

@@ -371,7 +371,7 @@ export function ApiClient() {
             onCloseHistory={() => setShowHistory(false)}
           />
           {showHistory ? (
-            <HistoryView store={store} />
+            <HistoryView store={store} onExit={() => setShowHistory(false)} />
           ) : activeRequest ? (
             <>
               <AddressBar

@@ -789,7 +789,7 @@ git push origin main --tags
 | Tool ID | Label | Default On | Notes |
 |---|---|---|---|
 | `task-tracker` | Time Tracker | ✅ | Timesheet, calendar, pomodoro, meeting notes |
-| `api-client` | API Client | ✅ | Collections, environments, pre/post scripts, Postman import/export |
+| `api-client` | API Client | ✅ | Collections, environments, pre/post scripts, Postman import/export, OpenAPI 3 / Swagger 2 import (`openapi.ts`) |
 | `mock-server` | Mock Server | ✅ | Local HTTP mock: Rhai scripts, live request log |
 | `cron-generator` | Cron Generator | ✅ | Visual editor, Quartz/Spring support |
 | `text-transform` | Text Transformer | ✅ | Case, join/split, arrays, Vietnamese phone numbers |

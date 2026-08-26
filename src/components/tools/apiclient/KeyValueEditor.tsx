@@ -148,7 +148,17 @@ export function KeyValueEditor({
     );
   }
 
-  const gridCols = secretToggle ? 'grid-cols-[1rem_1fr_1fr_2rem_2rem]' : 'grid-cols-[1rem_1fr_1fr_2rem]';
+  // `minmax(0,1fr)`, never a bare `1fr`. Every row here is its OWN grid
+  // container, so track sizes are computed per row — and `1fr` is shorthand for
+  // `minmax(auto, 1fr)`, whose `auto` floor is the cell's min-content width. One
+  // row holding something that can't shrink (a JWT in the CodeMirror value cell)
+  // therefore resized that row alone: its Name column collapsed to 21px while
+  // Value ballooned to 1149px in a 438px table, so the columns stopped lining up
+  // with every other row. Pinning the floor to 0 makes all rows agree whatever
+  // they contain.
+  const gridCols = secretToggle
+    ? 'grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]'
+    : 'grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)_2rem]';
 
   return (
     <div className="space-y-1.5">
@@ -181,7 +191,7 @@ export function KeyValueEditor({
                 />
               </div>
               {/* Name cell */}
-              <div className="border-r px-1.5">
+              <div className="min-w-0 border-r px-1.5">
                 <Input
                   value={row.key}
                   onChange={(e) => editRow(row.id, { key: e.target.value })}
@@ -191,9 +201,9 @@ export function KeyValueEditor({
                 />
               </div>
               {/* Value cell */}
-              <div className="border-r px-1.5">
+              <div className="min-w-0 border-r px-1.5">
                 {vars ? (
-                  <div className={cn('flex h-ctl items-center', disabled && 'opacity-40')}>
+                  <div className={cn('flex h-ctl min-w-0 items-center', disabled && 'opacity-40')}>
                     <InlineCodeField
                       value={row.value}
                       onChange={(v) => editRow(row.id, { value: v })}
@@ -202,7 +212,7 @@ export function KeyValueEditor({
                     />
                   </div>
                 ) : secret ? (
-                  <div className={cn('flex h-ctl items-center gap-0.5', disabled && 'opacity-40')}>
+                  <div className={cn('flex h-ctl min-w-0 items-center gap-0.5', disabled && 'opacity-40')}>
                     <Input
                       type={revealed.has(row.id) ? 'text' : 'password'}
                       value={row.value}

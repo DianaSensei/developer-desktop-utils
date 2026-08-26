@@ -237,8 +237,8 @@ export const TOOL_DEFS: ToolDef[] = [
     label: "API Client",
     icon: Send,
     description:
-      "Postman/Bruno-style HTTP workbench: collections, environments with {{vars}}, auth, pre/post-request scripts, tests & assertions, and Postman collection import/export.",
-    keywords: ["http", "rest", "api", "request", "postman", "bruno", "insomnia", "curl", "endpoint", "get", "post", "fetch", "client"],
+      "Postman/Bruno-style HTTP workbench: collections, environments with {{vars}}, auth, pre/post-request scripts, tests & assertions, and Postman / OpenAPI import.",
+    keywords: ["http", "rest", "api", "request", "postman", "bruno", "insomnia", "curl", "endpoint", "get", "post", "fetch", "client", "openapi", "swagger"],
   },
   {
     id: "mock-server",
