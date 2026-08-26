@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText, PowerOff, Info } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText, PowerOff, Info, Cpu, ChevronDown } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ViewHeader } from '@/components/ui/view-header';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { DataTable, Thead, Tbody, Tr, Th, Td, type SortDirection } from '@/components/ui/data-table';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { IconButton } from '@/components/ui/icon-button';
 import {
   containerApi, groupByComposeProject, COMPOSE_LABELS,
   type ContainerConnection, type ContainerSummary, type ComposeProjectGroup,
 } from './types';
-import { LogsPanel } from './LogsPanel';
+import { cn } from '@/lib/utils';
+import { ContainerLogsDialog } from './ContainerLogsDialog';
 import { ContainerDetailsDialog } from './ContainerDetailsDialog';
+import { ContainerResourcesDialog } from './ContainerResourcesDialog';
+
+/** Same three the Networks view refuses to remove — compose never creates
+ *  them, so a project's teardown must never touch them either. */
+const BUILTIN_NETWORKS = new Set(['bridge', 'host', 'none']);
 
 function stateTone(state?: string): BadgeTone {
   switch (state) {
@@ -37,10 +43,17 @@ function containerName(c: ContainerSummary): string {
  * the com.docker.compose.project label docker compose stamps on them (the
  * same technique tools like OrbStack use for their compose grouping), and
  * every action (start/stop/restart/remove/logs) reuses the plain per-
- * container bollard commands from container_tool.rs. The project-level
- * "Down" action is the same technique applied to every container in the
- * group — stop then force-remove — not `docker compose down`, so it never
- * touches compose-managed networks/volumes, only the containers.
+ * container bollard commands from container_tool.rs.
+ *
+ * The project-level actions mirror the compose CLI verbs that need no YAML:
+ * Start / Stop / Restart map onto every container in the group, and "Down"
+ * reproduces `docker compose down` — stop and force-remove the containers,
+ * then remove the networks carrying this project's label — with the optional
+ * `-v` variant additionally removing the project's named volumes. Since a
+ * real `down` removes the containers, the project stops being listed here
+ * afterwards: this view is built purely out of container labels, so a project
+ * with no containers has nothing left to group. Use Stop when the project
+ * should stay listed and startable.
  *
  * What's intentionally missing: `up`/`build`/`pull` for a project. Those
  * require parsing and orchestrating a compose YAML file client-side — logic
@@ -59,14 +72,12 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyProject, setBusyProject] = useState<string | null>(null);
   const [logsTarget, setLogsTarget] = useState<ContainerSummary | null>(null);
-  // See ContainersView for why this trails `logsTarget` by one render: it lets
-  // the Dialog stay mounted (`open={!!logsTarget}`) and animate its close
-  // instead of vanishing instantly when `logsTarget` clears.
-  const [logsDialogTarget, setLogsDialogTarget] = useState<ContainerSummary | null>(null);
-  useEffect(() => { if (logsTarget) setLogsDialogTarget(logsTarget); }, [logsTarget]);
   const [detailsTarget, setDetailsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
-  const [downTarget, setDownTarget] = useState<ComposeProjectGroup | null>(null);
+  const [downTarget, setDownTarget] = useState<{ project: ComposeProjectGroup; removeVolumes: boolean } | null>(null);
+  // One entry for a single service, every service in the group for the
+  // project-level button — the resource dialog handles both shapes.
+  const [limitsTargets, setLimitsTargets] = useState<{ id: string; name: string }[] | null>(null);
   const [sortKey, setSortKey] = useState<'service' | 'state' | 'status' | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
 
@@ -95,19 +106,73 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
     }
   };
 
-  const runDown = async (project: ComposeProjectGroup) => {
+  /** Runs one per-container action across a whole project — the Start / Stop
+   *  / Restart buttons in the project header. */
+  const runProject = async (project: ComposeProjectGroup, action: (c: ContainerSummary) => Promise<void>) => {
     setBusyProject(project.name);
     setError(null);
-    const results = await Promise.allSettled(project.containers.map(async (c) => {
+    const results = await Promise.allSettled(project.containers.map(action));
+    const failed = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (failed.length > 0) {
+      const first = failed[0].reason;
+      setError(`${failed.length} of ${project.containers.length} failed — ${String(first instanceof Error ? first.message : first)}`);
+    }
+    setBusyProject(null);
+    load();
+  };
+
+  /**
+   * `docker compose down` without the YAML: stop and force-remove every
+   * container in the project, then remove the networks compose created for it
+   * (matched by the same project label the grouping uses — built-in networks
+   * are never touched). `removeVolumes` adds the `-v` behaviour, removing the
+   * project's named volumes and the data in them.
+   *
+   * Networks and volumes are only removed after the containers are gone, since
+   * the daemon refuses to remove either while something is still attached.
+   */
+  const runDown = async (project: ComposeProjectGroup, removeVolumes: boolean) => {
+    setBusyProject(project.name);
+    setError(null);
+    const problems: string[] = [];
+    const note = (e: unknown) => problems.push(String(e instanceof Error ? e.message : e));
+
+    const containerResults = await Promise.allSettled(project.containers.map(async (c) => {
       if (c.State === 'running' || c.State === 'paused') {
         await containerApi.stop(connection, c.Id).catch(() => {});
       }
       await containerApi.remove(connection, c.Id, true);
     }));
-    const failed = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
-    if (failed.length > 0) {
-      const first = failed[0].reason;
-      setError(`${failed.length} of ${project.containers.length} failed — ${String(first instanceof Error ? first.message : first)}`);
+    containerResults.forEach((r) => { if (r.status === 'rejected') note(r.reason); });
+
+    // Only worth attempting once the containers are actually gone; otherwise
+    // every removal would fail with "network has active endpoints" anyway.
+    if (containerResults.every((r) => r.status === 'fulfilled')) {
+      try {
+        const networks = await containerApi.networkList(connection);
+        const projectNetworks = networks.filter(
+          (n) => n.Labels?.[COMPOSE_LABELS.project] === project.name && !BUILTIN_NETWORKS.has(n.Name),
+        );
+        const netResults = await Promise.allSettled(projectNetworks.map((n) => containerApi.networkRemove(connection, n.Name)));
+        netResults.forEach((r) => { if (r.status === 'rejected') note(r.reason); });
+      } catch (e) {
+        note(e);
+      }
+
+      if (removeVolumes) {
+        try {
+          const volumes = await containerApi.volumeList(connection);
+          const projectVolumes = volumes.filter((v) => v.Labels?.[COMPOSE_LABELS.project] === project.name);
+          const volResults = await Promise.allSettled(projectVolumes.map((v) => containerApi.volumeRemove(connection, v.Name, true)));
+          volResults.forEach((r) => { if (r.status === 'rejected') note(r.reason); });
+        } catch (e) {
+          note(e);
+        }
+      }
+    }
+
+    if (problems.length > 0) {
+      setError(`Down finished with ${problems.length} error(s) — ${problems[0]}`);
     }
     setBusyProject(null);
     load();
@@ -160,13 +225,52 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
                 <p className="text-sm font-medium">{p.name}</p>
                 {p.workingDir && <p className="text-[11px] text-fg-mute font-mono truncate">{p.workingDir}</p>}
               </div>
-              <Button
-                variant="outline" size="sm" className="shrink-0 hover:text-bad"
-                disabled={busyProject === p.name}
-                onClick={() => setDownTarget(p)}
-              >
-                <PowerOff className="h-3.5 w-3.5 mr-1.5" /> Down
-              </Button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <IconButton
+                  size="sm" title="Start all services"
+                  disabled={busyProject === p.name}
+                  onClick={() => runProject(p, (c) => containerApi.start(connection, c.Id))}
+                >
+                  <Play className="h-3.5 w-3.5" />
+                </IconButton>
+                <IconButton
+                  size="sm" title="Stop all services — the project stays listed and can be started again"
+                  disabled={busyProject === p.name}
+                  onClick={() => runProject(p, (c) => containerApi.stop(connection, c.Id))}
+                >
+                  <Square className="h-3.5 w-3.5" />
+                </IconButton>
+                <IconButton
+                  size="sm" title="Restart all services"
+                  disabled={busyProject === p.name}
+                  onClick={() => runProject(p, (c) => containerApi.restart(connection, c.Id))}
+                >
+                  <RotateCw className="h-3.5 w-3.5" />
+                </IconButton>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => setLimitsTargets(p.containers.map((c) => ({ id: c.Id, name: containerName(c) })))}
+                >
+                  <Cpu className="h-3.5 w-3.5 mr-1.5" /> Limits
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    title="Down this project"
+                    disabled={busyProject === p.name}
+                    className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'gap-1.5 hover:text-bad')}
+                  >
+                    <PowerOff className="h-3.5 w-3.5" /> Down <ChevronDown className="h-3 w-3 opacity-70" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setDownTarget({ project: p, removeVolumes: false })}>
+                      Down — remove containers + networks
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-bad" onClick={() => setDownTarget({ project: p, removeVolumes: true })}>
+                      Down + remove volumes
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
             <DataTable density="compact" containerClassName="rounded-none border-0">
               <Thead>
@@ -203,6 +307,9 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
                         <IconButton size="sm" title="Logs" onClick={() => setLogsTarget(c)}>
                           <FileText className="h-3.5 w-3.5" />
                         </IconButton>
+                        <IconButton size="sm" title="Resource limits" onClick={() => setLimitsTargets([{ id: c.Id, name: containerName(c) }])}>
+                          <Cpu className="h-3.5 w-3.5" />
+                        </IconButton>
                         <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(c)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </IconButton>
@@ -216,24 +323,14 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
         ))}
       </div>
 
-      <Dialog open={!!logsTarget} onOpenChange={(o) => { if (!o) setLogsTarget(null); }}>
-        <DialogContent className="max-w-3xl">
-          {logsDialogTarget && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="font-mono text-sm">{containerName(logsDialogTarget)}</DialogTitle>
-              </DialogHeader>
-              <div className="h-[50vh] flex flex-col">
-                <LogsPanel
-                  key={logsDialogTarget.Id}
-                  start={(tail, since, until, onLog) => containerApi.logsStart(connection, logsDialogTarget.Id, tail, since, until, onLog)}
-                  stop={containerApi.logsStop}
-                />
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ContainerLogsDialog
+        open={!!logsTarget}
+        onOpenChange={(o) => { if (!o) setLogsTarget(null); }}
+        connection={connection}
+        container={logsTarget}
+        onAction={runAction}
+        onRemove={setRemoveTarget}
+      />
 
       <ConfirmDialog
         open={!!removeTarget}
@@ -251,14 +348,27 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
       <ConfirmDialog
         open={!!downTarget}
         onOpenChange={(o) => { if (!o) setDownTarget(null); }}
-        title="Down this project?"
-        description={downTarget ? `Stop and remove all ${downTarget.containers.length} container(s) in "${downTarget.name}". This cannot be undone.` : ''}
-        confirmLabel="Down"
+        title={downTarget?.removeVolumes ? 'Down and remove volumes?' : 'Down this project?'}
+        description={downTarget
+          ? `Stop and remove all ${downTarget.project.containers.length} container(s) in "${downTarget.project.name}", `
+            + `plus the networks compose created for it`
+            + `${downTarget.removeVolumes ? ', plus its named volumes and all data in them' : ''}. `
+            + `The project stops being listed here once its containers are gone — use Stop instead to keep it listed. This cannot be undone.`
+          : ''}
+        confirmLabel={downTarget?.removeVolumes ? 'Down + volumes' : 'Down'}
         onConfirm={async () => {
           if (!downTarget) return;
-          await runDown(downTarget);
+          await runDown(downTarget.project, downTarget.removeVolumes);
           setDownTarget(null);
         }}
+      />
+
+      <ContainerResourcesDialog
+        open={!!limitsTargets}
+        onOpenChange={(o) => { if (!o) setLimitsTargets(null); }}
+        connection={connection}
+        targets={limitsTargets ?? []}
+        onApplied={load}
       />
 
       <ContainerDetailsDialog
@@ -266,6 +376,7 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
         onOpenChange={(o) => { if (!o) setDetailsTarget(null); }}
         connection={connection}
         container={detailsTarget}
+        onEditLimits={(c) => { setDetailsTarget(null); setLimitsTargets([{ id: c.Id, name: containerName(c) }]); }}
       />
     </div>
   );

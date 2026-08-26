@@ -196,8 +196,8 @@ export const TOOL_DEFS: ToolDef[] = [
     label: "Containers",
     icon: Container,
     description:
-      "Manage containers, images, volumes, and networks across Docker-compatible runtimes (colima, Docker Desktop, Rancher Desktop, OrbStack, Podman), with Compose projects grouped read-only by container label.",
-    keywords: ["docker", "colima", "podman", "rancher desktop", "orbstack", "container", "compose", "docker-compose", "image", "volume", "network", "dockerfile", "containerd"],
+      "Manage containers, images, volumes, and networks across Docker-compatible runtimes (colima, Docker Desktop, Rancher Desktop, OrbStack, Podman): live CPU/memory usage, CPU and memory limits editable one-by-one or across a selection, and Compose projects grouped read-only by container label.",
+    keywords: ["docker", "colima", "podman", "rancher desktop", "orbstack", "container", "compose", "docker-compose", "image", "volume", "network", "dockerfile", "containerd", "cpu", "memory", "resource", "limits", "stats", "quota", "prune", "disk usage", "tag", "subnet", "ipam"],
     experimental: true,
   },
   {

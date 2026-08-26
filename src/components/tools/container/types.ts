@@ -40,11 +40,20 @@ export interface ContainerSummary {
   Status?: string;
   Ports?: ContainerPort[];
   Labels?: Record<string, string>;
+  // The list endpoint already reports each container's mounts and attached
+  // networks. Declaring them here is what lets the Images/Volumes/Networks
+  // views answer "is this in use, and by what?" from the container list they
+  // can load anyway, instead of inspecting every resource one by one.
+  Mounts?: { Type?: string; Name?: string; Source?: string; Destination?: string }[];
+  NetworkSettings?: { Networks?: Record<string, { NetworkID?: string; IPAddress?: string }> };
 }
 
 export interface LogLine {
   stream: string;
   message: string;
+  /** Present only when the stream was started with timestamps on; split off
+   *  from the message backend-side so searches never match inside it. */
+  timestamp?: string | null;
 }
 
 export interface StatsFrame {
@@ -80,6 +89,29 @@ export interface ContainerNetworkInfo {
   macAddress?: string;
 }
 
+// The cgroup limits `docker update` can change on a live container. `null`
+// means "unlimited / daemon default" — the backend normalises the daemon's
+// `0`-for-unset to null so the editor can tell the two apart.
+export interface ContainerResources {
+  nanoCpus?: number | null;
+  cpuShares?: number | null;
+  cpuPeriod?: number | null;
+  cpuQuota?: number | null;
+  cpusetCpus?: string | null;
+  memoryBytes?: number | null;
+  memoryReservationBytes?: number | null;
+  memorySwapBytes?: number | null;
+  blkioWeight?: number | null;
+  pidsLimit?: number | null;
+  restartPolicy?: string | null;
+  restartMaxRetry?: number | null;
+}
+
+/** Only the fields present are sent to the daemon, which merges them into the
+ *  container's existing HostConfig — so a bulk edit of one limit leaves every
+ *  other limit on those containers alone. */
+export type ContainerResourceUpdate = Partial<Record<keyof ContainerResources, number | string | null>>;
+
 export interface ContainerDetails {
   id: string;
   name: string;
@@ -103,6 +135,7 @@ export interface ContainerDetails {
   mounts: ContainerMountInfo[];
   ports: ContainerPortBinding[];
   networks: ContainerNetworkInfo[];
+  resources: ContainerResources;
 }
 
 // ── Images ──────────────────────────────────────────────────────────────
@@ -141,6 +174,13 @@ export interface ImageDetails {
   layerCount: number;
 }
 
+/** Result of any of the four prune endpoints. Networks free no disk, so
+ *  `spaceReclaimed` is always 0 there. */
+export interface PruneResult {
+  deleted: number;
+  spaceReclaimed: number;
+}
+
 // ── Volumes / Networks ─────────────────────────────────────────────────────
 
 export interface VolumeInfo {
@@ -148,6 +188,10 @@ export interface VolumeInfo {
   Driver: string;
   Mountpoint: string;
   CreatedAt?: string;
+  /** Compose stamps `com.docker.compose.project` on volumes and networks it
+   *  creates, the same way it does on containers — that is how the Compose
+   *  view's "Down" finds what belongs to a project. */
+  Labels?: Record<string, string> | null;
 }
 
 export interface NetworkInfo {
@@ -155,6 +199,43 @@ export interface NetworkInfo {
   Name: string;
   Driver?: string;
   Scope?: string;
+  Labels?: Record<string, string> | null;
+}
+
+// Curated projections of `inspect_network` / `inspect_volume`, same approach
+// as ContainerDetails/ImageDetails.
+export interface NetworkIpamConfig {
+  subnet?: string;
+  ipRange?: string;
+  gateway?: string;
+}
+
+export interface NetworkDetails {
+  id: string;
+  name: string;
+  driver?: string;
+  scope?: string;
+  created?: string;
+  internal: boolean;
+  attachable: boolean;
+  ingress: boolean;
+  ipv6: boolean;
+  ipamDriver?: string;
+  ipamConfig: NetworkIpamConfig[];
+  options: Record<string, string>;
+  labels: Record<string, string>;
+}
+
+export interface VolumeDetails {
+  name: string;
+  driver: string;
+  mountpoint: string;
+  createdAt?: string;
+  scope?: string;
+  labels: Record<string, string>;
+  options: Record<string, string>;
+  sizeBytes?: number | null;
+  refCount?: number | null;
 }
 
 // ── System overview ─────────────────────────────────────────────────────
@@ -267,13 +348,31 @@ export const containerApi = {
   details: (config: ContainerConnection, containerId: string) =>
     invoke<ContainerDetails>('container_details', { config, containerId }),
 
-  /** `since`/`until` are Unix seconds; pass 0 for "no bound" on either. */
-  logsStart: (config: ContainerConnection, containerId: string, tail: string, since: number, until: number, onLog: Channel<LogLine>) =>
-    invoke<string>('container_logs_start', { config, containerId, tail, since, until, onLog }),
+  /** `since`/`until` are Unix seconds; pass 0 for "no bound" on either.
+   *  `timestamps` asks the daemon to prefix each line — it can only be chosen
+   *  when the stream starts, so toggling it restarts the stream. */
+  logsStart: (
+    config: ContainerConnection, containerId: string, tail: string,
+    since: number, until: number, timestamps: boolean, onLog: Channel<LogLine>,
+  ) => invoke<string>('container_logs_start', { config, containerId, tail, since, until, timestamps, onLog }),
   logsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
 
   statsStart: (config: ContainerConnection, containerId: string, onStat: Channel<StatsFrame>) =>
     invoke<string>('container_stats_start', { config, containerId, onStat }),
+  /** Streams share one registry on the Rust side, so the log-stream stopper
+   *  cancels a stats stream just the same. */
+  statsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
+  /** One sample per container for the table's live usage columns — cheaper
+   *  than one open stats stream per row. Containers that fail are omitted. */
+  statsSnapshot: (config: ContainerConnection, containerIds: string[]) =>
+    invoke<Record<string, StatsFrame>>('container_stats_snapshot', { config, containerIds }),
+
+  resources: (config: ContainerConnection, containerId: string) =>
+    invoke<ContainerResources>('container_resources', { config, containerId }),
+  updateResources: (config: ContainerConnection, containerId: string, resources: ContainerResourceUpdate) =>
+    invoke<void>('container_update_resources', { config, containerId, resources }),
+
+  prune: (config: ContainerConnection) => invoke<PruneResult>('container_prune', { config }),
 
   imageList: (config: ContainerConnection) => invoke<ImageSummary[]>('image_list', { config }),
   imageInspect: (config: ContainerConnection, imageId: string) => invoke<unknown>('image_inspect', { config, imageId }),
@@ -282,6 +381,11 @@ export const containerApi = {
     invoke<void>('image_remove', { config, imageId, force }),
   imagePull: (config: ContainerConnection, image: string, tag: string, onProgress: Channel<PullProgress>) =>
     invoke<void>('image_pull', { config, image, tag, onProgress }),
+  /** `danglingOnly` = `docker image prune`; `false` = `docker image prune -a`. */
+  imagePrune: (config: ContainerConnection, danglingOnly: boolean) =>
+    invoke<PruneResult>('image_prune', { config, danglingOnly }),
+  imageTag: (config: ContainerConnection, imageId: string, repo: string, tag: string) =>
+    invoke<void>('image_tag', { config, imageId, repo, tag }),
 
   volumeList: (config: ContainerConnection) => invoke<VolumeInfo[]>('volume_list', { config }),
   volumeRemove: (config: ContainerConnection, name: string, force: boolean) =>
@@ -291,11 +395,17 @@ export const containerApi = {
   /** Per-volume disk usage in bytes, keyed by name — `{}` on Windows (named
    *  pipe transport isn't wired up for this raw request, see backend). */
   volumeSizes: (config: ContainerConnection) => invoke<Record<string, number>>('volume_sizes', { config }),
+  volumePrune: (config: ContainerConnection) => invoke<PruneResult>('volume_prune', { config }),
+  volumeDetails: (config: ContainerConnection, name: string) =>
+    invoke<VolumeDetails>('volume_details', { config, name }),
 
   networkList: (config: ContainerConnection) => invoke<NetworkInfo[]>('network_list', { config }),
   networkRemove: (config: ContainerConnection, name: string) => invoke<void>('network_remove', { config, name }),
   networkCreate: (config: ContainerConnection, name: string, driver: string) =>
     invoke<void>('network_create', { config, name, driver }),
+  networkPrune: (config: ContainerConnection) => invoke<PruneResult>('network_prune', { config }),
+  networkDetails: (config: ContainerConnection, networkId: string) =>
+    invoke<NetworkDetails>('network_details', { config, networkId }),
 
   systemInfo: (config: ContainerConnection) => invoke<SystemInfo>('container_system_info', { config }),
   systemDf: (config: ContainerConnection) => invoke<SystemDataUsageResponse>('container_system_df', { config }),

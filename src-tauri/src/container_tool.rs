@@ -332,6 +332,58 @@ pub struct ContainerNetworkInfo {
     pub mac_address: Option<String>,
 }
 
+// ── Container resource limits (docker update) ─────────────────────────────
+//
+// The cgroup knobs `docker update` can change on a live container, projected
+// out of `HostConfig` the same way ContainerDetails projects the rest of the
+// inspect payload. `None` everywhere means "unlimited/daemon default" — the
+// daemon reports `0` for most unset limits, normalised to `None` here so the
+// UI never has to decide whether `0` means "zero" or "unset".
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerResources {
+    /// CPU quota in units of 1e-9 CPUs — `--cpus` as the daemon stores it.
+    pub nano_cpus: Option<i64>,
+    pub cpu_shares: Option<i64>,
+    pub cpu_period: Option<i64>,
+    pub cpu_quota: Option<i64>,
+    pub cpuset_cpus: Option<String>,
+    pub memory_bytes: Option<i64>,
+    pub memory_reservation_bytes: Option<i64>,
+    /// Total memory + swap. `-1` is docker's "unlimited swap" sentinel and is
+    /// passed through as-is rather than normalised away.
+    pub memory_swap_bytes: Option<i64>,
+    pub blkio_weight: Option<u16>,
+    pub pids_limit: Option<i64>,
+    pub restart_policy: Option<String>,
+    pub restart_max_retry: Option<i64>,
+}
+
+/// `0` is what the daemon reports for an unset limit; treat it as absent so
+/// the form renders an empty field instead of a literal zero limit.
+fn nonzero(v: Option<i64>) -> Option<i64> {
+    v.filter(|&n| n != 0)
+}
+
+fn resources_from_host_config(hc: &bollard::models::HostConfig) -> ContainerResources {
+    let restart_policy = hc.restart_policy.clone().unwrap_or_default();
+    ContainerResources {
+        nano_cpus: nonzero(hc.nano_cpus),
+        cpu_shares: nonzero(hc.cpu_shares),
+        cpu_period: nonzero(hc.cpu_period),
+        cpu_quota: nonzero(hc.cpu_quota),
+        cpuset_cpus: hc.cpuset_cpus.clone().filter(|s| !s.is_empty()),
+        memory_bytes: nonzero(hc.memory),
+        memory_reservation_bytes: nonzero(hc.memory_reservation),
+        memory_swap_bytes: nonzero(hc.memory_swap),
+        blkio_weight: hc.blkio_weight.filter(|&w| w != 0),
+        pids_limit: nonzero(hc.pids_limit),
+        restart_policy: restart_policy.name.map(|n| n.to_string()),
+        restart_max_retry: restart_policy.maximum_retry_count,
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerDetails {
@@ -357,6 +409,7 @@ pub struct ContainerDetails {
     pub mounts: Vec<ContainerMountInfo>,
     pub ports: Vec<ContainerPortBinding>,
     pub networks: Vec<ContainerNetworkInfo>,
+    pub resources: ContainerResources,
 }
 
 #[tauri::command]
@@ -374,6 +427,7 @@ pub async fn container_details(
     let cfg = insp.config.unwrap_or_default();
     let host_config = insp.host_config.unwrap_or_default();
     let net = insp.network_settings.unwrap_or_default();
+    let resources = resources_from_host_config(&host_config);
     let restart_policy = host_config.restart_policy.unwrap_or_default();
 
     let mounts = insp
@@ -439,8 +493,138 @@ pub async fn container_details(
         mounts,
         ports,
         networks,
+        resources,
     })
 }
+
+// ── Resource management (docker update) ───────────────────────────────────
+//
+// Every field is optional and only the ones the caller actually sets are put
+// on the wire: the Docker Engine's `/containers/{id}/update` merges the body
+// into the container's existing HostConfig, so omitting a field leaves that
+// limit untouched. That is what makes a bulk "apply CPU limit to these 5
+// containers" edit safe — it cannot clobber per-container memory limits the
+// user did not touch. Sentinels the daemon itself defines are passed through:
+// `0` clears a limit, `-1` means unlimited swap / unlimited pids.
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerResourceUpdate {
+    pub nano_cpus: Option<i64>,
+    pub cpu_shares: Option<i64>,
+    pub cpu_period: Option<i64>,
+    pub cpu_quota: Option<i64>,
+    pub cpuset_cpus: Option<String>,
+    pub memory_bytes: Option<i64>,
+    pub memory_reservation_bytes: Option<i64>,
+    pub memory_swap_bytes: Option<i64>,
+    pub blkio_weight: Option<u16>,
+    pub pids_limit: Option<i64>,
+    pub restart_policy: Option<String>,
+    pub restart_max_retry: Option<i64>,
+}
+
+fn restart_policy_from_name(name: &str, max_retry: Option<i64>) -> Result<bollard::models::RestartPolicy, String> {
+    use bollard::models::RestartPolicyNameEnum as E;
+    let variant = match name {
+        "" => E::EMPTY,
+        "no" => E::NO,
+        "always" => E::ALWAYS,
+        "unless-stopped" => E::UNLESS_STOPPED,
+        "on-failure" => E::ON_FAILURE,
+        other => return Err(format!("Unknown restart policy \"{other}\"")),
+    };
+    Ok(bollard::models::RestartPolicy {
+        name: Some(variant),
+        // Docker rejects a non-zero retry count on anything but on-failure.
+        maximum_retry_count: if matches!(variant, E::ON_FAILURE) { max_retry.or(Some(0)) } else { Some(0) },
+    })
+}
+
+/// Current cgroup limits for one container, without the rest of the (much
+/// larger) inspect payload — what the resource editor loads before it opens.
+#[tauri::command]
+pub async fn container_resources(
+    config: ContainerConnection,
+    container_id: String,
+) -> Result<ContainerResources, String> {
+    let docker = connect(&config)?;
+    let insp = docker
+        .inspect_container(&container_id, None)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(resources_from_host_config(&insp.host_config.unwrap_or_default()))
+}
+
+#[tauri::command]
+pub async fn container_update_resources(
+    config: ContainerConnection,
+    container_id: String,
+    resources: ContainerResourceUpdate,
+) -> Result<(), String> {
+    let docker = connect(&config)?;
+    let restart_policy = match &resources.restart_policy {
+        Some(name) => Some(restart_policy_from_name(name, resources.restart_max_retry)?),
+        None => None,
+    };
+    let body = bollard::models::ContainerUpdateBody {
+        nano_cpus: resources.nano_cpus,
+        cpu_shares: resources.cpu_shares,
+        cpu_period: resources.cpu_period,
+        cpu_quota: resources.cpu_quota,
+        cpuset_cpus: resources.cpuset_cpus.clone(),
+        memory: resources.memory_bytes,
+        memory_reservation: resources.memory_reservation_bytes,
+        memory_swap: resources.memory_swap_bytes,
+        blkio_weight: resources.blkio_weight,
+        pids_limit: resources.pids_limit,
+        restart_policy,
+        ..Default::default()
+    };
+    docker
+        .update_container(&container_id, body)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// One-shot CPU/memory/network sample for a set of containers, for the live
+/// usage columns in the containers table. Deliberately not the streaming
+/// `container_stats_start`: one long-lived stream per row would mean dozens of
+/// concurrent socket connections, whereas the table only needs a value every
+/// few seconds. `stream: false` with `one_shot: false` makes the daemon take
+/// the two samples a CPU percentage needs before replying — `one_shot: true`
+/// would return a frame whose precpu block is empty and whose CPU% is always 0.
+/// Containers that error or time out are simply absent from the map.
+#[tauri::command]
+pub async fn container_stats_snapshot(
+    config: ContainerConnection,
+    container_ids: Vec<String>,
+) -> Result<HashMap<String, StatsFrame>, String> {
+    let docker = connect(&config)?;
+    let futures = container_ids.into_iter().map(|id| {
+        let docker = docker.clone();
+        async move {
+            let opts = bollard::query_parameters::StatsOptions {
+                stream: false,
+                one_shot: false,
+            };
+            let frame = tokio::time::timeout(
+                std::time::Duration::from_secs(SNAPSHOT_TIMEOUT_SECS),
+                docker.stats(&id, Some(opts)).next(),
+            )
+            .await
+            .ok()
+            .flatten()
+            .and_then(|r| r.ok())
+            .map(|stats| stats_to_frame(&stats));
+            frame.map(|f| (id, f))
+        }
+    });
+    let frames = futures_util::future::join_all(futures).await;
+    Ok(frames.into_iter().flatten().collect())
+}
+
+const SNAPSHOT_TIMEOUT_SECS: u64 = 10;
 
 // ── Registry shared by logs + stats streams ─────────────────────────────────
 
@@ -472,6 +656,28 @@ pub async fn container_logs_stop(registry: tauri::State<'_, StreamRegistry>, str
 pub struct LogLine {
     pub stream: String, // "stdout" | "stderr"
     pub message: String,
+    /// RFC3339 timestamp the daemon prefixed to the line, split off here so
+    /// the frontend can render it in its own column and — more importantly —
+    /// so a keyword search never matches inside a timestamp. `None` when the
+    /// caller asked for no timestamps, or when a line arrives without one.
+    pub timestamp: Option<String>,
+}
+
+/// Docker writes `2026-08-26T09:41:02.123456789Z the message` when timestamps
+/// are on. Split on the first space and only accept the prefix as a timestamp
+/// if it actually looks like one — a log line that happens to start with a
+/// word must not lose that word.
+fn split_timestamp(line: &str) -> (Option<String>, &str) {
+    let Some((head, rest)) = line.split_once(' ') else { return (None, line) };
+    let looks_like_ts = head.len() >= 20
+        && head.as_bytes()[4] == b'-'
+        && head.contains('T')
+        && head[..4].chars().all(|c| c.is_ascii_digit());
+    if looks_like_ts {
+        (Some(head.to_string()), rest)
+    } else {
+        (None, line)
+    }
 }
 
 #[tauri::command]
@@ -482,6 +688,7 @@ pub async fn container_logs_start(
     tail: String,
     since: i32,
     until: i32,
+    timestamps: bool,
     on_log: Channel<LogLine>,
 ) -> Result<String, String> {
     let docker = connect(&config)?;
@@ -492,7 +699,7 @@ pub async fn container_logs_start(
         tail,
         since,
         until,
-        timestamps: false,
+        timestamps,
     };
 
     let id = Uuid::new_v4().to_string();
@@ -513,9 +720,15 @@ pub async fn container_logs_start(
                             bollard::container::LogOutput::Console { message } => ("stdout", message),
                             bollard::container::LogOutput::StdIn { message } => ("stdin", message),
                         };
+                        let raw = String::from_utf8_lossy(&bytes).to_string();
+                        // Trailing newline is the record separator, not content —
+                        // keeping it made every rendered row carry a blank line.
+                        let raw = raw.strip_suffix('\n').unwrap_or(&raw);
+                        let (ts, message) = if timestamps { split_timestamp(raw) } else { (None, raw) };
                         let line = LogLine {
                             stream: stream_name.to_string(),
-                            message: String::from_utf8_lossy(&bytes).to_string(),
+                            message: message.to_string(),
+                            timestamp: ts,
                         };
                         if on_log.send(line).is_err() {
                             break; // frontend dropped the channel
@@ -559,6 +772,29 @@ fn calc_cpu_percent(stats: &bollard::models::ContainerStatsResponse) -> f64 {
     }
 }
 
+/// Shared by the live stream and the table's one-shot snapshot so both compute
+/// the same numbers from a raw daemon stats payload.
+fn stats_to_frame(stats: &bollard::models::ContainerStatsResponse) -> StatsFrame {
+    let mem_usage = stats.memory_stats.as_ref().and_then(|m| m.usage).unwrap_or(0);
+    let mem_limit = stats.memory_stats.as_ref().and_then(|m| m.limit).unwrap_or(0);
+    let (rx, tx) = stats
+        .networks
+        .as_ref()
+        .map(|nets| {
+            nets.values().fold((0u64, 0u64), |(rx, tx), n| {
+                (rx + n.rx_bytes.unwrap_or(0), tx + n.tx_bytes.unwrap_or(0))
+            })
+        })
+        .unwrap_or((0, 0));
+    StatsFrame {
+        cpu_percent: calc_cpu_percent(stats),
+        mem_usage_bytes: mem_usage,
+        mem_limit_bytes: mem_limit,
+        net_rx_bytes: rx,
+        net_tx_bytes: tx,
+    }
+}
+
 #[tauri::command]
 pub async fn container_stats_start(
     registry: tauri::State<'_, StreamRegistry>,
@@ -584,25 +820,7 @@ pub async fn container_stats_start(
                 _ = notify.notified() => break,
                 next = stream.next() => match next {
                     Some(Ok(stats)) => {
-                        let mem_usage = stats.memory_stats.as_ref().and_then(|m| m.usage).unwrap_or(0);
-                        let mem_limit = stats.memory_stats.as_ref().and_then(|m| m.limit).unwrap_or(0);
-                        let (rx, tx) = stats
-                            .networks
-                            .as_ref()
-                            .map(|nets| {
-                                nets.values().fold((0u64, 0u64), |(rx, tx), n| {
-                                    (rx + n.rx_bytes.unwrap_or(0), tx + n.tx_bytes.unwrap_or(0))
-                                })
-                            })
-                            .unwrap_or((0, 0));
-                        let frame = StatsFrame {
-                            cpu_percent: calc_cpu_percent(&stats),
-                            mem_usage_bytes: mem_usage,
-                            mem_limit_bytes: mem_limit,
-                            net_rx_bytes: rx,
-                            net_tx_bytes: tx,
-                        };
-                        if on_stat.send(frame).is_err() {
+                        if on_stat.send(stats_to_frame(&stats)).is_err() {
                             break;
                         }
                     }
@@ -836,6 +1054,197 @@ pub async fn network_create(config: ContainerConnection, name: String, driver: S
 
 // ── System overview ─────────────────────────────────────────────────────
 
+// ── Prune (reclaiming disk) ───────────────────────────────────────────────
+//
+// One shape for all four prune endpoints: the daemon answers each with "what
+// was deleted" plus "how many bytes came back" (networks report no byte
+// count — nothing on disk is freed by removing one — so it stays 0 there).
+// The UI shows the same confirmation and result line for each, so collapsing
+// the four differently-named responses into one struct here keeps that from
+// being four near-identical frontend branches.
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PruneResult {
+    pub deleted: usize,
+    pub space_reclaimed: i64,
+}
+
+#[tauri::command]
+pub async fn container_prune(config: ContainerConnection) -> Result<PruneResult, String> {
+    let docker = connect(&config)?;
+    let resp = docker
+        .prune_containers(None::<bollard::query_parameters::PruneContainersOptions>)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PruneResult {
+        deleted: resp.containers_deleted.map(|v| v.len()).unwrap_or(0),
+        space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+    })
+}
+
+/// `dangling_only: true` matches `docker image prune` (untagged layers only);
+/// `false` matches `docker image prune -a` (every image no container uses).
+/// The distinction is a filter the daemon applies, not something the frontend
+/// can approximate by picking rows.
+#[tauri::command]
+pub async fn image_prune(config: ContainerConnection, dangling_only: bool) -> Result<PruneResult, String> {
+    let docker = connect(&config)?;
+    let mut filters: HashMap<String, Vec<String>> = HashMap::new();
+    filters.insert(
+        "dangling".to_string(),
+        vec![if dangling_only { "true" } else { "false" }.to_string()],
+    );
+    let opts = bollard::query_parameters::PruneImagesOptions { filters: Some(filters) };
+    let resp = docker.prune_images(Some(opts)).await.map_err(|e| e.to_string())?;
+    Ok(PruneResult {
+        deleted: resp.images_deleted.map(|v| v.len()).unwrap_or(0),
+        space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+    })
+}
+
+#[tauri::command]
+pub async fn volume_prune(config: ContainerConnection) -> Result<PruneResult, String> {
+    let docker = connect(&config)?;
+    let resp = docker
+        .prune_volumes(None::<bollard::query_parameters::PruneVolumesOptions>)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PruneResult {
+        deleted: resp.volumes_deleted.map(|v| v.len()).unwrap_or(0),
+        space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+    })
+}
+
+#[tauri::command]
+pub async fn network_prune(config: ContainerConnection) -> Result<PruneResult, String> {
+    let docker = connect(&config)?;
+    let resp = docker
+        .prune_networks(None::<bollard::query_parameters::PruneNetworksOptions>)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PruneResult {
+        deleted: resp.networks_deleted.map(|v| v.len()).unwrap_or(0),
+        space_reclaimed: 0,
+    })
+}
+
+// ── Tagging ───────────────────────────────────────────────────────────────
+
+/// `docker tag`. The daemon only ever adds a name to an existing image, so
+/// this can't overwrite anything except another tag of the same repo:tag pair.
+#[tauri::command]
+pub async fn image_tag(
+    config: ContainerConnection,
+    image_id: String,
+    repo: String,
+    tag: String,
+) -> Result<(), String> {
+    let docker = connect(&config)?;
+    let opts = bollard::query_parameters::TagImageOptions {
+        repo: Some(repo),
+        tag: Some(tag),
+    };
+    docker.tag_image(&image_id, Some(opts)).await.map_err(|e| e.to_string())
+}
+
+// ── Network / volume details (curated projections, as for containers) ─────
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkIpamConfig {
+    pub subnet: Option<String>,
+    pub ip_range: Option<String>,
+    pub gateway: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkDetails {
+    pub id: String,
+    pub name: String,
+    pub driver: Option<String>,
+    pub scope: Option<String>,
+    pub created: Option<String>,
+    pub internal: bool,
+    pub attachable: bool,
+    pub ingress: bool,
+    pub ipv6: bool,
+    pub ipam_driver: Option<String>,
+    pub ipam_config: Vec<NetworkIpamConfig>,
+    pub options: HashMap<String, String>,
+    pub labels: HashMap<String, String>,
+}
+
+/// Note: which containers are attached is deliberately NOT read here. This
+/// bollard version's `Network` model drops the daemon's `Containers` map on
+/// deserialize, and the same information is already in the container list the
+/// views load anyway (each summary carries its NetworkSettings), so the
+/// attachment list is computed frontend-side instead of with a second call.
+#[tauri::command]
+pub async fn network_details(config: ContainerConnection, network_id: String) -> Result<NetworkDetails, String> {
+    let docker = connect(&config)?;
+    let net = docker
+        .inspect_network(&network_id, None::<bollard::query_parameters::InspectNetworkOptions>)
+        .await
+        .map_err(|e| e.to_string())?;
+    let ipam = net.ipam.unwrap_or_default();
+    Ok(NetworkDetails {
+        id: net.id.unwrap_or_default(),
+        name: net.name.unwrap_or_default(),
+        driver: net.driver,
+        scope: net.scope,
+        created: net.created.map(|d| d.to_string()),
+        internal: net.internal.unwrap_or(false),
+        attachable: net.attachable.unwrap_or(false),
+        ingress: net.ingress.unwrap_or(false),
+        ipv6: net.enable_ipv6.unwrap_or(false),
+        ipam_driver: ipam.driver,
+        ipam_config: ipam
+            .config
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| NetworkIpamConfig { subnet: c.subnet, ip_range: c.ip_range, gateway: c.gateway })
+            .collect(),
+        options: net.options.unwrap_or_default(),
+        labels: net.labels.unwrap_or_default(),
+    })
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeDetails {
+    pub name: String,
+    pub driver: String,
+    pub mountpoint: String,
+    pub created_at: Option<String>,
+    pub scope: Option<String>,
+    pub labels: HashMap<String, String>,
+    pub options: HashMap<String, String>,
+    /// From the daemon's UsageData, which most drivers leave unset — `-1` is
+    /// docker's own "not available" marker and is passed through as such.
+    pub size_bytes: Option<i64>,
+    pub ref_count: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn volume_details(config: ContainerConnection, name: String) -> Result<VolumeDetails, String> {
+    let docker = connect(&config)?;
+    let vol = docker.inspect_volume(&name).await.map_err(|e| e.to_string())?;
+    let usage = vol.usage_data;
+    Ok(VolumeDetails {
+        name: vol.name,
+        driver: vol.driver,
+        mountpoint: vol.mountpoint,
+        created_at: vol.created_at.map(|d| d.to_string()),
+        scope: vol.scope.map(|s| s.to_string()),
+        labels: vol.labels,
+        options: vol.options,
+        size_bytes: usage.as_ref().map(|u| u.size),
+        ref_count: usage.as_ref().map(|u| u.ref_count),
+    })
+}
+
 #[tauri::command]
 pub async fn container_system_info(config: ContainerConnection) -> Result<bollard::models::SystemInfo, String> {
     let docker = connect(&config)?;
@@ -846,4 +1255,45 @@ pub async fn container_system_info(config: ContainerConnection) -> Result<bollar
 pub async fn container_system_df(config: ContainerConnection) -> Result<bollard::models::SystemDataUsageResponse, String> {
     let docker = connect(&config)?;
     docker.df(None).await.map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_timestamp;
+
+    #[test]
+    fn splits_a_docker_rfc3339_prefix() {
+        let (ts, msg) = split_timestamp("2026-08-26T09:41:02.123456789Z hello world");
+        assert_eq!(ts.as_deref(), Some("2026-08-26T09:41:02.123456789Z"));
+        assert_eq!(msg, "hello world");
+    }
+
+    #[test]
+    fn keeps_a_plain_line_intact() {
+        // A line whose first word is not a timestamp must not lose that word.
+        let (ts, msg) = split_timestamp("INFO starting server on :8080");
+        assert!(ts.is_none());
+        assert_eq!(msg, "INFO starting server on :8080");
+    }
+
+    #[test]
+    fn handles_a_line_with_no_space_at_all() {
+        let (ts, msg) = split_timestamp("panic!");
+        assert!(ts.is_none());
+        assert_eq!(msg, "panic!");
+    }
+
+    #[test]
+    fn rejects_a_prefix_that_is_merely_long() {
+        let (ts, msg) = split_timestamp("aaaaaaaaaaaaaaaaaaaaaaaa rest of the line");
+        assert!(ts.is_none());
+        assert_eq!(msg, "aaaaaaaaaaaaaaaaaaaaaaaa rest of the line");
+    }
+
+    #[test]
+    fn keeps_an_empty_message_after_the_timestamp() {
+        let (ts, msg) = split_timestamp("2026-08-26T09:41:02.000000000Z ");
+        assert_eq!(ts.as_deref(), Some("2026-08-26T09:41:02.000000000Z"));
+        assert_eq!(msg, "");
+    }
 }

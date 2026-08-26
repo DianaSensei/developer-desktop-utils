@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { HardDrive, RefreshCw, Trash2, Plus, Check } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { HardDrive, RefreshCw, Trash2, Plus, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ViewHeader } from '@/components/ui/view-header';
@@ -11,8 +11,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { containerApi, type ContainerConnection, type VolumeInfo } from './types';
+import { PruneButton } from './PruneButton';
+import { VolumeDetailsDialog } from './VolumeDetailsDialog';
+import { useUsageIndex, describeUsers } from './usage';
 import { useSort } from './useSort';
+import { useRowSelection } from './useRowSelection';
+import { RowCheckbox, SelectionBar } from './SelectionBar';
 import { formatBytes } from './format';
 
 export function VolumesView({ connection, refreshKey, onRefresh }: {
@@ -26,9 +32,11 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<VolumeInfo | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [detailsTarget, setDetailsTarget] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const { usage, reload: reloadUsage } = useUsageIndex(connection, refreshKey);
   // Volume size isn't part of the plain volume-list endpoint — the daemon has
   // to walk every volume's mountpoint on disk to compute it, which is
   // noticeably slower (`volume_sizes` — see container_tool.rs for why that
@@ -38,9 +46,10 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
   const [sizesLoading, setSizesLoading] = useState(false);
   const [sizeByName, setSizeByName] = useState<Record<string, number>>({});
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     setError(null);
+    reloadUsage();
     containerApi.volumeList(connection)
       .then(setVolumes)
       .catch((e) => { setVolumes([]); setError(String(e instanceof Error ? e.message : e)); })
@@ -51,8 +60,7 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
       .then(setSizeByName)
       .catch(() => setSizeByName({}))
       .finally(() => setSizesLoading(false));
-  };
-  useEffect(() => { load(); setSelected(new Set()); }, [connection, refreshKey]); // eslint-disable-line
+  }, [connection, reloadUsage]);
 
   const f = filter.trim().toLowerCase();
   const filtered = useMemo(() => (volumes ?? []).filter((v) => v.Name.toLowerCase().includes(f)), [volumes, f]);
@@ -61,29 +69,14 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
     driver: (v) => v.Driver,
     mountpoint: (v) => v.Mountpoint,
     size: (v) => sizeByName[v.Name] ?? -1,
+    used: (v) => usage.byVolume.get(v.Name)?.length ?? 0,
   });
 
-  const toggleSelected = (name: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
-      return next;
-    });
-  };
+  const selection = useRowSelection(rows, useCallback((v: VolumeInfo) => v.Name, []));
+  const { prune, clear } = selection;
 
-  const allVisibleSelected = rows.length > 0 && rows.every((v) => selected.has(v.Name));
-  const toggleSelectAllVisible = () => {
-    setSelected((prev) => {
-      if (allVisibleSelected) {
-        const next = new Set(prev);
-        rows.forEach((v) => next.delete(v.Name));
-        return next;
-      }
-      const next = new Set(prev);
-      rows.forEach((v) => next.add(v.Name));
-      return next;
-    });
-  };
+  useEffect(() => { load(); clear(); }, [load, refreshKey, clear]);
+  useEffect(() => { if (volumes) prune(volumes.map((v) => v.Name)); }, [volumes, prune]);
 
   const removeBulk = async (names: string[]) => {
     setBulkBusy(true);
@@ -95,12 +88,13 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
       setError(`${failed.length} of ${names.length} failed — ${String(first instanceof Error ? first.message : first)}`);
     }
     setBulkBusy(false);
-    setSelected(new Set());
+    clear();
     load();
   };
 
   return (
-    <div className="tool-full-height">
+    // `relative` anchors the floating SelectionBar (see SelectionBar.tsx).
+    <div className="tool-full-height relative">
       <ViewHeader
         icon={HardDrive}
         title="Volumes"
@@ -108,6 +102,16 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
         actions={(
           <>
             <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New volume</Button>
+            <PruneButton
+              noun="volumes"
+              variants={[{
+                label: 'Prune unused volumes',
+                description: 'Remove every volume no container is using, and all data in them (docker volume prune). This cannot be undone.',
+                run: () => containerApi.volumePrune(connection),
+              }]}
+              onDone={(m) => { setNotice(m); setError(null); load(); }}
+              onError={(m) => { setNotice(null); setError(m); }}
+            />
             <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
           </>
         )}
@@ -117,21 +121,21 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
         <SearchInput value={filter} onChange={setFilter} placeholder="Search volumes…" className="h-ctl text-sm" containerClassName="max-w-sm" />
       </div>
 
-      {selected.size > 0 && (
-        <div className="mx-5 mt-3 shrink-0 flex items-center justify-between gap-2 rounded-md border border-acc/30 bg-acc/5 px-3 py-2">
-          <span className="text-xs text-fg-mute">{selected.size.toLocaleString()} selected</span>
-          <div className="flex items-center gap-1.5">
-            <Button size="sm" variant="outline" className="h-ctl" onClick={() => setSelected(new Set())}>Clear</Button>
-            <Button size="sm" variant="destructive" className="h-ctl" disabled={bulkBusy} onClick={() => setBulkRemoveOpen(true)}>
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove {selected.size.toLocaleString()}
-            </Button>
-          </div>
-        </div>
-      )}
+      <SelectionBar
+        count={selection.count}
+        unselectedVisibleCount={selection.unselectedVisibleCount}
+        onSelectAllVisible={selection.selectAllVisible}
+        onClear={selection.clear}
+      >
+        <Button size="sm" variant="destructive" className="h-ctl" disabled={bulkBusy} onClick={() => setBulkRemoveOpen(true)}>
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove {selection.count.toLocaleString()}
+        </Button>
+      </SelectionBar>
 
-      <div className="tool-scrollable px-5 py-4">
+      <div className={cn('tool-scrollable px-5 py-4', selection.count > 0 && 'pb-20')}>
         {loading && !volumes && <LoadingRow />}
         {error && <Callout tone="error">{error}</Callout>}
+        {notice && !error && <Callout tone="info" className="mb-3">{notice}</Callout>}
         {volumes && !error && (
           rows.length === 0
             ? <p className="text-sm text-fg-mute">{f ? 'No matching volumes.' : 'No volumes.'}</p>
@@ -140,31 +144,56 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
                 <Thead>
                   <Tr>
                     <Th className="w-8">
-                      <RowCheckbox checked={allVisibleSelected} onClick={toggleSelectAllVisible} title="Select all shown" />
+                      <RowCheckbox
+                        checked={selection.allVisibleSelected}
+                        indeterminate={selection.someVisibleSelected}
+                        onToggle={selection.toggleAllVisible}
+                        title="Select all shown"
+                      />
                     </Th>
                     <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
                     <Th sortDirection={directionFor('driver')} onSortClick={() => toggleSort('driver')}>Driver</Th>
+                    <Th sortDirection={directionFor('used')} onSortClick={() => toggleSort('used')}>In use</Th>
                     <Th align="right" sortDirection={directionFor('size')} onSortClick={() => toggleSort('size')}>Size</Th>
                     <Th sortDirection={directionFor('mountpoint')} onSortClick={() => toggleSort('mountpoint')}>Mountpoint</Th>
                     <Th align="right"></Th>
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {rows.map((v) => (
-                    <Tr key={v.Name} selected={selected.has(v.Name)}>
-                      <Td>
-                        <RowCheckbox checked={selected.has(v.Name)} onClick={() => toggleSelected(v.Name)} title="Select volume" />
+                  {rows.map((v, index) => (
+                    <Tr key={v.Name} interactive selected={selection.isSelected(v.Name)} onClick={() => setDetailsTarget(v.Name)}>
+                      <Td onClick={(e) => e.stopPropagation()}>
+                        <RowCheckbox
+                          checked={selection.isSelected(v.Name)}
+                          onToggle={(e) => selection.toggle(v.Name, index, e.shiftKey)}
+                          title="Select volume"
+                        />
                       </Td>
                       <Td mono>{v.Name}</Td>
                       <Td>{v.Driver}</Td>
+                      <Td>
+                        <span title={describeUsers(usage.byVolume.get(v.Name))}>
+                          {(() => {
+                            const users = usage.byVolume.get(v.Name);
+                            return users && users.length > 0
+                              ? <Badge tone="success">{users.length} container{users.length > 1 ? 's' : ''}</Badge>
+                              : <Badge tone="neutral">unused</Badge>;
+                          })()}
+                        </span>
+                      </Td>
                       <Td numeric>
                         {sizesLoading && !(v.Name in sizeByName) ? <Spinner size="sm" /> : formatBytes(sizeByName[v.Name])}
                       </Td>
                       <Td mono>{v.Mountpoint}</Td>
-                      <Td align="right">
-                        <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(v)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </IconButton>
+                      <Td align="right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(v.Name)}>
+                            <Info className="h-3.5 w-3.5" />
+                          </IconButton>
+                          <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(v)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </IconButton>
+                        </div>
                       </Td>
                     </Tr>
                   ))}
@@ -175,6 +204,14 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
       </div>
 
       <CreateVolumeDialog open={createOpen} onOpenChange={setCreateOpen} connection={connection} onCreated={load} />
+
+      <VolumeDetailsDialog
+        open={!!detailsTarget}
+        onOpenChange={(o) => { if (!o) setDetailsTarget(null); }}
+        connection={connection}
+        name={detailsTarget}
+        users={detailsTarget ? usage.byVolume.get(detailsTarget) : undefined}
+      />
 
       <ConfirmDialog
         open={!!removeTarget}
@@ -193,28 +230,12 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
       <ConfirmDialog
         open={bulkRemoveOpen}
         onOpenChange={setBulkRemoveOpen}
-        title={`Remove ${selected.size} volumes?`}
-        description={`Remove ${selected.size.toLocaleString()} selected volume(s). Data on these volumes is lost.`}
+        title={`Remove ${selection.count} volumes?`}
+        description={`Remove ${selection.count.toLocaleString()} selected volume(s). Data on these volumes is lost.`}
         confirmLabel="Remove"
-        onConfirm={() => removeBulk(Array.from(selected))}
+        onConfirm={() => removeBulk(selection.keys)}
       />
     </div>
-  );
-}
-
-function RowCheckbox({ checked, onClick, title }: { checked: boolean; onClick: () => void; title: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={cn(
-        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-        checked ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
-      )}
-    >
-      {checked && <Check className="h-2.5 w-2.5" />}
-    </button>
   );
 }
 
