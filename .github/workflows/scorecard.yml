@@ -24,6 +24,7 @@ jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       security-events: write  # upload the SARIF to the Code scanning dashboard
       id-token: write         # OIDC token, required by publish_results

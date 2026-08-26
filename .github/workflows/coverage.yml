@@ -8,9 +8,20 @@ on:
 permissions:
   contents: read
 
+# The most expensive workflow here, and the only one that had no concurrency
+# group: every push to a PR branch started another Rust build while the previous
+# one was still running. Superseded PR runs are cancelled; runs on main are not,
+# so Codecov keeps a complete baseline for the default branch.
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   coverage:
     runs-on: ubuntu-22.04
+    # Observed median 3 min, worst 7.5 min. The default is 360, so a job wedged
+    # on a network stall would otherwise hold a concurrency slot for six hours.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

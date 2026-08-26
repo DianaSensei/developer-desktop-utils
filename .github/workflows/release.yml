@@ -34,6 +34,8 @@ jobs:
             rust-target: ''
 
     runs-on: ${{ matrix.platform }}
+    # Bundling + signing + attestation on three platforms.
+    timeout-minutes: 90
 
     permissions:
       contents: write      # publish the release and upload assets
@@ -75,7 +77,7 @@ jobs:
           workspaces: src-tauri -> target
           cache-on-failure: true
           shared-key: ${{ matrix.platform }}-${{ matrix.rust-target }}
-          # Restore only. The cache is created/refreshed by warm-cache.yml on main;
+          # Restore only. The cache is created/refreshed by build-cache.yml on main;
           # a tag run can read main's cache but would otherwise save a tag-scoped
           # copy that no future tag can reuse, so we never save here.
           save-if: false

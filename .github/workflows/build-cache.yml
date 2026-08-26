@@ -39,6 +39,8 @@ jobs:
             rust-target: ''
 
     runs-on: ${{ matrix.platform }}
+    # Cold cross-platform Tauri builds; observed worst 13.8 min.
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
