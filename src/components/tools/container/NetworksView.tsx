@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Network as NetworkIcon, RefreshCw, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { containerApi, type ContainerConnection, type NetworkInfo } from './types';
 import { useSort } from './useSort';
+import { useRowSelection } from './useRowSelection';
+import { RowCheckbox, SelectionBar } from './SelectionBar';
 
 const BUILTIN_NETWORKS = new Set(['bridge', 'host', 'none']);
 
@@ -26,16 +28,17 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<NetworkInfo | null>(null);
+  const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     setError(null);
     containerApi.networkList(connection)
       .then(setNetworks)
       .catch((e) => { setNetworks([]); setError(String(e instanceof Error ? e.message : e)); })
       .finally(() => setLoading(false));
-  };
-  useEffect(() => { load(); }, [connection, refreshKey]); // eslint-disable-line
+  }, [connection]);
 
   const f = filter.trim().toLowerCase();
   const filtered = useMemo(() => (networks ?? []).filter((n) => n.Name.toLowerCase().includes(f)), [networks, f]);
@@ -44,6 +47,30 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
     driver: (n) => n.Driver ?? '',
     scope: (n) => n.Scope ?? '',
   });
+
+  // `bridge`/`host`/`none` can't be removed, so they're not selectable either
+  // — offering a checkbox that can only ever produce a daemon error would be
+  // worse than not offering one.
+  const selectableRows = useMemo(() => rows.filter((n) => !BUILTIN_NETWORKS.has(n.Name)), [rows]);
+  const selection = useRowSelection(selectableRows, useCallback((n: NetworkInfo) => n.Name, []));
+  const { prune, clear } = selection;
+
+  useEffect(() => { load(); clear(); }, [load, refreshKey, clear]);
+  useEffect(() => { if (networks) prune(networks.map((n) => n.Name)); }, [networks, prune]);
+
+  const removeBulk = async (names: string[]) => {
+    setBulkBusy(true);
+    setError(null);
+    const results = await Promise.allSettled(names.map((name) => containerApi.networkRemove(connection, name)));
+    const failed = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (failed.length > 0) {
+      const first = failed[0].reason;
+      setError(`${failed.length} of ${names.length} failed — ${String(first instanceof Error ? first.message : first)}`);
+    }
+    setBulkBusy(false);
+    clear();
+    load();
+  };
 
   return (
     <div className="tool-full-height">
@@ -63,6 +90,17 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
         <SearchInput value={filter} onChange={setFilter} placeholder="Search networks…" className="h-ctl text-sm" containerClassName="max-w-sm" />
       </div>
 
+      <SelectionBar
+        count={selection.count}
+        unselectedVisibleCount={selection.unselectedVisibleCount}
+        onSelectAllVisible={selection.selectAllVisible}
+        onClear={selection.clear}
+      >
+        <Button size="sm" variant="destructive" className="h-ctl" disabled={bulkBusy} onClick={() => setBulkRemoveOpen(true)}>
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove {selection.count.toLocaleString()}
+        </Button>
+      </SelectionBar>
+
       <div className="tool-scrollable px-5 py-4">
         {loading && !networks && <LoadingRow />}
         {error && <Callout tone="error">{error}</Callout>}
@@ -73,6 +111,14 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
               <DataTable>
                 <Thead>
                   <Tr>
+                    <Th className="w-8">
+                      <RowCheckbox
+                        checked={selection.allVisibleSelected}
+                        indeterminate={selection.someVisibleSelected}
+                        onToggle={selection.toggleAllVisible}
+                        title="Select all removable networks"
+                      />
+                    </Th>
                     <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
                     <Th sortDirection={directionFor('driver')} onSortClick={() => toggleSort('driver')}>Driver</Th>
                     <Th sortDirection={directionFor('scope')} onSortClick={() => toggleSort('scope')}>Scope</Th>
@@ -81,7 +127,16 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
                 </Thead>
                 <Tbody>
                   {rows.map((n) => (
-                    <Tr key={n.Id}>
+                    <Tr key={n.Id} selected={selection.isSelected(n.Name)}>
+                      <Td>
+                        {!BUILTIN_NETWORKS.has(n.Name) && (
+                          <RowCheckbox
+                            checked={selection.isSelected(n.Name)}
+                            onToggle={(e) => selection.toggle(n.Name, selectableRows.findIndex((r) => r.Name === n.Name), e.shiftKey)}
+                            title="Select network"
+                          />
+                        )}
+                      </Td>
                       <Td mono>{n.Name}</Td>
                       <Td>{n.Driver}</Td>
                       <Td>{n.Scope}</Td>
@@ -114,6 +169,15 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
           setRemoveTarget(null);
           load();
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkRemoveOpen}
+        onOpenChange={setBulkRemoveOpen}
+        title={`Remove ${selection.count} networks?`}
+        description={`Remove ${selection.count.toLocaleString()} selected network(s). Networks still in use by a container are kept.`}
+        confirmLabel="Remove"
+        onConfirm={() => removeBulk(selection.keys)}
       />
     </div>
   );

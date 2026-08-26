@@ -80,6 +80,29 @@ export interface ContainerNetworkInfo {
   macAddress?: string;
 }
 
+// The cgroup limits `docker update` can change on a live container. `null`
+// means "unlimited / daemon default" — the backend normalises the daemon's
+// `0`-for-unset to null so the editor can tell the two apart.
+export interface ContainerResources {
+  nanoCpus?: number | null;
+  cpuShares?: number | null;
+  cpuPeriod?: number | null;
+  cpuQuota?: number | null;
+  cpusetCpus?: string | null;
+  memoryBytes?: number | null;
+  memoryReservationBytes?: number | null;
+  memorySwapBytes?: number | null;
+  blkioWeight?: number | null;
+  pidsLimit?: number | null;
+  restartPolicy?: string | null;
+  restartMaxRetry?: number | null;
+}
+
+/** Only the fields present are sent to the daemon, which merges them into the
+ *  container's existing HostConfig — so a bulk edit of one limit leaves every
+ *  other limit on those containers alone. */
+export type ContainerResourceUpdate = Partial<Record<keyof ContainerResources, number | string | null>>;
+
 export interface ContainerDetails {
   id: string;
   name: string;
@@ -103,6 +126,7 @@ export interface ContainerDetails {
   mounts: ContainerMountInfo[];
   ports: ContainerPortBinding[];
   networks: ContainerNetworkInfo[];
+  resources: ContainerResources;
 }
 
 // ── Images ──────────────────────────────────────────────────────────────
@@ -274,6 +298,18 @@ export const containerApi = {
 
   statsStart: (config: ContainerConnection, containerId: string, onStat: Channel<StatsFrame>) =>
     invoke<string>('container_stats_start', { config, containerId, onStat }),
+  /** Streams share one registry on the Rust side, so the log-stream stopper
+   *  cancels a stats stream just the same. */
+  statsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
+  /** One sample per container for the table's live usage columns — cheaper
+   *  than one open stats stream per row. Containers that fail are omitted. */
+  statsSnapshot: (config: ContainerConnection, containerIds: string[]) =>
+    invoke<Record<string, StatsFrame>>('container_stats_snapshot', { config, containerIds }),
+
+  resources: (config: ContainerConnection, containerId: string) =>
+    invoke<ContainerResources>('container_resources', { config, containerId }),
+  updateResources: (config: ContainerConnection, containerId: string, resources: ContainerResourceUpdate) =>
+    invoke<void>('container_update_resources', { config, containerId, resources }),
 
   imageList: (config: ContainerConnection) => invoke<ImageSummary[]>('image_list', { config }),
   imageInspect: (config: ContainerConnection, imageId: string) => invoke<unknown>('image_inspect', { config, imageId }),

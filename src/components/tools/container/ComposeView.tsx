@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText, PowerOff, Info } from 'lucide-react';
+import { FileStack, RefreshCw, Play, Square, RotateCw, Trash2, FileText, PowerOff, Info, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ViewHeader } from '@/components/ui/view-header';
 import { Callout } from '@/components/ui/callout';
@@ -15,6 +15,7 @@ import {
 } from './types';
 import { LogsPanel } from './LogsPanel';
 import { ContainerDetailsDialog } from './ContainerDetailsDialog';
+import { ContainerResourcesDialog } from './ContainerResourcesDialog';
 
 function stateTone(state?: string): BadgeTone {
   switch (state) {
@@ -67,6 +68,9 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
   const [detailsTarget, setDetailsTarget] = useState<ContainerSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ContainerSummary | null>(null);
   const [downTarget, setDownTarget] = useState<ComposeProjectGroup | null>(null);
+  // One entry for a single service, every service in the group for the
+  // project-level button — the resource dialog handles both shapes.
+  const [limitsTargets, setLimitsTargets] = useState<{ id: string; name: string }[] | null>(null);
   const [sortKey, setSortKey] = useState<'service' | 'state' | 'status' | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
 
@@ -160,13 +164,21 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
                 <p className="text-sm font-medium">{p.name}</p>
                 {p.workingDir && <p className="text-[11px] text-fg-mute font-mono truncate">{p.workingDir}</p>}
               </div>
-              <Button
-                variant="outline" size="sm" className="shrink-0 hover:text-bad"
-                disabled={busyProject === p.name}
-                onClick={() => setDownTarget(p)}
-              >
-                <PowerOff className="h-3.5 w-3.5 mr-1.5" /> Down
-              </Button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => setLimitsTargets(p.containers.map((c) => ({ id: c.Id, name: containerName(c) })))}
+                >
+                  <Cpu className="h-3.5 w-3.5 mr-1.5" /> Limits
+                </Button>
+                <Button
+                  variant="outline" size="sm" className="hover:text-bad"
+                  disabled={busyProject === p.name}
+                  onClick={() => setDownTarget(p)}
+                >
+                  <PowerOff className="h-3.5 w-3.5 mr-1.5" /> Down
+                </Button>
+              </div>
             </div>
             <DataTable density="compact" containerClassName="rounded-none border-0">
               <Thead>
@@ -202,6 +214,9 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
                         </IconButton>
                         <IconButton size="sm" title="Logs" onClick={() => setLogsTarget(c)}>
                           <FileText className="h-3.5 w-3.5" />
+                        </IconButton>
+                        <IconButton size="sm" title="Resource limits" onClick={() => setLimitsTargets([{ id: c.Id, name: containerName(c) }])}>
+                          <Cpu className="h-3.5 w-3.5" />
                         </IconButton>
                         <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(c)}>
                           <Trash2 className="h-3.5 w-3.5" />
@@ -261,11 +276,20 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
         }}
       />
 
+      <ContainerResourcesDialog
+        open={!!limitsTargets}
+        onOpenChange={(o) => { if (!o) setLimitsTargets(null); }}
+        connection={connection}
+        targets={limitsTargets ?? []}
+        onApplied={load}
+      />
+
       <ContainerDetailsDialog
         open={!!detailsTarget}
         onOpenChange={(o) => { if (!o) setDetailsTarget(null); }}
         connection={connection}
         container={detailsTarget}
+        onEditLimits={(c) => { setDetailsTarget(null); setLimitsTargets([{ id: c.Id, name: containerName(c) }]); }}
       />
     </div>
   );

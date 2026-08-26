@@ -332,6 +332,58 @@ pub struct ContainerNetworkInfo {
     pub mac_address: Option<String>,
 }
 
+// ── Container resource limits (docker update) ─────────────────────────────
+//
+// The cgroup knobs `docker update` can change on a live container, projected
+// out of `HostConfig` the same way ContainerDetails projects the rest of the
+// inspect payload. `None` everywhere means "unlimited/daemon default" — the
+// daemon reports `0` for most unset limits, normalised to `None` here so the
+// UI never has to decide whether `0` means "zero" or "unset".
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerResources {
+    /// CPU quota in units of 1e-9 CPUs — `--cpus` as the daemon stores it.
+    pub nano_cpus: Option<i64>,
+    pub cpu_shares: Option<i64>,
+    pub cpu_period: Option<i64>,
+    pub cpu_quota: Option<i64>,
+    pub cpuset_cpus: Option<String>,
+    pub memory_bytes: Option<i64>,
+    pub memory_reservation_bytes: Option<i64>,
+    /// Total memory + swap. `-1` is docker's "unlimited swap" sentinel and is
+    /// passed through as-is rather than normalised away.
+    pub memory_swap_bytes: Option<i64>,
+    pub blkio_weight: Option<u16>,
+    pub pids_limit: Option<i64>,
+    pub restart_policy: Option<String>,
+    pub restart_max_retry: Option<i64>,
+}
+
+/// `0` is what the daemon reports for an unset limit; treat it as absent so
+/// the form renders an empty field instead of a literal zero limit.
+fn nonzero(v: Option<i64>) -> Option<i64> {
+    v.filter(|&n| n != 0)
+}
+
+fn resources_from_host_config(hc: &bollard::models::HostConfig) -> ContainerResources {
+    let restart_policy = hc.restart_policy.clone().unwrap_or_default();
+    ContainerResources {
+        nano_cpus: nonzero(hc.nano_cpus),
+        cpu_shares: nonzero(hc.cpu_shares),
+        cpu_period: nonzero(hc.cpu_period),
+        cpu_quota: nonzero(hc.cpu_quota),
+        cpuset_cpus: hc.cpuset_cpus.clone().filter(|s| !s.is_empty()),
+        memory_bytes: nonzero(hc.memory),
+        memory_reservation_bytes: nonzero(hc.memory_reservation),
+        memory_swap_bytes: nonzero(hc.memory_swap),
+        blkio_weight: hc.blkio_weight.filter(|&w| w != 0),
+        pids_limit: nonzero(hc.pids_limit),
+        restart_policy: restart_policy.name.map(|n| n.to_string()),
+        restart_max_retry: restart_policy.maximum_retry_count,
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerDetails {
@@ -357,6 +409,7 @@ pub struct ContainerDetails {
     pub mounts: Vec<ContainerMountInfo>,
     pub ports: Vec<ContainerPortBinding>,
     pub networks: Vec<ContainerNetworkInfo>,
+    pub resources: ContainerResources,
 }
 
 #[tauri::command]
@@ -374,6 +427,7 @@ pub async fn container_details(
     let cfg = insp.config.unwrap_or_default();
     let host_config = insp.host_config.unwrap_or_default();
     let net = insp.network_settings.unwrap_or_default();
+    let resources = resources_from_host_config(&host_config);
     let restart_policy = host_config.restart_policy.unwrap_or_default();
 
     let mounts = insp
@@ -439,8 +493,138 @@ pub async fn container_details(
         mounts,
         ports,
         networks,
+        resources,
     })
 }
+
+// ── Resource management (docker update) ───────────────────────────────────
+//
+// Every field is optional and only the ones the caller actually sets are put
+// on the wire: the Docker Engine's `/containers/{id}/update` merges the body
+// into the container's existing HostConfig, so omitting a field leaves that
+// limit untouched. That is what makes a bulk "apply CPU limit to these 5
+// containers" edit safe — it cannot clobber per-container memory limits the
+// user did not touch. Sentinels the daemon itself defines are passed through:
+// `0` clears a limit, `-1` means unlimited swap / unlimited pids.
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerResourceUpdate {
+    pub nano_cpus: Option<i64>,
+    pub cpu_shares: Option<i64>,
+    pub cpu_period: Option<i64>,
+    pub cpu_quota: Option<i64>,
+    pub cpuset_cpus: Option<String>,
+    pub memory_bytes: Option<i64>,
+    pub memory_reservation_bytes: Option<i64>,
+    pub memory_swap_bytes: Option<i64>,
+    pub blkio_weight: Option<u16>,
+    pub pids_limit: Option<i64>,
+    pub restart_policy: Option<String>,
+    pub restart_max_retry: Option<i64>,
+}
+
+fn restart_policy_from_name(name: &str, max_retry: Option<i64>) -> Result<bollard::models::RestartPolicy, String> {
+    use bollard::models::RestartPolicyNameEnum as E;
+    let variant = match name {
+        "" => E::EMPTY,
+        "no" => E::NO,
+        "always" => E::ALWAYS,
+        "unless-stopped" => E::UNLESS_STOPPED,
+        "on-failure" => E::ON_FAILURE,
+        other => return Err(format!("Unknown restart policy \"{other}\"")),
+    };
+    Ok(bollard::models::RestartPolicy {
+        name: Some(variant),
+        // Docker rejects a non-zero retry count on anything but on-failure.
+        maximum_retry_count: if matches!(variant, E::ON_FAILURE) { max_retry.or(Some(0)) } else { Some(0) },
+    })
+}
+
+/// Current cgroup limits for one container, without the rest of the (much
+/// larger) inspect payload — what the resource editor loads before it opens.
+#[tauri::command]
+pub async fn container_resources(
+    config: ContainerConnection,
+    container_id: String,
+) -> Result<ContainerResources, String> {
+    let docker = connect(&config)?;
+    let insp = docker
+        .inspect_container(&container_id, None)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(resources_from_host_config(&insp.host_config.unwrap_or_default()))
+}
+
+#[tauri::command]
+pub async fn container_update_resources(
+    config: ContainerConnection,
+    container_id: String,
+    resources: ContainerResourceUpdate,
+) -> Result<(), String> {
+    let docker = connect(&config)?;
+    let restart_policy = match &resources.restart_policy {
+        Some(name) => Some(restart_policy_from_name(name, resources.restart_max_retry)?),
+        None => None,
+    };
+    let body = bollard::models::ContainerUpdateBody {
+        nano_cpus: resources.nano_cpus,
+        cpu_shares: resources.cpu_shares,
+        cpu_period: resources.cpu_period,
+        cpu_quota: resources.cpu_quota,
+        cpuset_cpus: resources.cpuset_cpus.clone(),
+        memory: resources.memory_bytes,
+        memory_reservation: resources.memory_reservation_bytes,
+        memory_swap: resources.memory_swap_bytes,
+        blkio_weight: resources.blkio_weight,
+        pids_limit: resources.pids_limit,
+        restart_policy,
+        ..Default::default()
+    };
+    docker
+        .update_container(&container_id, body)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// One-shot CPU/memory/network sample for a set of containers, for the live
+/// usage columns in the containers table. Deliberately not the streaming
+/// `container_stats_start`: one long-lived stream per row would mean dozens of
+/// concurrent socket connections, whereas the table only needs a value every
+/// few seconds. `stream: false` with `one_shot: false` makes the daemon take
+/// the two samples a CPU percentage needs before replying — `one_shot: true`
+/// would return a frame whose precpu block is empty and whose CPU% is always 0.
+/// Containers that error or time out are simply absent from the map.
+#[tauri::command]
+pub async fn container_stats_snapshot(
+    config: ContainerConnection,
+    container_ids: Vec<String>,
+) -> Result<HashMap<String, StatsFrame>, String> {
+    let docker = connect(&config)?;
+    let futures = container_ids.into_iter().map(|id| {
+        let docker = docker.clone();
+        async move {
+            let opts = bollard::query_parameters::StatsOptions {
+                stream: false,
+                one_shot: false,
+            };
+            let frame = tokio::time::timeout(
+                std::time::Duration::from_secs(SNAPSHOT_TIMEOUT_SECS),
+                docker.stats(&id, Some(opts)).next(),
+            )
+            .await
+            .ok()
+            .flatten()
+            .and_then(|r| r.ok())
+            .map(|stats| stats_to_frame(&stats));
+            frame.map(|f| (id, f))
+        }
+    });
+    let frames = futures_util::future::join_all(futures).await;
+    Ok(frames.into_iter().flatten().collect())
+}
+
+const SNAPSHOT_TIMEOUT_SECS: u64 = 10;
 
 // ── Registry shared by logs + stats streams ─────────────────────────────────
 
@@ -559,6 +743,29 @@ fn calc_cpu_percent(stats: &bollard::models::ContainerStatsResponse) -> f64 {
     }
 }
 
+/// Shared by the live stream and the table's one-shot snapshot so both compute
+/// the same numbers from a raw daemon stats payload.
+fn stats_to_frame(stats: &bollard::models::ContainerStatsResponse) -> StatsFrame {
+    let mem_usage = stats.memory_stats.as_ref().and_then(|m| m.usage).unwrap_or(0);
+    let mem_limit = stats.memory_stats.as_ref().and_then(|m| m.limit).unwrap_or(0);
+    let (rx, tx) = stats
+        .networks
+        .as_ref()
+        .map(|nets| {
+            nets.values().fold((0u64, 0u64), |(rx, tx), n| {
+                (rx + n.rx_bytes.unwrap_or(0), tx + n.tx_bytes.unwrap_or(0))
+            })
+        })
+        .unwrap_or((0, 0));
+    StatsFrame {
+        cpu_percent: calc_cpu_percent(stats),
+        mem_usage_bytes: mem_usage,
+        mem_limit_bytes: mem_limit,
+        net_rx_bytes: rx,
+        net_tx_bytes: tx,
+    }
+}
+
 #[tauri::command]
 pub async fn container_stats_start(
     registry: tauri::State<'_, StreamRegistry>,
@@ -584,25 +791,7 @@ pub async fn container_stats_start(
                 _ = notify.notified() => break,
                 next = stream.next() => match next {
                     Some(Ok(stats)) => {
-                        let mem_usage = stats.memory_stats.as_ref().and_then(|m| m.usage).unwrap_or(0);
-                        let mem_limit = stats.memory_stats.as_ref().and_then(|m| m.limit).unwrap_or(0);
-                        let (rx, tx) = stats
-                            .networks
-                            .as_ref()
-                            .map(|nets| {
-                                nets.values().fold((0u64, 0u64), |(rx, tx), n| {
-                                    (rx + n.rx_bytes.unwrap_or(0), tx + n.tx_bytes.unwrap_or(0))
-                                })
-                            })
-                            .unwrap_or((0, 0));
-                        let frame = StatsFrame {
-                            cpu_percent: calc_cpu_percent(&stats),
-                            mem_usage_bytes: mem_usage,
-                            mem_limit_bytes: mem_limit,
-                            net_rx_bytes: rx,
-                            net_tx_bytes: tx,
-                        };
-                        if on_stat.send(frame).is_err() {
+                        if on_stat.send(stats_to_frame(&stats)).is_err() {
                             break;
                         }
                     }
