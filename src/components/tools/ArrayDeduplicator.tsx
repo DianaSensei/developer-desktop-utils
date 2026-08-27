@@ -90,7 +90,7 @@ function LineNumbers({
 const count = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString());
 
 const AREA_CLASS =
-  'flex-1 min-w-0 h-full resize-none outline-none bg-transparent text-fg text-sm font-mono px-2.5 pb-2 placeholder:text-fg-mute/60';
+  'flex-1 min-w-0 h-full resize-none outline-hidden bg-transparent text-fg text-sm font-mono px-2.5 pb-2 placeholder:text-fg-mute/60';
 
 // `wrap="off"` is load-bearing, not cosmetic. The gutter next to these
 // textareas draws exactly one LINE_H-tall number per *logical* line, and the

@@ -51,7 +51,7 @@ function AuthField({ label, value, onValue, placeholder, vars, masked }: {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         >
-          <div className={cn('min-w-0 flex-1 transition-[filter]', hidden && 'select-none blur-sm')}>
+          <div className={cn('min-w-0 flex-1 transition-[filter]', hidden && 'select-none blur-xs')}>
             <InlineCodeField value={value} onChange={onValue} vars={vars} placeholder={placeholder} />
           </div>
           {masked && (

@@ -35,7 +35,7 @@ export function RowCheckbox({ checked, indeterminate, onToggle, title, disabled 
       title={title}
       className={cn(
         'flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-fast',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/35 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
+        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
         'active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40',
         active
           ? 'border-acc bg-acc text-acc-fg hover:bg-acc-hi hover:border-acc-hi'
@@ -73,7 +73,7 @@ export function SelectionBar({ count, unselectedVisibleCount, onSelectAllVisible
         aria-label={`${count} selected`}
         className={cn(
           'pointer-events-auto flex max-w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-lg',
-          'border border-acc/40 bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm',
+          'border border-acc/40 bg-card/95 px-3 py-2 shadow-lg backdrop-blur-xs',
           'animate-in fade-in-0 slide-in-from-bottom-2 duration-base ease-out-soft',
         )}
       >
@@ -82,7 +82,7 @@ export function SelectionBar({ count, unselectedVisibleCount, onSelectAllVisible
           {unselectedVisibleCount > 0 && (
             <button
               type="button"
-              className="rounded-sm text-xs text-acc underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/35"
+              className="rounded-sm text-xs text-acc underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35"
               onClick={onSelectAllVisible}
             >
               Select all {(count + unselectedVisibleCount).toLocaleString()} shown

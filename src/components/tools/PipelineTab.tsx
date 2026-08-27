@@ -412,18 +412,18 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
       <div className="shrink-0 flex items-center gap-px opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
         <button type="button" disabled={isFirst} onClick={() => onMove(-1)}
           aria-label="Move field up" title="Move field up"
-          className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+          className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
           <ChevronUp className="h-3.5 w-3.5" />
         </button>
         <button type="button" disabled={isLast} onClick={() => onMove(1)}
           aria-label="Move field down" title="Move field down"
-          className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+          className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
           <ChevronDown className="h-3.5 w-3.5" />
         </button>
         {field.type === 'custom' && (
           <button type="button" onClick={onRemove}
             aria-label="Remove field" title="Remove field"
-            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-bad transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-bad transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
             <Trash2 className="h-3 w-3" />
           </button>
         )}
@@ -682,17 +682,17 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         <div className="flex items-center gap-0.5 ml-auto">
           <button type="button" disabled={index === 0} onClick={onMoveUp}
             aria-label="Move step up" title="Move step up"
-            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
             <ChevronUp className="h-3.5 w-3.5" />
           </button>
           <button type="button" disabled={index === total - 1} onClick={onMoveDown}
             aria-label="Move step down" title="Move step down"
-            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
           <button type="button" onClick={onRemove}
             aria-label="Remove step" title="Remove step"
-            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-bad transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+            className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-bad transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -764,7 +764,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
                 aria-label={showKey ? 'Hide key' : 'Show key'}
                 title={showKey ? 'Hide key' : 'Show key'}
                 aria-pressed={showKey}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>

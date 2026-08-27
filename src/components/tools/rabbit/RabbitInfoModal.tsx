@@ -54,14 +54,14 @@ export function RabbitInfoModal({ onClose, onDismissPermanently }: RabbitInfoMod
           <button
             type="button"
             onClick={onDismissPermanently}
-            className="rounded text-xs text-fg-mute transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+            className="rounded text-xs text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
           >
             Don't show again
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md bg-acc px-4 py-1.5 text-xs font-medium text-acc-fg transition-colors hover:bg-acc/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+            className="rounded-md bg-acc px-4 py-1.5 text-xs font-medium text-acc-fg transition-colors hover:bg-acc/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
           >
             Got it
           </button>

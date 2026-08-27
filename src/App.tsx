@@ -254,7 +254,7 @@ function NavScrollArea({
                         : 'text-fg-mute hover:text-fg hover:bg-fg/[0.05]'
                     )}
                   >
-                    <span className="relative flex-shrink-0">
+                    <span className="relative shrink-0">
                       <Icon className="h-4 w-4" />
                       {isLive && (
                         // "Đang kết nối" là TRẠNG THÁI → xanh lá cố định, không
@@ -356,7 +356,7 @@ function NavScrollArea({
                     onClick={() => onEnableTool(tool)}
                     className="group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-fg-mute/70 transition-[color,background-color] duration-base ease-out-soft hover:text-fg hover:bg-fg/[0.05]"
                   >
-                    <Icon className="h-4 w-4 flex-shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
+                    <Icon className="h-4 w-4 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
                     <span className="flex-1 truncate text-sm">{tool.label}</span>
                     <span className="flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium text-acc opacity-0 transition-opacity group-hover:opacity-100">
                       <Plus className="h-3 w-3" /> {t('shell.sidebar.enable')}
@@ -386,7 +386,7 @@ function NavScrollArea({
                 isCollapsed ? 'py-1.5' : 'px-2.5 py-1.5 text-[11px]'
               )}
             >
-              <Plus className={isCollapsed ? 'h-3 w-3' : 'h-2.5 w-2.5 flex-shrink-0'} />
+              <Plus className={isCollapsed ? 'h-3 w-3' : 'h-2.5 w-2.5 shrink-0'} />
               {!isCollapsed && (
                 <span className="whitespace-nowrap">{t('shell.sidebar.moreInSettings', { count: hiddenCount })}</span>
               )}
@@ -862,7 +862,7 @@ function AppContent() {
                   aria-selected={on}
                   className={cn(
                     'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-2 text-xs leading-none transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
+                    'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
                     on
                       ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                       : 'text-fg-mute hover:text-fg',
@@ -1093,7 +1093,7 @@ function AppContent() {
                           aria-selected={on}
                           className={cn(
                             'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
+                            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
                             on
                               ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                               : 'text-fg-mute hover:text-fg',

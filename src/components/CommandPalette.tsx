@@ -120,7 +120,7 @@ export function CommandPalette() {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm duration-fast ease-out-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs duration-fast ease-out-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
           onOpenAutoFocus={(e) => {
             e.preventDefault();
@@ -149,7 +149,7 @@ export function CommandPalette() {
               }}
               onKeyDown={onQueryKeyDown}
               placeholder={t('palette.placeholder')}
-              className="h-ctl-lg w-full bg-transparent text-sm text-fg outline-none placeholder:text-fg-mute/60"
+              className="h-ctl-lg w-full bg-transparent text-sm text-fg outline-hidden placeholder:text-fg-mute/60"
             />
           </div>
 

@@ -470,7 +470,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   aria-checked={enabled}
                   aria-label={`:${name} — ${enabled ? 'enabled' : 'disabled'}`}
                   onClick={() => toggleEnabled(name)}
-                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
+                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
                   title={enabled ? 'Disable' : 'Enable'}
                 >
                   <span
@@ -552,7 +552,7 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
             }}
             onBlur={() => addTag(tagDraft)}
             placeholder={settings.tags.length ? '' : 'e.g., smoke, regression'}
-            className="min-w-[8rem] flex-1 bg-transparent text-xs outline-none placeholder:text-fg-mute"
+            className="min-w-[8rem] flex-1 bg-transparent text-xs outline-hidden placeholder:text-fg-mute"
             spellCheck={false}
           />
         </div>

@@ -13,7 +13,7 @@ export function AppLogo({ size = 28, className }: AppLogoProps) {
       viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn('flex-shrink-0', className)}
+      className={cn('shrink-0', className)}
     >
       <defs>
         <linearGradient id="logo-bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">

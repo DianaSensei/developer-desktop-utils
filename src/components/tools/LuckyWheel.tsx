@@ -450,7 +450,7 @@ export function LuckyWheel() {
           <canvas
             ref={canvasRef}
             style={{ width: '100%', height: 'auto', aspectRatio: '1 / 1' }}
-            className="drop-shadow-sm"
+            className="drop-shadow-xs"
           />
         </div>
 

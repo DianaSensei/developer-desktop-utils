@@ -197,7 +197,7 @@ export function KeyValueEditor({
                     aria-checked={row.enabled}
                     aria-label={`${row.key || keyPlaceholder} — ${row.enabled ? 'enabled' : 'disabled'}`}
                     onClick={() => editRow(row.id, { enabled: !row.enabled })}
-                    className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
+                    className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
                     title={row.enabled ? 'Disable' : 'Enable'}
                   >
                     <span

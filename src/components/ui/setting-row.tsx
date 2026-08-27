@@ -88,7 +88,7 @@ export function SettingRow({
           shared,
           // Rê chuột đổi NỀN, không đổi vị trí — design/RULES.md.
           'transition-colors hover:bg-bg-2/40',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
+          'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
         )}
       >
         {body}

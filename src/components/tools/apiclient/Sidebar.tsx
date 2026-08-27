@@ -198,7 +198,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
             <Plus className="h-3.5 w-3.5" />
           </IconButton>
           <DropdownMenu>
-            <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+            <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
               <MoreVertical className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">

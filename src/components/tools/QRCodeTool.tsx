@@ -436,7 +436,7 @@ function QrGenerator() {
                       onClick={clearCustomImage}
                       aria-label="Remove custom logo"
                       title="Remove custom logo"
-                      className="rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+                      className="rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
                     >
                       <X className="h-3 w-3" />
                     </button>

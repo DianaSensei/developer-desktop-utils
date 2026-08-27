@@ -167,29 +167,6 @@
                 0 3px 8px -3px hsl(var(--acc-c) / 0.30);
   }
 
-  /* ── Glass surfaces (Apple-style frosted, kept legible) ───────────────
-     Heavy blur + saturation, high fill opacity so content stays crisp.
-     -webkit- + standard prefixes for all three Tauri webviews. */
-  .glass {
-    background-color: hsl(var(--card-c) / 0.80);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    backdrop-filter: blur(24px) saturate(180%);
-  }
-  .glass-strong {
-    background-color: hsl(var(--card-c) / 0.90);
-    -webkit-backdrop-filter: blur(30px) saturate(190%);
-    backdrop-filter: blur(30px) saturate(190%);
-  }
-  .glass-chrome {
-    background-color: hsl(var(--chrome-c) / 0.86);
-    -webkit-backdrop-filter: blur(26px) saturate(185%);
-    backdrop-filter: blur(26px) saturate(185%);
-  }
-  .glass-sheen {
-    box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.14),
-                inset 0 -1px 0 0 hsl(0 0% 0% / 0.04);
-  }
-
   /* ── Micro-interaction ────────────────────────────────────────────────
      Rê chuột đổi NỀN/VIỀN, không đổi VỊ TRÍ — `design/RULES.md`. Bản cũ của
      .hover-elevate dịch phần tử lên 2px khi rê; đã bỏ vì nó làm layout nhảy
@@ -273,4 +250,34 @@
     animation-duration: 2s !important;
     animation-iteration-count: infinite !important;
   }
+}
+
+/* ── Glass surfaces (Apple-style frosted, kept legible) ─────────────────
+   Heavy blur + saturation, high fill opacity so content stays crisp.
+   -webkit- + standard prefixes for all three Tauri webviews.
+
+   Declared with `@utility` rather than as plain classes inside
+   `@layer utilities`: Tailwind 4's `@apply` only accepts utilities the engine
+   knows about, and `.sidebar-chrome` / `.header-chrome` below compose
+   `glass-chrome` and `glass-sheen` that way. `@utility` registers them so the
+   composition keeps working from a single definition, instead of the
+   declarations being duplicated into each consumer. */
+@utility glass {
+  background-color: hsl(var(--card-c) / 0.80);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+@utility glass-strong {
+  background-color: hsl(var(--card-c) / 0.90);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  backdrop-filter: blur(30px) saturate(190%);
+}
+@utility glass-chrome {
+  background-color: hsl(var(--chrome-c) / 0.86);
+  -webkit-backdrop-filter: blur(26px) saturate(185%);
+  backdrop-filter: blur(26px) saturate(185%);
+}
+@utility glass-sheen {
+  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.14),
+              inset 0 -1px 0 0 hsl(0 0% 0% / 0.04);
 }

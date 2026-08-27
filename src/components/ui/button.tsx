@@ -8,7 +8,7 @@ const buttonVariants = cva(
   // Rê chuột đổi màu/bóng, KHÔNG đổi vị trí — design/RULES.md. `transform` vẫn
   // nằm trong transition cho hiệu ứng lún khi bấm (active:scale), là phản hồi
   // trực tiếp dưới ngón tay chứ không phải chuyển động khi chỉ lướt qua.
-  'inline-flex items-center justify-center whitespace-nowrap rounded-sm text-sm font-medium ring-offset-bg transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-sm text-sm font-medium ring-offset-bg transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out motion-safe:active:scale-[0.97] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
