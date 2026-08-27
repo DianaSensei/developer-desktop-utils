@@ -29,6 +29,7 @@ import { executeRequest, errToString } from './engine';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
+import { buildResolvedVars } from './vars';
 
 export type SplitDirection = 'horizontal' | 'vertical';
 
@@ -354,6 +355,19 @@ export function ApiClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const runtimeVars = useMemo(() => ({ ...runtimeVarsRef.current }), [runtimeVarsVersion]);
 
+  // The merged, *source-tagged* variable set — unlike `varMap` (a flat
+  // name→value map for {{}} highlighting) this keeps which of the four
+  // scattered editors each winning value actually came from, for
+  // EnvQuickView's glance-and-deep-link popover. Request-level Vars aren't
+  // included — those are edited right there in the open request, not a
+  // separate surface. See vars.ts's buildResolvedVars for the merge itself.
+  const resolvedVars = useMemo(
+    () => buildResolvedVars(store.activeCollectionVars, runtimeVarsRef.current, store.activeEnv, store.vault),
+    // runtimeVarsVersion is intentionally a dep: the ref mutates invisibly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store.activeCollectionVars, store.activeEnv, store.vault, runtimeVarsVersion],
+  );
+
   const run = activeRequest ? (runs[activeRequest.id] ?? EMPTY_RUN) : EMPTY_RUN;
 
   return (
@@ -382,6 +396,8 @@ export function ApiClient() {
             onNewRequest={newRequest}
             onManageEnvironments={() => setEnvOpen(true)}
             onManageVault={() => setVaultOpen(true)}
+            onRuntimeVars={() => setRuntimeVarsOpen(true)}
+            resolvedVars={resolvedVars}
             historyActive={showHistory}
             onSelectRequest={(id) => { setShowHistory(false); store.setActiveRequestId(id); }}
             onOpenHistory={() => setShowHistory(true)}

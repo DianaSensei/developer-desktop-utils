@@ -86,6 +86,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <GuideSection icon={Braces} title="Variables">
         <p>Use <Var>{'{{name}}'}</Var> anywhere — URL, query, headers, body, or auth. A token turns <span className="text-ok">green</span> when it resolves in the current context and <span className="text-bad">red</span> when it doesn’t; hover to see its value.</p>
         <p>Define variables in an <strong className="text-fg">Environment</strong> (top-right dropdown) and select it to activate. Scripts can set session variables with <Tok>bru.setVar()</Tok>.</p>
+        <p>Variables come from four places — the active Environment, Collection Variables, session Runtime Variables, and the Vault — each with its own editor. The eye icon next to the environment picker shows every one currently in scope, grouped by source, with a link straight to each editor.</p>
       </GuideSection>
       <GuideSection icon={Code2} title="Body & auth">
         <p>Body modes: JSON, XML, text, form-urlencoded, multipart (file upload), GraphQL, or raw file. JSON can be pretty-printed.</p>

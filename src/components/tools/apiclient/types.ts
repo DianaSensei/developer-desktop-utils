@@ -158,6 +158,25 @@ export interface ApiRequest {
 // A flat map of variable name → value, used for {{var}} substitution.
 export type VarMap = Record<string, string>;
 
+// Where a resolved variable's *winning* value came from — variables live
+// scattered across four separate editors (Collection Variables inside the
+// Environment dialog, the active Environment itself, the Vault, and session
+// Runtime Variables), each with its own precedence, and nothing shows the
+// merged result with its source in one place. `ResolvedVar` is that merged
+// view — see ApiClient.tsx's `resolvedVars` and EnvQuickView.tsx.
+export type ResolvedVarSource = 'collection' | 'env' | 'vault' | 'runtime';
+
+export interface ResolvedVar {
+  name: string;
+  value: string;
+  // Vault entries are always masked here (never revealed from this glance
+  // view, matching how generated code/snippets never carry a real Vault
+  // value either) — an env variable is masked only when its own `secret`
+  // flag is set, and can be revealed via EnvQuickView's toggle.
+  secret: boolean;
+  source: ResolvedVarSource;
+}
+
 // ─── scripting results ──────────────────────────────────────────────────────
 
 export interface TestResult {

@@ -2,7 +2,7 @@
 // method-colored label and a close button. The right cluster holds the
 // environment selector, history, and the request/response layout toggle.
 
-import { AlertTriangle, Clock, Columns2, KeyRound, Plus, Rows2, Settings2, X } from 'lucide-react';
+import { AlertTriangle, Clock, Columns2, KeyRound, Plus, Rows2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
@@ -13,7 +13,7 @@ import { methodColor, methodShort } from './method-color';
 import { EnvQuickView } from './EnvQuickView';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
-import type { ApiResponse, Collection, TreeItem } from './types';
+import type { ApiResponse, Collection, ResolvedVar, TreeItem } from './types';
 
 // The one slice of ApiClient's per-tab RunState a tab actually needs to know
 // about — kept as its own shape (rather than importing RunState) so this
@@ -32,6 +32,10 @@ interface Props {
   onNewRequest: () => void;
   onManageEnvironments: () => void;
   onManageVault: () => void;
+  onRuntimeVars: () => void;
+  // The merged, source-tagged variable set (collection/env/vault/runtime) for
+  // EnvQuickView's glance popover — see ApiClient.tsx's `resolvedVars`.
+  resolvedVars: ResolvedVar[];
   historyActive: boolean;
   onSelectRequest: (id: string) => void;
   onOpenHistory: () => void;
@@ -61,7 +65,7 @@ function activeCollection(store: ApiStore): Collection | null {
 }
 
 export function RequestTabs({
-  store, runs, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault,
+  store, runs, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault, onRuntimeVars, resolvedVars,
   historyActive, onSelectRequest, onOpenHistory, onCloseHistory,
 }: Props) {
   const { openRequests, activeRequestId } = store;
@@ -180,10 +184,19 @@ export function RequestTabs({
             )}
           </SelectContent>
         </Select>
-        <EnvQuickView env={store.activeEnv} mismatched={mismatchedEnv} onManage={onManageEnvironments} />
-        <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-bg">
-          <Settings2 className="h-4 w-4" />
-        </IconButton>
+        {/* One entry point for "see everything, then go edit it" — no
+            separate gear icon next to this that opened the exact same
+            Environments dialog: EnvQuickView's own footer already links
+            there (plus Vault and Runtime Variables), so a second button here
+            was two controls for one destination. */}
+        <EnvQuickView
+          env={store.activeEnv}
+          mismatched={mismatchedEnv}
+          resolvedVars={resolvedVars}
+          onManageEnvironments={onManageEnvironments}
+          onManageVault={onManageVault}
+          onRuntimeVars={onRuntimeVars}
+        />
         <span className="mx-0.5 h-5 w-px bg-line" />
         <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-bg">
           <KeyRound className="h-4 w-4" />

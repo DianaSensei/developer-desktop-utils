@@ -136,7 +136,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                 <div className="mb-2">
                   <button
                     onClick={() => setSelection({ kind: 'collectionVars' })}
-                    className={cn(LIST_ROW, selection?.kind === 'collectionVars' && 'bg-acc')}
+                    className={cn(LIST_ROW, selection?.kind === 'collectionVars' && 'bg-acc-tint text-acc-ink')}
                   >
                     <span className={LIST_SLOT}><Layers className="h-3 w-3 text-fg-mute" /></span>
                     <span className="min-w-0 flex-1 truncate">Collection Variables</span>
@@ -293,7 +293,12 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
 // labels share one left edge. The 12px slot always exists, holding an icon, the
 // active dot, or nothing; before this the entry with an icon started 20px right
 // of the captions and the rows without a dot, and the column read as ragged.
-const LIST_ROW = 'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-acc/60';
+//
+// Hover is a neutral tint (bg-bg-2), not accent — hover:bg-acc/60 read as a
+// second, near-identical "selected" state next to the actual selected row's
+// solid bg-acc, and at that opacity over default text it also cleared AA by
+// less margin than either state should. Same fix as Sidebar's row selection.
+const LIST_ROW = 'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-bg-2/60';
 const LIST_SLOT = 'flex w-3 shrink-0 items-center justify-center';
 
 function Section({ title, onAdd, disabled, empty, emptyText = 'No environments', children }: {
@@ -331,7 +336,7 @@ function EnvRow({ env, active, selected, onClick }: {
   env: { id: string; name: string; variables?: KeyValue[] }; active: boolean; selected: boolean; onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} className={cn(LIST_ROW, selected && 'bg-acc')}>
+    <button onClick={onClick} className={cn(LIST_ROW, selected && 'bg-acc-tint text-acc-ink')}>
       <span className={LIST_SLOT}>{active && <StatusDot tone="live" size="xs" title="Active environment" />}</span>
       <span className="min-w-0 flex-1 truncate">{env.name}</span>
       <VarCountBadge count={varCount(env.variables)} />
