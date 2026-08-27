@@ -5,16 +5,21 @@ import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
-  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette,
+  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type,
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
+import type { TranslationKey } from '@/lib/i18n';
 import { Segmented } from '@/components/ui/segmented';
 import { SettingRow, SettingGroup } from '@/components/ui/setting-row';
 import {
   ACCENT_TONES, getAccentPreference, setAccentPreference,
   applyAccentToDocument, type AccentTone,
 } from '@/lib/accentPreference';
+import {
+  FONT_PREFERENCES, getFontPreference, setFontPreference,
+  applyFontToDocument, type FontPreference,
+} from '@/lib/fontPreference';
 import { getAppPermissionGroups } from '@/lib/appPermissions';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
@@ -207,6 +212,16 @@ const ACCENT_PREVIEW: Record<AccentTone, CSSProperties> = {
   amber: { background: 'hsl(34 78% 35%)' },
 };
 
+// t()'s key is a strict union (TranslationKey), so a template-literal key
+// built from FontPreference at the call site wouldn't type-check — this map
+// is the one place that connects the two.
+const FONT_LABEL_KEY: Record<FontPreference, TranslationKey> = {
+  default: 'settings.font.default',
+  system: 'settings.font.system',
+  serif: 'settings.font.serif',
+  classic: 'settings.font.classic',
+};
+
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -248,6 +263,12 @@ export function Settings() {
     setAccent(tone);
     setAccentPreference(tone);
     applyAccentToDocument(tone);
+  };
+  const [font, setFont] = useState<FontPreference>(() => getFontPreference());
+  const changeFont = (pref: FontPreference) => {
+    setFont(pref);
+    setFontPreference(pref);
+    applyFontToDocument(pref);
   };
 
   useEffect(() => {
@@ -393,6 +414,23 @@ export function Settings() {
           title={t('settings.tone.label')}
           description={t('settings.tone.description')}
           control={<AccentSwatches value={accent} onChange={changeAccent} ariaLabel={t('settings.tone.label')} />}
+        />
+        <SettingRow
+          icon={Type}
+          title={t('settings.font.label')}
+          description={t('settings.font.description')}
+          control={
+            <Select value={font} onValueChange={(v) => changeFont(v as FontPreference)}>
+              <SelectTrigger className="h-ctl w-44 text-xs" aria-label={t('settings.font.label')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_PREFERENCES.map((f) => (
+                  <SelectItem key={f} value={f}>{t(FONT_LABEL_KEY[f])}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          }
         />
       </SettingGroup>
 

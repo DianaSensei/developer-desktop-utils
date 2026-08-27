@@ -38,11 +38,11 @@ export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; op
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl gap-0 p-0">
+      <DialogContent size="lg" scrollable>
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>Import cURL</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 p-4">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           <div ref={editorWrapRef}>
             <TextEditor
               value={text}

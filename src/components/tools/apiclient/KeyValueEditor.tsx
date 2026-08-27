@@ -7,12 +7,13 @@
 // input the user is typing in is never remounted when it materializes — focus is
 // preserved. A "Bulk Edit" toggle swaps the table for a `key: value` textarea.
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Check, Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { InlineCodeField, TextEditor } from '@/design-system';
+import { copyToClipboard } from '@/lib/clipboard';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
 
 interface Props {
@@ -41,6 +42,13 @@ interface Props {
   // explains that only the last one wins (a plain object assignment) — real
   // HTTP semantics, not a bug, so this only makes the divergence visible.
   duplicateKeyHint?: 'params' | 'headers';
+  // Hides rows whose key/value don't match (case-insensitive substring) —
+  // for a large table (an environment with dozens of variables). This only
+  // narrows what's *rendered*: `onChange` still always receives every row,
+  // filtered or not, so editing while filtered can never silently drop the
+  // rows currently hidden from view. The trailing ghost row is never hidden,
+  // so a new row can still be added while filtered.
+  filterQuery?: string;
 }
 
 const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
@@ -62,6 +70,7 @@ export function KeyValueEditor({
   masked = false,
   secretToggle = false,
   duplicateKeyHint,
+  filterQuery,
 }: Props) {
   const isMasked = (row: KeyValue) => (typeof masked === 'function' ? masked(row) : masked);
   const [bulk, setBulk] = useState(false);
@@ -77,10 +86,29 @@ export function KeyValueEditor({
       return next;
     });
 
+  // Masked values otherwise need reveal → select → copy just to get one
+  // secret onto the clipboard. This is scoped to the masked branch only —
+  // a plain-text row's <Input> is already a click-select-copy away, so a
+  // dedicated button there would just be a second way to do the same thing.
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
+  const copyValue = async (row: KeyValue) => {
+    if (!row.value) return;
+    await copyToClipboard(row.value);
+    setCopiedId(row.id);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopiedId((id) => (id === row.id ? null : id)), 1200);
+  };
+
   // Only the filled rows are "real"; the trailing ghost represents the next row.
   const realRows = rows.filter(isFilled);
   const ghost = ghostRef.current;
-  const displayRows = [...realRows, ghost];
+  const q = filterQuery?.trim().toLowerCase() ?? '';
+  const visibleRows = q
+    ? realRows.filter((r) => r.key.toLowerCase().includes(q) || r.value.toLowerCase().includes(q))
+    : realRows;
+  const displayRows = [...visibleRows, ghost];
 
   const hasDuplicateKeys = useMemo(() => {
     if (!duplicateKeyHint) return false;
@@ -255,6 +283,16 @@ export function KeyValueEditor({
                         {revealed.has(row.id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                       </button>
                     )}
+                    {!isGhost && row.value && (
+                      <button
+                        type="button"
+                        onClick={() => copyValue(row)}
+                        className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
+                        title={copiedId === row.id ? 'Copied' : 'Copy value'}
+                      >
+                        {copiedId === row.id ? <Check className="h-3 w-3 text-ok" /> : <Copy className="h-3 w-3" />}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <Input
@@ -300,6 +338,11 @@ export function KeyValueEditor({
             </div>
           );
         })}
+        {q && visibleRows.length === 0 && (
+          <p className="px-3 py-3 text-center text-[11px] text-fg-mute">
+            No rows match &ldquo;{filterQuery}&rdquo; — {realRows.length} hidden.
+          </p>
+        )}
       </div>
 
       {hasDuplicateKeys && duplicateKeyHint && (

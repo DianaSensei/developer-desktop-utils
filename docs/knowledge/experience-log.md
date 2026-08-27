@@ -1,5 +1,42 @@
 # Experience log
 
+## [2026-08-27] API Client — a collection-scoped environment leaked into another collection's request when run via the Runner
+- Nguyên nhân: `environment-inheritance.md` (quyết định trước) đã cố ý tách khỏi mẫu "resolve
+  theo request id" khi thêm `activeEnvMismatched`/`activeEnv` trong `store.ts` — 2 giá trị này
+  chỉ resolve theo `activeCollectionId`, tức collection của **tab đang mở**
+  (`activeRequestId`), không phải collection của **request thực sự đang được thực thi**. Với
+  1 request gửi bằng nút Send, 2 khái niệm này luôn trùng nhau (request đang gửi chính là
+  request đang mở) nên không lộ bug. Nhưng `ApiClient.tsx`'s `runRequest` (dùng bởi Runner khi
+  chạy 1 collection/folder qua right-click → Run) nhận `req` là **bất kỳ** request nào trong
+  cây được chạy — có thể hoàn toàn khác collection với tab đang active — mà vẫn truyền thẳng
+  `store.activeEnv` (đã resolve theo tab) vào `executeRequest`. Kết quả: chạy Runner trên
+  collection B trong khi tab đang mở thuộc collection A và có 1 environment scope-theo-A đang
+  chọn ⇒ environment của A bị áp nhầm vào mọi request của B trong lượt chạy đó — đúng loại bug
+  mà `collectCollectionVars`/`getCollectionVars` (Collection Variables) đã né được từ trước
+  bằng cách resolve theo request id, nhưng lúc đó không áp dụng lại cho environment.
+- Số lần thử: 1/1 — phát hiện bằng cách so sánh trực tiếp `getCollectionVars(id)`/
+  `getInherited(id)` (đã đúng, resolve theo id) với cách `store.activeEnv` được truyền cho
+  `runRequest` (sai, resolve theo tab) trong cùng 1 lệnh gọi `executeRequest`.
+- Kết quả: Đã fix — thêm `resolveEnvForRequest`/`getEnvForRequest(id)` trong `store.ts` (cùng
+  khuôn với `collectCollectionVars`/`getCollectionVars`): global env luôn áp dụng, env
+  scope-theo-collection chỉ áp dụng khi collection sở hữu **request id được truyền vào** khớp,
+  không phải "collection đang active". `runRequest` chuyển sang dùng hàm này thay vì
+  `store.activeEnv`. Đồng thời sửa `persistResult` để nhận **đúng object environment đã áp
+  dụng cho lượt chạy đó** làm tham số thay vì tự đọc lại `store.activeEnv` — nếu không, việc
+  ghi ngược biến do script set (`bru.setEnvVar`) vẫn có thể lưu nhầm vào environment của tab
+  đang mở dù nó không phải environment thực sự vừa được dùng để chạy request đó. `activeEnv`/
+  `activeEnvMismatched` (theo tab) được giữ nguyên vì UI (dropdown chọn environment, cảnh báo
+  "Inactive here" ở `RequestTabs.tsx`) đúng là cần phản ánh theo tab đang mở, không phải theo
+  từng request trong 1 lượt Runner.
+- Bài học chung: khi một giá trị "theo id" (collection vars, inherited script/auth, và giờ là
+  environment) có 2 điểm dùng — (1) UI của tab đang mở, và (2) thực thi 1 request bất kỳ có thể
+  không thuộc tab đang mở (Runner, gọi hàng loạt) — chỉ sửa đúng 1 điểm (`getCollectionVars`
+  resolve theo id) không tự động kéo theo điểm còn lại (`activeEnv` vẫn resolve theo tab) được
+  fix theo. Khi thêm một cơ chế kế thừa mới theo collection/folder, phải rà lại **toàn bộ** danh
+  sách "theo id" hiện có (`getInherited`, `getCollectionVars`, và bất kỳ hàm `get*ForRequest`
+  nào sau này) để đảm bảo cùng một quy tắc áp dụng nhất quán ở mọi nơi resolve theo request id,
+  không chỉ nơi vừa được thêm mới.
+
 ## [2026-08-20] container tool — bollard 0.21's `SystemDataUsageResponse` silently drops the per-item lists the raw Docker API returns
 - Nguyên nhân: cần hiển thị dung lượng (Size) từng volume ở VolumesView. Kế hoạch ban đầu là
   tái dùng `container_system_df` (đã có sẵn, gọi `bollard::Docker::df()`) — Docker Engine API

@@ -8,13 +8,25 @@ import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { IconButton } from '@/components/ui/icon-button';
+import { StatusDot } from '@/components/ui/status-dot';
 import { methodColor, methodShort } from './method-color';
+import { EnvQuickView } from './EnvQuickView';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
-import type { Collection, TreeItem } from './types';
+import type { ApiResponse, Collection, TreeItem } from './types';
+
+// The one slice of ApiClient's per-tab RunState a tab actually needs to know
+// about — kept as its own shape (rather than importing RunState) so this
+// component doesn't reach into ApiClient's internal state type.
+export interface TabRunStatus {
+  error: string | null;
+  response: ApiResponse | null;
+  sending: boolean;
+}
 
 interface Props {
   store: ApiStore;
+  runs: Record<string, TabRunStatus>;
   direction: SplitDirection;
   onToggleDirection: () => void;
   onNewRequest: () => void;
@@ -24,6 +36,16 @@ interface Props {
   onSelectRequest: (id: string) => void;
   onOpenHistory: () => void;
   onCloseHistory: () => void;
+}
+
+// A tab "needs attention" once it has settled on a transport/script error or a
+// 4xx/5xx response — not while still in flight, and not for a 3xx (a
+// redirect isn't a failure; see request.ts's statusColor, which treats it as
+// merely worth noticing, not bad).
+function tabFailed(run: TabRunStatus | undefined): boolean {
+  if (!run || run.sending) return false;
+  if (run.error) return true;
+  return !!run.response && run.response.status >= 400;
 }
 
 function containsRequest(items: TreeItem[], id: string): boolean {
@@ -39,7 +61,7 @@ function activeCollection(store: ApiStore): Collection | null {
 }
 
 export function RequestTabs({
-  store, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault,
+  store, runs, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault,
   historyActive, onSelectRequest, onOpenHistory, onCloseHistory,
 }: Props) {
   const { openRequests, activeRequestId } = store;
@@ -57,11 +79,12 @@ export function RequestTabs({
       <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar">
         {openRequests.map((req) => {
           const active = !historyActive && req.id === activeRequestId;
+          const failed = tabFailed(runs[req.id]);
           return (
             <div
               key={req.id}
               onClick={() => onSelectRequest(req.id)}
-              title={`${req.method} ${req.name}`}
+              title={failed ? `${req.method} ${req.name} — last send failed` : `${req.method} ${req.name}`}
               className={cn(
                 'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-2.5 py-1.5 text-xs transition-colors',
                 active ? 'bg-bg text-fg' : 'text-fg-mute hover:bg-bg/50 hover:text-fg',
@@ -72,6 +95,7 @@ export function RequestTabs({
                 {methodShort(req.method)}
               </span>
               <span className="truncate">{req.name}</span>
+              {failed && <StatusDot tone="error" size="xs" className="shrink-0" />}
               {/* The slot keeps its 16px whether or not the × is showing, so a
                   tab's label doesn't reflow the moment the pointer enters it. */}
               <button
@@ -150,6 +174,7 @@ export function RequestTabs({
             )}
           </SelectContent>
         </Select>
+        <EnvQuickView env={store.activeEnv} mismatched={mismatchedEnv} onManage={onManageEnvironments} />
         <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-bg">
           <Settings2 className="h-4 w-4" />
         </IconButton>

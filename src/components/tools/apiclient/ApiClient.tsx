@@ -67,7 +67,7 @@ export function ApiClient() {
   const [cookiesOpen, setCookiesOpen] = useState(false);
   const [runtimeVarsOpen, setRuntimeVarsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [runTarget, setRunTarget] = useState<{ title: string; requests: ApiRequest[] } | null>(null);
+  const [runTarget, setRunTarget] = useState<{ title: string; requests: ApiRequest[]; collectionId: string } | null>(null);
   const [direction, setDirection] = usePersistentState<SplitDirection>(
     'devtool:apiclient:layout:v2', 'horizontal',
   );
@@ -165,9 +165,14 @@ export function ApiClient() {
   }, []);
 
   // After a run, persist runtime/env-var changes and (unless suppressed) record
-  // a history entry.
+  // a history entry. `env` must be the same environment (or null) that was
+  // actually passed to executeRequest for this run — never re-derived from
+  // `store.activeEnv`, which reflects whatever tab/collection is merely
+  // "active" and can differ from the collection the run's own request
+  // belongs to (see `getEnvForRequest` in store.ts).
   const persistResult = useCallback((
     req: ApiRequest,
+    env: ReturnType<typeof store.getEnvForRequest>,
     result: Awaited<ReturnType<typeof executeRequest>>,
     recordHistory = true,
   ) => {
@@ -177,8 +182,7 @@ export function ApiClient() {
     if (store.cookiesEnabled && result.response?.setCookies?.length) {
       store.captureCookies(result.response.url ?? req.url, result.response.setCookies);
     }
-    if (result.envChanged && store.activeEnv) {
-      const env = store.activeEnv;
+    if (result.envChanged && env) {
       const variables = env.variables.map((v) => (v.key in result.envVars ? { ...v, value: result.envVars[v.key] } : v));
       const existing = new Set(env.variables.map((v) => v.key));
       for (const [k, val] of Object.entries(result.envVars)) {
@@ -190,7 +194,7 @@ export function ApiClient() {
     // Values that must never be persisted in plaintext if the server happened
     // to echo them back in the response (see redactText in store.ts). Secret-
     // flagged environment variables get the same treatment as vault values.
-    const secretEnvValues = (store.activeEnv?.variables ?? []).filter((v) => v.secret && v.value).map((v) => v.value);
+    const secretEnvValues = (env?.variables ?? []).filter((v) => v.secret && v.value).map((v) => v.value);
     const sensitiveValues = [...Object.values(store.vaultVars), ...secretEnvValues];
     store.addHistory({
       method: req.method, url: req.url,
@@ -205,14 +209,26 @@ export function ApiClient() {
     }, sensitiveValues);
   }, [store]);
 
-  // Run one request (used by the Runner); resolves inherited scripts/auth per id.
-  // Runner results are deliberately kept out of History: a 20-request × 5-iteration
-  // run would otherwise evict every manually-sent entry from the 50-entry log, and
-  // the Runner already keeps the full request/response for each of its runs.
-  const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal) => {
+  // Run one request (used by the Runner); resolves inherited scripts/auth/env
+  // per id — never `store.activeEnv`, since the Runner may run a collection
+  // other than whatever tab/collection is currently open (a collection-scoped
+  // environment must only apply to its own collection's requests; see
+  // `getEnvForRequest` in store.ts). Runner results are deliberately kept out
+  // of History: a 20-request × 5-iteration run would otherwise evict every
+  // manually-sent entry from the 50-entry log, and the Runner already keeps
+  // the full request/response for each of its runs.
+  //
+  // `envId` lets the Runner pin a specific environment for its own run,
+  // independent of whatever is globally active — `undefined` (any other
+  // caller) keeps the normal per-request auto-resolution; the Runner always
+  // passes a concrete id or `null` ("No Environment"), since that choice is
+  // explicit and should not be second-guessed by the scope-mismatch check
+  // `getEnvForRequest` applies to an implicit/leftover selection.
+  const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal, envId?: string | null) => {
     const jar = store.cookiesEnabled ? store.cookies : [];
-    const result = await executeRequest(req, store.activeEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars, store.getCollectionVars(req.id));
-    persistResult(req, result, false);
+    const env = envId === undefined ? store.getEnvForRequest(req.id) : (envId === null ? null : store.environments.find((e) => e.id === envId) ?? null);
+    const result = await executeRequest(req, env, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars, store.getCollectionVars(req.id));
+    persistResult(req, env, result, false);
     return result;
   }, [store, persistResult]);
 
@@ -231,7 +247,7 @@ export function ApiClient() {
     try {
       const jar = store.cookiesEnabled ? store.cookies : [];
       const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current, store.vaultVars, store.activeCollectionVars);
-      persistResult(activeRequest, result);
+      persistResult(activeRequest, store.activeEnv, result);
       if (!isCurrent()) return;
       patchRun(id, {
         response: result.response,
@@ -300,8 +316,8 @@ export function ApiClient() {
   }, [store]);
 
   // Stable so the Sidebar's memoized tree nodes aren't invalidated each render.
-  const handleRun = useCallback((title: string, requests: ApiRequest[]) => {
-    setRunTarget({ title, requests });
+  const handleRun = useCallback((title: string, requests: ApiRequest[], collectionId: string) => {
+    setRunTarget({ title, requests, collectionId });
   }, []);
 
   // Merged variable map (collection + environment + session runtime vars) for
@@ -360,6 +376,7 @@ export function ApiClient() {
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <RequestTabs
             store={store}
+            runs={runs}
             direction={direction}
             onToggleDirection={() => setDirection((d) => (d === 'horizontal' ? 'vertical' : 'horizontal'))}
             onNewRequest={newRequest}
@@ -441,6 +458,7 @@ export function ApiClient() {
         onClose={() => setCodeOpen(false)}
         request={activeRequest}
         vars={codeOpen ? codeVars() : {}}
+        inheritedHeaders={activeRequest ? store.getInherited(activeRequest.id).headers : []}
       />
       {runTarget && (
         <RunnerDialog
@@ -450,6 +468,8 @@ export function ApiClient() {
           runRequest={runRequest}
           knownVars={Object.keys(varMap)}
           onClose={() => setRunTarget(null)}
+          environments={store.environments.filter((e) => !e.collectionId || e.collectionId === runTarget.collectionId)}
+          defaultEnvId={store.activeEnvId}
         />
       )}
     </div>

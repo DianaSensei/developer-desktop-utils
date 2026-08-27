@@ -54,6 +54,55 @@ describe('useApiStore — activeEnv collection scoping', () => {
     expect(result.current.activeEnvId).toBe(scopedEnvId);
     expect(result.current.selectedEnv?.id).toBe(scopedEnvId);
   });
+
+  it('getEnvForRequest never applies a collection-scoped environment to another collection\'s request, regardless of which tab is active', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    let scopedEnvId = '';
+    act(() => { scopedEnvId = result.current.addEnvironment(firstCollectionId); });
+    act(() => result.current.setActiveEnvId(scopedEnvId));
+
+    // Keep the *first* collection's request as the active tab (so activeEnv
+    // itself is NOT mismatched here) — the bug this guards is a Runner-style
+    // run of the *other* collection's request while a different tab is open.
+    let firstRequestId = '';
+    act(() => { firstRequestId = result.current.addItem(firstCollectionId, 'request'); });
+    act(() => result.current.selectRequest(firstRequestId));
+    expect(result.current.activeEnv?.id).toBe(scopedEnvId);
+
+    let secondRequestId = '';
+    act(() => { secondRequestId = result.current.addItem(secondCollectionId, 'request'); });
+
+    // The environment is scoped to the first collection and must not leak
+    // into a request that belongs to the second collection...
+    expect(result.current.getEnvForRequest(secondRequestId)).toBeNull();
+    // ...but does still apply to a request in the collection it's scoped to.
+    expect(result.current.getEnvForRequest(firstRequestId)?.id).toBe(scopedEnvId);
+  });
+
+  it('getEnvForRequest applies a global environment to any request', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    let globalEnvId = '';
+    act(() => { globalEnvId = result.current.addEnvironment(null); });
+    act(() => result.current.setActiveEnvId(globalEnvId));
+
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(secondCollectionId, 'request'); });
+    void firstCollectionId;
+
+    expect(result.current.getEnvForRequest(requestId)?.id).toBe(globalEnvId);
+  });
 });
 
 describe('useApiStore — addHistory secret redaction', () => {
@@ -175,6 +224,87 @@ describe('useApiStore — collection variables', () => {
     ]));
 
     expect(result.current.activeCollectionVars).toEqual({ version: 'v2' });
+  });
+});
+
+describe('useApiStore — duplicateEnvironment', () => {
+  it('clones the environment with a "copy" name, fresh ids, and the same scope', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let sourceId = '';
+    act(() => { sourceId = result.current.addEnvironment(collectionId); });
+    act(() => result.current.updateEnvironment(sourceId, {
+      name: 'Prod',
+      variables: [{ id: 'v1', key: 'host', value: 'prod.test', enabled: true }],
+    }));
+
+    let copyId: string | null = null;
+    act(() => { copyId = result.current.duplicateEnvironment(sourceId); });
+
+    expect(copyId).not.toBeNull();
+    expect(copyId).not.toBe(sourceId);
+    const copy = result.current.environments.find((e) => e.id === copyId);
+    expect(copy?.name).toBe('Prod copy');
+    expect(copy?.collectionId).toBe(collectionId);
+    expect(copy?.variables).toEqual([{ id: expect.any(String), key: 'host', value: 'prod.test', enabled: true }]);
+    expect(copy?.variables[0].id).not.toBe('v1');
+
+    // The source is untouched, and both environments coexist independently.
+    const source = result.current.environments.find((e) => e.id === sourceId);
+    expect(source?.variables).toEqual([{ id: 'v1', key: 'host', value: 'prod.test', enabled: true }]);
+    expect(result.current.environments).toHaveLength(2);
+  });
+
+  it('returns null for an unknown id and adds nothing', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const before = result.current.environments.length;
+    let copyId: string | null = null;
+    act(() => { copyId = result.current.duplicateEnvironment('does-not-exist'); });
+
+    expect(copyId).toBeNull();
+    expect(result.current.environments).toHaveLength(before);
+  });
+});
+
+describe('useApiStore — collection/folder headers', () => {
+  it('collects inherited headers outer (collection) to inner (folder) for a request', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    act(() => result.current.setNodeHeaders(collectionId, null, [
+      { id: 'h1', key: 'X-Collection', value: 'collection', enabled: true },
+    ]));
+
+    let folderId = '';
+    act(() => { folderId = result.current.addItem(collectionId, 'folder'); });
+    act(() => result.current.setNodeHeaders(collectionId, folderId, [
+      { id: 'h2', key: 'X-Folder', value: 'folder', enabled: true },
+    ]));
+
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(collectionId, 'request', folderId); });
+
+    const { headers } = result.current.getInherited(requestId);
+    expect(headers).toEqual([
+      [{ id: 'h1', key: 'X-Collection', value: 'collection', enabled: true }],
+      [{ id: 'h2', key: 'X-Folder', value: 'folder', enabled: true }],
+    ]);
+  });
+
+  it('omits empty header lists and returns [] for a request with no ancestor headers', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(collectionId, 'request'); });
+
+    expect(result.current.getInherited(requestId).headers).toEqual([]);
   });
 });
 

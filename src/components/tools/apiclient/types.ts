@@ -173,6 +173,10 @@ export interface Folder {
   collapsed?: boolean;
   script?: RequestScript;   // inherited by requests inside
   auth?: Auth;              // inherited by requests with 'inherit' auth
+  // Added to every request inside this folder (Bruno-style folder headers). A
+  // request's own header with the same name overrides it — see engine.ts /
+  // request.ts's buildHeaders.
+  headers?: KeyValue[];
 }
 
 export type TreeItem = ApiRequest | Folder;
@@ -188,6 +192,9 @@ export interface Collection {
   // environment is active. Lower precedence than the environment — see
   // engine.ts's varMap() — so an environment value still overrides it.
   variables?: KeyValue[];
+  // Added to every request in the collection (Bruno-style collection headers).
+  // A folder or request header with the same name overrides it.
+  headers?: KeyValue[];
 }
 
 export interface Environment {

@@ -227,33 +227,58 @@ function findFolderPath(items: TreeItem[], id: string, acc: Folder[]): Folder[] 
   return null;
 }
 
-export interface InheritedScripts { pre: string[]; post: string[]; auth: Auth | null }
+export interface InheritedScripts { pre: string[]; post: string[]; auth: Auth | null; headers: KeyValue[][] }
 
 // Ordered ancestor scripts for a request: pre runs collection→folders (outer to
 // inner); post runs the reverse (inner to outer) so cleanup unwinds naturally.
 // `auth` is the nearest ancestor (folder before collection) with concrete auth.
+// `headers` stays outer→inner (collection first) — request.ts's buildHeaders
+// applies them in that order so an inner folder's header overrides the
+// collection's, matching Bruno.
 function collectInherited(collections: Collection[], id: string): InheritedScripts {
   for (const c of collections) {
     const path = findFolderPath(c.items, id, []);
     if (path) {
-      const nodes: { script?: { req: string; res: string }; auth?: Auth }[] = [c, ...path];
+      const nodes: { script?: { req: string; res: string }; auth?: Auth; headers?: KeyValue[] }[] = [c, ...path];
       const pre = nodes.map((n) => n.script?.req ?? '').filter((s) => s.trim());
       const post = nodes.map((n) => n.script?.res ?? '').filter((s) => s.trim()).reverse();
+      const headers = nodes.map((n) => n.headers ?? []).filter((h) => h.length);
       let auth: Auth | null = null;
       for (let i = nodes.length - 1; i >= 0; i--) {
         const a = nodes[i].auth;
         if (a && a.type !== 'none' && a.type !== 'inherit') { auth = a; break; }
       }
-      return { pre, post, auth };
+      return { pre, post, auth, headers };
     }
   }
-  return { pre: [], post: [], auth: null };
+  return { pre: [], post: [], auth: null, headers: [] };
 }
 
 // The owning collection's shared variable defaults for a request, looked up by
 // request id (not the "active collection") so this stays correct for requests
 // run from the Runner, which may not belong to whatever collection happens to
 // be focused in the sidebar.
+function findOwningCollectionId(collections: Collection[], id: string): string | null {
+  for (const c of collections) {
+    if (findRequest(c.items, id)) return c.id;
+  }
+  return null;
+}
+
+// Resolve which environment actually applies to a given request: the selected
+// environment if it's global, or if it's scoped to the request's own owning
+// collection — never a collection-scoped environment left over from whatever
+// collection is merely "active" in the sidebar/tabs. This is what keeps a
+// Runner run of one collection from picking up another collection's scoped
+// environment just because it happened to be selected while a different
+// collection's tab was open (see `activeEnv`'s mismatch check below, which
+// this generalizes to an arbitrary request id instead of the active tab).
+function resolveEnvForRequest(collections: Collection[], selectedEnv: Environment | null, id: string): Environment | null {
+  if (!selectedEnv) return null;
+  if (!selectedEnv.collectionId) return selectedEnv;
+  return findOwningCollectionId(collections, id) === selectedEnv.collectionId ? selectedEnv : null;
+}
+
 function collectCollectionVars(collections: Collection[], id: string): VarMap {
   for (const c of collections) {
     if (!findFolderPath(c.items, id, [])) continue;
@@ -464,12 +489,26 @@ export function useApiStore() {
     setCollections((prev) => prev.map((c) => (c.id === collectionId ? { ...c, variables } : c)));
   }, [setCollections]);
 
+  // Set the inherited headers on a collection (nodeId null) or a folder.
+  const setNodeHeaders = useCallback((collectionId: string, nodeId: string | null, headers: KeyValue[]) => {
+    setCollections((prev) => prev.map((c) => {
+      if (c.id !== collectionId) return c;
+      if (!nodeId) return { ...c, headers };
+      return {
+        ...c,
+        items: mapTree(c.items, (item) =>
+          item.id === nodeId && item.type === 'folder' ? { ...item, headers } : item,
+        ),
+      };
+    }));
+  }, [setCollections]);
+
   // Inherited scripts/auth for any request id (used by the Runner).
   const getInherited = useCallback((id: string) => collectInherited(collections, id), [collections]);
 
   // Inherited (collection + folder) scripts for the request currently active.
   const inheritedScripts = useMemo(
-    () => (activeRequestId ? collectInherited(collections, activeRequestId) : { pre: [], post: [], auth: null }),
+    () => (activeRequestId ? collectInherited(collections, activeRequestId) : { pre: [], post: [], auth: null, headers: [] }),
     [collections, activeRequestId],
   );
 
@@ -477,6 +516,15 @@ export function useApiStore() {
   const getCollectionVars = useCallback(
     (id: string) => collectCollectionVars(collections, id),
     [collections],
+  );
+
+  // The environment that actually applies to a given request id (used by the
+  // Runner) — never a collection-scoped environment that only happens to be
+  // selected because a *different* collection's tab is open. See
+  // `resolveEnvForRequest`.
+  const getEnvForRequest = useCallback(
+    (id: string) => resolveEnvForRequest(collections, selectedEnv, id),
+    [collections, selectedEnv],
   );
 
   // Collection variables for the request currently active.
@@ -575,6 +623,23 @@ export function useApiStore() {
     return e.id;
   }, [setEnvironments]);
 
+  // Clone an environment (same scope, "<name> copy", every variable row given
+  // a fresh id so the two environments never share row identity) — the usual
+  // way to start a staging environment from prod without retyping every
+  // variable by hand.
+  const duplicateEnvironment = useCallback((id: string) => {
+    const source = environments.find((e) => e.id === id);
+    if (!source) return null;
+    const copy: Environment = {
+      ...source,
+      id: uid(),
+      name: `${source.name} copy`,
+      variables: source.variables.map((v) => ({ ...v, id: uid() })),
+    };
+    setEnvironments((prev) => [...prev, copy]);
+    return copy.id;
+  }, [environments, setEnvironments]);
+
   // Adds an already-built Environment (e.g. from environments-io.ts's
   // importEnvironment) as a new entry, keeping its id — the caller is
   // responsible for generating a fresh one so this can't collide.
@@ -636,10 +701,11 @@ export function useApiStore() {
     setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, updateRequest, setNodeScript, setNodeAuth,
+    setNodeHeaders,
     setCollectionVariables,
-    addEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
+    addEnvironment, duplicateEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
     vault, setVault, vaultVars,
-    addHistory, clearHistory, getInherited, getCollectionVars,
+    addHistory, clearHistory, getInherited, getCollectionVars, getEnvForRequest,
     cookies, cookiesEnabled, setCookiesEnabled,
     captureCookies, upsertCookie, deleteCookie, clearDomainCookies, clearCookies,
   };

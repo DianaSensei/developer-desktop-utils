@@ -90,6 +90,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <GuideSection icon={Code2} title="Body & auth">
         <p>Body modes: JSON, XML, text, form-urlencoded, multipart (file upload), GraphQL, or raw file. JSON can be pretty-printed.</p>
         <p>Auth: Bearer, Basic, Digest, API key, or OAuth2 — or <strong className="text-fg">Inherit</strong> from the parent folder/collection.</p>
+        <p>Right-click a collection or folder → <strong className="text-fg">Settings…</strong> to set headers, scripts, and auth shared by every request inside it. A request's own header with the same name overrides the inherited one; an inner folder's overrides its collection's.</p>
       </GuideSection>
       <GuideSection icon={ShieldCheck} title="Scripts, tests & cookies">
         <p>Each request has pre-request and post-response scripts plus tests/assertions (Bruno-style <Tok>bru</Tok>/<Tok>req</Tok>/<Tok>res</Tok> API, with a Postman <Tok>pm.*</Tok> shim). Collection/folder scripts are inherited.</p>

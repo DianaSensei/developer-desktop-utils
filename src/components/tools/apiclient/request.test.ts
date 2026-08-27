@@ -97,6 +97,51 @@ describe('sendRequest — request building', () => {
     expect((init.headers as Record<string, string>)['X-Key']).toBe('secret');
   });
 
+  it('applies inherited collection/folder headers ahead of the request\'s own', async () => {
+    const spy = stubFetch(fakeResponse(new TextEncoder().encode('{}'), { 'content-type': 'application/json' }));
+    await sendRequest(
+      req({ headers: [newKeyValue('X-Own', 'request')] }),
+      {},
+      undefined,
+      [],
+      [[newKeyValue('X-Collection', 'collection')], [newKeyValue('X-Folder', 'folder')]],
+    );
+    const [, init] = spy.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers['X-Collection']).toBe('collection');
+    expect(headers['X-Folder']).toBe('folder');
+    expect(headers['X-Own']).toBe('request');
+  });
+
+  it('lets a request header override an inherited one of the same name, case-insensitively', async () => {
+    const spy = stubFetch(fakeResponse(new TextEncoder().encode('{}'), { 'content-type': 'application/json' }));
+    await sendRequest(
+      req({ headers: [newKeyValue('x-shared', 'from-request')] }),
+      {},
+      undefined,
+      [],
+      [[newKeyValue('X-Shared', 'from-collection')]],
+    );
+    const [, init] = spy.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(Object.keys(headers).filter((k) => k.toLowerCase() === 'x-shared')).toHaveLength(1);
+    expect(headers['x-shared']).toBe('from-request');
+  });
+
+  it('lets an inner folder header override the collection\'s own of the same name', async () => {
+    const spy = stubFetch(fakeResponse(new TextEncoder().encode('{}'), { 'content-type': 'application/json' }));
+    await sendRequest(
+      req(),
+      {},
+      undefined,
+      [],
+      [[newKeyValue('X-Shared', 'from-collection')], [newKeyValue('X-Shared', 'from-folder')]],
+    );
+    const [, init] = spy.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers['X-Shared']).toBe('from-folder');
+  });
+
   it('rejects an empty URL', async () => {
     stubFetch(fakeResponse(new Uint8Array(), {}));
     await expect(sendRequest(req({ url: '   ' }), {})).rejects.toThrow('Enter a request URL');
