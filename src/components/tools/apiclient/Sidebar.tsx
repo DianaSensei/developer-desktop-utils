@@ -96,7 +96,10 @@ interface NodeCtx {
   onDrop: () => void;
 }
 
-type DropTarget = { id: string; where: 'before' | 'after' | 'inside' };
+// `copy` mirrors the copy-modifier (Alt/Option) held during the drag — Bruno/
+// Postman-style reorder-or-move by default, drag-to-copy (including across
+// collections) when held. See Row's onDragOver below.
+type DropTarget = { id: string; where: 'before' | 'after' | 'inside'; copy: boolean };
 
 interface Props {
   store: ApiStore;
@@ -129,7 +132,10 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   storeRef.current = store;
 
   const onDrop = useCallback(() => {
-    if (dragId && dropTarget) storeRef.current.moveItem(dragId, dropTarget.id, dropTarget.where);
+    if (dragId && dropTarget) {
+      if (dropTarget.copy) storeRef.current.copyItem(dragId, dropTarget.id, dropTarget.where);
+      else storeRef.current.moveItem(dragId, dropTarget.id, dropTarget.where);
+    }
     setDragId(null);
     setDropTarget(null);
   }, [dragId, dropTarget]);
@@ -477,15 +483,20 @@ function Row({
   return (
     <div
       draggable={!editing}
-      onDragStart={(e) => { e.stopPropagation(); ctx.setDragId(id); e.dataTransfer.effectAllowed = 'move'; }}
+      onDragStart={(e) => { e.stopPropagation(); ctx.setDragId(id); e.dataTransfer.effectAllowed = 'copyMove'; }}
       onDragEnd={() => { ctx.setDragId(null); ctx.setDropTarget(null); }}
       onDragOver={(e) => {
         if (!ctx.dragId || ctx.dragId === id) return;
         e.preventDefault();
+        // Hold Alt/Option while dragging to copy instead of move — mirrors the
+        // OS convention and lets a request/folder land in another collection
+        // without removing it from this one.
+        const copy = e.altKey;
+        e.dataTransfer.dropEffect = copy ? 'copy' : 'move';
         let where: DropTarget['where'] = 'after';
         if (container) where = 'inside';
         else { const r = e.currentTarget.getBoundingClientRect(); where = e.clientY < r.top + r.height / 2 ? 'before' : 'after'; }
-        if (ctx.dropTarget?.id !== id || ctx.dropTarget?.where !== where) ctx.setDropTarget({ id, where });
+        if (ctx.dropTarget?.id !== id || ctx.dropTarget?.where !== where || ctx.dropTarget?.copy !== copy) ctx.setDropTarget({ id, where, copy });
       }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onDrop(); }}
       className={cn(
@@ -495,7 +506,7 @@ function Row({
         // solid accent belongs to the one primary action on a screen.
         active && 'bg-acc-tint text-acc-ink',
         dragging && 'opacity-40',
-        dt?.where === 'inside' && 'bg-acc/10 ring-1 ring-inset ring-acc/40',
+        dt?.where === 'inside' && (dt.copy ? 'bg-ok/10 ring-1 ring-inset ring-ok/40' : 'bg-acc/10 ring-1 ring-inset ring-acc/40'),
       )}
       style={{ paddingLeft: 6 + depth * 12 }}
       onClick={hasChildren ? onToggle : onClick}
@@ -503,8 +514,8 @@ function Row({
     >
       {/* Bruno-style left accent stripe on the active request */}
       {active && <span className="pointer-events-none absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-acc" />}
-      {dt?.where === 'before' && <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-acc" />}
-      {dt?.where === 'after' && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-acc" />}
+      {dt?.where === 'before' && <span className={cn('pointer-events-none absolute inset-x-0 top-0 h-0.5', dt.copy ? 'bg-ok' : 'bg-acc')} />}
+      {dt?.where === 'after' && <span className={cn('pointer-events-none absolute inset-x-0 bottom-0 h-0.5', dt.copy ? 'bg-ok' : 'bg-acc')} />}
       {hasChildren ? (
         collapsed ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
           : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-mute" />

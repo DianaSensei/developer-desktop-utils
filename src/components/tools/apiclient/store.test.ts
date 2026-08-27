@@ -402,3 +402,93 @@ describe('useApiStore — importEnvironment', () => {
     expect(result.current.activeEnv?.variables[0]).toMatchObject({ key: 'host', value: 'imported.test' });
   });
 });
+
+describe('useApiStore — moveItem / copyItem (sidebar drag & drop)', () => {
+  it('reorders two requests within the same collection', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    // Start from an empty collection — the default seed collection already
+    // carries a sample request, which would just be a third, unrelated item.
+    let collectionId = '';
+    act(() => { collectionId = result.current.addCollection(); });
+    let firstId = '';
+    let secondId = '';
+    act(() => { firstId = result.current.addItem(collectionId, 'request'); });
+    act(() => { secondId = result.current.addItem(collectionId, 'request'); });
+
+    // Drag the second request to before the first.
+    act(() => result.current.moveItem(secondId, firstId, 'before'));
+
+    const ids = result.current.collections.find((c) => c.id === collectionId)!.items.map((i) => i.id);
+    expect(ids).toEqual([secondId, firstId]);
+  });
+
+  it('moveItem relocates a request into a different collection, removing it from the source', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const sourceId = result.current.collections[0].id;
+    let targetId = '';
+    act(() => { targetId = result.current.addCollection(); });
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(sourceId, 'request'); });
+
+    act(() => result.current.moveItem(requestId, targetId, 'inside'));
+
+    const source = result.current.collections.find((c) => c.id === sourceId)!;
+    const target = result.current.collections.find((c) => c.id === targetId)!;
+    expect(source.items.some((i) => i.id === requestId)).toBe(false);
+    expect(target.items.some((i) => i.id === requestId)).toBe(true);
+  });
+
+  it('copyItem duplicates a request into another collection and leaves the original in place', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const sourceId = result.current.collections[0].id;
+    let targetId = '';
+    act(() => { targetId = result.current.addCollection(); });
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(sourceId, 'request'); });
+    act(() => result.current.renameItem(requestId, 'Original name'));
+
+    act(() => result.current.copyItem(requestId, targetId, 'inside'));
+
+    const source = result.current.collections.find((c) => c.id === sourceId)!;
+    const target = result.current.collections.find((c) => c.id === targetId)!;
+    // Original stays untouched in its own collection.
+    expect(source.items.some((i) => i.id === requestId)).toBe(true);
+    // Target gets an independent copy — new id, same name.
+    expect(target.items).toHaveLength(1);
+    expect(target.items[0].id).not.toBe(requestId);
+    expect(target.items[0].name).toBe('Original name');
+  });
+
+  it('copyItem deep-clones a folder (with fresh ids for its children) rather than moving it', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const sourceId = result.current.collections[0].id;
+    let targetId = '';
+    act(() => { targetId = result.current.addCollection(); });
+    let folderId = '';
+    act(() => { folderId = result.current.addItem(sourceId, 'folder'); });
+    let childId = '';
+    act(() => { childId = result.current.addItem(sourceId, 'request', folderId); });
+
+    act(() => result.current.copyItem(folderId, targetId, 'inside'));
+
+    const source = result.current.collections.find((c) => c.id === sourceId)!;
+    const target = result.current.collections.find((c) => c.id === targetId)!;
+    expect(source.items.some((i) => i.id === folderId)).toBe(true);
+
+    const copiedFolder = target.items[0];
+    expect(copiedFolder.id).not.toBe(folderId);
+    expect(copiedFolder.type).toBe('folder');
+    if (copiedFolder.type === 'folder') {
+      expect(copiedFolder.items).toHaveLength(1);
+      expect(copiedFolder.items[0].id).not.toBe(childId);
+    }
+  });
+});

@@ -160,6 +160,15 @@ function containsId(item: TreeItem, id: string): boolean {
   return item.type === 'folder' && item.items.some((c) => containsId(c, id));
 }
 
+// Read-only lookup, for copy — unlike extractItem this leaves the tree untouched.
+function findItem(items: TreeItem[], id: string): TreeItem | null {
+  for (const it of items) {
+    if (it.id === id) return it;
+    if (it.type === 'folder') { const r = findItem(it.items, id); if (r) return r; }
+  }
+  return null;
+}
+
 // Remove `id` from the tree, capturing the removed item.
 function extractItem(items: TreeItem[], id: string): { items: TreeItem[]; found: TreeItem | null } {
   let found: TreeItem | null = null;
@@ -605,6 +614,32 @@ export function useApiStore() {
     });
   }, [setCollections]);
 
+  // Copy a request/folder to a new spot (drag & drop with the copy modifier
+  // held) — like moveItem, but the source stays put and the destination gets a
+  // deep clone with fresh ids. Can land in a different collection than the
+  // source, unlike cloneItem (which always clones next to the original).
+  const copyItem = useCallback((sourceId: string, targetId: string, where: 'before' | 'after' | 'inside') => {
+    if (sourceId === targetId) return;
+    setCollections((prev) => {
+      let source: TreeItem | null = null;
+      for (const c of prev) { source = findItem(c.items, sourceId); if (source) break; }
+      if (!source) return prev;
+      const copy = cloneTreeItem(source);
+      // Drop directly onto a collection → append at its root.
+      if (prev.some((c) => c.id === targetId)) {
+        return prev.map((c) => (c.id === targetId ? { ...c, items: [...c.items, copy], collapsed: false } : c));
+      }
+      let inserted = false;
+      const next = prev.map((c) => {
+        if (inserted) return c;
+        const r = insertRelative(c.items, targetId, copy, where);
+        if (r.done) { inserted = true; return { ...c, items: r.items }; }
+        return c;
+      });
+      return inserted ? next : prev;
+    });
+  }, [setCollections]);
+
   // Clone a folder or request (deep, new ids) next to itself.
   const cloneItem = useCallback((collectionId: string, itemId: string) => {
     setCollections((prev) => prev.map((c) =>
@@ -728,7 +763,7 @@ export function useApiStore() {
     activeRequestId, activeRequest, openRequests, inheritedScripts, activeCollectionVars,
     setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,
-    addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, updateRequest, setNodeScript, setNodeAuth,
+    addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, copyItem, updateRequest, setNodeScript, setNodeAuth,
     setNodeHeaders,
     setCollectionVariables,
     addEnvironment, duplicateEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
