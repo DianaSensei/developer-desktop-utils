@@ -5,7 +5,7 @@ import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
-  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type,
+  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard,
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -21,6 +21,7 @@ import {
   applyFontToDocument, type FontPreference,
 } from '@/lib/fontPreference';
 import { getAppPermissionGroups } from '@/lib/appPermissions';
+import { getShortcutGroups } from '@/lib/shortcuts';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import {
@@ -174,6 +175,10 @@ function ToolRowFields({ tool, enabled, favorite, onToggleFavorite, onToggleEnab
   );
 }
 
+function Kbd({ children }: { children: string }) {
+  return <kbd className="rounded border border-line bg-bg-2 px-1 py-0.5 font-mono text-[11px] text-fg">{children}</kbd>;
+}
+
 /**
  * Bốn swatch tròn cho tone chủ đạo — bản gọn của bộ chọn trong `design/preview/index.html`.
  * Chỉ đổi `--a-h/--a-s/--a-l`; mọi biến thể accent (nhuộm, viền, mực đậm) tự
@@ -245,6 +250,7 @@ const PERMISSION_NAMESPACE_ICONS: Record<string, typeof Clipboard> = {
 };
 
 const APP_PERMISSION_GROUPS = getAppPermissionGroups();
+const SHORTCUT_GROUPS = getShortcutGroups();
 
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools, isFavorite, toggleFavorite } = useFeatures();
@@ -253,7 +259,9 @@ export function Settings() {
   const { config, setField, resetConfig } = useAppConfig();
   const { locale, setLocale, t } = useLocale();
   const [configOpen, setConfigOpen] = useState(false);
-  const [permsOpen, setPermsOpen] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [permsOpen, setPermsOpen] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('');
   const [dataDir, setDataDir] = useState('');
   // Khởi tạo từ storage — main.tsx đã áp tone này lên <html> trước khi React
@@ -438,11 +446,19 @@ export function Settings() {
       <section className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold">{t('settings.section.tools')}</h2>
-            <p className="text-[11px] text-fg-mute mt-0.5">
+            <button
+              onClick={() => setToolsOpen((o) => !o)}
+              className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-fg/80"
+              aria-expanded={toolsOpen}
+            >
+              <ChevronDown className={cn('h-4 w-4 shrink-0 text-fg-mute transition-transform', !toolsOpen && '-rotate-90')} />
+              {t('settings.section.tools')}
+            </button>
+            <p className="text-[11px] text-fg-mute mt-0.5 pl-[22px]">
               {t('settings.tools.enabledCount', { enabled: enabledCount, total: TOOL_DEFS.length })}
             </p>
           </div>
+          {toolsOpen && (
           <div className="flex flex-wrap items-center gap-2">
             {!allEnabled && (
               <button
@@ -470,8 +486,11 @@ export function Settings() {
               {t('common.reset')}
             </button>
           </div>
+          )}
         </div>
 
+        {toolsOpen && (
+        <>
         {/* Search */}
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-mute/60" />
@@ -615,8 +634,59 @@ export function Settings() {
             return nodes;
           })()}
         </div>
+        </>
+        )}
       </section>
 
+      {/* Keyboard shortcuts section */}
+      <section className="space-y-3">
+        <button
+          onClick={() => setShortcutsOpen((o) => !o)}
+          className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-fg/80"
+          aria-expanded={shortcutsOpen}
+        >
+          <ChevronDown className={cn('h-4 w-4 text-fg-mute transition-transform', !shortcutsOpen && '-rotate-90')} />
+          {t('settings.section.shortcuts')}
+          <Keyboard className="h-3.5 w-3.5 text-fg-mute" />
+        </button>
+        {shortcutsOpen && (
+        <>
+        <p className="text-[11px] text-fg-mute -mt-1">
+          {t('settings.shortcuts.description')}
+        </p>
+        <div className="rounded-lg border divide-y">
+          {SHORTCUT_GROUPS.map((group) => {
+            const tool = group.toolId ? TOOL_DEFS.find((td) => td.id === group.toolId) : null;
+            const GroupIcon = tool?.icon ?? Keyboard;
+            const label = tool?.label ?? t('settings.shortcuts.global');
+            return (
+              <div key={group.toolId ?? 'global'} className="flex items-start gap-3 px-4 py-3">
+                <GroupIcon className="h-4 w-4 shrink-0 mt-0.5 text-acc" />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <p className="text-xs font-medium">{label}</p>
+                  <ul className="space-y-1.5">
+                    {group.shortcuts.map((s, i) => (
+                      <li key={i} className="flex items-center gap-2 text-[11px] leading-relaxed">
+                        <span className="flex shrink-0 items-center gap-0.5">
+                          {s.keys.map((k, ki) => (
+                            <span key={ki} className="flex items-center gap-0.5">
+                              {ki > 0 && <span className="text-fg-mute/50">{s.join === 'either' ? '/' : '+'}</span>}
+                              <Kbd>{k}</Kbd>
+                            </span>
+                          ))}
+                        </span>
+                        <span className="text-fg-mute">{s.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        </>
+        )}
+      </section>
 
       {/* Permissions section */}
       <section className="space-y-3">
