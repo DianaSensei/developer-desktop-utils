@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseScriptErrors, looksLikeCorsRejection } from './ResponsePanel';
+import { parseScriptErrors, looksLikeCorsRejection, looksLikeCertError, looksLikeRedirectLoop } from './ResponsePanel';
 import type { ApiResponse } from './types';
 
 describe('parseScriptErrors', () => {
@@ -67,5 +67,37 @@ describe('looksLikeCorsRejection', () => {
 
   it('does not flag a 5xx server error', () => {
     expect(looksLikeCorsRejection(res({ status: 500, statusText: 'Internal Server Error', body: 'cors origin blocked' }))).toBe(false);
+  });
+});
+
+describe('looksLikeCertError', () => {
+  it('flags a self-signed certificate message', () => {
+    expect(looksLikeCertError('error trying to connect: self signed certificate')).toBe(true);
+  });
+
+  it('flags an untrusted issuer message', () => {
+    expect(looksLikeCertError('invalid peer certificate: UnknownIssuer')).toBe(true);
+  });
+
+  it('flags a bare "certificate" mention', () => {
+    expect(looksLikeCertError('unable to get local issuer certificate')).toBe(true);
+  });
+
+  it('does not flag an unrelated network error', () => {
+    expect(looksLikeCertError('connection refused')).toBe(false);
+  });
+
+  it('does not match "ssl" as a substring of an unrelated word', () => {
+    expect(looksLikeCertError('the grassland was empty')).toBe(false);
+  });
+});
+
+describe('looksLikeRedirectLoop', () => {
+  it('flags reqwest\'s "too many redirects" message', () => {
+    expect(looksLikeRedirectLoop('error following redirect: too many redirects')).toBe(true);
+  });
+
+  it('does not flag an unrelated transport error', () => {
+    expect(looksLikeRedirectLoop('connection refused')).toBe(false);
   });
 });

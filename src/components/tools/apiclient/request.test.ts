@@ -164,6 +164,21 @@ describe('sendRequest — request building', () => {
     const settings = { ...newRequest().settings, timeout: 10 };
     await expect(sendRequest(req({ settings }), {})).rejects.toThrow(/timed out after 10 ms/);
   });
+
+  it('passes a danger flag to disable cert verification when verifyTls is off', async () => {
+    const spy = stubFetch(fakeResponse(new TextEncoder().encode('{}'), { 'content-type': 'application/json' }));
+    const settings = { ...newRequest().settings, verifyTls: false };
+    await sendRequest(req({ settings }), {});
+    const [, init] = spy.mock.calls[0] as unknown as [string, RequestInit & { danger?: unknown }];
+    expect(init.danger).toEqual({ acceptInvalidCerts: true, acceptInvalidHostnames: true });
+  });
+
+  it('omits the danger flag by default (verifyTls left at its default)', async () => {
+    const spy = stubFetch(fakeResponse(new TextEncoder().encode('{}'), { 'content-type': 'application/json' }));
+    await sendRequest(req(), {});
+    const [, init] = spy.mock.calls[0] as unknown as [string, RequestInit & { danger?: unknown }];
+    expect(init.danger).toBeUndefined();
+  });
 });
 
 describe('URL ⇄ params sync', () => {

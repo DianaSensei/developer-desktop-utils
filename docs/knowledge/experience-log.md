@@ -1,5 +1,34 @@
 # Experience log
 
+## [2026-08-27] API Client — "CORS" was one instance of a wider pattern: transport errors that read like a familiar term but come from a different layer
+- Nguyên nhân: sau khi fix xong case CORS/Origin (entry ngay dưới), người dùng hỏi tiếp "còn lỗi
+  nào tương tự có thể gặp" và "copy cURL từ Chrome/Edge/Safari có bị ảnh hưởng không" — tức cùng
+  một dạng câu hỏi, khái quát hoá từ 1 case cụ thể sang cả họ vấn đề. Rà lại `request.ts`'s
+  `netFetch` (đi qua `@tauri-apps/plugin-http`) thấy còn 2 lớp lỗi transport dễ đọc nhầm y hệt
+  kiểu CORS: (1) lỗi TLS certificate (self-signed/expired/hostname-mismatch) hiện ra như một câu
+  lỗi Rust/reqwest khó hiểu, không phải "khoá không hợp lệ" rõ ràng; (2) "too many redirects" khi
+  vượt `maxRedirects` — dễ tưởng server lỗi thay vì do giới hạn client tự đặt. Đồng thời rà
+  `curl.ts`'s `tokenize()` xác nhận: parser chỉ hiểu bash/POSIX quoting, nên dán cURL dạng
+  Windows cmd.exe (copy từ DevTools chọn nhầm "Copy as cURL (cmd)") sẽ mis-parse do khác cơ chế
+  line-continuation (`^` thay vì `\`) — một dạng nhầm lẫn thuật ngữ tương tự (cùng gọi là "cURL"
+  nhưng 2 định dạng khác nhau).
+- Số lần thử: 1/1 — cả 3 phát hiện đều xác nhận từ đọc source thật trước khi code: `.d.ts` của
+  `@tauri-apps/plugin-http` xác nhận `danger: DangerousSettings` đã tồn tại sẵn (không cần đoán
+  hay thêm Tauri command mới); `curl.ts`'s `tokenize()` đọc trực tiếp để xác nhận nó chỉ xử lý
+  `\`/`'`/`"`, không có nhánh nào xử lý `^`.
+- Kết quả: Đã thêm (xem `docs/decisions/transport-error-hints.md` để biết đầy đủ lý do thiết kế):
+  `RequestSettings.verifyTls` (setting mới, mặc định `true`, nối vào `danger` option có sẵn của
+  plugin-http) + `looksLikeCertError`/`looksLikeRedirectLoop` (heuristic trong `ResponsePanel.tsx`,
+  cùng khuôn với `looksLikeCorsRejection` đã có) + `looksLikeCmdFormat`/`hasSessionCredentials`
+  (heuristic trong `curl.ts`, hiện Callout ngay trong `ImportCurlDialog.tsx` khi đang dán). Cả 4
+  đều chỉ hiện gợi ý, không tự sửa, và tự tắt khi setting liên quan đã bị người dùng chủ động đổi
+  khỏi mặc định (tránh lặp lại lời khuyên vô ích khi họ đã biết và đã thử).
+- Bài học chung: một câu hỏi khái quát hoá ("còn lỗi tương tự nào khác") sau khi fix xong 1 case
+  cụ thể là tín hiệu nên chủ động rà toàn bộ layer liên quan (ở đây là "mọi lỗi transport/parse có
+  thể đọc nhầm bằng thuật ngữ quen thuộc") thay vì chỉ trả lời đúng câu hỏi hẹp — nhóm chúng lại
+  thành 1 quyết định thiết kế chung (gợi ý không tự sửa, tự tắt khi setting đã lệch mặc định) thay
+  vì xử lý rời rạc từng case sẽ nhất quán hơn cho người dùng và dễ maintain hơn cho code sau này.
+
 ## [2026-08-27] API Client — user-reported "CORS" in the desktop app is the target server rejecting a missing `Origin` header, not a browser CORS block
 - Nguyên nhân: người dùng báo "bị chặn CORS" khi chạy **bản desktop** (Tauri), nơi
   `request.ts`'s `netFetch` đã đi qua `@tauri-apps/plugin-http`'s `fetch` (chạy network call từ

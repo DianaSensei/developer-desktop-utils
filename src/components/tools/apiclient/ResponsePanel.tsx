@@ -22,7 +22,7 @@ import { Callout } from '@/components/ui/callout';
 import { isMac } from '@/hooks/useQuickPaste';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import type { ApiResponse, LogEntry, TestResult } from './types';
+import type { ApiRequest, ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
 import { saveBinaryFile, saveTextFile } from './fileio';
 import { queryJson } from './jsonpath';
@@ -100,11 +100,13 @@ interface Props {
   // Switches the request builder to the tab holding the script that failed
   // (only own-request scripts map to one — see parseScriptErrors above).
   onJumpToTab?: (tab: RequestPanelTab) => void;
-  // Whether the request that produced `response` already has an `Origin`
-  // header of its own — suppresses the CORS/Origin hint below once the user
-  // has already acted on it. Only checks the request's own Headers tab, not
-  // an inherited collection/folder header of the same name.
-  hasOriginHeader?: boolean;
+  // Switches to the request's Settings tab — used by the TLS/redirect hints
+  // below to point straight at the toggle that would fix them.
+  onJumpToSettings?: () => void;
+  // The request that produced `response`/`error`, so the hints below can check
+  // its own Headers (for an existing `Origin`) and Settings (verifyTls,
+  // followRedirects/maxRedirects) without the caller precomputing each one.
+  request?: ApiRequest | null;
 }
 
 type Tab = 'body' | 'headers' | 'timeline' | 'tests' | 'console';
@@ -118,13 +120,34 @@ type Tab = 'body' | 'headers' | 'timeline' | 'tests' | 'console';
 const CORS_HINT_PATTERN =
   /\bcors\b|access-control-allow-origin|origin[^.!?]{0,30}(not allow|disallow|block|reject|forbidden)|(not allow|disallow|block|reject|forbidden)[^.!?]{0,30}origin/i;
 
+// A transport error (never got a response at all) whose message talks about
+// the TLS certificate — self-signed/expired/hostname-mismatched, the classic
+// "testing against a local/dev HTTPS server" failure. `\bssl\b`/`\btls\b` are
+// word-bounded so this doesn't fire on an unrelated word that merely contains
+// those letters.
+const CERT_ERROR_PATTERN =
+  /\bcertificate\b|self[- ]signed|\bssl\b|\btls\b|unknownissuer|unable to get local issuer|invalid peer certificate|notvalidfor|hostname mismatch/i;
+
+export function looksLikeCertError(error: string): boolean {
+  return CERT_ERROR_PATTERN.test(error);
+}
+
+// reqwest's redirect policy reports exactly this phrase once a chain exceeds
+// the configured cap — distinct from a single unexpected redirect, which
+// would show up as a 3xx response instead of a transport error.
+const REDIRECT_LOOP_PATTERN = /too many redirects/i;
+
+export function looksLikeRedirectLoop(error: string): boolean {
+  return REDIRECT_LOOP_PATTERN.test(error);
+}
+
 export function looksLikeCorsRejection(response: ApiResponse): boolean {
   if (response.ok || response.status < 400 || response.status >= 500) return false;
   const haystack = `${response.body} ${response.headers.map(([k, v]) => `${k}: ${v}`).join(' ')}`;
   return CORS_HINT_PATTERN.test(haystack);
 }
 
-export function ResponsePanel({ response, sending, error, tests, logs, onClear, onJumpToTab, hasOriginHeader }: Props) {
+export function ResponsePanel({ response, sending, error, tests, logs, onClear, onJumpToTab, onJumpToSettings, request }: Props) {
   const [tab, setTab] = useState<Tab>('body');
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -183,7 +206,14 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   }, [response, big, format, pretty, filterResult]);
 
   const failed = tests.filter((t) => !t.passed).length;
+  const hasOriginHeader = !!request?.headers.some((h) => h.enabled && h.key.trim().toLowerCase() === 'origin');
   const corsHint = !!response && !hasOriginHeader && looksLikeCorsRejection(response);
+  // The two below are transport failures (no response at all), so they key off
+  // `error`, not `response` — and only while the request is still at the
+  // setting's default, so turning it on/up on purpose doesn't keep re-showing
+  // advice the user already acted on.
+  const certHint = !!error && request?.settings.verifyTls !== false && looksLikeCertError(error);
+  const redirectHint = !!error && request?.settings.followRedirects !== false && looksLikeRedirectLoop(error);
 
   const copy = useCallback(async () => {
     const text = tab === 'headers'
@@ -341,6 +371,40 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
             The server may be rejecting this for missing an <code className="rounded bg-bg-2 px-1">Origin</code> header
             — unlike a browser tab, this app's requests don't send one automatically. Try adding an{' '}
             <code className="rounded bg-bg-2 px-1">Origin</code> header on the Params tab with the value the API expects.
+          </Callout>
+        </div>
+      )}
+
+      {certHint && (
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+          <Callout
+            tone="warning" size="sm" title="Looks like a certificate problem"
+            actions={onJumpToSettings && (
+              <button onClick={onJumpToSettings} className="rounded px-1.5 py-0.5 text-[11px] font-medium underline-offset-2 hover:underline">
+                Open Settings
+              </button>
+            )}
+          >
+            The server's TLS certificate may be self-signed, expired, or for a different hostname — common when
+            testing a local/dev server. Settings tab → SSL Certificate Verification can turn this check off for
+            this request (only for a server you trust).
+          </Callout>
+        </div>
+      )}
+
+      {redirectHint && (
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+          <Callout
+            tone="warning" size="sm" title="Too many redirects"
+            actions={onJumpToSettings && (
+              <button onClick={onJumpToSettings} className="rounded px-1.5 py-0.5 text-[11px] font-medium underline-offset-2 hover:underline">
+                Open Settings
+              </button>
+            )}
+          >
+            The redirect chain exceeded Max Redirects
+            {request ? ` (currently ${request.settings.maxRedirects})` : ''}. If the API is genuinely bouncing
+            between the same URLs, that's a server-side loop; otherwise raise the limit in the Settings tab.
           </Callout>
         </div>
       )}

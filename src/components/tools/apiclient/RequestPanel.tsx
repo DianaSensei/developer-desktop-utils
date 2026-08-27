@@ -65,7 +65,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
     { id: 'auth', label: `Auth${request.auth.type !== 'none' ? ' •' : ''}` },
     { id: 'script', label: `Script${hasScript || hasVars ? ' •' : ''}` },
     { id: 'tests', label: `Tests${count(enabledAsserts)}${request.tests.trim() ? ' •' : ''}` },
-    { id: 'settings', label: 'Settings' },
+    { id: 'settings', label: `Settings${request.settings.verifyTls === false ? ' •' : ''}` },
   ];
 
   return (
@@ -585,6 +585,19 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
         clearable
         onChange={(timeout) => set({ timeout })}
       />
+
+      <ToggleRow
+        title="SSL Certificate Verification"
+        hint="Reject a self-signed, expired, or hostname-mismatched certificate. Turn off only for a local/dev server you trust — anyone on the network can impersonate the server while this is off."
+        checked={settings.verifyTls}
+        onChange={(verifyTls) => set({ verifyTls })}
+      />
+      {!settings.verifyTls && (
+        <Callout tone="warning" size="sm">
+          Certificate errors are being ignored for this request — including a real man-in-the-middle
+          on an untrusted network. Turn this back on once you're done testing against the self-signed server.
+        </Callout>
+      )}
     </div>
   );
 }

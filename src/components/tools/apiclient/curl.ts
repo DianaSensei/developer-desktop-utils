@@ -29,6 +29,27 @@ function tokenize(cmd: string): string[] {
 
 const NO_ARG = new Set(['-L', '--location', '--compressed', '-s', '--silent', '-S', '-k', '--insecure', '-i', '-I', '--head', '-v', '--verbose', '-g', '-#', '--progress-bar', '-f', '--fail', '-O', '-j']);
 
+// Chrome/Edge DevTools offer two "Copy as cURL" variants on Windows: "(bash)"
+// and "(cmd)". `tokenize()` above only understands POSIX/bash quoting
+// (backslash escapes, `\<newline>` continuation) — cmd.exe's own escaping
+// (`^<newline>` continuation, doubled `""` inside double-quoted values) reads
+// as garbage to it. A cmd-style paste is reliably identifiable by a `^` right
+// before a line break, which bash has no reason to ever produce there.
+export function looksLikeCmdFormat(input: string): boolean {
+  return /\^[ \t]*\r?\n/.test(input);
+}
+
+// Whether the parsed request carries a credential that's a snapshot of the
+// browser session it was copied from (a Cookie/Authorization header, or
+// -u/--user basic-auth parsed into req.auth) — these expire or get rotated by
+// the server independently of the request itself, so a request that worked
+// at import time can start failing later for a reason that has nothing to do
+// with the request's own configuration.
+export function hasSessionCredentials(req: ApiRequest): boolean {
+  if (req.auth.type === 'basic') return true;
+  return req.headers.some((h) => ['cookie', 'authorization'].includes(h.key.toLowerCase()));
+}
+
 export function parseCurl(input: string): ApiRequest {
   let tokens = tokenize(input.trim());
   if (tokens[0] === 'curl') tokens = tokens.slice(1);

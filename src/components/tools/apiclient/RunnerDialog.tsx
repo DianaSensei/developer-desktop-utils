@@ -909,7 +909,7 @@ function RunDetailView({ entry, onBack }: { entry: RunDetail; onBack: () => void
           error={result.error}
           tests={result.tests}
           logs={result.logs}
-          hasOriginHeader={request.headers.some((h) => h.enabled && h.key.trim().toLowerCase() === 'origin')}
+          request={request}
         />
       ) : (
         <RequestDetail request={request} sentUrl={result.response?.url} dataVars={dataVars} />

@@ -12,9 +12,13 @@ import { newKeyValue } from './types';
 import { substituteVars } from './vars';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
 import { type Cookie, cookieHeader } from './cookies';
+// Type-only — the actual module is loaded dynamically below, only when
+// running in Tauri, so this import never reaches the web build's bundle.
+import type { DangerousSettings } from '@tauri-apps/plugin-http';
 
+type NetFetchInit = RequestInit & { maxRedirections?: number; danger?: DangerousSettings };
 
-async function netFetch(input: string, init: RequestInit): Promise<Response> {
+async function netFetch(input: string, init: NetFetchInit): Promise<Response> {
   if (isTauri) {
     const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
     return tauriFetch(input, init);
@@ -201,7 +205,7 @@ export function clearOAuthTokenCache(): void {
 }
 
 // Fetch an OAuth2 access token (client-credentials or password grant).
-async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal): Promise<string> {
+async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal, verifyTls = true): Promise<string> {
   const url = sub(o.tokenUrl).trim();
   if (!url) throw new Error('OAuth2: token URL is required');
 
@@ -225,6 +229,7 @@ async function fetchOAuthToken(o: OAuth2Auth, sub: Sub, signal?: AbortSignal): P
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
     body: form.toString(),
     signal,
+    ...(verifyTls === false ? { danger: { acceptInvalidCerts: true, acceptInvalidHostnames: true } } : {}),
   });
   const raw = await res.text();
   let json: { access_token?: string; expires_in?: number; error?: string; error_description?: string };
@@ -307,7 +312,7 @@ export async function sendRequest(
   const reqHeaders = buildHeaders(req, sub, inheritedHeaders);
   // OAuth2: fetch an access token first, then send the request as Bearer.
   if (req.auth.type === 'oauth2') {
-    reqHeaders['Authorization'] = `Bearer ${await fetchOAuthToken(req.auth.oauth2, sub, timeoutCtl ? timeoutCtl.signal : signal)}`;
+    reqHeaders['Authorization'] = `Bearer ${await fetchOAuthToken(req.auth.oauth2, sub, timeoutCtl ? timeoutCtl.signal : signal, req.settings?.verifyTls !== false)}`;
   }
 
   // Auto-attach jar cookies unless the request sets its own Cookie header.
@@ -316,7 +321,7 @@ export async function sendRequest(
     if (header) reqHeaders['Cookie'] = header;
   }
 
-  const init: RequestInit & { maxRedirections?: number } = {
+  const init: NetFetchInit = {
     method: req.method,
     headers: reqHeaders,
     signal: timeoutCtl ? timeoutCtl.signal : signal,
@@ -324,6 +329,10 @@ export async function sendRequest(
   };
   // Tauri's HTTP plugin honours `maxRedirections`; harmless on web fetch.
   if (req.settings?.followRedirects !== false) init.maxRedirections = req.settings?.maxRedirects ?? 5;
+  // "SSL certificate verification" off (Postman/Insomnia's term) — accepts a
+  // self-signed/expired/hostname-mismatched cert. Tauri-only; ignored by the
+  // web build's plain `fetch`, which has no equivalent escape hatch.
+  if (req.settings?.verifyTls === false) init.danger = { acceptInvalidCerts: true, acceptInvalidHostnames: true };
   const body = buildBody(req, sub);
   if (body !== undefined) init.body = body;
 
