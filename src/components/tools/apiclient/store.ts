@@ -126,6 +126,19 @@ function mapTree(items: TreeItem[], fn: (item: TreeItem) => TreeItem): TreeItem[
   return changed ? next : items;
 }
 
+// Ids of every ancestor folder (root-first) containing `id`, or null if `id`
+// isn't found under `items` at all. Used by revealRequest below.
+function findAncestorPath(items: TreeItem[], id: string, path: string[] = []): string[] | null {
+  for (const it of items) {
+    if (it.id === id) return path;
+    if (it.type === 'folder') {
+      const found = findAncestorPath(it.items, id, [...path, it.id]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function removeFromTree(items: TreeItem[], id: string): TreeItem[] {
   return items
     .filter((item) => item.id !== id)
@@ -460,6 +473,31 @@ export function useApiStore() {
     }));
   }, [setCollections]);
 
+  // Force-expand the collection and every ancestor folder containing `id` —
+  // an explicit "make sure this is visible", not a toggle. Called when a
+  // request becomes active from outside the tree (reopening a tab, jumping
+  // in from History or the Runner), so it's never left sitting invisible
+  // behind a collapsed ancestor with no clue where it actually lives.
+  // Identity-preserving (via mapTree) so selecting a request that's already
+  // fully expanded is a no-op — no extra render, no extra persisted write.
+  const revealRequest = useCallback((id: string) => {
+    setCollections((prev) => {
+      let changed = false;
+      const next = prev.map((c) => {
+        const path = findAncestorPath(c.items, id);
+        if (path === null) return c;
+        const pathSet = new Set(path);
+        const items = mapTree(c.items, (item) =>
+          item.type === 'folder' && pathSet.has(item.id) && item.collapsed ? { ...item, collapsed: false } : item,
+        );
+        if (items === c.items && !c.collapsed) return c;
+        changed = true;
+        return { ...c, collapsed: false, items };
+      });
+      return changed ? next : prev;
+    });
+  }, [setCollections]);
+
   // Add a request (or folder) to a collection root, or into a folder by parentId.
   const addItem = useCallback((collectionId: string, kind: 'request' | 'folder', parentId?: string) => {
     const child: TreeItem = kind === 'request' ? newRequest() : newFolder();
@@ -762,7 +800,7 @@ export function useApiStore() {
     collections, environments, activeEnvId, activeEnv, activeEnvMismatched, selectedEnv, history, activeCollectionId,
     activeRequestId, activeRequest, openRequests, inheritedScripts, activeCollectionVars,
     setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
-    addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,
+    addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse, revealRequest,
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, copyItem, updateRequest, setNodeScript, setNodeAuth,
     setNodeHeaders,
     setCollectionVariables,

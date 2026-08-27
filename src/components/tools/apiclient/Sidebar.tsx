@@ -11,6 +11,8 @@ import {
   CopyPlus,
   Download,
   FilePlus2,
+  Folder as FolderIconClosed,
+  FolderOpen as FolderIconOpen,
   FolderPlus,
   Code2,
   Layers,
@@ -18,6 +20,7 @@ import {
   Pencil,
   Play,
   Plus,
+  SearchX,
   Trash2,
   Upload,
   X,
@@ -28,6 +31,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { ApiStore } from './store';
 import { type ApiRequest, type Auth, type Collection, type Folder, type KeyValue, type RequestScript, type TreeItem, newAuth, normalizeRequest } from './types';
 import { importPostman, exportPostman } from './postman';
@@ -61,6 +65,21 @@ function itemMatches(item: TreeItem, q: string): boolean {
 function collectionMatches(c: Collection, q: string): boolean {
   return c.name.toLowerCase().includes(q) || c.items.some((i) => itemMatches(i, q));
 }
+
+// Whether `id` (the active request) sits anywhere under `items` — used to put
+// a small "contains the open request" dot on a folder/collection that's
+// currently collapsed, so collapsing something you're actively working in
+// never means losing track of where it is.
+function containsRequestId(items: TreeItem[], id: string): boolean {
+  return items.some((it) => it.id === id || (it.type === 'folder' && containsRequestId(it.items, id)));
+}
+
+// One shared width for every row's leading type-indicator — the request
+// method badge (GET/POST/…) and the folder/collection icon alike — so every
+// row's name starts at the exact same x regardless of what kind of node it
+// is. Matches the width method-color.ts's `methodShort` abbreviations were
+// already sized for.
+const TYPE_COL = 'w-[2.25rem]';
 
 // One entry in a context menu. `sep` draws a divider above the item. Same
 // shape as the shared ContextMenu primitive's entries.
@@ -139,6 +158,17 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     setDragId(null);
     setDropTarget(null);
   }, [dragId, dropTarget]);
+
+  // Expand whatever ancestor folders/collection are hiding the active request
+  // whenever it *changes* — reopening a tab, jumping in from History, the
+  // Runner — so it's never left invisible behind a collapsed ancestor with no
+  // clue where it lives. Deliberately keyed on activeRequestId alone: this
+  // fires once per selection, not on every render, so it never fights a
+  // collapse the user makes afterwards while still working in that request.
+  useEffect(() => {
+    if (store.activeRequestId) store.revealRequest(store.activeRequestId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.activeRequestId]);
 
   // Importing a collection that carries scripts is a decision to run someone
   // else's code on the next Send, so it goes through a review step instead of
@@ -241,11 +271,21 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       {/* tree */}
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {store.collections.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-fg-mute">
-            No collections yet. Create one, or import a Postman file or OpenAPI spec.
-          </p>
+          <EmptyState
+            icon={Boxes}
+            title="No collections yet"
+            description="Create a collection, or import a Postman file / OpenAPI spec to get started."
+            action={{ label: 'New collection', onClick: () => store.addCollection() }}
+            secondaryAction={{ label: 'Import…', onClick: handleImport }}
+            className="px-4 py-8"
+          />
         ) : visible.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-fg-mute">No matches.</p>
+          <EmptyState
+            icon={SearchX}
+            title="No matches"
+            description={`Nothing in your collections matches "${query}".`}
+            className="px-4 py-8"
+          />
         ) : (
           visible.map((c) => <CollectionNode key={c.id} collection={c} ctx={nodeCtx} />)
         )}
@@ -302,6 +342,10 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
     onConfirm: () => store.deleteCollection(collection.id),
   });
 
+  // New Request first — the action taken most often — with New Folder right
+  // behind it, so both survive being folded into one "More" menu instead of
+  // a second hover button next to it (one action per row keeps the row from
+  // getting crowded — see RequestNode's own entries below for the same call).
   const entries: MenuEntry[] = [
     { icon: <FilePlus2 className="h-3.5 w-3.5" />, label: 'New Request', onClick: () => store.addItem(collection.id, 'request') },
     { icon: <FolderPlus className="h-3.5 w-3.5" />, label: 'New Folder', onClick: () => store.addItem(collection.id, 'folder') },
@@ -314,6 +358,10 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
     { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeCollection },
   ];
 
+  // Collapsed and still holding the open request — the dot on Row is the only
+  // thing left saying so once its contents are hidden.
+  const containsActive = collapsed && !!ctx.activeRequestId && containsRequestId(collection.items, ctx.activeRequestId);
+
   return (
     <div>
       <Row
@@ -325,15 +373,12 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
         hasChildren
         icon={<Layers className="h-3.5 w-3.5 text-fg-mute" />}
         name={collection.name}
+        nameClassName="font-semibold"
+        dot={containsActive}
         onToggle={() => store.toggleCollapse(collection.id)}
         onRename={(name) => store.renameCollection(collection.id, name)}
         entries={entries}
-        actions={
-          <>
-            <IconBtn title="Add request" onClick={() => store.addItem(collection.id, 'request')}><FilePlus2 className="h-3.5 w-3.5" /></IconBtn>
-            <IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>
-          </>
-        }
+        actions={<IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
       />
       {!collapsed && collection.items.filter((it) => !ctx.q || itemMatches(it, ctx.q)).map((item) => (
         <TreeNode key={item.id} item={item} depth={1} collectionId={collection.id} ctx={ctx} />
@@ -370,6 +415,13 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
     { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeFolder },
   ];
 
+  // Open/closed folder icon (VS Code convention) — folders previously had no
+  // icon at all, making them visually indistinguishable from an empty row at
+  // a glance; the icon doubles as a second, always-visible cue for collapsed
+  // state next to the chevron.
+  const FolderIcon = collapsed ? FolderIconClosed : FolderIconOpen;
+  const containsActive = collapsed && !!ctx.activeRequestId && containsRequestId(folder.items, ctx.activeRequestId);
+
   return (
     <div>
       <Row
@@ -379,16 +431,14 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
         depth={depth}
         collapsed={collapsed}
         hasChildren
+        icon={<FolderIcon className="h-3.5 w-3.5 text-fg-mute" />}
         name={folder.name}
+        nameClassName="font-medium"
+        dot={containsActive}
         onToggle={() => store.toggleCollapse(collectionId, folder.id)}
         onRename={(name) => store.renameItem(folder.id, name)}
         entries={entries}
-        actions={
-          <>
-            <IconBtn title="Add request" onClick={() => store.addItem(collectionId, 'request', folder.id)}><FilePlus2 className="h-3.5 w-3.5" /></IconBtn>
-            <IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>
-          </>
-        }
+        actions={<IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
       />
       {!collapsed && folder.items.filter((it) => !ctx.q || itemMatches(it, ctx.q)).map((child) => (
         <TreeNode key={child.id} item={child} depth={depth + 1} collectionId={collectionId} ctx={ctx} />
@@ -421,13 +471,11 @@ const RequestNode = memo(function RequestNode({ request, depth, collectionId, ct
       active={active}
       badge={
         // Text, not a tinted pill: at one pill per row the tint became the
-        // loudest thing in the panel and the padding pushed every name right by
-        // a different amount. A fixed 2.25rem gutter puts the names in a single
-        // column and leaves the method readable by color + label alone.
-        <span
-          title={request.method}
-          className={cn('w-[2.25rem] shrink-0 text-[11px] font-bold uppercase', methodColor(request.method))}
-        >
+        // loudest thing in the panel. Width comes from Row's shared TYPE_COL
+        // wrapper (same column every folder/collection icon sits in too), so
+        // every row's name — request, folder, or collection alike — starts at
+        // the same x; only the color + label need to carry the method.
+        <span title={request.method} className={cn('text-[11px] font-bold uppercase', methodColor(request.method))}>
           {methodShort(request.method)}
         </span>
       }
@@ -458,13 +506,21 @@ interface RowProps {
   hasChildren?: boolean;
   icon?: React.ReactNode;
   badge?: React.ReactNode;
+  // Small "contains the active request" indicator, shown on the icon corner
+  // — only meaningful (and only ever passed) while collapsed, since once
+  // expanded the active row itself is the indicator.
+  dot?: boolean;
+  // Typographic weight cue for the row's kind — collection heavier than
+  // folder, folder heavier than a plain request — so the three read as a
+  // hierarchy at a glance instead of three visually identical text lines.
+  nameClassName?: string;
   actions?: React.ReactNode;
   onClick?: () => void;
   onToggle?: () => void;
 }
 
 function Row({
-  ctx, id, depth, name, onRename, entries, active, container, collapsed, hasChildren, icon, badge, actions, onClick, onToggle,
+  ctx, id, depth, name, onRename, entries, active, container, collapsed, hasChildren, icon, badge, dot, nameClassName, actions, onClick, onToggle,
 }: RowProps) {
   const editing = ctx.editingId === id;
   const [draft, setDraft] = useState(name);
@@ -480,8 +536,19 @@ function Row({
   const dragging = ctx.dragId === id;
   const dt = ctx.dragId && ctx.dropTarget?.id === id ? ctx.dropTarget : null;
 
+  // Bring the active request into view the moment it becomes active (opening
+  // a tab, reopening from History, the Runner) — expanding its ancestors
+  // (see store.revealRequest) is wasted if the row itself is still scrolled
+  // off-screen. `active` is only ever true on a RequestNode's Row, so this is
+  // a no-op for every folder/collection row.
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (active) rowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [active]);
+
   return (
     <div
+      ref={rowRef}
       draggable={!editing}
       onDragStart={(e) => { e.stopPropagation(); ctx.setDragId(id); e.dataTransfer.effectAllowed = 'copyMove'; }}
       onDragEnd={() => { ctx.setDragId(null); ctx.setDropTarget(null); }}
@@ -504,7 +571,11 @@ function Row({
         // a folder just expanded, a drag-copy landing — and never replays on a
         // re-render of a row that already existed (React keeps its DOM node by
         // `key`), so plain reorders and edits stay perfectly still.
-        'group relative flex min-h-[26px] items-center gap-1.5 py-1 pr-1 text-xs cursor-pointer transition-colors hover:bg-bg-2/60 motion-safe:animate-fade-in-up',
+        // min-h-[28px]/gap-2, not the previous 26px/1.5: dense is the right
+        // default for this tree, but 26px left icon/chevron/badge/name
+        // touching each other with no breathing room, which read as clutter
+        // rather than density — this is the smallest bump that fixes that.
+        'group relative flex min-h-[28px] items-center gap-2 py-1 pr-1 text-xs cursor-pointer transition-colors hover:bg-bg-2/60 motion-safe:animate-fade-in-up',
         // Selection is a tint, not a saturated accent fill: bg-acc is the solid
         // action blue, and body text on it clears neither AA nor the rule that
         // solid accent belongs to the one primary action on a screen.
@@ -526,8 +597,21 @@ function Row({
       ) : (
         <span className="w-0 shrink-0" />
       )}
-      {icon}
-      {badge}
+      {/* One shared-width column for whatever marks the row's kind — method
+          badge for a request, folder/collection icon otherwise — so every
+          row's name starts at the same x (see TYPE_COL). */}
+      {(icon || badge) && (
+        <span className={cn('relative flex shrink-0 items-center justify-center', TYPE_COL)}>
+          {icon}
+          {badge}
+          {dot && (
+            <span
+              title="Contains the open request"
+              className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-acc"
+            />
+          )}
+        </span>
+      )}
       {editing ? (
         <Input
           autoFocus
@@ -542,7 +626,7 @@ function Row({
           className="h-6 flex-1 px-1 text-xs"
         />
       ) : (
-        <span className="flex-1 truncate" onDoubleClick={(e) => { e.stopPropagation(); ctx.setEditingId(id); }}>
+        <span className={cn('flex-1 truncate', nameClassName)} onDoubleClick={(e) => { e.stopPropagation(); ctx.setEditingId(id); }}>
           {name}
         </span>
       )}

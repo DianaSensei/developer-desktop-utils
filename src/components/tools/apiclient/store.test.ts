@@ -492,3 +492,61 @@ describe('useApiStore — moveItem / copyItem (sidebar drag & drop)', () => {
     }
   });
 });
+
+describe('useApiStore — revealRequest (sidebar auto-expand on select)', () => {
+  it('expands every collapsed ancestor folder and the collection containing the request', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let outerId = '';
+    act(() => { outerId = result.current.addItem(collectionId, 'folder'); });
+    let innerId = '';
+    act(() => { innerId = result.current.addItem(collectionId, 'folder', outerId); });
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(collectionId, 'request', innerId); });
+
+    // Collapse everything on the way down, as if the user tucked it all away.
+    act(() => result.current.toggleCollapse(collectionId));
+    act(() => result.current.toggleCollapse(collectionId, outerId));
+    act(() => result.current.toggleCollapse(collectionId, innerId));
+
+    const findFolder = (id: string) => {
+      const outer = result.current.collections.find((c) => c.id === collectionId)!.items
+        .find((i) => i.id === outerId);
+      const target = id === outerId ? outer : (outer && outer.type === 'folder' ? outer.items.find((i) => i.id === innerId) : undefined);
+      return target && target.type === 'folder' ? target : undefined;
+    };
+    expect(result.current.collections.find((c) => c.id === collectionId)!.collapsed).toBe(true);
+    expect(findFolder(outerId)?.collapsed).toBe(true);
+    expect(findFolder(innerId)?.collapsed).toBe(true);
+
+    act(() => result.current.revealRequest(requestId));
+
+    expect(result.current.collections.find((c) => c.id === collectionId)!.collapsed).toBeFalsy();
+    expect(findFolder(outerId)?.collapsed).toBe(false);
+    expect(findFolder(innerId)?.collapsed).toBe(false);
+  });
+
+  it('is a no-op (same collections reference) when nothing was actually collapsed', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(collectionId, 'request'); });
+
+    const before = result.current.collections;
+    act(() => result.current.revealRequest(requestId));
+    expect(result.current.collections).toBe(before);
+  });
+
+  it('does nothing when the id does not belong to any collection', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const before = result.current.collections;
+    act(() => result.current.revealRequest('does-not-exist'));
+    expect(result.current.collections).toBe(before);
+  });
+});
