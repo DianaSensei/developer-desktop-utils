@@ -101,7 +101,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl gap-0 p-0">
+      <DialogContent size="xl" scrollable>
         {/* h-14 + pr-12, not py-3 + mr-6: DialogContent pins its own close X at
             `right-4 top-4` as a 24px box, so its centre is a fixed 28px from
             the top and right. A 56px header centres this button on the same
@@ -116,7 +116,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
         </DialogHeader>
         {error && <Callout tone="error" size="sm" className="mx-4 mt-3">{error}</Callout>}
 
-        <div className="flex h-[26rem]">
+        <div className="flex min-h-0 flex-1">
           {/* list — grouped by scope */}
           <div className="flex w-60 shrink-0 flex-col border-r">
             {/* Search stays outside the scrolling list — a filter box that

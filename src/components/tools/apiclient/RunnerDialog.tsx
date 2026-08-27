@@ -440,7 +440,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex h-[82vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent size="full" scrollable>
         <DialogHeader className="flex h-14 shrink-0 flex-row items-center border-b px-4">
           <DialogTitle className="flex w-full items-center gap-2 pr-10">
             <Play className="h-4 w-4 shrink-0 text-acc-ink" />

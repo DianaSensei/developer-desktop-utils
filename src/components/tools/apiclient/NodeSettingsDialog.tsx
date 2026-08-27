@@ -49,7 +49,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-w-3xl flex-col gap-0 p-0">
+      <DialogContent size="xl" scrollable>
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>
             {target.kind} settings — <span className="font-normal text-fg-mute">{target.name}</span>
@@ -63,7 +63,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
         </div>
 
         {tab === 'scripts' ? (
-          <div className="flex flex-col gap-4 p-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
             <p className="text-[11px] text-fg-mute">
               These run for every request inside this {target.kind.toLowerCase()} — pre-request before each send, post-response after.
             </p>
@@ -89,14 +89,14 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
             </div>
           </div>
         ) : tab === 'auth' ? (
-          <div className="flex flex-col gap-3 p-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <p className="text-[11px] text-fg-mute">
               Requests with “Inherit” auth use this {target.kind.toLowerCase()}’s authorization.
             </p>
             <AuthEditor auth={auth} onChange={setAuth} allowInherit={false} vars={vars} />
           </div>
         ) : (
-          <div className="flex flex-col gap-3 p-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <p className="text-[11px] text-fg-mute">
               Added to every request inside this {target.kind.toLowerCase()}. A request's own header
               with the same name overrides it.

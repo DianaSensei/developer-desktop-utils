@@ -23,16 +23,51 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+
+// A width scale for every dialog in the app, replacing ad-hoc per-call-site
+// max-w-* values that had drifted with no shared reasoning (sm through 5xl).
+// `md` matches the previous unstated default, so a dialog that omits `size`
+// looks exactly as it did before this scale existed.
+const SIZE_CLASS: Record<DialogSize, string> = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-2xl',
+  xl: 'max-w-3xl',
+  '2xl': 'max-w-4xl',
+  full: 'max-w-5xl',
+};
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean }
->(({ className, children, hideClose, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    hideClose?: boolean;
+    /** Width tier — see `SIZE_CLASS`. Default `md` (the previous fixed size). */
+    size?: DialogSize;
+    /**
+     * A multi-section dialog (its own header/tabs/footer, not the default
+     * centered-text-with-buttons shape) that manages its own internal
+     * scrolling panes. Caps the dialog at 85% of the viewport height instead
+     * of letting it grow past the screen on a short window — every complex
+     * dialog in the app used to pick its own ad-hoc vh value (70/80/82…), and
+     * several picked none at all, which could push content off-screen with
+     * no way to reach it on a small laptop. Also resets the default
+     * `gap-4 p-6` to `gap-0 p-0`, since a dialog like this lays out its own
+     * header border and section padding rather than using Dialog's own.
+     * Render `flex flex-col` content and let each pane inside scroll on its
+     * own (`overflow-y-auto`).
+     */
+    scrollable?: boolean;
+  }
+>(({ className, children, hideClose, size = 'md', scrollable, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-line/70 glass-strong glass-sheen p-6 shadow-lg duration-base ease-out-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+        'fixed left-1/2 top-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-line/70 glass-strong glass-sheen p-6 shadow-lg duration-base ease-out-soft data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+        SIZE_CLASS[size],
+        scrollable && 'flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0',
         className
       )}
       {...props}

@@ -22,6 +22,7 @@ import '@fontsource/ibm-plex-mono/latin-600.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
 import { applyAccentToDocument, getAccentPreference } from './lib/accentPreference';
+import { applyFontToDocument, getFontPreference } from './lib/fontPreference';
 import { isTauri } from './lib/platform';
 
 // The app's module graph (App.tsx and everything it imports, e.g.
@@ -47,6 +48,7 @@ async function bootstrap() {
   // như dark-mode hệ thống, chỉ cần áp một lần lúc khởi động; đổi tại chỗ về
   // sau do Settings tự set thẳng lên <html> khi người dùng bấm chọn.
   applyAccentToDocument(getAccentPreference());
+  applyFontToDocument(getFontPreference());
 
   const { default: App } = await import('./App');
   ReactDOM.createRoot(document.getElementById('root')!).render(

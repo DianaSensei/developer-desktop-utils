@@ -82,6 +82,15 @@ export const DICTIONARY = {
     vi: 'Đổi màu nhấn của toàn app. Trạng thái (hợp lệ/lỗi/cảnh báo) không đổi theo.',
     en: "Changes the app's accent color. Status colors (valid/error/warning) stay fixed.",
   },
+  'settings.font.label': { vi: 'Mặt chữ', en: 'Font' },
+  'settings.font.description': {
+    vi: 'Đổi mặt chữ giao diện chung, dùng mặt chữ hệ thống đã cài sẵn — không cần tải font mới. Chữ đơn cách (mã, số liệu) giữ nguyên.',
+    en: "Changes the app's general UI font, using fonts already installed on your system — nothing new to download. Monospace text (code, data) stays fixed.",
+  },
+  'settings.font.default': { vi: 'Mặc định (Be Vietnam Pro)', en: 'Default (Be Vietnam Pro)' },
+  'settings.font.system': { vi: 'Mặt chữ hệ thống', en: 'System font' },
+  'settings.font.serif': { vi: 'Chữ có chân', en: 'Serif' },
+  'settings.font.classic': { vi: 'Sans cổ điển', en: 'Classic sans' },
 
   // ── Sidebar — trạng thái, tooltip, nút ──────────────────────────────────
   'shell.sidebar.connected': { vi: 'Đang kết nối', en: 'Connected' },

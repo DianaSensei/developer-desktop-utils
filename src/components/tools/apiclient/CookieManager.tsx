@@ -25,7 +25,7 @@ export function CookieManager({ store, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex h-[70vh] max-w-2xl flex-col gap-0 p-0">
+      <DialogContent size="lg" scrollable>
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2"><CookieIcon className="h-4 w-4" /> Cookies</span>

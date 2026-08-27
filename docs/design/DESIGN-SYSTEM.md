@@ -250,6 +250,13 @@ These patterns kept getting reimplemented per-tool with small drifting variation
   </div>
   {menu.state && <ContextMenu state={menu.state} onClose={menu.close} />}
   ```
+- **`Dialog` / `DialogContent`** — every dialog picks its width from a closed `size` scale (`sm`/`md`/`lg`/`xl`/`2xl`/`full`, default `md`) instead of a hand-typed `max-w-*`. A dialog with its own header/tabs/footer (not the default centered-text-with-buttons shape) also passes `scrollable`, which caps it at `85vh` and resets the default `gap-4 p-6` to `gap-0 p-0` — render `flex flex-col` content and give each pane inside its own `min-h-0 flex-1 overflow-y-auto` rather than letting the dialog grow past the viewport on a short screen.
+  ```tsx
+  <DialogContent size="lg" scrollable>
+    <DialogHeader className="border-b px-4 py-3"><DialogTitle>…</DialogTitle></DialogHeader>
+    <div className="min-h-0 flex-1 overflow-y-auto p-4">…</div>
+  </DialogContent>
+  ```
 - **`ConfirmDialog`** — confirmation for any destructive/irreversible action (delete, purge, disconnect-and-lose-state). Every destructive action must go through this or an equivalent confirm step — see "Error prevention & recovery" above.
   ```tsx
   <ConfirmDialog

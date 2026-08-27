@@ -233,6 +233,35 @@
 [data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 35%; }
 
 /* ============================================================================
+   PRESET FONT — chỉ đổi lại `--sans` (mặt chữ UI chung); `--mono` không đổi
+   theo lựa chọn này vì nó phục vụ mục đích riêng (đọc mã/số liệu chính xác
+   theo cột), không phải gu đọc chung. Đặt data-font trên <html>.
+
+   Bốn lựa chọn — không phải font THẬT tải về (không @font-face nào khác
+   ngoài Be Vietnam Pro/IBM Plex Mono đã bundle sẵn), mà là stack CSS generic
+   trỏ vào mặt chữ HỆ THỐNG đã cài sẵn trên máy người dùng — đúng yêu cầu
+   "chọn font từ hệ thống" mà không cần enumerate font thật (Tauri chạy trên
+   WebView riêng từng OS, không có API liệt kê font hệ thống dùng chung được).
+   ========================================================================== */
+[data-font="default"] {
+  --sans: "Be Vietnam Pro", system-ui, -apple-system,
+          "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+/* Mặt chữ UI mặc định của hệ điều hành — San Francisco (macOS), Segoe UI
+   (Windows), Ubuntu/Cantarell (Linux GNOME) — không có Be Vietnam Pro. */
+[data-font="system"] {
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+[data-font="serif"] {
+  --sans: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+/* Sans hình học cổ điển — khác hẳn dáng nhân văn (humanist) bo tròn của
+   Be Vietnam Pro, cho người thích nhìn "gọn, thẳng" hơn. */
+[data-font="classic"] {
+  --sans: Helvetica, Arial, "Liberation Sans", sans-serif;
+}
+
+/* ============================================================================
    NỀN MÔI TRƯỜNG — gradient pastel.
    Đây là chỗ DUY NHẤT gradient được phép. Không bao giờ trên nút, không bao
    giờ sau chữ cần đọc. Đặt class .dk-bg lên phần tử nền toàn trang.

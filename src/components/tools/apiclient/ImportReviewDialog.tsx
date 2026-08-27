@@ -43,7 +43,7 @@ export function ImportReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
-      <DialogContent className="flex max-h-[80vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent size="lg" scrollable>
         <DialogHeader className="shrink-0 border-b px-4 py-3">
           <DialogTitle className="flex items-center gap-2 text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0 text-warn" />

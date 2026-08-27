@@ -43,7 +43,7 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex h-[80vh] max-w-4xl flex-col gap-0 p-0">
+      <DialogContent size="2xl" scrollable>
         <div className="flex items-center justify-between border-b px-4 py-3">
           <DialogTitle className="text-base">Generate Code</DialogTitle>
         </div>
