@@ -317,7 +317,12 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           <Filter className="h-4 w-4" />
         </IconButton>
       )}
-      {response && <ActionsMenu copied={copied} onCopy={copy} onSave={saveResponse} onClear={onClear} />}
+      {response && (
+        <IconButton onClick={copy} title={copied ? 'Copied' : 'Copy'} className={cn(copied && 'text-ok')}>
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        </IconButton>
+      )}
+      {response && <ActionsMenu onSave={saveResponse} onClear={onClear} />}
     </>
   );
 
@@ -519,20 +524,17 @@ function Centered({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2">{children}</div>;
 }
 
-// The … menu holding the copy / save / clear actions, so the status readout
-// stays pinned right and never gets pushed off on resize.
-function ActionsMenu({ copied, onCopy, onSave, onClear }: {
-  copied: boolean; onCopy: () => void; onSave: () => void; onClear?: () => void;
-}) {
+// The … menu holding the save / clear actions, so the status readout stays
+// pinned right and never gets pushed off on resize. Copy lives as its own
+// button beside this menu (see headerRight above) — it's the action taken
+// often enough that burying it a level down cost an extra click every time.
+function ActionsMenu({ onSave, onClear }: { onSave: () => void; onClear?: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger title="More" className="rounded p-1 text-fg-mute transition-colors hover:bg-acc hover:text-fg">
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[11rem]">
-        <DropdownMenuItem onClick={onCopy} icon={copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}>
-          Copy
-        </DropdownMenuItem>
         <DropdownMenuItem onClick={onSave} icon={<Download className="h-3.5 w-3.5" />}>
           Save response…
         </DropdownMenuItem>
