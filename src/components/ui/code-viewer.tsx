@@ -15,6 +15,7 @@ import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorState } from '@codemirror/state';
 import { useCodeTheme } from '@/components/ui/code-theme';
+import { jsonFoldCount } from '@/components/ui/json-fold-count';
 
 const jsonLang = json();
 const sqlLang = sql();
@@ -51,11 +52,14 @@ export function CodeViewer({ value, language, plain, placeholder }: CodeViewerPr
     : [
         basicSetup,
         ...(langExt ? [langExt] : []),
+        // Folding a key/item shows how many it holds instead of a bare "…" —
+        // only meaningful for JSON's Object/Array nodes (see json-fold-count.ts).
+        ...(language === 'json' ? [jsonFoldCount] : []),
         theme.extension,
         EditorView.lineWrapping,
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
-      ]), [langExt, plain, theme.extension]);
+      ]), [langExt, language, plain, theme.extension]);
 
   // Recreate the view when the language changes so the parser swaps cleanly.
   useEffect(() => {
