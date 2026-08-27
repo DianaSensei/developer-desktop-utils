@@ -258,6 +258,27 @@ function collectInherited(collections: Collection[], id: string): InheritedScrip
 // request id (not the "active collection") so this stays correct for requests
 // run from the Runner, which may not belong to whatever collection happens to
 // be focused in the sidebar.
+function findOwningCollectionId(collections: Collection[], id: string): string | null {
+  for (const c of collections) {
+    if (findRequest(c.items, id)) return c.id;
+  }
+  return null;
+}
+
+// Resolve which environment actually applies to a given request: the selected
+// environment if it's global, or if it's scoped to the request's own owning
+// collection — never a collection-scoped environment left over from whatever
+// collection is merely "active" in the sidebar/tabs. This is what keeps a
+// Runner run of one collection from picking up another collection's scoped
+// environment just because it happened to be selected while a different
+// collection's tab was open (see `activeEnv`'s mismatch check below, which
+// this generalizes to an arbitrary request id instead of the active tab).
+function resolveEnvForRequest(collections: Collection[], selectedEnv: Environment | null, id: string): Environment | null {
+  if (!selectedEnv) return null;
+  if (!selectedEnv.collectionId) return selectedEnv;
+  return findOwningCollectionId(collections, id) === selectedEnv.collectionId ? selectedEnv : null;
+}
+
 function collectCollectionVars(collections: Collection[], id: string): VarMap {
   for (const c of collections) {
     if (!findFolderPath(c.items, id, [])) continue;
@@ -497,6 +518,15 @@ export function useApiStore() {
     [collections],
   );
 
+  // The environment that actually applies to a given request id (used by the
+  // Runner) — never a collection-scoped environment that only happens to be
+  // selected because a *different* collection's tab is open. See
+  // `resolveEnvForRequest`.
+  const getEnvForRequest = useCallback(
+    (id: string) => resolveEnvForRequest(collections, selectedEnv, id),
+    [collections, selectedEnv],
+  );
+
   // Collection variables for the request currently active.
   const activeCollectionVars = useMemo(
     () => (activeRequestId ? collectCollectionVars(collections, activeRequestId) : {}),
@@ -658,7 +688,7 @@ export function useApiStore() {
     setCollectionVariables,
     addEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
     vault, setVault, vaultVars,
-    addHistory, clearHistory, getInherited, getCollectionVars,
+    addHistory, clearHistory, getInherited, getCollectionVars, getEnvForRequest,
     cookies, cookiesEnabled, setCookiesEnabled,
     captureCookies, upsertCookie, deleteCookie, clearDomainCookies, clearCookies,
   };

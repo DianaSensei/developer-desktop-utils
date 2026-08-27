@@ -54,6 +54,55 @@ describe('useApiStore — activeEnv collection scoping', () => {
     expect(result.current.activeEnvId).toBe(scopedEnvId);
     expect(result.current.selectedEnv?.id).toBe(scopedEnvId);
   });
+
+  it('getEnvForRequest never applies a collection-scoped environment to another collection\'s request, regardless of which tab is active', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    let scopedEnvId = '';
+    act(() => { scopedEnvId = result.current.addEnvironment(firstCollectionId); });
+    act(() => result.current.setActiveEnvId(scopedEnvId));
+
+    // Keep the *first* collection's request as the active tab (so activeEnv
+    // itself is NOT mismatched here) — the bug this guards is a Runner-style
+    // run of the *other* collection's request while a different tab is open.
+    let firstRequestId = '';
+    act(() => { firstRequestId = result.current.addItem(firstCollectionId, 'request'); });
+    act(() => result.current.selectRequest(firstRequestId));
+    expect(result.current.activeEnv?.id).toBe(scopedEnvId);
+
+    let secondRequestId = '';
+    act(() => { secondRequestId = result.current.addItem(secondCollectionId, 'request'); });
+
+    // The environment is scoped to the first collection and must not leak
+    // into a request that belongs to the second collection...
+    expect(result.current.getEnvForRequest(secondRequestId)).toBeNull();
+    // ...but does still apply to a request in the collection it's scoped to.
+    expect(result.current.getEnvForRequest(firstRequestId)?.id).toBe(scopedEnvId);
+  });
+
+  it('getEnvForRequest applies a global environment to any request', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    let globalEnvId = '';
+    act(() => { globalEnvId = result.current.addEnvironment(null); });
+    act(() => result.current.setActiveEnvId(globalEnvId));
+
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(secondCollectionId, 'request'); });
+    void firstCollectionId;
+
+    expect(result.current.getEnvForRequest(requestId)?.id).toBe(globalEnvId);
+  });
 });
 
 describe('useApiStore — addHistory secret redaction', () => {
