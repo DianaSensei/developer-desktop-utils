@@ -1,9 +1,16 @@
 // Manage environments and their {{variables}}. Pick an environment on the left,
 // edit its name and variable table on the right. The active environment's
 // variables are substituted into URLs, headers, body, and auth at send time.
+//
+// Environments and Collection Variables are different *kinds* of things, not
+// peers in one list: an environment is a swappable set you turn "Active" (Dev
+// vs Prod), while Collection Variables is a single always-on bag of defaults
+// for the whole collection. Showing "Collection Variables" as a row above the
+// environment list made it look like a third environment, so it's a separate
+// tab instead — picking it can't be confused with picking an environment.
 
 import { useEffect, useState } from 'react';
-import { Copy, Download, Layers, Plus, Trash2, Upload } from 'lucide-react';
+import { Copy, Download, Plus, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Button } from '@/components/ui/button';
@@ -15,6 +22,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { Callout } from '@/components/ui/callout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { KeyValueEditor } from './KeyValueEditor';
 import { pickJsonFile, saveJsonFile } from './fileio';
 import { exportEnvironmentNative, exportEnvironmentPostman, importEnvironment as parseEnvironmentFile } from './environments-io';
@@ -27,9 +35,7 @@ interface Props {
   onClose: () => void;
 }
 
-// The list on the left can have either an environment or the active
-// collection's shared "Collection Variables" bag selected.
-type Selection = { kind: 'env'; id: string } | { kind: 'collectionVars' } | null;
+type Tab = 'environments' | 'collectionVars';
 
 // How many variables actually take effect — matches the substitution rule
 // (enabled + non-empty key) rather than the raw row count, so the badge next
@@ -40,9 +46,8 @@ const varCount = (vars: KeyValue[] = []): number =>
 
 export function EnvironmentEditor({ store, open, onClose }: Props) {
   const { environments } = store;
-  const [selection, setSelection] = useState<Selection>(
-    environments[0] ? { kind: 'env', id: environments[0].id } : null,
-  );
+  const [tab, setTab] = useState<Tab>('environments');
+  const [selectedEnvId, setSelectedEnvId] = useState<string | null>(environments[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   // Filters the *rows* of whichever environment/collection-vars is open on
@@ -50,22 +55,28 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   // environments. Reset on every selection change so a filter left over from
   // one environment doesn't silently hide rows when you switch to another.
   const [varFilter, setVarFilter] = useState('');
-  useEffect(() => { setVarFilter(''); }, [selection]);
+  useEffect(() => { setVarFilter(''); }, [selectedEnvId, tab]);
 
-  // Keep a valid selection as environments are added/removed.
+  // Keep a valid environment selected as environments are added/removed.
   useEffect(() => {
-    if (selection?.kind === 'collectionVars') return;
-    if (selection?.kind === 'env' && environments.some((e) => e.id === selection.id)) return;
-    setSelection(environments[0] ? { kind: 'env', id: environments[0].id } : null);
-  }, [environments, selection]);
+    if (selectedEnvId && environments.some((e) => e.id === selectedEnvId)) return;
+    setSelectedEnvId(environments[0]?.id ?? null);
+  }, [environments, selectedEnvId]);
 
   // Reset the filter each time the dialog is reopened, so a search left over
   // from a previous visit doesn't silently hide environments the user expects
   // to see.
   useEffect(() => { if (open) setQuery(''); }, [open]);
 
-  const selected = selection?.kind === 'env' ? environments.find((e) => e.id === selection.id) ?? null : null;
   const activeCollection = store.collections.find((c) => c.id === store.activeCollectionId) ?? null;
+
+  // The Collection Variables tab only makes sense with a collection open —
+  // fall back if the active collection disappears while the dialog is open.
+  useEffect(() => {
+    if (tab === 'collectionVars' && !activeCollection) setTab('environments');
+  }, [tab, activeCollection]);
+
+  const selected = environments.find((e) => e.id === selectedEnvId) ?? null;
   const collectionEnvs = environments.filter((e) => e.collectionId === store.activeCollectionId);
   const globalEnvs = environments.filter((e) => !e.collectionId);
 
@@ -73,7 +84,21 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   const matches = (name: string) => !q || name.toLowerCase().includes(q);
   const filteredCollectionEnvs = collectionEnvs.filter((e) => matches(e.name));
   const filteredGlobalEnvs = globalEnvs.filter((e) => matches(e.name));
-  const showCollectionVars = !!activeCollection && matches('Collection Variables');
+
+  const tabDefs: TabDef[] = [
+    {
+      id: 'environments',
+      label: 'Environments',
+      badge: environments.length > 0 ? <Badge pill size="xs" className="ml-1">{environments.length}</Badge> : undefined,
+    },
+    ...(activeCollection ? [{
+      id: 'collectionVars',
+      label: 'Collection Variables',
+      badge: varCount(activeCollection.variables) > 0
+        ? <Badge pill size="xs" className="ml-1">{varCount(activeCollection.variables)}</Badge>
+        : undefined,
+    }] : []),
+  ];
 
   const handleImport = async () => {
     setError(null);
@@ -82,7 +107,8 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
       if (!text) return;
       const env = parseEnvironmentFile(text);
       const id = store.importEnvironment(env);
-      setSelection({ kind: 'env', id });
+      setTab('environments');
+      setSelectedEnvId(id);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -119,183 +145,189 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
         </DialogHeader>
         {error && <Callout tone="error" size="sm" className="mx-4 mt-3">{error}</Callout>}
 
-        <div className="flex min-h-0 flex-1">
-          {/* list — grouped by scope */}
-          <div className="flex w-60 shrink-0 flex-col border-r">
-            {/* Search stays outside the scrolling list — a filter box that
-                scrolls out of view is a filter box the user forgets is on,
-                left wondering why an environment they know exists is
-                "missing". */}
-            <div className="border-b p-1.5">
-              <SearchInput
-                value={query}
-                onChange={setQuery}
-                placeholder="Search environments"
-                className="h-ctl text-xs"
+        {/* The one thing every confused-user report about this dialog comes
+            back to: which of these four wins. Stated once, up front, instead
+            of split across two tooltips and a footnote paragraph each editor
+            used to carry on its own. */}
+        <Callout tone="info" size="sm" className="mx-4 mt-3">
+          An <strong className="text-fg">environment</strong> is a swappable set of
+          variables (Dev vs Prod) — mark one &ldquo;Active&rdquo; to use it.{' '}
+          <strong className="text-fg">Collection Variables</strong> are always-on
+          defaults for the whole collection; an active environment&rsquo;s
+          variable with the same name wins. Use either with{' '}
+          <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code> in a request.
+        </Callout>
+
+        <Tabs tabs={tabDefs} active={tab} onSelect={(id) => setTab(id as Tab)} className="px-4" />
+
+        {tab === 'collectionVars' && activeCollection ? (
+          <div className="min-w-0 flex-1 overflow-y-auto p-4">
+            <div className="mx-auto max-w-3xl space-y-4">
+              <div>
+                <h3 className="text-sm font-medium">Collection Variables</h3>
+                <p className="text-[11px] text-fg-mute">
+                  Shared defaults for every request in <strong className="text-fg">{activeCollection.name}</strong>,
+                  regardless of which environment is active — a variable of the same name in the
+                  active environment still wins.
+                </p>
+              </div>
+              <VarFilterBox rows={activeCollection.variables ?? []} value={varFilter} onChange={setVarFilter} />
+              <KeyValueEditor
+                rows={activeCollection.variables ?? []}
+                onChange={(variables) => store.setCollectionVariables(activeCollection.id, variables)}
+                keyPlaceholder="Variable"
+                valuePlaceholder="Value"
+                filterQuery={varFilter}
               />
             </div>
-            <div className="flex-1 overflow-y-auto py-1">
-              {showCollectionVars && (
-                <div className="mb-2">
-                  <button
-                    onClick={() => setSelection({ kind: 'collectionVars' })}
-                    className={cn(LIST_ROW, selection?.kind === 'collectionVars' && 'bg-acc-tint text-acc-ink')}
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1">
+            {/* list — environments only, grouped by scope */}
+            <div className="flex w-60 shrink-0 flex-col border-r">
+              {/* Search stays outside the scrolling list — a filter box that
+                  scrolls out of view is a filter box the user forgets is on,
+                  left wondering why an environment they know exists is
+                  "missing". */}
+              <div className="border-b p-1.5">
+                <SearchInput
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search environments"
+                  className="h-ctl text-xs"
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto py-1">
+                <Section
+                  title={activeCollection?.name ?? 'Collection'}
+                  disabled={!store.activeCollectionId}
+                  empty={filteredCollectionEnvs.length === 0}
+                  emptyText={q ? 'No matches' : 'No environments'}
+                  onAdd={() => setSelectedEnvId(store.addEnvironment(store.activeCollectionId))}
+                >
+                  {filteredCollectionEnvs.map((e) => (
+                    <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selectedEnvId === e.id} onClick={() => setSelectedEnvId(e.id)} />
+                  ))}
+                </Section>
+                <Section
+                  title="Global"
+                  empty={filteredGlobalEnvs.length === 0}
+                  emptyText={q ? 'No matches' : 'No environments'}
+                  onAdd={() => setSelectedEnvId(store.addEnvironment(null))}
+                >
+                  {filteredGlobalEnvs.map((e) => (
+                    <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selectedEnvId === e.id} onClick={() => setSelectedEnvId(e.id)} />
+                  ))}
+                </Section>
+              </div>
+            </div>
+
+            {/* editor */}
+            <div className="min-w-0 flex-1 overflow-y-auto p-4">
+              {selected ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="max-w-[30%] shrink truncate rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute"
+                      title={selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
+                    >
+                      {selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
+                    </span>
+                    <Input
+                      value={selected.name}
+                      onChange={(e) => store.updateEnvironment(selected.id, { name: e.target.value })}
+                      className="h-ctl min-w-0 flex-1 text-sm font-medium"
+                    />
+                    <Button
+                      variant={store.activeEnvId === selected.id ? 'secondary' : 'outline'}
+                      className="h-ctl shrink-0 text-xs"
+                      onClick={() => store.setActiveEnvId(store.activeEnvId === selected.id ? null : selected.id)}
+                      title={store.activeEnvId === selected.id
+                        ? 'This is the active environment — its variables are applied to requests. Click to deactivate.'
+                        : 'Make this the active environment: its variables will be applied to requests, overriding Collection Variables.'}
+                    >
+                      {store.activeEnvId === selected.id ? 'Active' : 'Set active'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-ctl w-ctl shrink-0 text-fg-mute"
+                      onClick={() => {
+                        const id = store.duplicateEnvironment(selected.id);
+                        if (id) setSelectedEnvId(id);
+                      }}
+                      title="Duplicate environment"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        title="Export environment"
+                        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-acc hover:text-fg"
+                      >
+                        <Download className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleExport(selected, 'postman')}>Export (Postman)</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport(selected, 'native')}>Export (DevTool)</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-bad"
+                      onClick={() => store.deleteEnvironment(selected.id)}
+                      title="Delete environment"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <VarFilterBox rows={selected.variables} value={varFilter} onChange={setVarFilter} />
+                  <KeyValueEditor
+                    rows={selected.variables}
+                    onChange={(variables) => store.updateEnvironment(selected.id, { variables })}
+                    keyPlaceholder="Variable"
+                    valuePlaceholder="Value"
+                    masked={(row) => !!row.secret}
+                    secretToggle
+                    filterQuery={varFilter}
+                  />
+                  <p className="text-[11px] text-fg-mute">
+                    Click the lock icon to mark a value secret — it stays masked here and is left out
+                    of generated code, exports, and history the same way the Vault is.
+                  </p>
+                </div>
+              ) : (
+                // "Create an environment" with nothing to click left the user
+                // hunting for the + beside a section caption. Put the action here.
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                  <p className="max-w-[22rem] text-xs text-fg-mute">
+                    No environments yet. An environment is a set of variables you can switch on and
+                    off — e.g. one for Dev, one for Prod — without editing your requests.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    onClick={() => setSelectedEnvId(store.addEnvironment(store.activeCollectionId))}
                   >
-                    <span className={LIST_SLOT}><Layers className="h-3 w-3 text-fg-mute" /></span>
-                    <span className="min-w-0 flex-1 truncate">Collection Variables</span>
-                    <VarCountBadge count={varCount(activeCollection?.variables)} />
-                  </button>
+                    <Plus className="h-3.5 w-3.5" /> New environment
+                  </Button>
                 </div>
               )}
-              <Section
-                title={activeCollection?.name ?? 'Collection'}
-                disabled={!store.activeCollectionId}
-                empty={filteredCollectionEnvs.length === 0}
-                emptyText={q ? 'No matches' : 'No environments'}
-                onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(store.activeCollectionId) })}
-              >
-                {filteredCollectionEnvs.map((e) => (
-                  <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
-                ))}
-              </Section>
-              <Section
-                title="Global"
-                empty={filteredGlobalEnvs.length === 0}
-                emptyText={q ? 'No matches' : 'No environments'}
-                onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(null) })}
-              >
-                {filteredGlobalEnvs.map((e) => (
-                  <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
-                ))}
-              </Section>
             </div>
           </div>
-
-          {/* editor */}
-          <div className="min-w-0 flex-1 overflow-y-auto p-4">
-            {selection?.kind === 'collectionVars' && activeCollection ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="max-w-[45%] shrink truncate rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute"
-                    title={activeCollection.name}
-                  >
-                    {activeCollection.name}
-                  </span>
-                  <span className="shrink-0 text-sm font-medium">Collection Variables</span>
-                </div>
-                <VarFilterBox rows={activeCollection.variables ?? []} value={varFilter} onChange={setVarFilter} />
-                <KeyValueEditor
-                  rows={activeCollection.variables ?? []}
-                  onChange={(variables) => store.setCollectionVariables(activeCollection.id, variables)}
-                  keyPlaceholder="Variable"
-                  valuePlaceholder="Value"
-                  filterQuery={varFilter}
-                />
-                <p className="text-[11px] text-fg-mute">
-                  Shared defaults for every request in this collection, regardless of which
-                  environment is active. An environment variable with the same name still
-                  overrides it.
-                </p>
-              </div>
-            ) : selected ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="max-w-[30%] shrink truncate rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute"
-                    title={selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
-                  >
-                    {selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
-                  </span>
-                  <Input
-                    value={selected.name}
-                    onChange={(e) => store.updateEnvironment(selected.id, { name: e.target.value })}
-                    className="h-ctl min-w-0 flex-1 text-sm font-medium"
-                  />
-                  <Button
-                    variant={store.activeEnvId === selected.id ? 'secondary' : 'outline'}
-                    className="h-ctl shrink-0 text-xs"
-                    onClick={() => store.setActiveEnvId(store.activeEnvId === selected.id ? null : selected.id)}
-                  >
-                    {store.activeEnvId === selected.id ? 'Active' : 'Set active'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-ctl w-ctl shrink-0 text-fg-mute"
-                    onClick={() => {
-                      const id = store.duplicateEnvironment(selected.id);
-                      if (id) setSelection({ kind: 'env', id });
-                    }}
-                    title="Duplicate environment"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      title="Export environment"
-                      className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-acc hover:text-fg"
-                    >
-                      <Download className="h-4 w-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleExport(selected, 'postman')}>Export (Postman)</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport(selected, 'native')}>Export (DevTool)</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-bad"
-                    onClick={() => store.deleteEnvironment(selected.id)}
-                    title="Delete environment"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                <VarFilterBox rows={selected.variables} value={varFilter} onChange={setVarFilter} />
-                <KeyValueEditor
-                  rows={selected.variables}
-                  onChange={(variables) => store.updateEnvironment(selected.id, { variables })}
-                  keyPlaceholder="Variable"
-                  valuePlaceholder="Value"
-                  masked={(row) => !!row.secret}
-                  secretToggle
-                  filterQuery={varFilter}
-                />
-                <p className="text-[11px] text-fg-mute">
-                  Reference a variable anywhere with <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code>.{' '}
-                  Click the lock icon to mark a value secret — it stays masked here and is left out of
-                  generated code, exports, and history the same way the Vault is.
-                </p>
-              </div>
-            ) : (
-              // "Create an environment" with nothing to click left the user
-              // hunting for the + beside a section caption. Put the action here.
-              <div className="flex h-full flex-col items-center justify-center gap-3">
-                <p className="text-xs text-fg-mute">No environments yet.</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs"
-                  onClick={() => setSelection({ kind: 'env', id: store.addEnvironment(store.activeCollectionId) })}
-                >
-                  <Plus className="h-3.5 w-3.5" /> New environment
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
 }
 
-// Every line in the left list — the Collection Variables entry, the section
-// captions, and each environment — is laid out on these two classes, so their
-// labels share one left edge. The 12px slot always exists, holding an icon, the
-// active dot, or nothing; before this the entry with an icon started 20px right
-// of the captions and the rows without a dot, and the column read as ragged.
+// Every line in the left list — section captions and each environment row —
+// is laid out on these two classes, so their labels share one left edge. The
+// 12px slot always exists, holding the active dot or nothing; before this the
+// rows with a dot started 20px right of the captions and the column read as
+// ragged.
 //
 // Hover is a neutral tint (bg-bg-2), not accent — hover:bg-acc/60 read as a
 // second, near-identical "selected" state next to the actual selected row's

@@ -2,7 +2,7 @@
 // method-colored label and a close button. The right cluster holds the
 // environment selector, history, and the request/response layout toggle.
 
-import { AlertTriangle, Clock, Columns2, KeyRound, Plus, Rows2, X } from 'lucide-react';
+import { AlertTriangle, Clock, Columns2, Plus, Rows2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
@@ -185,10 +185,10 @@ export function RequestTabs({
           </SelectContent>
         </Select>
         {/* One entry point for "see everything, then go edit it" — no
-            separate gear icon next to this that opened the exact same
-            Environments dialog: EnvQuickView's own footer already links
-            there (plus Vault and Runtime Variables), so a second button here
-            was two controls for one destination. */}
+            separate Vault/gear icon next to this that opened one of the exact
+            same destinations: EnvQuickView's own footer already links to
+            Environments, Vault, and Runtime Variables, so a second button
+            here for any one of them was two controls for one destination. */}
         <EnvQuickView
           env={store.activeEnv}
           mismatched={mismatchedEnv}
@@ -198,9 +198,6 @@ export function RequestTabs({
           onRuntimeVars={onRuntimeVars}
         />
         <span className="mx-0.5 h-5 w-px bg-line" />
-        <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-bg">
-          <KeyRound className="h-4 w-4" />
-        </IconButton>
         <IconButton
           onClick={onOpenHistory}
           title="History"
