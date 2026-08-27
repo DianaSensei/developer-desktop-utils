@@ -49,7 +49,7 @@ export function NumberStepper({
           if (!Number.isNaN(n)) set(n);
           else if (e.target.value === '') onChange(min);
         }}
-        className="w-10 border-x bg-transparent text-center text-xs tabular-nums focus:outline-none"
+        className="w-10 border-x bg-transparent text-center text-xs tabular-nums focus:outline-hidden"
       />
       <button
         type="button"
@@ -194,7 +194,7 @@ export function TimeStepperField({
           if (e.key === 'ArrowUp') { e.preventDefault(); setDraft(null); nudge(1); }
           if (e.key === 'ArrowDown') { e.preventDefault(); setDraft(null); nudge(-1); }
         }}
-        className="w-full min-w-0 bg-transparent px-1.5 text-center font-mono text-sm tabular-nums focus:outline-none"
+        className="w-full min-w-0 bg-transparent px-1.5 text-center font-mono text-sm tabular-nums focus:outline-hidden"
       />
       <div className="flex flex-col border-l border-sunk">
         {stepBtn(1, ChevronUp, 'Later')}
@@ -340,7 +340,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
         checked ? 'bg-acc' : 'bg-fg-mute/25'
       )}
     >

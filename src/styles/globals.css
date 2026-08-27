@@ -1,9 +1,11 @@
 /* Portable design-system tokens, base + utilities (must come before @tailwind). */
 @import "../design-system/tokens.css";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+/* Keep the JS config as the source of truth for now: it carries the portable
+   design-kit preset chain (design/tailwind-preset.cjs), the colour vocabulary
+   and the animate plugin. Migrating it to CSS `@theme` is a separate step. */
+@config "../../tailwind.config.js";
 
 @layer base {
   * {

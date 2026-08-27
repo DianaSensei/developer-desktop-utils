@@ -553,7 +553,7 @@ export function SqlFormatter() {
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <div
           ref={containerRef}
-          className="flex flex-col flex-1 min-h-0 overflow-hidden [&_.cm-editor]:bg-bg [&_.cm-editor.cm-focused]:outline-none"
+          className="flex flex-col flex-1 min-h-0 overflow-hidden [&_.cm-editor]:bg-bg [&_.cm-editor.cm-focused]:outline-hidden"
         />
       </div>
 

@@ -87,7 +87,7 @@ export function ExplainBand({ tone, title, children, examples, className }: Expl
                 title={ex.title}
                 className={cn(
                   'rounded-xs border bg-card/60 px-2 py-1 font-mono text-[11px] leading-none',
-                  'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
+                  'transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
                   t.chip,
                 )}
               >

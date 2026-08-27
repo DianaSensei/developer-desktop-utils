@@ -144,7 +144,7 @@ export function ImageBase64Tool() {
                     onClick={clearEncode}
                     aria-label="Remove image"
                     title="Remove image"
-                    className="absolute top-2 right-2 p-1 rounded-md bg-bg/80 border hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+                    className="absolute top-2 right-2 p-1 rounded-md bg-bg/80 border hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -199,7 +199,7 @@ export function ImageBase64Tool() {
                 value={decodeInput}
                 onChange={(e) => { setDecodeInput(e.target.value); setDecodeError(false); }}
                 placeholder="data:image/png;base64,iVBORw0KGgo… or raw base64"
-                className="w-full rounded-lg border border-line bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed resize-none h-24 outline-none focus:ring-1 focus:ring-acc placeholder:text-fg-mute/50"
+                className="w-full rounded-lg border border-line bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed resize-none h-24 outline-hidden focus:ring-1 focus:ring-acc placeholder:text-fg-mute/50"
               />
             </div>
 

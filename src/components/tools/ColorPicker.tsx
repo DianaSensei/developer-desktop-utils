@@ -143,7 +143,7 @@ const PALETTE_SIZE = 16; // number of colors extracted from the image (strip scr
 function Help({ text }: { text: string }) {
   return (
     <Tooltip label={text} side="bottom" width={224}>
-      <span tabIndex={0} className="inline-flex align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+      <span tabIndex={0} className="inline-flex align-middle focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
         <HelpCircle className="h-3.5 w-3.5 cursor-help text-fg-mute/50 transition-colors hover:text-fg" />
       </span>
     </Tooltip>

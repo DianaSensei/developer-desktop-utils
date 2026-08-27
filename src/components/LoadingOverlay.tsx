@@ -26,7 +26,7 @@ export function LoadingOverlay({
         // at all despite the class name implying one.
         'flex flex-col items-center justify-center gap-3 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-fast motion-safe:ease-out-soft',
         fullScreen
-          ? 'fixed inset-0 bg-bg/50 backdrop-blur-sm z-50'
+          ? 'fixed inset-0 bg-bg/50 backdrop-blur-xs z-50'
           : 'absolute inset-0 bg-bg/40 backdrop-blur-xs rounded-lg',
         className
       )}

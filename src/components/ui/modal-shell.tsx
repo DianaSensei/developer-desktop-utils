@@ -123,7 +123,7 @@ export function ModalShell({
         tabIndex={-1}
         onKeyDown={onKeyDown}
         className={cn(
-          'flex w-full flex-col overflow-hidden rounded-lg border bg-bg shadow-xl outline-none max-h-[88vh]',
+          'flex w-full flex-col overflow-hidden rounded-lg border bg-bg shadow-xl outline-hidden max-h-[88vh]',
           'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-base motion-safe:ease-out-soft',
           width,
           className,
@@ -140,7 +140,7 @@ export function ModalShell({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+            className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
           >
             <X className="h-4 w-4" />
           </button>

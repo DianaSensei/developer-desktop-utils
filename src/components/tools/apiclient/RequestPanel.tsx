@@ -529,7 +529,7 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
             }}
             onBlur={() => addTag(tagDraft)}
             placeholder={settings.tags.length ? '' : 'e.g., smoke, regression'}
-            className="min-w-[8rem] flex-1 bg-transparent text-xs outline-none placeholder:text-fg-mute"
+            className="min-w-[8rem] flex-1 bg-transparent text-xs outline-hidden placeholder:text-fg-mute"
             spellCheck={false}
           />
         </div>

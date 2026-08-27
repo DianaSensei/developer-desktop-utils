@@ -221,7 +221,7 @@ export function CliConsole({ conn, db }: CliConsoleProps) {
           disabled={running}
           placeholder="GET mykey"
           autoFocus
-          className="flex-1 bg-transparent outline-none placeholder:text-fg-mute/50"
+          className="flex-1 bg-transparent outline-hidden placeholder:text-fg-mute/50"
         />
       </div>
     </div>
