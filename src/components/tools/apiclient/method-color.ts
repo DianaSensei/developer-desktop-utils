@@ -47,3 +47,15 @@ const BADGE: Record<HttpMethod, string> = {
 export const methodColor      = (m: HttpMethod): string => TEXT[m]  ?? 'text-fg';
 export const methodBg         = (m: HttpMethod): string => BG[m]   ?? 'bg-transparent';
 export const methodBadgeStyle = (m: HttpMethod): string => BADGE[m] ?? 'bg-bg-2/60 text-fg';
+
+// Abbreviated label for width-constrained lists (sidebar tree, tab strip).
+// DELETE/OPTIONS are twice the width of GET, so spelled out they force every
+// name in the column to start at a different x — the abbreviations let the
+// label sit in one fixed 36px gutter and the names line up under each other.
+// The full method is still on the element's `title`.
+const SHORT: Record<HttpMethod, string> = {
+  GET: 'GET', POST: 'POST', PUT: 'PUT', PATCH: 'PATCH',
+  DELETE: 'DEL', HEAD: 'HEAD', OPTIONS: 'OPT',
+};
+
+export const methodShort = (m: HttpMethod): string => SHORT[m] ?? m;

@@ -8,7 +8,7 @@ import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { IconButton } from '@/components/ui/icon-button';
-import { methodColor } from './method-color';
+import { methodColor, methodShort } from './method-color';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
 import type { Collection, TreeItem } from './types';
@@ -61,19 +61,24 @@ export function RequestTabs({
             <div
               key={req.id}
               onClick={() => onSelectRequest(req.id)}
+              title={`${req.method} ${req.name}`}
               className={cn(
-                'group relative flex max-w-[200px] shrink-0 cursor-pointer items-center gap-2 border-r px-3 py-2 text-xs transition-colors',
-                active ? 'bg-bg text-fg' : 'text-fg-mute hover:bg-bg/50',
+                'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-2.5 py-1.5 text-xs transition-colors',
+                active ? 'bg-bg text-fg' : 'text-fg-mute hover:bg-bg/50 hover:text-fg',
               )}
             >
               {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />}
-              <span className={cn('text-[11px] font-bold uppercase', methodColor(req.method))}>{req.method}</span>
+              <span className={cn('shrink-0 text-[11px] font-bold uppercase', methodColor(req.method))}>
+                {methodShort(req.method)}
+              </span>
               <span className="truncate">{req.name}</span>
+              {/* The slot keeps its 16px whether or not the × is showing, so a
+                  tab's label doesn't reflow the moment the pointer enters it. */}
               <button
                 onClick={(e) => { e.stopPropagation(); store.closeTab(req.id); }}
                 className={cn(
-                  'ml-1 rounded-md p-0.5 text-fg-mute/70 hover:bg-acc hover:text-fg',
-                  active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                  'grid h-4 w-4 shrink-0 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40',
+                  active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                 )}
                 title="Close tab"
               >
@@ -83,25 +88,31 @@ export function RequestTabs({
           );
         })}
         {historyActive && (
-          <div className="group relative flex shrink-0 items-center gap-2 border-r bg-bg px-3 py-2 text-xs text-fg">
+          <div className="group relative flex shrink-0 items-center gap-1.5 border-r border-line bg-bg px-2.5 py-1.5 text-xs text-fg">
             <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />
-            <Clock className="h-3.5 w-3.5 text-acc-ink" />
+            <Clock className="h-3.5 w-3.5 shrink-0 text-acc-ink" />
             <span>History</span>
-            <button onClick={onCloseHistory} className="ml-1 rounded p-0.5 text-fg-mute/70 hover:bg-acc hover:text-fg" title="Close history">
+            <button
+              onClick={onCloseHistory}
+              className="grid h-4 w-4 shrink-0 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40"
+              title="Close history"
+            >
               <X className="h-3 w-3" />
             </button>
           </div>
         )}
-        <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none px-2.5 hover:bg-bg">
+        <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none px-2 hover:bg-bg">
           <Plus className="h-4 w-4" />
         </IconButton>
       </div>
 
       {/* right cluster: environment · history · layout */}
-      {/* py-1.5 — hàng này dùng items-stretch nên chiều cao thực tế do phần tử cao
+      {/* py-1 — hàng này dùng items-stretch nên chiều cao thực tế do phần tử cao
           nhất quyết định; SelectTrigger cao đúng h-ctl (34px), không có py thì nó
-          CHÍNH LÀ chiều cao cả hàng, khiến pill chạm sát viền trên/dưới toolbar. */}
-      <div className="flex shrink-0 items-center gap-1 border-l py-1.5 pl-2 pr-1.5 text-fg-mute">
+          CHÍNH LÀ chiều cao cả hàng, khiến pill chạm sát viền trên/dưới toolbar.
+          1.5 → 1: đủ để pill không chạm viền, mà thanh tab thấp đi 4px — đây là
+          thanh chrome, mọi pixel nó không dùng thì phần response dùng. */}
+      <div className="flex shrink-0 items-center gap-0.5 border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
         {mismatchedEnv && (
           <span
             title={`"${mismatchedEnv.name}" belongs to another collection and is not applied here — its variables won't be substituted into this request. Pick an environment from this collection or Global, or switch back to that collection.`}
@@ -146,7 +157,6 @@ export function RequestTabs({
         <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-bg">
           <KeyRound className="h-4 w-4" />
         </IconButton>
-        <span className="mx-0.5 h-5 w-px bg-line" />
         <IconButton
           onClick={onOpenHistory}
           title="History"

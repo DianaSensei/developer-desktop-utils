@@ -449,7 +449,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
     <div className="space-y-2">
       <Label className="text-xs text-fg-mute">Path</Label>
       <div className="overflow-hidden rounded-md border text-xs">
-        <div className="grid grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)] border-b bg-bg-2/30 font-semibold">
+        <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] border-b bg-bg-2/30 font-semibold">
           <div />
           <div className="border-r px-3 py-1.5">Name</div>
           <div className="px-3 py-1.5">Value</div>
@@ -457,23 +457,46 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
         {names.map((name) => {
           const enabled = enabledOf(name);
           return (
-            <div key={name} className="grid grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
-              <div className="flex items-center justify-center">
+            <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+              {/* Toggle target is the whole cell, not just the checkbox glyph —
+                  same change as KeyValueEditor's, and the Name cell below joins
+                  it: unlike the Name column there, this one is read-only text
+                  (the name comes from the URL), so a click on it has nothing to
+                  edit and can mean "toggle this param" instead. */}
+              <div className="flex items-stretch">
                 <button
                   type="button"
+                  role="checkbox"
+                  aria-checked={enabled}
+                  aria-label={`:${name} — ${enabled ? 'enabled' : 'disabled'}`}
                   onClick={() => toggleEnabled(name)}
-                  className={cn(
-                    'h-2 w-2 shrink-0 rounded-full transition-colors',
-                    enabled ? 'bg-acc' : 'bg-fg-mute/30 hover:bg-fg-mute/50',
-                  )}
+                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
                   title={enabled ? 'Disable' : 'Enable'}
-                />
+                >
+                  <span
+                    className={cn(
+                      'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+                      enabled
+                        ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
+                        : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
+                    )}
+                  >
+                    {enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                  </span>
+                </button>
               </div>
               {/* Same reason as AuthQueryParamRow above: a long placeholder name
                   (OpenAPI specs produce plenty) would otherwise claim the whole
                   row and leave the Value field unusably narrow. */}
-              <div className={cn('flex min-w-0 items-center border-r px-3 py-1 font-mono text-fg-mute', !enabled && 'opacity-40 line-through')}>
-                <span className="truncate" title={`:${name}`}>:{name}</span>
+              <div
+                onClick={() => toggleEnabled(name)}
+                title={enabled ? 'Disable this path param' : 'Enable this path param'}
+                className={cn(
+                  'flex min-w-0 cursor-pointer select-none items-center border-r px-3 py-1 font-mono text-fg-mute transition-colors hover:bg-bg-2/60',
+                  !enabled && 'opacity-40 line-through',
+                )}
+              >
+                <span className="truncate">:{name}</span>
               </div>
               <div className="flex h-ctl min-w-0 items-center px-2">
                 <InlineCodeField
