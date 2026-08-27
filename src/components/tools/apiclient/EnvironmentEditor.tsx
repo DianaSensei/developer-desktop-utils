@@ -10,13 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { IconButton } from '@/components/ui/icon-button';
 import { StatusDot } from '@/components/ui/status-dot';
+import { Badge } from '@/components/ui/badge';
+import { SearchInput } from '@/components/ui/search-input';
 import { Callout } from '@/components/ui/callout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { KeyValueEditor } from './KeyValueEditor';
 import { pickJsonFile, saveJsonFile } from './fileio';
 import { exportEnvironmentNative, exportEnvironmentPostman, importEnvironment as parseEnvironmentFile } from './environments-io';
-import type { Environment } from './types';
+import type { Environment, KeyValue } from './types';
 import type { ApiStore } from './store';
 
 interface Props {
@@ -29,12 +31,20 @@ interface Props {
 // collection's shared "Collection Variables" bag selected.
 type Selection = { kind: 'env'; id: string } | { kind: 'collectionVars' } | null;
 
+// How many variables actually take effect — matches the substitution rule
+// (enabled + non-empty key) rather than the raw row count, so the badge next
+// to an environment reflects what it really contributes, not stray/disabled
+// rows left over from editing.
+const varCount = (vars: KeyValue[] = []): number =>
+  vars.filter((v) => v.enabled && v.key.trim() !== '').length;
+
 export function EnvironmentEditor({ store, open, onClose }: Props) {
   const { environments } = store;
   const [selection, setSelection] = useState<Selection>(
     environments[0] ? { kind: 'env', id: environments[0].id } : null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   // Keep a valid selection as environments are added/removed.
   useEffect(() => {
@@ -43,10 +53,21 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
     setSelection(environments[0] ? { kind: 'env', id: environments[0].id } : null);
   }, [environments, selection]);
 
+  // Reset the filter each time the dialog is reopened, so a search left over
+  // from a previous visit doesn't silently hide environments the user expects
+  // to see.
+  useEffect(() => { if (open) setQuery(''); }, [open]);
+
   const selected = selection?.kind === 'env' ? environments.find((e) => e.id === selection.id) ?? null : null;
   const activeCollection = store.collections.find((c) => c.id === store.activeCollectionId) ?? null;
   const collectionEnvs = environments.filter((e) => e.collectionId === store.activeCollectionId);
   const globalEnvs = environments.filter((e) => !e.collectionId);
+
+  const q = query.trim().toLowerCase();
+  const matches = (name: string) => !q || name.toLowerCase().includes(q);
+  const filteredCollectionEnvs = collectionEnvs.filter((e) => matches(e.name));
+  const filteredGlobalEnvs = globalEnvs.filter((e) => matches(e.name));
+  const showCollectionVars = !!activeCollection && matches('Collection Variables');
 
   const handleImport = async () => {
     setError(null);
@@ -91,33 +112,54 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
 
         <div className="flex h-[26rem]">
           {/* list — grouped by scope */}
-          <div className="flex w-56 shrink-0 flex-col overflow-y-auto border-r py-1">
-            {activeCollection && (
-              <div className="mb-2">
-                <button
-                  onClick={() => setSelection({ kind: 'collectionVars' })}
-                  className={cn(LIST_ROW, selection?.kind === 'collectionVars' && 'bg-acc')}
-                >
-                  <span className={LIST_SLOT}><Layers className="h-3 w-3 text-fg-mute" /></span>
-                  <span className="truncate">Collection Variables</span>
-                </button>
-              </div>
-            )}
-            <Section
-              title={activeCollection?.name ?? 'Collection'}
-              disabled={!store.activeCollectionId}
-              empty={collectionEnvs.length === 0}
-              onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(store.activeCollectionId) })}
-            >
-              {collectionEnvs.map((e) => (
-                <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
-              ))}
-            </Section>
-            <Section title="Global" empty={globalEnvs.length === 0} onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(null) })}>
-              {globalEnvs.map((e) => (
-                <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
-              ))}
-            </Section>
+          <div className="flex w-60 shrink-0 flex-col border-r">
+            {/* Search stays outside the scrolling list — a filter box that
+                scrolls out of view is a filter box the user forgets is on,
+                left wondering why an environment they know exists is
+                "missing". */}
+            <div className="border-b p-1.5">
+              <SearchInput
+                value={query}
+                onChange={setQuery}
+                placeholder="Search environments"
+                className="h-ctl text-xs"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto py-1">
+              {showCollectionVars && (
+                <div className="mb-2">
+                  <button
+                    onClick={() => setSelection({ kind: 'collectionVars' })}
+                    className={cn(LIST_ROW, selection?.kind === 'collectionVars' && 'bg-acc')}
+                  >
+                    <span className={LIST_SLOT}><Layers className="h-3 w-3 text-fg-mute" /></span>
+                    <span className="min-w-0 flex-1 truncate">Collection Variables</span>
+                    <VarCountBadge count={varCount(activeCollection?.variables)} />
+                  </button>
+                </div>
+              )}
+              <Section
+                title={activeCollection?.name ?? 'Collection'}
+                disabled={!store.activeCollectionId}
+                empty={filteredCollectionEnvs.length === 0}
+                emptyText={q ? 'No matches' : 'No environments'}
+                onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(store.activeCollectionId) })}
+              >
+                {filteredCollectionEnvs.map((e) => (
+                  <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
+                ))}
+              </Section>
+              <Section
+                title="Global"
+                empty={filteredGlobalEnvs.length === 0}
+                emptyText={q ? 'No matches' : 'No environments'}
+                onAdd={() => setSelection({ kind: 'env', id: store.addEnvironment(null) })}
+              >
+                {filteredGlobalEnvs.map((e) => (
+                  <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selection?.kind === 'env' && selection.id === e.id} onClick={() => setSelection({ kind: 'env', id: e.id })} />
+                ))}
+              </Section>
+            </div>
           </div>
 
           {/* editor */}
@@ -226,8 +268,8 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
 const LIST_ROW = 'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-acc/60';
 const LIST_SLOT = 'flex w-3 shrink-0 items-center justify-center';
 
-function Section({ title, onAdd, disabled, empty, children }: {
-  title: string; onAdd: () => void; disabled?: boolean; empty?: boolean; children: React.ReactNode;
+function Section({ title, onAdd, disabled, empty, emptyText = 'No environments', children }: {
+  title: string; onAdd: () => void; disabled?: boolean; empty?: boolean; emptyText?: string; children: React.ReactNode;
 }) {
   return (
     <div className="mb-2">
@@ -243,19 +285,28 @@ function Section({ title, onAdd, disabled, empty, children }: {
       {/* An empty section used to render a caption, a +, and then nothing —
           which reads as broken rather than as "there is nothing here yet". */}
       {empty
-        ? <p className="py-1 pl-8 pr-3 text-[11px] text-fg-mute/70">No environments</p>
+        ? <p className="py-1 pl-8 pr-3 text-[11px] text-fg-mute/70">{emptyText}</p>
         : children}
     </div>
   );
 }
 
+// Small rounded count pill — only shown once there's something to count, so a
+// freshly-created (still-empty) environment doesn't carry a distracting "0"
+// everywhere in the list.
+function VarCountBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return <Badge pill size="xs" className="shrink-0">{count}</Badge>;
+}
+
 function EnvRow({ env, active, selected, onClick }: {
-  env: { id: string; name: string }; active: boolean; selected: boolean; onClick: () => void;
+  env: { id: string; name: string; variables?: KeyValue[] }; active: boolean; selected: boolean; onClick: () => void;
 }) {
   return (
     <button onClick={onClick} className={cn(LIST_ROW, selected && 'bg-acc')}>
-      <span className={LIST_SLOT}>{active && <StatusDot tone="live" size="xs" />}</span>
-      <span className="truncate">{env.name}</span>
+      <span className={LIST_SLOT}>{active && <StatusDot tone="live" size="xs" title="Active environment" />}</span>
+      <span className="min-w-0 flex-1 truncate">{env.name}</span>
+      <VarCountBadge count={varCount(env.variables)} />
     </button>
   );
 }

@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { IconButton } from '@/components/ui/icon-button';
 import { methodColor, methodShort } from './method-color';
+import { EnvQuickView } from './EnvQuickView';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
 import type { Collection, TreeItem } from './types';
@@ -150,6 +151,7 @@ export function RequestTabs({
             )}
           </SelectContent>
         </Select>
+        <EnvQuickView env={store.activeEnv} mismatched={mismatchedEnv} onManage={onManageEnvironments} />
         <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-bg">
           <Settings2 className="h-4 w-4" />
         </IconButton>
