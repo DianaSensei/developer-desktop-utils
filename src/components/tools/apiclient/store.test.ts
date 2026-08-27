@@ -178,6 +178,44 @@ describe('useApiStore — collection variables', () => {
   });
 });
 
+describe('useApiStore — collection/folder headers', () => {
+  it('collects inherited headers outer (collection) to inner (folder) for a request', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    act(() => result.current.setNodeHeaders(collectionId, null, [
+      { id: 'h1', key: 'X-Collection', value: 'collection', enabled: true },
+    ]));
+
+    let folderId = '';
+    act(() => { folderId = result.current.addItem(collectionId, 'folder'); });
+    act(() => result.current.setNodeHeaders(collectionId, folderId, [
+      { id: 'h2', key: 'X-Folder', value: 'folder', enabled: true },
+    ]));
+
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(collectionId, 'request', folderId); });
+
+    const { headers } = result.current.getInherited(requestId);
+    expect(headers).toEqual([
+      [{ id: 'h1', key: 'X-Collection', value: 'collection', enabled: true }],
+      [{ id: 'h2', key: 'X-Folder', value: 'folder', enabled: true }],
+    ]);
+  });
+
+  it('omits empty header lists and returns [] for a request with no ancestor headers', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let requestId = '';
+    act(() => { requestId = result.current.addItem(collectionId, 'request'); });
+
+    expect(result.current.getInherited(requestId).headers).toEqual([]);
+  });
+});
+
 describe('useApiStore — importEnvironment', () => {
   it('appends an already-built Environment and it becomes selectable', async () => {
     const { useApiStore } = await import('./store');

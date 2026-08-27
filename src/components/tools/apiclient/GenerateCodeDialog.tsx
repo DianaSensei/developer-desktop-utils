@@ -9,16 +9,20 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CodeViewer } from '@/design-system';
 import { CODE_TARGETS, generateCode } from './codegen';
-import type { ApiRequest, VarMap } from './types';
+import type { ApiRequest, KeyValue, VarMap } from './types';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   request: ApiRequest | null;
   vars: VarMap;
+  // Collection/folder headers that apply ahead of the request's own (see
+  // request.ts's buildHeaders) — included so the generated snippet matches
+  // what Send actually transmits.
+  inheritedHeaders?: KeyValue[][];
 }
 
-export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
+export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHeaders = [] }: Props) {
   const [lang, setLang] = useState('Shell');
   const [variant, setVariant] = useState('curl');
   const [interpolate, setInterpolate] = useState(true);
@@ -26,8 +30,8 @@ export function GenerateCodeDialog({ open, onClose, request, vars }: Props) {
   const target = CODE_TARGETS.find((t) => t.lang === lang) ?? CODE_TARGETS[0];
 
   const code = useMemo(
-    () => (request ? generateCode(request, vars, lang, variant, interpolate) : ''),
-    [request, vars, lang, variant, interpolate],
+    () => (request ? generateCode(request, vars, lang, variant, interpolate, inheritedHeaders) : ''),
+    [request, vars, lang, variant, interpolate, inheritedHeaders],
   );
 
   const pickLang = (l: string) => {

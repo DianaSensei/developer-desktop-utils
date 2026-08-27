@@ -441,6 +441,7 @@ export function ApiClient() {
         onClose={() => setCodeOpen(false)}
         request={activeRequest}
         vars={codeOpen ? codeVars() : {}}
+        inheritedHeaders={activeRequest ? store.getInherited(activeRequest.id).headers : []}
       />
       {runTarget && (
         <RunnerDialog

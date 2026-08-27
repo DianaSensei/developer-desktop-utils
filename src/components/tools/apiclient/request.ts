@@ -79,28 +79,43 @@ export function buildUrl(req: ApiRequest, sub: Sub): string {
   return `${head}?${search.toString()}`;
 }
 
-// Assemble headers from the headers list, auth, and the body content-type.
-function buildHeaders(req: ApiRequest, sub: Sub): Record<string, string> {
+// Assemble headers from the collection/folder chain (outer→inner), the
+// request's own headers list, auth, and the body content-type. Later sources
+// override an earlier one of the same name (case-insensitively, since HTTP
+// header names aren't case-sensitive) — matching Bruno's collection → folder →
+// request precedence.
+function buildHeaders(req: ApiRequest, sub: Sub, inheritedHeaders: KeyValue[][] = []): Record<string, string> {
   const headers: Record<string, string> = {};
-  for (const [k, v] of enabledPairs(req.headers)) {
-    headers[sub(k)] = sub(v);
+  const keyByLower: Record<string, string> = {};
+  const setHeader = (k: string, v: string) => {
+    if (!k) return;
+    const lower = k.toLowerCase();
+    const prevKey = keyByLower[lower];
+    if (prevKey && prevKey !== k) delete headers[prevKey];
+    headers[k] = v;
+    keyByLower[lower] = k;
+  };
+
+  for (const list of inheritedHeaders) {
+    for (const [k, v] of enabledPairs(list)) setHeader(sub(k), sub(v));
   }
+  for (const [k, v] of enabledPairs(req.headers)) setHeader(sub(k), sub(v));
 
   if (req.auth.type === 'bearer' && req.auth.token.trim()) {
-    headers['Authorization'] = `Bearer ${sub(req.auth.token).trim()}`;
+    setHeader('Authorization', `Bearer ${sub(req.auth.token).trim()}`);
   } else if (req.auth.type === 'basic') {
     const user = sub(req.auth.username);
     const pass = sub(req.auth.password);
-    headers['Authorization'] = `Basic ${btoa(`${user}:${pass}`)}`;
+    setHeader('Authorization', `Basic ${btoa(`${user}:${pass}`)}`);
   } else if (req.auth.type === 'apikey' && req.auth.apiKey.placement === 'header' && req.auth.apiKey.key.trim()) {
-    headers[sub(req.auth.apiKey.key)] = sub(req.auth.apiKey.value);
+    setHeader(sub(req.auth.apiKey.key), sub(req.auth.apiKey.value));
   }
 
-  const hasContentType = Object.keys(headers).some((h) => h.toLowerCase() === 'content-type');
+  const hasContentType = 'content-type' in keyByLower;
   if (!hasContentType && req.method !== 'GET' && req.method !== 'HEAD') {
     const ct = BODY_CONTENT_TYPE[req.body.mode];
     // multipart is intentionally omitted so fetch can set the boundary itself.
-    if (ct) headers['Content-Type'] = ct === 'file' ? (req.body.fileType || 'application/octet-stream') : ct;
+    if (ct) setHeader('Content-Type', ct === 'file' ? (req.body.fileType || 'application/octet-stream') : ct);
   }
   return headers;
 }
@@ -262,6 +277,7 @@ export async function sendRequest(
   vars: VarMap,
   signal?: AbortSignal,
   cookieJar: Cookie[] = [],
+  inheritedHeaders: KeyValue[][] = [],
 ): Promise<ApiResponse> {
   const sub: Sub = (s) => substituteVars(s, vars);
   const url = buildUrl(req, sub);
@@ -288,7 +304,7 @@ export async function sendRequest(
     detachAbortBridge();
   };
 
-  const reqHeaders = buildHeaders(req, sub);
+  const reqHeaders = buildHeaders(req, sub, inheritedHeaders);
   // OAuth2: fetch an access token first, then send the request as Bearer.
   if (req.auth.type === 'oauth2') {
     reqHeaders['Authorization'] = `Bearer ${await fetchOAuthToken(req.auth.oauth2, sub, timeoutCtl ? timeoutCtl.signal : signal)}`;
@@ -450,12 +466,14 @@ function resolveBody(req: ApiRequest, sub: Sub): ResolvedBody {
 
 // Resolve a request into the concrete method/url/headers/body used to render a
 // code snippet. `interpolate` toggles {{var}} substitution (Bruno's checkbox).
-export function resolveRequest(req: ApiRequest, vars: VarMap, interpolate: boolean): ResolvedRequest {
+export function resolveRequest(
+  req: ApiRequest, vars: VarMap, interpolate: boolean, inheritedHeaders: KeyValue[][] = [],
+): ResolvedRequest {
   const sub: Sub = interpolate ? (s) => substituteVars(s, vars) : (s) => s;
   const url = buildUrl(req, sub) || sub(req.url);
   const finalUrl = url && !/^https?:\/\//i.test(url) ? `http://${url}` : url;
 
-  const headers: [string, string][] = Object.entries(buildHeaders(req, sub));
+  const headers: [string, string][] = Object.entries(buildHeaders(req, sub, inheritedHeaders));
   if (!headers.some(([k]) => k.toLowerCase() === 'content-type')) {
     const ct = DISPLAY_CONTENT_TYPE[req.body.mode] ?? (req.body.mode === 'file' ? req.body.fileType : null);
     if (ct) headers.push(['Content-Type', ct]);

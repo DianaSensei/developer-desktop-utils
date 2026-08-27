@@ -227,27 +227,31 @@ function findFolderPath(items: TreeItem[], id: string, acc: Folder[]): Folder[] 
   return null;
 }
 
-export interface InheritedScripts { pre: string[]; post: string[]; auth: Auth | null }
+export interface InheritedScripts { pre: string[]; post: string[]; auth: Auth | null; headers: KeyValue[][] }
 
 // Ordered ancestor scripts for a request: pre runs collection→folders (outer to
 // inner); post runs the reverse (inner to outer) so cleanup unwinds naturally.
 // `auth` is the nearest ancestor (folder before collection) with concrete auth.
+// `headers` stays outer→inner (collection first) — request.ts's buildHeaders
+// applies them in that order so an inner folder's header overrides the
+// collection's, matching Bruno.
 function collectInherited(collections: Collection[], id: string): InheritedScripts {
   for (const c of collections) {
     const path = findFolderPath(c.items, id, []);
     if (path) {
-      const nodes: { script?: { req: string; res: string }; auth?: Auth }[] = [c, ...path];
+      const nodes: { script?: { req: string; res: string }; auth?: Auth; headers?: KeyValue[] }[] = [c, ...path];
       const pre = nodes.map((n) => n.script?.req ?? '').filter((s) => s.trim());
       const post = nodes.map((n) => n.script?.res ?? '').filter((s) => s.trim()).reverse();
+      const headers = nodes.map((n) => n.headers ?? []).filter((h) => h.length);
       let auth: Auth | null = null;
       for (let i = nodes.length - 1; i >= 0; i--) {
         const a = nodes[i].auth;
         if (a && a.type !== 'none' && a.type !== 'inherit') { auth = a; break; }
       }
-      return { pre, post, auth };
+      return { pre, post, auth, headers };
     }
   }
-  return { pre: [], post: [], auth: null };
+  return { pre: [], post: [], auth: null, headers: [] };
 }
 
 // The owning collection's shared variable defaults for a request, looked up by
@@ -464,12 +468,26 @@ export function useApiStore() {
     setCollections((prev) => prev.map((c) => (c.id === collectionId ? { ...c, variables } : c)));
   }, [setCollections]);
 
+  // Set the inherited headers on a collection (nodeId null) or a folder.
+  const setNodeHeaders = useCallback((collectionId: string, nodeId: string | null, headers: KeyValue[]) => {
+    setCollections((prev) => prev.map((c) => {
+      if (c.id !== collectionId) return c;
+      if (!nodeId) return { ...c, headers };
+      return {
+        ...c,
+        items: mapTree(c.items, (item) =>
+          item.id === nodeId && item.type === 'folder' ? { ...item, headers } : item,
+        ),
+      };
+    }));
+  }, [setCollections]);
+
   // Inherited scripts/auth for any request id (used by the Runner).
   const getInherited = useCallback((id: string) => collectInherited(collections, id), [collections]);
 
   // Inherited (collection + folder) scripts for the request currently active.
   const inheritedScripts = useMemo(
-    () => (activeRequestId ? collectInherited(collections, activeRequestId) : { pre: [], post: [], auth: null }),
+    () => (activeRequestId ? collectInherited(collections, activeRequestId) : { pre: [], post: [], auth: null, headers: [] }),
     [collections, activeRequestId],
   );
 
@@ -636,6 +654,7 @@ export function useApiStore() {
     setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse,
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, updateRequest, setNodeScript, setNodeAuth,
+    setNodeHeaders,
     setCollectionVariables,
     addEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
     vault, setVault, vaultVars,

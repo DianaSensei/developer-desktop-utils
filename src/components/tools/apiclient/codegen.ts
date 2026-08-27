@@ -1,7 +1,7 @@
 // Generate request code snippets in several languages from a request, mirroring
 // Bruno's "Generate Code" dialog. Each language exposes one or more variants.
 
-import type { ApiRequest, VarMap } from './types';
+import type { ApiRequest, KeyValue, VarMap } from './types';
 import { resolveRequest, shellQuote, type ResolvedRequest } from './request';
 
 export interface CodeTarget {
@@ -18,8 +18,9 @@ export const CODE_TARGETS: CodeTarget[] = [
 
 export function generateCode(
   request: ApiRequest, vars: VarMap, lang: string, variant: string, interpolate: boolean,
+  inheritedHeaders: KeyValue[][] = [],
 ): string {
-  const r = resolveRequest(request, vars, interpolate);
+  const r = resolveRequest(request, vars, interpolate, inheritedHeaders);
   switch (`${lang}/${variant}`) {
     case 'Shell/curl': return curl(r);
     case 'Shell/httpie': return httpie(r);

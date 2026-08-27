@@ -29,7 +29,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { ApiStore } from './store';
-import { type ApiRequest, type Auth, type Collection, type Folder, type RequestScript, type TreeItem, newAuth, normalizeRequest } from './types';
+import { type ApiRequest, type Auth, type Collection, type Folder, type KeyValue, type RequestScript, type TreeItem, newAuth, normalizeRequest } from './types';
 import { importPostman, exportPostman } from './postman';
 import { type ScriptFinding, findScripts, stripScripts } from './collectionScripts';
 import { ImportReviewDialog } from './ImportReviewDialog';
@@ -41,6 +41,7 @@ import { ImportCurlDialog } from './ImportCurlDialog';
 
 const emptyScript = (s?: RequestScript): RequestScript => s ?? { req: '', res: '' };
 const inheritAuth = (a?: Auth): Auth => a ?? newAuth();
+const emptyHeaders = (h?: KeyValue[]): KeyValue[] => h ?? [];
 
 // Flatten all requests under a list of tree items (depth-first), normalized for
 // the engine.
@@ -243,7 +244,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       </div>
 
       {settings && (
-        <NodeSettingsDialog target={settings} onSave={store.setNodeScript} onSaveAuth={store.setNodeAuth} onClose={() => setSettings(null)} vars={envVars} />
+        <NodeSettingsDialog target={settings} onSave={store.setNodeScript} onSaveAuth={store.setNodeAuth} onSaveHeaders={store.setNodeHeaders} onClose={() => setSettings(null)} vars={envVars} />
       )}
       {menu.state && <ContextMenu state={menu.state} onClose={menu.close} />}
       {pendingDelete && (
@@ -300,7 +301,7 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
     { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', sep: true, onClick: () => store.cloneCollection(collection.id) },
     { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(collection.id) },
     { icon: <Download className="h-3.5 w-3.5" />, label: 'Export (Postman)', onClick: handleExport },
-    { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId: collection.id, nodeId: null, name: collection.name, kind: 'Collection', script: emptyScript(collection.script), auth: inheritAuth(collection.auth) }) },
+    { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId: collection.id, nodeId: null, name: collection.name, kind: 'Collection', script: emptyScript(collection.script), auth: inheritAuth(collection.auth), headers: emptyHeaders(collection.headers) }) },
     { icon: <ChevronsDownUp className="h-3.5 w-3.5" />, label: collapsed ? 'Expand' : 'Collapse', onClick: () => store.toggleCollapse(collection.id) },
     { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeCollection },
   ];
@@ -356,7 +357,7 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
     { icon: <Play className="h-3.5 w-3.5" />, label: 'Run', sep: true, onClick: () => ctx.onRun(folder.name, flattenRequests(folder.items)) },
     { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', sep: true, onClick: () => store.cloneItem(collectionId, folder.id) },
     { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(folder.id) },
-    { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId, nodeId: folder.id, name: folder.name, kind: 'Folder', script: emptyScript(folder.script), auth: inheritAuth(folder.auth) }) },
+    { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId, nodeId: folder.id, name: folder.name, kind: 'Folder', script: emptyScript(folder.script), auth: inheritAuth(folder.auth), headers: emptyHeaders(folder.headers) }) },
     { icon: <ChevronsDownUp className="h-3.5 w-3.5" />, label: collapsed ? 'Expand' : 'Collapse', onClick: () => store.toggleCollapse(collectionId, folder.id) },
     { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeFolder },
   ];

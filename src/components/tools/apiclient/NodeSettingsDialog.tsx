@@ -10,9 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Callout } from '@/components/ui/callout';
 import { JavaScriptEditor } from '@/design-system';
 import { AuthEditor } from './AuthEditor';
+import { KeyValueEditor } from './KeyValueEditor';
 import { scriptApiExtensions } from './scriptCompletion';
 import { scriptCallsNetwork } from './collectionScripts';
-import { type Auth, type RequestScript, type VarMap, newAuth } from './types';
+import { type Auth, type KeyValue, type RequestScript, type VarMap, newAuth } from './types';
 
 export interface NodeSettingsTarget {
   collectionId: string;
@@ -21,24 +22,28 @@ export interface NodeSettingsTarget {
   kind: 'Collection' | 'Folder';
   script: RequestScript;
   auth: Auth;
+  headers: KeyValue[];
 }
 
 interface Props {
   target: NodeSettingsTarget;
   onSave: (collectionId: string, nodeId: string | null, script: RequestScript) => void;
   onSaveAuth: (collectionId: string, nodeId: string | null, auth: Auth) => void;
+  onSaveHeaders: (collectionId: string, nodeId: string | null, headers: KeyValue[]) => void;
   onClose: () => void;
   vars?: VarMap;
 }
 
-export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }: Props) {
-  const [tab, setTab] = useState<'scripts' | 'auth'>('scripts');
+export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, onClose, vars }: Props) {
+  const [tab, setTab] = useState<'scripts' | 'auth' | 'headers'>('scripts');
   const [script, setScript] = useState<RequestScript>(target.script);
   const [auth, setAuth] = useState<Auth>(target.auth ?? newAuth());
+  const [headers, setHeaders] = useState<KeyValue[]>(target.headers);
 
   const save = () => {
     onSave(target.collectionId, target.nodeId, script);
     onSaveAuth(target.collectionId, target.nodeId, auth);
+    onSaveHeaders(target.collectionId, target.nodeId, headers);
     onClose();
   };
 
@@ -54,6 +59,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
         <div className="flex items-center gap-4 border-b px-4">
           <TabBtn id="scripts" label="Scripts" active={tab} onSelect={setTab} />
           <TabBtn id="auth" label="Auth" active={tab} onSelect={setTab} />
+          <TabBtn id="headers" label="Headers" active={tab} onSelect={setTab} />
         </div>
 
         {tab === 'scripts' ? (
@@ -82,12 +88,20 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
               )}
             </div>
           </div>
-        ) : (
+        ) : tab === 'auth' ? (
           <div className="flex flex-col gap-3 p-4">
             <p className="text-[11px] text-fg-mute">
               Requests with “Inherit” auth use this {target.kind.toLowerCase()}’s authorization.
             </p>
             <AuthEditor auth={auth} onChange={setAuth} allowInherit={false} vars={vars} />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 p-4">
+            <p className="text-[11px] text-fg-mute">
+              Added to every request inside this {target.kind.toLowerCase()}. A request's own header
+              with the same name overrides it.
+            </p>
+            <KeyValueEditor rows={headers} onChange={setHeaders} keyPlaceholder="Header" valuePlaceholder="Value" />
           </div>
         )}
 
@@ -104,7 +118,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onClose, vars }
 // new identity on every keystroke in the script editors, so React remounts the
 // button and it loses focus mid-keyboard-navigation.
 function TabBtn({ id, label, active, onSelect }: {
-  id: 'scripts' | 'auth'; label: string; active: string; onSelect: (id: 'scripts' | 'auth') => void;
+  id: 'scripts' | 'auth' | 'headers'; label: string; active: string; onSelect: (id: 'scripts' | 'auth' | 'headers') => void;
 }) {
   return (
     <button

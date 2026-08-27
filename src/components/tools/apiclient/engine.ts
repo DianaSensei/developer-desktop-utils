@@ -7,7 +7,7 @@
 // vars (bru.setVar) override them. Scripts may mutate the request draft and both
 // variable stores; the caller persists the resulting env/runtime changes.
 
-import type { ApiRequest, ApiResponse, Auth, Environment, LogEntry, TestResult, VarMap } from './types';
+import type { ApiRequest, ApiResponse, Auth, Environment, KeyValue, LogEntry, TestResult, VarMap } from './types';
 import { newRequest } from './types';
 import { sendRequest } from './request';
 import type { Cookie } from './cookies';
@@ -50,7 +50,7 @@ function envToMap(env: Environment | null): VarMap {
   return map;
 }
 
-export interface InheritedScripts { pre: string[]; post: string[]; auth?: Auth | null }
+export interface InheritedScripts { pre: string[]; post: string[]; auth?: Auth | null; headers?: KeyValue[][] }
 
 export async function executeRequest(
   request: ApiRequest,
@@ -150,7 +150,7 @@ export async function executeRequest(
   // 3. build & send
   let response: ApiResponse;
   try {
-    response = await sendRequest(draft, varMap(), signal, cookieJar);
+    response = await sendRequest(draft, varMap(), signal, cookieJar, inherited.headers ?? []);
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
     errors.push(errToString(e));
