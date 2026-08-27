@@ -431,7 +431,7 @@ export function ApiClient() {
               />
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-fg-mute">
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-fg-mute motion-safe:animate-fade-in-up">
               <Send className="h-10 w-10 opacity-20" />
               <div className="text-center">
                 <p className="text-sm font-medium text-fg/70">No request open</p>

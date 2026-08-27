@@ -500,7 +500,11 @@ function Row({
       }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onDrop(); }}
       className={cn(
-        'group relative flex min-h-[26px] items-center gap-1.5 py-1 pr-1 text-xs cursor-pointer transition-colors hover:bg-bg-2/60',
+        // Plays once wherever the row is freshly mounted — a new request/folder,
+        // a folder just expanded, a drag-copy landing — and never replays on a
+        // re-render of a row that already existed (React keeps its DOM node by
+        // `key`), so plain reorders and edits stay perfectly still.
+        'group relative flex min-h-[26px] items-center gap-1.5 py-1 pr-1 text-xs cursor-pointer transition-colors hover:bg-bg-2/60 motion-safe:animate-fade-in-up',
         // Selection is a tint, not a saturated accent fill: bg-acc is the solid
         // action blue, and body text on it clears neither AA nor the rule that
         // solid accent belongs to the one primary action on a screen.

@@ -300,11 +300,18 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           <Spinner size="sm" /> Sending…
         </span>
       ) : response ? (
-        <>
+        // Keyed on the response's own shape, not just its presence: a fresh
+        // send always changes at least one of these, so the key changes too and
+        // React mounts a new node — which is what makes the fade-in replay on
+        // every arrival instead of only the first one.
+        <span
+          key={`${response.url}|${response.timeMs}|${response.sizeBytes}|${response.status}`}
+          className="flex items-center gap-2.5 motion-safe:animate-fade-in-up"
+        >
           <span className={cn('font-semibold', statusColor(response.status))}>{response.status} {response.statusText}</span>
           <span className="text-fg-mute">{response.timeMs} ms</span>
           <span className="text-fg-mute">{formatBytes(response.sizeBytes)}</span>
-        </>
+        </span>
       ) : (
         <span className="font-semibold text-bad">No response</span>
       )}
@@ -371,7 +378,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       )}
 
       {corsHint && (
-        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
           <Callout tone="warning" size="sm" title="Looks like an Origin/CORS check">
             The server may be rejecting this for missing an <code className="rounded bg-bg-2 px-1">Origin</code> header
             — unlike a browser tab, this app's requests don't send one automatically. Try adding an{' '}
@@ -381,7 +388,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       )}
 
       {certHint && (
-        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
           <Callout
             tone="warning" size="sm" title="Looks like a certificate problem"
             actions={onJumpToSettings && (
@@ -398,7 +405,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       )}
 
       {redirectHint && (
-        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
           <Callout
             tone="warning" size="sm" title="Too many redirects"
             actions={onJumpToSettings && (
@@ -521,7 +528,7 @@ function suggestedFileName(r: ApiResponse): string {
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2">{children}</div>;
+  return <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 motion-safe:animate-fade-in-up">{children}</div>;
 }
 
 // The … menu holding the save / clear actions, so the status readout stays

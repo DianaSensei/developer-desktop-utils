@@ -86,11 +86,17 @@ export function RequestTabs({
               onClick={() => onSelectRequest(req.id)}
               title={failed ? `${req.method} ${req.name} — last send failed` : `${req.method} ${req.name}`}
               className={cn(
-                'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-2.5 py-1.5 text-xs transition-colors',
+                // scale-in plays once, on the fresh mount a newly-opened tab gets
+                // (an already-open tab just being reordered/re-rendered keeps its
+                // DOM node by `key`, so it never replays).
+                'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-2.5 py-1.5 text-xs transition-colors motion-safe:animate-scale-in',
                 active ? 'bg-bg text-fg' : 'text-fg-mute hover:bg-bg/50 hover:text-fg',
               )}
             >
-              {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />}
+              {/* Always mounted, opacity-crossfaded rather than conditionally
+                  rendered — switching the active tab used to snap this bar on/off
+                  instantly. */}
+              <span className={cn('absolute inset-x-0 top-0 h-0.5 bg-acc transition-opacity duration-base ease-out-soft', active ? 'opacity-100' : 'opacity-0')} />
               <span className={cn('shrink-0 text-[11px] font-bold uppercase', methodColor(req.method))}>
                 {methodShort(req.method)}
               </span>
@@ -112,7 +118,7 @@ export function RequestTabs({
           );
         })}
         {historyActive && (
-          <div className="group relative flex shrink-0 items-center gap-1.5 border-r border-line bg-bg px-2.5 py-1.5 text-xs text-fg">
+          <div className="group relative flex shrink-0 items-center gap-1.5 border-r border-line bg-bg px-2.5 py-1.5 text-xs text-fg motion-safe:animate-scale-in">
             <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />
             <Clock className="h-3.5 w-3.5 shrink-0 text-acc-ink" />
             <span>History</span>
