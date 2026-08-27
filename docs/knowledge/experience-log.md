@@ -1,5 +1,143 @@
 # Experience log
 
+## [2026-08-27] API Client — {{token}} showed red in collection/folder Headers & Auth despite the variable having a value
+- Nguyên nhân: `Sidebar.tsx` build một map `envVars` cho tham số `vars` của
+  `NodeSettingsDialog` (dialog Settings của collection/folder — tab Headers,
+  Auth) nhưng map đó CHỈ gồm biến của `store.activeEnv` (environment đang
+  active theo TAB đang mở) — hoàn toàn thiếu **Collection Variables** của
+  chính collection đang sửa. Tệ hơn: tab **Headers** của dialog này gọi
+  `<KeyValueEditor rows={headers} onChange={setHeaders} .../>` mà KHÔNG hề
+  truyền prop `vars` — tức {{token}} trong Headers luôn hiện đỏ (unknown)
+  bất kể có định nghĩa ở đâu, một lỗi sót từ khi feature "Bruno-style
+  collection/folder headers" được thêm (phase trước trong cùng session này) —
+  code build/tsc pass sạch vì `vars` là prop optional trên `KeyValueEditor`
+  (`vars?: VarMap`), nên thiếu nó không phải lỗi type.
+- Số lần thử: 1/1 — lần theo đúng đường đi highlighting thật:
+  `InlineCodeField` → `var-support.ts`'s `varExtensions` (`m[1] in vars` quyết
+  định class `cm-var`/`cm-var-unknown`) → ngược lên từng nơi truyền `vars`
+  xuống `KeyValueEditor`/`AuthEditor`, thay vì đoán nguyên nhân.
+- Kết quả: Đã fix — thêm hàm `varsForCollection(collections, selectedEnv,
+  collectionId)` trong `store.ts` (khác với `collectCollectionVars`/
+  `resolveEnvForRequest` ở chỗ nhận thẳng **collection id đã biết chắc chắn**
+  thay vì phải dò ngược từ một request id, vì một node collection/folder tự nó
+  không có request id nào để tra) — trả về Collection Variables của ĐÚNG
+  collection đang sửa (`target.collectionId`, không phải "collection đang
+  active") hợp nhất với environment đang chọn NẾU nó là global hoặc thuộc
+  cùng collection đó (đúng cùng quy tắc "collection env chỉ hiệu lực với
+  collection của nó" đã áp dụng chỗ khác). Expose qua
+  `store.getVarsForCollection(collectionId)`; `Sidebar.tsx` dùng nó thay
+  `envVars` cũ; `NodeSettingsDialog.tsx`'s Headers tab được bổ sung
+  `vars={vars}` (trước đó thiếu hẳn).
+- Bài học chung: một prop optional (`vars?: VarMap`) là chỗ dễ bị BỎ SÓT ở
+  một call site mới thêm (Headers tab) mà không ai để ý — vì thiếu nó không
+  gây lỗi type/runtime, chỉ âm thầm tắt một tính năng (highlighting). Khi thêm
+  một tab/editor MỚI dùng lại `KeyValueEditor`/`AuthEditor` trong một khu vực
+  đã có sẵn var-highlighting ở tab khác cùng dialog, phải rà xem tab mới có
+  được truyền đúng `vars` như các tab anh em hay không — không thể chỉ tin
+  `tsc`/build xanh. Đồng thời, đây là một biến thể khác của nguyên tắc "resolve
+  theo id, không theo tab đang active" (đã ghi nhận ở các entry khác): lần này
+  không phải request id mà là collection id của chính node đang mở dialog.
+
+## [2026-08-27] API Client — a long collection name broke the Environment dialog's layout
+- Nguyên nhân: hai chỗ trong `EnvironmentEditor.tsx` hiện badge tên collection
+  (`activeCollection.name`) với class `shrink-0` và KHÔNG có `truncate`/`max-w` —
+  một flex item `shrink-0` không bao giờ co lại, nên tên collection dài (không
+  giới hạn độ dài khi tạo collection) khiến badge nới rộng ra đúng bằng độ dài
+  chuỗi, đẩy phần còn lại của hàng (ô nhập tên environment, các nút
+  Active/Duplicate/Export/Delete) tràn ra ngoài panel — "layout bị bể" đúng như
+  người dùng mô tả. Cùng lúc đó, `Section`'s title (bên danh sách trái) cũng
+  hiện `activeCollection?.name` qua `<SectionLabel className="truncate">` —
+  nhưng KHÔNG có ellipsis xuất hiện dù có class `truncate`: `SectionLabel` tự
+  bọc `children` trong một `<span>` RIÊNG không có `truncate`/`min-w-0`; class
+  `truncate`/`min-w-0` truyền vào chỉ nằm trên `Tag` bọc ngoài (một flex
+  container) — text-overflow: ellipsis không áp dụng xuyên qua một phần tử con
+  lồng bên trong, nó chỉ hoạt động khi chính phần tử có `overflow:hidden` là
+  nơi chứa trực tiếp nội dung inline. Kết quả: overflow bị cắt CỨNG không có
+  "…", không tràn ra ngoài cột 240px cố định nên không "bể" rõ như 2 badge kia,
+  nhưng vẫn là cùng một lỗi gốc.
+- Số lần thử: 1/1 — phát hiện bằng cách đọc lại đúng cấu trúc JSX + suy luận
+  CSS flexbox/text-overflow thay vì đoán, rồi grep toàn bộ codebase xem
+  `SectionLabel` có chỗ nào khác từng dựa vào `truncate` không (chỉ đúng 1 chỗ
+  — `HistoryView.tsx` chỉ dùng `min-w-0` không `truncate`, các chỗ còn lại đều
+  caption tĩnh ngắn) trước khi sửa để tránh phá layout những nơi khác.
+- Kết quả: Đã fix — (1) hai badge tên collection đổi `shrink-0` (không co)
+  thành `max-w-[…] shrink truncate` + thêm `title={...}` để hover xem đầy đủ
+  tên; ô `Input` tên environment cạnh đó thêm `min-w-0 flex-1` để co giãn đúng
+  thay vì giữ `w-full` mặc định (vốn không tự co khi hàng bị ép hẹp). (2) Sửa
+  gốc trong `section-label.tsx`: thêm `min-w-0 truncate` vào chính `<span>`
+  chứa `children` (không chỉ ở `Tag` bọc ngoài) — an toàn ngược cho toàn bộ ~25
+  chỗ dùng `SectionLabel` khác vì `truncate`/`min-w-0` không có tác dụng quan
+  sát được trừ khi nội dung thực sự tràn.
+- Bài học chung: `truncate`/`min-w-0` chỉ có tác dụng đúng khi đặt lên phần tử
+  TRỰC TIẾP chứa text tràn (giống cách `EnvRow`'s `<span className="min-w-0
+  flex-1 truncate">{env.name}</span>` đã làm đúng ngay trong cùng file) — một
+  component dùng chung nào tự bọc `children` trong một `<span>`/`<div>` nội bộ
+  (như `SectionLabel`) sẽ vô hiệu hoá `truncate` truyền từ ngoài vào trừ khi
+  bản thân component đó cũng áp `truncate` lên đúng phần tử bọc text. Và bất kỳ
+  badge/pill nào hiện dữ liệu do người dùng tự đặt tên (project, collection,
+  environment...) — độ dài không có giới hạn ở tầng nhập liệu — đều cần
+  `truncate` + `max-w` + `title` ngay từ đầu, không phải chỉ khi có báo lỗi.
+
+## [2026-08-27] API Client — "CORS" was one instance of a wider pattern: transport errors that read like a familiar term but come from a different layer
+- Nguyên nhân: sau khi fix xong case CORS/Origin (entry ngay dưới), người dùng hỏi tiếp "còn lỗi
+  nào tương tự có thể gặp" và "copy cURL từ Chrome/Edge/Safari có bị ảnh hưởng không" — tức cùng
+  một dạng câu hỏi, khái quát hoá từ 1 case cụ thể sang cả họ vấn đề. Rà lại `request.ts`'s
+  `netFetch` (đi qua `@tauri-apps/plugin-http`) thấy còn 2 lớp lỗi transport dễ đọc nhầm y hệt
+  kiểu CORS: (1) lỗi TLS certificate (self-signed/expired/hostname-mismatch) hiện ra như một câu
+  lỗi Rust/reqwest khó hiểu, không phải "khoá không hợp lệ" rõ ràng; (2) "too many redirects" khi
+  vượt `maxRedirects` — dễ tưởng server lỗi thay vì do giới hạn client tự đặt. Đồng thời rà
+  `curl.ts`'s `tokenize()` xác nhận: parser chỉ hiểu bash/POSIX quoting, nên dán cURL dạng
+  Windows cmd.exe (copy từ DevTools chọn nhầm "Copy as cURL (cmd)") sẽ mis-parse do khác cơ chế
+  line-continuation (`^` thay vì `\`) — một dạng nhầm lẫn thuật ngữ tương tự (cùng gọi là "cURL"
+  nhưng 2 định dạng khác nhau).
+- Số lần thử: 1/1 — cả 3 phát hiện đều xác nhận từ đọc source thật trước khi code: `.d.ts` của
+  `@tauri-apps/plugin-http` xác nhận `danger: DangerousSettings` đã tồn tại sẵn (không cần đoán
+  hay thêm Tauri command mới); `curl.ts`'s `tokenize()` đọc trực tiếp để xác nhận nó chỉ xử lý
+  `\`/`'`/`"`, không có nhánh nào xử lý `^`.
+- Kết quả: Đã thêm (xem `docs/decisions/transport-error-hints.md` để biết đầy đủ lý do thiết kế):
+  `RequestSettings.verifyTls` (setting mới, mặc định `true`, nối vào `danger` option có sẵn của
+  plugin-http) + `looksLikeCertError`/`looksLikeRedirectLoop` (heuristic trong `ResponsePanel.tsx`,
+  cùng khuôn với `looksLikeCorsRejection` đã có) + `looksLikeCmdFormat`/`hasSessionCredentials`
+  (heuristic trong `curl.ts`, hiện Callout ngay trong `ImportCurlDialog.tsx` khi đang dán). Cả 4
+  đều chỉ hiện gợi ý, không tự sửa, và tự tắt khi setting liên quan đã bị người dùng chủ động đổi
+  khỏi mặc định (tránh lặp lại lời khuyên vô ích khi họ đã biết và đã thử).
+- Bài học chung: một câu hỏi khái quát hoá ("còn lỗi tương tự nào khác") sau khi fix xong 1 case
+  cụ thể là tín hiệu nên chủ động rà toàn bộ layer liên quan (ở đây là "mọi lỗi transport/parse có
+  thể đọc nhầm bằng thuật ngữ quen thuộc") thay vì chỉ trả lời đúng câu hỏi hẹp — nhóm chúng lại
+  thành 1 quyết định thiết kế chung (gợi ý không tự sửa, tự tắt khi setting đã lệch mặc định) thay
+  vì xử lý rời rạc từng case sẽ nhất quán hơn cho người dùng và dễ maintain hơn cho code sau này.
+
+## [2026-08-27] API Client — user-reported "CORS" in the desktop app is the target server rejecting a missing `Origin` header, not a browser CORS block
+- Nguyên nhân: người dùng báo "bị chặn CORS" khi chạy **bản desktop** (Tauri), nơi
+  `request.ts`'s `netFetch` đã đi qua `@tauri-apps/plugin-http`'s `fetch` (chạy network call từ
+  Rust) đúng như thiết kế — về lý thuyết không có khái niệm CORS ở đây vì không phải trình duyệt
+  thực hiện fetch. Người dùng xác nhận: lỗi không phải "Failed to fetch" chung chung, mà là chính
+  server đích trả về 403 với nội dung nhắc tới CORS/Origin trong body. Tức là: **server đích tự
+  kiểm tra header `Origin`** (một số API làm vậy như một lớp phòng thủ, dù không phải trình
+  duyệt) — và Tauri (native HTTP client) không tự thêm `Origin` như một tab trình duyệt thật vẫn
+  làm, nên request bị server từ chối vì thiếu header đó.
+- Số lần thử: 1/1 — nghi vấn ban đầu (trước khi hỏi người dùng) là plugin-http có thể ÂM THẦM
+  lọc bỏ các "forbidden header" (Origin/Referer/Cookie/Host) theo đúng WHATWG Fetch spec, vì
+  source của plugin dùng `new Request(input, init)` (browser-native) để chuẩn hoá header trước
+  khi gửi qua IPC — dựng `Request` với guard "request" đúng là sẽ bỏ các header đó. Đọc thẳng
+  `node_modules/@tauri-apps/plugin-http/dist-js/index.js` để xác minh: code build một `Headers`
+  KHÔNG có guard (`new Headers(init.headers)`, không đi qua `Request`) làm nguồn header chính,
+  chỉ dùng `req.headers` (bản đã bị `Request` lọc) để BỔ SUNG header trình duyệt tự thêm (như
+  Content-Type mặc định) khi CHƯA có sẵn — nên forbidden header người dùng tự đặt (Origin,
+  Referer...) **không bị mất**. Kết luận: đây không phải bug của plugin/app — người dùng chỉ cần
+  tự thêm header `Origin` (Headers tab) khớp giá trị API đích yêu cầu.
+- Kết quả: Không sửa gì ở tầng transport (không cần, đã đúng). Thêm 1 gợi ý chủ động trong
+  `ResponsePanel.tsx`: `looksLikeCorsRejection(response)` — heuristic nhận diện response 4xx có
+  body/header nhắc tới CORS/Origin/access-control, và nếu request hiện tại **chưa có** header
+  `Origin` riêng thì hiện `Callout` giải thích đúng nguyên nhân (desktop app không tự thêm
+  Origin như trình duyệt) + gợi ý thêm header đó. Không tự động chèn header (tránh đoán sai giá
+  trị App đích mong đợi).
+- Bài học chung: khi người dùng báo lỗi bằng thuật ngữ trình duyệt quen thuộc ("CORS") trong một
+  app KHÔNG chạy trong trình duyệt, đừng vội tin tên gọi đó đúng nghĩa gốc — hỏi thẳng "lỗi hiện
+  ở đâu, nội dung chính xác là gì" trước khi sửa. Ở đây "CORS" chỉ là từ khoá trong thông điệp
+  lỗi của SERVER ĐÍCH, không phải cơ chế CORS thật của trình duyệt — hai thứ đọc giống nhau
+  nhưng nguyên nhân và cách sửa hoàn toàn khác nhau (sửa code app vs. thêm 1 header).
+
 ## [2026-08-27] API Client — a collection-scoped environment leaked into another collection's request when run via the Runner
 - Nguyên nhân: `environment-inheritance.md` (quyết định trước) đã cố ý tách khỏi mẫu "resolve
   theo request id" khi thêm `activeEnvMismatched`/`activeEnv` trong `store.ts` — 2 giá trị này

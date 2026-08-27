@@ -101,7 +101,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
               Added to every request inside this {target.kind.toLowerCase()}. A request's own header
               with the same name overrides it.
             </p>
-            <KeyValueEditor rows={headers} onChange={setHeaders} keyPlaceholder="Header" valuePlaceholder="Value" />
+            <KeyValueEditor rows={headers} onChange={setHeaders} keyPlaceholder="Header" valuePlaceholder="Value" vars={vars} />
           </div>
         )}
 

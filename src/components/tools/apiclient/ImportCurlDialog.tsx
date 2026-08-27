@@ -1,17 +1,28 @@
 // Paste a cURL command to create a request (Bruno's "Import cURL").
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
 import { TextEditor } from '@/design-system';
-import { parseCurl } from './curl';
+import { hasSessionCredentials, looksLikeCmdFormat, parseCurl } from './curl';
 import type { ApiStore } from './store';
 
 export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; open: boolean; onClose: () => void }) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const editorWrapRef = useRef<HTMLDivElement>(null);
+
+  // Live heads-up as the user pastes, independent of the Import click:
+  // - cmd-format is a plain-text check (still useful even if the paste is
+  //   incomplete/invalid so far).
+  // - Credentials are checked off a real parse, swallowed here since a
+  //   partial paste mid-edit isn't an error worth surfacing as one.
+  const cmdFormat = useMemo(() => looksLikeCmdFormat(text), [text]);
+  const hasCreds = useMemo(() => {
+    if (!text.trim()) return false;
+    try { return hasSessionCredentials(parseCurl(text)); } catch { return false; }
+  }, [text]);
 
   // CodeSurface doesn't expose an autoFocus prop (unlike the plain <textarea>
   // this replaced) — focus the CodeMirror content div directly once the
@@ -51,6 +62,19 @@ export function ImportCurlDialog({ store, open, onClose }: { store: ApiStore; op
               className="min-h-[180px]"
             />
           </div>
+          {cmdFormat && (
+            <Callout tone="warning" size="sm" title="Looks like Windows cmd format">
+              This parser only understands the bash/POSIX cURL format. In Chrome/Edge DevTools, use{' '}
+              <strong className="text-fg">Copy → Copy as cURL (bash)</strong>, not "(cmd)" — the cmd version's{' '}
+              <code className="rounded bg-bg-2 px-1">^</code> line continuations and quoting will likely mis-parse.
+            </Callout>
+          )}
+          {hasCreds && (
+            <Callout tone="info" size="sm" title="Includes a session credential">
+              This command carries a Cookie, Authorization, or basic-auth value copied from that browser session —
+              it's a snapshot, not a live login, so it can expire or be rotated independently of this request.
+            </Callout>
+          )}
           {error && <Callout tone="error" size="sm">{error}</Callout>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>

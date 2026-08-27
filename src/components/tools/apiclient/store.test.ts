@@ -227,6 +227,84 @@ describe('useApiStore — collection variables', () => {
   });
 });
 
+describe('useApiStore — getVarsForCollection', () => {
+  it('resolves a collection\'s own variables regardless of which collection/tab is active', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    act(() => result.current.setCollectionVariables(firstCollectionId, [
+      { id: 'v1', key: 'host', value: 'first.test', enabled: true },
+    ]));
+
+    // Make the *second* collection active — getVarsForCollection for the
+    // first collection must still resolve its own variables, not the active
+    // one's (or nothing at all, which is the bug this guards: a {{token}}
+    // that already has a Collection Variable value showing as unresolved).
+    let otherRequestId = '';
+    act(() => { otherRequestId = result.current.addItem(secondCollectionId, 'request'); });
+    act(() => result.current.selectRequest(otherRequestId));
+
+    expect(result.current.activeCollectionId).toBe(secondCollectionId);
+    expect(result.current.getVarsForCollection(firstCollectionId)).toEqual({ host: 'first.test' });
+  });
+
+  it('includes a global environment\'s variables', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let globalEnvId = '';
+    act(() => { globalEnvId = result.current.addEnvironment(null); });
+    act(() => result.current.updateEnvironment(globalEnvId, {
+      variables: [{ id: 'v1', key: 'token', value: 'abc', enabled: true }],
+    }));
+    act(() => result.current.setActiveEnvId(globalEnvId));
+
+    expect(result.current.getVarsForCollection(collectionId)).toEqual({ token: 'abc' });
+  });
+
+  it('excludes an environment scoped to a different collection', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    let scopedEnvId = '';
+    act(() => { scopedEnvId = result.current.addEnvironment(firstCollectionId); });
+    act(() => result.current.updateEnvironment(scopedEnvId, {
+      variables: [{ id: 'v1', key: 'token', value: 'abc', enabled: true }],
+    }));
+    act(() => result.current.setActiveEnvId(scopedEnvId));
+
+    expect(result.current.getVarsForCollection(secondCollectionId)).toEqual({});
+  });
+
+  it('lets the environment override a collection variable of the same name', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    act(() => result.current.setCollectionVariables(collectionId, [
+      { id: 'v1', key: 'host', value: 'from-collection', enabled: true },
+    ]));
+
+    let envId = '';
+    act(() => { envId = result.current.addEnvironment(collectionId); });
+    act(() => result.current.updateEnvironment(envId, {
+      variables: [{ id: 'v2', key: 'host', value: 'from-env', enabled: true }],
+    }));
+    act(() => result.current.setActiveEnvId(envId));
+
+    expect(result.current.getVarsForCollection(collectionId)).toEqual({ host: 'from-env' });
+  });
+});
+
 describe('useApiStore — duplicateEnvironment', () => {
   it('clones the environment with a "copy" name, fresh ids, and the same scope', async () => {
     const { useApiStore } = await import('./store');

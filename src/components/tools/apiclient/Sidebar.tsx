@@ -169,14 +169,16 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
 
   const confirmDelete = useCallback((opts: PendingDelete) => setPendingDelete(opts), []);
 
-  // Environment variables, for {{var}} highlighting in collection/folder auth.
-  // Secret-flagged variables stay masked here too — same rule as everywhere
-  // else a value only ever needs to be recognized, not displayed.
-  const envVars = useMemo(() => {
-    const m: Record<string, string> = {};
-    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) m[v.key] = v.secret ? '••••••••' : v.value;
-    return m;
-  }, [store.activeEnv]);
+  // Collection + environment variables, for {{var}} highlighting in the
+  // collection/folder settings dialog (headers, auth) — keyed by the node
+  // actually being edited (`settings.collectionId`), not whatever tab happens
+  // to be open, so a token referencing that collection's own Collection
+  // Variables shows as known even when it's a different collection than the
+  // active one.
+  const nodeVars = useMemo(
+    () => (settings ? store.getVarsForCollection(settings.collectionId) : {}),
+    [settings, store.getVarsForCollection],
+  );
 
   const nodeCtx: NodeCtx = useMemo(() => ({
     storeRef, activeRequestId: store.activeRequestId, q, onError: setError, onSettings: setSettings,
@@ -244,7 +246,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
       </div>
 
       {settings && (
-        <NodeSettingsDialog target={settings} onSave={store.setNodeScript} onSaveAuth={store.setNodeAuth} onSaveHeaders={store.setNodeHeaders} onClose={() => setSettings(null)} vars={envVars} />
+        <NodeSettingsDialog target={settings} onSave={store.setNodeScript} onSaveAuth={store.setNodeAuth} onSaveHeaders={store.setNodeHeaders} onClose={() => setSettings(null)} vars={nodeVars} />
       )}
       {menu.state && <ContextMenu state={menu.state} onClose={menu.close} />}
       {pendingDelete && (

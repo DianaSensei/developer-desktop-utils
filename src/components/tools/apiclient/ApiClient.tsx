@@ -424,6 +424,8 @@ export function ApiClient() {
                     logs={run.logs}
                     onClear={() => setRuns((prev) => ({ ...prev, [activeRequest.id]: EMPTY_RUN }))}
                     onJumpToTab={(t) => setPanelTabs((prev) => ({ ...prev, [activeRequest.id]: t }))}
+                    onJumpToSettings={() => setPanelTabs((prev) => ({ ...prev, [activeRequest.id]: 'settings' }))}
+                    request={activeRequest}
                   />
                 }
               />

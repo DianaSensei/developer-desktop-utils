@@ -158,6 +158,14 @@ export const DICTIONARY = {
   'settings.tools.dragReorder': { vi: 'Kéo để sắp xếp lại', en: 'Drag to reorder' },
   'settings.tools.dragReorderGroup': { vi: 'Kéo để sắp xếp lại {{label}}', en: 'Drag to reorder {{label}}' },
 
+  // ── Settings — Shortcuts ─────────────────────────────────────────────────
+  'settings.section.shortcuts': { vi: 'Phím tắt', en: 'Keyboard Shortcuts' },
+  'settings.shortcuts.description': {
+    vi: 'Các phím tắt hoạt động ở mọi nơi trong app, cộng với phím tắt riêng của từng tool.',
+    en: 'Shortcuts that work anywhere in the app, plus ones specific to each tool.',
+  },
+  'settings.shortcuts.global': { vi: 'Áp dụng mọi nơi', en: 'Works everywhere' },
+
   // ── Settings — Permissions ───────────────────────────────────────────────
   'settings.permissions.title': { vi: 'Quyền ứng dụng', en: 'App Permissions' },
   'settings.permissions.description': {

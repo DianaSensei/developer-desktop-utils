@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseScriptErrors } from './ResponsePanel';
+import { parseScriptErrors, looksLikeCorsRejection, looksLikeCertError, looksLikeRedirectLoop } from './ResponsePanel';
+import type { ApiResponse } from './types';
 
 describe('parseScriptErrors', () => {
   it('splits a single labelled error into label + message', () => {
@@ -31,5 +32,72 @@ describe('parseScriptErrors', () => {
     expect(parseScriptErrors('connection refused')).toEqual([
       { label: '', message: 'connection refused' },
     ]);
+  });
+});
+
+describe('looksLikeCorsRejection', () => {
+  const res = (over: Partial<ApiResponse> = {}): ApiResponse => ({
+    status: 403, statusText: 'Forbidden', ok: false, headers: [], body: '',
+    contentType: 'text/plain', timeMs: 5, sizeBytes: 0, ...over,
+  });
+
+  it('flags a 403 body that mentions CORS', () => {
+    expect(looksLikeCorsRejection(res({ body: 'Request blocked by CORS policy' }))).toBe(true);
+  });
+
+  it('flags a 403 body saying the origin is not allowed', () => {
+    expect(looksLikeCorsRejection(res({ body: 'Origin http://localhost is not allowed' }))).toBe(true);
+  });
+
+  it('flags an Access-Control-Allow-Origin mismatch message', () => {
+    expect(looksLikeCorsRejection(res({ body: 'No Access-Control-Allow-Origin header present' }))).toBe(true);
+  });
+
+  it('also checks response headers, not just the body', () => {
+    expect(looksLikeCorsRejection(res({ body: 'forbidden', headers: [['x-error', 'origin rejected']] }))).toBe(true);
+  });
+
+  it('does not flag an unrelated 403', () => {
+    expect(looksLikeCorsRejection(res({ body: 'Invalid API key' }))).toBe(false);
+  });
+
+  it('does not flag a 2xx response even if it happens to mention CORS', () => {
+    expect(looksLikeCorsRejection(res({ status: 200, ok: true, body: 'CORS is enabled for this origin' }))).toBe(false);
+  });
+
+  it('does not flag a 5xx server error', () => {
+    expect(looksLikeCorsRejection(res({ status: 500, statusText: 'Internal Server Error', body: 'cors origin blocked' }))).toBe(false);
+  });
+});
+
+describe('looksLikeCertError', () => {
+  it('flags a self-signed certificate message', () => {
+    expect(looksLikeCertError('error trying to connect: self signed certificate')).toBe(true);
+  });
+
+  it('flags an untrusted issuer message', () => {
+    expect(looksLikeCertError('invalid peer certificate: UnknownIssuer')).toBe(true);
+  });
+
+  it('flags a bare "certificate" mention', () => {
+    expect(looksLikeCertError('unable to get local issuer certificate')).toBe(true);
+  });
+
+  it('does not flag an unrelated network error', () => {
+    expect(looksLikeCertError('connection refused')).toBe(false);
+  });
+
+  it('does not match "ssl" as a substring of an unrelated word', () => {
+    expect(looksLikeCertError('the grassland was empty')).toBe(false);
+  });
+});
+
+describe('looksLikeRedirectLoop', () => {
+  it('flags reqwest\'s "too many redirects" message', () => {
+    expect(looksLikeRedirectLoop('error following redirect: too many redirects')).toBe(true);
+  });
+
+  it('does not flag an unrelated transport error', () => {
+    expect(looksLikeRedirectLoop('connection refused')).toBe(false);
   });
 });

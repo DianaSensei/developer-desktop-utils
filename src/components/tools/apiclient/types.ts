@@ -129,6 +129,12 @@ export interface RequestSettings {
   maxRedirects: number;      // cap on redirects when following
   timeout: number;           // ms to wait before aborting (0 = no limit)
   tags: string[];            // free-form labels
+  // Verify the server's TLS certificate (hostname + chain of trust). Off lets
+  // a self-signed/expired/localhost cert through — same escape hatch Postman
+  // and Insomnia call "SSL certificate verification". Read as `!== false`
+  // everywhere (see request.ts), so a request persisted before this field
+  // existed still behaves as verifying, matching every other boolean here.
+  verifyTls: boolean;
 }
 
 export interface ApiRequest {
@@ -263,7 +269,7 @@ export const newAssertion = (): Assertion => ({
 });
 
 export const newSettings = (): RequestSettings => ({
-  encodeUrl: true, followRedirects: true, maxRedirects: 5, timeout: 0, tags: [],
+  encodeUrl: true, followRedirects: true, maxRedirects: 5, timeout: 0, tags: [], verifyTls: true,
 });
 
 export function newRequest(partial: Partial<ApiRequest> = {}): ApiRequest {

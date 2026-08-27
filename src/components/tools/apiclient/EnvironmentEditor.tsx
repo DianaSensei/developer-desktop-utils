@@ -173,10 +173,13 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             {selection?.kind === 'collectionVars' && activeCollection ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute">
+                  <span
+                    className="max-w-[45%] shrink truncate rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute"
+                    title={activeCollection.name}
+                  >
                     {activeCollection.name}
                   </span>
-                  <span className="text-sm font-medium">Collection Variables</span>
+                  <span className="shrink-0 text-sm font-medium">Collection Variables</span>
                 </div>
                 <VarFilterBox rows={activeCollection.variables ?? []} value={varFilter} onChange={setVarFilter} />
                 <KeyValueEditor
@@ -195,13 +198,16 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             ) : selected ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute">
+                  <span
+                    className="max-w-[30%] shrink truncate rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute"
+                    title={selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
+                  >
                     {selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
                   </span>
                   <Input
                     value={selected.name}
                     onChange={(e) => store.updateEnvironment(selected.id, { name: e.target.value })}
-                    className="h-ctl text-sm font-medium"
+                    className="h-ctl min-w-0 flex-1 text-sm font-medium"
                   />
                   <Button
                     variant={store.activeEnvId === selected.id ? 'secondary' : 'outline'}
@@ -298,7 +304,7 @@ function Section({ title, onAdd, disabled, empty, emptyText = 'No environments',
       <div className="flex items-center justify-between py-1 px-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className={LIST_SLOT} aria-hidden />
-          <SectionLabel className="min-w-0 truncate">{title}</SectionLabel>
+          <SectionLabel className="min-w-0 truncate" title={title}>{title}</SectionLabel>
         </div>
         <IconButton size="xs" onClick={onAdd} disabled={disabled} title={`New ${title} environment`}>
           <Plus className="h-3.5 w-3.5" />

@@ -50,7 +50,14 @@ export function SectionLabel({
 }: SectionLabelProps) {
   return (
     <Tag className={cn('flex items-center gap-2', className)} {...props}>
-      <span className={cn('font-semibold uppercase tracking-wide text-fg-mute', SIZE_CLASS[size])}>
+      {/* `truncate`/`min-w-0` passed via `className` land on `Tag`, which by
+          itself doesn't cascade an ellipsis onto arbitrary-length `children`
+          text — a flex container clips an overflowing nested span without
+          showing "…". Carrying both here too is what actually lets a long
+          dynamic caption (e.g. a collection name) ellipsize instead of
+          hard-clipping; harmless no-op for the many static, short captions
+          that never overflow. */}
+      <span className={cn('min-w-0 truncate font-semibold uppercase tracking-wide text-fg-mute', SIZE_CLASS[size])}>
         {children}
       </span>
       {count != null && (
