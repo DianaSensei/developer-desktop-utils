@@ -35,7 +35,7 @@ import { type ScriptFinding, findScripts, stripScripts } from './collectionScrip
 import { ImportReviewDialog } from './ImportReviewDialog';
 import { importOpenApi, isOpenApiDocument, parseSpecText } from './openapi';
 import { pickCollectionFile, saveJsonFile } from './fileio';
-import { methodBadgeStyle } from './method-color';
+import { methodColor, methodShort } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
 import { ImportCurlDialog } from './ImportCurlDialog';
 
@@ -186,17 +186,20 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   return (
     <div className="flex h-full w-full flex-col">
       {/* header */}
-      <div className="flex items-center justify-between gap-1 border-b border-line px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-fg-mute/70">
+      {/* size="xs" (24px), not the 34px control height: these sit beside an 11px
+          eyebrow, and at h-ctl they alone set the header's height — 50px of
+          chrome above a list of 24px rows. */}
+      <div className="flex items-center justify-between gap-1 border-b border-line px-2.5 py-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-fg-mute">
           <Boxes className="h-3.5 w-3.5" /> Collections
         </div>
         <div className="flex items-center gap-0.5">
-          <IconButton size="sm" title="New collection" onClick={() => store.addCollection()}>
-            <Plus className="h-4 w-4" />
+          <IconButton size="xs" title="New collection" onClick={() => store.addCollection()} className="hover:bg-bg-2">
+            <Plus className="h-3.5 w-3.5" />
           </IconButton>
           <DropdownMenu>
-            <DropdownMenuTrigger title="More" className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-acc hover:text-fg">
-              <MoreVertical className="h-4 w-4" />
+            <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acc/40">
+              <MoreVertical className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection / OpenAPI</DropdownMenuItem>
@@ -220,7 +223,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
           <ul className="max-h-32 min-w-0 flex-1 space-y-1 overflow-y-auto">
             {notices.map((n) => <li key={n} className="break-words">{n}</li>)}
           </ul>
-          <IconButton size="sm" title="Dismiss" onClick={() => setNotices([])}>
+          <IconButton size="xs" title="Dismiss" onClick={() => setNotices([])} className="hover:bg-bg-2">
             <X className="h-3.5 w-3.5" />
           </IconButton>
         </div>
@@ -299,7 +302,7 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
     { icon: <Download className="h-3.5 w-3.5" />, label: 'Export (Postman)', onClick: handleExport },
     { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId: collection.id, nodeId: null, name: collection.name, kind: 'Collection', script: emptyScript(collection.script), auth: inheritAuth(collection.auth) }) },
     { icon: <ChevronsDownUp className="h-3.5 w-3.5" />, label: collapsed ? 'Expand' : 'Collapse', onClick: () => store.toggleCollapse(collection.id) },
-    { icon: <X className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeCollection },
+    { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeCollection },
   ];
 
   return (
@@ -319,7 +322,6 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
         actions={
           <>
             <IconBtn title="Add request" onClick={() => store.addItem(collection.id, 'request')}><FilePlus2 className="h-3.5 w-3.5" /></IconBtn>
-            <IconBtn title="Add folder" onClick={() => store.addItem(collection.id, 'folder')}><FolderPlus className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>
           </>
         }
@@ -356,7 +358,7 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
     { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(folder.id) },
     { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId, nodeId: folder.id, name: folder.name, kind: 'Folder', script: emptyScript(folder.script), auth: inheritAuth(folder.auth) }) },
     { icon: <ChevronsDownUp className="h-3.5 w-3.5" />, label: collapsed ? 'Expand' : 'Collapse', onClick: () => store.toggleCollapse(collectionId, folder.id) },
-    { icon: <X className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeFolder },
+    { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeFolder },
   ];
 
   return (
@@ -375,7 +377,6 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
         actions={
           <>
             <IconBtn title="Add request" onClick={() => store.addItem(collectionId, 'request', folder.id)}><FilePlus2 className="h-3.5 w-3.5" /></IconBtn>
-            <IconBtn title="Add folder" onClick={() => store.addItem(collectionId, 'folder', folder.id)}><FolderPlus className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>
           </>
         }
@@ -400,7 +401,7 @@ const RequestNode = memo(function RequestNode({ request, depth, collectionId, ct
   const entries: MenuEntry[] = [
     { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', onClick: () => store.cloneItem(collectionId, request.id) },
     { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(request.id) },
-    { icon: <X className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeRequest },
+    { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeRequest },
   ];
 
   return (
@@ -410,20 +411,25 @@ const RequestNode = memo(function RequestNode({ request, depth, collectionId, ct
       depth={depth}
       active={active}
       badge={
-        <span className={cn('shrink-0 rounded px-1 py-px text-[11px] font-bold uppercase tracking-wide', methodBadgeStyle(request.method))}>
-          {request.method}
+        // Text, not a tinted pill: at one pill per row the tint became the
+        // loudest thing in the panel and the padding pushed every name right by
+        // a different amount. A fixed 2.25rem gutter puts the names in a single
+        // column and leaves the method readable by color + label alone.
+        <span
+          title={request.method}
+          className={cn('w-[2.25rem] shrink-0 text-[11px] font-bold uppercase', methodColor(request.method))}
+        >
+          {methodShort(request.method)}
         </span>
       }
       name={request.name}
       onClick={() => store.selectRequest(request.id)}
       onRename={(name) => store.renameItem(request.id, name)}
       entries={entries}
-      actions={
-        <>
-          <IconBtn title="Clone" onClick={() => store.cloneItem(collectionId, request.id)}><CopyPlus className="h-3.5 w-3.5" /></IconBtn>
-          <IconBtn title="Remove" onClick={removeRequest}><Trash2 className="h-3.5 w-3.5" /></IconBtn>
-        </>
-      }
+      // One hover affordance per row — clone and remove both live in this menu
+      // (and on right-click), so a second and third button only cost the name
+      // the width it needs.
+      actions={<IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
     />
   );
 });
@@ -480,8 +486,11 @@ function Row({
       }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onDrop(); }}
       className={cn(
-        'group relative flex items-center gap-1.5 py-[5px] pr-1 text-xs cursor-pointer transition-colors hover:bg-acc/60',
-        active && 'bg-acc/80 text-fg',
+        'group relative flex min-h-[26px] items-center gap-1.5 py-1 pr-1 text-xs cursor-pointer transition-colors hover:bg-bg-2/60',
+        // Selection is a tint, not a saturated accent fill: bg-acc is the solid
+        // action blue, and body text on it clears neither AA nor the rule that
+        // solid accent belongs to the one primary action on a screen.
+        active && 'bg-acc-tint text-acc-ink',
         dragging && 'opacity-40',
         dt?.where === 'inside' && 'bg-acc/10 ring-1 ring-inset ring-acc/40',
       )}
@@ -519,7 +528,10 @@ function Row({
           {name}
         </span>
       )}
-      <div className="flex items-center opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="flex items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+        onClick={(e) => e.stopPropagation()}
+      >
         {actions}
       </div>
     </div>
@@ -528,9 +540,12 @@ function Row({
 
 // Thin wrapper around the shared IconButton with the sidebar's own hover tone
 // (the panel background differs from the app chrome IconButton defaults to).
+// size="xs" (24px) is deliberate: at the default 34px these row actions, not the
+// text, set the row height — the tree rendered ~30% fewer requests per screen
+// for buttons that are invisible until hover.
 function IconBtn({ children, title, onClick }: { children: React.ReactNode; title: string; onClick: (e: React.MouseEvent) => void }) {
   return (
-    <IconButton size="sm" title={title} onClick={onClick} className="hover:bg-bg">
+    <IconButton size="xs" title={title} onClick={onClick} className="hover:bg-bg-2">
       {children}
     </IconButton>
   );

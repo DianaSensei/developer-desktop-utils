@@ -10,7 +10,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
+import { Check, Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { InlineCodeField, TextEditor } from '@/design-system';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
@@ -156,15 +156,18 @@ export function KeyValueEditor({
   // Value ballooned to 1149px in a 438px table, so the columns stopped lining up
   // with every other row. Pinning the floor to 0 makes all rows agree whatever
   // they contain.
+  // The leading column is 2rem, not 1rem: the whole cell is the enable/disable
+  // target (see the row below), so this width is the target's width. The dot
+  // inside stays 8px — the affordance grew, the visual didn't.
   const gridCols = secretToggle
-    ? 'grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]'
-    : 'grid-cols-[1rem_minmax(0,1fr)_minmax(0,1fr)_2rem]';
+    ? 'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]'
+    : 'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem]';
 
   return (
     <div className="space-y-1.5">
       <div className="overflow-hidden rounded-md border text-xs">
         {/* Header row */}
-        <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute/70', gridCols)}>
+        <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>
@@ -178,17 +181,37 @@ export function KeyValueEditor({
           const secret = isMasked(row);
           return (
             <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors', gridCols)}>
-              {/* Enable/disable toggle dot */}
-              <div className="flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => !isGhost && editRow(row.id, { enabled: !row.enabled })}
-                  className={cn(
-                    'h-2 w-2 shrink-0 rounded-full transition-colors',
-                    isGhost ? 'invisible' : row.enabled ? 'bg-acc' : 'bg-fg-mute/30 hover:bg-fg-mute/50',
-                  )}
-                  title={row.enabled ? 'Disable' : 'Enable'}
-                />
+              {/* Enable/disable. The button IS the cell — clicking anywhere in
+                  the leading column toggles the row, not just the checkbox
+                  glyph itself, so the target stays the full ~34px cell people
+                  actually aim for. The Name/Value cells keep their normal
+                  behavior: they're editors, so a click there has to place the
+                  caret, not toggle the row. */}
+              <div className="flex items-stretch">
+                {isGhost ? (
+                  <span className="w-full" />
+                ) : (
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={row.enabled}
+                    aria-label={`${row.key || keyPlaceholder} — ${row.enabled ? 'enabled' : 'disabled'}`}
+                    onClick={() => editRow(row.id, { enabled: !row.enabled })}
+                    className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
+                    title={row.enabled ? 'Disable' : 'Enable'}
+                  >
+                    <span
+                      className={cn(
+                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+                        row.enabled
+                          ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
+                          : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
+                      )}
+                    >
+                      {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                    </span>
+                  </button>
+                )}
               </div>
               {/* Name cell */}
               <div className="min-w-0 border-r px-1.5">
