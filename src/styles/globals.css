@@ -113,6 +113,22 @@
     font-feature-settings: inherit;
   }
 
+  /* Browsers only give `<a>` a pointer cursor by default — a `<button>` (and
+     Radix primitives built on one: Select trigger, Switch, Dialog close, …)
+     gets the plain arrow unless something says otherwise, so hovering a
+     clickable control looked identical to hovering static text. One rule
+     here fixes every button in every tool instead of a `cursor-pointer` class
+     hand-added per call site (and per future one). Covers `role="button"`
+     too, for the handful of div/span-based custom controls that predate this
+     rule. Disabled buttons are excluded — most already pair `disabled` with
+     `pointer-events-none` (no hover reaches them at all), and forcing
+     `not-allowed` on the few that don't would be a separate, deliberate
+     decision, not a side effect of this fix. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
   /* WebKitGTK (Linux) paints a grey tap-highlight box on click — remove it */
   * {
     -webkit-tap-highlight-color: transparent;
