@@ -1,5 +1,43 @@
 # Experience log
 
+## [2026-08-27] API Client — {{token}} showed red in collection/folder Headers & Auth despite the variable having a value
+- Nguyên nhân: `Sidebar.tsx` build một map `envVars` cho tham số `vars` của
+  `NodeSettingsDialog` (dialog Settings của collection/folder — tab Headers,
+  Auth) nhưng map đó CHỈ gồm biến của `store.activeEnv` (environment đang
+  active theo TAB đang mở) — hoàn toàn thiếu **Collection Variables** của
+  chính collection đang sửa. Tệ hơn: tab **Headers** của dialog này gọi
+  `<KeyValueEditor rows={headers} onChange={setHeaders} .../>` mà KHÔNG hề
+  truyền prop `vars` — tức {{token}} trong Headers luôn hiện đỏ (unknown)
+  bất kể có định nghĩa ở đâu, một lỗi sót từ khi feature "Bruno-style
+  collection/folder headers" được thêm (phase trước trong cùng session này) —
+  code build/tsc pass sạch vì `vars` là prop optional trên `KeyValueEditor`
+  (`vars?: VarMap`), nên thiếu nó không phải lỗi type.
+- Số lần thử: 1/1 — lần theo đúng đường đi highlighting thật:
+  `InlineCodeField` → `var-support.ts`'s `varExtensions` (`m[1] in vars` quyết
+  định class `cm-var`/`cm-var-unknown`) → ngược lên từng nơi truyền `vars`
+  xuống `KeyValueEditor`/`AuthEditor`, thay vì đoán nguyên nhân.
+- Kết quả: Đã fix — thêm hàm `varsForCollection(collections, selectedEnv,
+  collectionId)` trong `store.ts` (khác với `collectCollectionVars`/
+  `resolveEnvForRequest` ở chỗ nhận thẳng **collection id đã biết chắc chắn**
+  thay vì phải dò ngược từ một request id, vì một node collection/folder tự nó
+  không có request id nào để tra) — trả về Collection Variables của ĐÚNG
+  collection đang sửa (`target.collectionId`, không phải "collection đang
+  active") hợp nhất với environment đang chọn NẾU nó là global hoặc thuộc
+  cùng collection đó (đúng cùng quy tắc "collection env chỉ hiệu lực với
+  collection của nó" đã áp dụng chỗ khác). Expose qua
+  `store.getVarsForCollection(collectionId)`; `Sidebar.tsx` dùng nó thay
+  `envVars` cũ; `NodeSettingsDialog.tsx`'s Headers tab được bổ sung
+  `vars={vars}` (trước đó thiếu hẳn).
+- Bài học chung: một prop optional (`vars?: VarMap`) là chỗ dễ bị BỎ SÓT ở
+  một call site mới thêm (Headers tab) mà không ai để ý — vì thiếu nó không
+  gây lỗi type/runtime, chỉ âm thầm tắt một tính năng (highlighting). Khi thêm
+  một tab/editor MỚI dùng lại `KeyValueEditor`/`AuthEditor` trong một khu vực
+  đã có sẵn var-highlighting ở tab khác cùng dialog, phải rà xem tab mới có
+  được truyền đúng `vars` như các tab anh em hay không — không thể chỉ tin
+  `tsc`/build xanh. Đồng thời, đây là một biến thể khác của nguyên tắc "resolve
+  theo id, không theo tab đang active" (đã ghi nhận ở các entry khác): lần này
+  không phải request id mà là collection id của chính node đang mở dialog.
+
 ## [2026-08-27] API Client — a long collection name broke the Environment dialog's layout
 - Nguyên nhân: hai chỗ trong `EnvironmentEditor.tsx` hiện badge tên collection
   (`activeCollection.name`) với class `shrink-0` và KHÔNG có `truncate`/`max-w` —

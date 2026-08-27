@@ -289,6 +289,25 @@ function collectCollectionVars(collections: Collection[], id: string): VarMap {
   return {};
 }
 
+// Vars (collection + matching-or-global environment) for a collection/folder's
+// own settings dialog (headers/auth) — keyed directly by the *collection* id
+// rather than a descendant request id, since a collection/folder node has no
+// request id of its own for `collectCollectionVars`/`resolveEnvForRequest` to
+// look up. Same precedence as the per-request `varMap` (ApiClient.tsx): env
+// overrides collection. Used so a {{token}} referencing a Collection Variable
+// or the active environment shows as *known* while editing that collection's
+// own inherited headers/auth, not just while editing an actual request.
+function varsForCollection(
+  collections: Collection[], selectedEnv: Environment | null, collectionId: string,
+): VarMap {
+  const map: VarMap = {};
+  const collection = collections.find((c) => c.id === collectionId);
+  for (const v of collection?.variables ?? []) if (v.enabled && v.key) map[v.key] = v.value;
+  const env = selectedEnv && (!selectedEnv.collectionId || selectedEnv.collectionId === collectionId) ? selectedEnv : null;
+  if (env) for (const v of env.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
+  return map;
+}
+
 // ─── store hook ─────────────────────────────────────────────────────────────
 
 export function useApiStore() {
@@ -518,6 +537,15 @@ export function useApiStore() {
     [collections],
   );
 
+  // Vars (collection + matching-or-global env) for a collection/folder's own
+  // settings dialog — see `varsForCollection`. Used for {{}} highlighting in
+  // the collection/folder Headers and Auth tabs, keyed by collection id
+  // rather than the (possibly unrelated) currently-open tab.
+  const getVarsForCollection = useCallback(
+    (collectionId: string) => varsForCollection(collections, selectedEnv, collectionId),
+    [collections, selectedEnv],
+  );
+
   // The environment that actually applies to a given request id (used by the
   // Runner) — never a collection-scoped environment that only happens to be
   // selected because a *different* collection's tab is open. See
@@ -705,7 +733,7 @@ export function useApiStore() {
     setCollectionVariables,
     addEnvironment, duplicateEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
     vault, setVault, vaultVars,
-    addHistory, clearHistory, getInherited, getCollectionVars, getEnvForRequest,
+    addHistory, clearHistory, getInherited, getCollectionVars, getEnvForRequest, getVarsForCollection,
     cookies, cookiesEnabled, setCookiesEnabled,
     captureCookies, upsertCookie, deleteCookie, clearDomainCookies, clearCookies,
   };
