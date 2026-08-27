@@ -396,6 +396,7 @@ export function ApiClient() {
                 onChange={(patch) => store.updateRequest(activeRequest.id, patch)}
                 onSend={send}
                 onCancel={cancel}
+                onRename={(name) => store.renameItem(activeRequest.id, name)}
                 sending={run.sending}
                 onGenerateCode={() => setCodeOpen(true)}
                 vars={varMap}
