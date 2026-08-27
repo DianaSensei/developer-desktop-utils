@@ -1,5 +1,36 @@
 # Experience log
 
+## [2026-08-27] API Client — user-reported "CORS" in the desktop app is the target server rejecting a missing `Origin` header, not a browser CORS block
+- Nguyên nhân: người dùng báo "bị chặn CORS" khi chạy **bản desktop** (Tauri), nơi
+  `request.ts`'s `netFetch` đã đi qua `@tauri-apps/plugin-http`'s `fetch` (chạy network call từ
+  Rust) đúng như thiết kế — về lý thuyết không có khái niệm CORS ở đây vì không phải trình duyệt
+  thực hiện fetch. Người dùng xác nhận: lỗi không phải "Failed to fetch" chung chung, mà là chính
+  server đích trả về 403 với nội dung nhắc tới CORS/Origin trong body. Tức là: **server đích tự
+  kiểm tra header `Origin`** (một số API làm vậy như một lớp phòng thủ, dù không phải trình
+  duyệt) — và Tauri (native HTTP client) không tự thêm `Origin` như một tab trình duyệt thật vẫn
+  làm, nên request bị server từ chối vì thiếu header đó.
+- Số lần thử: 1/1 — nghi vấn ban đầu (trước khi hỏi người dùng) là plugin-http có thể ÂM THẦM
+  lọc bỏ các "forbidden header" (Origin/Referer/Cookie/Host) theo đúng WHATWG Fetch spec, vì
+  source của plugin dùng `new Request(input, init)` (browser-native) để chuẩn hoá header trước
+  khi gửi qua IPC — dựng `Request` với guard "request" đúng là sẽ bỏ các header đó. Đọc thẳng
+  `node_modules/@tauri-apps/plugin-http/dist-js/index.js` để xác minh: code build một `Headers`
+  KHÔNG có guard (`new Headers(init.headers)`, không đi qua `Request`) làm nguồn header chính,
+  chỉ dùng `req.headers` (bản đã bị `Request` lọc) để BỔ SUNG header trình duyệt tự thêm (như
+  Content-Type mặc định) khi CHƯA có sẵn — nên forbidden header người dùng tự đặt (Origin,
+  Referer...) **không bị mất**. Kết luận: đây không phải bug của plugin/app — người dùng chỉ cần
+  tự thêm header `Origin` (Headers tab) khớp giá trị API đích yêu cầu.
+- Kết quả: Không sửa gì ở tầng transport (không cần, đã đúng). Thêm 1 gợi ý chủ động trong
+  `ResponsePanel.tsx`: `looksLikeCorsRejection(response)` — heuristic nhận diện response 4xx có
+  body/header nhắc tới CORS/Origin/access-control, và nếu request hiện tại **chưa có** header
+  `Origin` riêng thì hiện `Callout` giải thích đúng nguyên nhân (desktop app không tự thêm
+  Origin như trình duyệt) + gợi ý thêm header đó. Không tự động chèn header (tránh đoán sai giá
+  trị App đích mong đợi).
+- Bài học chung: khi người dùng báo lỗi bằng thuật ngữ trình duyệt quen thuộc ("CORS") trong một
+  app KHÔNG chạy trong trình duyệt, đừng vội tin tên gọi đó đúng nghĩa gốc — hỏi thẳng "lỗi hiện
+  ở đâu, nội dung chính xác là gì" trước khi sửa. Ở đây "CORS" chỉ là từ khoá trong thông điệp
+  lỗi của SERVER ĐÍCH, không phải cơ chế CORS thật của trình duyệt — hai thứ đọc giống nhau
+  nhưng nguyên nhân và cách sửa hoàn toàn khác nhau (sửa code app vs. thêm 1 header).
+
 ## [2026-08-27] API Client — a collection-scoped environment leaked into another collection's request when run via the Runner
 - Nguyên nhân: `environment-inheritance.md` (quyết định trước) đã cố ý tách khỏi mẫu "resolve
   theo request id" khi thêm `activeEnvMismatched`/`activeEnv` trong `store.ts` — 2 giá trị này

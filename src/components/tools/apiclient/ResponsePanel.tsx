@@ -18,6 +18,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { IconButton } from '@/components/ui/icon-button';
+import { Callout } from '@/components/ui/callout';
 import { isMac } from '@/hooks/useQuickPaste';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -99,11 +100,31 @@ interface Props {
   // Switches the request builder to the tab holding the script that failed
   // (only own-request scripts map to one — see parseScriptErrors above).
   onJumpToTab?: (tab: RequestPanelTab) => void;
+  // Whether the request that produced `response` already has an `Origin`
+  // header of its own — suppresses the CORS/Origin hint below once the user
+  // has already acted on it. Only checks the request's own Headers tab, not
+  // an inherited collection/folder header of the same name.
+  hasOriginHeader?: boolean;
 }
 
 type Tab = 'body' | 'headers' | 'timeline' | 'tests' | 'console';
 
-export function ResponsePanel({ response, sending, error, tests, logs, onClear, onJumpToTab }: Props) {
+// A completed (non-2xx) response whose body or headers talk about CORS/Origin
+// — the desktop app's requests go through Rust (see request.ts's netFetch),
+// which never has browser CORS enforcement to trip over, but a server can
+// still reject a request for lacking the `Origin` header a real browser tab
+// would have sent automatically. This is a heuristic on response content, not
+// a certainty, so it's phrased as a suggestion, not a diagnosis.
+const CORS_HINT_PATTERN =
+  /\bcors\b|access-control-allow-origin|origin[^.!?]{0,30}(not allow|disallow|block|reject|forbidden)|(not allow|disallow|block|reject|forbidden)[^.!?]{0,30}origin/i;
+
+export function looksLikeCorsRejection(response: ApiResponse): boolean {
+  if (response.ok || response.status < 400 || response.status >= 500) return false;
+  const haystack = `${response.body} ${response.headers.map(([k, v]) => `${k}: ${v}`).join(' ')}`;
+  return CORS_HINT_PATTERN.test(haystack);
+}
+
+export function ResponsePanel({ response, sending, error, tests, logs, onClear, onJumpToTab, hasOriginHeader }: Props) {
   const [tab, setTab] = useState<Tab>('body');
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,6 +183,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   }, [response, big, format, pretty, filterResult]);
 
   const failed = tests.filter((t) => !t.passed).length;
+  const corsHint = !!response && !hasOriginHeader && looksLikeCorsRejection(response);
 
   const copy = useCallback(async () => {
     const text = tab === 'headers'
@@ -310,6 +332,16 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {corsHint && (
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+          <Callout tone="warning" size="sm" title="Looks like an Origin/CORS check">
+            The server may be rejecting this for missing an <code className="rounded bg-bg-2 px-1">Origin</code> header
+            — unlike a browser tab, this app's requests don't send one automatically. Try adding an{' '}
+            <code className="rounded bg-bg-2 px-1">Origin</code> header on the Params tab with the value the API expects.
+          </Callout>
         </div>
       )}
 

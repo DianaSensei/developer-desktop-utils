@@ -424,6 +424,7 @@ export function ApiClient() {
                     logs={run.logs}
                     onClear={() => setRuns((prev) => ({ ...prev, [activeRequest.id]: EMPTY_RUN }))}
                     onJumpToTab={(t) => setPanelTabs((prev) => ({ ...prev, [activeRequest.id]: t }))}
+                    hasOriginHeader={activeRequest.headers.some((h) => h.enabled && h.key.trim().toLowerCase() === 'origin')}
                   />
                 }
               />
