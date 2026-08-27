@@ -101,7 +101,10 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent size="xl" scrollable>
+      {/* full, not xl: the fixed 240px list eats a fifth of xl's 768px before
+          the variable table (name/value/secret-toggle/delete) even starts —
+          the same two-pane shape as Runner, which already uses full. */}
+      <DialogContent size="full" scrollable>
         {/* h-14 + pr-12, not py-3 + mr-6: DialogContent pins its own close X at
             `right-4 top-4` as a 24px box, so its centre is a fixed 28px from
             the top and right. A 56px header centres this button on the same
