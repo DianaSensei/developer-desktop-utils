@@ -14,6 +14,7 @@
 // so existing JSON.parse/JSON.stringify call sites need no changes.
 
 import { load, type Store } from '@tauri-apps/plugin-store';
+import { isTauri } from '@/lib/platform';
 
 const STORE_FILE = 'app-settings.json';
 const MIGRATION_FLAG = '__migratedFromLocalStorage';
@@ -78,6 +79,23 @@ async function migrateThemeKey(s: Store): Promise<void> {
 }
 
 export async function initPersistentStore(): Promise<void> {
+  // Web (`npm run dev`/`vite preview`, no Tauri IPC bridge): the store plugin
+  // has nothing to invoke and throws before ever resolving — there's also no
+  // *need* for it, since plain `localStorage` already does the job natively
+  // in a real browser. Read it straight into the cache and skip the
+  // Tauri-store migrations entirely (they exist to move data *into* the
+  // store this build doesn't have).
+  if (!isTauri) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key === null) continue;
+      const value = localStorage.getItem(key);
+      if (value !== null) cache.set(key, value);
+    }
+    freshInstall = cache.size === 0;
+    return;
+  }
+
   const s = await load(STORE_FILE, { defaults: {}, autoSave: 100 });
   store = s;
   await migrateFromLocalStorage(s);
@@ -108,22 +126,29 @@ export function storageGet(key: string): string | null {
 
 export function storageSet(key: string, value: string): void {
   cache.set(key, value);
-  void store?.set(key, value);
+  if (isTauri) void store?.set(key, value);
+  else try { localStorage.setItem(key, value); } catch { /* unavailable — cache is still authoritative for this session */ }
 }
 
 export function storageRemove(key: string): void {
   cache.delete(key);
-  void store?.delete(key);
+  if (isTauri) void store?.delete(key);
+  else try { localStorage.removeItem(key); } catch { /* unavailable */ }
 }
 
 export async function flushPersistentStore(): Promise<void> {
-  await store?.save();
+  if (isTauri) await store?.save();
+  // Web: storageSet already writes localStorage synchronously — nothing to flush.
 }
 
 export async function clearPersistentStore(): Promise<void> {
   cache.clear();
-  await store?.clear();
-  await store?.save();
+  if (isTauri) {
+    await store?.clear();
+    await store?.save();
+  } else {
+    try { localStorage.clear(); } catch { /* unavailable */ }
+  }
 }
 
 // --- Theme preference (single source of truth: `devtool-theme`) ---
