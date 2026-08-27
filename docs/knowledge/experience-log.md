@@ -1,5 +1,45 @@
 # Experience log
 
+## [2026-08-27] API Client — a long collection name broke the Environment dialog's layout
+- Nguyên nhân: hai chỗ trong `EnvironmentEditor.tsx` hiện badge tên collection
+  (`activeCollection.name`) với class `shrink-0` và KHÔNG có `truncate`/`max-w` —
+  một flex item `shrink-0` không bao giờ co lại, nên tên collection dài (không
+  giới hạn độ dài khi tạo collection) khiến badge nới rộng ra đúng bằng độ dài
+  chuỗi, đẩy phần còn lại của hàng (ô nhập tên environment, các nút
+  Active/Duplicate/Export/Delete) tràn ra ngoài panel — "layout bị bể" đúng như
+  người dùng mô tả. Cùng lúc đó, `Section`'s title (bên danh sách trái) cũng
+  hiện `activeCollection?.name` qua `<SectionLabel className="truncate">` —
+  nhưng KHÔNG có ellipsis xuất hiện dù có class `truncate`: `SectionLabel` tự
+  bọc `children` trong một `<span>` RIÊNG không có `truncate`/`min-w-0`; class
+  `truncate`/`min-w-0` truyền vào chỉ nằm trên `Tag` bọc ngoài (một flex
+  container) — text-overflow: ellipsis không áp dụng xuyên qua một phần tử con
+  lồng bên trong, nó chỉ hoạt động khi chính phần tử có `overflow:hidden` là
+  nơi chứa trực tiếp nội dung inline. Kết quả: overflow bị cắt CỨNG không có
+  "…", không tràn ra ngoài cột 240px cố định nên không "bể" rõ như 2 badge kia,
+  nhưng vẫn là cùng một lỗi gốc.
+- Số lần thử: 1/1 — phát hiện bằng cách đọc lại đúng cấu trúc JSX + suy luận
+  CSS flexbox/text-overflow thay vì đoán, rồi grep toàn bộ codebase xem
+  `SectionLabel` có chỗ nào khác từng dựa vào `truncate` không (chỉ đúng 1 chỗ
+  — `HistoryView.tsx` chỉ dùng `min-w-0` không `truncate`, các chỗ còn lại đều
+  caption tĩnh ngắn) trước khi sửa để tránh phá layout những nơi khác.
+- Kết quả: Đã fix — (1) hai badge tên collection đổi `shrink-0` (không co)
+  thành `max-w-[…] shrink truncate` + thêm `title={...}` để hover xem đầy đủ
+  tên; ô `Input` tên environment cạnh đó thêm `min-w-0 flex-1` để co giãn đúng
+  thay vì giữ `w-full` mặc định (vốn không tự co khi hàng bị ép hẹp). (2) Sửa
+  gốc trong `section-label.tsx`: thêm `min-w-0 truncate` vào chính `<span>`
+  chứa `children` (không chỉ ở `Tag` bọc ngoài) — an toàn ngược cho toàn bộ ~25
+  chỗ dùng `SectionLabel` khác vì `truncate`/`min-w-0` không có tác dụng quan
+  sát được trừ khi nội dung thực sự tràn.
+- Bài học chung: `truncate`/`min-w-0` chỉ có tác dụng đúng khi đặt lên phần tử
+  TRỰC TIẾP chứa text tràn (giống cách `EnvRow`'s `<span className="min-w-0
+  flex-1 truncate">{env.name}</span>` đã làm đúng ngay trong cùng file) — một
+  component dùng chung nào tự bọc `children` trong một `<span>`/`<div>` nội bộ
+  (như `SectionLabel`) sẽ vô hiệu hoá `truncate` truyền từ ngoài vào trừ khi
+  bản thân component đó cũng áp `truncate` lên đúng phần tử bọc text. Và bất kỳ
+  badge/pill nào hiện dữ liệu do người dùng tự đặt tên (project, collection,
+  environment...) — độ dài không có giới hạn ở tầng nhập liệu — đều cần
+  `truncate` + `max-w` + `title` ngay từ đầu, không phải chỉ khi có báo lỗi.
+
 ## [2026-08-27] API Client — "CORS" was one instance of a wider pattern: transport errors that read like a familiar term but come from a different layer
 - Nguyên nhân: sau khi fix xong case CORS/Origin (entry ngay dưới), người dùng hỏi tiếp "còn lỗi
   nào tương tự có thể gặp" và "copy cURL từ Chrome/Edge/Safari có bị ảnh hưởng không" — tức cùng
