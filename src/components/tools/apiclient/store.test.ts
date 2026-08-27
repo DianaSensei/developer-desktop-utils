@@ -227,6 +227,49 @@ describe('useApiStore — collection variables', () => {
   });
 });
 
+describe('useApiStore — duplicateEnvironment', () => {
+  it('clones the environment with a "copy" name, fresh ids, and the same scope', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let sourceId = '';
+    act(() => { sourceId = result.current.addEnvironment(collectionId); });
+    act(() => result.current.updateEnvironment(sourceId, {
+      name: 'Prod',
+      variables: [{ id: 'v1', key: 'host', value: 'prod.test', enabled: true }],
+    }));
+
+    let copyId: string | null = null;
+    act(() => { copyId = result.current.duplicateEnvironment(sourceId); });
+
+    expect(copyId).not.toBeNull();
+    expect(copyId).not.toBe(sourceId);
+    const copy = result.current.environments.find((e) => e.id === copyId);
+    expect(copy?.name).toBe('Prod copy');
+    expect(copy?.collectionId).toBe(collectionId);
+    expect(copy?.variables).toEqual([{ id: expect.any(String), key: 'host', value: 'prod.test', enabled: true }]);
+    expect(copy?.variables[0].id).not.toBe('v1');
+
+    // The source is untouched, and both environments coexist independently.
+    const source = result.current.environments.find((e) => e.id === sourceId);
+    expect(source?.variables).toEqual([{ id: 'v1', key: 'host', value: 'prod.test', enabled: true }]);
+    expect(result.current.environments).toHaveLength(2);
+  });
+
+  it('returns null for an unknown id and adds nothing', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const before = result.current.environments.length;
+    let copyId: string | null = null;
+    act(() => { copyId = result.current.duplicateEnvironment('does-not-exist'); });
+
+    expect(copyId).toBeNull();
+    expect(result.current.environments).toHaveLength(before);
+  });
+});
+
 describe('useApiStore — collection/folder headers', () => {
   it('collects inherited headers outer (collection) to inner (folder) for a request', async () => {
     const { useApiStore } = await import('./store');

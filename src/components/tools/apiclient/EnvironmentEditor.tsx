@@ -3,7 +3,7 @@
 // variables are substituted into URLs, headers, body, and auth at send time.
 
 import { useEffect, useState } from 'react';
-import { Download, Layers, Plus, Trash2, Upload } from 'lucide-react';
+import { Copy, Download, Layers, Plus, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,12 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   );
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  // Filters the *rows* of whichever environment/collection-vars is open on
+  // the right — separate from `query` above, which filters the left list of
+  // environments. Reset on every selection change so a filter left over from
+  // one environment doesn't silently hide rows when you switch to another.
+  const [varFilter, setVarFilter] = useState('');
+  useEffect(() => { setVarFilter(''); }, [selection]);
 
   // Keep a valid selection as environments are added/removed.
   useEffect(() => {
@@ -172,11 +178,13 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   </span>
                   <span className="text-sm font-medium">Collection Variables</span>
                 </div>
+                <VarFilterBox rows={activeCollection.variables ?? []} value={varFilter} onChange={setVarFilter} />
                 <KeyValueEditor
                   rows={activeCollection.variables ?? []}
                   onChange={(variables) => store.setCollectionVariables(activeCollection.id, variables)}
                   keyPlaceholder="Variable"
                   valuePlaceholder="Value"
+                  filterQuery={varFilter}
                 />
                 <p className="text-[11px] text-fg-mute">
                   Shared defaults for every request in this collection, regardless of which
@@ -202,6 +210,18 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   >
                     {store.activeEnvId === selected.id ? 'Active' : 'Set active'}
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-ctl w-ctl shrink-0 text-fg-mute"
+                    onClick={() => {
+                      const id = store.duplicateEnvironment(selected.id);
+                      if (id) setSelection({ kind: 'env', id });
+                    }}
+                    title="Duplicate environment"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       title="Export environment"
@@ -224,6 +244,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                <VarFilterBox rows={selected.variables} value={varFilter} onChange={setVarFilter} />
                 <KeyValueEditor
                   rows={selected.variables}
                   onChange={(variables) => store.updateEnvironment(selected.id, { variables })}
@@ -231,6 +252,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   valuePlaceholder="Value"
                   masked={(row) => !!row.secret}
                   secretToggle
+                  filterQuery={varFilter}
                 />
                 <p className="text-[11px] text-fg-mute">
                   Reference a variable anywhere with <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code>.{' '}
@@ -309,4 +331,15 @@ function EnvRow({ env, active, selected, onClick }: {
       <VarCountBadge count={varCount(env.variables)} />
     </button>
   );
+}
+
+// Below this many rows, the table alone is easy enough to scan — the search
+// box would just be one more thing on screen for a handful of variables. Past
+// it (an environment carrying dozens of vars), finding one by eye gets slow
+// enough that the box earns its place.
+const VAR_FILTER_THRESHOLD = 8;
+
+function VarFilterBox({ rows, value, onChange }: { rows: KeyValue[]; value: string; onChange: (v: string) => void }) {
+  if (rows.length <= VAR_FILTER_THRESHOLD) return null;
+  return <SearchInput value={value} onChange={onChange} placeholder="Filter variables" className="h-ctl text-xs" />;
 }

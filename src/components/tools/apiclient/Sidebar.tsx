@@ -88,7 +88,7 @@ interface NodeCtx {
   confirmDelete: (opts: PendingDelete) => void;
   editingId: string | null;
   setEditingId: (id: string | null) => void;
-  onRun: (title: string, requests: ApiRequest[]) => void;
+  onRun: (title: string, requests: ApiRequest[], collectionId: string) => void;
   dragId: string | null;
   dropTarget: DropTarget | null;
   setDragId: (id: string | null) => void;
@@ -101,7 +101,7 @@ type DropTarget = { id: string; where: 'before' | 'after' | 'inside' };
 interface Props {
   store: ApiStore;
   searchInputRef?: React.Ref<HTMLInputElement>;
-  onRun: (title: string, requests: ApiRequest[]) => void;
+  onRun: (title: string, requests: ApiRequest[], collectionId: string) => void;
 }
 
 export function Sidebar({ store, searchInputRef, onRun }: Props) {
@@ -297,7 +297,7 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
   const entries: MenuEntry[] = [
     { icon: <FilePlus2 className="h-3.5 w-3.5" />, label: 'New Request', onClick: () => store.addItem(collection.id, 'request') },
     { icon: <FolderPlus className="h-3.5 w-3.5" />, label: 'New Folder', onClick: () => store.addItem(collection.id, 'folder') },
-    { icon: <Play className="h-3.5 w-3.5" />, label: 'Run', sep: true, onClick: () => ctx.onRun(collection.name, flattenRequests(collection.items)) },
+    { icon: <Play className="h-3.5 w-3.5" />, label: 'Run', sep: true, onClick: () => ctx.onRun(collection.name, flattenRequests(collection.items), collection.id) },
     { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', sep: true, onClick: () => store.cloneCollection(collection.id) },
     { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(collection.id) },
     { icon: <Download className="h-3.5 w-3.5" />, label: 'Export (Postman)', onClick: handleExport },
@@ -354,7 +354,7 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
   const entries: MenuEntry[] = [
     { icon: <FilePlus2 className="h-3.5 w-3.5" />, label: 'New Request', onClick: () => store.addItem(collectionId, 'request', folder.id) },
     { icon: <FolderPlus className="h-3.5 w-3.5" />, label: 'New Folder', onClick: () => store.addItem(collectionId, 'folder', folder.id) },
-    { icon: <Play className="h-3.5 w-3.5" />, label: 'Run', sep: true, onClick: () => ctx.onRun(folder.name, flattenRequests(folder.items)) },
+    { icon: <Play className="h-3.5 w-3.5" />, label: 'Run', sep: true, onClick: () => ctx.onRun(folder.name, flattenRequests(folder.items), collectionId) },
     { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', sep: true, onClick: () => store.cloneItem(collectionId, folder.id) },
     { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(folder.id) },
     { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId, nodeId: folder.id, name: folder.name, kind: 'Folder', script: emptyScript(folder.script), auth: inheritAuth(folder.auth), headers: emptyHeaders(folder.headers) }) },

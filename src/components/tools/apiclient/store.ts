@@ -623,6 +623,23 @@ export function useApiStore() {
     return e.id;
   }, [setEnvironments]);
 
+  // Clone an environment (same scope, "<name> copy", every variable row given
+  // a fresh id so the two environments never share row identity) — the usual
+  // way to start a staging environment from prod without retyping every
+  // variable by hand.
+  const duplicateEnvironment = useCallback((id: string) => {
+    const source = environments.find((e) => e.id === id);
+    if (!source) return null;
+    const copy: Environment = {
+      ...source,
+      id: uid(),
+      name: `${source.name} copy`,
+      variables: source.variables.map((v) => ({ ...v, id: uid() })),
+    };
+    setEnvironments((prev) => [...prev, copy]);
+    return copy.id;
+  }, [environments, setEnvironments]);
+
   // Adds an already-built Environment (e.g. from environments-io.ts's
   // importEnvironment) as a new entry, keeping its id — the caller is
   // responsible for generating a fresh one so this can't collide.
@@ -686,7 +703,7 @@ export function useApiStore() {
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, updateRequest, setNodeScript, setNodeAuth,
     setNodeHeaders,
     setCollectionVariables,
-    addEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
+    addEnvironment, duplicateEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
     vault, setVault, vaultVars,
     addHistory, clearHistory, getInherited, getCollectionVars, getEnvForRequest,
     cookies, cookiesEnabled, setCookiesEnabled,

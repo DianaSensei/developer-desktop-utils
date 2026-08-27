@@ -26,7 +26,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Stat, type StatProps } from '@/components/ui/stat';
+import { Badge } from '@/components/ui/badge';
 import { Field } from '@/components/ui/tool-section';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Callout } from '@/components/ui/callout';
@@ -39,15 +41,23 @@ import { type ColumnMapping, collectVarTokens, mapColumns, missingColumns } from
 import type { ExecResult } from './engine';
 import { MAX_STEPS_PER_ITERATION, describeJump, findDuplicateNames, nextStepIndex } from './runnerFlow';
 import { type RunDetail, type RunRecord, isOk, summarize } from './runnerStats';
-import type { ApiRequest, HttpMethod, VarMap } from './types';
+import type { ApiRequest, Environment, HttpMethod, VarMap } from './types';
 
 interface Props {
   title: string;
   requests: ApiRequest[];
-  runRequest: (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal) => Promise<ExecResult>;
+  runRequest: (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal, envId?: string | null) => Promise<ExecResult>;
   // Variable names resolvable from the environment / session, so the data-file
   // mapping only warns about tokens nothing can supply.
   knownVars?: string[];
+  // Candidates for the run's own environment picker — already scoped to
+  // Global + this run's own collection by the caller (ApiClient.tsx), so a
+  // scoped environment belonging to some unrelated collection never shows up
+  // as an option here.
+  environments: Environment[];
+  // Preselected on open — the environment currently active app-wide, if it's
+  // a valid candidate for this run.
+  defaultEnvId: string | null;
   open: boolean;
   onClose: () => void;
 }
@@ -58,12 +68,22 @@ const parseTags = (s: string): string[] =>
 
 type ResultFilter = 'all' | 'passed' | 'failed';
 
-export function RunnerDialog({ title, requests, runRequest, knownVars = [], open, onClose }: Props) {
+export function RunnerDialog({ title, requests, runRequest, knownVars = [], environments, defaultEnvId, open, onClose }: Props) {
   const [phase, setPhase] = useState<'setup' | 'results'>('setup');
 
   // Run order (reorderable) and selection.
   const [order, setOrder] = useState<ApiRequest[]>(requests);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(requests.map((r) => r.id)));
+
+  // The environment this run will use — pinned independently of whatever is
+  // globally active, so switching tabs elsewhere while the Runner is open (or
+  // simply having a different collection focused before opening it) can
+  // never change what a run already configured actually sends. `null` is a
+  // deliberate, explicit "No Environment" choice, distinct from the "auto"
+  // behavior a plain Send uses (see runRequest's envId param in ApiClient.tsx).
+  const [envId, setEnvId] = useState<string | null>(
+    defaultEnvId && environments.some((e) => e.id === defaultEnvId) ? defaultEnvId : null,
+  );
 
   // Config.
   const [delay, setDelay] = useState('');
@@ -107,6 +127,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
     lastSig.current = sig;
     setOrder(requests);
     setSelected(new Set(requests.map((r) => r.id)));
+    setEnvId(defaultEnvId && environments.some((e) => e.id === defaultEnvId) ? defaultEnvId : null);
     resetRun();
     setPhase('setup');
   }
@@ -167,7 +188,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
     setCurrent({ iter, name: req.name, method: req.method });
     let record: RunRecord;
     try {
-      const r = await runRequest(req, dataVars, abortRef.current?.signal);
+      const r = await runRequest(req, dataVars, abortRef.current?.signal, envId);
       if (cancelledRef.current) return null;
       const passed = r.tests.filter((t) => t.passed).length;
       record = {
@@ -285,6 +306,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
   const resetAll = () => {
     setOrder(requests);
     setSelected(new Set(requests.map((r) => r.id)));
+    setEnvId(defaultEnvId && environments.some((e) => e.id === defaultEnvId) ? defaultEnvId : null);
     setDelay(''); setIterations('1'); setParallel(false); setIncludeTags(''); setExcludeTags('');
     setStopOnFailure(false); setSaveResponses(true);
     setDataFile(null); setDataError(null);
@@ -350,6 +372,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
       finishedAt: new Date().toISOString(),
       durationMs: elapsed,
       options: {
+        environment: envId ? (environments.find((e) => e.id === envId)?.name ?? envId) : null,
         iterations: iters,
         delayMs,
         parallel,
@@ -424,6 +447,9 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
             <span className="shrink-0 text-sm font-semibold">Runner</span>
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute/50" />
             <span className="min-w-0 truncate text-sm font-normal text-fg-mute">{title}</span>
+            <Badge tone="neutral" className="shrink-0" title="Environment used for this run">
+              {envId ? (environments.find((e) => e.id === envId)?.name ?? envId) : 'No Environment'}
+            </Badge>
             {phase === 'results' && (
               <Button
                 variant="ghost" size="sm"
@@ -442,6 +468,27 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], open
             <div className="flex min-h-0 flex-1">
               {/* config */}
               <div className="w-80 shrink-0 space-y-4 overflow-y-auto border-r p-4">
+                <Field label="Environment" hint="Pinned to this run — unaffected by whichever environment is active elsewhere in the app.">
+                  <Select value={envId ?? 'none'} onValueChange={(v) => setEnvId(v === 'none' ? null : v)}>
+                    <SelectTrigger className="h-ctl text-xs"><SelectValue placeholder="No Environment" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Environment</SelectItem>
+                      {environments.some((e) => e.collectionId) && (
+                        <SelectGroup>
+                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">This collection</SelectLabel>
+                          {environments.filter((e) => e.collectionId).map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                        </SelectGroup>
+                      )}
+                      {environments.some((e) => !e.collectionId) && (
+                        <SelectGroup>
+                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">Global</SelectLabel>
+                          {environments.filter((e) => !e.collectionId).map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                        </SelectGroup>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </Field>
+
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Iterations">
                     <Input
