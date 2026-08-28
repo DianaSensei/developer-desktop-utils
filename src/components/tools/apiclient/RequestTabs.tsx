@@ -2,7 +2,7 @@
 // method-colored label and a close button. The right cluster holds the
 // environment selector, history, and the request/response layout toggle.
 
-import { AlertTriangle, Clock, Columns2, Plus, Rows2, X } from 'lucide-react';
+import { Clock, Columns2, Folder, Globe, Plus, Rows2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
@@ -72,10 +72,6 @@ export function RequestTabs({
   const collection = activeCollection(store);
   const globalEnvs = store.environments.filter((e) => !e.collectionId);
   const collectionEnvs = store.environments.filter((e) => e.collectionId === store.activeCollectionId);
-  // Selected but scoped to a different collection than the one open right now
-  // — store.activeEnv resolves to null in this case (see store.ts), so surface
-  // it instead of letting the picker silently show "No Environment".
-  const mismatchedEnv = store.activeEnvMismatched ? store.selectedEnv : null;
 
   return (
     <div className="flex items-stretch border-b border-line bg-bg-2/10">
@@ -146,22 +142,29 @@ export function RequestTabs({
           CHÍNH LÀ chiều cao cả hàng, khiến pill chạm sát viền trên/dưới toolbar.
           1.5 → 1: đủ để pill không chạm viền, mà thanh tab thấp đi 4px — đây là
           thanh chrome, mọi pixel nó không dùng thì phần response dùng. */}
-      <div className="flex shrink-0 items-center gap-0.5 border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
-        {mismatchedEnv && (
-          <span
-            title={`"${mismatchedEnv.name}" belongs to another collection and is not applied here — its variables won't be substituted into this request. Pick an environment from this collection or Global, or switch back to that collection.`}
-          >
-            <AlertTriangle className="h-3.5 w-3.5 text-warn" />
-          </span>
-        )}
+      <div className="flex shrink-0 items-center gap-1 border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
+        {/* Two independent pickers, not one — a Collection env and a Global
+            env can both be active at once (Collection wins on a name
+            collision; see EnvQuickView's precedence note). The folder/globe
+            glyphs are load-bearing, not decoration: they're what makes the
+            two selects self-explanatory at a glance instead of reading as
+            duplicates of each other. */}
         <Select
-          value={store.activeEnvId ?? 'none'}
-          onValueChange={(v) => store.setActiveEnvId(v === 'none' ? null : v)}
+          value={(store.activeCollectionId && store.activeEnvByCollection[store.activeCollectionId]) || 'none'}
+          onValueChange={(v) => store.activeCollectionId && store.setActiveCollectionEnv(store.activeCollectionId, v === 'none' ? null : v)}
         >
           {/* h-ctl khớp chiều cao IconButton bên cạnh — bản trước dùng h-8 (32px)
               cạnh IconButton mặc định h-ctl (34px), lệch 2px khiến cả cụm nhìn
               không thẳng hàng. */}
-          <SelectTrigger className="h-ctl w-40 text-xs rounded-sm"><SelectValue placeholder="No Environment" /></SelectTrigger>
+          <SelectTrigger
+            className="h-ctl w-32 text-xs rounded-sm"
+            title="Collection environment — scoped to this collection, follows whichever collection the active request belongs to"
+          >
+            <span className="flex min-w-0 items-center gap-1">
+              <Folder className="h-3 w-3 shrink-0 opacity-70" />
+              <SelectValue placeholder="No Environment" />
+            </span>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No Environment</SelectItem>
             {collectionEnvs.length > 0 && (
@@ -170,18 +173,24 @@ export function RequestTabs({
                 {collectionEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
               </SelectGroup>
             )}
-            {globalEnvs.length > 0 && (
-              <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">Global</SelectLabel>
-                {globalEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-              </SelectGroup>
-            )}
-            {mismatchedEnv && (
-              <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">Inactive here</SelectLabel>
-                <SelectItem value={mismatchedEnv.id}>{mismatchedEnv.name} (other collection)</SelectItem>
-              </SelectGroup>
-            )}
+          </SelectContent>
+        </Select>
+        <Select
+          value={store.activeGlobalEnvId ?? 'none'}
+          onValueChange={(v) => store.setActiveGlobalEnv(v === 'none' ? null : v)}
+        >
+          <SelectTrigger
+            className="h-ctl w-32 text-xs rounded-sm"
+            title="Global environment — applies across every collection, unaffected by which one is active"
+          >
+            <span className="flex min-w-0 items-center gap-1">
+              <Globe className="h-3 w-3 shrink-0 opacity-70" />
+              <SelectValue placeholder="No Global Env" />
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No Global Env</SelectItem>
+            {globalEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
           </SelectContent>
         </Select>
         {/* One entry point for "see everything, then go edit it" — no
@@ -190,8 +199,8 @@ export function RequestTabs({
             Environments, Vault, and Runtime Variables, so a second button
             here for any one of them was two controls for one destination. */}
         <EnvQuickView
-          env={store.activeEnv}
-          mismatched={mismatchedEnv}
+          collectionEnv={store.activeCollectionEnv}
+          globalEnv={store.activeGlobalEnv}
           resolvedVars={resolvedVars}
           onManageEnvironments={onManageEnvironments}
           onManageVault={onManageVault}

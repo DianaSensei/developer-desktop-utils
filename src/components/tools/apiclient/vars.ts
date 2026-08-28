@@ -15,29 +15,36 @@ export function substituteVars(text: string, vars: VarMap): string {
   );
 }
 
-// Merge collection/runtime/env/Vault variables into one source-tagged list —
-// the four scattered editors' winning values in one place, for EnvQuickView's
-// glance popover (see ApiClient.tsx's `resolvedVars`). Same precedence as
-// ApiClient.tsx's `varMap`: collection < runtime < env; Vault is namespaced
-// (`vault.<key>`) so it never collides with the others regardless of order.
-// Sorted by name so callers don't each have to.
+// Merge Collection Variables/runtime/Collection env/Global env/Vault into one
+// source-tagged list — the five scattered editors' winning values in one
+// place, for EnvQuickView's glance popover (see ApiClient.tsx's
+// `resolvedVars`). Same precedence as engine.ts's real substitution and
+// ApiClient.tsx's `varMap`: collectionVar < globalEnv < collectionEnv <
+// runtime; Vault is namespaced (`vault.<key>`) so it never collides with the
+// others regardless of order. Sorted by name so callers don't each have to.
 export function buildResolvedVars(
   collectionVars: VarMap,
   runtimeVars: VarMap,
-  env: Environment | null,
+  collectionEnv: Environment | null,
+  globalEnv: Environment | null,
   vault: KeyValue[],
 ): ResolvedVar[] {
   const byName = new Map<string, ResolvedVar>();
   for (const [name, value] of Object.entries(collectionVars)) {
-    byName.set(name, { name, value, secret: false, source: 'collection' });
+    byName.set(name, { name, value, secret: false, source: 'collectionVar' });
+  }
+  if (globalEnv) {
+    for (const v of globalEnv.variables) {
+      if (v.enabled && v.key) byName.set(v.key, { name: v.key, value: v.value, secret: !!v.secret, source: 'globalEnv' });
+    }
+  }
+  if (collectionEnv) {
+    for (const v of collectionEnv.variables) {
+      if (v.enabled && v.key) byName.set(v.key, { name: v.key, value: v.value, secret: !!v.secret, source: 'collectionEnv' });
+    }
   }
   for (const [name, value] of Object.entries(runtimeVars)) {
     byName.set(name, { name, value, secret: false, source: 'runtime' });
-  }
-  if (env) {
-    for (const v of env.variables) {
-      if (v.enabled && v.key) byName.set(v.key, { name: v.key, value: v.value, secret: !!v.secret, source: 'env' });
-    }
   }
   // Vault values are never read in here, real or masked — always a fixed
   // placeholder, so there is no path for a real one to leak out of Vault's

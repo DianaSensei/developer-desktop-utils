@@ -159,12 +159,12 @@ export interface ApiRequest {
 export type VarMap = Record<string, string>;
 
 // Where a resolved variable's *winning* value came from — variables live
-// scattered across four separate editors (Collection Variables inside the
-// Environment dialog, the active Environment itself, the Vault, and session
-// Runtime Variables), each with its own precedence, and nothing shows the
-// merged result with its source in one place. `ResolvedVar` is that merged
-// view — see ApiClient.tsx's `resolvedVars` and EnvQuickView.tsx.
-export type ResolvedVarSource = 'collection' | 'env' | 'vault' | 'runtime';
+// scattered across five separate editors (Collection Variables, a
+// Collection-scoped Environment, a Global Environment, the Vault, and
+// session Runtime Variables), each with its own precedence, and nothing
+// shows the merged result with its source in one place. `ResolvedVar` is
+// that merged view — see ApiClient.tsx's `resolvedVars` and EnvQuickView.tsx.
+export type ResolvedVarSource = 'collectionVar' | 'collectionEnv' | 'globalEnv' | 'vault' | 'runtime';
 
 export interface ResolvedVar {
   name: string;

@@ -14,22 +14,113 @@ beforeEach(() => {
   cache.clear();
 });
 
-describe('useApiStore — activeEnv collection scoping', () => {
-  it('resolves the selected environment normally when it matches (or is global to) the active collection', async () => {
+describe('useApiStore — two-tier active environment (collection + global)', () => {
+  it('activates a global environment regardless of which collection is active', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    let envId = '';
+    act(() => { envId = result.current.addEnvironment(null); }); // global
+    act(() => result.current.setActiveGlobalEnv(envId));
+
+    expect(result.current.activeGlobalEnv?.id).toBe(envId);
+    expect(result.current.activeCollectionEnv).toBeNull();
+  });
+
+  it('switches the active collection env to the target collection\'s own remembered choice when the active request changes collections', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    let firstEnvId = '';
+    act(() => { firstEnvId = result.current.addEnvironment(firstCollectionId); });
+    act(() => result.current.setActiveCollectionEnv(firstCollectionId, firstEnvId));
+
+    let secondEnvId = '';
+    act(() => { secondEnvId = result.current.addEnvironment(secondCollectionId); });
+    act(() => result.current.setActiveCollectionEnv(secondCollectionId, secondEnvId));
+
+    let firstRequestId = '';
+    act(() => { firstRequestId = result.current.addItem(firstCollectionId, 'request'); });
+    act(() => result.current.selectRequest(firstRequestId));
+    expect(result.current.activeCollectionEnv?.id).toBe(firstEnvId);
+
+    // Switching to a request in the *other* collection follows that
+    // collection's own remembered choice — never a stale one carried over.
+    let secondRequestId = '';
+    act(() => { secondRequestId = result.current.addItem(secondCollectionId, 'request'); });
+    act(() => result.current.selectRequest(secondRequestId));
+    expect(result.current.activeCollectionId).toBe(secondCollectionId);
+    expect(result.current.activeCollectionEnv?.id).toBe(secondEnvId);
+  });
+
+  it('resolves to "No Environment" for a collection that has no remembered choice, without touching another collection\'s', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const firstCollectionId = result.current.collections[0].id;
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    let scopedEnvId = '';
+    act(() => { scopedEnvId = result.current.addEnvironment(firstCollectionId); });
+    act(() => result.current.setActiveCollectionEnv(firstCollectionId, scopedEnvId));
+
+    let secondRequestId = '';
+    act(() => { secondRequestId = result.current.addItem(secondCollectionId, 'request'); });
+    act(() => result.current.selectRequest(secondRequestId));
+
+    expect(result.current.activeCollectionId).toBe(secondCollectionId);
+    expect(result.current.activeCollectionEnv).toBeNull();
+  });
+
+  it('keeps a global env active across a collection switch that also changes the collection env', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    let secondCollectionId = '';
+    act(() => { secondCollectionId = result.current.addCollection(); });
+
+    let globalEnvId = '';
+    act(() => { globalEnvId = result.current.addEnvironment(null); });
+    act(() => result.current.setActiveGlobalEnv(globalEnvId));
+
+    let secondRequestId = '';
+    act(() => { secondRequestId = result.current.addItem(secondCollectionId, 'request'); });
+    act(() => result.current.selectRequest(secondRequestId));
+
+    expect(result.current.activeCollectionId).toBe(secondCollectionId);
+    expect(result.current.activeGlobalEnv?.id).toBe(globalEnvId);
+  });
+
+  it('isEnvActive reports true only for the winning environment in its own scope', async () => {
     const { useApiStore } = await import('./store');
     const { result } = renderHook(() => useApiStore());
 
     const collectionId = result.current.collections[0].id;
-    let envId = '';
-    act(() => { envId = result.current.addEnvironment(null); }); // global
-    act(() => result.current.setActiveEnvId(envId));
+    let collEnvId = '';
+    act(() => { collEnvId = result.current.addEnvironment(collectionId); });
+    let otherCollEnvId = '';
+    act(() => { otherCollEnvId = result.current.addEnvironment(collectionId); });
+    let globalEnvId = '';
+    act(() => { globalEnvId = result.current.addEnvironment(null); });
 
-    expect(result.current.activeEnv?.id).toBe(envId);
-    expect(result.current.activeEnvMismatched).toBe(false);
-    void collectionId;
+    act(() => result.current.setActiveCollectionEnv(collectionId, collEnvId));
+    act(() => result.current.setActiveGlobalEnv(globalEnvId));
+
+    const collEnv = result.current.environments.find((e) => e.id === collEnvId)!;
+    const otherCollEnv = result.current.environments.find((e) => e.id === otherCollEnvId)!;
+    const globalEnv = result.current.environments.find((e) => e.id === globalEnvId)!;
+
+    expect(result.current.isEnvActive(collEnv)).toBe(true);
+    expect(result.current.isEnvActive(otherCollEnv)).toBe(false);
+    expect(result.current.isEnvActive(globalEnv)).toBe(true);
   });
 
-  it('treats a collection-scoped environment as inactive while working in a different collection', async () => {
+  it('getEnvsForRequest never applies a collection-scoped environment to another collection\'s request, regardless of which tab is active', async () => {
     const { useApiStore } = await import('./store');
     const { result } = renderHook(() => useApiStore());
 
@@ -39,69 +130,61 @@ describe('useApiStore — activeEnv collection scoping', () => {
 
     let scopedEnvId = '';
     act(() => { scopedEnvId = result.current.addEnvironment(firstCollectionId); });
-    act(() => result.current.setActiveEnvId(scopedEnvId));
+    act(() => result.current.setActiveCollectionEnv(firstCollectionId, scopedEnvId));
 
-    // Move into a request that lives in the *other* collection.
-    let requestId = '';
-    act(() => { requestId = result.current.addItem(secondCollectionId, 'request'); });
-    act(() => result.current.selectRequest(requestId));
-
-    expect(result.current.activeCollectionId).toBe(secondCollectionId);
-    expect(result.current.activeEnvMismatched).toBe(true);
-    expect(result.current.activeEnv).toBeNull();
-    // The raw selection is preserved (so the UI can still show/offer it), only
-    // its *effect* on substitution is suppressed.
-    expect(result.current.activeEnvId).toBe(scopedEnvId);
-    expect(result.current.selectedEnv?.id).toBe(scopedEnvId);
-  });
-
-  it('getEnvForRequest never applies a collection-scoped environment to another collection\'s request, regardless of which tab is active', async () => {
-    const { useApiStore } = await import('./store');
-    const { result } = renderHook(() => useApiStore());
-
-    const firstCollectionId = result.current.collections[0].id;
-    let secondCollectionId = '';
-    act(() => { secondCollectionId = result.current.addCollection(); });
-
-    let scopedEnvId = '';
-    act(() => { scopedEnvId = result.current.addEnvironment(firstCollectionId); });
-    act(() => result.current.setActiveEnvId(scopedEnvId));
-
-    // Keep the *first* collection's request as the active tab (so activeEnv
-    // itself is NOT mismatched here) — the bug this guards is a Runner-style
-    // run of the *other* collection's request while a different tab is open.
+    // Keep the *first* collection's request as the active tab (so
+    // activeCollectionEnv itself resolves fine here) — the bug this guards is
+    // a Runner-style run of the *other* collection's request while a
+    // different tab is open.
     let firstRequestId = '';
     act(() => { firstRequestId = result.current.addItem(firstCollectionId, 'request'); });
     act(() => result.current.selectRequest(firstRequestId));
-    expect(result.current.activeEnv?.id).toBe(scopedEnvId);
+    expect(result.current.activeCollectionEnv?.id).toBe(scopedEnvId);
 
     let secondRequestId = '';
     act(() => { secondRequestId = result.current.addItem(secondCollectionId, 'request'); });
 
     // The environment is scoped to the first collection and must not leak
     // into a request that belongs to the second collection...
-    expect(result.current.getEnvForRequest(secondRequestId)).toBeNull();
+    expect(result.current.getEnvsForRequest(secondRequestId).collectionEnv).toBeNull();
     // ...but does still apply to a request in the collection it's scoped to.
-    expect(result.current.getEnvForRequest(firstRequestId)?.id).toBe(scopedEnvId);
+    expect(result.current.getEnvsForRequest(firstRequestId).collectionEnv?.id).toBe(scopedEnvId);
   });
 
-  it('getEnvForRequest applies a global environment to any request', async () => {
+  it('getEnvsForRequest applies a global environment to any request', async () => {
     const { useApiStore } = await import('./store');
     const { result } = renderHook(() => useApiStore());
 
-    const firstCollectionId = result.current.collections[0].id;
     let secondCollectionId = '';
     act(() => { secondCollectionId = result.current.addCollection(); });
 
     let globalEnvId = '';
     act(() => { globalEnvId = result.current.addEnvironment(null); });
-    act(() => result.current.setActiveEnvId(globalEnvId));
+    act(() => result.current.setActiveGlobalEnv(globalEnvId));
 
     let requestId = '';
     act(() => { requestId = result.current.addItem(secondCollectionId, 'request'); });
-    void firstCollectionId;
 
-    expect(result.current.getEnvForRequest(requestId)?.id).toBe(globalEnvId);
+    expect(result.current.getEnvsForRequest(requestId).globalEnv?.id).toBe(globalEnvId);
+  });
+
+  it('deleteEnvironment clears it from both the per-collection map and the global slot', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    const collectionId = result.current.collections[0].id;
+    let collEnvId = '';
+    act(() => { collEnvId = result.current.addEnvironment(collectionId); });
+    let globalEnvId = '';
+    act(() => { globalEnvId = result.current.addEnvironment(null); });
+    act(() => result.current.setActiveCollectionEnv(collectionId, collEnvId));
+    act(() => result.current.setActiveGlobalEnv(globalEnvId));
+
+    act(() => result.current.deleteEnvironment(collEnvId));
+    expect(result.current.activeEnvByCollection[collectionId]).toBeUndefined();
+
+    act(() => result.current.deleteEnvironment(globalEnvId));
+    expect(result.current.activeGlobalEnvId).toBeNull();
   });
 });
 
@@ -262,7 +345,7 @@ describe('useApiStore — getVarsForCollection', () => {
     act(() => result.current.updateEnvironment(globalEnvId, {
       variables: [{ id: 'v1', key: 'token', value: 'abc', enabled: true }],
     }));
-    act(() => result.current.setActiveEnvId(globalEnvId));
+    act(() => result.current.setActiveGlobalEnv(globalEnvId));
 
     expect(result.current.getVarsForCollection(collectionId)).toEqual({ token: 'abc' });
   });
@@ -280,7 +363,7 @@ describe('useApiStore — getVarsForCollection', () => {
     act(() => result.current.updateEnvironment(scopedEnvId, {
       variables: [{ id: 'v1', key: 'token', value: 'abc', enabled: true }],
     }));
-    act(() => result.current.setActiveEnvId(scopedEnvId));
+    act(() => result.current.setActiveCollectionEnv(firstCollectionId, scopedEnvId));
 
     expect(result.current.getVarsForCollection(secondCollectionId)).toEqual({});
   });
@@ -299,7 +382,7 @@ describe('useApiStore — getVarsForCollection', () => {
     act(() => result.current.updateEnvironment(envId, {
       variables: [{ id: 'v2', key: 'host', value: 'from-env', enabled: true }],
     }));
-    act(() => result.current.setActiveEnvId(envId));
+    act(() => result.current.setActiveCollectionEnv(collectionId, envId));
 
     expect(result.current.getVarsForCollection(collectionId)).toEqual({ host: 'from-env' });
   });
@@ -398,8 +481,8 @@ describe('useApiStore — importEnvironment', () => {
 
     expect(id).toBe(env.id);
     expect(result.current.environments.some((e) => e.id === env.id)).toBe(true);
-    act(() => result.current.setActiveEnvId(env.id));
-    expect(result.current.activeEnv?.variables[0]).toMatchObject({ key: 'host', value: 'imported.test' });
+    act(() => result.current.setActiveGlobalEnv(env.id));
+    expect(result.current.activeGlobalEnv?.variables[0]).toMatchObject({ key: 'host', value: 'imported.test' });
   });
 });
 

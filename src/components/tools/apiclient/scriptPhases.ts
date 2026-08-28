@@ -24,8 +24,11 @@ import type {
 
 export interface PhaseStores {
   runtime: VarMap;
-  env: VarMap;
-  envName: string | null;
+  collectionVar: VarMap;
+  collectionEnv: VarMap;
+  globalEnv: VarMap;
+  collectionEnvName: string | null;
+  globalEnvName: string | null;
   data?: VarMap;
 }
 
@@ -84,7 +87,15 @@ export async function runPhase(input: PhaseInput, signal?: AbortSignal): Promise
 
   const result = (): PhaseOutput => ({
     draft,
-    stores: { runtime: stores.runtime, env: stores.env, envName: stores.envName, data: stores.data },
+    stores: {
+      runtime: stores.runtime,
+      collectionVar: stores.collectionVar,
+      collectionEnv: stores.collectionEnv,
+      globalEnv: stores.globalEnv,
+      collectionEnvName: stores.collectionEnvName,
+      globalEnvName: stores.globalEnvName,
+      data: stores.data,
+    },
     tests: out.tests,
     logs: out.logs,
     errors,

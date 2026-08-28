@@ -58,16 +58,17 @@ afterEach(() => { vi.unstubAllGlobals(); });
 const req = (over: Partial<ApiRequest> = {}): ApiRequest =>
   newRequest({ url: 'https://api.test/x', ...over });
 
-const env = (variables: Record<string, string>): Environment => ({
+const env = (variables: Record<string, string>, collectionId: string | null = null): Environment => ({
   id: 'e1',
   name: 'Test',
+  collectionId,
   variables: Object.entries(variables).map(([key, value], i) => ({ id: `v${i}`, key, value, enabled: true })),
 });
 
 describe('executeRequest — script error attribution', () => {
   it('names the pre-request script and does not send', async () => {
     const spy = stubJson('{}');
-    const r = await executeRequest(req({ script: { req: 'throw new Error("bad setup");', res: '' } }), null, {});
+    const r = await executeRequest(req({ script: { req: 'throw new Error("bad setup");', res: '' } }), null, null, {});
     expect(spy).not.toHaveBeenCalled();
     expect(r.response).toBeNull();
     expect(r.error).toContain('Pre-request script');
@@ -76,7 +77,7 @@ describe('executeRequest — script error attribution', () => {
 
   it('names an inherited pre-request script separately', async () => {
     stubJson('{}');
-    const r = await executeRequest(req(), null, {}, undefined, { pre: ['throw new Error("from folder");'], post: [] });
+    const r = await executeRequest(req(), null, null, {}, undefined, { pre: ['throw new Error("from folder");'], post: [] });
     expect(r.error).toContain('Inherited pre-request script');
     expect(r.error).toContain('from folder');
   });
@@ -88,7 +89,7 @@ describe('executeRequest — script error attribution', () => {
         script: { req: '', res: 'throw new Error("post boom");' },
         tests: 'test("status", () => expect(res.getStatus()).to.equal(200));',
       }),
-      null, {},
+      null, null, {},
     );
     expect(r.response?.status).toBe(200);
     expect(r.error).toContain('Post-response script');
@@ -99,7 +100,7 @@ describe('executeRequest — script error attribution', () => {
     stubJson('{}');
     const r = await executeRequest(
       req({ script: { req: '', res: 'throw new Error("one");' }, tests: 'throw new Error("two");' }),
-      null, {},
+      null, null, {},
     );
     expect(r.error).toContain('one');
     expect(r.error).toContain('two');
@@ -107,42 +108,83 @@ describe('executeRequest — script error attribution', () => {
 
   it('reports a transport failure as the error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('connection refused'); }));
-    const r = await executeRequest(req(), null, {});
+    const r = await executeRequest(req(), null, null, {});
     expect(r.response).toBeNull();
     expect(r.error).toContain('connection refused');
   });
 });
 
 describe('executeRequest — variables', () => {
-  it('applies environment variables and persists script-set env changes', async () => {
+  it('applies collection-environment variables and persists script-set changes', async () => {
     const spy = stubJson('{"token":"t-123"}');
     const r = await executeRequest(
       req({
         url: 'https://{{host}}/x',
         script: { req: '', res: "bru.setEnvVar('token', res.getBody().token);" },
       }),
-      env({ host: 'api.test' }), {},
+      env({ host: 'api.test' }, 'c1'), null, {},
     );
     expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://api.test/x');
-    expect(r.envChanged).toBe(true);
-    expect(r.envVars.token).toBe('t-123');
+    expect(r.collectionEnvChanged).toBe(true);
+    expect(r.collectionEnvVars.token).toBe('t-123');
+    expect(r.globalEnvChanged).toBe(false);
   });
 
-  it('lets runtime vars win over the environment', async () => {
+  it('applies global-environment variables and persists script-set changes separately from the collection env', async () => {
+    const spy = stubJson('{"token":"g-123"}');
+    const r = await executeRequest(
+      req({
+        url: 'https://{{host}}/x',
+        script: { req: '', res: "bru.setEnvVar('token', res.getBody().token, 'global');" },
+      }),
+      null, env({ host: 'global.test' }), {},
+    );
+    expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://global.test/x');
+    expect(r.globalEnvChanged).toBe(true);
+    expect(r.globalEnvVars.token).toBe('g-123');
+    expect(r.collectionEnvChanged).toBe(false);
+  });
+
+  it('persists a script write to Collection Variables via bru.setCollectionVar', async () => {
+    stubJson('{"limit":42}');
+    const r = await executeRequest(
+      req({ script: { req: '', res: "bru.setCollectionVar('limit', String(res.getBody().limit));" } }),
+      null, null, {},
+    );
+    expect(r.collectionVarsChanged).toBe(true);
+    expect(r.collectionVars.limit).toBe('42');
+    expect(r.collectionEnvChanged).toBe(false);
+    expect(r.globalEnvChanged).toBe(false);
+  });
+
+  it('lets the collection environment override the global environment for the same name', async () => {
     const spy = stubJson('{}');
     await executeRequest(
       req({ url: 'https://{{host}}/x' }),
-      env({ host: 'env.test' }),
+      env({ host: 'coll-env.test' }, 'c1'),
+      env({ host: 'global-env.test' }),
+      {},
+    );
+    expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://coll-env.test/x');
+  });
+
+  it('lets runtime vars win over both environments', async () => {
+    const spy = stubJson('{}');
+    await executeRequest(
+      req({ url: 'https://{{host}}/x' }),
+      env({ host: 'coll-env.test' }, 'c1'),
+      env({ host: 'global-env.test' }),
       { host: 'runtime.test' },
     );
     expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://runtime.test/x');
   });
 
-  it('lets a data-file row override the environment but not runtime vars', async () => {
+  it('lets a data-file row override both environments but not runtime vars', async () => {
     const spy = stubJson('{}');
     await executeRequest(
       req({ url: 'https://{{host}}/{{path}}' }),
-      env({ host: 'env.test', path: 'env' }),
+      env({ host: 'env.test', path: 'env' }, 'c1'),
+      null,
       { path: 'runtime' },
       undefined, { pre: [], post: [] }, [], { host: 'data.test', path: 'data' },
     );
@@ -153,27 +195,37 @@ describe('executeRequest — variables', () => {
     const spy = stubJson('{}');
     await executeRequest(
       req({ url: 'https://{{host}}/x' }),
-      null, {}, undefined, { pre: [], post: [] }, [], {}, undefined, {},
+      null, null, {}, undefined, { pre: [], post: [] }, [], {}, undefined, {},
       { host: 'collection.test' },
     );
     expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://collection.test/x');
   });
 
-  it('lets the environment override a collection variable of the same name', async () => {
+  it('lets the collection environment override a collection variable of the same name', async () => {
     const spy = stubJson('{}');
     await executeRequest(
       req({ url: 'https://{{host}}/x' }),
-      env({ host: 'env.test' }), {}, undefined, { pre: [], post: [] }, [], {}, undefined, {},
+      env({ host: 'env.test' }, 'c1'), null, {}, undefined, { pre: [], post: [] }, [], {}, undefined, {},
       { host: 'collection.test' },
     );
     expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://env.test/x');
+  });
+
+  it('lets the global environment override a collection variable of the same name', async () => {
+    const spy = stubJson('{}');
+    await executeRequest(
+      req({ url: 'https://{{host}}/x' }),
+      null, env({ host: 'global.test' }), {}, undefined, { pre: [], post: [] }, [], {}, undefined, {},
+      { host: 'collection.test' },
+    );
+    expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://global.test/x');
   });
 
   it('lets vault still take lowest precedence under a collection variable', async () => {
     const spy = stubJson('{}');
     await executeRequest(
       req({ url: 'https://{{host}}/x' }),
-      null, {}, undefined, { pre: [], post: [] }, [], {}, undefined,
+      null, null, {}, undefined, { pre: [], post: [] }, [], {}, undefined,
       { host: 'vault.test' },
       { host: 'collection.test' },
     );
@@ -187,7 +239,7 @@ describe('executeRequest — variables', () => {
         vars: { req: [], res: [{ id: 'v1', name: 'itemId', value: 'res.body.id', enabled: true }] },
         tests: 'test("var", () => expect(bru.getVar("itemId")).to.equal("42"));',
       }),
-      null, {},
+      null, null, {},
     );
     expect(r.tests).toEqual([{ name: 'var', passed: true }]);
     expect(r.runtimeVars.itemId).toBe('42');
@@ -206,7 +258,7 @@ describe('executeRequest — assertions', () => {
           { id: 'a4', expr: 'res.status', operator: 'equals', value: '999', enabled: false },
         ],
       }),
-      null, {},
+      null, null, {},
     );
     expect(r.tests.map((t) => t.passed)).toEqual([true, true, false]);
   });
@@ -217,7 +269,7 @@ describe('executeRequest — request mutation from scripts', () => {
     const spy = stubJson('{}');
     await executeRequest(
       req({ script: { req: "req.setHeader('X-Trace', 'abc'); req.setMethod('post');", res: '' } }),
-      null, {},
+      null, null, {},
     );
     const init = (spy.mock.calls[0] as unknown as [string, RequestInit])[1];
     expect((init.headers as Record<string, string>)['X-Trace']).toBe('abc');
@@ -227,7 +279,7 @@ describe('executeRequest — request mutation from scripts', () => {
   it('does not mutate the stored request', async () => {
     stubJson('{}');
     const original = req({ script: { req: "req.setUrl('https://other.test/y');", res: '' } });
-    await executeRequest(original, null, {});
+    await executeRequest(original, null, null, {});
     expect(original.url).toBe('https://api.test/x');
   });
 });
@@ -249,7 +301,7 @@ describe('executeRequest — script sandbox', () => {
     const factory = vi.fn(() => new SilentWorker() as unknown as Worker);
     __setSandboxWorkerFactory(factory);
 
-    const r = await executeRequest(req(), null, {});
+    const r = await executeRequest(req(), null, null, {});
     expect(r.response?.status).toBe(200);
     expect(factory).not.toHaveBeenCalled();
   });
@@ -260,7 +312,7 @@ describe('executeRequest — script sandbox', () => {
 
     const r = await executeRequest(
       req({ script: { req: 'while (true) {}', res: '' } }),
-      null, {}, undefined, { pre: [], post: [] }, [], {},
+      null, null, {}, undefined, { pre: [], post: [] }, [], {},
       20,
     );
     // The send is skipped: the request was never finished being built.
@@ -275,7 +327,7 @@ describe('executeRequest — script sandbox', () => {
 
     const r = await executeRequest(
       req({ tests: 'while (true) {}' }),
-      null, {}, undefined, { pre: [], post: [] }, [], {},
+      null, null, {}, undefined, { pre: [], post: [] }, [], {},
       20,
     );
     expect(r.response?.status).toBe(200);
@@ -289,20 +341,20 @@ describe('executeRequest — flow control', () => {
     stubJson('{}');
     const r = await executeRequest(
       req({ script: { req: '', res: "bru.setNextRequest('Cleanup');" } }),
-      null, {},
+      null, null, {},
     );
     expect(r.nextRequest).toBe('Cleanup');
   });
 
   it('surfaces null for an early end of iteration', async () => {
     stubJson('{}');
-    const r = await executeRequest(req({ tests: 'bru.setNextRequest(null);' }), null, {});
+    const r = await executeRequest(req({ tests: 'bru.setNextRequest(null);' }), null, null, {});
     expect(r.nextRequest).toBeNull();
   });
 
   it('leaves nextRequest undefined when no script asked', async () => {
     stubJson('{}');
-    const r = await executeRequest(req({ tests: 'test("t", () => expect(1).to.equal(1));' }), null, {});
+    const r = await executeRequest(req({ tests: 'test("t", () => expect(1).to.equal(1));' }), null, null, {});
     expect(r.nextRequest).toBeUndefined();
   });
 });

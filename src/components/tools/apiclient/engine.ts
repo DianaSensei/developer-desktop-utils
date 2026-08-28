@@ -3,9 +3,12 @@
 //   pre-request vars  →  pre-request script  →  build & SEND  →
 //   post-response vars  →  post-response script  →  tests script  →  assertions
 //
-// Variable precedence for {{substitution}}: environment vars first, then runtime
-// vars (bru.setVar) override them. Scripts may mutate the request draft and both
-// variable stores; the caller persists the resulting env/runtime changes.
+// Variable precedence for {{substitution}}: Collection Variables first, then
+// the Global environment, then the Collection environment (each can override
+// the one before it), then a data-file row, then runtime vars (bru.setVar)
+// win over everything. Scripts may mutate the request draft and any of the
+// three persisted variable stores; the caller persists the resulting
+// collection-var/collection-env/global-env changes.
 
 import type { ApiRequest, ApiResponse, Auth, Environment, KeyValue, LogEntry, TestResult, VarMap } from './types';
 import { newRequest } from './types';
@@ -20,8 +23,12 @@ export interface ExecResult {
   logs: LogEntry[];
   error: string | null;        // transport/script error
   runtimeVars: VarMap;         // updated runtime vars
-  envVars: VarMap;             // updated environment vars (to persist)
-  envChanged: boolean;
+  collectionVars: VarMap;      // updated Collection Variables (to persist)
+  collectionVarsChanged: boolean;
+  collectionEnvVars: VarMap;   // updated Collection environment vars (to persist)
+  collectionEnvChanged: boolean;
+  globalEnvVars: VarMap;       // updated Global environment vars (to persist)
+  globalEnvChanged: boolean;
   // Flow control from setNextRequest: a request name to jump to, null to end
   // the iteration, or undefined when no script asked for anything. Only the
   // Runner acts on it — a single Send has no sequence to steer.
@@ -54,7 +61,8 @@ export interface InheritedScripts { pre: string[]; post: string[]; auth?: Auth |
 
 export async function executeRequest(
   request: ApiRequest,
-  env: Environment | null,
+  collectionEnv: Environment | null,
+  globalEnv: Environment | null,
   runtimeVarsIn: VarMap,
   signal?: AbortSignal,
   inherited: InheritedScripts = { pre: [], post: [] },
@@ -62,7 +70,7 @@ export async function executeRequest(
   dataVars: VarMap = {},
   scriptTimeoutMs: number = DEFAULT_SCRIPT_TIMEOUT_MS,
   vault: VarMap = {},
-  collectionVars: VarMap = {},
+  collectionVarsIn: VarMap = {},
 ): Promise<ExecResult> {
   // Work on copies so a failed run never mutates stored state.
   let draft = newRequest({ ...request });
@@ -70,25 +78,32 @@ export async function executeRequest(
   if (draft.auth.type === 'inherit') draft.auth = inherited.auth ?? { ...draft.auth, type: 'none' };
   let stores: PhaseStores = {
     runtime: { ...runtimeVarsIn },
-    env: envToMap(env),
-    envName: env?.name ?? null,
+    collectionVar: { ...collectionVarsIn },
+    collectionEnv: envToMap(collectionEnv),
+    globalEnv: envToMap(globalEnv),
+    collectionEnvName: collectionEnv?.name ?? null,
+    globalEnvName: globalEnv?.name ?? null,
     data: dataVars,
   };
 
-  const envBefore = JSON.stringify(stores.env);
+  const collectionVarBefore = JSON.stringify(stores.collectionVar);
+  const collectionEnvBefore = JSON.stringify(stores.collectionEnv);
+  const globalEnvBefore = JSON.stringify(stores.globalEnv);
   const tests: TestResult[] = [];
   const logs: LogEntry[] = [];
   const errors: string[] = [];
 
-  // Combined substitution map. Precedence: vault < collection < env < data-file
-  // row < runtime (bru.setVar / local) — a collection variable is a shared
-  // default that the environment (and everything after it) can still override,
-  // and a data file overrides the environment but explicit runtime sets still
-  // win — matching Postman's variable resolution order. Vault secrets are
-  // namespaced (`vault.<key>`) and merged only here, at send time — they never
-  // enter `stores.env`, so scripts can't read or persist them.
+  // Combined substitution map. Precedence: vault < collection var < global env
+  // < collection env < data-file row < runtime (bru.setVar / local) — a
+  // Collection Variable is a shared default either environment can still
+  // override, the Collection environment (scoped, specific) wins over the
+  // Global one (cross-collection, general) on a name collision, and a data
+  // file overrides both but explicit runtime sets still win — matching
+  // Postman's variable resolution order. Vault secrets are namespaced
+  // (`vault.<key>`) and merged only here, at send time — they never enter
+  // the script-visible stores, so scripts can't read or persist them.
   const varMap = (): VarMap => (
-    { ...vault, ...collectionVars, ...stores.env, ...dataVars, ...stores.runtime }
+    { ...vault, ...stores.collectionVar, ...stores.globalEnv, ...stores.collectionEnv, ...dataVars, ...stores.runtime }
   );
 
   // Fold a completed phase back into the local state. A phase that overran its
@@ -128,8 +143,12 @@ export async function executeRequest(
     logs,
     error: errors.length ? errors.join('\n') : null,
     runtimeVars: stores.runtime,
-    envVars: stores.env,
-    envChanged: JSON.stringify(stores.env) !== envBefore,
+    collectionVars: stores.collectionVar,
+    collectionVarsChanged: JSON.stringify(stores.collectionVar) !== collectionVarBefore,
+    collectionEnvVars: stores.collectionEnv,
+    collectionEnvChanged: JSON.stringify(stores.collectionEnv) !== collectionEnvBefore,
+    globalEnvVars: stores.globalEnv,
+    globalEnvChanged: JSON.stringify(stores.globalEnv) !== globalEnvBefore,
     nextRequest,
   });
 

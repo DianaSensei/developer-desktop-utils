@@ -28,7 +28,7 @@ import { useApiStore } from './store';
 import { executeRequest, errToString } from './engine';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
 import { useAppConfig } from '@/contexts/AppConfigContext';
-import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
+import type { ApiRequest, ApiResponse, Environment, KeyValue, LogEntry, TestResult, VarMap } from './types';
 import { buildResolvedVars } from './vars';
 
 export type SplitDirection = 'horizontal' | 'vertical';
@@ -165,15 +165,31 @@ export function ApiClient() {
     setRuns((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY_RUN), ...patch } }));
   }, []);
 
-  // After a run, persist runtime/env-var changes and (unless suppressed) record
-  // a history entry. `env` must be the same environment (or null) that was
-  // actually passed to executeRequest for this run — never re-derived from
-  // `store.activeEnv`, which reflects whatever tab/collection is merely
-  // "active" and can differ from the collection the run's own request
-  // belongs to (see `getEnvForRequest` in store.ts).
+  // Fold a script's changed values back into a variable-row array, adding new
+  // rows for names that didn't exist before — shared by all three persisted
+  // stores a script can write into (Collection Variables, Collection env,
+  // Global env).
+  const mergeVarsIntoRows = (rows: KeyValue[], vars: VarMap): KeyValue[] => {
+    const merged = rows.map((v) => (v.key in vars ? { ...v, value: vars[v.key] } : v));
+    const existing = new Set(rows.map((v) => v.key));
+    for (const [k, val] of Object.entries(vars)) {
+      if (!existing.has(k)) merged.push({ id: `s-${Date.now()}-${k}`, key: k, value: val, enabled: true });
+    }
+    return merged;
+  };
+
+  // After a run, persist collection-var/env-var/runtime-var changes and
+  // (unless suppressed) record a history entry. `collectionEnv`/`globalEnv`
+  // must be the same environments (or null) that were actually passed to
+  // executeRequest for this run — never re-derived from
+  // `store.activeCollectionEnv`/`store.activeGlobalEnv`, which reflect
+  // whatever tab/collection is merely "active" and can differ from the
+  // collection the run's own request belongs to (see `getEnvsForRequest` in
+  // store.ts).
   const persistResult = useCallback((
     req: ApiRequest,
-    env: ReturnType<typeof store.getEnvForRequest>,
+    collectionEnv: Environment | null,
+    globalEnv: Environment | null,
     result: Awaited<ReturnType<typeof executeRequest>>,
     recordHistory = true,
   ) => {
@@ -183,19 +199,25 @@ export function ApiClient() {
     if (store.cookiesEnabled && result.response?.setCookies?.length) {
       store.captureCookies(result.response.url ?? req.url, result.response.setCookies);
     }
-    if (result.envChanged && env) {
-      const variables = env.variables.map((v) => (v.key in result.envVars ? { ...v, value: result.envVars[v.key] } : v));
-      const existing = new Set(env.variables.map((v) => v.key));
-      for (const [k, val] of Object.entries(result.envVars)) {
-        if (!existing.has(k)) variables.push({ id: `s-${Date.now()}-${k}`, key: k, value: val, enabled: true });
+    if (result.collectionEnvChanged && collectionEnv) {
+      store.updateEnvironment(collectionEnv.id, { variables: mergeVarsIntoRows(collectionEnv.variables, result.collectionEnvVars) });
+    }
+    if (result.globalEnvChanged && globalEnv) {
+      store.updateEnvironment(globalEnv.id, { variables: mergeVarsIntoRows(globalEnv.variables, result.globalEnvVars) });
+    }
+    if (result.collectionVarsChanged) {
+      const owningCollectionId = store.getOwningCollectionId(req.id);
+      const collection = owningCollectionId ? store.collections.find((c) => c.id === owningCollectionId) : null;
+      if (owningCollectionId && collection) {
+        store.setCollectionVariables(owningCollectionId, mergeVarsIntoRows(collection.variables ?? [], result.collectionVars));
       }
-      store.updateEnvironment(env.id, { variables });
     }
     if (!recordHistory) return;
     // Values that must never be persisted in plaintext if the server happened
     // to echo them back in the response (see redactText in store.ts). Secret-
     // flagged environment variables get the same treatment as vault values.
-    const secretEnvValues = (env?.variables ?? []).filter((v) => v.secret && v.value).map((v) => v.value);
+    const secretEnvValues = [...(collectionEnv?.variables ?? []), ...(globalEnv?.variables ?? [])]
+      .filter((v) => v.secret && v.value).map((v) => v.value);
     const sensitiveValues = [...Object.values(store.vaultVars), ...secretEnvValues];
     store.addHistory({
       method: req.method, url: req.url,
@@ -210,26 +232,38 @@ export function ApiClient() {
     }, sensitiveValues);
   }, [store]);
 
-  // Run one request (used by the Runner); resolves inherited scripts/auth/env
-  // per id — never `store.activeEnv`, since the Runner may run a collection
-  // other than whatever tab/collection is currently open (a collection-scoped
-  // environment must only apply to its own collection's requests; see
-  // `getEnvForRequest` in store.ts). Runner results are deliberately kept out
-  // of History: a 20-request × 5-iteration run would otherwise evict every
-  // manually-sent entry from the 50-entry log, and the Runner already keeps
-  // the full request/response for each of its runs.
+  // Run one request (used by the Runner); resolves inherited scripts/auth/envs
+  // per id — never `store.activeCollectionEnv`/`store.activeGlobalEnv`, since
+  // the Runner may run a collection other than whatever tab/collection is
+  // currently open (a collection-scoped environment must only apply to its
+  // own collection's requests; see `getEnvsForRequest` in store.ts). Runner
+  // results are deliberately kept out of History: a 20-request × 5-iteration
+  // run would otherwise evict every manually-sent entry from the 50-entry
+  // log, and the Runner already keeps the full request/response for each of
+  // its runs.
   //
   // `envId` lets the Runner pin a specific environment for its own run,
   // independent of whatever is globally active — `undefined` (any other
-  // caller) keeps the normal per-request auto-resolution; the Runner always
-  // passes a concrete id or `null` ("No Environment"), since that choice is
-  // explicit and should not be second-guessed by the scope-mismatch check
-  // `getEnvForRequest` applies to an implicit/leftover selection.
+  // caller) keeps the normal per-request auto-resolution (both collection and
+  // global env); the Runner always passes a concrete id or `null` ("No
+  // Environment"), routed into whichever of the two slots that environment's
+  // own scope belongs to (Runner still only ever forces one at a time).
   const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal, envId?: string | null) => {
     const jar = store.cookiesEnabled ? store.cookies : [];
-    const env = envId === undefined ? store.getEnvForRequest(req.id) : (envId === null ? null : store.environments.find((e) => e.id === envId) ?? null);
-    const result = await executeRequest(req, env, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars, store.getCollectionVars(req.id));
-    persistResult(req, env, result, false);
+    let collectionEnv: Environment | null;
+    let globalEnv: Environment | null;
+    if (envId === undefined) {
+      ({ collectionEnv, globalEnv } = store.getEnvsForRequest(req.id));
+    } else if (envId === null) {
+      collectionEnv = null;
+      globalEnv = null;
+    } else {
+      const forced = store.environments.find((e) => e.id === envId) ?? null;
+      collectionEnv = forced?.collectionId ? forced : null;
+      globalEnv = forced && !forced.collectionId ? forced : null;
+    }
+    const result = await executeRequest(req, collectionEnv, globalEnv, runtimeVarsRef.current, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars, store.getCollectionVars(req.id));
+    persistResult(req, collectionEnv, globalEnv, result, false);
     return result;
   }, [store, persistResult]);
 
@@ -247,8 +281,8 @@ export function ApiClient() {
     patchRun(id, { sending: true, error: null });
     try {
       const jar = store.cookiesEnabled ? store.cookies : [];
-      const result = await executeRequest(activeRequest, store.activeEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current, store.vaultVars, store.activeCollectionVars);
-      persistResult(activeRequest, store.activeEnv, result);
+      const result = await executeRequest(activeRequest, store.activeCollectionEnv, store.activeGlobalEnv, runtimeVarsRef.current, controller.signal, store.inheritedScripts, jar, {}, scriptTimeoutRef.current, store.vaultVars, store.activeCollectionVars);
+      persistResult(activeRequest, store.activeCollectionEnv, store.activeGlobalEnv, result);
       if (!isCurrent()) return;
       patchRun(id, {
         response: result.response,
@@ -321,33 +355,44 @@ export function ApiClient() {
     setRunTarget({ title, requests, collectionId });
   }, []);
 
-  // Merged variable map (collection + environment + session runtime vars) for
+  // Fold Collection Variables, then the Global env, then the Collection env
+  // (each overriding the one before it) into `map` — the same precedence
+  // engine.ts's real substitution uses, minus the data-file row (not
+  // applicable to these UI previews) and runtime (applied separately by each
+  // caller below, since only `varMap` needs it merged in for highlighting).
+  const foldEnvs = (map: VarMap) => {
+    if (store.activeGlobalEnv) for (const v of store.activeGlobalEnv.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
+    if (store.activeCollectionEnv) for (const v of store.activeCollectionEnv.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
+  };
+
+  // Merged variable map (collection var + envs + session runtime vars) for
   // code generation. Secret-flagged environment variables are masked here too
   // — a generated snippet is exactly the kind of thing that gets pasted into a
   // chat or a doc, so it must not carry the real value any more than the
   // Vault's entries do.
   const codeVars = useCallback((): VarMap => {
-    const env = store.activeEnv;
-    const vars: VarMap = { ...store.activeCollectionVars, ...runtimeVarsRef.current };
-    if (env) for (const v of env.variables) if (v.enabled && v.key) vars[v.key] = v.secret ? '••••••••' : v.value;
+    const vars: VarMap = { ...store.activeCollectionVars };
+    foldEnvs(vars);
+    Object.assign(vars, runtimeVarsRef.current);
     return vars;
-  }, [store.activeEnv, store.activeCollectionVars]);
+  }, [store.activeCollectionEnv, store.activeGlobalEnv, store.activeCollectionVars]);
 
   // Known variables (name → current value) for {{ }} highlighting, autocomplete,
   // and hover-value tooltips in inputs.
   const varMap = useMemo(() => {
-    const map: VarMap = { ...store.activeCollectionVars, ...runtimeVarsRef.current };
-    if (store.activeEnv) for (const v of store.activeEnv.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
+    const map: VarMap = { ...store.activeCollectionVars };
+    foldEnvs(map);
+    Object.assign(map, runtimeVarsRef.current);
     if (activeRequest) for (const v of activeRequest.vars.req) if (v.name) map[v.name] = v.value;
     // Vault secrets and secret-flagged environment variables are recognized
     // (for highlight/autocomplete) but their values stay masked in the UI —
     // the real value only reaches the request that's actually sent (see
-    // engine.ts's own vault merge, and the env spread above).
+    // engine.ts's own vault merge, and the env folds above).
     for (const v of store.vault) if (v.enabled && v.key) map[`vault.${v.key}`] = '••••••••';
     return map;
     // runtimeVarsVersion is intentionally a dep: the ref mutates invisibly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.activeEnv, store.activeCollectionVars, store.vault, activeRequest, runtimeVarsVersion]);
+  }, [store.activeCollectionEnv, store.activeGlobalEnv, store.activeCollectionVars, store.vault, activeRequest, runtimeVarsVersion]);
 
   // Runtime vars only (bru.setVar / declarative Vars tab), for the standalone
   // inspector — unlike `varMap` above, this excludes collection/env/vault so
@@ -356,16 +401,16 @@ export function ApiClient() {
   const runtimeVars = useMemo(() => ({ ...runtimeVarsRef.current }), [runtimeVarsVersion]);
 
   // The merged, *source-tagged* variable set — unlike `varMap` (a flat
-  // name→value map for {{}} highlighting) this keeps which of the four
+  // name→value map for {{}} highlighting) this keeps which of the five
   // scattered editors each winning value actually came from, for
   // EnvQuickView's glance-and-deep-link popover. Request-level Vars aren't
   // included — those are edited right there in the open request, not a
   // separate surface. See vars.ts's buildResolvedVars for the merge itself.
   const resolvedVars = useMemo(
-    () => buildResolvedVars(store.activeCollectionVars, runtimeVarsRef.current, store.activeEnv, store.vault),
+    () => buildResolvedVars(store.activeCollectionVars, runtimeVarsRef.current, store.activeCollectionEnv, store.activeGlobalEnv, store.vault),
     // runtimeVarsVersion is intentionally a dep: the ref mutates invisibly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [store.activeCollectionVars, store.activeEnv, store.vault, runtimeVarsVersion],
+    [store.activeCollectionVars, store.activeCollectionEnv, store.activeGlobalEnv, store.vault, runtimeVarsVersion],
   );
 
   const run = activeRequest ? (runs[activeRequest.id] ?? EMPTY_RUN) : EMPTY_RUN;
@@ -488,7 +533,7 @@ export function ApiClient() {
           knownVars={Object.keys(varMap)}
           onClose={() => setRunTarget(null)}
           environments={store.environments.filter((e) => !e.collectionId || e.collectionId === runTarget.collectionId)}
-          defaultEnvId={store.activeEnvId}
+          defaultEnvId={store.activeCollectionEnv?.id ?? store.activeGlobalEnv?.id ?? null}
         />
       )}
     </div>

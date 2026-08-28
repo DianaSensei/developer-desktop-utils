@@ -3,7 +3,8 @@ import { runPhase, type PhaseStores } from './scriptPhases';
 import { newRequest, type ApiResponse } from './types';
 
 const stores = (over: Partial<PhaseStores> = {}): PhaseStores => ({
-  runtime: {}, env: {}, envName: null, ...over,
+  runtime: {}, collectionVar: {}, collectionEnv: {}, globalEnv: {},
+  collectionEnvName: null, globalEnvName: null, ...over,
 });
 
 const response = (over: Partial<ApiResponse> = {}): ApiResponse => ({

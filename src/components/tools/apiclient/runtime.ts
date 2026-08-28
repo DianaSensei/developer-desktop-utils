@@ -367,10 +367,18 @@ export interface RunControl {
   nextRequest?: string | null;
 }
 
+// Which environment tier bru.*EnvVar targets. Reads with no scope fall
+// through collection -> global; writes with no scope default to
+// 'collection' (a write can't merge, it has to land somewhere specific).
+export type EnvScope = 'collection' | 'global';
+
 export interface VarStores {
-  runtime: VarMap;   // bru.setVar / getVar  (mutated in place)
-  env: VarMap;       // bru.setEnvVar / getEnvVar (mutated in place)
-  envName: string | null;
+  runtime: VarMap;       // bru.setVar / getVar  (mutated in place, ephemeral)
+  collectionVar: VarMap; // bru.setCollectionVar / getCollectionVar (persisted)
+  collectionEnv: VarMap; // bru.setEnvVar(...,'collection') / getEnvVar (persisted)
+  globalEnv: VarMap;     // bru.setEnvVar(...,'global') / getEnvVar (persisted)
+  collectionEnvName: string | null;
+  globalEnvName: string | null;
   data?: VarMap;     // current data-file row (read-only; data-driven runs)
   // Mutated by setNextRequest; read by the Runner after the request finishes.
   // Ignored for a single Send, where there is no sequence to steer.
@@ -381,18 +389,33 @@ export interface VarStores {
 }
 
 export function makeBru(stores: VarStores) {
-  // Same precedence as the {{substitution}} map in engine.ts: env < data < runtime.
-  const allVars = (): VarMap => ({ ...stores.env, ...(stores.data ?? {}), ...stores.runtime });
+  // Same precedence as the {{substitution}} map in engine.ts (vault aside,
+  // which never enters these stores — see engine.ts):
+  // collectionVar < globalEnv < collectionEnv < data < runtime.
+  const allVars = (): VarMap => ({
+    ...stores.collectionVar, ...stores.globalEnv, ...stores.collectionEnv, ...(stores.data ?? {}), ...stores.runtime,
+  });
+  const envStore = (scope?: EnvScope) => (scope === 'global' ? stores.globalEnv : stores.collectionEnv);
   return {
     getVar: (k: string) => (k in stores.runtime ? stores.runtime[k] : stores.data?.[k]),
     setVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.runtime[k] = v == null ? '' : String(v); },
     deleteVar: (k: string) => { delete stores.runtime[k]; },
     hasVar: (k: string) => k in stores.runtime || (!!stores.data && k in stores.data),
-    getEnvVar: (k: string) => stores.env[k],
-    setEnvVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.env[k] = v == null ? '' : String(v); },
-    hasEnvVar: (k: string) => k in stores.env,
-    deleteEnvVar: (k: string) => { delete stores.env[k]; },
-    getEnvName: () => stores.envName,
+    getCollectionVar: (k: string) => stores.collectionVar[k],
+    setCollectionVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.collectionVar[k] = v == null ? '' : String(v); },
+    hasCollectionVar: (k: string) => k in stores.collectionVar,
+    deleteCollectionVar: (k: string) => { delete stores.collectionVar[k]; },
+    // No scope: read falls through collection -> global (matches precedence);
+    // write/delete default to 'collection', the closer analog to the old
+    // single-environment behavior.
+    getEnvVar: (k: string, scope?: EnvScope) =>
+      (scope ? envStore(scope)[k] : (k in stores.collectionEnv ? stores.collectionEnv[k] : stores.globalEnv[k])),
+    setEnvVar: (k: string, v: unknown, scope: EnvScope = 'collection') => { if (isSafeKey(k)) envStore(scope)[k] = v == null ? '' : String(v); },
+    hasEnvVar: (k: string, scope?: EnvScope) =>
+      (scope ? k in envStore(scope) : (k in stores.collectionEnv || k in stores.globalEnv)),
+    deleteEnvVar: (k: string, scope: EnvScope = 'collection') => { delete envStore(scope)[k]; },
+    getEnvName: (scope?: EnvScope) =>
+      (scope === 'global' ? stores.globalEnvName : scope === 'collection' ? stores.collectionEnvName : (stores.collectionEnvName ?? stores.globalEnvName)),
     // Postman parity: bru.getIterationData('x') reads the current data row.
     getIterationData: (k: string) => stores.data?.[k],
     // Expand {{tokens}} in a string exactly as the send pipeline would.
@@ -449,8 +472,7 @@ interface PmDeps {
   test: (name: string, fn: () => unknown) => Promise<void>;
 }
 
-// Maps Postman's `pm` API onto our bru/req/res primitives. Collection/global
-// variables don't have separate stores here, so they alias the runtime vars.
+// Maps Postman's `pm` API onto our bru/req/res primitives.
 export function makePm({ bru, req, res, expect, test }: PmDeps) {
   const varBag = (get: (k: string) => unknown, set: (k: string, v: unknown) => void) => ({
     get, set,
@@ -466,12 +488,20 @@ export function makePm({ bru, req, res, expect, test }: PmDeps) {
     test,
     expect,
     info: { requestName: req?.getName?.() ?? '', requestId: '' },
+    // pm.environment defaults to the collection-scoped env, same as a bare
+    // bru.getEnvVar/setEnvVar call — Postman's own "environment" is the
+    // one-active-set-at-a-time notion, and Collection env is the closer
+    // analog of the two.
     environment: bru
       ? { ...varBag(bru.getEnvVar, bru.setEnvVar), name: bru.getEnvName() }
       : undefined,
     variables,
-    collectionVariables: variables,
-    globals: variables,
+    // Collection/global variables now have real, separate stores — route
+    // each to its own bucket instead of aliasing the runtime-only `variables`.
+    collectionVariables: bru ? { ...varBag(bru.getCollectionVar, bru.setCollectionVar) } : undefined,
+    globals: bru
+      ? { ...varBag((k) => bru.getEnvVar(k, 'global'), (k, v) => bru.setEnvVar(k, v, 'global')) }
+      : undefined,
     iterationData: bru ? { get: (k: string) => bru.getIterationData(k) } : undefined,
     request: req,
     // Postman's current flow-control namespace. `skipRequest` isn't meaningful

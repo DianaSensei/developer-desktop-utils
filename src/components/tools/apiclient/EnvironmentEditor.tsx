@@ -146,15 +146,18 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
         {error && <Callout tone="error" size="sm" className="mx-4 mt-3">{error}</Callout>}
 
         {/* The one thing every confused-user report about this dialog comes
-            back to: which of these four wins. Stated once, up front, instead
+            back to: which of these three wins. Stated once, up front, instead
             of split across two tooltips and a footnote paragraph each editor
             used to carry on its own. */}
         <Callout tone="info" size="sm" className="mx-4 mt-3">
-          An <strong className="text-fg">environment</strong> is a swappable set of
-          variables (Dev vs Prod) — mark one &ldquo;Active&rdquo; to use it.{' '}
-          <strong className="text-fg">Collection Variables</strong> are always-on
-          defaults for the whole collection; an active environment&rsquo;s
-          variable with the same name wins. Use either with{' '}
+          A <strong className="text-fg">Collection environment</strong> is scoped to one
+          collection and follows whichever one the active request belongs to. A{' '}
+          <strong className="text-fg">Global environment</strong> applies everywhere and
+          stays active across collections. Both can be &ldquo;Active&rdquo; at the same
+          time — the Collection one wins on a name collision.{' '}
+          <strong className="text-fg">Collection Variables</strong> are the always-on
+          fallback beneath either: <em>Collection env → Global env → Collection
+          Variables</em>. Use any of them with{' '}
           <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code> in a request.
         </Callout>
 
@@ -206,7 +209,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   onAdd={() => setSelectedEnvId(store.addEnvironment(store.activeCollectionId))}
                 >
                   {filteredCollectionEnvs.map((e) => (
-                    <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selectedEnvId === e.id} onClick={() => setSelectedEnvId(e.id)} />
+                    <EnvRow key={e.id} env={e} active={store.isEnvActive(e)} selected={selectedEnvId === e.id} onClick={() => setSelectedEnvId(e.id)} />
                   ))}
                 </Section>
                 <Section
@@ -216,7 +219,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   onAdd={() => setSelectedEnvId(store.addEnvironment(null))}
                 >
                   {filteredGlobalEnvs.map((e) => (
-                    <EnvRow key={e.id} env={e} active={store.activeEnvId === e.id} selected={selectedEnvId === e.id} onClick={() => setSelectedEnvId(e.id)} />
+                    <EnvRow key={e.id} env={e} active={store.isEnvActive(e)} selected={selectedEnvId === e.id} onClick={() => setSelectedEnvId(e.id)} />
                   ))}
                 </Section>
               </div>
@@ -239,14 +242,23 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                       className="h-ctl min-w-0 flex-1 text-sm font-medium"
                     />
                     <Button
-                      variant={store.activeEnvId === selected.id ? 'secondary' : 'outline'}
+                      variant={store.isEnvActive(selected) ? 'secondary' : 'outline'}
                       className="h-ctl shrink-0 text-xs"
-                      onClick={() => store.setActiveEnvId(store.activeEnvId === selected.id ? null : selected.id)}
-                      title={store.activeEnvId === selected.id
-                        ? 'This is the active environment — its variables are applied to requests. Click to deactivate.'
-                        : 'Make this the active environment: its variables will be applied to requests, overriding Collection Variables.'}
+                      onClick={() => {
+                        const active = store.isEnvActive(selected);
+                        if (selected.collectionId) {
+                          store.setActiveCollectionEnv(selected.collectionId, active ? null : selected.id);
+                        } else {
+                          store.setActiveGlobalEnv(active ? null : selected.id);
+                        }
+                      }}
+                      title={store.isEnvActive(selected)
+                        ? 'This is the active environment for its scope — its variables are applied to requests. Click to deactivate.'
+                        : selected.collectionId
+                          ? 'Make this the active Collection environment: its variables apply to requests in this collection, winning over a Global environment and Collection Variables.'
+                          : 'Make this the active Global environment: its variables apply across every collection, beneath a Collection environment but above Collection Variables.'}
                     >
-                      {store.activeEnvId === selected.id ? 'Active' : 'Set active'}
+                      {store.isEnvActive(selected) ? 'Active' : 'Set active'}
                     </Button>
                     <Button
                       variant="ghost"

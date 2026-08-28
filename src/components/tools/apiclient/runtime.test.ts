@@ -5,7 +5,8 @@ import { newRequest, type ApiResponse } from './types';
 const emptyRun = (): ScriptRun => ({ logs: [], tests: [], error: null });
 
 const stores = (over: Partial<VarStores> = {}): VarStores => ({
-  runtime: {}, env: {}, envName: null, ...over,
+  runtime: {}, collectionVar: {}, collectionEnv: {}, globalEnv: {},
+  collectionEnvName: null, globalEnvName: null, ...over,
 });
 
 const response = (over: Partial<ApiResponse> = {}): ApiResponse => ({
@@ -126,8 +127,8 @@ describe('assert helpers', () => {
 });
 
 describe('bru', () => {
-  it('interpolates using env < data < runtime precedence', () => {
-    const s = stores({ env: { host: 'env-host', only: 'e' }, data: { host: 'data-host' }, runtime: {} });
+  it('interpolates using collectionEnv < data < runtime precedence', () => {
+    const s = stores({ collectionEnv: { host: 'env-host', only: 'e' }, data: { host: 'data-host' }, runtime: {} });
     const bru = makeBru(s);
     expect(bru.interpolate('{{host}}/{{only}}')).toBe('data-host/e');
     bru.setVar('host', 'runtime-host');
@@ -148,6 +149,55 @@ describe('bru', () => {
 
   it('resolves sleep normally', async () => {
     await expect(makeBru(stores()).sleep(1)).resolves.toBeUndefined();
+  });
+});
+
+describe('bru — collection var and scoped env stores', () => {
+  it('setCollectionVar/getCollectionVar/hasCollectionVar/deleteCollectionVar target their own store', () => {
+    const s = stores();
+    const bru = makeBru(s);
+    expect(bru.hasCollectionVar('limit')).toBe(false);
+    bru.setCollectionVar('limit', 10);
+    expect(bru.hasCollectionVar('limit')).toBe(true);
+    expect(bru.getCollectionVar('limit')).toBe('10');
+    expect(s.collectionVar.limit).toBe('10');
+    bru.deleteCollectionVar('limit');
+    expect(bru.hasCollectionVar('limit')).toBe(false);
+  });
+
+  it('setEnvVar defaults to the collection scope', () => {
+    const s = stores();
+    const bru = makeBru(s);
+    bru.setEnvVar('token', 'abc');
+    expect(s.collectionEnv.token).toBe('abc');
+    expect(s.globalEnv.token).toBeUndefined();
+  });
+
+  it('setEnvVar(..., "global") targets the global store instead', () => {
+    const s = stores();
+    const bru = makeBru(s);
+    bru.setEnvVar('token', 'abc', 'global');
+    expect(s.globalEnv.token).toBe('abc');
+    expect(s.collectionEnv.token).toBeUndefined();
+  });
+
+  it('getEnvVar with no scope falls through collection -> global', () => {
+    const s = stores({ globalEnv: { host: 'global-host' } });
+    const bru = makeBru(s);
+    expect(bru.getEnvVar('host')).toBe('global-host');
+    s.collectionEnv.host = 'collection-host';
+    expect(bru.getEnvVar('host')).toBe('collection-host');
+    // An explicit scope bypasses the fallthrough.
+    expect(bru.getEnvVar('host', 'global')).toBe('global-host');
+  });
+
+  it('getEnvName defaults to the collection env name, falling back to the global one', () => {
+    const s = stores({ collectionEnvName: null, globalEnvName: 'Shared' });
+    const bru = makeBru(s);
+    expect(bru.getEnvName()).toBe('Shared');
+    s.collectionEnvName = 'Staging';
+    expect(bru.getEnvName()).toBe('Staging');
+    expect(bru.getEnvName('global')).toBe('Shared');
   });
 });
 
@@ -200,7 +250,7 @@ describe('pm compatibility shim', () => {
   });
 
   it('supports pm.variables.replaceIn', async () => {
-    const s = stores({ env: { host: 'api.test' } });
+    const s = stores({ collectionEnv: { host: 'api.test' } });
     const out = emptyRun();
     await runScript(
       'pm.test("t", () => expect(pm.variables.replaceIn("{{host}}/v1")).to.equal("api.test/v1"));',
@@ -251,14 +301,16 @@ describe('prototype pollution', () => {
     expect(req.getHeaders().authorization).toBe('Bearer t');
   });
 
-  it('refuses bru.setVar / setEnvVar on a prototype key', () => {
+  it('refuses bru.setVar / setEnvVar / setCollectionVar on a prototype key', () => {
     const s = stores();
     const bru = makeBru(s);
     bru.setVar('__proto__', 'polluted');
     bru.setEnvVar('constructor', 'polluted');
+    bru.setCollectionVar('__proto__', 'polluted');
     bru.setVar('token', 'abc');
     expect(Object.prototype.hasOwnProperty.call(s.runtime, '__proto__')).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(s.env, 'constructor')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(s.collectionEnv, 'constructor')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(s.collectionVar, '__proto__')).toBe(false);
     expect(s.runtime.token).toBe('abc');
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });

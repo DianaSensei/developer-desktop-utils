@@ -7,6 +7,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { storageGet } from '@/lib/persistentStore';
 import { type Cookie, applySetCookies } from './cookies';
 import { paramsFromUrl } from './request';
 import {
@@ -287,18 +288,52 @@ function findOwningCollectionId(collections: Collection[], id: string): string |
   return null;
 }
 
-// Resolve which environment actually applies to a given request: the selected
-// environment if it's global, or if it's scoped to the request's own owning
-// collection — never a collection-scoped environment left over from whatever
-// collection is merely "active" in the sidebar/tabs. This is what keeps a
-// Runner run of one collection from picking up another collection's scoped
-// environment just because it happened to be selected while a different
-// collection's tab was open (see `activeEnv`'s mismatch check below, which
-// this generalizes to an arbitrary request id instead of the active tab).
-function resolveEnvForRequest(collections: Collection[], selectedEnv: Environment | null, id: string): Environment | null {
-  if (!selectedEnv) return null;
-  if (!selectedEnv.collectionId) return selectedEnv;
-  return findOwningCollectionId(collections, id) === selectedEnv.collectionId ? selectedEnv : null;
+// Resolve which environments actually apply to a given request — the
+// collection env remembered for the request's own *owning* collection, and
+// the (collection-independent) global env — looked up by request id rather
+// than "whatever tab is active", so a Runner run of one collection can never
+// pick up a *different* collection's scoped environment just because that
+// other collection's tab happened to be open. There's no "mismatch" case
+// here any more: each collection only ever resolves its own remembered
+// choice, never someone else's.
+function resolveEnvsForRequest(
+  collections: Collection[],
+  environments: Environment[],
+  activeEnvByCollection: Record<string, string>,
+  activeGlobalEnvId: string | null,
+  id: string,
+): { collectionEnv: Environment | null; globalEnv: Environment | null } {
+  const owningCollectionId = findOwningCollectionId(collections, id);
+  const collectionEnvId = owningCollectionId ? activeEnvByCollection[owningCollectionId] : undefined;
+  const collectionEnv = collectionEnvId
+    ? environments.find((e) => e.id === collectionEnvId && e.collectionId === owningCollectionId) ?? null
+    : null;
+  const globalEnv = activeGlobalEnvId ? environments.find((e) => e.id === activeGlobalEnvId) ?? null : null;
+  return { collectionEnv, globalEnv };
+}
+
+// One-time migration from the old single "active environment" selection
+// (`devtool:apiclient:activeEnv`, one id shared across the whole app) into
+// the new per-collection-memory + separate-global model. Reads the legacy
+// key directly (bypassing usePersistentState, which only ever reads a key
+// once per fresh state) so an upgrading user's current choice survives
+// instead of silently resetting to "No Environment" everywhere. Only
+// consulted when the *new* key is still empty (see the `initial` argument
+// at each usePersistentState call below) — a no-op once migrated, and a
+// no-op for anyone whose legacy selection was already cleared or unknown.
+function migrateLegacyActiveEnv(environments: Environment[]): { byCollection: Record<string, string>; global: string | null } {
+  try {
+    const raw = storageGet('devtool:apiclient:activeEnv');
+    if (raw === null) return { byCollection: {}, global: null };
+    const legacyId = JSON.parse(raw) as string | null;
+    const env = legacyId ? environments.find((e) => e.id === legacyId) : null;
+    if (!env) return { byCollection: {}, global: null };
+    return env.collectionId
+      ? { byCollection: { [env.collectionId]: env.id }, global: null }
+      : { byCollection: {}, global: env.id };
+  } catch {
+    return { byCollection: {}, global: null };
+  }
 }
 
 function collectCollectionVars(collections: Collection[], id: string): VarMap {
@@ -311,22 +346,32 @@ function collectCollectionVars(collections: Collection[], id: string): VarMap {
   return {};
 }
 
-// Vars (collection + matching-or-global environment) for a collection/folder's
+// Vars (collection var + global env + collection env) for a collection/folder's
 // own settings dialog (headers/auth) — keyed directly by the *collection* id
 // rather than a descendant request id, since a collection/folder node has no
-// request id of its own for `collectCollectionVars`/`resolveEnvForRequest` to
-// look up. Same precedence as the per-request `varMap` (ApiClient.tsx): env
-// overrides collection. Used so a {{token}} referencing a Collection Variable
-// or the active environment shows as *known* while editing that collection's
-// own inherited headers/auth, not just while editing an actual request.
+// request id of its own for `collectCollectionVars`/`resolveEnvsForRequest` to
+// look up. Same precedence as the per-request `varMap` (ApiClient.tsx):
+// collection env overrides global env overrides collection var. Used so a
+// {{token}} referencing a Collection Variable or either active environment
+// shows as *known* while editing that collection's own inherited
+// headers/auth, not just while editing an actual request.
 function varsForCollection(
-  collections: Collection[], selectedEnv: Environment | null, collectionId: string,
+  collections: Collection[],
+  environments: Environment[],
+  activeEnvByCollection: Record<string, string>,
+  activeGlobalEnvId: string | null,
+  collectionId: string,
 ): VarMap {
   const map: VarMap = {};
   const collection = collections.find((c) => c.id === collectionId);
   for (const v of collection?.variables ?? []) if (v.enabled && v.key) map[v.key] = v.value;
-  const env = selectedEnv && (!selectedEnv.collectionId || selectedEnv.collectionId === collectionId) ? selectedEnv : null;
-  if (env) for (const v of env.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
+  const globalEnv = activeGlobalEnvId ? environments.find((e) => e.id === activeGlobalEnvId) : null;
+  if (globalEnv) for (const v of globalEnv.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
+  const collectionEnvId = activeEnvByCollection[collectionId];
+  const collectionEnv = collectionEnvId
+    ? environments.find((e) => e.id === collectionEnvId && e.collectionId === collectionId)
+    : null;
+  if (collectionEnv) for (const v of collectionEnv.variables) if (v.enabled && v.key) map[v.key] = v.secret ? '••••••••' : v.value;
   return map;
 }
 
@@ -341,8 +386,15 @@ export function useApiStore() {
   const [environments, setEnvironments] = usePersistentState<Environment[]>(
     'devtool:apiclient:environments', [], { debounceMs: 300 },
   );
-  const [activeEnvId, setActiveEnvId] = usePersistentState<string | null>(
-    'devtool:apiclient:activeEnv', null,
+  // Per-collection remembered choice (collectionId -> envId) and the single,
+  // collection-independent global choice — replaces the old single
+  // `activeEnvId`. Both `initial` args only ever run once, and only when
+  // their own key has never been written — see migrateLegacyActiveEnv.
+  const [activeEnvByCollection, setActiveEnvByCollection] = usePersistentState<Record<string, string>>(
+    'devtool:apiclient:activeEnvByCollection', () => migrateLegacyActiveEnv(environments).byCollection,
+  );
+  const [activeGlobalEnvId, setActiveGlobalEnvId] = usePersistentState<string | null>(
+    'devtool:apiclient:activeGlobalEnv', () => migrateLegacyActiveEnv(environments).global,
   );
   const [history, setHistory] = usePersistentState<HistoryEntry[]>(
     'devtool:apiclient:history', [], { debounceMs: 500 },
@@ -400,18 +452,50 @@ export function useApiStore() {
     return collections[0]?.id ?? null;
   }, [collections, activeRequestId]);
 
-  const selectedEnv = useMemo(
-    () => environments.find((e) => e.id === activeEnvId) ?? null,
-    [environments, activeEnvId],
+  // The collection environment remembered for whichever collection is
+  // currently active — automatically follows the active request's own
+  // collection, never a stale choice left over from a different one, because
+  // it's looked up fresh from that collection's own map entry every time.
+  const activeCollectionEnv = useMemo(() => {
+    if (!activeCollectionId) return null;
+    const id = activeEnvByCollection[activeCollectionId];
+    if (!id) return null;
+    const env = environments.find((e) => e.id === id);
+    return env && env.collectionId === activeCollectionId ? env : null;
+  }, [environments, activeEnvByCollection, activeCollectionId]);
+
+  // The single global environment, unaffected by which collection is active.
+  const activeGlobalEnv = useMemo(
+    () => (activeGlobalEnvId ? environments.find((e) => e.id === activeGlobalEnvId) ?? null : null),
+    [environments, activeGlobalEnvId],
   );
 
-  // A collection-scoped environment left selected while working in a
-  // *different* collection would silently apply the wrong variables (or
-  // wrongly appear applied at all) — nothing else in the app clears
-  // `activeEnvId` on collection switch, so treat it as inactive here instead.
-  // Global environments (collectionId null/undefined) are unaffected.
-  const activeEnvMismatched = !!selectedEnv?.collectionId && selectedEnv.collectionId !== activeCollectionId;
-  const activeEnv = activeEnvMismatched ? null : selectedEnv;
+  // True when `env` is the winning choice in its own scope — the collection
+  // slot for a collection-scoped environment, the single global slot for a
+  // global one. Used for the active-dot in environment lists and the
+  // Active/Set active toggle, so both scopes share one "is this the one"
+  // check instead of two ad hoc comparisons scattered across the UI.
+  const isEnvActive = useCallback((env: Environment) => (
+    env.collectionId
+      ? activeEnvByCollection[env.collectionId] === env.id
+      : activeGlobalEnvId === env.id
+  ), [activeEnvByCollection, activeGlobalEnvId]);
+
+  const setActiveCollectionEnv = useCallback((collectionId: string, envId: string | null) => {
+    setActiveEnvByCollection((prev) => {
+      if (envId === null) {
+        if (!(collectionId in prev)) return prev;
+        const next = { ...prev };
+        delete next[collectionId];
+        return next;
+      }
+      return prev[collectionId] === envId ? prev : { ...prev, [collectionId]: envId };
+    });
+  }, [setActiveEnvByCollection]);
+
+  const setActiveGlobalEnv = useCallback((envId: string | null) => {
+    setActiveGlobalEnvId(envId);
+  }, [setActiveGlobalEnvId]);
 
   // Open tabs resolved to live requests, dropping any that were deleted.
   const openRequests = useMemo(
@@ -584,22 +668,30 @@ export function useApiStore() {
     [collections],
   );
 
-  // Vars (collection + matching-or-global env) for a collection/folder's own
-  // settings dialog — see `varsForCollection`. Used for {{}} highlighting in
-  // the collection/folder Headers and Auth tabs, keyed by collection id
-  // rather than the (possibly unrelated) currently-open tab.
+  // Vars (collection var + global env + collection env) for a
+  // collection/folder's own settings dialog — see `varsForCollection`. Used
+  // for {{}} highlighting in the collection/folder Headers and Auth tabs,
+  // keyed by collection id rather than the (possibly unrelated) currently-open tab.
   const getVarsForCollection = useCallback(
-    (collectionId: string) => varsForCollection(collections, selectedEnv, collectionId),
-    [collections, selectedEnv],
+    (collectionId: string) => varsForCollection(collections, environments, activeEnvByCollection, activeGlobalEnvId, collectionId),
+    [collections, environments, activeEnvByCollection, activeGlobalEnvId],
   );
 
-  // The environment that actually applies to a given request id (used by the
-  // Runner) — never a collection-scoped environment that only happens to be
-  // selected because a *different* collection's tab is open. See
-  // `resolveEnvForRequest`.
-  const getEnvForRequest = useCallback(
-    (id: string) => resolveEnvForRequest(collections, selectedEnv, id),
-    [collections, selectedEnv],
+  // The environments that actually apply to a given request id (used by the
+  // Runner and the plain Send path) — never a collection-scoped environment
+  // that only happens to be remembered for a *different* collection whose
+  // tab is merely open. See `resolveEnvsForRequest`.
+  const getEnvsForRequest = useCallback(
+    (id: string) => resolveEnvsForRequest(collections, environments, activeEnvByCollection, activeGlobalEnvId, id),
+    [collections, environments, activeEnvByCollection, activeGlobalEnvId],
+  );
+
+  // The collection a request belongs to, regardless of which tab/collection
+  // is merely "active" — used to persist a script's collection-var writes
+  // back into the right bag.
+  const getOwningCollectionId = useCallback(
+    (id: string) => findOwningCollectionId(collections, id),
+    [collections],
   );
 
   // Collection variables for the request currently active.
@@ -755,8 +847,16 @@ export function useApiStore() {
 
   const deleteEnvironment = useCallback((id: string) => {
     setEnvironments((prev) => prev.filter((e) => e.id !== id));
-    setActiveEnvId((cur) => (cur === id ? null : cur));
-  }, [setEnvironments, setActiveEnvId]);
+    setActiveEnvByCollection((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [collId, envId] of Object.entries(next)) {
+        if (envId === id) { delete next[collId]; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+    setActiveGlobalEnvId((cur) => (cur === id ? null : cur));
+  }, [setEnvironments, setActiveEnvByCollection, setActiveGlobalEnvId]);
 
   // — history —
 
@@ -797,16 +897,18 @@ export function useApiStore() {
   const clearCookies = useCallback(() => setCookies([]), [setCookies]);
 
   return {
-    collections, environments, activeEnvId, activeEnv, activeEnvMismatched, selectedEnv, history, activeCollectionId,
+    collections, environments,
+    activeEnvByCollection, activeGlobalEnvId, activeCollectionEnv, activeGlobalEnv, isEnvActive,
+    history, activeCollectionId,
     activeRequestId, activeRequest, openRequests, inheritedScripts, activeCollectionVars,
-    setActiveRequestId, setActiveEnvId, selectRequest, closeTab,
+    setActiveRequestId, setActiveCollectionEnv, setActiveGlobalEnv, selectRequest, closeTab,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse, revealRequest,
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, copyItem, updateRequest, setNodeScript, setNodeAuth,
     setNodeHeaders,
     setCollectionVariables,
     addEnvironment, duplicateEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
     vault, setVault, vaultVars,
-    addHistory, clearHistory, getInherited, getCollectionVars, getEnvForRequest, getVarsForCollection,
+    addHistory, clearHistory, getInherited, getCollectionVars, getEnvsForRequest, getOwningCollectionId, getVarsForCollection,
     cookies, cookiesEnabled, setCookiesEnabled,
     captureCookies, upsertCookie, deleteCookie, clearDomainCookies, clearCookies,
   };

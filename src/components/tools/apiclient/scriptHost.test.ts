@@ -9,7 +9,7 @@ import { newRequest } from './types';
 const prePhase = (script: string): PhaseInput => ({
   phase: 'pre',
   draft: newRequest({ url: 'https://api.test/x' }),
-  stores: { runtime: {}, env: {}, envName: null },
+  stores: { runtime: {}, collectionVar: {}, collectionEnv: {}, globalEnv: {}, collectionEnvName: null, globalEnvName: null },
   inherited: [],
   vars: [],
   script,
