@@ -161,14 +161,25 @@ export function RequestTabs({
           {/* h-ctl khớp chiều cao IconButton bên cạnh — bản trước dùng h-8 (32px)
               cạnh IconButton mặc định h-ctl (34px), lệch 2px khiến cả cụm nhìn
               không thẳng hàng. */}
+          {/* A <div> wrapper, not <span> — SelectTrigger's own base style
+              carries `[&>span]:line-clamp-1` for its direct-child span
+              (meant for SelectValue's own rendered span), and nesting it a
+              level deeper moves it out of that rule's reach. Radix's
+              SelectValue doesn't forward `className` to that span at all (its
+              class stays empty however it's called), so truncation is
+              re-applied here via `[&>span]` on the div — its span really is
+              a direct child (verified against the rendered DOM) — instead of
+              on SelectValue itself. Without it, a name too long for w-28
+              wraps onto a second line under the icon rather than eliding
+              with "…". */}
           <SelectTrigger
             className="h-ctl w-28 text-xs rounded-sm"
             title="Collection environment — scoped to this collection, follows whichever collection the active request belongs to"
           >
-            <span className="flex min-w-0 items-center gap-1">
+            <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
               <Folder className="h-3 w-3 shrink-0 opacity-70" />
               <SelectValue placeholder="No Environment" />
-            </span>
+            </div>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No Environment</SelectItem>
@@ -188,10 +199,10 @@ export function RequestTabs({
             className="h-ctl w-28 text-xs rounded-sm"
             title="Global environment — applies across every collection, unaffected by which one is active"
           >
-            <span className="flex min-w-0 items-center gap-1">
+            <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
               <Globe className="h-3 w-3 shrink-0 opacity-70" />
               <SelectValue placeholder="No Global Env" />
-            </span>
+            </div>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No Global Env</SelectItem>
