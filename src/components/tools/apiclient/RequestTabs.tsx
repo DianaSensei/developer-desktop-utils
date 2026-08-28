@@ -131,10 +131,15 @@ export function RequestTabs({
             </button>
           </div>
         )}
-        <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none px-2 hover:bg-bg">
-          <Plus className="h-4 w-4" />
-        </IconButton>
       </div>
+
+      {/* Pinned outside the scrollable tab strip, not inside it — with many
+          tabs open (or a narrower window) the strip scrolls/clips before this
+          ever would, and "open a new request" is exactly the one action that
+          must never end up scrolled out of reach. */}
+      <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg">
+        <Plus className="h-4 w-4" />
+      </IconButton>
 
       {/* right cluster: environment · history · layout */}
       {/* py-1 — hàng này dùng items-stretch nên chiều cao thực tế do phần tử cao
@@ -157,7 +162,7 @@ export function RequestTabs({
               cạnh IconButton mặc định h-ctl (34px), lệch 2px khiến cả cụm nhìn
               không thẳng hàng. */}
           <SelectTrigger
-            className="h-ctl w-32 text-xs rounded-sm"
+            className="h-ctl w-28 text-xs rounded-sm"
             title="Collection environment — scoped to this collection, follows whichever collection the active request belongs to"
           >
             <span className="flex min-w-0 items-center gap-1">
@@ -180,7 +185,7 @@ export function RequestTabs({
           onValueChange={(v) => store.setActiveGlobalEnv(v === 'none' ? null : v)}
         >
           <SelectTrigger
-            className="h-ctl w-32 text-xs rounded-sm"
+            className="h-ctl w-28 text-xs rounded-sm"
             title="Global environment — applies across every collection, unaffected by which one is active"
           >
             <span className="flex min-w-0 items-center gap-1">
