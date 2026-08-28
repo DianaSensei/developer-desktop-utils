@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Braces, Check, ChevronDown, Code2, Database, File, FileText, FormInput,
-  Hexagon, type LucideIcon, Sparkles, Tag, Trash2, X,
+  Hexagon, type LucideIcon, Tag, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,8 @@ import { MultipartEditor } from './MultipartEditor';
 import { AuthEditor } from './AuthEditor';
 import { scriptApiExtensions } from './scriptCompletion';
 import { scriptCallsNetwork } from './collectionScripts';
-import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet, type ScriptSnippet } from './scriptSnippets';
+import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet } from './scriptSnippets';
+import { SnippetMenu } from './SnippetMenu';
 import { authQueryParam, urlWithParams } from './request';
 import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
@@ -147,22 +148,6 @@ function NetworkCallNotice() {
   );
 }
 
-// One-click snippet menu, appended to the script's current text — see
-// scriptSnippets.ts for why this appends rather than inserting at the cursor.
-function SnippetMenu({ snippets, onInsert }: { snippets: ScriptSnippet[]; onInsert: (s: ScriptSnippet) => void }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 text-[11px] font-medium text-fg-mute transition-colors hover:text-fg">
-        <Sparkles className="h-3 w-3" /> Snippet
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {snippets.map((s) => (
-          <DropdownMenuItem key={s.label} onClick={() => onInsert(s)}>{s.label}</DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 type ScriptPhase = 'req' | 'res';
 
