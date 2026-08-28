@@ -4,28 +4,30 @@
 // same function can run either on the main thread or inside the sandbox worker
 // (see scriptHost.ts). Input and output are plain structured-cloneable data:
 //
-//   pre  — inherited pre-request scripts → request vars → the request's own
-//          pre-request script. Stops at the first failure, because a request
-//          built by a script that threw is not worth sending.
-//   post — response vars → post-response script → inherited post-response
-//          scripts → tests → declarative assertions. Keeps going after a
-//          failure, since the tests are usually the point of the request.
+//   pre  — inherited pre-request scripts → the request's own pre-request
+//          script. Stops at the first failure, because a request built by a
+//          script that threw is not worth sending.
+//   post — post-response script → inherited post-response scripts → tests →
+//          declarative assertions. Keeps going after a failure, since the
+//          tests are usually the point of the request.
 //
 // Scripts mutate `draft` and the variable stores in place; the caller reads the
 // returned copies back out.
 
 import {
-  applyVars, evalAssertions, makeBru, makeReq, makeRes, runScript,
+  evalAssertions, makeBru, makeReq, makeRes, runScript,
   type RunControl, type ScriptRun, type VarStores,
 } from './runtime';
 import type {
-  ApiRequest, ApiResponse, Assertion, LogEntry, TestResult, VarDef, VarMap,
+  ApiRequest, ApiResponse, Assertion, LogEntry, TestResult, VarMap,
 } from './types';
 
 export interface PhaseStores {
-  runtime: VarMap;
-  env: VarMap;
-  envName: string | null;
+  collectionVar: VarMap;
+  collectionEnv: VarMap;
+  globalEnv: VarMap;
+  collectionEnvName: string | null;
+  globalEnvName: string | null;
   data?: VarMap;
 }
 
@@ -34,7 +36,6 @@ export interface PrePhaseInput {
   draft: ApiRequest;
   stores: PhaseStores;
   inherited: string[];
-  vars: VarDef[];
   script: string;
 }
 
@@ -44,7 +45,6 @@ export interface PostPhaseInput {
   stores: PhaseStores;
   response: ApiResponse;
   inherited: string[];
-  vars: VarDef[];
   script: string;
   tests: string;
   assertions: Assertion[];
@@ -84,7 +84,14 @@ export async function runPhase(input: PhaseInput, signal?: AbortSignal): Promise
 
   const result = (): PhaseOutput => ({
     draft,
-    stores: { runtime: stores.runtime, env: stores.env, envName: stores.envName, data: stores.data },
+    stores: {
+      collectionVar: stores.collectionVar,
+      collectionEnv: stores.collectionEnv,
+      globalEnv: stores.globalEnv,
+      collectionEnvName: stores.collectionEnvName,
+      globalEnvName: stores.globalEnvName,
+      data: stores.data,
+    },
     tests: out.tests,
     logs: out.logs,
     errors,
@@ -102,14 +109,12 @@ export async function runPhase(input: PhaseInput, signal?: AbortSignal): Promise
       );
       if (!ok) return result();
     }
-    applyVars(input.vars, stores, { bru: makeBru(stores) });
     await run('Pre-request script', input.script, { bru: makeBru(stores), req: makeReq(draft) });
     return result();
   }
 
   const res = makeRes(input.response);
   const bru = makeBru(stores);
-  applyVars(input.vars, stores, { res, bru });
   await run('Post-response script', input.script, { bru, req: makeReq(draft), res });
   for (let i = 0; i < input.inherited.length; i++) {
     await run(

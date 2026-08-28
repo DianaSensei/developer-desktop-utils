@@ -13,6 +13,8 @@ import { AuthEditor } from './AuthEditor';
 import { KeyValueEditor } from './KeyValueEditor';
 import { scriptApiExtensions } from './scriptCompletion';
 import { scriptCallsNetwork } from './collectionScripts';
+import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet } from './scriptSnippets';
+import { SnippetMenu } from './SnippetMenu';
 import { type Auth, type KeyValue, type RequestScript, type VarMap, newAuth } from './types';
 
 export interface NodeSettingsTarget {
@@ -68,8 +70,11 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
               These run for every request inside this {target.kind.toLowerCase()} — pre-request before each send, post-response after.
             </p>
             <div className="flex h-44 flex-col gap-1.5">
-              <Label className="text-xs">Pre-request</Label>
-              <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setVar('base', 'https://api.example.com');"} extraExtensions={scriptApiExtensions} />
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">Pre-request</Label>
+                <SnippetMenu snippets={PRE_REQUEST_SNIPPETS} onInsert={(s) => setScript((v) => ({ ...v, req: appendSnippet(v.req, s) }))} />
+              </div>
+              <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setEnvVar('base', 'https://api.example.com');"} extraExtensions={scriptApiExtensions} />
               {scriptCallsNetwork(script.req) && (
                 <Callout tone="warning" size="sm">
                   This script can make its own network request, separate from the Send button — review
@@ -78,7 +83,10 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
               )}
             </div>
             <div className="flex h-44 flex-col gap-1.5">
-              <Label className="text-xs">Post-response</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">Post-response</Label>
+                <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => setScript((v) => ({ ...v, res: appendSnippet(v.res, s) }))} />
+              </div>
               <JavaScriptEditor value={script.res} onChange={(res) => setScript((s) => ({ ...s, res }))} placeholder={"console.log('done', res.getStatus());"} extraExtensions={scriptApiExtensions} />
               {scriptCallsNetwork(script.res) && (
                 <Callout tone="warning" size="sm">

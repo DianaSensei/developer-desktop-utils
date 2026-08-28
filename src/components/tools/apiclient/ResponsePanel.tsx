@@ -7,10 +7,10 @@
 // behind a progress bar rather than being replaced by a spinner — swapping the
 // whole pane out and back was the single biggest source of flicker in the tool.
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, type Ref } from 'react';
 import {
   AlertCircle, Binary, Braces, Check, ChevronDown, Code2, Copy, Download, Eraser,
-  FileCode, FileText, Filter, Hash, MoreHorizontal, Send, X,
+  FileCode, FileText, Filter, Hash, MoreHorizontal, Search, Send, X,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
@@ -26,7 +26,7 @@ import type { ApiRequest, ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
 import { saveBinaryFile, saveTextFile } from './fileio';
 import { queryJson } from './jsonpath';
-import { CodeViewer } from '@/design-system';
+import { CodeViewer, type CodeViewerHandle } from '@/design-system';
 import type { RequestPanelTab } from './RequestPanel';
 
 // Labels scriptPhases.ts attaches to a request's *own* scripts (as opposed to
@@ -156,6 +156,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   const [preview, setPreview] = useState(false);
   const [filter, setFilter] = useState('');
   const [showFilter, setShowFilter] = useState(false);
+  const codeViewerRef = useRef<CodeViewerHandle>(null);
 
   const big = !!response && response.body.length > LARGE_BODY;
 
@@ -204,6 +205,14 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       default: return response.body;
     }
   }, [response, big, format, pretty, filterResult]);
+
+  // Mirrors ResponseBody's own branching below: true exactly when it renders
+  // the CodeViewer text surface — never for the HTML/image preview iframe, and
+  // never for a binary body still shown as "switch to Hex/Base64" placeholder,
+  // both of which have nothing a text search could act on.
+  const showsSearchableCode = !!response && !!(response.body || response.bodyBase64)
+    && !(preview && (kind === 'html' || kind === 'image' || format === 'html'))
+    && !(response.binary && format !== 'hex' && format !== 'base64');
 
   const failed = tests.filter((t) => !t.passed).length;
   const hasOriginHeader = !!request?.headers.some((h) => h.enabled && h.key.trim().toLowerCase() === 'origin');
@@ -300,13 +309,28 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           <Spinner size="sm" /> Sending…
         </span>
       ) : response ? (
-        <>
+        // Keyed on the response's own shape, not just its presence: a fresh
+        // send always changes at least one of these, so the key changes too and
+        // React mounts a new node — which is what makes the fade-in replay on
+        // every arrival instead of only the first one.
+        <span
+          key={`${response.url}|${response.timeMs}|${response.sizeBytes}|${response.status}`}
+          className="flex items-center gap-2.5 motion-safe:animate-fade-in-up"
+        >
           <span className={cn('font-semibold', statusColor(response.status))}>{response.status} {response.statusText}</span>
           <span className="text-fg-mute">{response.timeMs} ms</span>
           <span className="text-fg-mute">{formatBytes(response.sizeBytes)}</span>
-        </>
+        </span>
       ) : (
         <span className="font-semibold text-bad">No response</span>
+      )}
+      {activeTab === 'body' && showsSearchableCode && (
+        <IconButton
+          onClick={() => codeViewerRef.current?.openSearch()}
+          title={`Search in response (${isMac ? '⌘F' : 'Ctrl+F'})`}
+        >
+          <Search className="h-4 w-4" />
+        </IconButton>
       )}
       {response && activeTab === 'body' && kind === 'json' && !big && (
         <IconButton
@@ -317,7 +341,12 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           <Filter className="h-4 w-4" />
         </IconButton>
       )}
-      {response && <ActionsMenu copied={copied} onCopy={copy} onSave={saveResponse} onClear={onClear} />}
+      {response && (
+        <IconButton onClick={copy} title={copied ? 'Copied' : 'Copy'} className={cn(copied && 'text-ok')}>
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        </IconButton>
+      )}
+      {response && <ActionsMenu onSave={saveResponse} onClear={onClear} />}
     </>
   );
 
@@ -366,7 +395,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       )}
 
       {corsHint && (
-        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
           <Callout tone="warning" size="sm" title="Looks like an Origin/CORS check">
             The server may be rejecting this for missing an <code className="rounded bg-bg-2 px-1">Origin</code> header
             — unlike a browser tab, this app's requests don't send one automatically. Try adding an{' '}
@@ -376,7 +405,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       )}
 
       {certHint && (
-        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
           <Callout
             tone="warning" size="sm" title="Looks like a certificate problem"
             actions={onJumpToSettings && (
@@ -393,7 +422,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       )}
 
       {redirectHint && (
-        <div className="shrink-0 border-b border-warn/20 px-3 py-2">
+        <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
           <Callout
             tone="warning" size="sm" title="Too many redirects"
             actions={onJumpToSettings && (
@@ -423,7 +452,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                   Large response ({formatBytes(response.sizeBytes)}) shown as raw text for performance.
                 </div>
               )}
-              <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} />
+              <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} viewerRef={codeViewerRef} />
               {showFilter && kind === 'json' && (
                 <div className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-1.5 focus-within:bg-bg-2/20">
                   <Filter className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
@@ -516,23 +545,20 @@ function suggestedFileName(r: ApiResponse): string {
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2">{children}</div>;
+  return <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-2 motion-safe:animate-fade-in-up">{children}</div>;
 }
 
-// The … menu holding the copy / save / clear actions, so the status readout
-// stays pinned right and never gets pushed off on resize.
-function ActionsMenu({ copied, onCopy, onSave, onClear }: {
-  copied: boolean; onCopy: () => void; onSave: () => void; onClear?: () => void;
-}) {
+// The … menu holding the save / clear actions, so the status readout stays
+// pinned right and never gets pushed off on resize. Copy lives as its own
+// button beside this menu (see headerRight above) — it's the action taken
+// often enough that burying it a level down cost an extra click every time.
+function ActionsMenu({ onSave, onClear }: { onSave: () => void; onClear?: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger title="More" className="rounded p-1 text-fg-mute transition-colors hover:bg-acc hover:text-fg">
         <MoreHorizontal className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[11rem]">
-        <DropdownMenuItem onClick={onCopy} icon={copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}>
-          Copy
-        </DropdownMenuItem>
         <DropdownMenuItem onClick={onSave} icon={<Download className="h-3.5 w-3.5" />}>
           Save response…
         </DropdownMenuItem>
@@ -548,8 +574,9 @@ function ActionsMenu({ copied, onCopy, onSave, onClear }: {
 
 // ─── response body ────────────────────────────────────────────────────────────
 
-function ResponseBody({ response, kind, format, preview, text, plain }: {
+function ResponseBody({ response, kind, format, preview, text, plain, viewerRef }: {
   response: ApiResponse; kind: Kind; format: Format; preview: boolean; text: string; plain?: boolean;
+  viewerRef?: Ref<CodeViewerHandle>;
 }) {
   if (preview) {
     if (kind === 'html' || format === 'html') {
@@ -587,7 +614,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
   }
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      <CodeViewer value={text} language={!plain && format === 'json' ? 'json' : 'text'} plain={plain} />
+      <CodeViewer ref={viewerRef} value={text} language={!plain && format === 'json' ? 'json' : 'text'} plain={plain} />
     </div>
   );
 }

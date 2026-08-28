@@ -20,6 +20,10 @@ import {
   FONT_PREFERENCES, getFontPreference, setFontPreference,
   applyFontToDocument, type FontPreference,
 } from '@/lib/fontPreference';
+import {
+  MONO_FONT_PREFERENCES, getMonoFontPreference, setMonoFontPreference,
+  applyMonoFontToDocument, type MonoFontPreference,
+} from '@/lib/monoFontPreference';
 import { getAppPermissionGroups } from '@/lib/appPermissions';
 import { getShortcutGroups } from '@/lib/shortcuts';
 import { Spinner } from '@/components/ui/spinner';
@@ -227,6 +231,11 @@ const FONT_LABEL_KEY: Record<FontPreference, TranslationKey> = {
   classic: 'settings.font.classic',
 };
 
+const MONO_FONT_LABEL_KEY: Record<MonoFontPreference, TranslationKey> = {
+  'ibm-plex-mono': 'settings.monoFont.ibmPlexMono',
+  'fira-code': 'settings.monoFont.firaCode',
+};
+
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -277,6 +286,12 @@ export function Settings() {
     setFont(pref);
     setFontPreference(pref);
     applyFontToDocument(pref);
+  };
+  const [monoFont, setMonoFont] = useState<MonoFontPreference>(() => getMonoFontPreference());
+  const changeMonoFont = (pref: MonoFontPreference) => {
+    setMonoFont(pref);
+    setMonoFontPreference(pref);
+    applyMonoFontToDocument(pref);
   };
 
   useEffect(() => {
@@ -435,6 +450,23 @@ export function Settings() {
               <SelectContent>
                 {FONT_PREFERENCES.map((f) => (
                   <SelectItem key={f} value={f}>{t(FONT_LABEL_KEY[f])}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          }
+        />
+        <SettingRow
+          icon={Type}
+          title={t('settings.monoFont.label')}
+          description={t('settings.monoFont.description')}
+          control={
+            <Select value={monoFont} onValueChange={(v) => changeMonoFont(v as MonoFontPreference)}>
+              <SelectTrigger className="h-ctl w-44 text-xs" aria-label={t('settings.monoFont.label')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONO_FONT_PREFERENCES.map((f) => (
+                  <SelectItem key={f} value={f}>{t(MONO_FONT_LABEL_KEY[f])}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -8,8 +8,8 @@ describe('appendSnippet', () => {
   });
 
   it('appends with a blank line separator when the script already has content', () => {
-    const out = appendSnippet('bru.setVar("a", 1);', POST_RESPONSE_SNIPPETS[0]);
-    expect(out).toBe(`bru.setVar("a", 1);\n\n${POST_RESPONSE_SNIPPETS[0].code}`);
+    const out = appendSnippet('bru.setCollectionVar("a", 1);', POST_RESPONSE_SNIPPETS[0]);
+    expect(out).toBe(`bru.setCollectionVar("a", 1);\n\n${POST_RESPONSE_SNIPPETS[0].code}`);
   });
 });
 

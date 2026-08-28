@@ -84,13 +84,20 @@ export const DICTIONARY = {
   },
   'settings.font.label': { vi: 'Mặt chữ', en: 'Font' },
   'settings.font.description': {
-    vi: 'Đổi mặt chữ giao diện chung, dùng mặt chữ hệ thống đã cài sẵn — không cần tải font mới. Chữ đơn cách (mã, số liệu) giữ nguyên.',
-    en: "Changes the app's general UI font, using fonts already installed on your system — nothing new to download. Monospace text (code, data) stays fixed.",
+    vi: 'Đổi mặt chữ giao diện chung, dùng mặt chữ hệ thống đã cài sẵn — không cần tải font mới.',
+    en: "Changes the app's general UI font, using fonts already installed on your system — nothing new to download.",
   },
   'settings.font.default': { vi: 'Mặc định (Be Vietnam Pro)', en: 'Default (Be Vietnam Pro)' },
   'settings.font.system': { vi: 'Mặt chữ hệ thống', en: 'System font' },
   'settings.font.serif': { vi: 'Chữ có chân', en: 'Serif' },
   'settings.font.classic': { vi: 'Sans cổ điển', en: 'Classic sans' },
+  'settings.monoFont.label': { vi: 'Mặt chữ mã', en: 'Code font' },
+  'settings.monoFont.description': {
+    vi: 'Mặt chữ đơn cách cho code, JSON, và các ô nhập dữ liệu — riêng khỏi mặt chữ giao diện chung ở trên. Cả hai lựa chọn đều tự host, không cần tải thêm.',
+    en: 'Monospace font for code, JSON, and data fields — separate from the general UI font above. Both options are self-hosted, nothing extra to download.',
+  },
+  'settings.monoFont.ibmPlexMono': { vi: 'IBM Plex Mono (mặc định)', en: 'IBM Plex Mono (default)' },
+  'settings.monoFont.firaCode': { vi: 'Fira Code (có ligature)', en: 'Fira Code (with ligatures)' },
 
   // ── Sidebar — trạng thái, tooltip, nút ──────────────────────────────────
   'shell.sidebar.connected': { vi: 'Đang kết nối', en: 'Connected' },

@@ -19,9 +19,9 @@ describe('findScripts', () => {
   });
 
   it('finds a collection-level script', () => {
-    const c = collection({ script: { req: 'bru.setVar("a", 1);', res: '' } });
+    const c = collection({ script: { req: 'bru.setCollectionVar("a", 1);', res: '' } });
     expect(findScripts(c)).toEqual([
-      { path: '', kind: 'pre-request', code: 'bru.setVar("a", 1);' },
+      { path: '', kind: 'pre-request', code: 'bru.setCollectionVar("a", 1);' },
     ]);
   });
 
@@ -155,7 +155,7 @@ describe('scriptCallsNetwork', () => {
   });
 
   it('ignores scripts with no network call', () => {
-    expect(scriptCallsNetwork('bru.setVar("x", 1);\nreq.setHeader("X-Trace", "abc");')).toBe(false);
+    expect(scriptCallsNetwork('bru.setCollectionVar("x", 1);\nreq.setHeader("X-Trace", "abc");')).toBe(false);
     expect(scriptCallsNetwork('')).toBe(false);
   });
 

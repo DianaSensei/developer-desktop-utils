@@ -1,14 +1,14 @@
 // Scripting runtime — a Bruno-compatible JS sandbox.
 //
-// Pre-request and post-response scripts, the test runner, declarative vars, and
-// declarative assertions all execute here. Scripts run via the AsyncFunction
+// Pre-request and post-response scripts, the test runner, and declarative
+// assertions all execute here. Scripts run via the AsyncFunction
 // constructor inside the app's own JS context with a curated set of globals
 // (`bru`, `req`, `res`, `expect`, `test`, `assert`, `console`). This is the same
 // trust model as Postman/Bruno: the scripts are the user's own, run locally, and
 // nothing is sent anywhere except the HTTP request itself.
 
 import type {
-  ApiRequest, ApiResponse, Assertion, LogEntry, TestResult, VarDef, VarMap,
+  ApiRequest, ApiResponse, Assertion, LogEntry, TestResult, VarMap,
 } from './types';
 import { substituteVars } from './vars';
 import { requireModule } from './modules';
@@ -261,8 +261,9 @@ function parseBody(res: ApiResponse): unknown {
 }
 
 // Keys that would walk up to Object.prototype instead of landing on the map.
-// Variable names reach `bru.setVar` from scripts and from collection files that
-// may have been imported from somewhere untrusted, so a write keyed on one of
+// Variable names reach `bru.setCollectionVar`/`setEnvVar` from scripts and from
+// collection files that may have been imported from somewhere untrusted, so a
+// write keyed on one of
 // these is prototype pollution rather than a variable. Spelled out as a
 // disjunction rather than a Set lookup so the guard is visible at the point it
 // is applied, to a reader and to a taint-tracking analyser alike.
@@ -367,10 +368,17 @@ export interface RunControl {
   nextRequest?: string | null;
 }
 
+// Which environment tier bru.*EnvVar targets. Reads with no scope fall
+// through collection -> global; writes with no scope default to
+// 'collection' (a write can't merge, it has to land somewhere specific).
+export type EnvScope = 'collection' | 'global';
+
 export interface VarStores {
-  runtime: VarMap;   // bru.setVar / getVar  (mutated in place)
-  env: VarMap;       // bru.setEnvVar / getEnvVar (mutated in place)
-  envName: string | null;
+  collectionVar: VarMap; // bru.setCollectionVar / getCollectionVar (persisted)
+  collectionEnv: VarMap; // bru.setEnvVar(...,'collection') / getEnvVar (persisted)
+  globalEnv: VarMap;     // bru.setEnvVar(...,'global') / getEnvVar (persisted)
+  collectionEnvName: string | null;
+  globalEnvName: string | null;
   data?: VarMap;     // current data-file row (read-only; data-driven runs)
   // Mutated by setNextRequest; read by the Runner after the request finishes.
   // Ignored for a single Send, where there is no sequence to steer.
@@ -381,18 +389,29 @@ export interface VarStores {
 }
 
 export function makeBru(stores: VarStores) {
-  // Same precedence as the {{substitution}} map in engine.ts: env < data < runtime.
-  const allVars = (): VarMap => ({ ...stores.env, ...(stores.data ?? {}), ...stores.runtime });
+  // Same precedence as the {{substitution}} map in engine.ts (vault aside,
+  // which never enters these stores — see engine.ts):
+  // collectionVar < globalEnv < collectionEnv < data.
+  const allVars = (): VarMap => ({
+    ...stores.collectionVar, ...stores.globalEnv, ...stores.collectionEnv, ...(stores.data ?? {}),
+  });
+  const envStore = (scope?: EnvScope) => (scope === 'global' ? stores.globalEnv : stores.collectionEnv);
   return {
-    getVar: (k: string) => (k in stores.runtime ? stores.runtime[k] : stores.data?.[k]),
-    setVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.runtime[k] = v == null ? '' : String(v); },
-    deleteVar: (k: string) => { delete stores.runtime[k]; },
-    hasVar: (k: string) => k in stores.runtime || (!!stores.data && k in stores.data),
-    getEnvVar: (k: string) => stores.env[k],
-    setEnvVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.env[k] = v == null ? '' : String(v); },
-    hasEnvVar: (k: string) => k in stores.env,
-    deleteEnvVar: (k: string) => { delete stores.env[k]; },
-    getEnvName: () => stores.envName,
+    getCollectionVar: (k: string) => stores.collectionVar[k],
+    setCollectionVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.collectionVar[k] = v == null ? '' : String(v); },
+    hasCollectionVar: (k: string) => k in stores.collectionVar,
+    deleteCollectionVar: (k: string) => { delete stores.collectionVar[k]; },
+    // No scope: read falls through collection -> global (matches precedence);
+    // write/delete default to 'collection', the closer analog to the old
+    // single-environment behavior.
+    getEnvVar: (k: string, scope?: EnvScope) =>
+      (scope ? envStore(scope)[k] : (k in stores.collectionEnv ? stores.collectionEnv[k] : stores.globalEnv[k])),
+    setEnvVar: (k: string, v: unknown, scope: EnvScope = 'collection') => { if (isSafeKey(k)) envStore(scope)[k] = v == null ? '' : String(v); },
+    hasEnvVar: (k: string, scope?: EnvScope) =>
+      (scope ? k in envStore(scope) : (k in stores.collectionEnv || k in stores.globalEnv)),
+    deleteEnvVar: (k: string, scope: EnvScope = 'collection') => { delete envStore(scope)[k]; },
+    getEnvName: (scope?: EnvScope) =>
+      (scope === 'global' ? stores.globalEnvName : scope === 'collection' ? stores.collectionEnvName : (stores.collectionEnvName ?? stores.globalEnvName)),
     // Postman parity: bru.getIterationData('x') reads the current data row.
     getIterationData: (k: string) => stores.data?.[k],
     // Expand {{tokens}} in a string exactly as the send pipeline would.
@@ -449,29 +468,30 @@ interface PmDeps {
   test: (name: string, fn: () => unknown) => Promise<void>;
 }
 
-// Maps Postman's `pm` API onto our bru/req/res primitives. Collection/global
-// variables don't have separate stores here, so they alias the runtime vars.
+// Maps Postman's `pm` API onto our bru/req/res primitives.
 export function makePm({ bru, req, res, expect, test }: PmDeps) {
   const varBag = (get: (k: string) => unknown, set: (k: string, v: unknown) => void) => ({
     get, set,
     has: (k: string) => get(k) !== undefined,
     unset: (k: string) => set(k, ''),
   });
-  const variables = bru ? {
-    ...varBag(bru.getVar, bru.setVar),
-    // pm.variables.replaceIn('{{host}}/users') — resolve tokens in a string.
-    replaceIn: (text: string) => bru.interpolate(text),
-  } : undefined;
   const pm: Record<string, unknown> = {
     test,
     expect,
     info: { requestName: req?.getName?.() ?? '', requestId: '' },
+    // pm.environment defaults to the collection-scoped env, same as a bare
+    // bru.getEnvVar/setEnvVar call — Postman's own "environment" is the
+    // one-active-set-at-a-time notion, and Collection env is the closer
+    // analog of the two.
     environment: bru
-      ? { ...varBag(bru.getEnvVar, bru.setEnvVar), name: bru.getEnvName() }
+      ? { ...varBag(bru.getEnvVar, bru.setEnvVar), name: bru.getEnvName(), replaceIn: (text: string) => bru.interpolate(text) }
       : undefined,
-    variables,
-    collectionVariables: variables,
-    globals: variables,
+    // Collection/global variables have their own persisted stores — route
+    // each to its own bucket.
+    collectionVariables: bru ? { ...varBag(bru.getCollectionVar, bru.setCollectionVar) } : undefined,
+    globals: bru
+      ? { ...varBag((k) => bru.getEnvVar(k, 'global'), (k, v) => bru.setEnvVar(k, v, 'global')) }
+      : undefined,
     iterationData: bru ? { get: (k: string) => bru.getIterationData(k) } : undefined,
     request: req,
     // Postman's current flow-control namespace. `skipRequest` isn't meaningful
@@ -642,13 +662,13 @@ export async function runScript(
   }
 }
 
-// ─── declarative vars ───────────────────────────────────────────────────────
+// ─── declarative-expression parser (used by Assert) ─────────────────────────
 
-// Vars/Assert expressions are parsed, never evaluated. These fields are
-// declarative — `res.body.token`, `res.body.items[0].id`, `bru.getVar('x')` —
-// but they travel inside the collection file, so opening a collection someone
-// sent you would otherwise run whatever they put in a Vars row. Earlier this
-// was a `new Function(...)` with the dangerous globals shadowed out by extra
+// Assert expressions are parsed, never evaluated. These fields are
+// declarative — `res.body.token`, `res.body.items[0].id` — but they travel
+// inside the collection file, so opening a collection someone sent you would
+// otherwise run whatever they put in an Assert row. Earlier this was a
+// `new Function(...)` with the dangerous globals shadowed out by extra
 // parameters, which was defence in depth rather than a boundary:
 // `({}).constructor.constructor` still reached Function and `eval` cannot be
 // shadowed at all. The grammar below removes code construction entirely — it
@@ -664,8 +684,7 @@ export async function runScript(
 // falls back to the literal string, as a parse error always did.
 
 // Property keys that are never worth traversing from a collection file: they
-// are the reachable route to Function and to Object.prototype. `applyVars`
-// refuses the same three as var *names* below.
+// are the reachable route to Function and to Object.prototype.
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 // Callables that turn data back into code. Unreachable via UNSAFE_KEYS today;
@@ -825,7 +844,7 @@ class VarExprParser {
   private postfix(): unknown {
     let val = this.primary();
     // `receiver` tracks the object a method was read from, so a call binds
-    // `this` correctly for `bru.getVar('x')` / `res.getStatus()`.
+    // `this` correctly for `bru.getCollectionVar('x')` / `res.getStatus()`.
     let receiver: unknown = undefined;
     for (;;) {
       if (this.eatOp('.')) {
@@ -891,7 +910,7 @@ class VarExprParser {
   }
 }
 
-// Evaluate a Vars/Assert expression. Supports property paths, indices, method
+// Evaluate an Assert expression. Supports property paths, indices, method
 // calls on the scope objects, literals and the operators above. Anything
 // outside that grammar falls back to the literal string, matching the previous
 // evaluator's behaviour on a parse error.
@@ -903,17 +922,10 @@ function evalVarExpr(expr: string, scope: Record<string, unknown>): unknown {
   }
 }
 
-export function applyVars(defs: VarDef[], stores: VarStores, scope: Record<string, unknown>): void {
-  for (const d of defs) {
-    const name = d.name;
-    if (!d.enabled || !name.trim()) continue;
-    // Var names travel inside the collection file; a row named __proto__ would
-    // otherwise write through this plain store onto Object.prototype.
-    if (name === '__proto__' || name === 'constructor' || name === 'prototype') continue;
-    const val = evalVarExpr(d.value, scope);
-    stores.runtime[name] = val == null ? '' : String(val);
-  }
-}
+// Exposed only for runtime.test.ts's direct coverage of the expression
+// grammar/containment (the parser is otherwise only reached indirectly, via
+// evalAssertions's operator comparisons).
+export const __evalVarExpr = evalVarExpr;
 
 // ─── declarative assertions ─────────────────────────────────────────────────
 

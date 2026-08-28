@@ -171,6 +171,7 @@ export function KeyValueEditor({
           value={bulkText}
           onChange={parseBulk}
           placeholder={`${keyPlaceholder}: ${valuePlaceholder}`}
+          vars={vars}
         />
       </div>
     );

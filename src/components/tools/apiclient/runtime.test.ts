@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { applyVars, makeBru, makeReq, makeRes, runScript, type ScriptRun, type VarStores } from './runtime';
+import { __evalVarExpr, makeBru, makeReq, makeRes, runScript, type ScriptRun, type VarStores } from './runtime';
 import { newRequest, type ApiResponse } from './types';
 
 const emptyRun = (): ScriptRun => ({ logs: [], tests: [], error: null });
 
 const stores = (over: Partial<VarStores> = {}): VarStores => ({
-  runtime: {}, env: {}, envName: null, ...over,
+  collectionVar: {}, collectionEnv: {}, globalEnv: {},
+  collectionEnvName: null, globalEnvName: null, ...over,
 });
 
 const response = (over: Partial<ApiResponse> = {}): ApiResponse => ({
@@ -126,12 +127,10 @@ describe('assert helpers', () => {
 });
 
 describe('bru', () => {
-  it('interpolates using env < data < runtime precedence', () => {
-    const s = stores({ env: { host: 'env-host', only: 'e' }, data: { host: 'data-host' }, runtime: {} });
+  it('interpolates using collectionEnv < data precedence', () => {
+    const s = stores({ collectionEnv: { host: 'env-host', only: 'e' }, data: { host: 'data-host' } });
     const bru = makeBru(s);
     expect(bru.interpolate('{{host}}/{{only}}')).toBe('data-host/e');
-    bru.setVar('host', 'runtime-host');
-    expect(bru.interpolate('{{host}}')).toBe('runtime-host');
   });
 
   it('leaves unknown tokens untouched', () => {
@@ -148,6 +147,55 @@ describe('bru', () => {
 
   it('resolves sleep normally', async () => {
     await expect(makeBru(stores()).sleep(1)).resolves.toBeUndefined();
+  });
+});
+
+describe('bru — collection var and scoped env stores', () => {
+  it('setCollectionVar/getCollectionVar/hasCollectionVar/deleteCollectionVar target their own store', () => {
+    const s = stores();
+    const bru = makeBru(s);
+    expect(bru.hasCollectionVar('limit')).toBe(false);
+    bru.setCollectionVar('limit', 10);
+    expect(bru.hasCollectionVar('limit')).toBe(true);
+    expect(bru.getCollectionVar('limit')).toBe('10');
+    expect(s.collectionVar.limit).toBe('10');
+    bru.deleteCollectionVar('limit');
+    expect(bru.hasCollectionVar('limit')).toBe(false);
+  });
+
+  it('setEnvVar defaults to the collection scope', () => {
+    const s = stores();
+    const bru = makeBru(s);
+    bru.setEnvVar('token', 'abc');
+    expect(s.collectionEnv.token).toBe('abc');
+    expect(s.globalEnv.token).toBeUndefined();
+  });
+
+  it('setEnvVar(..., "global") targets the global store instead', () => {
+    const s = stores();
+    const bru = makeBru(s);
+    bru.setEnvVar('token', 'abc', 'global');
+    expect(s.globalEnv.token).toBe('abc');
+    expect(s.collectionEnv.token).toBeUndefined();
+  });
+
+  it('getEnvVar with no scope falls through collection -> global', () => {
+    const s = stores({ globalEnv: { host: 'global-host' } });
+    const bru = makeBru(s);
+    expect(bru.getEnvVar('host')).toBe('global-host');
+    s.collectionEnv.host = 'collection-host';
+    expect(bru.getEnvVar('host')).toBe('collection-host');
+    // An explicit scope bypasses the fallthrough.
+    expect(bru.getEnvVar('host', 'global')).toBe('global-host');
+  });
+
+  it('getEnvName defaults to the collection env name, falling back to the global one', () => {
+    const s = stores({ collectionEnvName: null, globalEnvName: 'Shared' });
+    const bru = makeBru(s);
+    expect(bru.getEnvName()).toBe('Shared');
+    s.collectionEnvName = 'Staging';
+    expect(bru.getEnvName()).toBe('Staging');
+    expect(bru.getEnvName('global')).toBe('Shared');
   });
 });
 
@@ -199,11 +247,11 @@ describe('pm compatibility shim', () => {
     expect(out.tests[0].error).toContain('404');
   });
 
-  it('supports pm.variables.replaceIn', async () => {
-    const s = stores({ env: { host: 'api.test' } });
+  it('supports pm.environment.replaceIn', async () => {
+    const s = stores({ collectionEnv: { host: 'api.test' } });
     const out = emptyRun();
     await runScript(
-      'pm.test("t", () => expect(pm.variables.replaceIn("{{host}}/v1")).to.equal("api.test/v1"));',
+      'pm.test("t", () => expect(pm.environment.replaceIn("{{host}}/v1")).to.equal("api.test/v1"));',
       { bru: makeBru(s), res: makeRes(response()) },
       out,
     );
@@ -251,55 +299,34 @@ describe('prototype pollution', () => {
     expect(req.getHeaders().authorization).toBe('Bearer t');
   });
 
-  it('refuses bru.setVar / setEnvVar on a prototype key', () => {
+  it('refuses bru.setEnvVar / setCollectionVar on a prototype key', () => {
     const s = stores();
     const bru = makeBru(s);
-    bru.setVar('__proto__', 'polluted');
     bru.setEnvVar('constructor', 'polluted');
-    bru.setVar('token', 'abc');
-    expect(Object.prototype.hasOwnProperty.call(s.runtime, '__proto__')).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(s.env, 'constructor')).toBe(false);
-    expect(s.runtime.token).toBe('abc');
-    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
-  });
-
-  it('refuses a Vars row named __proto__ but keeps the rows around it', () => {
-    const s = stores();
-    applyVars(
-      [
-        { id: '1', name: '__proto__', value: '"polluted"', enabled: true },
-        { id: '2', name: 'token', value: 'res.body.token', enabled: true },
-      ],
-      s,
-      { res: makeRes(response()) },
-    );
-    expect(Object.prototype.hasOwnProperty.call(s.runtime, '__proto__')).toBe(false);
-    expect(s.runtime.token).toBe('abc');
+    bru.setCollectionVar('__proto__', 'polluted');
+    bru.setCollectionVar('token', 'abc');
+    expect(Object.prototype.hasOwnProperty.call(s.collectionEnv, 'constructor')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(s.collectionVar, '__proto__')).toBe(false);
+    expect(s.collectionVar.token).toBe('abc');
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 });
 
-describe('Vars/Assert expression containment', () => {
-  const evalVia = (expr: string): unknown => {
-    const s = stores();
-    applyVars([{ id: '1', name: 'out', value: expr, enabled: true }], s, {
-      res: makeRes(response()),
-    });
-    return s.runtime.out;
-  };
+describe('Assert expression containment', () => {
+  const evalVia = (expr: string): unknown => __evalVarExpr(expr, { res: makeRes(response()) });
 
-  it('still evaluates the declarative expressions the tab is for', () => {
+  it('still evaluates the expressions the Assert tab is for', () => {
     expect(evalVia('res.body.token')).toBe('abc');
-    expect(evalVia('res.body.items.length')).toBe('3');
-    expect(evalVia('res.status')).toBe('200');
+    expect(evalVia('res.body.items.length')).toBe(3);
+    expect(evalVia('res.status')).toBe(200);
   });
 
   it('reads bracket keys, numeric indices and paths through them', () => {
     expect(evalVia("res.body['token']")).toBe('abc');
-    expect(evalVia('res.body.items[1]')).toBe('2');
-    expect(evalVia("res.body['items'][2]")).toBe('3');
+    expect(evalVia('res.body.items[1]')).toBe(2);
+    expect(evalVia("res.body['items'][2]")).toBe(3);
     // Reads through a primitive: JS boxes it, so this must resolve too.
-    expect(evalVia('res.body.token.length')).toBe('3');
+    expect(evalVia('res.body.token.length')).toBe(3);
   });
 
   it('tolerates whitespace inside a path', () => {
@@ -308,18 +335,18 @@ describe('Vars/Assert expression containment', () => {
   });
 
   it('evaluates operators, literals and grouping', () => {
-    expect(evalVia('40 + 2')).toBe('42');
-    expect(evalVia('res.status === 200')).toBe('true');
-    expect(evalVia('res.status >= 200 && res.status < 300')).toBe('true');
+    expect(evalVia('40 + 2')).toBe(42);
+    expect(evalVia('res.status === 200')).toBe(true);
+    expect(evalVia('res.status >= 200 && res.status < 300')).toBe(true);
     expect(evalVia("res.body.token + '!'")).toBe('abc!');
-    expect(evalVia('(1 + 2) * 3')).toBe('9');
-    expect(evalVia('!res.body.missing')).toBe('true');
+    expect(evalVia('(1 + 2) * 3')).toBe(9);
+    expect(evalVia('!res.body.missing')).toBe(true);
     // Short-circuits like JS, so a missing left side is not a path error.
-    expect(evalVia('res.body.missing && res.body.missing.deep')).toBe('');
+    expect(evalVia('res.body.missing && res.body.missing.deep')).toBeUndefined();
   });
 
   it('calls a method on an object or a primitive receiver', () => {
-    expect(evalVia('res.getStatus()')).toBe('200');
+    expect(evalVia('res.getStatus()')).toBe(200);
     expect(evalVia('res.body.token.toUpperCase()')).toBe('ABC');
     expect(evalVia("res.getHeader('content-type')")).toBe('application/json');
   });

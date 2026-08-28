@@ -37,10 +37,18 @@ beforeEach(() => {
   vi.resetModules();
   localStorage.clear();
   fakeStoreData = {};
+  // This file exercises persistentStore.ts's Tauri code path (the mocked
+  // plugin-store above) — `@/lib/platform`'s `isTauri` reads
+  // `window.__TAURI_INTERNALS__` once at import time, so it has to be set
+  // before the `import('./persistentStore')` in each test, and `platform.ts`
+  // has to be freshly re-evaluated (via the vi.resetModules() above) to
+  // actually pick it up. web-mode behavior (no Tauri) has its own tests below.
+  (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
 });
 
 describe('setThemePreference / getThemePreference', () => {
@@ -150,5 +158,54 @@ describe('wasFreshInstall', () => {
     await mod.initPersistentStore();
 
     expect(mod.wasFreshInstall()).toBe(false);
+  });
+});
+
+// The `npm run dev`/`vite preview` path — no Tauri IPC bridge, so the store
+// plugin's `load()` would throw before ever resolving (confirmed live: it
+// blocked the whole app from rendering). Falls back to plain `localStorage`
+// instead, which already works natively in a real browser.
+describe('web mode (no Tauri)', () => {
+  beforeEach(() => {
+    delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+  });
+
+  it('reads whatever is already in localStorage into the cache at boot, without touching the Tauri store', async () => {
+    localStorage.setItem('devtool-theme', 'dark');
+    localStorage.setItem('devtool:some-tool:input', 'hello');
+    const mod = await import('./persistentStore');
+    await mod.initPersistentStore();
+
+    expect(mod.storageGet('devtool-theme')).toBe('dark');
+    expect(mod.storageGet('devtool:some-tool:input')).toBe('hello');
+    expect(mod.wasFreshInstall()).toBe(false);
+  });
+
+  it('is a fresh install when localStorage is empty at boot', async () => {
+    const mod = await import('./persistentStore');
+    await mod.initPersistentStore();
+    expect(mod.wasFreshInstall()).toBe(true);
+  });
+
+  it('storageSet/storageRemove write straight through to localStorage', async () => {
+    const mod = await import('./persistentStore');
+    await mod.initPersistentStore();
+
+    mod.storageSet('devtool-theme', 'light');
+    expect(localStorage.getItem('devtool-theme')).toBe('light');
+
+    mod.storageRemove('devtool-theme');
+    expect(localStorage.getItem('devtool-theme')).toBeNull();
+    expect(mod.storageGet('devtool-theme')).toBeNull();
+  });
+
+  it('clearPersistentStore clears localStorage too', async () => {
+    localStorage.setItem('devtool-theme', 'dark');
+    const mod = await import('./persistentStore');
+    await mod.initPersistentStore();
+
+    await mod.clearPersistentStore();
+    expect(localStorage.getItem('devtool-theme')).toBeNull();
+    expect(mod.storageGet('devtool-theme')).toBeNull();
   });
 });

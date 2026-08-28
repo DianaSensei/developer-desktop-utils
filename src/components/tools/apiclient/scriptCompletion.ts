@@ -46,7 +46,7 @@ const resShape = ns({
 });
 
 const bruShape = ns({
-  getVar: noop, setVar: noop, deleteVar: noop, hasVar: noop,
+  getCollectionVar: noop, setCollectionVar: noop, hasCollectionVar: noop, deleteCollectionVar: noop,
   getEnvVar: noop, setEnvVar: noop, hasEnvVar: noop, deleteEnvVar: noop, getEnvName: noop,
   getIterationData: noop, interpolate: noop, getVars: noop,
   setNextRequest: noop, sleep: noop,
@@ -60,10 +60,9 @@ const bruShape = ns({
 const pmShape = ns({
   test: noop, expect: noop,
   info: ns({ requestName: '', requestId: '' }),
-  environment: ns({ ...varBag(), name: '' }),
-  variables: ns({ ...varBag(), replaceIn: noop }),
-  collectionVariables: ns({ ...varBag(), replaceIn: noop }),
-  globals: ns({ ...varBag(), replaceIn: noop }),
+  environment: ns({ ...varBag(), name: '', replaceIn: noop }),
+  collectionVariables: varBag(),
+  globals: varBag(),
   iterationData: ns({ get: noop }),
   request: reqShape,
   execution: ns({ setNextRequest: noop }),

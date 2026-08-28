@@ -262,6 +262,22 @@
 }
 
 /* ============================================================================
+   PRESET MONO FONT — riêng khỏi bốn preset --sans ở trên: đây là lựa chọn có
+   chủ đích cho việc ĐỌC MÃ (ligature, độ rộng ký tự đều), người dùng có gu
+   khác nhau về việc có muốn ligature (=>, !=, >=…) hay không, nên không còn
+   "một chuẩn cố định" nữa. Cả hai đều là font THẬT tự host (bundle sẵn như
+   Be Vietnam Pro, không phải stack hệ thống) nên hiện giống hệt nhau trên mọi
+   nền. Đặt data-mono-font trên <html>. */
+[data-mono-font="ibm-plex-mono"] {
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+          Consolas, "Liberation Mono", monospace;
+}
+[data-mono-font="fira-code"] {
+  --mono: "Fira Code", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+          Consolas, "Liberation Mono", monospace;
+}
+
+/* ============================================================================
    NỀN MÔI TRƯỜNG — gradient pastel.
    Đây là chỗ DUY NHẤT gradient được phép. Không bao giờ trên nút, không bao
    giờ sau chữ cần đọc. Đặt class .dk-bg lên phần tử nền toàn trang.

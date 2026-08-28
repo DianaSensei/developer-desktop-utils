@@ -19,10 +19,19 @@ import '@fontsource/be-vietnam-pro/vietnamese-600.css';
 import '@fontsource/ibm-plex-mono/latin-400.css';
 import '@fontsource/ibm-plex-mono/latin-500.css';
 import '@fontsource/ibm-plex-mono/latin-600.css';
+// Fira Code — the alternative code font (opt-in, Settings → Code font). Loaded
+// unconditionally alongside IBM Plex Mono like every other self-hosted face
+// here: switching the preference just flips `--mono` (see monoFontPreference.ts
+// / tokens.css's `[data-mono-font]`), so the face has to already be on the
+// page before that switch can take effect.
+import '@fontsource/fira-code/latin-400.css';
+import '@fontsource/fira-code/latin-500.css';
+import '@fontsource/fira-code/latin-600.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
 import { applyAccentToDocument, getAccentPreference } from './lib/accentPreference';
 import { applyFontToDocument, getFontPreference } from './lib/fontPreference';
+import { applyMonoFontToDocument, getMonoFontPreference } from './lib/monoFontPreference';
 import { isTauri } from './lib/platform';
 
 // The app's module graph (App.tsx and everything it imports, e.g.
@@ -49,6 +58,7 @@ async function bootstrap() {
   // sau do Settings tự set thẳng lên <html> khi người dùng bấm chọn.
   applyAccentToDocument(getAccentPreference());
   applyFontToDocument(getFontPreference());
+  applyMonoFontToDocument(getMonoFontPreference());
 
   const { default: App } = await import('./App');
   ReactDOM.createRoot(document.getElementById('root')!).render(

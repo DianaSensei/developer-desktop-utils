@@ -190,7 +190,6 @@ function importRequest(item: PmItem): ApiRequest {
     body: importBody(r.body),
     auth: importAuth(r.auth ?? item.auth),
     script: { req: preReq, res: '' },
-    vars: { req: [], res: [] },
     assertions: [],
     tests: test,
     settings: newSettings(),

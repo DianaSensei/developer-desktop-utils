@@ -22,6 +22,7 @@ import { linter, lintGutter } from '@codemirror/lint';
 import type { Extension } from '@codemirror/state';
 import { CodeSurface, type CodeSurfaceProps } from '@/components/ui/code-editor-base';
 import { syntaxErrorLinter } from '@/components/ui/syntax-lint';
+import { jsonFoldCount } from '@/components/ui/json-fold-count';
 
 const jsonLang = json();
 const jsLang = javascript();
@@ -31,7 +32,7 @@ const sqlLang = sql();
 // untouched field before the user has typed anything. Skip linting until
 // there's real content.
 const jsonLintSource = jsonParseLinter();
-const jsonLint = [linter((view) => (view.state.doc.length === 0 ? [] : jsonLintSource(view))), lintGutter()];
+const jsonLint = [linter((view) => (view.state.doc.length === 0 ? [] : jsonLintSource(view))), lintGutter(), jsonFoldCount];
 // JS/SQL have no dedicated linter package (unlike JSON) — flag whatever the
 // grammar itself already marks unparseable, which is still a real win over
 // nothing (unclosed strings/brackets, stray tokens).
@@ -40,7 +41,9 @@ const syntaxLint = [syntaxErrorLinter(), lintGutter()];
 export interface CodeEditorProps extends CodeSurfaceProps {}
 
 /** JSON body/value editing — request bodies, GraphQL variables, Kafka/RabbitMQ
- *  payloads, stub responses. Flags invalid JSON inline as you type. */
+ *  payloads, stub responses. Flags invalid JSON inline as you type; folding a
+ *  key/item shows how many it holds instead of a bare "…" (see
+ *  json-fold-count.ts). */
 export function JsonEditor(props: CodeEditorProps) {
   return <CodeSurface {...props} lang={jsonLang} extraExtensions={jsonLint} />;
 }
@@ -51,7 +54,7 @@ export function JsonEditor(props: CodeEditorProps) {
  *  JSON, so pairing it with a lenient parser would flag input the tool
  *  itself considers valid. Used by the JSON Formatter's raw input. */
 export function JsonSyntaxEditor(props: CodeEditorProps) {
-  return <CodeSurface {...props} lang={jsonLang} />;
+  return <CodeSurface {...props} lang={jsonLang} extraExtensions={[jsonFoldCount]} />;
 }
 
 export interface JavaScriptEditorProps extends CodeEditorProps {

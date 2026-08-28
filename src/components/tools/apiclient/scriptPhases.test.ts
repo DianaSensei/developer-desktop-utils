@@ -3,7 +3,8 @@ import { runPhase, type PhaseStores } from './scriptPhases';
 import { newRequest, type ApiResponse } from './types';
 
 const stores = (over: Partial<PhaseStores> = {}): PhaseStores => ({
-  runtime: {}, env: {}, envName: null, ...over,
+  collectionVar: {}, collectionEnv: {}, globalEnv: {},
+  collectionEnvName: null, globalEnvName: null, ...over,
 });
 
 const response = (over: Partial<ApiResponse> = {}): ApiResponse => ({
@@ -17,11 +18,10 @@ describe('pre phase', () => {
       phase: 'pre',
       draft: newRequest(),
       stores: stores(),
-      inherited: ["bru.setVar('order', 'a');", "bru.setVar('order', bru.getVar('order') + 'b');"],
-      vars: [],
-      script: "bru.setVar('order', bru.getVar('order') + 'c');",
+      inherited: ["bru.setCollectionVar('order', 'a');", "bru.setCollectionVar('order', bru.getCollectionVar('order') + 'b');"],
+      script: "bru.setCollectionVar('order', bru.getCollectionVar('order') + 'c');",
     });
-    expect(out.stores.runtime.order).toBe('abc');
+    expect(out.stores.collectionVar.order).toBe('abc');
     expect(out.errors).toEqual([]);
   });
 
@@ -30,14 +30,13 @@ describe('pre phase', () => {
       phase: 'pre',
       draft: newRequest(),
       stores: stores(),
-      inherited: ['throw new Error("boom");', "bru.setVar('reached', 'yes');"],
-      vars: [],
-      script: "bru.setVar('own', 'yes');",
+      inherited: ['throw new Error("boom");', "bru.setCollectionVar('reached', 'yes');"],
+      script: "bru.setCollectionVar('own', 'yes');",
     });
     expect(out.errors).toHaveLength(1);
     expect(out.errors[0]).toContain('Inherited pre-request script #1');
-    expect(out.stores.runtime.reached).toBeUndefined();
-    expect(out.stores.runtime.own).toBeUndefined();
+    expect(out.stores.collectionVar.reached).toBeUndefined();
+    expect(out.stores.collectionVar.own).toBeUndefined();
   });
 
   it('does not number a lone inherited script', async () => {
@@ -46,23 +45,9 @@ describe('pre phase', () => {
       draft: newRequest(),
       stores: stores(),
       inherited: ['throw new Error("boom");'],
-      vars: [],
       script: '',
     });
     expect(out.errors[0]).toMatch(/^Inherited pre-request script: /);
-  });
-
-  it('applies declarative vars before the request script', async () => {
-    const out = await runPhase({
-      phase: 'pre',
-      draft: newRequest(),
-      stores: stores(),
-      inherited: [],
-      vars: [{ id: 'v1', name: 'n', value: '40 + 2', enabled: true }],
-      script: "bru.setVar('doubled', Number(bru.getVar('n')) * 2);",
-    });
-    expect(out.stores.runtime.n).toBe('42');
-    expect(out.stores.runtime.doubled).toBe('84');
   });
 
   it('returns the mutated draft', async () => {
@@ -72,7 +57,6 @@ describe('pre phase', () => {
       draft,
       stores: stores(),
       inherited: [],
-      vars: [],
       script: "req.setUrl('https://changed.test/y'); req.setHeader('X-A', '1');",
     });
     expect(out.draft.url).toBe('https://changed.test/y');
@@ -88,7 +72,6 @@ describe('post phase', () => {
       stores: stores(),
       response: response(),
       inherited: ['throw new Error("folder boom");'],
-      vars: [],
       script: 'throw new Error("own boom");',
       tests: 'test("still ran", () => expect(res.getStatus()).to.equal(200));',
       assertions: [{ id: 'a1', expr: 'res.body.id', operator: 'equals', value: '7', enabled: true }],
@@ -109,13 +92,12 @@ describe('post phase', () => {
       stores: stores(),
       response: response(),
       inherited: [],
-      vars: [],
-      script: "bru.setVar('captured', res.getBody().id);",
-      tests: 'test("captured", () => expect(bru.getVar("captured")).to.equal("7"));',
+      script: "bru.setCollectionVar('captured', res.getBody().id);",
+      tests: 'test("captured", () => expect(bru.getCollectionVar("captured")).to.equal("7"));',
       assertions: [],
     });
     expect(out.tests).toEqual([{ name: 'captured', passed: true }]);
-    expect(out.stores.runtime.captured).toBe('7');
+    expect(out.stores.collectionVar.captured).toBe('7');
   });
 
   it('collects console output in order', async () => {
@@ -125,7 +107,6 @@ describe('post phase', () => {
       stores: stores(),
       response: response(),
       inherited: ["console.log('second');"],
-      vars: [],
       script: "console.log('first');",
       tests: '',
       assertions: [],
@@ -140,7 +121,6 @@ describe('post phase', () => {
       stores: stores(),
       response: response(),
       inherited: [],
-      vars: [],
       script: 'res.setBody({ id: 99 });',
       tests: 'test("mutated", () => expect(res.getBody().id).to.equal(99));',
       assertions: [],
@@ -157,7 +137,6 @@ describe('abort signal', () => {
       draft: newRequest(),
       stores: stores(),
       inherited: [],
-      vars: [],
       script: 'await bru.sleep(5000);',
     }, ctl.signal);
     ctl.abort();
@@ -173,14 +152,13 @@ describe('runner flow control', () => {
     stores: stores(),
     response: response(),
     inherited: [],
-    vars: [],
     script,
     tests,
     assertions: [],
   });
 
   it('reports nothing when no script asks for a jump', async () => {
-    const out = await post("bru.setVar('x', '1');");
+    const out = await post("bru.setCollectionVar('x', '1');");
     expect(out.control.nextRequest).toBeUndefined();
     expect('nextRequest' in out.control).toBe(false);
   });
@@ -217,11 +195,10 @@ describe('runner flow control', () => {
       draft: newRequest(),
       stores: stores(),
       inherited: [],
-      vars: [],
-      script: "bru.setNextRequest('Somewhere'); bru.setVar('ran', 'yes');",
+      script: "bru.setNextRequest('Somewhere'); bru.setCollectionVar('ran', 'yes');",
     });
     // The call is accepted (no crash) and recorded; a plain Send just ignores it.
-    expect(out.stores.runtime.ran).toBe('yes');
+    expect(out.stores.collectionVar.ran).toBe('yes');
     expect(out.errors).toEqual([]);
     expect(out.control.nextRequest).toBe('Somewhere');
   });

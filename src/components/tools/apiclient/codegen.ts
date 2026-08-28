@@ -35,14 +35,14 @@ export function generateCode(
 // ─── shell ────────────────────────────────────────────────────────────────────
 
 function curl(r: ResolvedRequest): string {
-  const lines = [`curl --request ${r.method} \\`, `  --url ${shellQuote(r.url)}`];
+  const lines = [`curl --request ${r.method}`, `  --url ${shellQuote(r.url)}`];
   for (const [k, v] of r.headers) lines.push(`  --header ${shellQuote(`${k}: ${v}`)}`);
   const b = r.body;
   if (b.type === 'raw') lines.push(`  --data ${shellQuote(b.text)}`);
   else if (b.type === 'urlencoded') for (const [k, v] of b.fields) lines.push(`  --data-urlencode ${shellQuote(`${k}=${v}`)}`);
   else if (b.type === 'multipart') for (const f of b.fields) lines.push(`  --form ${shellQuote(`${f.key}=${f.file ? `@${f.file}` : f.value ?? ''}`)}`);
   else if (b.type === 'file' && b.fileName) lines.push(`  --data-binary ${shellQuote(`@${b.fileName}`)}`);
-  return lines.join(' \\\n').replace(/ \\\n$/, '');
+  return lines.join(' \\\n');
 }
 
 function httpie(r: ResolvedRequest): string {

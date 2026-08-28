@@ -28,6 +28,46 @@ describe('parseCurl', () => {
     const req = parseCurl("curl 'https://api.example.com/x' -b 'session=abc123'");
     expect(req.headers).toEqual([expect.objectContaining({ key: 'Cookie', value: 'session=abc123' })]);
   });
+
+  // curl's own default: -d/--data with no explicit Content-Type header still
+  // sends application/x-www-form-urlencoded, so a bare `-d 'a=1'` is a form
+  // body even though nothing in the command says so.
+  it('treats a bare -d body with no Content-Type header as urlencoded', () => {
+    const req = parseCurl("curl -X POST 'https://api.example.com/x' -d 'ushiw=jwj'");
+    expect(req.body).toEqual({ mode: 'urlencoded', raw: '', form: [expect.objectContaining({ key: 'ushiw', value: 'jwj' })] });
+  });
+
+  it('treats a bare multi-field -d body as urlencoded and merges it with a following -d', () => {
+    const req = parseCurl("curl -X POST 'https://api.example.com/x' -d 'a=1' -d 'b=2'");
+    expect(req.body).toEqual({
+      mode: 'urlencoded',
+      raw: '',
+      form: [expect.objectContaining({ key: 'a', value: '1' }), expect.objectContaining({ key: 'b', value: '2' })],
+    });
+  });
+
+  it('still treats a bare -d JSON body as json, not urlencoded', () => {
+    const req = parseCurl("curl -X POST 'https://api.example.com/x' -d '{\"a\":1}'");
+    expect(req.body).toEqual({ mode: 'json', raw: '{"a":1}', form: [] });
+  });
+
+  it('still treats a bare -d body with no "=" as plain text', () => {
+    const req = parseCurl("curl -X POST 'https://api.example.com/x' -d 'not a form body'");
+    expect(req.body).toEqual({ mode: 'text', raw: 'not a form body', form: [] });
+  });
+
+  it('an explicit non-form Content-Type header overrides the urlencoded default', () => {
+    const req = parseCurl("curl -X POST 'https://api.example.com/x' -H 'Content-Type: text/plain' -d 'ushiw=jwj'");
+    expect(req.body).toEqual({ mode: 'text', raw: 'ushiw=jwj', form: [] });
+  });
+
+  // The exact command from the bug report: a typo'd --data-urlendcode (missing
+  // the 'e') is an unknown flag to curl (and to our parser) and its argument is
+  // dropped, same as real curl would refuse it — only the plain -d survives.
+  it("drops an unrecognized flag's argument (e.g. a typo'd --data-urlendcode) and still form-decodes the surviving -d", () => {
+    const req = parseCurl("curl -X POST 'https://api.example.com/x' --data-urlendcode 'avd=aj' -d 'ushiw=jwj'");
+    expect(req.body).toEqual({ mode: 'urlencoded', raw: '', form: [expect.objectContaining({ key: 'ushiw', value: 'jwj' })] });
+  });
 });
 
 describe('looksLikeCmdFormat', () => {

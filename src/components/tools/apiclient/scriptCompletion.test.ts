@@ -66,7 +66,7 @@ const fakeResponse: ApiResponse = {
 
 describe('scriptCompletion shape parity', () => {
   it('bru', () => {
-    const real = pathsOf(makeBru({ runtime: {}, env: {}, envName: null }));
+    const real = pathsOf(makeBru({ collectionVar: {}, collectionEnv: {}, globalEnv: {}, collectionEnvName: null, globalEnvName: null }));
     assertNoMissing(real, pathsOf(scriptCompletionShapes.bru));
   });
 
@@ -91,7 +91,7 @@ describe('scriptCompletion shape parity', () => {
   });
 
   it('pm', () => {
-    const bru = makeBru({ runtime: {}, env: {}, envName: null });
+    const bru = makeBru({ collectionVar: {}, collectionEnv: {}, globalEnv: {}, collectionEnvName: null, globalEnvName: null });
     const req = makeReq(newRequest({ url: 'https://api.test/x' }));
     const res = makeRes(fakeResponse);
     const real = pathsOf(makePm({ bru, req, res, expect: makeExpect(), test: async () => {} }));

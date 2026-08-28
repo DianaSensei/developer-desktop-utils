@@ -2,7 +2,7 @@
 // method-colored label and a close button. The right cluster holds the
 // environment selector, history, and the request/response layout toggle.
 
-import { AlertTriangle, Clock, Columns2, KeyRound, Plus, Rows2, Settings2, X } from 'lucide-react';
+import { Clock, Columns2, Folder, Globe, Plus, Rows2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
@@ -13,7 +13,7 @@ import { methodColor, methodShort } from './method-color';
 import { EnvQuickView } from './EnvQuickView';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
-import type { ApiResponse, Collection, TreeItem } from './types';
+import type { ApiResponse, Collection, ResolvedVar, TreeItem } from './types';
 
 // The one slice of ApiClient's per-tab RunState a tab actually needs to know
 // about — kept as its own shape (rather than importing RunState) so this
@@ -32,6 +32,9 @@ interface Props {
   onNewRequest: () => void;
   onManageEnvironments: () => void;
   onManageVault: () => void;
+  // The merged, source-tagged variable set (collection/env/vault) for
+  // EnvQuickView's glance popover — see ApiClient.tsx's `resolvedVars`.
+  resolvedVars: ResolvedVar[];
   historyActive: boolean;
   onSelectRequest: (id: string) => void;
   onOpenHistory: () => void;
@@ -61,17 +64,13 @@ function activeCollection(store: ApiStore): Collection | null {
 }
 
 export function RequestTabs({
-  store, runs, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault,
+  store, runs, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault, resolvedVars,
   historyActive, onSelectRequest, onOpenHistory, onCloseHistory,
 }: Props) {
   const { openRequests, activeRequestId } = store;
   const collection = activeCollection(store);
   const globalEnvs = store.environments.filter((e) => !e.collectionId);
   const collectionEnvs = store.environments.filter((e) => e.collectionId === store.activeCollectionId);
-  // Selected but scoped to a different collection than the one open right now
-  // — store.activeEnv resolves to null in this case (see store.ts), so surface
-  // it instead of letting the picker silently show "No Environment".
-  const mismatchedEnv = store.activeEnvMismatched ? store.selectedEnv : null;
 
   return (
     <div className="flex items-stretch border-b border-line bg-bg-2/10">
@@ -86,11 +85,17 @@ export function RequestTabs({
               onClick={() => onSelectRequest(req.id)}
               title={failed ? `${req.method} ${req.name} — last send failed` : `${req.method} ${req.name}`}
               className={cn(
-                'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-2.5 py-1.5 text-xs transition-colors',
+                // scale-in plays once, on the fresh mount a newly-opened tab gets
+                // (an already-open tab just being reordered/re-rendered keeps its
+                // DOM node by `key`, so it never replays).
+                'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-2.5 py-1.5 text-xs transition-colors motion-safe:animate-scale-in',
                 active ? 'bg-bg text-fg' : 'text-fg-mute hover:bg-bg/50 hover:text-fg',
               )}
             >
-              {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />}
+              {/* Always mounted, opacity-crossfaded rather than conditionally
+                  rendered — switching the active tab used to snap this bar on/off
+                  instantly. */}
+              <span className={cn('absolute inset-x-0 top-0 h-0.5 bg-acc transition-opacity duration-base ease-out-soft', active ? 'opacity-100' : 'opacity-0')} />
               <span className={cn('shrink-0 text-[11px] font-bold uppercase', methodColor(req.method))}>
                 {methodShort(req.method)}
               </span>
@@ -112,7 +117,7 @@ export function RequestTabs({
           );
         })}
         {historyActive && (
-          <div className="group relative flex shrink-0 items-center gap-1.5 border-r border-line bg-bg px-2.5 py-1.5 text-xs text-fg">
+          <div className="group relative flex shrink-0 items-center gap-1.5 border-r border-line bg-bg px-2.5 py-1.5 text-xs text-fg motion-safe:animate-scale-in">
             <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />
             <Clock className="h-3.5 w-3.5 shrink-0 text-acc-ink" />
             <span>History</span>
@@ -125,10 +130,15 @@ export function RequestTabs({
             </button>
           </div>
         )}
-        <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none px-2 hover:bg-bg">
-          <Plus className="h-4 w-4" />
-        </IconButton>
       </div>
+
+      {/* Pinned outside the scrollable tab strip, not inside it — with many
+          tabs open (or a narrower window) the strip scrolls/clips before this
+          ever would, and "open a new request" is exactly the one action that
+          must never end up scrolled out of reach. */}
+      <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg">
+        <Plus className="h-4 w-4" />
+      </IconButton>
 
       {/* right cluster: environment · history · layout */}
       {/* py-1 — hàng này dùng items-stretch nên chiều cao thực tế do phần tử cao
@@ -136,22 +146,40 @@ export function RequestTabs({
           CHÍNH LÀ chiều cao cả hàng, khiến pill chạm sát viền trên/dưới toolbar.
           1.5 → 1: đủ để pill không chạm viền, mà thanh tab thấp đi 4px — đây là
           thanh chrome, mọi pixel nó không dùng thì phần response dùng. */}
-      <div className="flex shrink-0 items-center gap-0.5 border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
-        {mismatchedEnv && (
-          <span
-            title={`"${mismatchedEnv.name}" belongs to another collection and is not applied here — its variables won't be substituted into this request. Pick an environment from this collection or Global, or switch back to that collection.`}
-          >
-            <AlertTriangle className="h-3.5 w-3.5 text-warn" />
-          </span>
-        )}
+      <div className="flex shrink-0 items-center gap-1 border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
+        {/* Two independent pickers, not one — a Collection env and a Global
+            env can both be active at once (Collection wins on a name
+            collision; see EnvQuickView's precedence note). The folder/globe
+            glyphs are load-bearing, not decoration: they're what makes the
+            two selects self-explanatory at a glance instead of reading as
+            duplicates of each other. */}
         <Select
-          value={store.activeEnvId ?? 'none'}
-          onValueChange={(v) => store.setActiveEnvId(v === 'none' ? null : v)}
+          value={(store.activeCollectionId && store.activeEnvByCollection[store.activeCollectionId]) || 'none'}
+          onValueChange={(v) => store.activeCollectionId && store.setActiveCollectionEnv(store.activeCollectionId, v === 'none' ? null : v)}
         >
           {/* h-ctl khớp chiều cao IconButton bên cạnh — bản trước dùng h-8 (32px)
               cạnh IconButton mặc định h-ctl (34px), lệch 2px khiến cả cụm nhìn
               không thẳng hàng. */}
-          <SelectTrigger className="h-ctl w-40 text-xs rounded-sm"><SelectValue placeholder="No Environment" /></SelectTrigger>
+          {/* A <div> wrapper, not <span> — SelectTrigger's own base style
+              carries `[&>span]:line-clamp-1` for its direct-child span
+              (meant for SelectValue's own rendered span), and nesting it a
+              level deeper moves it out of that rule's reach. Radix's
+              SelectValue doesn't forward `className` to that span at all (its
+              class stays empty however it's called), so truncation is
+              re-applied here via `[&>span]` on the div — its span really is
+              a direct child (verified against the rendered DOM) — instead of
+              on SelectValue itself. Without it, a name too long for w-28
+              wraps onto a second line under the icon rather than eliding
+              with "…". */}
+          <SelectTrigger
+            className="h-ctl w-28 text-xs rounded-sm"
+            title="Collection environment — scoped to this collection, follows whichever collection the active request belongs to"
+          >
+            <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
+              <Folder className="h-3 w-3 shrink-0 opacity-70" />
+              <SelectValue placeholder="No Environment" />
+            </div>
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No Environment</SelectItem>
             {collectionEnvs.length > 0 && (
@@ -160,28 +188,39 @@ export function RequestTabs({
                 {collectionEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
               </SelectGroup>
             )}
-            {globalEnvs.length > 0 && (
-              <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">Global</SelectLabel>
-                {globalEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-              </SelectGroup>
-            )}
-            {mismatchedEnv && (
-              <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">Inactive here</SelectLabel>
-                <SelectItem value={mismatchedEnv.id}>{mismatchedEnv.name} (other collection)</SelectItem>
-              </SelectGroup>
-            )}
           </SelectContent>
         </Select>
-        <EnvQuickView env={store.activeEnv} mismatched={mismatchedEnv} onManage={onManageEnvironments} />
-        <IconButton onClick={onManageEnvironments} title="Configure environments" className="hover:bg-bg">
-          <Settings2 className="h-4 w-4" />
-        </IconButton>
+        <Select
+          value={store.activeGlobalEnvId ?? 'none'}
+          onValueChange={(v) => store.setActiveGlobalEnv(v === 'none' ? null : v)}
+        >
+          <SelectTrigger
+            className="h-ctl w-28 text-xs rounded-sm"
+            title="Global environment — applies across every collection, unaffected by which one is active"
+          >
+            <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
+              <Globe className="h-3 w-3 shrink-0 opacity-70" />
+              <SelectValue placeholder="No Global Env" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No Global Env</SelectItem>
+            {globalEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {/* One entry point for "see everything, then go edit it" — no
+            separate Vault/gear icon next to this that opened one of the exact
+            same destinations: EnvQuickView's own footer already links to
+            Environments and Vault, so a second button here for either was
+            two controls for one destination. */}
+        <EnvQuickView
+          collectionEnv={store.activeCollectionEnv}
+          globalEnv={store.activeGlobalEnv}
+          resolvedVars={resolvedVars}
+          onManageEnvironments={onManageEnvironments}
+          onManageVault={onManageVault}
+        />
         <span className="mx-0.5 h-5 w-px bg-line" />
-        <IconButton onClick={onManageVault} title="Vault (local secrets)" className="hover:bg-bg">
-          <KeyRound className="h-4 w-4" />
-        </IconButton>
         <IconButton
           onClick={onOpenHistory}
           title="History"

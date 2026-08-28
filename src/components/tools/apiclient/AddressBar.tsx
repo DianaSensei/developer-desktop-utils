@@ -5,6 +5,7 @@ import { Code2, Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { methodBg, methodColor } from './method-color';
 import { InlineCodeField } from '@/design-system';
@@ -15,6 +16,7 @@ import { type ApiRequest, HTTP_METHODS } from './types';
 interface Props {
   request: ApiRequest;
   onChange: (patch: Partial<ApiRequest>) => void;
+  onRename: (name: string) => void;
   onSend: () => void;
   onCancel: () => void;
   sending: boolean;
@@ -22,7 +24,7 @@ interface Props {
   vars: Record<string, string>;
 }
 
-export function AddressBar({ request, onChange, onSend, onCancel, sending, onGenerateCode, vars }: Props) {
+export function AddressBar({ request, onChange, onRename, onSend, onCancel, sending, onGenerateCode, vars }: Props) {
   const pathParamValues: Record<string, string> = {};
   for (const p of request.pathParams) if (p.enabled && p.key) pathParamValues[p.key] = p.value;
 
@@ -59,15 +61,28 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
   };
 
   return (
-    <div className="px-3 py-2.5">
+    <div className="px-3 pb-2 pt-1.5">
+      {/* Request name — the only other place it's editable is a double-click in
+          the sidebar tree, which isn't obvious from inside the request itself.
+          Blends into the bar until hovered/focused rather than sitting in its
+          own bordered box, so it reads as a title, not a second input field
+          stacked on top of the address bar below it. */}
+      <Input
+        value={request.name}
+        onChange={(e) => onRename(e.target.value)}
+        placeholder="Request name"
+        aria-label="Request name"
+        className="mb-1 h-6 w-full truncate rounded-sm border-0 bg-transparent px-1.5 text-sm font-semibold text-fg shadow-none transition-colors hover:bg-bg-2/50 focus-visible:bg-bg-2/70 focus-visible:ring-1 focus-visible:ring-acc/30 focus-visible:ring-offset-0"
+      />
+      {/* h-ctl, not h-ctl-lg: this bar used to be the one control in the app
+          taller than the 34px standard (--h) — 40px around 12-13px text read
+          as noticeably oversized next to every other input/select/button. */}
       <div className="flex items-center overflow-hidden rounded-lg border border-line bg-bg shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-2 focus-within:ring-acc/40">
         {/* Method selector — tinted to match the active HTTP method (Bruno-style) */}
         {/* text-xs, not the Select default text-sm: every other place this app
             prints a method — tab strip, sidebar badge, history, runner — uses
             an 11-12px bold uppercase label, and at 14px this one read a size
-            larger than everything around it while eating the bar's width. The
-            trigger keeps h-ctl-lg so it still fills the pill; only the type and
-            the horizontal footprint shrink.
+            larger than everything around it while eating the bar's width.
             w-[5.5rem]: fixed, not auto — an auto width would shift the URL field
             sideways on every method change. 88px is what the longest label
             (OPTIONS) needs at this size, so nothing truncates and GET no longer
@@ -75,7 +90,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         <Select value={request.method} onValueChange={(v) => onChange({ method: v as ApiRequest['method'] })}>
           <SelectTrigger
             className={cn(
-              'h-ctl-lg w-[5.5rem] shrink-0 gap-0.5 border-0 pl-2.5 pr-1.5 text-xs font-bold uppercase tracking-wide shadow-none focus:ring-0 rounded-r-none [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-70',
+              'h-ctl w-[5.5rem] shrink-0 gap-0.5 border-0 pl-2.5 pr-1.5 text-xs font-bold uppercase tracking-wide shadow-none focus:ring-0 rounded-r-none [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-70',
               methodColor(request.method),
               methodBg(request.method),
             )}
@@ -96,7 +111,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
         {/* Divider between method and URL */}
         <span className="h-5 w-px shrink-0 bg-line" />
 
-        <div className="flex h-ctl-lg min-w-0 flex-1 items-center px-3">
+        <div className="flex h-ctl min-w-0 flex-1 items-center px-3">
           <InlineCodeField
             value={request.url}
             onChange={handleUrl}
@@ -112,9 +127,14 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
           <Code2 className="h-4 w-4" />
         </IconButton>
 
-        {/* Send / Cancel */}
+        {/* Send / Cancel — flush with the bar (no margin): at h-ctl-lg the bar
+            had room to float this as an inset pill, but at the bar's now-equal
+            h-ctl height there's nowhere left for an inset to come from without
+            making the button shorter than every other control in the app. The
+            bar's own rounded-lg + overflow-hidden already clips this flush
+            corner into that curve, so it still reads as one rounded pill. */}
         {sending ? (
-          <Button variant="destructive" size="sm" onClick={onCancel} className="m-1 h-ctl gap-1.5 rounded-sm">
+          <Button variant="destructive" size="sm" onClick={onCancel} className="h-ctl gap-1.5 rounded-none press">
             <X className="h-3.5 w-3.5" /> Cancel
           </Button>
         ) : (
@@ -122,7 +142,7 @@ export function AddressBar({ request, onChange, onSend, onCancel, sending, onGen
             size="sm"
             onClick={onSend}
             disabled={!request.url.trim()}
-            className="m-1 h-ctl gap-1.5 rounded-sm shadow-sm active:scale-[0.97] transition-transform"
+            className="h-ctl gap-1.5 rounded-none shadow-sm press"
           >
             <Send className="h-3.5 w-3.5" /> Send
           </Button>

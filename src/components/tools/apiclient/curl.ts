@@ -50,6 +50,13 @@ export function hasSessionCredentials(req: ApiRequest): boolean {
   return req.headers.some((h) => ['cookie', 'authorization'].includes(h.key.toLowerCase()));
 }
 
+// Whether a raw -d/--data body has the `key=value(&key=value)*` shape a form
+// submit produces — used to apply curl's own default Content-Type (see
+// parseCurl below) when the command declares no header at all.
+function looksUrlEncoded(body: string): boolean {
+  return body.trim() !== '' && body.split('&').every((seg) => /^[^&=\s]+=/.test(seg));
+}
+
 export function parseCurl(input: string): ApiRequest {
   let tokens = tokenize(input.trim());
   if (tokens[0] === 'curl') tokens = tokens.slice(1);
@@ -116,7 +123,12 @@ export function parseCurl(input: string): ApiRequest {
     };
   } else if (mode === 'raw') {
     const isJson = /json/.test(ctHeader) || /^\s*[[{]/.test(body);
-    const isUrlEnc = /x-www-form-urlencoded/.test(ctHeader);
+    // curl itself defaults -d/--data*/--data-binary/--data-ascii to
+    // application/x-www-form-urlencoded whenever the command sets no explicit
+    // Content-Type — so a bare `-d 'a=1&b=2'` with no -H at all is exactly as
+    // form-encoded as one that spells the header out, and importing it as
+    // plain text would silently disagree with what curl actually sends.
+    const isUrlEnc = /x-www-form-urlencoded/.test(ctHeader) || (!ctHeader && !isJson && looksUrlEncoded(body));
     if (isUrlEnc) {
       req.body = { mode: 'urlencoded', raw: '', form: body.split('&').filter(Boolean).map((p) => { const eq = p.indexOf('='); return newKeyValue(decodeURIComponent(eq >= 0 ? p.slice(0, eq) : p), decodeURIComponent(eq >= 0 ? p.slice(eq + 1) : '')); }) };
     } else {

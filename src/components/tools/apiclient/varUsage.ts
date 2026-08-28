@@ -8,7 +8,8 @@
 //
 // The fields scanned here are exactly the ones request.ts substitutes into, so
 // "used" means used — not merely "the word appears somewhere in the request".
-// Scripts are deliberately excluded: they read data through bru.getVar(), not
+// Scripts are deliberately excluded: they read data through bru.getEnvVar()/
+// getCollectionVar(), not
 // {{token}} substitution, so scanning their text would report false positives.
 
 import type { ApiRequest } from './types';
@@ -118,8 +119,8 @@ export function mapColumns(
 }
 
 // Variables the run needs that the data file doesn't supply. Environment and
-// runtime variables cover most of them, so this is only a warning surface —
-// `known` carries the names resolvable from elsewhere.
+// collection variables cover most of them, so this is only a warning surface
+// — `known` carries the names resolvable from elsewhere.
 export function missingColumns(used: Set<string>, columns: string[], known: Set<string>): string[] {
   const provided = new Set(columns);
   return [...used].filter((v) => !provided.has(v) && !known.has(v)).sort();

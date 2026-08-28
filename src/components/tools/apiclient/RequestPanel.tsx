@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Braces, Check, ChevronDown, Code2, Database, File, FileText, FormInput,
-  Hexagon, type LucideIcon, Sparkles, Tag, Trash2, X,
+  Hexagon, type LucideIcon, Tag, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,17 +19,18 @@ import {
 import { Tabs } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Callout } from '@/components/ui/callout';
-import { Badge, CollapsibleSection, InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
+import { Badge, InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
 import { AuthEditor } from './AuthEditor';
 import { scriptApiExtensions } from './scriptCompletion';
 import { scriptCallsNetwork } from './collectionScripts';
-import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet, type ScriptSnippet } from './scriptSnippets';
+import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet } from './scriptSnippets';
+import { SnippetMenu } from './SnippetMenu';
 import { authQueryParam, urlWithParams } from './request';
 import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
-  type KeyValue, type VarDef, type VarMap, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
+  type VarMap, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
 } from './types';
 
 export type RequestPanelTab =
@@ -53,7 +54,6 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
   const enabledHeaders = request.headers.filter((h) => h.enabled && h.key).length;
 
   const hasScript = !!(request.script.req.trim() || request.script.res.trim());
-  const hasVars = request.vars.req.length > 0 || request.vars.res.length > 0;
   const enabledAsserts = request.assertions.filter((a) => a.enabled && a.expr).length;
 
   const tabs: { id: Tab; label: string }[] = [
@@ -63,7 +63,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
     { id: 'params', label: `Params${count(enabledParams)}` },
     { id: 'body', label: `Body${request.body.mode !== 'none' ? ' •' : ''}` },
     { id: 'auth', label: `Auth${request.auth.type !== 'none' ? ' •' : ''}` },
-    { id: 'script', label: `Script${hasScript || hasVars ? ' •' : ''}` },
+    { id: 'script', label: `Script${hasScript ? ' •' : ''}` },
     { id: 'tests', label: `Tests${count(enabledAsserts)}${request.tests.trim() ? ' •' : ''}` },
     { id: 'settings', label: `Settings${request.settings.verifyTls === false ? ' •' : ''}` },
   ];
@@ -148,46 +148,6 @@ function NetworkCallNotice() {
   );
 }
 
-// One-click snippet menu, appended to the script's current text — see
-// scriptSnippets.ts for why this appends rather than inserting at the cursor.
-function SnippetMenu({ snippets, onInsert }: { snippets: ScriptSnippet[]; onInsert: (s: ScriptSnippet) => void }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 text-[11px] font-medium text-fg-mute transition-colors hover:text-fg">
-        <Sparkles className="h-3 w-3" /> Snippet
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {snippets.map((s) => (
-          <DropdownMenuItem key={s.label} onClick={() => onInsert(s)}>{s.label}</DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-// Declarative vars run before the script in the same phase (see engine.ts's
-// documented pipeline: "pre-request vars → pre-request script", "post-response
-// vars → post-response script") — shown above the corresponding script editor
-// here so the tab reflects the real execution order. Collapsed by default
-// when empty so the common case (no declarative vars, just a script) doesn't
-// pay for a permanently-open table most requests never use.
-function VarsSection({ label, rows, onChange, valuePlaceholder }: {
-  label: string; rows: KeyValue[]; onChange: (rows: KeyValue[]) => void; valuePlaceholder: string;
-}) {
-  const filled = rows.filter((r) => r.key || r.value).length;
-  return (
-    <CollapsibleSection
-      title="Vars"
-      eyebrow
-      variant="bordered"
-      defaultOpen={filled > 0}
-      actions={filled > 0 ? <Badge tone="neutral" pill>{filled}</Badge> : undefined}
-    >
-      <p className="mb-1.5 text-[11px] text-fg-mute">{label}, set without writing a script.</p>
-      <KeyValueEditor rows={rows} onChange={onChange} valuePlaceholder={valuePlaceholder} valueLabel={valuePlaceholder} bulkEdit={false} />
-    </CollapsibleSection>
-  );
-}
 
 type ScriptPhase = 'req' | 'res';
 
@@ -199,16 +159,13 @@ type ScriptPhase = 'req' | 'res';
 // hàng tiêu đề gọn lại giống "Path" ở tab Params: một nhãn nhỏ, không đoạn văn
 // luôn hiện.
 function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
-  const { script, vars } = request;
+  const { script } = request;
   const [phase, setPhase] = useState<ScriptPhase>('req');
   const isReq = phase === 'req';
 
   const phaseScript = isReq ? script.req : script.res;
   const setPhaseScript = (v: string) =>
     onChange({ script: isReq ? { ...script, req: v } : { ...script, res: v } });
-  const phaseVarRows = toKv(isReq ? vars.req : vars.res);
-  const setPhaseVarRows = (rows: KeyValue[]) =>
-    onChange({ vars: isReq ? { ...vars, req: fromKv(rows) } : { ...vars, res: fromKv(rows) } });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
@@ -233,30 +190,17 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
           ? <>Runs before send; mutate <code className="rounded bg-bg-2 px-1">req</code>, set <code className="rounded bg-bg-2 px-1">bru</code> vars.</>
           : <>Runs after response; read <code className="rounded bg-bg-2 px-1">res</code>, set <code className="rounded bg-bg-2 px-1">bru</code> vars.</>}
       </p>
-      <VarsSection
-        label={isReq ? 'Variables to set before the request' : 'Variables to set from the response — expressions, e.g. res.body.token'}
-        rows={phaseVarRows}
-        onChange={setPhaseVarRows}
-        valuePlaceholder={isReq ? 'Value' : 'Expr'}
-      />
       <JavaScriptEditor
         key={phase}
         value={phaseScript}
         onChange={setPhaseScript}
-        placeholder={isReq ? "bru.setVar('ts', Date.now());\nreq.setHeader('X-Trace', 'abc');" : "bru.setVar('token', res.getBody().token);"}
+        placeholder={isReq ? "req.setHeader('X-Trace', 'abc');\nbru.setEnvVar('ts', Date.now());" : "bru.setEnvVar('token', res.getBody().token);"}
         extraExtensions={scriptApiExtensions}
       />
       {scriptCallsNetwork(phaseScript) && <NetworkCallNotice />}
     </div>
   );
 }
-
-// ─── vars (declarative) ───────────────────────────────────────────────────────
-
-const toKv = (defs: VarDef[]): KeyValue[] =>
-  defs.map((d) => ({ id: d.id, key: d.name, value: d.value, enabled: d.enabled }));
-const fromKv = (rows: KeyValue[]): VarDef[] =>
-  rows.map((r) => ({ id: r.id, name: r.key, value: r.value, enabled: r.enabled }));
 
 // ─── assertions (declarative) ─────────────────────────────────────────────────
 
