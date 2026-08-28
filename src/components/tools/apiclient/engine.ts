@@ -5,10 +5,10 @@
 //
 // Variable precedence for {{substitution}}: Collection Variables first, then
 // the Global environment, then the Collection environment (each can override
-// the one before it), then a data-file row, then runtime vars (bru.setVar)
-// win over everything. Scripts may mutate the request draft and any of the
-// three persisted variable stores; the caller persists the resulting
-// collection-var/collection-env/global-env changes.
+// the one before it), then a data-file row wins over all of them. Scripts may
+// mutate the request draft and any of the three persisted variable stores;
+// the caller persists the resulting collection-var/collection-env/global-env
+// changes.
 
 import type { ApiRequest, ApiResponse, Auth, Environment, KeyValue, LogEntry, TestResult, VarMap } from './types';
 import { newRequest } from './types';
@@ -22,7 +22,6 @@ export interface ExecResult {
   tests: TestResult[];
   logs: LogEntry[];
   error: string | null;        // transport/script error
-  runtimeVars: VarMap;         // updated runtime vars
   collectionVars: VarMap;      // updated Collection Variables (to persist)
   collectionVarsChanged: boolean;
   collectionEnvVars: VarMap;   // updated Collection environment vars (to persist)
@@ -63,7 +62,6 @@ export async function executeRequest(
   request: ApiRequest,
   collectionEnv: Environment | null,
   globalEnv: Environment | null,
-  runtimeVarsIn: VarMap,
   signal?: AbortSignal,
   inherited: InheritedScripts = { pre: [], post: [] },
   cookieJar: Cookie[] = [],
@@ -77,7 +75,6 @@ export async function executeRequest(
   // Resolve 'inherit' auth from the collection/folder chain.
   if (draft.auth.type === 'inherit') draft.auth = inherited.auth ?? { ...draft.auth, type: 'none' };
   let stores: PhaseStores = {
-    runtime: { ...runtimeVarsIn },
     collectionVar: { ...collectionVarsIn },
     collectionEnv: envToMap(collectionEnv),
     globalEnv: envToMap(globalEnv),
@@ -94,16 +91,15 @@ export async function executeRequest(
   const errors: string[] = [];
 
   // Combined substitution map. Precedence: vault < collection var < global env
-  // < collection env < data-file row < runtime (bru.setVar / local) — a
-  // Collection Variable is a shared default either environment can still
-  // override, the Collection environment (scoped, specific) wins over the
-  // Global one (cross-collection, general) on a name collision, and a data
-  // file overrides both but explicit runtime sets still win — matching
+  // < collection env < data-file row — a Collection Variable is a shared
+  // default either environment can still override, the Collection
+  // environment (scoped, specific) wins over the Global one (cross-collection,
+  // general) on a name collision, and a data file overrides both — matching
   // Postman's variable resolution order. Vault secrets are namespaced
   // (`vault.<key>`) and merged only here, at send time — they never enter
   // the script-visible stores, so scripts can't read or persist them.
   const varMap = (): VarMap => (
-    { ...vault, ...stores.collectionVar, ...stores.globalEnv, ...stores.collectionEnv, ...dataVars, ...stores.runtime }
+    { ...vault, ...stores.collectionVar, ...stores.globalEnv, ...stores.collectionEnv, ...dataVars }
   );
 
   // Fold a completed phase back into the local state. A phase that overran its
@@ -142,7 +138,6 @@ export async function executeRequest(
     tests,
     logs,
     error: errors.length ? errors.join('\n') : null,
-    runtimeVars: stores.runtime,
     collectionVars: stores.collectionVar,
     collectionVarsChanged: JSON.stringify(stores.collectionVar) !== collectionVarBefore,
     collectionEnvVars: stores.collectionEnv,
@@ -152,15 +147,14 @@ export async function executeRequest(
     nextRequest,
   });
 
-  // 1–2. inherited pre-request scripts (collection → folders), the request's
-  //      own vars, then its pre-request script. Any failure cancels the send.
-  if (hasWork(request.script.req, request.vars.req, inherited.pre)) {
+  // 1–2. inherited pre-request scripts (collection → folders), then the
+  //      request's own pre-request script. Any failure cancels the send.
+  if (hasWork(request.script.req, inherited.pre)) {
     const preOk = await runPhaseSafely({
       phase: 'pre',
       draft,
       stores,
       inherited: inherited.pre,
-      vars: request.vars.req,
       script: request.script.req,
     }, 'Pre-request script');
     if (!preOk || errors.length) return finish(null);
@@ -176,10 +170,10 @@ export async function executeRequest(
     return finish(null);
   }
 
-  // 4–6. post-response vars + script (request, then inherited inner→outer),
-  //      tests, then assertions. A failing script here does not stop the rest:
-  //      the tests are usually the reason the request was sent.
-  if (hasWork(request.script.res, request.tests, request.vars.res, request.assertions, inherited.post)) {
+  // 4–6. post-response script (request, then inherited inner→outer), tests,
+  //      then assertions. A failing script here does not stop the rest: the
+  //      tests are usually the reason the request was sent.
+  if (hasWork(request.script.res, request.tests, request.assertions, inherited.post)) {
     await runPhaseSafely({
       phase: 'post',
       draft,
@@ -189,7 +183,6 @@ export async function executeRequest(
       // worker on every send would cost far more than running the script does.
       response: response.bodyBase64 ? { ...response, bodyBase64: undefined } : response,
       inherited: inherited.post,
-      vars: request.vars.res,
       script: request.script.res,
       tests: request.tests,
       assertions: request.assertions,

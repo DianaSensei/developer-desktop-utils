@@ -79,20 +79,6 @@ export interface RequestScript {
   res: string;   // post-response script
 }
 
-// Declarative variable assignment (Bruno's "Vars" tab). `value` is a JS
-// expression: pre-request vars see {{...}}-substituted text; post-response vars
-// are evaluated with `res`/`bru` in scope to extract values from the response.
-export interface VarDef {
-  id: string;
-  name: string;
-  value: string;
-  enabled: boolean;
-}
-export interface RequestVars {
-  req: VarDef[];   // set before the request
-  res: VarDef[];   // set from the response
-}
-
 export const ASSERT_OPERATORS = [
   'equals', 'notEquals', 'gt', 'gte', 'lt', 'lte', 'in', 'notIn',
   'contains', 'notContains', 'length', 'matches', 'notMatches', 'startsWith', 'endsWith', 'between',
@@ -149,7 +135,6 @@ export interface ApiRequest {
   body: RequestBody;
   auth: Auth;
   script: RequestScript;
-  vars: RequestVars;
   assertions: Assertion[];
   tests: string;          // post-response test script (expect/test)
   settings: RequestSettings;
@@ -159,12 +144,12 @@ export interface ApiRequest {
 export type VarMap = Record<string, string>;
 
 // Where a resolved variable's *winning* value came from — variables live
-// scattered across five separate editors (Collection Variables, a
-// Collection-scoped Environment, a Global Environment, the Vault, and
-// session Runtime Variables), each with its own precedence, and nothing
-// shows the merged result with its source in one place. `ResolvedVar` is
-// that merged view — see ApiClient.tsx's `resolvedVars` and EnvQuickView.tsx.
-export type ResolvedVarSource = 'collectionVar' | 'collectionEnv' | 'globalEnv' | 'vault' | 'runtime';
+// scattered across four separate editors (Collection Variables, a
+// Collection-scoped Environment, a Global Environment, and the Vault), each
+// with its own precedence, and nothing shows the merged result with its
+// source in one place. `ResolvedVar` is that merged view — see
+// ApiClient.tsx's `resolvedVars` and EnvQuickView.tsx.
+export type ResolvedVarSource = 'collectionVar' | 'collectionEnv' | 'globalEnv' | 'vault';
 
 export interface ResolvedVar {
   name: string;
@@ -281,8 +266,6 @@ export const newKeyValue = (key = '', value = ''): KeyValue => ({
   id: uid(), key, value, enabled: true,
 });
 
-export const newVarDef = (): VarDef => ({ id: uid(), name: '', value: '', enabled: true });
-
 export const newAssertion = (): Assertion => ({
   id: uid(), expr: '', operator: 'equals', value: '', enabled: true,
 });
@@ -304,7 +287,6 @@ export function newRequest(partial: Partial<ApiRequest> = {}): ApiRequest {
     body: partial.body ?? { mode: 'none', raw: '', form: [] },
     auth: partial.auth ?? newAuth(),
     script: partial.script ?? { req: '', res: '' },
-    vars: partial.vars ?? { req: [], res: [] },
     assertions: partial.assertions ?? [],
     tests: partial.tests ?? '',
     settings: partial.settings ?? newSettings(),
@@ -320,14 +302,13 @@ export function normalizeRequest(req: ApiRequest): ApiRequest {
   const mode = LEGACY_BODY_MODE[req.body?.mode as string];
   const legacyOp = (req.assertions ?? []).some((a) => a.operator in { eq: 1, neq: 1 });
   const authOk = req.auth && req.auth.apiKey && req.auth.oauth2;
-  if (req.script && req.vars && req.assertions && typeof req.tests === 'string' && req.settings && req.pathParams && authOk && !mode && !legacyOp) return req;
+  if (req.script && req.assertions && typeof req.tests === 'string' && req.settings && req.pathParams && authOk && !mode && !legacyOp) return req;
   return {
     ...req,
     pathParams: req.pathParams ?? [],
     auth: { ...newAuth(), ...req.auth, apiKey: { ...newAuth().apiKey, ...req.auth?.apiKey }, oauth2: { ...newAuth().oauth2, ...req.auth?.oauth2 } },
     body: mode ? { ...req.body, mode } : req.body,
     script: req.script ?? { req: '', res: '' },
-    vars: req.vars ?? { req: [], res: [] },
     assertions: (req.assertions ?? []).map((a) => ({ ...a, operator: migrateAssertOp(a.operator) })),
     tests: req.tests ?? '',
     settings: req.settings ?? newSettings(),

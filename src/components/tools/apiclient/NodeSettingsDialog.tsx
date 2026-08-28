@@ -69,7 +69,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
             </p>
             <div className="flex h-44 flex-col gap-1.5">
               <Label className="text-xs">Pre-request</Label>
-              <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setVar('base', 'https://api.example.com');"} extraExtensions={scriptApiExtensions} />
+              <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setEnvVar('base', 'https://api.example.com');"} extraExtensions={scriptApiExtensions} />
               {scriptCallsNetwork(script.req) && (
                 <Callout tone="warning" size="sm">
                   This script can make its own network request, separate from the Send button — review

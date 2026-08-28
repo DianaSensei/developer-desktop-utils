@@ -1,13 +1,13 @@
 // A fast, read-only glance at every variable currently in scope — Collection
-// env, Global env, Collection Variables, session Runtime, and Vault alike —
-// sits next to the two environment pickers so seeing what's in effect (and
-// where each value actually comes from) doesn't mean opening four separate
-// dialogs and checking each one. Editing still only happens in each
-// variable's own editor; this is look-don't-touch by design, with one link
-// per editor at the bottom.
+// env, Global env, Collection Variables, and Vault alike — sits next to the
+// two environment pickers so seeing what's in effect (and where each value
+// actually comes from) doesn't mean opening three separate dialogs and
+// checking each one. Editing still only happens in each variable's own
+// editor; this is look-don't-touch by design, with one link per editor at
+// the bottom.
 
 import { useState } from 'react';
-import { Eye, EyeOff, Folder, Globe, KeyRound, Layers, Settings2, Variable } from 'lucide-react';
+import { Eye, EyeOff, Folder, Globe, KeyRound, Layers, Settings2 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
@@ -22,21 +22,20 @@ interface Props {
   collectionEnv: Environment | null;
   globalEnv: Environment | null;
   // The merged, source-tagged variable set (collectionEnv/globalEnv/
-  // collectionVar/vault/runtime) — see ApiClient.tsx's `resolvedVars`.
+  // collectionVar/vault) — see ApiClient.tsx's `resolvedVars`.
   resolvedVars: ResolvedVar[];
   onManageEnvironments: () => void;
   onManageVault: () => void;
-  onRuntimeVars: () => void;
 }
 
-const GROUP_ORDER: ResolvedVarSource[] = ['collectionEnv', 'globalEnv', 'runtime', 'collectionVar', 'vault'];
+const GROUP_ORDER: ResolvedVarSource[] = ['collectionEnv', 'globalEnv', 'collectionVar', 'vault'];
 const GROUP_LABEL: Record<ResolvedVarSource, string> = {
   collectionEnv: 'Collection Environment', globalEnv: 'Global Environment',
-  runtime: 'Runtime', collectionVar: 'Collection Variables', vault: 'Vault',
+  collectionVar: 'Collection Variables', vault: 'Vault',
 };
 const ENV_SOURCES = new Set<ResolvedVarSource>(['collectionEnv', 'globalEnv']);
 
-export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageEnvironments, onManageVault, onRuntimeVars }: Props) {
+export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageEnvironments, onManageVault }: Props) {
   const [revealSecrets, setRevealSecrets] = useState(false);
   // Vault entries are always masked here regardless of the toggle (see
   // ApiClient.tsx's resolvedVars comment) — only a Collection/Global env
@@ -46,7 +45,7 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        title="Quick view variables (Collection env, Global env, Collection Variables, Runtime, Vault)"
+        title="Quick view variables (Collection env, Global env, Collection Variables, Vault)"
         className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-bg hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
       >
         <Eye className="h-4 w-4" />
@@ -128,9 +127,6 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onManageVault} icon={<KeyRound className="h-3.5 w-3.5" />}>
             Vault…
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onRuntimeVars} icon={<Variable className="h-3.5 w-3.5" />}>
-            Runtime Variables…
           </DropdownMenuItem>
         </div>
       </DropdownMenuContent>

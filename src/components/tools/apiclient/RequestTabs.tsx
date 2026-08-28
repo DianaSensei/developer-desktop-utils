@@ -32,8 +32,7 @@ interface Props {
   onNewRequest: () => void;
   onManageEnvironments: () => void;
   onManageVault: () => void;
-  onRuntimeVars: () => void;
-  // The merged, source-tagged variable set (collection/env/vault/runtime) for
+  // The merged, source-tagged variable set (collection/env/vault) for
   // EnvQuickView's glance popover — see ApiClient.tsx's `resolvedVars`.
   resolvedVars: ResolvedVar[];
   historyActive: boolean;
@@ -65,7 +64,7 @@ function activeCollection(store: ApiStore): Collection | null {
 }
 
 export function RequestTabs({
-  store, runs, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault, onRuntimeVars, resolvedVars,
+  store, runs, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault, resolvedVars,
   historyActive, onSelectRequest, onOpenHistory, onCloseHistory,
 }: Props) {
   const { openRequests, activeRequestId } = store;
@@ -212,15 +211,14 @@ export function RequestTabs({
         {/* One entry point for "see everything, then go edit it" — no
             separate Vault/gear icon next to this that opened one of the exact
             same destinations: EnvQuickView's own footer already links to
-            Environments, Vault, and Runtime Variables, so a second button
-            here for any one of them was two controls for one destination. */}
+            Environments and Vault, so a second button here for either was
+            two controls for one destination. */}
         <EnvQuickView
           collectionEnv={store.activeCollectionEnv}
           globalEnv={store.activeGlobalEnv}
           resolvedVars={resolvedVars}
           onManageEnvironments={onManageEnvironments}
           onManageVault={onManageVault}
-          onRuntimeVars={onRuntimeVars}
         />
         <span className="mx-0.5 h-5 w-px bg-line" />
         <IconButton

@@ -549,7 +549,6 @@ function importOperation(
     body,
     auth,
     script: { req: '', res: '' },
-    vars: { req: [], res: [] },
     assertions: [],
     tests: '',
     settings: newSettings(),

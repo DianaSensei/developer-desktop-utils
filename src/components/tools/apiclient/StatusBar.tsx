@@ -1,15 +1,13 @@
 // Bottom status bar — app label left, quick actions right.
 // Keeps chrome minimal; only includes actions the user can actually trigger.
 
-import { AlertTriangle, Cookie, Search, Variable } from 'lucide-react';
+import { AlertTriangle, Cookie, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-export function StatusBar({ onSearch, onCookies, cookieCount, onRuntimeVars, runtimeVarCount, sandboxDegraded }: {
+export function StatusBar({ onSearch, onCookies, cookieCount, sandboxDegraded }: {
   onSearch: () => void;
   onCookies: () => void;
   cookieCount: number;
-  onRuntimeVars: () => void;
-  runtimeVarCount: number;
   sandboxDegraded?: boolean;
 }) {
   return (
@@ -34,17 +32,6 @@ export function StatusBar({ onSearch, onCookies, cookieCount, onRuntimeVars, run
           className="flex items-center gap-1 transition-colors hover:text-fg"
         >
           <Search className="h-3 w-3" /> Search
-        </button>
-        <span className="h-3 w-px bg-line" />
-        <button
-          onClick={onRuntimeVars}
-          title="Inspect runtime variables (bru.setVar)"
-          className="flex items-center gap-1 transition-colors hover:text-fg"
-        >
-          <Variable className="h-3 w-3" /> Vars
-          {runtimeVarCount > 0 && (
-            <Badge tone="neutral" pill className="ml-0.5">{runtimeVarCount}</Badge>
-          )}
         </button>
         <span className="h-3 w-px bg-line" />
         <button

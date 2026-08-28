@@ -5,12 +5,11 @@ import { newEnvironment, newKeyValue } from './types';
 describe('buildResolvedVars', () => {
   it('tags each variable with the source it came from', () => {
     const collectionEnv = newEnvironment('Dev', 'c1', [{ ...newKeyValue('token', 'abc'), enabled: true }]);
-    const result = buildResolvedVars({ baseUrl: 'https://api.test' }, { sessionId: 's1' }, collectionEnv, null, [
+    const result = buildResolvedVars({ baseUrl: 'https://api.test' }, collectionEnv, null, [
       { ...newKeyValue('apiKey', 'k1'), enabled: true },
     ]);
     expect(result).toEqual([
       { name: 'baseUrl', value: 'https://api.test', secret: false, source: 'collectionVar' },
-      { name: 'sessionId', value: 's1', secret: false, source: 'runtime' },
       { name: 'token', value: 'abc', secret: false, source: 'collectionEnv' },
       { name: 'vault.apiKey', value: '••••••••', secret: true, source: 'vault' },
     ]);
@@ -18,31 +17,20 @@ describe('buildResolvedVars', () => {
 
   it('precedence: collection env overrides collection var for the same name', () => {
     const collectionEnv = newEnvironment('Dev', 'c1', [{ ...newKeyValue('host', 'from-env'), enabled: true }]);
-    const result = buildResolvedVars({ host: 'from-collection' }, {}, collectionEnv, null, []);
+    const result = buildResolvedVars({ host: 'from-collection' }, collectionEnv, null, []);
     expect(result).toEqual([{ name: 'host', value: 'from-env', secret: false, source: 'collectionEnv' }]);
-  });
-
-  it('precedence: runtime overrides the collection env for the same name — matches engine.ts\'s real substitution order', () => {
-    const collectionEnv = newEnvironment('Dev', 'c1', [{ ...newKeyValue('host', 'from-env'), enabled: true }]);
-    const result = buildResolvedVars({ host: 'from-collection' }, { host: 'from-runtime' }, collectionEnv, null, []);
-    expect(result).toEqual([{ name: 'host', value: 'from-runtime', secret: false, source: 'runtime' }]);
-  });
-
-  it('runtime overrides collection var when there is no environment value for the same name', () => {
-    const result = buildResolvedVars({ host: 'from-collection' }, { host: 'from-runtime' }, null, null, []);
-    expect(result).toEqual([{ name: 'host', value: 'from-runtime', secret: false, source: 'runtime' }]);
   });
 
   it('collection env overrides global env for the same name', () => {
     const collectionEnv = newEnvironment('Dev', 'c1', [{ ...newKeyValue('host', 'from-collection-env'), enabled: true }]);
     const globalEnv = newEnvironment('Shared', null, [{ ...newKeyValue('host', 'from-global-env'), enabled: true }]);
-    const result = buildResolvedVars({}, {}, collectionEnv, globalEnv, []);
+    const result = buildResolvedVars({}, collectionEnv, globalEnv, []);
     expect(result).toEqual([{ name: 'host', value: 'from-collection-env', secret: false, source: 'collectionEnv' }]);
   });
 
   it('global env overrides collection var when there is no collection env value for the same name', () => {
     const globalEnv = newEnvironment('Shared', null, [{ ...newKeyValue('host', 'from-global-env'), enabled: true }]);
-    const result = buildResolvedVars({ host: 'from-collection-var' }, {}, null, globalEnv, []);
+    const result = buildResolvedVars({ host: 'from-collection-var' }, null, globalEnv, []);
     expect(result).toEqual([{ name: 'host', value: 'from-global-env', secret: false, source: 'globalEnv' }]);
   });
 
@@ -51,7 +39,7 @@ describe('buildResolvedVars', () => {
       { ...newKeyValue('public', 'p'), enabled: true },
       { ...newKeyValue('private', 's'), enabled: true, secret: true },
     ]);
-    const result = buildResolvedVars({}, {}, collectionEnv, null, []);
+    const result = buildResolvedVars({}, collectionEnv, null, []);
     expect(result).toEqual([
       { name: 'private', value: 's', secret: true, source: 'collectionEnv' },
       { name: 'public', value: 'p', secret: false, source: 'collectionEnv' },
@@ -59,7 +47,7 @@ describe('buildResolvedVars', () => {
   });
 
   it('never reads a real Vault value — always the fixed masked placeholder', () => {
-    const result = buildResolvedVars({}, {}, null, null, [{ ...newKeyValue('secretKey', 'the-real-secret'), enabled: true }]);
+    const result = buildResolvedVars({}, null, null, [{ ...newKeyValue('secretKey', 'the-real-secret'), enabled: true }]);
     expect(result).toEqual([{ name: 'vault.secretKey', value: '••••••••', secret: true, source: 'vault' }]);
     expect(JSON.stringify(result)).not.toContain('the-real-secret');
   });
@@ -73,15 +61,15 @@ describe('buildResolvedVars', () => {
       { ...newKeyValue('disabledVault', 'x'), enabled: false },
       { ...newKeyValue('', 'y'), enabled: true },
     ];
-    expect(buildResolvedVars({}, {}, collectionEnv, null, vault)).toEqual([]);
+    expect(buildResolvedVars({}, collectionEnv, null, vault)).toEqual([]);
   });
 
   it('is sorted by name', () => {
-    const result = buildResolvedVars({ zeta: '1', alpha: '2' }, {}, null, null, []);
+    const result = buildResolvedVars({ zeta: '1', alpha: '2' }, null, null, []);
     expect(result.map((r) => r.name)).toEqual(['alpha', 'zeta']);
   });
 
   it('returns an empty list when nothing is in scope anywhere', () => {
-    expect(buildResolvedVars({}, {}, null, null, [])).toEqual([]);
+    expect(buildResolvedVars({}, null, null, [])).toEqual([]);
   });
 });

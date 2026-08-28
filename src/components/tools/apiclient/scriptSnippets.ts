@@ -14,10 +14,6 @@ export const PRE_REQUEST_SNIPPETS: ScriptSnippet[] = [
     code: `req.setHeader('X-Trace-Id', Date.now().toString());`,
   },
   {
-    label: 'Set a runtime variable',
-    code: `bru.setVar('startedAt', Date.now());`,
-  },
-  {
     label: 'Read an environment variable',
     code: `const token = bru.getEnvVar('token');`,
   },
@@ -39,10 +35,6 @@ export const POST_RESPONSE_SNIPPETS: ScriptSnippet[] = [
   {
     label: 'Set an environment variable from the response',
     code: `bru.setEnvVar('token', res.getBody().token);`,
-  },
-  {
-    label: 'Set a runtime variable from the response',
-    code: `bru.setVar('id', res.getBody().id);`,
   },
 ];
 
