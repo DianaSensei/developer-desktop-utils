@@ -82,6 +82,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       <GuideSection icon={Send} title="Send a request">
         <p>Pick a method, type the URL, and click <strong className="text-fg">Send</strong> (or <Key>{mod}</Key>+<Key>↵</Key>). The response — status, time, size, headers, and a pretty-printed body — shows on the right.</p>
         <p>In the desktop app requests go through Rust, so there’s no browser CORS restriction — you can call any API.</p>
+        <p>The magnifying-glass icon above the response body opens a find/replace panel (or press <Key>{mod}</Key>+<Key>F</Key> with the body focused) — next/previous, match case, regex, and whole-word, same as the request editors.</p>
       </GuideSection>
       <GuideSection icon={Braces} title="Variables">
         <p>Use <Var>{'{{name}}'}</Var> anywhere — URL, query, headers, body, or auth. A token turns <span className="text-ok">green</span> when it resolves in the current context and <span className="text-bad">red</span> when it doesn’t; hover to see its value.</p>

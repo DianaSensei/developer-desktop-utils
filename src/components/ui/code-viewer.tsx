@@ -7,13 +7,14 @@
 // can't edit), so a single component with a `language` prop covers every
 // tool that needs to display code.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { EditorView, basicSetup, minimalSetup } from 'codemirror';
-import { lineNumbers } from '@codemirror/view';
+import { keymap, lineNumbers } from '@codemirror/view';
 import { json } from '@codemirror/lang-json';
 import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorState } from '@codemirror/state';
+import { openSearchPanel, searchKeymap } from '@codemirror/search';
 import { useCodeTheme } from '@/components/ui/code-theme';
 import { jsonFoldCount } from '@/components/ui/json-fold-count';
 
@@ -32,7 +33,17 @@ export interface CodeViewerProps {
   placeholder?: string;
 }
 
-export function CodeViewer({ value, language, plain, placeholder }: CodeViewerProps) {
+export interface CodeViewerHandle {
+  /** Focuses the editor and opens CodeMirror's own find/replace panel — the
+   *  same one Ctrl+F/Cmd+F already triggers while the editor has focus, for a
+   *  caller that wants a visible "Search" button to do the same thing without
+   *  requiring the user to click into the text first. */
+  openSearch: () => void;
+}
+
+export const CodeViewer = forwardRef<CodeViewerHandle, CodeViewerProps>(function CodeViewer(
+  { value, language, plain, placeholder }, ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   // Read-only: no active-line tint, and the gutter sits flush on the pane
@@ -45,6 +56,10 @@ export function CodeViewer({ value, language, plain, placeholder }: CodeViewerPr
     ? [
         minimalSetup,
         lineNumbers(),
+        // basicSetup (below) already carries searchKeymap — minimalSetup
+        // doesn't, so a large/plain body would otherwise have no way to
+        // trigger search at all, the case it's arguably most useful for.
+        keymap.of(searchKeymap),
         theme.extension,
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
@@ -80,6 +95,15 @@ export function CodeViewer({ value, language, plain, placeholder }: CodeViewerPr
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
   }, [value]);
 
+  useImperativeHandle(ref, () => ({
+    openSearch: () => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.focus();
+      openSearchPanel(view);
+    },
+  }), []);
+
   return (
     <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden">
       <div ref={containerRef} className="flex flex-col flex-1 min-h-0 overflow-hidden" />
@@ -90,4 +114,4 @@ export function CodeViewer({ value, language, plain, placeholder }: CodeViewerPr
       )}
     </div>
   );
-}
+});

@@ -94,7 +94,7 @@ export {
   JsonEditor, JsonSyntaxEditor, JavaScriptEditor, SqlEditor, TextEditor,
   type CodeEditorProps, type JavaScriptEditorProps,
 } from '@/components/ui/code-editor';
-export { CodeViewer, type CodeViewerProps } from '@/components/ui/code-viewer';
+export { CodeViewer, type CodeViewerProps, type CodeViewerHandle } from '@/components/ui/code-viewer';
 export { InlineCodeField, type InlineCodeFieldProps } from '@/components/ui/inline-code-field';
 
 // Code theme — the shared CodeMirror 6 look (theme, syntax palette, and the

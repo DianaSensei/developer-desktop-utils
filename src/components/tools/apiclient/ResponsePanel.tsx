@@ -7,10 +7,10 @@
 // behind a progress bar rather than being replaced by a spinner — swapping the
 // whole pane out and back was the single biggest source of flicker in the tool.
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, type Ref } from 'react';
 import {
   AlertCircle, Binary, Braces, Check, ChevronDown, Code2, Copy, Download, Eraser,
-  FileCode, FileText, Filter, Hash, MoreHorizontal, Send, X,
+  FileCode, FileText, Filter, Hash, MoreHorizontal, Search, Send, X,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
@@ -26,7 +26,7 @@ import type { ApiRequest, ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
 import { saveBinaryFile, saveTextFile } from './fileio';
 import { queryJson } from './jsonpath';
-import { CodeViewer } from '@/design-system';
+import { CodeViewer, type CodeViewerHandle } from '@/design-system';
 import type { RequestPanelTab } from './RequestPanel';
 
 // Labels scriptPhases.ts attaches to a request's *own* scripts (as opposed to
@@ -156,6 +156,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   const [preview, setPreview] = useState(false);
   const [filter, setFilter] = useState('');
   const [showFilter, setShowFilter] = useState(false);
+  const codeViewerRef = useRef<CodeViewerHandle>(null);
 
   const big = !!response && response.body.length > LARGE_BODY;
 
@@ -204,6 +205,14 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       default: return response.body;
     }
   }, [response, big, format, pretty, filterResult]);
+
+  // Mirrors ResponseBody's own branching below: true exactly when it renders
+  // the CodeViewer text surface — never for the HTML/image preview iframe, and
+  // never for a binary body still shown as "switch to Hex/Base64" placeholder,
+  // both of which have nothing a text search could act on.
+  const showsSearchableCode = !!response && !!(response.body || response.bodyBase64)
+    && !(preview && (kind === 'html' || kind === 'image' || format === 'html'))
+    && !(response.binary && format !== 'hex' && format !== 'base64');
 
   const failed = tests.filter((t) => !t.passed).length;
   const hasOriginHeader = !!request?.headers.some((h) => h.enabled && h.key.trim().toLowerCase() === 'origin');
@@ -314,6 +323,14 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         </span>
       ) : (
         <span className="font-semibold text-bad">No response</span>
+      )}
+      {activeTab === 'body' && showsSearchableCode && (
+        <IconButton
+          onClick={() => codeViewerRef.current?.openSearch()}
+          title={`Search in response (${isMac ? '⌘F' : 'Ctrl+F'})`}
+        >
+          <Search className="h-4 w-4" />
+        </IconButton>
       )}
       {response && activeTab === 'body' && kind === 'json' && !big && (
         <IconButton
@@ -435,7 +452,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                   Large response ({formatBytes(response.sizeBytes)}) shown as raw text for performance.
                 </div>
               )}
-              <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} />
+              <ResponseBody response={response} kind={kind} format={format} preview={preview} text={bodyText} plain={big} viewerRef={codeViewerRef} />
               {showFilter && kind === 'json' && (
                 <div className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-1.5 focus-within:bg-bg-2/20">
                   <Filter className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
@@ -557,8 +574,9 @@ function ActionsMenu({ onSave, onClear }: { onSave: () => void; onClear?: () => 
 
 // ─── response body ────────────────────────────────────────────────────────────
 
-function ResponseBody({ response, kind, format, preview, text, plain }: {
+function ResponseBody({ response, kind, format, preview, text, plain, viewerRef }: {
   response: ApiResponse; kind: Kind; format: Format; preview: boolean; text: string; plain?: boolean;
+  viewerRef?: Ref<CodeViewerHandle>;
 }) {
   if (preview) {
     if (kind === 'html' || format === 'html') {
@@ -596,7 +614,7 @@ function ResponseBody({ response, kind, format, preview, text, plain }: {
   }
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      <CodeViewer value={text} language={!plain && format === 'json' ? 'json' : 'text'} plain={plain} />
+      <CodeViewer ref={viewerRef} value={text} language={!plain && format === 'json' ? 'json' : 'text'} plain={plain} />
     </div>
   );
 }
