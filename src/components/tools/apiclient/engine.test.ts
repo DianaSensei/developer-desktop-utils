@@ -179,6 +179,47 @@ describe('executeRequest — variables', () => {
     expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://runtime.test/x');
   });
 
+  it('persists a runtime var set with bru.setVar in a pre-request script', async () => {
+    // Direct regression test for the report that a pre-request bru.setVar
+    // seemed to "stick" no matter what — this confirms the base mechanism
+    // (script -> stores.runtime -> ExecResult.runtimeVars) actually works;
+    // the stickiness itself is correct (runtime wins over everything and
+    // isn't cleared by picking No Environment) — see RuntimeVarsInspector's
+    // onClear/onDeleteVar for the fix to *that*.
+    const spy = stubJson('{}');
+    const r = await executeRequest(
+      req({
+        url: 'https://{{host}}/x',
+        script: { req: "bru.setVar('host', 'from-script.test');", res: '' },
+      }),
+      null, null, {},
+    );
+    expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://from-script.test/x');
+    expect(r.runtimeVars.host).toBe('from-script.test');
+  });
+
+  it('keeps a runtime var across a send that no longer sets it, until explicitly cleared by the caller', async () => {
+    // Mirrors what a caller (ApiClient.tsx) does: it feeds the *previous*
+    // result's runtimeVars back in as `runtimeVarsIn` on the next call. A
+    // script that stops calling bru.setVar for a name doesn't erase it —
+    // only an explicit runtimeVarsIn without that key (i.e. the UI's
+    // "Clear"/"Clear all") does.
+    stubJson('{}');
+    const first = await executeRequest(
+      req({ script: { req: "bru.setVar('sticky', 'first-value');", res: '' } }),
+      null, null, {},
+    );
+    expect(first.runtimeVars.sticky).toBe('first-value');
+
+    const spy = stubJson('{}');
+    const second = await executeRequest(
+      req({ url: 'https://{{sticky}}/x', script: { req: '', res: '' } }),
+      null, null, first.runtimeVars,
+    );
+    expect((spy.mock.calls[0] as unknown as [string])[0]).toBe('https://first-value/x');
+    expect(second.runtimeVars.sticky).toBe('first-value');
+  });
+
   it('lets a data-file row override both environments but not runtime vars', async () => {
     const spy = stubJson('{}');
     await executeRequest(

@@ -400,6 +400,21 @@ export function ApiClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const runtimeVars = useMemo(() => ({ ...runtimeVarsRef.current }), [runtimeVarsVersion]);
 
+  // Runtime vars have no "No Environment"-style off switch of their own —
+  // they win over every other tier until a script overwrites them again or
+  // the app restarts (see RuntimeVarsInspector's own note) — so this is the
+  // only way to actually get rid of one that's gone stale.
+  const clearRuntimeVars = useCallback(() => {
+    runtimeVarsRef.current = {};
+    setRuntimeVarsVersion((v) => v + 1);
+  }, []);
+  const deleteRuntimeVar = useCallback((key: string) => {
+    const next = { ...runtimeVarsRef.current };
+    delete next[key];
+    runtimeVarsRef.current = next;
+    setRuntimeVarsVersion((v) => v + 1);
+  }, []);
+
   // The merged, *source-tagged* variable set — unlike `varMap` (a flat
   // name→value map for {{}} highlighting) this keeps which of the five
   // scattered editors each winning value actually came from, for
@@ -516,7 +531,13 @@ export function ApiClient() {
       <EnvironmentEditor store={store} open={envOpen} onClose={() => setEnvOpen(false)} />
       <VaultManager store={store} open={vaultOpen} onClose={() => setVaultOpen(false)} />
       <CookieManager store={store} open={cookiesOpen} onClose={() => setCookiesOpen(false)} />
-      <RuntimeVarsInspector vars={runtimeVars} open={runtimeVarsOpen} onClose={() => setRuntimeVarsOpen(false)} />
+      <RuntimeVarsInspector
+        vars={runtimeVars}
+        open={runtimeVarsOpen}
+        onClose={() => setRuntimeVarsOpen(false)}
+        onClear={clearRuntimeVars}
+        onDeleteVar={deleteRuntimeVar}
+      />
       <GenerateCodeDialog
         open={codeOpen}
         onClose={() => setCodeOpen(false)}
