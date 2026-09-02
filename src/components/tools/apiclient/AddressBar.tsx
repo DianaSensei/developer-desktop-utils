@@ -8,7 +8,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { methodBg, methodColor } from './method-color';
-import { InlineCodeField } from '@/design-system';
+import { InlineCodeField, type InlineCodeFieldHandle } from '@/design-system';
 import { paramsFromUrl } from './request';
 import { parseCurl } from './curl';
 import { type ApiRequest, HTTP_METHODS } from './types';
@@ -22,9 +22,11 @@ interface Props {
   sending: boolean;
   onGenerateCode: () => void;
   vars: Record<string, string>;
+  // Lets the parent move focus into the URL field (⌘L) — see ApiClient.tsx.
+  urlFieldRef?: React.Ref<InlineCodeFieldHandle>;
 }
 
-export function AddressBar({ request, onChange, onRename, onSend, onCancel, sending, onGenerateCode, vars }: Props) {
+export function AddressBar({ request, onChange, onRename, onSend, onCancel, sending, onGenerateCode, vars, urlFieldRef }: Props) {
   const pathParamValues: Record<string, string> = {};
   for (const p of request.pathParams) if (p.enabled && p.key) pathParamValues[p.key] = p.value;
 
@@ -113,6 +115,7 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
 
         <div className="flex h-ctl min-w-0 flex-1 items-center px-3">
           <InlineCodeField
+            ref={urlFieldRef}
             value={request.url}
             onChange={handleUrl}
             vars={vars}
@@ -134,15 +137,21 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
             bar's own rounded-lg + overflow-hidden already clips this flush
             corner into that curve, so it still reads as one rounded pill. */}
         {sending ? (
-          <Button variant="destructive" size="sm" onClick={onCancel} className="h-ctl gap-1.5 rounded-none press">
+          <Button variant="destructive" size="sm" onClick={onCancel} title="Cancel the request in flight" className="h-ctl gap-1.5 rounded-none press">
             <X className="h-3.5 w-3.5" /> Cancel
           </Button>
         ) : (
+          // sc/scMod: the shortcut printed inline (Send │ ⌘⏎) is how a new user
+          // learns it exists — the response pane's splash lists it too, but
+          // only until the first response replaces it.
           <Button
             size="sm"
             onClick={onSend}
             disabled={!request.url.trim()}
+            title={request.url.trim() ? 'Send the request' : 'Enter a URL to send'}
             className="h-ctl gap-1.5 rounded-none shadow-sm press"
+            sc="⏎"
+            scMod
           >
             <Send className="h-3.5 w-3.5" /> Send
           </Button>

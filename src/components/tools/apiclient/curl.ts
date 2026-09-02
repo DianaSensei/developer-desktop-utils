@@ -4,6 +4,12 @@
 
 import { type ApiRequest, type HttpMethod, HTTP_METHODS, newAuth, newKeyValue, newRequest } from './types';
 
+// The escapes bash resolves inside ANSI-C quoting ($'…'). Anything else after
+// a backslash stands for itself, which is what bash does too.
+const ANSI_C_ESCAPES: Record<string, string> = {
+  n: '\n', t: '\t', r: '\r', a: '\x07', b: '\b', f: '\f', v: '\v', e: '\x1b', '0': '\0',
+};
+
 // Shell-aware tokenizer: respects single/double quotes and backslash escapes,
 // and folds `\<newline>` line continuations.
 function tokenize(cmd: string): string[] {
@@ -18,6 +24,21 @@ function tokenize(cmd: string): string[] {
       if (ch === quote) quote = null;
       else if (quote === '"' && ch === '\\' && i + 1 < s.length) cur += s[++i];
       else cur += ch;
+    } else if (ch === '$' && s[i + 1] === "'") {
+      // ANSI-C quoting, $'…'. Chrome and Edge DevTools switch "Copy as cURL
+      // (bash)" into this form the moment the body contains a newline — so a
+      // pretty-printed JSON payload arrives this way rather than in ordinary
+      // single quotes. Read as a plain quoted string it kept the leading `$`
+      // and left every `\n` as the two characters backslash-n, producing a
+      // body that was neither valid JSON nor what was copied.
+      i += 2;
+      for (; i < s.length && s[i] !== "'"; i++) {
+        if (s[i] === '\\' && i + 1 < s.length) {
+          const c = s[++i];
+          cur += ANSI_C_ESCAPES[c] ?? c;
+        } else cur += s[i];
+      }
+      started = true;
     } else if (ch === '"' || ch === "'") { quote = ch; started = true; }
     else if (ch === '\\' && i + 1 < s.length) { cur += s[++i]; started = true; }
     else if (/\s/.test(ch)) { if (started) { out.push(cur); cur = ''; started = false; } }
@@ -27,7 +48,27 @@ function tokenize(cmd: string): string[] {
   return out;
 }
 
-const NO_ARG = new Set(['-L', '--location', '--compressed', '-s', '--silent', '-S', '-k', '--insecure', '-i', '-I', '--head', '-v', '--verbose', '-g', '-#', '--progress-bar', '-f', '--fail', '-O', '-j']);
+// Flags that take no value. Anything missing from here falls through to the
+// "assume it takes an argument" branch at the end of the parse loop, which for
+// a boolean flag eats the token after it — and that token is very often the
+// URL. `-G` was the case that showed it up: `curl -G https://api.test/x -d
+// 'a=1'` imported with an empty URL.
+const NO_ARG = new Set([
+  '-L', '--location', '--location-trusted', '--compressed', '-s', '--silent', '-S', '--show-error',
+  '-k', '--insecure', '-i', '--include', '-I', '--head', '-v', '--verbose', '-g', '--globoff',
+  '-#', '--progress-bar', '--no-progress-meter', '-f', '--fail', '--fail-with-body', '-O', '-j',
+  '-G', '--get', '-N', '--no-buffer', '--raw', '--path-as-is', '-4', '--ipv4', '-6', '--ipv6',
+  '--http0.9', '--http1.0', '--http1.1', '--http2', '--http2-prior-knowledge', '--http3',
+  '--tlsv1', '--tlsv1.0', '--tlsv1.1', '--tlsv1.2', '--tlsv1.3', '--ssl', '--ssl-reqd',
+  '--anyauth', '--basic', '--digest', '--ntlm', '--negotiate', '--tcp-nodelay', '--no-keepalive',
+  '-a', '--append', '-q', '--disable', '-Z', '--parallel', '--tr-encoding', '--no-sessionid',
+]);
+
+// A token that is unmistakably the request URL, so an unknown flag never
+// consumes it as its own value. Deliberately narrow — an absolute URL with a
+// scheme, which is what every "Copy as cURL" produces — so that a genuine
+// option value like `--cert /path/to.pem` is still consumed normally.
+const looksLikeUrl = (t: string): boolean => /^[a-z][a-z0-9+.-]*:\/\//i.test(t);
 
 // Chrome/Edge DevTools offer two "Copy as cURL" variants on Windows: "(bash)"
 // and "(cmd)". `tokenize()` above only understands POSIX/bash quoting
@@ -69,6 +110,9 @@ export function parseCurl(input: string): ApiRequest {
   const formData: [string, string, boolean][] = []; // key, value, isFile
   const urlencoded: [string, string][] = [];
   let mode: 'none' | 'raw' | 'urlencoded' | 'multipart' = 'none';
+  // -G/--get: curl appends the data to the query string and sends a GET
+  // instead of putting it in a body.
+  let asQuery = false;
 
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
@@ -96,9 +140,28 @@ export function parseCurl(input: string): ApiRequest {
     else if (t === '-b' || t === '--cookie') headers.push(['Cookie', arg()]);
     else if (t === '-A' || t === '--user-agent') headers.push(['User-Agent', arg()]);
     else if (t === '-e' || t === '--referer') headers.push(['Referer', arg()]);
+    else if (t === '-G' || t === '--get') asQuery = true;
     else if (NO_ARG.has(t)) { /* ignore */ }
-    else if (t.startsWith('-')) { arg(); /* unknown flag: assume it takes an arg */ }
+    else if (t.startsWith('-')) {
+      // Unknown flag. Most curl flags that take a value are followed by a
+      // plain token (`--max-time 30`), so consuming one is the right default
+      // — but never the URL, which a boolean flag we don't know about would
+      // otherwise swallow, and never another flag.
+      const next = tokens[i + 1];
+      if (next !== undefined && !next.startsWith('-') && !looksLikeUrl(next)) i++;
+    }
     else if (!url) url = t;
+  }
+
+  // With -G the collected data belongs in the query string, not a body.
+  if (asQuery) {
+    const pairs = mode === 'urlencoded'
+      ? urlencoded.map(([k, v]) => `${k}=${v}`)
+      : body.split('&').filter(Boolean);
+    if (pairs.length) url += (url.includes('?') ? '&' : '?') + pairs.join('&');
+    body = '';
+    mode = 'none';
+    if (!method) method = 'GET';
   }
 
   if (!method) method = (body || mode !== 'none') ? 'POST' : 'GET';

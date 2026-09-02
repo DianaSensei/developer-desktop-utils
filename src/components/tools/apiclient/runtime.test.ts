@@ -197,6 +197,33 @@ describe('bru — collection var and scoped env stores', () => {
     expect(bru.getEnvName()).toBe('Staging');
     expect(bru.getEnvName('global')).toBe('Shared');
   });
+
+  it('does not resolve prototype properties as if they were set variables', () => {
+    // A collection var/env named "toString" or "constructor" is a plausible
+    // real name; before the fix `get*Var` fell through to Object.prototype
+    // and handed the script a live built-in instead of undefined, and
+    // `has*Var` falsely reported one as set.
+    const s = stores();
+    const bru = makeBru(s);
+    expect(bru.hasCollectionVar('toString')).toBe(false);
+    expect(bru.getCollectionVar('toString')).toBeUndefined();
+    expect(bru.hasCollectionVar('constructor')).toBe(false);
+    expect(bru.getCollectionVar('constructor')).toBeUndefined();
+
+    expect(bru.hasEnvVar('constructor')).toBe(false);
+    expect(bru.getEnvVar('constructor')).toBeUndefined();
+    expect(bru.hasEnvVar('toString', 'global')).toBe(false);
+    expect(bru.getEnvVar('toString', 'global')).toBeUndefined();
+
+    const withData = makeBru(stores({ data: {} }));
+    expect(withData.getIterationData('constructor')).toBeUndefined();
+
+    // A genuinely set variable by that same name still works normally —
+    // the fix only rejects the prototype fallthrough, not the key itself.
+    bru.setCollectionVar('toString', 'x');
+    expect(bru.hasCollectionVar('toString')).toBe(true);
+    expect(bru.getCollectionVar('toString')).toBe('x');
+  });
 });
 
 describe('req host object', () => {
@@ -365,6 +392,36 @@ describe('Assert expression containment', () => {
       expect(evalVia(expr)).toBe(expr);
     }
     expect((globalThis as Record<string, unknown>).leaked).toBeUndefined();
+  });
+
+  it('refuses an unsafe key assembled at evaluation time, not just a literal one', () => {
+    // The denylist runs on the *evaluated* key, so a concatenation reaches it
+    // too. Worth pinning: checking keys at parse time instead would pass every
+    // other test here while leaving this route open.
+    for (const expr of [
+      "res.body['con' + 'structor']",
+      "res.body['__pro' + 'to__']",
+      "res.body['proto' + 'type']",
+    ]) {
+      expect(evalVia(expr)).toBe(expr);
+    }
+  });
+
+  it('refuses call/apply/bind even where the key itself is readable', () => {
+    // `constructor` is stopped by the key denylist long before the callee
+    // denylist matters, so those tests never exercise it. `call` is not a
+    // denied key — reading it is fine, invoking it is what must be refused,
+    // which is the only thing standing between a reachable function and
+    // arbitrary receivers.
+    for (const expr of [
+      "res.body.token.toUpperCase.call('zz')",
+      "res.body.token.toUpperCase.apply('zz')",
+      'res.body.token.toUpperCase.bind()',
+    ]) {
+      expect(evalVia(expr)).toBe(expr);
+    }
+    // Reading the function is allowed and harmless; only the invocation is not.
+    expect(typeof evalVia('res.body.token.toUpperCase')).toBe('function');
   });
 
   it('falls back to the literal for anything outside the grammar', () => {

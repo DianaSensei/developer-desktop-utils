@@ -6,7 +6,7 @@
 // multi-line — so it stays a separate, narrower component rather than a mode
 // of the others.
 
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { cn } from '@/lib/utils';
@@ -27,6 +27,13 @@ export interface InlineCodeFieldProps {
   pathParamValues?: Record<string, string>;
 }
 
+// Imperative surface for a parent that needs to move focus into the field
+// (the address bar's ⌘L) — CodeMirror owns the contenteditable, so a plain
+// DOM ref to the wrapper can't be focused. Same shape as CodeViewerHandle.
+export interface InlineCodeFieldHandle {
+  focus: () => void;
+}
+
 // Single-line specifics on top of the shared code theme: no flex fill, no
 // padding, and the scroller must not scroll (the field is one line).
 const singleLineTheme = EditorView.theme({
@@ -36,9 +43,22 @@ const singleLineTheme = EditorView.theme({
   '.cm-var, .cm-var-unknown': { fontSize: '11px' },
 });
 
-export function InlineCodeField({ value, onChange, vars, placeholder, onEnter, className, pathParamValues }: InlineCodeFieldProps) {
+export const InlineCodeField = forwardRef<InlineCodeFieldHandle, InlineCodeFieldProps>(function InlineCodeField(
+  { value, onChange, vars, placeholder, onEnter, className, pathParamValues },
+  handleRef,
+) {
   const ref = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  useImperativeHandle(handleRef, () => ({
+    focus: () => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.focus();
+      // Land the caret at the end, where a URL edit almost always continues,
+      // rather than wherever it last was (or at 0 on a fresh mount).
+      view.dispatch({ selection: { anchor: view.state.doc.length } });
+    },
+  }), []);
   // Live refs so the editor (created once) always sees fresh callbacks/vars.
   const varsRef = useRef(vars);
   varsRef.current = vars;
@@ -117,4 +137,4 @@ export function InlineCodeField({ value, onChange, vars, placeholder, onEnter, c
   }, [pathParamValues]);
 
   return <div ref={ref} className={cn('min-w-0 flex-1', className)} />;
-}
+});

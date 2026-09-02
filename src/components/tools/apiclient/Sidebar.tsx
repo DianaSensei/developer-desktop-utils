@@ -42,6 +42,7 @@ import { pickCollectionFile, saveJsonFile } from './fileio';
 import { methodColor, methodShort } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
 import { ImportCurlDialog } from './ImportCurlDialog';
+import { collectionMatches, itemMatches } from './treeSearch';
 
 const emptyScript = (s?: RequestScript): RequestScript => s ?? { req: '', res: '' };
 const inheritAuth = (a?: Auth): Auth => a ?? newAuth();
@@ -58,13 +59,6 @@ function flattenRequests(items: TreeItem[]): ApiRequest[] {
   return out;
 }
 
-function itemMatches(item: TreeItem, q: string): boolean {
-  if (item.type === 'request') return item.name.toLowerCase().includes(q);
-  return item.name.toLowerCase().includes(q) || item.items.some((c) => itemMatches(c, q));
-}
-function collectionMatches(c: Collection, q: string): boolean {
-  return c.name.toLowerCase().includes(q) || c.items.some((i) => itemMatches(i, q));
-}
 
 // Whether `id` (the active request) sits anywhere under `items` — used to put
 // a small "contains the open request" dot on a folder/collection that's
@@ -188,7 +182,9 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
         collection = result.collection;
         setNotices(result.warnings);
       } else if (doc && typeof doc === 'object' && Array.isArray((doc as { item?: unknown }).item)) {
-        collection = importPostman(file.text);
+        const result = importPostman(file.text);
+        collection = result.collection;
+        setNotices(result.warnings);
       } else {
         throw new Error(`${file.name} is neither a Postman collection nor an OpenAPI/Swagger spec`);
       }
@@ -250,7 +246,11 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
 
       {/* search */}
       <div className="border-b border-line px-2 py-1.5">
-        <SearchInput ref={searchInputRef} value={query} onChange={setQuery} placeholder="Search" className="h-ctl text-xs" />
+        {/* Matches name, URL and method (see treeSearch.ts) — the
+            placeholder says so because a name-only search is what every
+            other tree search in the app does, and nobody would try "users"
+            for a request called "List all" otherwise. */}
+        <SearchInput ref={searchInputRef} value={query} onChange={setQuery} placeholder="Search name, URL, method" className="h-ctl text-xs" />
       </div>
 
       {error && (
@@ -480,6 +480,9 @@ const RequestNode = memo(function RequestNode({ request, depth, collectionId, ct
         </span>
       }
       name={request.name}
+      // The tree shows names only; the URL on hover is what tells "Get user"
+      // in one folder from "Get user" in another without opening either.
+      title={request.url ? `${request.method} ${request.url}` : undefined}
       onClick={() => store.selectRequest(request.id)}
       onRename={(name) => store.renameItem(request.id, name)}
       entries={entries}
@@ -517,10 +520,12 @@ interface RowProps {
   actions?: React.ReactNode;
   onClick?: () => void;
   onToggle?: () => void;
+  // Native tooltip for the whole row (a request's URL) — none for folders.
+  title?: string;
 }
 
 function Row({
-  ctx, id, depth, name, onRename, entries, active, container, collapsed, hasChildren, icon, badge, dot, nameClassName, actions, onClick, onToggle,
+  ctx, id, depth, name, onRename, entries, active, container, collapsed, hasChildren, icon, badge, dot, nameClassName, actions, onClick, onToggle, title,
 }: RowProps) {
   const editing = ctx.editingId === id;
   const [draft, setDraft] = useState(name);
@@ -549,7 +554,13 @@ function Row({
   return (
     <div
       ref={rowRef}
-      draggable={!editing}
+      title={title}
+      // Collections (depth 0) aren't draggable: moveItem/copyItem only relocate
+      // tree items within collections.items, so a collection id is never found
+      // there — picking one up and dropping it anywhere was a silent no-op that
+      // looked broken rather than doing nothing on purpose. Folders/requests
+      // (depth > 0) keep the real drag-to-reorder/move behavior.
+      draggable={!editing && depth > 0}
       onDragStart={(e) => { e.stopPropagation(); ctx.setDragId(id); e.dataTransfer.effectAllowed = 'copyMove'; }}
       onDragEnd={() => { ctx.setDragId(null); ctx.setDropTarget(null); }}
       onDragOver={(e) => {

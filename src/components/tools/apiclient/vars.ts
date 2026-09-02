@@ -8,10 +8,16 @@ import type { Environment, KeyValue, ResolvedVar, VarMap } from './types';
 
 // Replace every {{name}} token using the supplied variable map. Unknown tokens
 // are left as-is so the user can see what didn't resolve.
+//
+// `hasOwnProperty`, not `name in vars`: `in` walks the prototype chain, so
+// every member of Object.prototype counted as a defined variable and
+// substituted its function. `{{constructor}}` in a URL became the literal text
+// `function Object() { [native code] }` in the request that was sent, instead
+// of staying visible as an unresolved token.
 export function substituteVars(text: string, vars: VarMap): string {
   if (!text) return text;
   return text.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (whole, name: string) =>
-    name in vars ? vars[name] : whole,
+    Object.prototype.hasOwnProperty.call(vars, name) ? vars[name] : whole,
   );
 }
 

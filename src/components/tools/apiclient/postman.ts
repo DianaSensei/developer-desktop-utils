@@ -72,6 +72,15 @@ interface PmCollection {
   auth?: PmAuth;
 }
 
+export interface PostmanImport {
+  collection: Collection;
+  // Notes about anything that couldn't be mapped one-to-one — currently just
+  // an auth scheme this app has no equivalent for (see importAuth's SUPPORTED
+  // set). Shown after import so the result is never silently lossy, the same
+  // contract openapi.ts's import already keeps.
+  warnings: string[];
+}
+
 // ─── import ─────────────────────────────────────────────────────────────────
 
 const mapKv = (list?: PmKeyValue[]): KeyValue[] =>
@@ -86,10 +95,28 @@ function findKv(list: PmKeyValue[] | undefined, key: string): string {
   return list?.find((p) => p.key === key)?.value ?? '';
 }
 
-function importAuth(auth?: PmAuth): Auth {
+// Auth types this app can actually reproduce. Postman also defines awsv4,
+// digest (→ handled separately below), ntlm, oauth1, hawk, edgegrid, asap and
+// akamai — none of which this client can sign, so importing one of those
+// silently as "No Auth" would leave every request quietly unauthenticated
+// with nothing in the UI explaining why. `warn` records it instead; the
+// caller surfaces it the same way an unsupported OpenAPI body type is.
+const SUPPORTED_AUTH_TYPES = new Set(['bearer', 'basic', 'digest', 'apikey', 'oauth2']);
+
+// `auth` is `undefined` in exactly the case Postman itself uses it for:
+// the request/folder declares no auth block of its own, so it inherits
+// whatever its parent folder or the collection root has — this app's own
+// 'inherit' type is precisely that. A present block with `type: 'noauth'`
+// is the other, different thing Postman has a name for: auth deliberately
+// turned off, mapped to this app's 'none'. Collapsing both to 'none' (the
+// previous behavior) meant importing any real-world collection that sets
+// auth once at the folder/collection level — the ordinary way to do it in
+// Postman — silently dropped it from every request inside.
+function importAuth(auth: PmAuth | undefined, warn: (msg: string) => void): Auth {
   const base = newAuth();
-  if (!auth?.type) return base;
-  const type = auth.type as AuthType;
+  if (!auth) return { ...base, type: 'inherit' };
+  const type = auth.type as AuthType | undefined;
+  if (!type || type === ('noauth' as AuthType)) return base;
   if (type === 'bearer') return { ...base, type, token: findKv(auth.bearer, 'token') };
   if (type === 'basic') {
     return { ...base, type, username: findKv(auth.basic, 'username'), password: findKv(auth.basic, 'password') };
@@ -121,6 +148,9 @@ function importAuth(auth?: PmAuth): Auth {
         password: findKv(auth.oauth2, 'password'),
       },
     };
+  }
+  if (!SUPPORTED_AUTH_TYPES.has(type)) {
+    warn(`Auth type "${type}" isn't supported here and was imported as No Auth — set it up manually.`);
   }
   return base;
 }
@@ -168,7 +198,7 @@ const execText = (e?: PmEvent): string => {
   return Array.isArray(exec) ? exec.join('\n') : String(exec);
 };
 
-function importRequest(item: PmItem): ApiRequest {
+function importRequest(item: PmItem, warn: (msg: string) => void): ApiRequest {
   const r = item.request ?? {};
   const method = (r.method ?? 'GET').toUpperCase();
   const url = typeof r.url === 'object' ? r.url : undefined;
@@ -188,7 +218,7 @@ function importRequest(item: PmItem): ApiRequest {
     pathParams,
     headers: mapKv(r.header),
     body: importBody(r.body),
-    auth: importAuth(r.auth ?? item.auth),
+    auth: importAuth(r.auth ?? item.auth, warn),
     script: { req: preReq, res: '' },
     assertions: [],
     tests: test,
@@ -196,24 +226,30 @@ function importRequest(item: PmItem): ApiRequest {
   };
 }
 
-function importItems(items: PmItem[] | undefined): TreeItem[] {
+function importItems(items: PmItem[] | undefined, warn: (msg: string) => void): TreeItem[] {
   return (items ?? []).map((item): TreeItem => {
     if (Array.isArray(item.item)) {
       const folder: Folder = {
         type: 'folder',
         id: uid(),
         name: item.name ?? 'Folder',
-        items: importItems(item.item),
+        items: importItems(item.item, warn),
       };
+      // Only set when the folder itself declares an auth block — leaving it
+      // unset (rather than 'inherit') is what lets a request further down
+      // keep walking up past this folder to the collection root, exactly as
+      // it would if the field were never read at all. See collectInherited
+      // in store.ts, which skips a node whose auth is unset.
+      if (item.auth) folder.auth = importAuth(item.auth, warn);
       return folder;
     }
-    return importRequest(item);
+    return importRequest(item, warn);
   });
 }
 
 // Parse a Postman collection JSON string into our Collection model. Throws on
 // malformed JSON or a shape that clearly isn't a Postman collection.
-export function importPostman(jsonText: string): Collection {
+export function importPostman(jsonText: string): PostmanImport {
   let data: PmCollection;
   try {
     data = JSON.parse(jsonText) as PmCollection;
@@ -223,11 +259,15 @@ export function importPostman(jsonText: string): Collection {
   if (!data || !Array.isArray(data.item)) {
     throw new Error('Not a Postman collection (missing "item" array)');
   }
-  return {
+  const warnings: string[] = [];
+  const warn = (msg: string) => { if (!warnings.includes(msg)) warnings.push(msg); };
+  const collection: Collection = {
     id: uid(),
     name: data.info?.name ?? 'Imported Collection',
-    items: importItems(data.item),
+    items: importItems(data.item, warn),
   };
+  if (data.auth) collection.auth = importAuth(data.auth, warn);
+  return { collection, warnings };
 }
 
 // ─── export ─────────────────────────────────────────────────────────────────
@@ -332,7 +372,7 @@ function exportRequest(req: ApiRequest): PmItem {
 function exportItems(items: TreeItem[]): PmItem[] {
   return items.map((item) =>
     item.type === 'folder'
-      ? { name: item.name, item: exportItems(item.items) }
+      ? { name: item.name, item: exportItems(item.items), auth: exportAuth(item.auth ?? newAuth()) }
       : exportRequest(item),
   );
 }
@@ -344,6 +384,14 @@ export function exportPostman(collection: Collection): unknown {
       name: collection.name,
       schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
     },
+    // Folder/collection-level auth (this app's own Bruno-style inheritance,
+    // set from the Auth tab in NodeSettingsDialog) has a direct Postman
+    // equivalent — the same optional `auth` block a request carries, applied
+    // to a folder/collection item instead. Without this, exporting a
+    // collection that uses it silently dropped it: every request importing
+    // that file back would have nothing to inherit, since importAuth only
+    // ever reads it from here.
+    auth: exportAuth(collection.auth ?? newAuth()),
     item: exportItems(collection.items),
   };
 }

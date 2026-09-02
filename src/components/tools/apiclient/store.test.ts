@@ -246,6 +246,27 @@ describe('useApiStore — addHistory secret redaction', () => {
 
     expect(result.current.history[0].response?.body).toBe('ok');
   });
+
+  it('redacts the error, console logs and test results too, not just the response', async () => {
+    // A script logging a token while debugging is ordinary, and reqwest names
+    // the URL it failed on — both are persisted verbatim without this.
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    act(() => result.current.addHistory({
+      method: 'GET', url: '{{baseUrl}}/x', status: 0, ok: false, timeMs: 5,
+      error: 'error sending request for url (https://api.test/x?key=sk-live-9f3a)',
+      logs: [{ level: 'log', text: 'token is sk-live-9f3a' }],
+      tests: [{ name: 'token is sk-live-9f3a', passed: false, error: "expected 'sk-live-9f3a' to equal 'x'" }],
+    }, ['sk-live-9f3a']));
+    const entry = result.current.history[0];
+    expect(entry.error).not.toContain('sk-live-9f3a');
+    expect(entry.logs?.[0].text).not.toContain('sk-live-9f3a');
+    expect(entry.tests?.[0].name).not.toContain('sk-live-9f3a');
+    expect(entry.tests?.[0].error).not.toContain('sk-live-9f3a');
+    expect(entry.error).toContain('••••••••');
+  });
+
 });
 
 describe('useApiStore — collection variables', () => {
@@ -573,6 +594,29 @@ describe('useApiStore — moveItem / copyItem (sidebar drag & drop)', () => {
       expect(copiedFolder.items).toHaveLength(1);
       expect(copiedFolder.items[0].id).not.toBe(childId);
     }
+  });
+
+  it('moveItem/copyItem leave every collection untouched when the source id is a collection, not a tree item', async () => {
+    // Both only ever look for `sourceId` inside collections' *items* (via
+    // extractItem/findItem) — a collection's own id is never a member of its
+    // own items array, so passing one in is a safe no-op rather than
+    // corrupting state. This is why the sidebar row for a collection is not
+    // draggable: dragging one and dropping it produced no visible change, so
+    // the drag affordance itself was removed rather than "fixing" this into
+    // doing something (collection reordering was never implemented).
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    let targetId = '';
+    act(() => { targetId = result.current.addCollection(); });
+    const sourceCollectionId = result.current.collections[0].id;
+    const before = result.current.collections;
+
+    act(() => result.current.moveItem(sourceCollectionId, targetId, 'inside'));
+    expect(result.current.collections).toBe(before);
+
+    act(() => result.current.copyItem(sourceCollectionId, targetId, 'inside'));
+    expect(result.current.collections).toBe(before);
   });
 });
 

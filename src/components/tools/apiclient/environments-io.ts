@@ -30,6 +30,17 @@ function isNativeFormat(json: unknown): json is NativeEnvironmentFile {
 
 // Fresh ids for every row and a defaulted `enabled`, regardless of which
 // format (or a hand-edited file) supplied them.
+//
+// `secret` is read from either format's own way of marking one: this app's
+// native export writes it as `secret: true` (see exportEnvironmentNative,
+// which serializes the row as-is); Postman's environment.json marks the same
+// thing as `"type": "secret"` on the value (its UI's own masking). Missing
+// this dropped the lock on every secret-flagged variable on the way back in
+// — silently, since nothing here threw or warned — which meant a value the
+// user had explicitly protected (masked in the UI, excluded from generated
+// code and from History's redaction list; see KeyValueEditor's lock toggle)
+// came back in fully exposed after nothing more than an export/import
+// round-trip, or an ordinary Postman environment import.
 function sanitizeVariables(rows: unknown): KeyValue[] {
   if (!Array.isArray(rows)) return [];
   const out: KeyValue[] = [];
@@ -39,7 +50,11 @@ function sanitizeVariables(rows: unknown): KeyValue[] {
     const key = typeof rec.key === 'string' ? rec.key : '';
     if (!key) continue;
     const value = typeof rec.value === 'string' ? rec.value : '';
-    out.push({ id: `iv-${Date.now()}-${Math.random().toString(36).slice(2)}`, key, value, enabled: rec.enabled !== false });
+    const secret = rec.secret === true || rec.type === 'secret';
+    out.push({
+      id: `iv-${Date.now()}-${Math.random().toString(36).slice(2)}`, key, value,
+      enabled: rec.enabled !== false, ...(secret ? { secret: true } : {}),
+    });
   }
   return out;
 }
@@ -53,7 +68,11 @@ export function exportEnvironmentPostman(env: Environment): string {
   const file: PmEnvironmentFile = {
     id: env.id,
     name: env.name,
-    values: env.variables.map((v) => ({ key: v.key, value: v.value, enabled: v.enabled, type: 'default' })),
+    // `type` is Postman's own secret marker (its UI masks a "secret" value
+    // the same way this app's lock icon does) — carrying it over means a
+    // variable protected here stays protected in the exported file too,
+    // whether it's opened in Postman or re-imported back into this app.
+    values: env.variables.map((v) => ({ key: v.key, value: v.value, enabled: v.enabled, type: v.secret ? 'secret' : 'default' })),
     _postman_variable_scope: 'environment',
   };
   return JSON.stringify(file, null, 2);

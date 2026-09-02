@@ -68,12 +68,21 @@ export function buildUrl(req: ApiRequest, sub: Sub): string {
   if (req.auth.type === 'apikey' && req.auth.apiKey.placement === 'query' && req.auth.apiKey.key.trim()) {
     params.push([sub(req.auth.apiKey.key), sub(req.auth.apiKey.value)]);
   }
-  // No managed params → leave the URL (and its own query) untouched.
-  if (!params.length) return base;
+  // With no params table at all, the URL's own query is all there is — leave
+  // it untouched (a script that set `req.url` outright, say).
+  if (!req.params.length && !params.length) return base;
 
   // The params table mirrors the query string, so build the query *only* from
   // the params (dropping the URL's own query) to avoid duplicating them.
   const head = base.split('#')[0].split('?')[0];
+
+  // A table where every row is disabled still governs: the query goes away.
+  // This used to fall through the `!params.length` guard above and return the
+  // URL untouched, so unchecking the *last* enabled param sent it anyway —
+  // reachable on any imported request, whose URL keeps the full raw query
+  // while its params table carries the enabled/disabled flags (see
+  // postman.ts's `rawUrl` + `mapKv(url.query)`).
+  if (!params.length) return head;
 
   if (req.settings?.encodeUrl === false) {
     return `${head}?${params.map(([k, v]) => `${k}=${v}`).join('&')}`;

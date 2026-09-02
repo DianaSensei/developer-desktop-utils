@@ -388,6 +388,18 @@ export interface VarStores {
   signal?: AbortSignal;
 }
 
+// `stores.collectionVar` etc. are plain `{}` maps that came off the wire (an
+// imported collection/environment file) or were built up over a run — a key
+// named "toString" or "constructor" is a perfectly ordinary variable name a
+// user might pick, but a bare `obj[k]` / `k in obj` resolves it against
+// Object.prototype instead of reporting "not set". That hands a script a
+// live built-in (`bru.getCollectionVar('toString')` -> `Object.prototype.
+// toString`) where it expected `undefined`, and makes `bru.hasCollectionVar`
+// falsely report a variable that was never set. Same class of bug as the
+// `getHeader('constructor')` case noted above `isSafeKey`, just unguarded
+// here instead of designed out.
+const hasOwn = (obj: VarMap, k: string): boolean => Object.prototype.hasOwnProperty.call(obj, k);
+
 export function makeBru(stores: VarStores) {
   // Same precedence as the {{substitution}} map in engine.ts (vault aside,
   // which never enters these stores — see engine.ts):
@@ -397,23 +409,26 @@ export function makeBru(stores: VarStores) {
   });
   const envStore = (scope?: EnvScope) => (scope === 'global' ? stores.globalEnv : stores.collectionEnv);
   return {
-    getCollectionVar: (k: string) => stores.collectionVar[k],
+    getCollectionVar: (k: string) => (hasOwn(stores.collectionVar, k) ? stores.collectionVar[k] : undefined),
     setCollectionVar: (k: string, v: unknown) => { if (isSafeKey(k)) stores.collectionVar[k] = v == null ? '' : String(v); },
-    hasCollectionVar: (k: string) => k in stores.collectionVar,
+    hasCollectionVar: (k: string) => hasOwn(stores.collectionVar, k),
     deleteCollectionVar: (k: string) => { delete stores.collectionVar[k]; },
     // No scope: read falls through collection -> global (matches precedence);
     // write/delete default to 'collection', the closer analog to the old
     // single-environment behavior.
-    getEnvVar: (k: string, scope?: EnvScope) =>
-      (scope ? envStore(scope)[k] : (k in stores.collectionEnv ? stores.collectionEnv[k] : stores.globalEnv[k])),
+    getEnvVar: (k: string, scope?: EnvScope) => {
+      if (scope) return hasOwn(envStore(scope), k) ? envStore(scope)[k] : undefined;
+      if (hasOwn(stores.collectionEnv, k)) return stores.collectionEnv[k];
+      return hasOwn(stores.globalEnv, k) ? stores.globalEnv[k] : undefined;
+    },
     setEnvVar: (k: string, v: unknown, scope: EnvScope = 'collection') => { if (isSafeKey(k)) envStore(scope)[k] = v == null ? '' : String(v); },
     hasEnvVar: (k: string, scope?: EnvScope) =>
-      (scope ? k in envStore(scope) : (k in stores.collectionEnv || k in stores.globalEnv)),
+      (scope ? hasOwn(envStore(scope), k) : (hasOwn(stores.collectionEnv, k) || hasOwn(stores.globalEnv, k))),
     deleteEnvVar: (k: string, scope: EnvScope = 'collection') => { delete envStore(scope)[k]; },
     getEnvName: (scope?: EnvScope) =>
       (scope === 'global' ? stores.globalEnvName : scope === 'collection' ? stores.collectionEnvName : (stores.collectionEnvName ?? stores.globalEnvName)),
     // Postman parity: bru.getIterationData('x') reads the current data row.
-    getIterationData: (k: string) => stores.data?.[k],
+    getIterationData: (k: string) => (stores.data && hasOwn(stores.data, k) ? stores.data[k] : undefined),
     // Expand {{tokens}} in a string exactly as the send pipeline would.
     interpolate: (text: string) => substituteVars(String(text ?? ''), allVars()),
     getVars: () => allVars(),

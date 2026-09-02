@@ -56,7 +56,12 @@ export function queryJson(data: unknown, expr: string): unknown {
           const idx = tok.value < 0 ? item.length + tok.value : tok.value;
           if (idx >= 0 && idx < item.length) next.push(item[idx]);
         }
-      } else if (item && typeof item === 'object' && tok.value in (item as object)) {
+      } else if (item && typeof item === 'object'
+        // Own properties only — `in` walks the prototype chain, so a filter
+        // like `$.constructor` matched Object.prototype's member and returned
+        // a function. An array's `length` is an own property, so `$.items.length`
+        // still answers with the count.
+        && Object.prototype.hasOwnProperty.call(item, tok.value)) {
         next.push((item as Record<string, unknown>)[tok.value]);
       }
     }

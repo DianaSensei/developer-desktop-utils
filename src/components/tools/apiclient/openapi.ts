@@ -590,6 +590,18 @@ export function importOpenApi(doc: unknown): OpenApiImport {
   const collectionAuth = resolveSecurity(root.security, schemes, collectAuth);
   const baseUrl = baseUrlOf(root);
 
+  // A spec that names no server, or names one as a bare path, describes an API
+  // without saying where it lives — so every request imports without a host and
+  // fails on the first Send with a transport error that says nothing about why.
+  // The model is deliberately left alone here (a spec that didn't say cannot be
+  // made to say); this is the warnings channel doing its job, since a missing
+  // host is exactly the kind of thing that must not be silently lossy.
+  if (!baseUrl) {
+    warn('This spec declares no server, so requests were imported with a path only and cannot be sent as-is. Add the API host to the front of each URL, or set one up as a collection variable.');
+  } else if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(baseUrl)) {
+    warn(`The spec's server is the relative URL "${baseUrl}", which has no host — the imported baseUrl variable needs the scheme and host prefixed before a request can be sent.`);
+  }
+
   const ctx: OperationCtx = {
     resolve,
     schemes,

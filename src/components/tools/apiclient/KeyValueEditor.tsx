@@ -58,6 +58,28 @@ const DUPLICATE_KEY_TEXT: Record<'params' | 'headers', string> = {
   headers: 'Only the last value is sent — a repeated header name overwrites earlier ones.',
 };
 
+/**
+ * Whether two enabled rows collide on name, by the rules of the thing being
+ * edited — exported for its own test.
+ *
+ * Header names are case-insensitive (RFC 7230) and request.ts's `buildHeaders`
+ * folds them that way: `Accept` and `accept` are one header and only the last
+ * survives. A case-only difference is precisely the collision hardest to spot
+ * by eye, and the exact-match check this used to do stayed silent for it.
+ * Query parameters are the opposite — `id` and `ID` really are two different
+ * params — so those keep comparing exactly.
+ */
+export function hasDuplicateNames(rows: KeyValue[], kind: 'params' | 'headers'): boolean {
+  const seen = new Set<string>();
+  for (const r of rows) {
+    if (!r.enabled || !r.key) continue;
+    const name = kind === 'headers' ? r.key.toLowerCase() : r.key;
+    if (seen.has(name)) return true;
+    seen.add(name);
+  }
+  return false;
+}
+
 export function KeyValueEditor({
   rows,
   onChange,
@@ -110,16 +132,10 @@ export function KeyValueEditor({
     : realRows;
   const displayRows = [...visibleRows, ghost];
 
-  const hasDuplicateKeys = useMemo(() => {
-    if (!duplicateKeyHint) return false;
-    const seen = new Set<string>();
-    for (const r of realRows) {
-      if (!r.enabled || !r.key) continue;
-      if (seen.has(r.key)) return true;
-      seen.add(r.key);
-    }
-    return false;
-  }, [realRows, duplicateKeyHint]);
+  const hasDuplicateKeys = useMemo(
+    () => (duplicateKeyHint ? hasDuplicateNames(realRows, duplicateKeyHint) : false),
+    [realRows, duplicateKeyHint],
+  );
 
   const editRow = (id: string, patch: Partial<KeyValue>) => {
     if (id === ghost.id) {
@@ -161,18 +177,23 @@ export function KeyValueEditor({
 
   if (bulk) {
     return (
+      // The mode toggle keeps the same corner and the same weight in both
+      // modes. It used to sit *below* the table and *above* the textarea, and
+      // switch from a muted label to an accent link — so the one control you
+      // need to get back moved ~200px and changed appearance the moment you
+      // used it.
       <div className="space-y-1.5">
-        <div className="flex justify-end">
-          <button onClick={() => setBulk(false)} className="text-[11px] font-medium text-acc hover:underline">
-            Key-Value Edit
-          </button>
-        </div>
         <TextEditor
           value={bulkText}
           onChange={parseBulk}
           placeholder={`${keyPlaceholder}: ${valuePlaceholder}`}
           vars={vars}
         />
+        <div className="flex justify-end">
+          <button onClick={() => setBulk(false)} className="text-[11px] text-fg-mute transition-colors hover:text-fg">
+            Key-Value Edit
+          </button>
+        </div>
       </div>
     );
   }

@@ -194,20 +194,23 @@ function HistoryRow({ entry, showHost, selected, onClick }: {
   entry: HistoryEntry; showHost: boolean; selected: boolean; onClick: () => void;
 }) {
   const { host, path } = splitUrl(entry.url);
-  // The muted greys that carry these columns on the panel background drop below
-  // AA once the row is filled with solid accent, so the selected row gets its
-  // own pair rather than reusing them.
-  const secondary = selected ? 'text-fg/75' : 'text-fg-mute/75';
-  const tertiary = selected ? 'text-fg/60' : 'text-fg-mute/50';
+  // Selection is a tint plus a left stripe — the same treatment the sidebar
+  // tree and the ⌘P palette use for "this is the one you're on". A solid
+  // `bg-acc` fill (what this row used) is the app's primary-action color,
+  // and it made the one selected row shout louder than the Send button
+  // while forcing its own AA-safe grey scale that nothing else shares.
+  const secondary = 'text-fg-mute/75';
+  const tertiary = 'text-fg-mute/50';
   return (
     <button
       onClick={onClick}
       title={entry.url}
       className={cn(
-        'flex w-full items-center gap-2.5 border-b border-line/40 px-3 py-2 text-left text-xs transition-colors',
-        selected ? 'bg-acc' : 'hover:bg-acc/40',
+        'relative flex w-full items-center gap-2.5 border-b border-line/40 px-3 py-2 text-left text-xs transition-colors',
+        selected ? 'bg-acc-tint text-acc-ink' : 'hover:bg-bg-2/60',
       )}
     >
+      {selected && <span className="pointer-events-none absolute inset-y-0 left-0 w-0.5 rounded-r-full bg-acc" />}
       <span className={cn('w-14 shrink-0 font-mono text-[11px] tabular-nums', secondary)}>{clock(entry.at)}</span>
       <span className={cn('w-12 shrink-0 text-[11px] font-bold uppercase', methodColor(entry.method))}>
         {entry.method}

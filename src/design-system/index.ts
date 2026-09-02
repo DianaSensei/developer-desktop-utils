@@ -95,7 +95,7 @@ export {
   type CodeEditorProps, type JavaScriptEditorProps,
 } from '@/components/ui/code-editor';
 export { CodeViewer, type CodeViewerProps, type CodeViewerHandle } from '@/components/ui/code-viewer';
-export { InlineCodeField, type InlineCodeFieldProps } from '@/components/ui/inline-code-field';
+export { InlineCodeField, type InlineCodeFieldProps, type InlineCodeFieldHandle } from '@/components/ui/inline-code-field';
 
 // Code theme — the shared CodeMirror 6 look (theme, syntax palette, and the
 // hook that keeps a live editor in step with the app's light/dark switch).

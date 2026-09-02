@@ -113,10 +113,28 @@ describe('importOpenApi — structure', () => {
     expect(collection.variables?.[0].value).toBe('https://eu.example.com/v2');
   });
 
-  it('emits no baseUrl variable when the spec declares no server', () => {
-    const { collection } = importOpenApi({ openapi: '3.0.0', paths: { '/pets': { get: {} } } });
+  it('emits no baseUrl variable when the spec declares no server, and says why', () => {
+    const { collection, warnings } = importOpenApi({ openapi: '3.0.0', paths: { '/pets': { get: {} } } });
     expect(collection.variables).toEqual([]);
     expect(asRequest(collection.items[0]).url).toBe('/pets');
+    // Without the warning the whole collection just fails on the first Send
+    // with a transport error that never mentions the missing host.
+    expect(warnings.join()).toMatch(/declares no server/);
+  });
+
+  it('warns when the only server is a relative URL with no host', () => {
+    // Common in specs served next to the API they describe.
+    const { collection, warnings } = importOpenApi({
+      openapi: '3.0.0', servers: [{ url: '/v2' }], paths: { '/pets': { get: {} } },
+    });
+    expect(collection.variables?.[0]).toMatchObject({ key: 'baseUrl', value: '/v2' });
+    expect(asRequest(collection.items[0]).url).toBe('{{baseUrl}}/pets');
+    expect(warnings.join()).toMatch(/relative URL "\/v2", which has no host/);
+  });
+
+  it('says nothing when the server is absolute', () => {
+    const { warnings } = importOpenApi(spec({ paths: { '/pets': { get: {} } } }));
+    expect(warnings.join()).not.toMatch(/no server|relative URL/);
   });
 
   it('skips TRACE, which the client cannot send, and says so', () => {

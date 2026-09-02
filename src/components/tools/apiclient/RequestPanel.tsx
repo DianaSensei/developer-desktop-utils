@@ -4,8 +4,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Braces, Check, ChevronDown, Code2, Database, File, FileText, FormInput,
-  Hexagon, type LucideIcon, Tag, Trash2, X,
+  Braces, Check, ChevronDown, Code2, Database, File, FileQuestion, FileText,
+  FormInput, Hexagon, type LucideIcon, Tag, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,8 @@ import {
 import { Tabs } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Callout } from '@/components/ui/callout';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SettingGroup, SettingRow } from '@/components/ui/setting-row';
 import { Badge, InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
@@ -84,8 +86,17 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {/* Headers từng là tab riêng — di chuyển vào đây làm phần thứ ba, cùng
             hình dạng với Query/Path (nhãn nhỏ + bảng), thay vì buộc người dùng
             nhảy tab để thấy trọn bộ những gì gắn liền với request này. */}
+        {/* max-w-3xl on the table panes: in the stacked layout the request
+            pane spans the whole window, and a `1fr 1fr` key/value grid there
+            gave a 7-character value like `profile` a 600px column. The cap
+            binds only above ~800px, so a side-by-side split (pane ~600px) is
+            untouched and only the stacked layout and very wide windows are
+            reined in. It does cost a long header value (a bearer token, say)
+            some visible width, but those cells scroll horizontally and the
+            trade reads better than half a screen of empty table. Matches the
+            Auth and Settings panes, which already cap at max-w-lg/xl. */}
         {tab === 'params' && (
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+          <div className="min-h-0 max-w-3xl flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
               <Label className="text-xs text-fg-mute">Query</Label>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
@@ -107,7 +118,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
         {tab === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}
         {tab === 'tests' && (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+          <div className="flex min-h-0 max-w-3xl flex-1 flex-col gap-3 overflow-y-auto p-3">
             <div className="shrink-0 space-y-1.5">
               <Label className="text-xs">Assertions</Label>
               <AssertEditor request={request} onChange={onChange} />
@@ -233,10 +244,13 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
     // width the table scrolls sideways instead (the pattern docs/ai/CLAUDE.md
     // prescribes for horizontal data tables) so every cell stays usable.
     <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
-      <div className="min-w-[26rem]">
+      <div className="min-w-[24rem]">
       {/* header */}
-      <div className="grid grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)_2rem] border-b bg-bg-2/30 font-semibold">
-        <div className="border-r px-3 py-1.5">Expr</div>
+      {/* Same header treatment as KeyValueEditor's tables, so the three
+          tables a request shows (Query, Headers, Assertions) read as one
+          family instead of two styles. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
+        <div className="border-r px-3 py-1.5">Expression</div>
         <div className="border-r px-3 py-1.5">Operator</div>
         <div className="border-r px-3 py-1.5">Value</div>
         <div />
@@ -246,7 +260,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         const isGhost = a.id === ghost.id;
         const unary = UNARY_ASSERT_OPERATORS.includes(a.operator);
         return (
-          <div key={a.id} className="grid grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+          <div key={a.id} className="group grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors">
             {/* expr cell with enable checkbox */}
             <div className="flex min-w-0 items-center gap-1.5 border-r px-2">
               <button
@@ -263,7 +277,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
               <Input
                 value={a.expr}
                 onChange={(e) => editRow(a.id, { expr: e.target.value })}
-                placeholder="Expr"
+                placeholder="res.status"
                 className={cn(assertInputCls, !isGhost && !a.enabled && 'opacity-50')}
                 spellCheck={false}
               />
@@ -285,7 +299,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
                 <Input
                   value={a.value}
                   onChange={(e) => editRow(a.id, { value: e.target.value })}
-                  placeholder="Value"
+                  placeholder="200"
                   className={cn(assertInputCls, !isGhost && !a.enabled && 'opacity-50')}
                   spellCheck={false}
                 />
@@ -295,8 +309,8 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
             {/* action cell */}
             <div className="flex items-center justify-center">
               {!isGhost && (
-                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-bad">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-fg-mute/40 opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:text-bad">
+                  <Trash2 className="h-3 w-3" />
                 </button>
               )}
             </div>
@@ -392,16 +406,21 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
   return (
     <div className="space-y-2">
       <Label className="text-xs text-fg-mute">Path</Label>
+      {/* Same four-track grid as KeyValueEditor (the trailing 2rem is
+          empty here — path params can't be removed, only disabled) so this
+          table's Value column starts at exactly the same x as the Query and
+          Headers tables above and below it. */}
       <div className="overflow-hidden rounded-md border text-xs">
-        <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] border-b bg-bg-2/30 font-semibold">
+        <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
           <div />
           <div className="border-r px-3 py-1.5">Name</div>
-          <div className="px-3 py-1.5">Value</div>
+          <div className="border-r px-3 py-1.5">Value</div>
+          <div />
         </div>
         {names.map((name) => {
           const enabled = enabledOf(name);
           return (
-            <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+            <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors">
               {/* Toggle target is the whole cell, not just the checkbox glyph —
                   same change as KeyValueEditor's, and the Name cell below joins
                   it: unlike the Name column there, this one is read-only text
@@ -442,7 +461,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
               >
                 <span className="truncate">:{name}</span>
               </div>
-              <div className="flex h-ctl min-w-0 items-center px-2">
+              <div className="flex h-ctl min-w-0 items-center border-r px-1.5">
                 <InlineCodeField
                   value={valueOf(name)}
                   onChange={(v) => setValue(name, v)}
@@ -450,6 +469,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   placeholder="Value"
                 />
               </div>
+              <div />
             </div>
           );
         })}
@@ -472,17 +492,20 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
   };
 
   return (
-    <div className="max-w-xl space-y-6">
-      <p className="text-xs text-fg-mute">Configure request settings for this item.</p>
-
-      {/* Tags */}
+    // SettingGroup + SettingRow, the app's own shape for a panel of
+    // configuration, instead of the hand-rolled label/hint/Switch row this
+    // pane used to repeat. The rows now sit on one surface separated by
+    // hairlines rather than floating free in a column, and they read the
+    // same as the app's Settings page — which is what this pane is, scoped
+    // to one request.
+    <div className="max-w-xl space-y-5">
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>
         <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-2 focus-within:ring-acc/40">
           {settings.tags.map((t) => (
             <span key={t} className="flex items-center gap-1 rounded bg-bg-2 px-1.5 py-0.5 text-[11px]">
               {t}
-              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-fg-mute hover:text-bad">
+              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-fg-mute hover:text-bad" title={`Remove ${t}`}>
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -502,40 +525,37 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
         </div>
       </div>
 
-      <ToggleRow
-        title="URL Encoding"
-        hint="Automatically encode query parameters in the URL"
-        checked={settings.encodeUrl}
-        onChange={(encodeUrl) => set({ encodeUrl })}
-      />
-      <ToggleRow
-        title="Automatically Follow Redirects"
-        hint="Follow HTTP redirects automatically"
-        checked={settings.followRedirects}
-        onChange={(followRedirects) => set({ followRedirects })}
-      />
+      <SettingGroup title="Request">
+        <SettingRow
+          title="URL encoding"
+          description="Percent-encode query parameters before sending."
+          control={<Switch checked={settings.encodeUrl} onCheckedChange={(encodeUrl) => set({ encodeUrl })} aria-label="URL encoding" />}
+        />
+        <SettingRow
+          title="Follow redirects"
+          description="Follow 3xx responses automatically instead of returning them."
+          control={<Switch checked={settings.followRedirects} onCheckedChange={(followRedirects) => set({ followRedirects })} aria-label="Follow redirects" />}
+        />
+        <SettingRow
+          title="Max redirects"
+          description="How many hops to follow before giving up."
+          disabled={!settings.followRedirects}
+          control={<NumberField value={settings.maxRedirects} onChange={(maxRedirects) => set({ maxRedirects })} label="Max redirects" />}
+        />
+        <SettingRow
+          title="Timeout"
+          description="Milliseconds to wait before aborting. 0 waits forever."
+          control={<NumberField value={settings.timeout} onChange={(timeout) => set({ timeout })} label="Timeout in milliseconds" clearable />}
+        />
+      </SettingGroup>
 
-      <NumberRow
-        title="Max Redirects"
-        hint="Set a limit for the number of redirects to follow"
-        value={settings.maxRedirects}
-        disabled={!settings.followRedirects}
-        onChange={(maxRedirects) => set({ maxRedirects })}
-      />
-      <NumberRow
-        title="Timeout (ms)"
-        hint="Set maximum time to wait before aborting the request"
-        value={settings.timeout}
-        clearable
-        onChange={(timeout) => set({ timeout })}
-      />
-
-      <ToggleRow
-        title="SSL Certificate Verification"
-        hint="Reject a self-signed, expired, or hostname-mismatched certificate. Turn off only for a local/dev server you trust — anyone on the network can impersonate the server while this is off."
-        checked={settings.verifyTls}
-        onChange={(verifyTls) => set({ verifyTls })}
-      />
+      <SettingGroup title="Security">
+        <SettingRow
+          title="SSL certificate verification"
+          description="Reject a self-signed, expired, or hostname-mismatched certificate. Turn off only for a local/dev server you trust — anyone on the network can impersonate the server while this is off."
+          control={<Switch checked={settings.verifyTls} onCheckedChange={(verifyTls) => set({ verifyTls })} aria-label="SSL certificate verification" />}
+        />
+      </SettingGroup>
       {!settings.verifyTls && (
         <Callout tone="warning" size="sm">
           Certificate errors are being ignored for this request — including a real man-in-the-middle
@@ -546,44 +566,28 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
   );
 }
 
-function ToggleRow({ title, hint, checked, onChange }: {
-  title: string; hint: string; checked: boolean; onChange: (v: boolean) => void;
+// The number control inside a SettingRow — `clearable` adds the reset-to-0
+// affordance the Timeout row needs (0 meaning "no limit" is not something you
+// can type your way back to once a value is in the field on every platform's
+// number input).
+function NumberField({ value, onChange, label, clearable }: {
+  value: number; onChange: (v: number) => void; label: string; clearable?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="space-y-0.5">
-        <p className="text-xs font-medium">{title}</p>
-        <p className="text-[11px] text-fg-mute">{hint}</p>
-      </div>
-      <Switch checked={checked} onCheckedChange={onChange} aria-label={title} />
-    </div>
-  );
-}
-
-function NumberRow({ title, hint, value, onChange, disabled, clearable }: {
-  title: string; hint: string; value: number; onChange: (v: number) => void; disabled?: boolean; clearable?: boolean;
-}) {
-  return (
-    <div className={cn('flex items-center justify-between gap-4', disabled && 'opacity-50')}>
-      <div className="space-y-0.5">
-        <p className="text-xs font-medium">{title}</p>
-        <p className="text-[11px] text-fg-mute">{hint}</p>
-      </div>
-      <div className="relative w-28 shrink-0">
-        <Input
-          type="number"
-          min={0}
-          value={value}
-          disabled={disabled}
-          onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-          className="h-ctl text-xs"
-        />
-        {clearable && value > 0 && (
-          <button onClick={() => onChange(0)} title="Clear" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute hover:text-fg">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+    <div className="relative w-28">
+      <Input
+        type="number"
+        min={0}
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+        className="h-ctl text-xs"
+      />
+      {clearable && value > 0 && (
+        <button onClick={() => onChange(0)} title="Clear" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute hover:text-fg">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -651,7 +655,21 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
   const setBody = (patch: Partial<typeof body>) => onChange({ body: { ...body, ...patch } });
 
   if (body.mode === 'none') {
-    return <p className="text-sm text-fg-mute">No Body</p>;
+    // A GET with no body is a perfectly finished state, so this is a neutral
+    // empty state, not a warning — but when a body IS wanted, pointing at a
+    // menu in the tab bar cost a hunt plus two clicks. The two types that
+    // cover almost every case get a button right here; the rest stay in the
+    // menu, named so the pointer knows where to go.
+    return (
+      <EmptyState
+        icon={FileQuestion}
+        title="No request body"
+        description="GET and DELETE usually send none. To add one, start here or pick another type from the menu above."
+        action={{ label: 'JSON', onClick: () => setBody({ mode: 'json' }) }}
+        secondaryAction={{ label: 'Form data', onClick: () => setBody({ mode: 'multipart' }) }}
+        className="px-4 py-10"
+      />
+    );
   }
   if (body.mode === 'multipart') {
     return (
