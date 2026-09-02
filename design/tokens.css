@@ -148,12 +148,44 @@
           Consolas, "Liberation Mono", monospace;
 
   /* ── Chuyển động: một nhịp duy nhất ───────────────────────────────────
-     Rê chuột đổi nền/viền — KHÔNG đổi vị trí. Không hover-lift. */
+     Rê chuột đổi nền/viền — KHÔNG đổi vị trí. Không hover-lift.
+
+     BỐN LUẬT, áp cho mọi component. Ba luật đầu là thứ phân biệt một giao
+     diện được CHỈNH với một giao diện chỉ "có gắn transition":
+
+     1. VÀO CHẬM, RA NHANH. Một panel mở ra là thông tin mới — mắt cần thời
+        gian bắt lấy nó, nên vào bằng `--dur-base` + `--ease-out-soft`. Cũng
+        panel đó đóng lại thì người dùng đã quyết định xong rồi, đứng đợi nó
+        bay ra là bực — nên ra bằng `--dur-exit` + `--ease-in-soft`, nhanh
+        hơn gần một nửa. Vào và ra CÙNG một thời lượng là dấu hiệu số một của
+        chuyển động chưa ai ngồi chỉnh.
+
+     2. CÀNG NHỎ CÀNG NHANH. Một cái tick 14px và một hộp thoại toàn màn hình
+        không thể cùng 220ms — cái tick sẽ lờ đờ, hộp thoại sẽ giật. Chọn
+        theo quãng đường phần tử đi, không theo thói quen:
+          `--dur-press` 90ms  → phản hồi dưới ngón tay (nhấn, tick, hover dày đặc)
+          `--dur-fast`  150ms → đổi màu, đổi icon, chip
+          `--dur-base`  220ms → menu, popover, con trượt tab/segmented
+          `--dur-slow`  340ms → bề mặt lớn: dialog, sheet, overlay toàn màn
+
+     3. PHẢN HỒI NHẤN LÀ TỨC THÌ. Lún xuống trong `--dur-press`, nhả ra trong
+        `--dur-fast`. Nhấn mà chờ 200ms mới thấy gì thì nút đọc ra là "hỏng",
+        không phải "mượt".
+
+     4. MỘT CHUYỂN ĐỘNG PHẢI TRẢ LỜI ĐƯỢC "ĐỂ LÀM GÌ". Phản hồi, thứ bậc,
+        hay chuyển trạng thái — nếu không nói được thì cắt. Đây là app công
+        cụ, không phải trang giới thiệu. */
   --ease-out-soft: cubic-bezier(.22, 1, .36, 1);
   --ease-spring:   cubic-bezier(.34, 1.45, .64, 1);
+  /* Đường cong RA: bắt đầu chậm rồi vọt đi. Ngược hẳn với out-soft, và đó là
+     ý đồ — phần tử biến mất phải dứt khoát, không "trôi" ra. */
+  --ease-in-soft:  cubic-bezier(.4, 0, .9, .3);
+  --dur-press: 90ms;
   --dur-fast: 150ms;
   --dur-base: 220ms;
   --dur-slow: 340ms;
+  /* Thời lượng RA dùng chung, để luật 1 chỉ nằm ở một chỗ. */
+  --dur-exit: 130ms;
 
   color-scheme: light;
 }

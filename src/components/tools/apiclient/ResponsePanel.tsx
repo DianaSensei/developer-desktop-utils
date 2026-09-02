@@ -373,7 +373,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         tabs={tabDefs}
         active={activeTab}
         onSelect={(id) => setTab(id as Tab)}
-        activeClassName="border-acc text-fg"
+        activeClassName="text-fg"
         right={headerRight}
       />
 

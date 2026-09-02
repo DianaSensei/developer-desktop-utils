@@ -23,6 +23,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -613,12 +614,10 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                         className={cn('group flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs hover:bg-acc/50', !checked && 'opacity-50')}
                       >
                         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-fg-mute/30 group-hover:text-fg-mute/60" />
-                        <span
-                          className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                            checked ? 'border-acc bg-acc text-acc-fg' : 'border-sunk')}
-                        >
-                          {checked && <Check className="h-3 w-3" />}
-                        </span>
+                        {/* Hàng bao ngoài đã bắt click (`onClick={() => toggle(req.id)}`),
+                            nên ô tick chỉ VẼ trạng thái — `tabIndex={-1}` để nó
+                            không thành một tab-stop thứ hai cho cùng một việc. */}
+                        <Checkbox checked={checked} tabIndex={-1} aria-hidden="true" />
                         <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(req.method))}>{req.method}</span>
                         <span className="min-w-0 flex-1 truncate" title={req.url}>{req.name}</span>
                         {filteredOut && <span className="shrink-0 rounded bg-bg-2 px-1.5 py-0.5 text-[11px] text-fg-mute">filtered</span>}

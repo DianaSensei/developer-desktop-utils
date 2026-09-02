@@ -176,21 +176,43 @@
            hover:shadow hover:border-line/70
            active:shadow-sm;
   }
+  /* Lún khi nhấn cho các control tự dựng (thẻ, hàng danh sách bấm được) —
+     `Button`/`IconButton` đã có sẵn bên trong. Nhấn trong `--dur-press`, nhả
+     trong `--dur-fast`: nhanh xuống, thong thả lên. Xem luật 3 trong
+     `design/tokens.css`. */
   .press {
-    @apply transition-transform duration-fast ease-out-soft motion-safe:active:scale-[0.96];
+    @apply transition-transform duration-fast ease-out-soft
+           motion-safe:active:scale-[0.97] motion-safe:active:duration-press;
   }
+  /* Vào của một khối nội dung. 340ms + 10px là quãng của một BỀ MẶT LỚN; dùng
+     cho một thẻ hay một hàng thì nó lê thê, nên hạ về nhịp `--dur-base` và
+     6px. Quãng đường ngắn hơn cũng có nghĩa là nội dung bên dưới bớt bị đẩy. */
   .animate-fade-in-up {
-    animation: fadeInUp var(--dur-slow) var(--ease-out-soft);
+    animation: fadeInUp var(--dur-base) var(--ease-out-soft);
   }
   .animate-scale-in {
     animation: scaleIn var(--dur-base) var(--ease-out-soft);
   }
+  /* Vào theo tầng cho danh sách. Mắt đọc ra một luồng thay vì tám thứ nảy lên
+     cùng lúc; 40ms/mục và chốt ở mục thứ 8 — quá 8 thì mục cuối chờ lâu đến
+     mức đọc ra là app chậm, chứ không phải app mượt. */
+  .stagger-in > * {
+    animation: fadeInUp var(--dur-base) var(--ease-out-soft) backwards;
+  }
+  .stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-in > *:nth-child(2) { animation-delay: 40ms; }
+  .stagger-in > *:nth-child(3) { animation-delay: 80ms; }
+  .stagger-in > *:nth-child(4) { animation-delay: 120ms; }
+  .stagger-in > *:nth-child(5) { animation-delay: 160ms; }
+  .stagger-in > *:nth-child(6) { animation-delay: 200ms; }
+  .stagger-in > *:nth-child(7) { animation-delay: 240ms; }
+  .stagger-in > *:nth-child(n + 8) { animation-delay: 280ms; }
   @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.95); }
+    from { opacity: 0; transform: scale(0.96); }
     to { opacity: 1; transform: scale(1); }
   }
 

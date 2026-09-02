@@ -72,7 +72,7 @@ export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: Produc
             <p className="text-[11px] text-fg-mute">Send a message to a topic</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+        <Button variant="outline" size="sm" busy={loading} onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
       </div>
 
       <div className="tool-scrollable px-5 py-5">

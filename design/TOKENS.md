@@ -198,8 +198,30 @@ Bốn bài kiểm tra bắt buộc trước khi khoá font (xem mục Typography
 
 ## Chuyển động
 
-Một nhịp duy nhất: `--dur-fast` 150ms · `--dur-base` 220ms · `--dur-slow` 340ms,
-với `--ease-out-soft` cho hầu hết và `--ease-spring` cho phần tử bật ra.
+| Token | Giá trị | Dùng cho |
+|---|---|---|
+| `--dur-press` | 90ms | Phản hồi dưới ngón tay: lún khi nhấn, hover ở hàng dày |
+| `--dur-fast` | 150ms | Đổi màu, đổi icon, chip |
+| `--dur-base` | 220ms | Menu, popover, con trượt tab/segmented |
+| `--dur-slow` | 340ms | Bề mặt lớn: dialog, sheet, overlay toàn màn |
+| `--dur-exit` | 130ms | Mọi thứ đi RA |
+| `--ease-out-soft` | `cubic-bezier(.22,1,.36,1)` | Mặc định, cho mọi thứ đi VÀO |
+| `--ease-in-soft` | `cubic-bezier(.4,0,.9,.3)` | Mọi thứ đi RA |
+| `--ease-spring` | `cubic-bezier(.34,1.45,.64,1)` | Phần tử bật ra, con trượt |
+
+Bốn luật, ghi đầy đủ kèm lý do trong `tokens.css`:
+
+1. **Vào chậm, ra nhanh.** Vào `--dur-base` + `out-soft`; ra `--dur-exit` +
+   `in-soft`. Vào và ra cùng thời lượng là dấu hiệu số một của chuyển động
+   chưa ai ngồi chỉnh.
+2. **Càng nhỏ càng nhanh.** Chọn thời lượng theo quãng đường phần tử đi.
+3. **Phản hồi nhấn là tức thì.** Lún trong `--dur-press`, nhả trong `--dur-fast`.
+4. **Nói được "để làm gì" thì mới giữ.** Phản hồi, thứ bậc, hay chuyển trạng
+   thái — không nói được thì cắt.
+
+Keyframe dùng chung (preset sinh ra utility `animate-*`): `pop-in` / `pop-out`
+cho bề mặt bật ra, `tick-draw` cho nét tick tự vẽ, `shimmer` cho khối chờ,
+`ring-ping` cho xác nhận thành công một lần.
 
 **Rê chuột đổi nền/viền — không đổi vị trí.** Không hover-lift, không glow.
 `prefers-reduced-motion` được tôn trọng ngay trong `tokens.css`.

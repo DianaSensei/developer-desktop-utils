@@ -73,7 +73,7 @@ function ClientsTab({ conn }: { conn: RedisConnection }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-fg-mute">{rows.length.toLocaleString()} connected client(s)</p>
-        <Button variant="outline" size="sm" onClick={reload}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+        <Button variant="outline" size="sm" busy={loading} onClick={reload}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
       </div>
       {loading && !data && <LoadingRow />}
       {error && <Callout tone="error">{error}</Callout>}
@@ -108,7 +108,7 @@ function SlowLogTab({ conn }: { conn: RedisConnection }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-fg-mute">Most recent {rows.length.toLocaleString()} slow command(s)</p>
-        <Button variant="outline" size="sm" onClick={reload}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+        <Button variant="outline" size="sm" busy={loading} onClick={reload}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
       </div>
       {loading && !data && <LoadingRow />}
       {error && <Callout tone="error">{error}</Callout>}
@@ -175,7 +175,7 @@ function ConfigTab({ conn }: { conn: RedisConnection }) {
       </Callout>
       <div className="flex items-center justify-between gap-2">
         <SearchInput value={filter} onChange={setFilter} placeholder="Filter, e.g. maxmemory*" className="h-ctl text-sm font-mono max-w-sm" />
-        <Button variant="outline" size="sm" onClick={reload}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+        <Button variant="outline" size="sm" busy={loading} onClick={reload}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
       </div>
       {loading && !data && <LoadingRow />}
       {error && <Callout tone="error">{error}</Callout>}

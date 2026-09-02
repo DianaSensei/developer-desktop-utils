@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Callout } from '@/components/ui/callout';
-import { Spinner, LoadingRow } from '@/components/ui/spinner';
+import { LoadingRow } from '@/components/ui/spinner';
 import { Field } from '@/components/ui/tool-section';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import {
@@ -58,7 +58,7 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
         actions={(
           <>
             <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New exchange</Button>
-            <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+            <Button variant="outline" size="sm" busy={exchanges.loading} onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
           </>
         )}
       />
@@ -140,8 +140,11 @@ function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
         actions={(
           <>
             <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New exchange</Button>
-            <Button variant="outline" size="sm" onClick={onRefresh} disabled={info.loading}>
-              {info.loading ? <Spinner size="sm" className="mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />} Refresh
+            {/* `busy` xoay chính icon Refresh. Cách cũ là tráo hẳn sang <Spinner>,
+                  mà hai glyph không cùng bề rộng nên nút NHẤY một cái đúng vào
+                  khoảnh khắc người dùng vừa bấm nó. */}
+            <Button variant="outline" size="sm" onClick={onRefresh} busy={info.loading}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
             </Button>
           </>
         )}

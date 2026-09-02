@@ -9,7 +9,7 @@
 // behavior instead of a plain non-responsive tab row that clips at narrow
 // widths.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronsRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
@@ -145,11 +145,12 @@ export function Tabs({ tabs, active, onSelect, right, className, activeClassName
         ))}
       </div>
 
-      <div className="flex min-w-0 items-center gap-4 overflow-hidden">
-        {inlineTabs.map((t) => (
-          <TabBtn key={t.id} def={t} active={t.id === active} activeClassName={activeClassName} onClick={() => onSelect(t.id)} />
-        ))}
-      </div>
+      <TabRow
+        tabs={inlineTabs}
+        active={active}
+        activeClassName={activeClassName}
+        onSelect={onSelect}
+      />
       {overflowTabs.length > 0 && <TabOverflow tabs={overflowTabs} onSelect={onSelect} />}
       {right != null && (
         <div ref={rightRef} className="ml-auto flex shrink-0 items-center gap-2.5 whitespace-nowrap pl-4 text-xs">
@@ -160,23 +161,101 @@ export function Tabs({ tabs, active, onSelect, right, className, activeClassName
   );
 }
 
-function TabBtn({ def, active, activeClassName, onClick }: {
-  def: TabDef; active: boolean; activeClassName?: string; onClick: () => void;
+/**
+ * Hàng tab + MỘT gạch chân dùng chung, trượt giữa các tab.
+ *
+ * Bản trước cho mỗi nút một `border-b-2` riêng, và đổi tab chỉ là tắt viền ở
+ * nút cũ rồi bật viền ở nút mới. Hai chuyện xảy ra cùng lúc ở hai chỗ cách xa
+ * nhau nên mắt không nối được chúng lại: người dùng thấy "gạch chân biến mất
+ * rồi có gạch chân khác", chứ không thấy "gạch chân đi từ tab này sang tab
+ * kia". Đó là thông tin duy nhất mà chuyển động ở thanh tab cần truyền, và
+ * cũng là lý do một thanh tab chỉ đổi màu luôn đọc ra là làm cho có.
+ *
+ * Gạch chân dịch bằng `transform` (không `left`) nên không reflow, và lần đặt
+ * đầu tiên không có transition — xem ghi chú cùng nội dung ở `Segmented`.
+ * Hover vẫn cho gạch mờ riêng ở từng nút: đó là "cái này bấm được", một nghĩa
+ * khác với "cái này đang mở", nên nó không dùng chung con trượt.
+ */
+function TabRow({ tabs, active, activeClassName, onSelect }: {
+  tabs: TabDef[]; active: string; activeClassName?: string; onSelect: (id: string) => void;
 }) {
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [bar, setBar] = useState<{ x: number; w: number } | null>(null);
+  const ready = useRef(false);
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const el = btnRefs.current[active];
+    // Tab đang mở có thể đang nằm trong menu tràn — lúc đó không có gạch chân
+    // nào để vẽ, và ẩn nó đi đúng hơn là neo bừa vào tab đầu tiên.
+    if (!row || !el) { setBar(null); return; }
+    const measure = () => setBar({ x: el.offsetLeft, w: el.offsetWidth });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(row);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [active, tabs]);
+
+  useEffect(() => {
+    if (!bar) return;
+    const id = requestAnimationFrame(() => { ready.current = true; });
+    return () => cancelAnimationFrame(id);
+  }, [bar]);
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-medium transition-colors',
-        active
-          ? (activeClassName ?? 'border-acc text-fg')
-          : 'border-transparent text-fg-mute hover:text-fg hover:border-line',
+    <div ref={rowRef} className="relative flex min-w-0 items-center gap-4 overflow-hidden">
+      {tabs.map((t) => (
+        <TabBtn
+          key={t.id}
+          ref={(el) => { btnRefs.current[t.id] = el; }}
+          def={t}
+          active={t.id === active}
+          activeClassName={activeClassName}
+          onClick={() => onSelect(t.id)}
+        />
+      ))}
+      {bar && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            // `bottom-0`, KHÔNG phải `-bottom-px`: hàng này có `overflow-hidden`
+            // để cắt các tab tràn ra, nên bất cứ thứ gì đặt ngoài mép dưới đều
+            // bị cắt mất — kể cả chính gạch chân. Các nút có `-mb-px` nên mép
+            // dưới của hàng nằm đúng trên đường viền của thanh tab.
+            'pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-acc',
+            ready.current && 'motion-safe:transition-transform motion-safe:duration-base motion-safe:ease-out-soft',
+          )}
+          style={{ width: bar.w, transform: `translateX(${bar.x}px)` }}
+        />
       )}
-    >
-      {def.label}{def.badge}
-    </button>
+    </div>
   );
 }
+
+const TabBtn = forwardRef<HTMLButtonElement, {
+  def: TabDef; active: boolean; activeClassName?: string; onClick: () => void;
+}>(({ def, active, activeClassName, onClick }, ref) => (
+  <button
+    ref={ref}
+    onClick={onClick}
+    aria-selected={active}
+    className={cn(
+      // Gạch chân của tab ĐANG MỞ do `TabRow` vẽ; `border-b-2` ở đây chỉ còn
+      // phục vụ trạng thái hover (và giữ nguyên chiều cao hàng để đổi tab
+      // không làm layout nhích lên một pixel).
+      'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent py-2.5 text-xs font-medium',
+      'transition-colors duration-fast ease-out-soft',
+      active
+        ? (activeClassName ?? 'text-fg')
+        : 'text-fg-mute hover:text-fg hover:border-line',
+    )}
+  >
+    {def.label}{def.badge}
+  </button>
+));
+TabBtn.displayName = 'TabBtn';
 
 function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string) => void }) {
   const [open, setOpen] = useState(false);

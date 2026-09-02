@@ -20,6 +20,8 @@ export {
   SelectLabel, SelectItem, SelectSeparator, SelectScrollUpButton, SelectScrollDownButton,
 } from '@/components/ui/select';
 export { Switch, type SwitchProps } from '@/components/ui/switch';
+export { Checkbox, type CheckboxProps } from '@/components/ui/checkbox';
+export { Skeleton, SkeletonText, SkeletonList, type SkeletonProps } from '@/components/ui/skeleton';
 export {
   Dialog, DialogTrigger, DialogPortal, DialogClose, DialogOverlay, DialogContent,
   DialogHeader, DialogFooter, DialogTitle, DialogDescription,

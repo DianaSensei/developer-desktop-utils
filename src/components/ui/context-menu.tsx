@@ -73,7 +73,7 @@ export function ContextMenu({ state, onClose, width = 220 }: ContextMenuProps) {
               disabled={en.disabled}
               onClick={() => { en.onClick(); onClose(); }}
               className={cn(
-                'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-acc',
+                'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs transition-colors duration-press ease-out-soft hover:bg-acc',
                 'disabled:pointer-events-none disabled:opacity-50',
                 en.danger && 'text-bad hover:bg-bad/10',
               )}

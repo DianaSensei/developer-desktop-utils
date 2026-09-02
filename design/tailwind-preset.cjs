@@ -92,12 +92,15 @@ module.exports = {
 
       transitionTimingFunction: {
         'out-soft': 'var(--ease-out-soft)',
+        'in-soft': 'var(--ease-in-soft)',
         spring: 'var(--ease-spring)',
       },
       transitionDuration: {
+        press: 'var(--dur-press)',
         fast: 'var(--dur-fast)',
         base: 'var(--dur-base)',
         slow: 'var(--dur-slow)',
+        exit: 'var(--dur-exit)',
       },
 
       keyframes: {
@@ -107,6 +110,43 @@ module.exports = {
         'progress-indeterminate': {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(400%)' },
+        },
+
+        /* ── Bật ra / thu vào ────────────────────────────────────────────
+           Cho menu, popover, chip trạng thái. Đi kèm `transform-origin` do
+           call site đặt, nên cùng một keyframe phục vụ được cả menu neo ở
+           trên lẫn neo ở dưới — nó "mọc ra" từ nút bấm chứ không nở ra từ
+           giữa chính nó. Vào 96% (không phải 95%): ở kích thước menu thật,
+           95% đã đủ lớn để đọc ra là "giật một cái". */
+        'pop-in': {
+          from: { opacity: 0, transform: 'scale(.96)' },
+          to: { opacity: 1, transform: 'scale(1)' },
+        },
+        'pop-out': {
+          from: { opacity: 1, transform: 'scale(1)' },
+          to: { opacity: 0, transform: 'scale(.97)' },
+        },
+
+        /* Nét tick tự vẽ. `stroke-dasharray` đặt ở component; ở đây chỉ kéo
+           dashoffset về 0. Vì sao không fade: một cái tick fade vào trông
+           như nó vốn ở đó rồi, còn nét vẽ đọc ra là "vừa mới xong" — đúng
+           nghĩa của hành động người dùng vừa làm. */
+        'tick-draw': {
+          from: { strokeDashoffset: 'var(--tick-len, 22)' },
+          to: { strokeDashoffset: '0' },
+        },
+
+        /* Vệt sáng quét qua khối chờ (skeleton). Không phải trang trí: nó là
+           thứ phân biệt "đang tải" với "tải xong và rỗng". */
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+
+        /* Vòng sáng lan ra một lần khi một việc THÀNH CÔNG (copy, lưu, gửi).
+           Một lần, rồi hết — không lặp. */
+        'ring-ping': {
+          from: { opacity: '.5', transform: 'scale(.9)' },
+          to: { opacity: 0, transform: 'scale(1.5)' },
         },
       },
       animation: {
@@ -118,6 +158,14 @@ module.exports = {
         // Continuous indeterminate sweep, not an entrance/exit — its 1.1s
         // linear-ish loop is a deliberate pace unrelated to the UI tempo scale.
         'progress-indeterminate': 'progress-indeterminate 1.1s ease-in-out infinite',
+
+        // Vào/ra bất đối xứng — luật 1 trong `tokens.css`. Cùng một cặp cho
+        // mọi bề mặt bật ra, nên menu, popover và chip nhả ra cùng một nhịp.
+        'pop-in': 'pop-in var(--dur-base) var(--ease-out-soft)',
+        'pop-out': 'pop-out var(--dur-exit) var(--ease-in-soft) forwards',
+        'tick-draw': 'tick-draw var(--dur-fast) var(--ease-out-soft) forwards',
+        shimmer: 'shimmer 1.4s ease-in-out infinite',
+        'ring-ping': 'ring-ping var(--dur-slow) var(--ease-out-soft) forwards',
       },
     },
   },

@@ -48,7 +48,7 @@ export function GroupListView({ brokerId, refreshKey, onRefresh, onSelectGroup }
         icon={Users}
         title="Consumer groups"
         subtitle={groups ? `${groups.length} groups` : 'Kafka cluster'}
-        actions={<Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>}
+        actions={<Button variant="outline" size="sm" busy={loading} onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>}
       />
 
       <div className="px-5 pt-3 shrink-0">

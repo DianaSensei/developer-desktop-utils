@@ -77,7 +77,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         tabs={tabs}
         active={tab}
         onSelect={(id) => onTabChange(id as Tab)}
-        activeClassName="border-acc text-fg"
+        activeClassName="text-fg"
         right={tab === 'body' ? <BodyModeDropdown body={request.body} onChange={onChange} /> : undefined}
       />
 
