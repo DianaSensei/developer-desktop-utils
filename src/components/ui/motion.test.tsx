@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ContextMenu } from '@/components/ui/context-menu';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
@@ -152,6 +153,29 @@ describe('StatusMessage', () => {
       );
       expect((container.firstChild as HTMLElement).className).toContain(expected);
       unmount();
+    }
+  });
+});
+
+describe('ContextMenu', () => {
+  it('sống thêm một nhịp sau khi đóng để kịp thu lại — giống DropdownMenu', () => {
+    vi.useFakeTimers();
+    try {
+      const state = { x: 50, y: 60, entries: [{ label: 'Xoá', onClick: vi.fn() }] };
+      const onClose = vi.fn();
+      render(<ContextMenu state={state} onClose={onClose} />);
+      expect(screen.getByRole('menu')).toBeTruthy();
+
+      fireEvent.click(screen.getByText('Xoá'));
+      // Vẫn còn trong DOM ngay sau click — chưa gọi onClose thật.
+      const menu = screen.getByRole('menu');
+      expect(menu.className).toContain('pointer-events-none');
+      expect(onClose).not.toHaveBeenCalled();
+
+      act(() => { vi.advanceTimersByTime(130); });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

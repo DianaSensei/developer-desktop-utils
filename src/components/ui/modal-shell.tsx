@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,21 @@ import { cn } from '@/lib/utils';
  * Radix `Dialog` (`ui/dialog.tsx`) remains the right choice for a dialog with
  * a trigger element. These modals are rendered conditionally by their parent
  * with no trigger to bind to, which is the case this covers.
+ *
+ * ── Vì sao có animation vào mà không có animation ra ────────────────────────
+ * Đây là 7 form kết nối/info modal của mọi broker trong app (Kafka, RabbitMQ,
+ * Redis, Container) — và tất cả đều được cha mount kiểu `{open && <Form/>}`.
+ * Khi `onClose` gọi `setOpen(false)`, React gỡ `ModalShell` khỏi cây NGAY LẬP
+ * TỨC — chưa kịp phát khung hình animation nào. Kết quả: mở ra thì mượt
+ * (`fade-in` + `zoom-in-95`), đóng thì BIẾN MẤT, đúng lỗi từng có ở
+ * `DropdownMenu` trước khi sửa (xem ghi chú ở đó).
+ *
+ * `ModalShell` không sở hữu biến `open` — cha nó sở hữu — nên hướng sửa phải
+ * NGƯỢC với DropdownMenu: thay vì tự trì hoãn việc gỡ khỏi DOM, nó phải trì
+ * hoãn việc BÁO cho cha biết là đã đóng. Mọi đường đóng (Escape, bấm ra ngoài,
+ * nút X) đi qua `requestClose()`: bật `closing` để panel chạy animation ra
+ * ngay, rồi mới gọi `onClose` thật sau `--dur-exit` — lúc đó cha mới gỡ nó, và
+ * animation đã kịp chạy xong.
  */
 export interface ModalShellProps {
   /** Called on Escape, backdrop click, and the header close button. */
@@ -61,10 +76,28 @@ export function ModalShell({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descId = useId();
+  const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
 
   // Keep the latest handler without re-binding the key listener each render.
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+
+  // 130ms = `--dur-exit`. Chạy animation trước, rồi mới báo cho cha — cha gỡ
+  // component ngay khi `onClose` chạy, nên gọi sớm hơn là cắt animation giữa
+  // chừng.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const requestClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing(true);
+    // Dọn timer nếu chính component bị gỡ vì lý do khác (route đổi, StrictMode
+    // double-invoke lúc dev) trước khi kịp tự bắn — nếu không, `onClose` gọi
+    // vào một cha đã unmount thì vô hại nhưng vẫn là một timer treo lơ lửng.
+    timerRef.current = setTimeout(() => closeRef.current(), 130);
+  }, []);
 
   // Escape closes, and Tab cycles inside the panel instead of walking into the
   // page behind the overlay — the part `aria-modal` describes but cannot make
@@ -72,7 +105,7 @@ export function ModalShell({
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.stopPropagation();
-      closeRef.current();
+      requestClose();
       return;
     }
     if (e.key !== 'Tab') return;
@@ -98,6 +131,9 @@ export function ModalShell({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     panelRef.current?.focus({ preventScroll: true });
+    // Trả tiêu điểm lại sau khi component THẬT SỰ bị gỡ (cleanup này chạy lúc
+    // đó, không phải lúc `closing` bật) — nên trình đọc màn hình không nhảy
+    // tiêu điểm ngay giữa lúc panel còn đang mờ dần.
     return () => previous?.focus?.({ preventScroll: true });
   }, []);
 
@@ -107,12 +143,14 @@ export function ModalShell({
         'fixed inset-0 z-50 flex justify-center p-4',
         align === 'top' ? 'items-start pt-[10vh]' : 'items-center',
         scrim === 'strong' ? 'bg-black/60' : 'bg-black/40',
-        'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-fast motion-safe:ease-out-soft',
+        closing
+          ? 'pointer-events-none motion-safe:animate-out motion-safe:fade-out-0 motion-safe:duration-exit motion-safe:ease-in-soft'
+          : 'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-fast motion-safe:ease-out-soft',
         overlayClassName,
       )}
       // mousedown rather than click: a selection drag that starts inside an
       // input and releases over the backdrop should not close the modal.
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) requestClose(); }}
     >
       <div
         ref={panelRef}
@@ -124,7 +162,9 @@ export function ModalShell({
         onKeyDown={onKeyDown}
         className={cn(
           'flex w-full flex-col overflow-hidden rounded-lg border bg-bg shadow-xl outline-hidden max-h-[88vh]',
-          'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-base motion-safe:ease-out-soft',
+          closing
+            ? 'motion-safe:animate-out motion-safe:fade-out-0 motion-safe:zoom-out-95 motion-safe:duration-exit motion-safe:ease-in-soft'
+            : 'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-base motion-safe:ease-out-soft',
           width,
           className,
         )}
@@ -138,7 +178,7 @@ export function ModalShell({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Close"
             className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
           >

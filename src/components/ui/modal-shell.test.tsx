@@ -44,29 +44,68 @@ describe('ModalShell', () => {
     expect(screen.getByRole('dialog').getAttribute('aria-describedby')).toBeNull();
   });
 
-  it('gives the close button an accessible name', () => {
+  // `onClose` giờ chạy trễ 130ms (`--dur-exit`) sau mỗi đường đóng, để panel
+  // kịp chạy animation ra trước khi cha gỡ nó khỏi cây — xem ghi chú "Vì sao
+  // có animation vào mà không có animation ra" ở đầu `modal-shell.tsx`. Ba
+  // test dưới đây giữ nguyên Ý ĐỊNH cũ (mỗi đường đóng phải gọi `onClose`
+  // đúng một lần) nhưng phải đợi qua độ trễ đó.
+  it('gives the close button an accessible name, and closes after the exit animation', () => {
+    vi.useFakeTimers();
     const { onClose } = renderShell();
     const close = screen.getByRole('button', { name: 'Close' });
     fireEvent.click(close);
+    expect(onClose).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(130);
     expect(onClose).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
-  it('closes on Escape', () => {
+  it('closes on Escape, after the exit animation', () => {
+    vi.useFakeTimers();
     const { onClose } = renderShell();
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    vi.advanceTimersByTime(130);
     expect(onClose).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it('closes on a backdrop press but not on one that starts inside the panel', () => {
+    vi.useFakeTimers();
     const { onClose } = renderShell();
     const dialog = screen.getByRole('dialog');
     const backdrop = dialog.parentElement!;
 
     fireEvent.mouseDown(dialog);
+    vi.advanceTimersByTime(130);
     expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.mouseDown(backdrop);
+    vi.advanceTimersByTime(130);
     expect(onClose).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('plays the exit animation instead of vanishing in one frame, and ignores a second close request mid-exit', () => {
+    // Đây chính là lỗi đã sửa: bản trước gọi `onClose` NGAY, cha gỡ component
+    // khỏi cây trong cùng khung hình, nên panel không kịp chạy animation ra —
+    // giống hệt lỗi từng có ở `DropdownMenu` trước khi sửa.
+    vi.useFakeTimers();
+    const { onClose } = renderShell();
+    const dialog = screen.getByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    // Vẫn còn trong DOM ngay sau khi đóng — animation ra cần một khung hình.
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(dialog.className).toContain('animate-out');
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Một lần đóng thứ hai giữa lúc đang chạy animation ra không được xếp
+    // thêm một lượt gọi `onClose` nữa.
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    vi.advanceTimersByTime(130);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it('moves focus onto the panel on open rather than into a field', () => {
