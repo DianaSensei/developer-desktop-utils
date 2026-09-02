@@ -61,10 +61,15 @@ export function MultipartEditor({ rows, onChange }: Props) {
     // Value instead; scroll sideways below the min width rather than shrink
     // them to unusable slivers.
     <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
-      <div className="min-w-[24rem]">
-      {/* header */}
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem_2rem] border-b bg-bg-2/30 font-semibold">
-        <div className="border-r px-3 py-1.5">Key</div>
+      <div className="min-w-[26rem]">
+      {/* Header and grid match KeyValueEditor's: an uppercase muted caption
+          rather than bold title case, "Name" rather than "Key", and a leading
+          2rem toggle column so the Name cell starts at the same x as it does
+          in the Query/Headers/Path tables above. This editor was the one table
+          in the tool that kept the old treatment. */}
+      <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_10rem_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
+        <div />
+        <div className="border-r px-3 py-1.5">Name</div>
         <div className="border-r px-3 py-1.5">Value</div>
         <div className="border-r px-3 py-1.5">Content-Type</div>
         <div />
@@ -74,24 +79,41 @@ export function MultipartEditor({ rows, onChange }: Props) {
         const isGhost = row.id === ghost.id;
         const isFile = row.kind === 'file' && !!row.fileName;
         return (
-          <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
-            {/* key cell with enable checkbox */}
-            <div className="flex min-w-0 items-center gap-1.5 border-r px-2">
-              <button
-                type="button"
-                onClick={() => !isGhost && editRow(row.id, { enabled: !row.enabled })}
-                className={cn(
-                  'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-                  isGhost ? 'invisible' : row.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
-                )}
-                title={row.enabled ? 'Enabled' : 'Disabled'}
-              >
-                {!isGhost && row.enabled && <Check className="h-2.5 w-2.5" />}
-              </button>
+          <div key={row.id} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_10rem_2rem] border-b last:border-b-0 transition-colors hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+            {/* Toggle column — the whole cell is the target, with the same
+                role/aria and hover feedback KeyValueEditor's rows carry. */}
+            <div className="flex items-stretch border-r">
+              {isGhost ? (
+                <span className="w-full" />
+              ) : (
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={row.enabled}
+                  aria-label={`${row.key || 'Field'} — ${row.enabled ? 'enabled' : 'disabled'}`}
+                  onClick={() => editRow(row.id, { enabled: !row.enabled })}
+                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
+                  title={row.enabled ? 'Disable' : 'Enable'}
+                >
+                  <span
+                    className={cn(
+                      'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+                      row.enabled
+                        ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
+                        : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
+                    )}
+                  >
+                    {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+                  </span>
+                </button>
+              )}
+            </div>
+            {/* name cell */}
+            <div className="flex min-w-0 items-center border-r px-1.5">
               <Input
                 value={row.key}
                 onChange={(e) => editRow(row.id, { key: e.target.value })}
-                placeholder="Key"
+                placeholder="Name"
                 className={cn(inputCls, !isGhost && !row.enabled && 'opacity-50')}
                 spellCheck={false}
               />
@@ -134,11 +156,17 @@ export function MultipartEditor({ rows, onChange }: Props) {
               />
             </div>
 
-            {/* action cell */}
+            {/* Action cell — revealed on hover/focus like every other table's,
+                instead of a trash icon sitting on every row at rest. */}
             <div className="flex items-center justify-center">
               {!isGhost && (
-                <button type="button" onClick={() => removeRow(row.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-bad">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <button
+                  type="button"
+                  onClick={() => removeRow(row.id)}
+                  title="Remove"
+                  className="rounded p-1 text-fg-mute/40 opacity-0 transition-all hover:text-bad group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+                >
+                  <Trash2 className="h-3 w-3" />
                 </button>
               )}
             </div>
