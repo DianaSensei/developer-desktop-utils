@@ -595,6 +595,29 @@ describe('useApiStore — moveItem / copyItem (sidebar drag & drop)', () => {
       expect(copiedFolder.items[0].id).not.toBe(childId);
     }
   });
+
+  it('moveItem/copyItem leave every collection untouched when the source id is a collection, not a tree item', async () => {
+    // Both only ever look for `sourceId` inside collections' *items* (via
+    // extractItem/findItem) — a collection's own id is never a member of its
+    // own items array, so passing one in is a safe no-op rather than
+    // corrupting state. This is why the sidebar row for a collection is not
+    // draggable: dragging one and dropping it produced no visible change, so
+    // the drag affordance itself was removed rather than "fixing" this into
+    // doing something (collection reordering was never implemented).
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    let targetId = '';
+    act(() => { targetId = result.current.addCollection(); });
+    const sourceCollectionId = result.current.collections[0].id;
+    const before = result.current.collections;
+
+    act(() => result.current.moveItem(sourceCollectionId, targetId, 'inside'));
+    expect(result.current.collections).toBe(before);
+
+    act(() => result.current.copyItem(sourceCollectionId, targetId, 'inside'));
+    expect(result.current.collections).toBe(before);
+  });
 });
 
 describe('useApiStore — revealRequest (sidebar auto-expand on select)', () => {

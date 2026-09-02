@@ -555,7 +555,12 @@ function Row({
     <div
       ref={rowRef}
       title={title}
-      draggable={!editing}
+      // Collections (depth 0) aren't draggable: moveItem/copyItem only relocate
+      // tree items within collections.items, so a collection id is never found
+      // there — picking one up and dropping it anywhere was a silent no-op that
+      // looked broken rather than doing nothing on purpose. Folders/requests
+      // (depth > 0) keep the real drag-to-reorder/move behavior.
+      draggable={!editing && depth > 0}
       onDragStart={(e) => { e.stopPropagation(); ctx.setDragId(id); e.dataTransfer.effectAllowed = 'copyMove'; }}
       onDragEnd={() => { ctx.setDragId(null); ctx.setDropTarget(null); }}
       onDragOver={(e) => {

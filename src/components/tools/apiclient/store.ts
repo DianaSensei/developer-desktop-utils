@@ -748,14 +748,6 @@ export function useApiStore() {
     [collections, activeRequestId],
   );
 
-  const duplicateRequest = useCallback((collectionId: string, req: ApiRequest) => {
-    const copy = { ...newRequest({ ...req, name: `${req.name} copy` }) };
-    setCollections((prev) => prev.map((c) =>
-      c.id === collectionId ? { ...c, items: [...c.items, copy] } : c,
-    ));
-    selectRequest(copy.id);
-  }, [setCollections, selectRequest]);
-
   // Insert an already-built request (e.g. a cURL import) and focus it.
   const addRequest = useCallback((collectionId: string, request: ApiRequest, parentId?: string) => {
     setCollections((prev) => prev.map((c) => {
@@ -951,7 +943,7 @@ export function useApiStore() {
     activeRequestId, activeRequest, openRequests, inheritedScripts, activeCollectionVars,
     setActiveRequestId, setActiveCollectionEnv, setActiveGlobalEnv, selectRequest, closeTab, closeTabs,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse, revealRequest,
-    addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, copyItem, updateRequest, setNodeScript, setNodeAuth,
+    addItem, addRequest, deleteItem, renameItem, cloneItem, cloneCollection, moveItem, copyItem, updateRequest, setNodeScript, setNodeAuth,
     setNodeHeaders,
     setCollectionVariables,
     addEnvironment, duplicateEnvironment, importEnvironment, updateEnvironment, deleteEnvironment,
