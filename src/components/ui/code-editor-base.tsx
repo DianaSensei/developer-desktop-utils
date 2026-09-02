@@ -123,7 +123,13 @@ export function CodeSurface({
   return (
     <div
       className={cn(
-        'flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border border-sunk bg-bg shadow-sm transition-shadow hover:border-line/80 focus-within:shadow-none focus-within:ring-2 focus-within:ring-acc/40',
+        // Công thức vòng focus đã gom về một chỗ trong app: `ring-[3px]` màu
+        // `--acc-ring` (bí danh `ring-focus`), không offset. Trước là
+        // `ring-2 ring-acc/40` riêng của mỗi editor — không dính lỗi "dính lại
+        // sau khi bấm chuột" (đây là `focus-within`, đúng ngữ nghĩa vì
+        // CodeMirror không phải input gốc), nhưng khác công thức với input,
+        // textarea, select, button trong cùng app.
+        'flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border border-sunk bg-bg shadow-sm transition-shadow duration-fast ease-out-soft hover:border-line/80 focus-within:shadow-none focus-within:ring-[3px] focus-within:ring-focus',
         className,
       )}
     >

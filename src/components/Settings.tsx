@@ -530,7 +530,7 @@ export function Settings() {
             value={toolQuery}
             onChange={(e) => setToolQuery(e.target.value)}
             placeholder={t('shell.search.placeholder')}
-            className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-bg-2 focus-visible:ring-1"
+            className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-bg-2"
           />
           {toolQuery && (
             <button

@@ -79,7 +79,7 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
       {/* h-ctl, not h-ctl-lg: this bar used to be the one control in the app
           taller than the 34px standard (--h) — 40px around 12-13px text read
           as noticeably oversized next to every other input/select/button. */}
-      <div className="flex items-center overflow-hidden rounded-lg border border-line bg-bg shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-2 focus-within:ring-acc/40">
+      <div className="flex items-center overflow-hidden rounded-lg border border-line bg-bg shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-[3px] focus-within:ring-focus">
         {/* Method selector — tinted to match the active HTTP method (Bruno-style) */}
         {/* text-xs, not the Select default text-sm: every other place this app
             prints a method — tab strip, sidebar badge, history, runner — uses

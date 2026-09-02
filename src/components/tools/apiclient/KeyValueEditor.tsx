@@ -230,7 +230,7 @@ export function KeyValueEditor({
           const disabled = !isGhost && !row.enabled;
           const secret = isMasked(row);
           return (
-            <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors', gridCols)}>
+            <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors', gridCols)}>
               {/* Enable/disable. The button IS the cell — clicking anywhere in
                   the leading column toggles the row, not just the checkbox
                   glyph itself, so the target stays the full ~34px cell people
@@ -247,7 +247,7 @@ export function KeyValueEditor({
                     aria-checked={row.enabled}
                     aria-label={`${row.key || keyPlaceholder} — ${row.enabled ? 'enabled' : 'disabled'}`}
                     onClick={() => editRow(row.id, { enabled: !row.enabled })}
-                    className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
+                    className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
                     title={row.enabled ? 'Disable' : 'Enable'}
                   >
                     <span

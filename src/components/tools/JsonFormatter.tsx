@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Eye,
   EyeOff,
@@ -618,14 +617,14 @@ export function JsonFormatter() {
           >
             {lines.map((line) => {
               const bracketHighlighted = line.kind !== 'primitive' && line.path === hoveredContainer;
-              const bracketClass = cn('text-fg-mute', bracketHighlighted && 'text-fg font-semibold');
+              const bracketClass = cn('text-fg-mute transition-colors duration-fast ease-out-soft', bracketHighlighted && 'text-fg font-semibold');
               const isMatch = lineMatches(line, lowerQuery);
               const isSelected = line.kind !== 'close' && selectedPath === line.path;
               const isToggle = line.kind === 'open' || line.kind === 'collapsed';
               return (
                 <div
                   key={`${line.path}:${line.kind}`}
-                  className="flex items-start hover:bg-bg-2/30"
+                  className="flex items-start hover:bg-bg-2/30 transition-colors duration-fast ease-out-soft"
                   onMouseEnter={() => setHoveredContainer(line.containerPath)}
                   onClick={() => { setSelectedPath(line.path); if (isToggle && !forceExpand) toggle(line.path); }}
                 >
@@ -634,9 +633,31 @@ export function JsonFormatter() {
                   </span>
                   <div className="flex min-w-0 flex-1 items-start pr-3" style={{ paddingLeft: `${line.depth * indent.size}ch` }}>
                     <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-fg-mute">
-                      {isToggle && (line.kind === 'open' ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)}
+                      {/* MỘT icon xoay 90°, không phải tráo giữa hai icon khác nhau.
+                          Bản trước tráo ChevronDown ↔ ChevronRight — hai component
+                          Lucide khác nhau, nên React coi đó là hai node khác nhau
+                          và không có gì để animate: mở/gập BẬT TẮT trong một khung
+                          hình. Đây là hàng dày đặc nhất trong toàn app xét theo tần
+                          suất bấm (mọi node object/array trong cây JSON), nên đúng
+                          chỗ đáng animate nhất lại là chỗ trơ nhất. Cùng công thức
+                          `CollapsibleSection` đã dùng: một ChevronRight, xoay bằng
+                          `--ease-spring` khi mở. */}
+                      {isToggle && (
+                        <ChevronRight
+                          className={cn(
+                            'h-3.5 w-3.5 transition-transform duration-base ease-spring',
+                            line.kind === 'open' && 'rotate-90',
+                          )}
+                        />
+                      )}
                     </span>
-                    <span className={cn('whitespace-pre rounded-sm px-0.5', isSelected && 'bg-fg/10', isMatch && 'bg-warn/25')}>
+                    <span
+                      className={cn(
+                        'whitespace-pre rounded-sm px-0.5 transition-colors duration-fast ease-out-soft',
+                        isSelected && 'bg-fg/10',
+                        isMatch && 'bg-warn/25',
+                      )}
+                    >
                       {line.name !== undefined && (
                         <>
                           <span className="text-[var(--json-key)]">{quoteText(line.name, quote)}</span>

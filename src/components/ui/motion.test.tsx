@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { execSync } from 'node:child_process';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ContextMenu } from '@/components/ui/context-menu';
@@ -26,6 +27,41 @@ import {
  *   - nội dung đang thu lại vẫn Tab vào được.
  */
 
+describe('Vòng focus — MỘT công thức cho toàn app', () => {
+  // Quét toàn bộ `src/**/*.tsx` thay vì một danh sách file cứng: sáu công thức
+  // vòng focus khác nhau (`ring-acc/35`, `/40`, `/50`, đặc, có/không offset)
+  // là đúng lỗi user report ở phiên trước — bị bắt lại một cách máy móc, không
+  // phải liệt kê từng file rồi quên cập nhật danh sách lần sau.
+  //
+  // KHÔNG dùng cách đếm này để cấm `ring-*` nói chung — chấm trạng thái, viền
+  // kéo-thả, khối màu trong Clockify… vẫn được dùng `ring-1`/`ring-2` với màu
+  // ngữ nghĩa riêng (`ring-ok/40`, `ring-line`) vì đó không phải vòng focus.
+  // Luật ở đây hẹp hơn: bất cứ đâu dùng ĐÚNG bề rộng `ring-[3px]` (bề rộng chỉ
+  // dành riêng cho vòng focus trong app này) thì bắt buộc phải đi kèm màu
+  // `ring-focus` trong CÙNG FILE.
+  it('mọi `ring-[3px]` trong `src/**/*.tsx` đều có `ring-focus` đi kèm, trong cùng file', () => {
+    const files = execSync(
+      "git ls-files 'src/**/*.tsx' ':!:src/**/*.test.tsx'",
+      { cwd: process.cwd(), encoding: 'utf-8' },
+    ).trim().split('\n').filter(Boolean);
+
+    const mismatches: string[] = [];
+    for (const f of files) {
+      const raw = readFileSync(resolve(process.cwd(), f), 'utf-8');
+      // Bỏ comment trước khi đếm — cùng lý do `design-system/guard.test.ts`
+      // làm việc này: một dòng giải thích *vì sao* nhắc tới `ring-[3px]` không
+      // được tính là một lần dùng thật.
+      const stripped = raw
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|[^:])\/\/.*$/gm, '$1');
+      const widths = stripped.match(/ring-\[3px\]/g)?.length ?? 0;
+      const colors = stripped.match(/ring-focus\b/g)?.length ?? 0;
+      if (widths !== colors) mismatches.push(`${f}: ${widths} ring-[3px] vs ${colors} ring-focus`);
+    }
+    expect(mismatches).toEqual([]);
+  });
+});
+
 describe('Vòng focus — không được dính lại sau khi bấm chuột', () => {
   // `focus:` khớp với MỌI kiểu nhận tiêu điểm, kể cả click chuột — nên vòng
   // sáng ở lại trên control cho tới khi bấm chỗ khác. `focus-visible:` chỉ khớp
@@ -48,16 +84,8 @@ describe('Vòng focus — không được dính lại sau khi bấm chuột', ()
     }
   });
 
-  it('vòng focus có MÀU tường minh — Tailwind 4 không còn màu ring mặc định', () => {
-    // `ring-<width>` một mình đổ về `currentcolor`: vòng sáng sẽ mang màu CHỮ
-    // (trắng trên nút accent). Mọi chỗ đặt bề rộng phải đặt kèm màu.
-    for (const f of files) {
-      const src = readFileSync(resolve(process.cwd(), f), 'utf-8');
-      const widths = src.match(/focus-visible:ring-\[3px\]/g)?.length ?? 0;
-      const colors = src.match(/focus-visible:ring-focus/g)?.length ?? 0;
-      expect(colors, f).toBe(widths);
-    }
-  });
+  // Bao quát bởi rào chắn tổng quát ở khối 'Vòng focus — MỘT công thức
+  // cho toàn app' bên trên (Tailwind 4 không còn màu ring mặc định).
 
   it('nút không còn quầng sáng ngả accent — design/RULES.md cấm glow', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/components/ui/button.tsx'), 'utf-8');

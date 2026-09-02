@@ -113,8 +113,13 @@ export function Tr({ interactive, selected, className, ...props }: TrProps) {
   return (
     <tr
       className={cn(
-        'transition-colors',
-        interactive && 'cursor-pointer hover:bg-bg-2/40',
+        // Nhịp chung của app, không phải mặc định của Tailwind — hai con số
+        // trùng nhau (150ms) nhưng đường cong khác: `ease` phẳng của trình
+        // duyệt so với `--ease-out-soft` mà mọi hover khác trong app dùng.
+        // 22 view danh sách (Kafka/RabbitMQ/Redis/Container) đi qua component
+        // này, nên đây là một trong những hover phổ biến nhất trong app.
+        'transition-colors duration-fast ease-out-soft',
+        interactive && 'cursor-pointer hover:bg-bg-2/40 active:bg-bg-2/60',
         selected && 'bg-acc/10',
         className,
       )}
@@ -150,7 +155,7 @@ export function Th({ align = 'left', className, sortDirection, onSortClick, chil
           type="button"
           onClick={onSortClick}
           className={cn(
-            'inline-flex items-center gap-1 hover:text-fg transition-colors -mx-1 px-1',
+            'inline-flex items-center gap-1 hover:text-fg transition-colors duration-fast ease-out-soft -mx-1 px-1',
             align === 'right' && 'flex-row-reverse',
           )}
         >

@@ -585,7 +585,7 @@ function IconStep({ title, onClick, children }: { title: string; onClick: () => 
       title={title}
       aria-label={title}
       onClick={onClick}
-      className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-acc/10 hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35"
+      className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-acc/10 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
     >
       {children}
     </button>

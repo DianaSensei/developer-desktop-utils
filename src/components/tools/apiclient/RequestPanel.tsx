@@ -260,7 +260,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         const isGhost = a.id === ghost.id;
         const unary = UNARY_ASSERT_OPERATORS.includes(a.operator);
         return (
-          <div key={a.id} className="group grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors">
+          <div key={a.id} className="group grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors">
             {/* expr cell with enable checkbox */}
             <div className="flex min-w-0 items-center gap-1.5 border-r px-2">
               <button
@@ -420,7 +420,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
         {names.map((name) => {
           const enabled = enabledOf(name);
           return (
-            <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors">
+            <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors">
               {/* Toggle target is the whole cell, not just the checkbox glyph —
                   same change as KeyValueEditor's, and the Name cell below joins
                   it: unlike the Name column there, this one is read-only text
@@ -433,7 +433,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   aria-checked={enabled}
                   aria-label={`:${name} — ${enabled ? 'enabled' : 'disabled'}`}
                   onClick={() => toggleEnabled(name)}
-                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
+                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
                   title={enabled ? 'Disable' : 'Enable'}
                 >
                   <span
@@ -501,7 +501,7 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
     <div className="max-w-xl space-y-5">
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-2 focus-within:ring-acc/40">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-[3px] focus-within:ring-focus">
           {settings.tags.map((t) => (
             <span key={t} className="flex items-center gap-1 rounded bg-bg-2 px-1.5 py-0.5 text-[11px]">
               {t}

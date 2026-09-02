@@ -82,7 +82,7 @@ export function SelectionBar({ count, unselectedVisibleCount, onSelectAllVisible
           {unselectedVisibleCount > 0 && (
             <button
               type="button"
-              className="rounded-sm text-xs text-acc underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35"
+              className="rounded-sm text-xs text-acc underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
               onClick={onSelectAllVisible}
             >
               Select all {(count + unselectedVisibleCount).toLocaleString()} shown
