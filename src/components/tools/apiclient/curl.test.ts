@@ -107,3 +107,51 @@ describe('hasSessionCredentials', () => {
     expect(hasSessionCredentials(req)).toBe(false);
   });
 });
+
+describe('parseCurl — flags that used to swallow the URL', () => {
+  it('-G puts the data in the query string and sends a GET', () => {
+    // Previously `-G` fell through to "unknown flag, assume it takes an
+    // argument" and ate the URL, leaving the request with none at all.
+    const r = parseCurl("curl -G https://api.test/x -d 'a=1' -d 'b=2'");
+    expect(r.url).toBe('https://api.test/x?a=1&b=2');
+    expect(r.method).toBe('GET');
+    expect(r.body.mode).toBe('none');
+  });
+
+  it('-G merges into a query string the URL already has', () => {
+    const r = parseCurl("curl -G 'https://api.test/x?page=1' --data-urlencode 'q=hello world'");
+    expect(r.url).toBe('https://api.test/x?page=1&q=hello world');
+  });
+
+  it('an unknown boolean flag no longer consumes the URL', () => {
+    const r = parseCurl('curl --some-future-flag https://api.test/x');
+    expect(r.url).toBe('https://api.test/x');
+  });
+
+  it('an unknown flag still consumes an ordinary value', () => {
+    const r = parseCurl('curl --max-time 30 https://api.test/x');
+    expect(r.url).toBe('https://api.test/x');
+  });
+
+  it('an unknown flag never consumes the flag after it', () => {
+    const r = parseCurl('curl --future -H "X-A: 1" https://api.test/x');
+    expect(r.url).toBe('https://api.test/x');
+    expect(r.headers.map((h) => [h.key, h.value])).toEqual([['X-A', '1']]);
+  });
+});
+
+describe("parseCurl — ANSI-C quoting ($'…')", () => {
+  it('resolves the escapes DevTools emits for a multi-line body', () => {
+    // Chrome/Edge switch to $'…' as soon as the payload contains a newline,
+    // and write it as the two characters backslash-n. String.raw keeps this
+    // test's input as the parser really receives it.
+    const r = parseCurl(String.raw`curl https://x.test --data-raw $'{\n  "a": 1\n}'`);
+    expect(r.body.raw).toBe('{\n  "a": 1\n}');
+    expect(r.body.mode).toBe('json');
+  });
+
+  it('resolves tabs and escaped quotes, and keeps an unknown escape literal', () => {
+    const r = parseCurl(String.raw`curl https://x.test --data-raw $'a\tb \'q\' \z'`);
+    expect(r.body.raw).toBe("a\tb 'q' z");
+  });
+});
