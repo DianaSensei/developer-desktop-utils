@@ -367,6 +367,36 @@ describe('Assert expression containment', () => {
     expect((globalThis as Record<string, unknown>).leaked).toBeUndefined();
   });
 
+  it('refuses an unsafe key assembled at evaluation time, not just a literal one', () => {
+    // The denylist runs on the *evaluated* key, so a concatenation reaches it
+    // too. Worth pinning: checking keys at parse time instead would pass every
+    // other test here while leaving this route open.
+    for (const expr of [
+      "res.body['con' + 'structor']",
+      "res.body['__pro' + 'to__']",
+      "res.body['proto' + 'type']",
+    ]) {
+      expect(evalVia(expr)).toBe(expr);
+    }
+  });
+
+  it('refuses call/apply/bind even where the key itself is readable', () => {
+    // `constructor` is stopped by the key denylist long before the callee
+    // denylist matters, so those tests never exercise it. `call` is not a
+    // denied key — reading it is fine, invoking it is what must be refused,
+    // which is the only thing standing between a reachable function and
+    // arbitrary receivers.
+    for (const expr of [
+      "res.body.token.toUpperCase.call('zz')",
+      "res.body.token.toUpperCase.apply('zz')",
+      'res.body.token.toUpperCase.bind()',
+    ]) {
+      expect(evalVia(expr)).toBe(expr);
+    }
+    // Reading the function is allowed and harmless; only the invocation is not.
+    expect(typeof evalVia('res.body.token.toUpperCase')).toBe('function');
+  });
+
   it('falls back to the literal for anything outside the grammar', () => {
     // No ambient global is reachable: only a name the scope itself owns
     // resolves, so these come back unparsed rather than as the worker global.
