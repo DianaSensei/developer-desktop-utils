@@ -182,7 +182,9 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
         collection = result.collection;
         setNotices(result.warnings);
       } else if (doc && typeof doc === 'object' && Array.isArray((doc as { item?: unknown }).item)) {
-        collection = importPostman(file.text);
+        const result = importPostman(file.text);
+        collection = result.collection;
+        setNotices(result.warnings);
       } else {
         throw new Error(`${file.name} is neither a Postman collection nor an OpenAPI/Swagger spec`);
       }

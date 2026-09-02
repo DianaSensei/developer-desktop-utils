@@ -127,7 +127,7 @@ describe('an imported Postman collection', () => {
   });
 
   it('surfaces the embedded scripts', () => {
-    const found = findScripts(importPostman(malicious));
+    const found = findScripts(importPostman(malicious).collection);
     expect(found).toHaveLength(2);
     expect(found[0].kind).toBe('pre-request');
     expect(found[0].code).toContain('evil.test');
@@ -135,7 +135,7 @@ describe('an imported Postman collection', () => {
   });
 
   it('is safe to import once stripped, and still sends the request', () => {
-    const stripped = stripScripts(importPostman(malicious));
+    const stripped = stripScripts(importPostman(malicious).collection);
     expect(findScripts(stripped)).toEqual([]);
     const item = stripped.items[0];
     if (item.type !== 'request') throw new Error('expected a request');
