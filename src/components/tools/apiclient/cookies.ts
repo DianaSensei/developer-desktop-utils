@@ -53,7 +53,8 @@ export function parseSetCookie(raw: string, url: string): Cookie | null {
 
   // No Domain attribute → host-only cookie (RFC 6265 §5.3): it must only be
   // sent back to the exact origin host, never to subdomains.
-  const cookie: Cookie = { name, value, domain: hostOf(url), path: pathOf(url), hostOnly: true };
+  const host = hostOf(url);
+  const cookie: Cookie = { name, value, domain: host, path: pathOf(url), hostOnly: true };
   let maxAge: number | null = null;
 
   for (const attr of parts) {
@@ -63,7 +64,20 @@ export function parseSetCookie(raw: string, url: string): Cookie | null {
     switch (k) {
       case 'domain': {
         const d = v.replace(/^\./, '').toLowerCase();
-        if (d) { cookie.domain = d; cookie.hostOnly = false; }
+        // RFC 6265 §5.3 step 6: a Domain attribute that does not domain-match
+        // the host the response came from is REJECTED — the cookie stays
+        // host-only. Without this check any host you send one request to can
+        // plant a cookie for any other host, and the jar then attaches it to
+        // your next request there: `Set-Cookie: session=…; Domain=api.bank.example`
+        // answered by an unrelated server was stored and sent on verbatim.
+        // Browsers have always enforced this; the jar did not.
+        //
+        // Not a public-suffix check: `Domain=co.uk` from `a.co.uk` still
+        // passes here, which needs the PSL to catch and is out of scope for
+        // this jar. The cheap half of it is covered — a single-label domain
+        // (`Domain=com`) is only accepted when it *is* the host, so
+        // `localhost` keeps working and `com` does not.
+        if (d && domainMatchesHost(host, d)) { cookie.domain = d; cookie.hostOnly = false; }
         break;
       }
       case 'path': cookie.path = v || '/'; break;
@@ -77,6 +91,18 @@ export function parseSetCookie(raw: string, url: string): Cookie | null {
   // Max-Age takes precedence over Expires (RFC 6265 §5.2.2).
   if (maxAge !== null) cookie.expires = Date.now() + maxAge * 1000;
   return cookie;
+}
+
+// Whether `host` may be given a cookie scoped to `domain` — the same
+// relation `domainMatches` uses when sending, applied at capture time to the
+// Domain attribute. Exported for its own test.
+export function domainMatchesHost(host: string, domain: string): boolean {
+  if (!host || !domain) return false;
+  if (host === domain) return true;
+  // A domain with no dot can only ever be the host itself (see the Domain
+  // case above) — this is what keeps `Domain=com` out of the jar.
+  if (!domain.includes('.')) return false;
+  return host.endsWith(`.${domain}`);
 }
 
 const expired = (c: Cookie, now: number) => c.expires !== undefined && c.expires <= now;

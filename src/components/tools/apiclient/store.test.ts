@@ -246,6 +246,27 @@ describe('useApiStore — addHistory secret redaction', () => {
 
     expect(result.current.history[0].response?.body).toBe('ok');
   });
+
+  it('redacts the error, console logs and test results too, not just the response', async () => {
+    // A script logging a token while debugging is ordinary, and reqwest names
+    // the URL it failed on — both are persisted verbatim without this.
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    act(() => result.current.addHistory({
+      method: 'GET', url: '{{baseUrl}}/x', status: 0, ok: false, timeMs: 5,
+      error: 'error sending request for url (https://api.test/x?key=sk-live-9f3a)',
+      logs: [{ level: 'log', text: 'token is sk-live-9f3a' }],
+      tests: [{ name: 'token is sk-live-9f3a', passed: false, error: "expected 'sk-live-9f3a' to equal 'x'" }],
+    }, ['sk-live-9f3a']));
+    const entry = result.current.history[0];
+    expect(entry.error).not.toContain('sk-live-9f3a');
+    expect(entry.logs?.[0].text).not.toContain('sk-live-9f3a');
+    expect(entry.tests?.[0].name).not.toContain('sk-live-9f3a');
+    expect(entry.tests?.[0].error).not.toContain('sk-live-9f3a');
+    expect(entry.error).toContain('••••••••');
+  });
+
 });
 
 describe('useApiStore — collection variables', () => {

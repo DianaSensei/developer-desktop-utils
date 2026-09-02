@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authQueryParam, paramsFromUrl, sendRequest, substituteVars, urlWithParams } from './request';
+import { authQueryParam, buildUrl, paramsFromUrl, sendRequest, substituteVars, urlWithParams } from './request';
 import { newAuth, newKeyValue, newRequest, type ApiRequest } from './types';
 
 // A minimal stand-in for the parts of `Response` that sendRequest reads.
@@ -228,5 +228,33 @@ describe('authQueryParam', () => {
   it('surfaces the key/value when auth places the api key in the query', () => {
     const auth = { ...newAuth(), type: 'apikey' as const, apiKey: { key: 'apiKey', value: 'secret-1', placement: 'query' as const } };
     expect(authQueryParam(req({ auth }))).toEqual({ key: 'apiKey', value: 'secret-1' });
+  });
+});
+
+
+describe('buildUrl — disabled query params', () => {
+  const id = (s: string) => s;
+
+  it('drops the URL query when every param row is disabled', () => {
+    // Reachable on any Postman/OpenAPI import: the URL keeps the full raw
+    // query while the params table carries the enabled flags.
+    const req = newRequest({
+      url: 'https://api.test/search?q=secret',
+      params: [{ ...newKeyValue('q', 'secret'), enabled: false }],
+    });
+    expect(buildUrl(req, id)).toBe('https://api.test/search');
+  });
+
+  it('keeps the enabled ones and drops only the disabled', () => {
+    const req = newRequest({
+      url: 'https://api.test/search?q=a&page=2',
+      params: [newKeyValue('q', 'a'), { ...newKeyValue('page', '2'), enabled: false }],
+    });
+    expect(buildUrl(req, id)).toBe('https://api.test/search?q=a');
+  });
+
+  it('leaves the URL alone when there is no params table to govern it', () => {
+    const req = newRequest({ url: 'https://api.test/search?q=raw', params: [] });
+    expect(buildUrl(req, id)).toBe('https://api.test/search?q=raw');
   });
 });

@@ -93,6 +93,31 @@ function trimHistoryEntry(
       },
     };
   }
+  // The three text channels a secret reaches besides the response itself.
+  // Redaction covered the body, headers and final URL but stopped there, so a
+  // value scrubbed out of the response was still written to disk alongside it:
+  //
+  //   error  — reqwest names the URL it failed on, and an API key placed as a
+  //            query param is resolved into that URL before it is sent.
+  //   logs   — `console.log(bru.getEnvVar('token'))` while debugging a script
+  //            is ordinary, and every line is persisted.
+  //   tests  — an assertion failure quotes the values it compared.
+  //
+  // The request snapshot deliberately isn't touched: it holds the request as
+  // authored, so secrets appear there as `{{vault.token}}`, never resolved.
+  if (sensitiveValues.length > 0) {
+    if (out.error) out.error = redactText(out.error, sensitiveValues);
+    if (out.logs?.length) {
+      out.logs = out.logs.map((l) => ({ ...l, text: redactText(l.text, sensitiveValues) }));
+    }
+    if (out.tests?.length) {
+      out.tests = out.tests.map((t) => ({
+        ...t,
+        name: redactText(t.name, sensitiveValues),
+        ...(t.error ? { error: redactText(t.error, sensitiveValues) } : {}),
+      }));
+    }
+  }
   return out;
 }
 
