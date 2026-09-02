@@ -25,4 +25,15 @@ describe('requireModule', () => {
     expect(() => requireModule('left-pad')).toThrow(/jwt-decode/);
     expect(() => requireModule('left-pad')).toThrow(/dayjs/);
   });
+
+  it('does not resolve Object.prototype properties as if they were bundled modules', () => {
+    // `require` is exposed straight to scripts — require('constructor') must
+    // report "not available" like any other unbundled name, not hand back a
+    // live Object constructor / Object.prototype off the module lookup's own
+    // prototype chain.
+    expect(() => requireModule('constructor')).toThrow(/constructor.*not available/);
+    expect(() => requireModule('__proto__')).toThrow(/not available/);
+    expect(() => requireModule('toString')).toThrow(/not available/);
+    expect(() => requireModule('hasOwnProperty')).toThrow(/not available/);
+  });
 });

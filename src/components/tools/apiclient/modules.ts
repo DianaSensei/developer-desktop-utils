@@ -30,7 +30,14 @@ const MODULES: Record<string, unknown> = {
 };
 
 export function requireModule(name: string): unknown {
-  if (name in MODULES) return MODULES[name];
+  // `MODULES` is a plain object, so a bare `name in MODULES` resolves against
+  // Object.prototype too: require('constructor') returned the live Object
+  // constructor, require('__proto__') returned Object.prototype itself — a
+  // script that came from an imported collection getting a reflection handle
+  // it was never meant to have, out of what looks like an ordinary "module
+  // not found" check. `require` is exposed straight to scripts (see
+  // runtime.ts), so this was directly reachable, not just an internal detail.
+  if (Object.prototype.hasOwnProperty.call(MODULES, name)) return MODULES[name];
   throw new Error(
     `require('${name}') is not available. Bundled modules: ${Object.keys(MODULES)
       .filter((m) => !m.includes('/'))
