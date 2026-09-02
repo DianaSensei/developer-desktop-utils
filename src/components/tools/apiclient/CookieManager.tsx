@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { ApiStore } from './store';
 import { type Cookie, groupByDomain } from './cookies';
@@ -49,9 +50,15 @@ export function CookieManager({ store, open, onClose }: Props) {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {groups.length === 0 ? (
-            <p className="px-4 py-10 text-center text-xs text-fg-mute">
-              No cookies yet. They're captured automatically from response <code className="rounded bg-bg-2 px-1">Set-Cookie</code> headers, or add one below.
-            </p>
+            // The app's one empty-state primitive, not a bare sentence in a
+            // blank band — every other empty list in the tool (collections,
+            // search with no matches, no request body) already uses it.
+            <EmptyState
+              icon={CookieIcon}
+              title="No cookies yet"
+              description="Cookies are captured automatically from a response's Set-Cookie header. You can also add one by hand below."
+              className="px-4 py-10"
+            />
           ) : (
             groups.map(([domain, cookies]) => (
               <div key={domain} className="border-b">

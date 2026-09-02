@@ -506,23 +506,31 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
 
                 <div className="space-y-2">
                   <SectionLabel>Advanced</SectionLabel>
-                  <OptionRow
-                    label="Stop run if an error occurs"
-                    checked={stopOnFailure}
-                    onChange={setStopOnFailure}
-                  />
-                  <OptionRow
-                    label="Save responses"
-                    hint="Keep each response so you can open it afterwards."
-                    checked={saveResponses}
-                    onChange={setSaveResponses}
-                  />
-                  <OptionRow
-                    label="Run in parallel"
-                    hint={parallel ? 'Flow control (setNextRequest) is ignored in parallel runs.' : undefined}
-                    checked={parallel}
-                    onChange={setParallel}
-                  />
+                  {/* One bordered surface with hairline dividers, not three
+                      separate bordered cards stacked with gaps — three boxes
+                      inside a panel that is itself inside a dialog is two
+                      frames too many, and it read as three unrelated settings
+                      rather than one group. See SettingGroup in the kit for
+                      the same shape at Settings-page density. */}
+                  <div className="overflow-hidden rounded-md border divide-y divide-line-soft">
+                    <OptionRow
+                      label="Stop run if an error occurs"
+                      checked={stopOnFailure}
+                      onChange={setStopOnFailure}
+                    />
+                    <OptionRow
+                      label="Save responses"
+                      hint="Keep each response so you can open it afterwards."
+                      checked={saveResponses}
+                      onChange={setSaveResponses}
+                    />
+                    <OptionRow
+                      label="Run in parallel"
+                      hint={parallel ? 'Flow control (setNextRequest) is ignored in parallel runs.' : undefined}
+                      checked={parallel}
+                      onChange={setParallel}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -983,7 +991,7 @@ function OptionRow({ label, hint, checked, onChange }: {
   label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-3 rounded-md border px-3 py-2">
+    <label className="flex cursor-pointer items-start justify-between gap-3 px-3 py-2 transition-colors hover:bg-bg-2/40">
       <span className="min-w-0">
         <span className="block text-xs font-medium">{label}</span>
         {hint && <span className="mt-0.5 block text-[11px] text-fg-mute">{hint}</span>}

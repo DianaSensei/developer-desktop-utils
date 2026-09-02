@@ -2,11 +2,12 @@
 // interpolate {{vars}}, preview the snippet, and copy it.
 
 import { useMemo, useState } from 'react';
-import { Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { CopyButton } from '@/components/ui/copy-button';
+import { Label } from '@/components/ui/label';
+import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { CodeViewer } from '@/design-system';
 import { CODE_TARGETS, generateCode } from './codegen';
 import type { ApiRequest, KeyValue, VarMap } from './types';
@@ -57,40 +58,36 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-1.5">
-            {target.variants.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => setVariant(v.id)}
-                className={cn(
-                  'rounded-md border px-3 py-1 text-xs font-medium transition-colors',
-                  variant === v.id ? 'border-acc/30 bg-acc/10 text-acc' : 'hover:bg-acc',
-                )}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
+          {/* Segmented, not three hand-rolled pill buttons: this is the kit's
+              mode-switch control, and the hand-rolled version's "selected"
+              state (a 10%-accent tint) was far weaker than every other
+              selected state in the tool. */}
+          <Segmented
+            value={variant}
+            onValueChange={setVariant}
+            size="sm"
+            aria-label="Variant"
+            options={target.variants.map((v) => ({ value: v.id, label: v.label }))}
+          />
 
-          <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs">
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={interpolate}
-              onClick={() => setInterpolate((i) => !i)}
-              className={cn(
-                'flex h-4 w-4 items-center justify-center rounded border transition-colors',
-                interpolate ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
-              )}
-            >
-              {interpolate && <Check className="h-3 w-3" />}
-            </button>
-            Interpolate Variables
-          </label>
+          {/* Switch, not a hand-rolled role="checkbox" button — the app has no
+              checkbox primitive, and every other on/off in the tool (Settings
+              tab, Runner, cookie jar) is a Switch. */}
+          <Label className="ml-auto flex cursor-pointer items-center gap-2 text-xs">
+            Interpolate variables
+            <Switch checked={interpolate} onCheckedChange={setInterpolate} aria-label="Interpolate variables" />
+          </Label>
         </div>
 
-        {/* code preview */}
-        <div className="relative flex min-h-0 flex-1 flex-col border-t">
+        {/* Code preview.
+            min-h-[22rem] is load-bearing, not taste: DialogContent's
+            `scrollable` gives the dialog `max-h-[85vh]` and no definite
+            height, so this pane's `flex-1` resolved against an indefinite
+            parent and collapsed to zero — the dialog rendered as a header and
+            a toolbar with no code under it at all. A real minimum gives the
+            CodeViewer inside something to fill; longer snippets scroll within
+            it rather than growing the dialog. */}
+        <div className="relative flex min-h-[22rem] flex-1 flex-col border-t">
           <CodeViewer value={code} language="text" />
           <CopyButton
             value={() => code}

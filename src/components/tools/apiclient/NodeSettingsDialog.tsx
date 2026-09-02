@@ -3,9 +3,10 @@
 // inside it (Bruno-style collection/folder settings).
 
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Segmented } from '@/components/ui/segmented';
+import { Tabs } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Callout } from '@/components/ui/callout';
 import { JavaScriptEditor } from '@/design-system';
@@ -36,8 +37,12 @@ interface Props {
   vars?: VarMap;
 }
 
+type NodeTab = 'scripts' | 'auth' | 'headers';
+type ScriptPhase = 'req' | 'res';
+
 export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, onClose, vars }: Props) {
-  const [tab, setTab] = useState<'scripts' | 'auth' | 'headers'>('scripts');
+  const [tab, setTab] = useState<NodeTab>('scripts');
+  const [phase, setPhase] = useState<ScriptPhase>('req');
   const [script, setScript] = useState<RequestScript>(target.script);
   const [auth, setAuth] = useState<Auth>(target.auth ?? newAuth());
   const [headers, setHeaders] = useState<KeyValue[]>(target.headers);
@@ -58,44 +63,29 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center gap-4 border-b px-4">
-          <TabBtn id="scripts" label="Scripts" active={tab} onSelect={setTab} />
-          <TabBtn id="auth" label="Auth" active={tab} onSelect={setTab} />
-          <TabBtn id="headers" label="Headers" active={tab} onSelect={setTab} />
-        </div>
+        {/* The shared Tabs strip, not a hand-rolled trio of underline buttons
+            — same control the request and response panels use, so a
+            collection's tabs behave (and collapse into ») like every other
+            tab strip in the tool. */}
+        <Tabs
+          tabs={[{ id: 'scripts', label: 'Scripts' }, { id: 'auth', label: 'Auth' }, { id: 'headers', label: 'Headers' }]}
+          active={tab}
+          onSelect={(id) => setTab(id as NodeTab)}
+          className="px-4"
+        />
 
         {tab === 'scripts' ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <p className="text-[11px] text-fg-mute">
-              These run for every request inside this {target.kind.toLowerCase()} — pre-request before each send, post-response after.
-            </p>
-            <div className="flex h-44 flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs">Pre-request</Label>
-                <SnippetMenu snippets={PRE_REQUEST_SNIPPETS} onInsert={(s) => setScript((v) => ({ ...v, req: appendSnippet(v.req, s) }))} />
-              </div>
-              <JavaScriptEditor value={script.req} onChange={(req) => setScript((s) => ({ ...s, req }))} placeholder={"bru.setEnvVar('base', 'https://api.example.com');"} extraExtensions={scriptApiExtensions} />
-              {scriptCallsNetwork(script.req) && (
-                <Callout tone="warning" size="sm">
-                  This script can make its own network request, separate from the Send button — review
-                  it before running scripts from a source you don't fully trust.
-                </Callout>
-              )}
-            </div>
-            <div className="flex h-44 flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs">Post-response</Label>
-                <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => setScript((v) => ({ ...v, res: appendSnippet(v.res, s) }))} />
-              </div>
-              <JavaScriptEditor value={script.res} onChange={(res) => setScript((s) => ({ ...s, res }))} placeholder={"console.log('done', res.getStatus());"} extraExtensions={scriptApiExtensions} />
-              {scriptCallsNetwork(script.res) && (
-                <Callout tone="warning" size="sm">
-                  This script can make its own network request, separate from the Send button — review
-                  it before running scripts from a source you don't fully trust.
-                </Callout>
-              )}
-            </div>
-          </div>
+          // One editor at full height behind a phase switch, the same shape
+          // the request's own Script tab settled on — the two editors used to
+          // stand stacked, each capped at h-44, so both were too short to
+          // read a real script in while only one was ever being edited.
+          <ScriptPane
+            kind={target.kind}
+            phase={phase}
+            onPhaseChange={setPhase}
+            script={script}
+            onScriptChange={setScript}
+          />
         ) : tab === 'auth' ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <p className="text-[11px] text-fg-mute">
@@ -122,18 +112,54 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
   );
 }
 
-// Hoisted out of NodeSettingsDialog: a component declared inside render gets a
-// new identity on every keystroke in the script editors, so React remounts the
-// button and it loses focus mid-keyboard-navigation.
-function TabBtn({ id, label, active, onSelect }: {
-  id: 'scripts' | 'auth' | 'headers'; label: string; active: string; onSelect: (id: 'scripts' | 'auth' | 'headers') => void;
+// Hoisted out of NodeSettingsDialog for the same reason the old TabBtn was: a
+// component declared inside render gets a new identity on every keystroke, so
+// React tears down and rebuilds the CodeMirror instance on each character.
+function ScriptPane({ kind, phase, onPhaseChange, script, onScriptChange }: {
+  kind: NodeSettingsTarget['kind'];
+  phase: ScriptPhase;
+  onPhaseChange: (p: ScriptPhase) => void;
+  script: RequestScript;
+  onScriptChange: (fn: (s: RequestScript) => RequestScript) => void;
 }) {
+  const isReq = phase === 'req';
+  const value = isReq ? script.req : script.res;
   return (
-    <button
-      onClick={() => onSelect(id)}
-      className={cn('border-b-2 py-2 text-xs font-medium transition-colors', active === id ? 'border-acc text-fg' : 'border-transparent text-fg-mute hover:text-fg')}
-    >
-      {label}
-    </button>
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
+      <div className="flex items-center justify-between gap-2">
+        <Segmented
+          value={phase}
+          onValueChange={onPhaseChange}
+          size="sm"
+          aria-label="Script phase"
+          options={[{ value: 'req', label: 'Pre-request' }, { value: 'res', label: 'Post-response' }]}
+        />
+        <SnippetMenu
+          snippets={isReq ? PRE_REQUEST_SNIPPETS : POST_RESPONSE_SNIPPETS}
+          onInsert={(sn) => onScriptChange((v) => (isReq
+            ? { ...v, req: appendSnippet(v.req, sn) }
+            : { ...v, res: appendSnippet(v.res, sn) }))}
+        />
+      </div>
+      <Label className="text-[11px] font-normal text-fg-mute">
+        Runs for every request inside this {kind.toLowerCase()}
+        {isReq ? ', before each send.' : ', after each response.'}
+      </Label>
+      <div className="flex h-72 flex-col">
+        <JavaScriptEditor
+          key={phase}
+          value={value}
+          onChange={(v) => onScriptChange((s) => (isReq ? { ...s, req: v } : { ...s, res: v }))}
+          placeholder={isReq ? "bru.setEnvVar('base', 'https://api.example.com');" : "console.log('done', res.getStatus());"}
+          extraExtensions={scriptApiExtensions}
+        />
+      </div>
+      {scriptCallsNetwork(value) && (
+        <Callout tone="warning" size="sm">
+          This script can make its own network request, separate from the Send button — review
+          it before running scripts from a source you don't fully trust.
+        </Callout>
+      )}
+    </div>
   );
 }
