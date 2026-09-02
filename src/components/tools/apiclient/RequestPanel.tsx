@@ -263,7 +263,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
               <Input
                 value={a.expr}
                 onChange={(e) => editRow(a.id, { expr: e.target.value })}
-                placeholder="Expr"
+                placeholder="res.status"
                 className={cn(assertInputCls, !isGhost && !a.enabled && 'opacity-50')}
                 spellCheck={false}
               />
@@ -285,7 +285,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
                 <Input
                   value={a.value}
                   onChange={(e) => editRow(a.id, { value: e.target.value })}
-                  placeholder="Value"
+                  placeholder="200"
                   className={cn(assertInputCls, !isGhost && !a.enabled && 'opacity-50')}
                   spellCheck={false}
                 />
@@ -651,7 +651,13 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
   const setBody = (patch: Partial<typeof body>) => onChange({ body: { ...body, ...patch } });
 
   if (body.mode === 'none') {
-    return <p className="text-sm text-fg-mute">No Body</p>;
+    // Says where the type picker is: it sits in the tab bar, not in this
+    // pane, and a bare "No Body" here left people looking for it down here.
+    return (
+      <p className="text-xs text-fg-mute">
+        This request sends no body. Pick a type from the <span className="font-medium text-acc-ink">No Body</span> menu at the right of the tab bar.
+      </p>
+    );
   }
   if (body.mode === 'multipart') {
     return (

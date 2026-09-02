@@ -2,8 +2,11 @@
 // method-colored label and a close button. The right cluster holds the
 // environment selector, history, and the request/response layout toggle.
 
+import { useEffect, useRef } from 'react';
 import { Clock, Columns2, Folder, Globe, Plus, Rows2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -71,19 +74,63 @@ export function RequestTabs({
   const collection = activeCollection(store);
   const globalEnvs = store.environments.filter((e) => !e.collectionId);
   const collectionEnvs = store.environments.filter((e) => e.collectionId === store.activeCollectionId);
+  const menu = useContextMenu();
+
+  // The strip scrolls (no-scrollbar) once tabs overflow, so a tab activated
+  // from the sidebar, History, ⌘P or Ctrl+Tab could sit out of view with
+  // nothing on screen saying which one is current. Bring it into view on
+  // every activation — `nearest` so the strip doesn't jump when it's
+  // already visible.
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (historyActive) return;
+    stripRef.current?.querySelector<HTMLElement>('[data-active="true"]')
+      ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [activeRequestId, historyActive]);
+
+  // Right-click on a tab — the browser-tab vocabulary everyone already has.
+  // Close Others / to the Right go through store.closeTabs in one update so
+  // the tab kept stays the active one (see the store for why not N × closeTab).
+  const tabEntries = (id: string): ContextMenuEntry[] => {
+    const ids = openRequests.map((r) => r.id);
+    const idx = ids.indexOf(id);
+    const others = ids.filter((t) => t !== id);
+    const toRight = ids.slice(idx + 1);
+    return [
+      { label: 'Close', onClick: () => store.closeTab(id) },
+      { label: 'Close Others', disabled: others.length === 0, onClick: () => store.closeTabs(others) },
+      { label: 'Close to the Right', disabled: toRight.length === 0, onClick: () => store.closeTabs(toRight) },
+      { label: 'Close All', sep: true, onClick: () => store.closeTabs(ids) },
+    ];
+  };
 
   return (
     <div className="flex items-stretch border-b border-line bg-bg-2/10">
       {/* tabs (scrollable) + new */}
-      <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar">
+      {/* Double-click on the empty part of the strip opens a new request —
+          the browser-tab-bar gesture; the + button stays for discoverability. */}
+      <div
+        ref={stripRef}
+        className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar"
+        onDoubleClick={(e) => { if (e.target === e.currentTarget) onNewRequest(); }}
+      >
         {openRequests.map((req) => {
+          const run = runs[req.id];
           const active = !historyActive && req.id === activeRequestId;
-          const failed = tabFailed(runs[req.id]);
+          const failed = tabFailed(run);
+          const tip = [
+            `${req.method} ${req.name}${failed ? ' — last send failed' : run?.sending ? ' — sending…' : ''}`,
+            req.url,
+          ].filter(Boolean).join('\n');
           return (
             <div
               key={req.id}
+              data-active={active || undefined}
               onClick={() => onSelectRequest(req.id)}
-              title={failed ? `${req.method} ${req.name} — last send failed` : `${req.method} ${req.name}`}
+              // Middle-click closes, as in every browser/editor tab strip.
+              onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); store.closeTab(req.id); } }}
+              onContextMenu={(e) => menu.open(e, tabEntries(req.id))}
+              title={tip}
               className={cn(
                 // scale-in plays once, on the fresh mount a newly-opened tab gets
                 // (an already-open tab just being reordered/re-rendered keeps its
@@ -100,7 +147,12 @@ export function RequestTabs({
                 {methodShort(req.method)}
               </span>
               <span className="truncate">{req.name}</span>
-              {failed && <StatusDot tone="error" size="xs" className="shrink-0" />}
+              {/* In flight beats failed: a resend clears the old failure
+                  the moment it starts, and the spinner is what tells you
+                  which of several tabs is still waiting. */}
+              {run?.sending
+                ? <Spinner size="xs" className="shrink-0 text-fg-mute" label="Sending" />
+                : failed && <StatusDot tone="error" size="xs" className="shrink-0" />}
               {/* The slot keeps its 16px whether or not the × is showing, so a
                   tab's label doesn't reflow the moment the pointer enters it. */}
               <button
@@ -236,6 +288,7 @@ export function RequestTabs({
           {direction === 'horizontal' ? <Rows2 className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}
         </IconButton>
       </div>
+      {menu.state && <ContextMenu state={menu.state} onClose={menu.close} width={180} />}
     </div>
   );
 }

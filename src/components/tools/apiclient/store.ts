@@ -522,6 +522,29 @@ export function useApiStore() {
     });
   }, [setOpenTabIds, setActiveRequestId]);
 
+  // Close several tabs at once (the tab strip's Close Others / Close to the
+  // Right / Close All). One state update, not a closeTab() per id: each of
+  // those would re-pick the "neighbour" active tab in turn, and the tab that
+  // ends up focused after closing five in a row is whatever the fifth
+  // pick landed on, not the one the user kept. If the active tab survives it
+  // stays active; otherwise the nearest survivor to where it was takes over.
+  const closeTabs = useCallback((ids: string[]) => {
+    const gone = new Set(ids);
+    setOpenTabIds((prev) => {
+      const next = prev.filter((t) => !gone.has(t));
+      setActiveRequestId((cur) => {
+        if (cur && !gone.has(cur)) return cur;
+        if (!cur) return null;
+        const idx = prev.indexOf(cur);
+        // Survivors before `idx` in the old order keep their positions; the
+        // one that took the closed tab's slot (or the last one) is nearest.
+        const before = prev.slice(0, idx).filter((t) => !gone.has(t)).length;
+        return next[before] ?? next[before - 1] ?? null;
+      });
+      return next;
+    });
+  }, [setOpenTabIds, setActiveRequestId]);
+
   // — collection / tree ops —
 
   const addCollection = useCallback(() => {
@@ -901,7 +924,7 @@ export function useApiStore() {
     activeEnvByCollection, activeGlobalEnvId, activeCollectionEnv, activeGlobalEnv, isEnvActive,
     history, activeCollectionId,
     activeRequestId, activeRequest, openRequests, inheritedScripts, activeCollectionVars,
-    setActiveRequestId, setActiveCollectionEnv, setActiveGlobalEnv, selectRequest, closeTab,
+    setActiveRequestId, setActiveCollectionEnv, setActiveGlobalEnv, selectRequest, closeTab, closeTabs,
     addCollection, importCollection, deleteCollection, renameCollection, toggleCollapse, revealRequest,
     addItem, addRequest, deleteItem, renameItem, duplicateRequest, cloneItem, cloneCollection, moveItem, copyItem, updateRequest, setNodeScript, setNodeAuth,
     setNodeHeaders,

@@ -7,9 +7,13 @@
 // export as Postman v2.1. Requests only fire when the user clicks Send.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Plus, Search, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { Button } from '@/components/ui/button';
+import { Keycap } from '@/components/ui/keycap';
+import type { InlineCodeFieldHandle } from '@/design-system';
+import { RequestQuickOpen } from './RequestQuickOpen';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
 import { AddressBar } from './AddressBar';
@@ -66,6 +70,7 @@ export function ApiClient() {
   const [codeOpen, setCodeOpen] = useState(false);
   const [cookiesOpen, setCookiesOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [runTarget, setRunTarget] = useState<{ title: string; requests: ApiRequest[]; collectionId: string } | null>(null);
   const [direction, setDirection] = usePersistentState<SplitDirection>(
     'devtool:apiclient:layout:v2', 'horizontal',
@@ -79,6 +84,7 @@ export function ApiClient() {
   );
   const [resizing, setResizing] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const urlFieldRef = useRef<InlineCodeFieldHandle>(null);
 
   // Drag the divider between the collections sidebar and the workbench.
   const resizeCleanupRef = useRef<(() => void) | null>(null);
@@ -140,9 +146,17 @@ export function ApiClient() {
 
   // Drop per-tab run state (and remembered editor tab) for requests that are no
   // longer open, so a long session doesn't accumulate every response it ever saw.
+  // The ids that just left the strip also go onto `closedTabs`, the stack
+  // ⌘⇧T reopens from (most recent first, capped so it never grows unbounded).
   const openIdsKey = store.openRequests.map((r) => r.id).join(',');
+  const prevOpenIds = useRef<string[]>([]);
+  const closedTabs = useRef<string[]>([]);
   useEffect(() => {
     const open = new Set(openIdsKey ? openIdsKey.split(',') : []);
+    for (const id of prevOpenIds.current) {
+      if (!open.has(id)) closedTabs.current = [id, ...closedTabs.current.filter((t) => t !== id)].slice(0, 20);
+    }
+    prevOpenIds.current = [...open];
     const prune = <T,>(prev: Record<string, T>): Record<string, T> => {
       const keys = Object.keys(prev);
       if (keys.every((k) => open.has(k))) return prev;
@@ -310,36 +324,118 @@ export function ApiClient() {
   sendRef.current = send;
   const storeRef = useRef(store);
   storeRef.current = store;
+  const showHistoryRef = useRef(showHistory);
+  showHistoryRef.current = showHistory;
+  const quickOpenRef = useRef(quickOpen);
+  quickOpenRef.current = quickOpen;
 
-  // Global keyboard shortcuts (Bruno parity): ⌘/Ctrl + Enter sends, + B creates a
-  // request in the first collection, + E opens the environment manager.
+  // New request in the first collection — and, with no collection yet, a
+  // collection first. ⌘B / the + button / the empty state used to silently do
+  // nothing on a fresh workspace, which reads as "the shortcut is broken"
+  // rather than "make a collection first".
+  const newRequest = useCallback(() => {
+    const s = storeRef.current;
+    const collectionId = s.collections[0]?.id ?? s.addCollection();
+    setShowHistory(false);
+    s.addItem(collectionId, 'request');
+  }, []);
+
+  // Open a request in a tab from anywhere (⌘P, the empty state) and leave the
+  // History view if it was covering the workbench.
+  const openRequest = useCallback((id: string) => {
+    setShowHistory(false);
+    storeRef.current.selectRequest(id);
+  }, []);
+
+  // Global keyboard shortcuts (Bruno parity plus the browser-tab set):
+  //   ⌘/Ctrl+Enter  send          ⌘/Ctrl+L      focus the URL field
+  //   ⌘/Ctrl+B      new request   ⌘/Ctrl+P      go to request (quick open)
+  //   ⌘/Ctrl+E      environments  ⌘/Ctrl+W      close tab (or History)
+  //   ⌘/Ctrl+⇧T     reopen tab    ⌘/Ctrl+1…9    jump to the Nth tab (9 = last)
+  //   Ctrl+Tab / Ctrl+⇧Tab        next / previous tab
+  //   ⌘/Ctrl+F      focus the collection search (outside a code editor)
+  // ⌘K is the app-wide tool palette (CommandPalette.tsx) and stays untouched.
+  // Every one is a no-op while a dialog is open — sending the request behind
+  // the Environments dialog because ⌘Enter fell through was a real footgun.
   useEffect(() => {
+    const dialogOpen = () => !!document.querySelector('[role="dialog"]');
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey)) return;
-      const req = activeRequestRef.current;
       const s = storeRef.current;
-      if (e.key === 'Enter') {
-        if (req && !runsRef.current[req.id]?.sending) { e.preventDefault(); sendRef.current(); }
-      } else if (e.key.toLowerCase() === 'b') {
-        const first = s.collections[0];
-        if (first) { e.preventDefault(); s.addItem(first.id, 'request'); }
-      } else if (e.key.toLowerCase() === 'e') {
-        e.preventDefault(); setEnvOpen(true);
-      } else if (e.key.toLowerCase() === 'w') {
-        // Always prevent the OS window-close shortcut (⌘W on macOS closes the window
-        // when not intercepted). Close the active tab if one is open.
+      const req = activeRequestRef.current;
+      const key = e.key.toLowerCase();
+
+      // Ctrl+Tab cycles tabs on every platform (no ⌘ variant — ⌘Tab is the
+      // OS app switcher on macOS).
+      if (e.ctrlKey && !e.metaKey && e.key === 'Tab') {
+        if (dialogOpen()) return;
+        const ids = s.openRequests.map((r) => r.id);
+        if (ids.length === 0) return;
         e.preventDefault();
-        if (req) s.closeTab(req.id);
+        const cur = showHistoryRef.current ? -1 : ids.indexOf(s.activeRequestId ?? '');
+        const next = e.shiftKey
+          ? (cur <= 0 ? ids.length - 1 : cur - 1)
+          : (cur < 0 || cur === ids.length - 1 ? 0 : cur + 1);
+        openRequest(ids[next]);
+        return;
+      }
+
+      if (!(e.metaKey || e.ctrlKey)) return;
+
+      // ⌘P toggles the quick-open even when it's the dialog that's open;
+      // every other shortcut yields to whatever dialog has focus.
+      if (key === 'p' && !e.shiftKey) {
+        if (dialogOpen() && !quickOpenRef.current) return;
+        e.preventDefault();
+        setQuickOpen((o) => !o);
+        return;
+      }
+      if (dialogOpen()) return;
+
+      if (e.key === 'Enter') {
+        // Only with something to send, and only when the request is actually
+        // on screen — History overlays it, so a send from there would be blind.
+        if (req && !showHistoryRef.current && req.url.trim() && !runsRef.current[req.id]?.sending) {
+          e.preventDefault();
+          sendRef.current();
+        }
+      } else if (key === 'l') {
+        if (req && !showHistoryRef.current) { e.preventDefault(); urlFieldRef.current?.focus(); }
+      } else if (key === 'b') {
+        e.preventDefault();
+        newRequest();
+      } else if (key === 'e') {
+        e.preventDefault(); setEnvOpen(true);
+      } else if (key === 'f') {
+        // A CodeMirror surface (the response viewer, a body editor) has its
+        // own ⌘F search; leave that alone and only claim the key elsewhere.
+        if ((e.target as HTMLElement | null)?.closest?.('.cm-editor')) return;
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      } else if (key === 't' && e.shiftKey) {
+        // Reopen the most recently closed tab that still exists (it may have
+        // been deleted since — skip those rather than opening a blank tab).
+        e.preventDefault();
+        while (closedTabs.current.length) {
+          const id = closedTabs.current.shift()!;
+          if (s.getOwningCollectionId(id)) { openRequest(id); break; }
+        }
+      } else if (key === 'w') {
+        // Always prevent the OS window-close shortcut (⌘W on macOS closes the window
+        // when not intercepted). History is "a tab" here too: close it first.
+        e.preventDefault();
+        if (showHistoryRef.current) setShowHistory(false);
+        else if (req) s.closeTab(req.id);
+      } else if (/^[1-9]$/.test(e.key) && !e.shiftKey && !e.altKey) {
+        const ids = s.openRequests.map((r) => r.id);
+        if (ids.length === 0) return;
+        const target = e.key === '9' ? ids[ids.length - 1] : ids[Number(e.key) - 1];
+        if (target) { e.preventDefault(); openRequest(target); }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  const newRequest = useCallback(() => {
-    const first = store.collections[0];
-    if (first) { setShowHistory(false); store.addItem(first.id, 'request'); }
-  }, [store]);
+  }, [newRequest, openRequest]);
 
   // Stable so the Sidebar's memoized tree nodes aren't invalidated each render.
   const handleRun = useCallback((title: string, requests: ApiRequest[], collectionId: string) => {
@@ -420,7 +516,7 @@ export function ApiClient() {
             onManageVault={() => setVaultOpen(true)}
             resolvedVars={resolvedVars}
             historyActive={showHistory}
-            onSelectRequest={(id) => { setShowHistory(false); store.setActiveRequestId(id); }}
+            onSelectRequest={openRequest}
             onOpenHistory={() => setShowHistory(true)}
             onCloseHistory={() => setShowHistory(false)}
           />
@@ -437,6 +533,7 @@ export function ApiClient() {
                 sending={run.sending}
                 onGenerateCode={() => setCodeOpen(true)}
                 vars={varMap}
+                urlFieldRef={urlFieldRef}
               />
               <SplitPane
                 direction={direction}
@@ -469,12 +566,27 @@ export function ApiClient() {
               />
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-fg-mute motion-safe:animate-fade-in-up">
+            // Keycap, not a hard-coded ⌘: this is the first thing a Windows/
+            // Linux user sees, and "⌘B" there is a key they don't have. The
+            // two buttons are the same actions as the shortcuts beside them,
+            // for the mouse-first user who hasn't learned either yet.
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 text-fg-mute motion-safe:animate-fade-in-up">
               <Send className="h-10 w-10 opacity-20" />
               <div className="text-center">
                 <p className="text-sm font-medium text-fg/70">No request open</p>
-                <p className="mt-1 text-xs">Select a request from the sidebar, or press <kbd className="rounded border bg-bg-2 px-1.5 py-0.5 font-mono text-[11px]">⌘B</kbd> to create one.</p>
+                <p className="mt-1 text-xs">Select a request from the sidebar, or create / find one:</p>
               </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={newRequest} sc="B" scMod className="h-ctl gap-1.5">
+                  <Plus className="h-3.5 w-3.5" /> New request
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setQuickOpen(true)} sc="P" scMod className="h-ctl gap-1.5">
+                  <Search className="h-3.5 w-3.5" /> Go to request
+                </Button>
+              </div>
+              <p className="text-[11px] text-fg-mute/80">
+                All shortcuts are listed in the response pane once a request is open, e.g. <Keycap mod>⏎</Keycap> to send.
+              </p>
             </div>
           )}
         </div>
@@ -487,6 +599,13 @@ export function ApiClient() {
         sandboxDegraded={sandboxDegraded}
       />
 
+      <RequestQuickOpen
+        open={quickOpen}
+        onOpenChange={setQuickOpen}
+        collections={store.collections}
+        openIds={store.openRequests.map((r) => r.id)}
+        onPick={openRequest}
+      />
       <EnvironmentEditor store={store} open={envOpen} onClose={() => setEnvOpen(false)} />
       <VaultManager store={store} open={vaultOpen} onClose={() => setVaultOpen(false)} />
       <CookieManager store={store} open={cookiesOpen} onClose={() => setCookiesOpen(false)} />

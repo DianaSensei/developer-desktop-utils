@@ -253,7 +253,10 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
     const mod = isMac ? '⌘' : 'Ctrl';
     const shortcuts: [string, string][] = [
       ['Send Request', `${mod} + Enter`],
+      ['Focus URL', `${mod} + L`],
+      ['Go to Request', `${mod} + P`],
       ['New Request', `${mod} + B`],
+      ['Next / Previous Tab', 'Ctrl + Tab'],
       ['Close Tab', `${mod} + W`],
       ['Edit Environments', `${mod} + E`],
     ];
@@ -264,7 +267,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           {shortcuts.map(([label, keys]) => (
             <div key={label} className="flex items-center justify-end gap-6 text-xs text-fg-mute">
               <span>{label}</span>
-              <span className="w-24 font-mono text-fg-mute/80">{keys}</span>
+              <span className="w-28 font-mono text-fg-mute/80">{keys}</span>
             </div>
           ))}
         </div>
@@ -476,12 +479,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         )}
         {activeTab === 'headers' && response && (
           <div className="min-h-0 flex-1 divide-y overflow-auto text-xs">
-            {response.headers.map(([k, v], i) => (
-              <div key={i} className="flex gap-3 px-3 py-1.5">
-                <span className="w-48 shrink-0 break-words font-medium text-fg-mute">{k}</span>
-                <span className="break-words font-mono">{v}</span>
-              </div>
-            ))}
+            {response.headers.map(([k, v], i) => <HeaderRow key={i} name={k} value={v} />)}
           </div>
         )}
         {activeTab === 'timeline' && response && <Timeline response={response} />}
@@ -520,6 +518,38 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// One response header. The per-row copy takes just the value — the header
+// Copy button copies the whole `name: value` list, which is the wrong grain
+// when what you want is one token/etag/request-id to paste elsewhere.
+function HeaderRow({ name, value }: { name: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const copy = async () => {
+    await copyToClipboard(value);
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1200);
+  };
+  return (
+    <div className="group flex items-start gap-3 px-3 py-1.5 hover:bg-bg-2/20">
+      <span className="w-48 shrink-0 break-words font-medium text-fg-mute">{name}</span>
+      <span className="min-w-0 flex-1 break-words font-mono">{value}</span>
+      <button
+        type="button"
+        onClick={copy}
+        title={copied ? 'Copied' : 'Copy value'}
+        className={cn(
+          'shrink-0 rounded p-0.5 text-fg-mute/60 transition-all hover:text-fg focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+          copied ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        )}
+      >
+        {copied ? <Check className="h-3 w-3 text-ok" /> : <Copy className="h-3 w-3" />}
+      </button>
     </div>
   );
 }
