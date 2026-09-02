@@ -286,7 +286,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
             {/* operator cell */}
             <div className="flex items-center border-r">
               <Select value={a.operator} onValueChange={(v) => editRow(a.id, { operator: v as AssertOperator })}>
-                <SelectTrigger className="h-ctl w-full border-0 bg-transparent px-2 text-xs shadow-none focus:ring-0"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-ctl w-full border-0 bg-transparent px-2 text-xs shadow-none focus-visible:ring-0"><SelectValue /></SelectTrigger>
                 <SelectContent className="max-h-72">
                   {ASSERT_OPERATORS.map((op) => <SelectItem key={op} value={op}>{op}</SelectItem>)}
                 </SelectContent>

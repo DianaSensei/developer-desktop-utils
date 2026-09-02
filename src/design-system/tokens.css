@@ -157,15 +157,23 @@
     display: none;
   }
 
-  /* Bóng ngả sắc accent dưới hành động chính. */
-  .shadow-primary {
-    box-shadow: 0 2px 8px -2px hsl(var(--acc-c) / 0.35),
-                0 1px 2px -1px hsl(var(--acc-c) / 0.25);
-  }
-  .shadow-primary-lg {
-    box-shadow: 0 8px 20px -4px hsl(var(--acc-c) / 0.45),
-                0 3px 8px -3px hsl(var(--acc-c) / 0.30);
-  }
+  /* `.shadow-primary` / `.shadow-primary-lg` (quầng sáng ngả accent dưới hành
+     động chính) đã BỊ XOÁ. Hai lý do, cả hai đều là luật đã có sẵn:
+
+     1. `design/RULES.md` — "không hover-lift, không glow". Đó là một quầng sáng
+        MÀU, và nó phình từ 8px lên 20px khi rê chuột. Nút chuẩn của kit
+        (`design/preview/standalone.html`, `.btn.solid`) chỉ có `--sh-sm` và khi
+        hover thì đổi nền sang `--acc-hi`, không đụng tới bóng.
+
+     2. `design/RULES.md` — "hai hệ shadow song song". Hai utility này ghi THẲNG
+        `box-shadow`, trong khi `shadow-soft` và mọi `ring-*` của Tailwind ghi
+        qua chuỗi biến `--tw-shadow` / `--tw-ring-shadow`. Cùng thuộc tính, cùng
+        độ cụ thể, nên thứ tự trong bundle quyết định chứ không phải ý đồ: vòng
+        focus xoá sạch cái bóng, hoặc ngược lại, tuỳ tổ hợp. Xem ghi chú đầy đủ
+        trong `ui/button.tsx`.
+
+     Cần nhấn mạnh hành động chính thì dùng NỀN ĐẶC màu accent — nó đã là thứ
+     nổi nhất trên màn rồi. */
 
   /* ── Micro-interaction ────────────────────────────────────────────────
      Rê chuột đổi NỀN/VIỀN, không đổi VỊ TRÍ — `design/RULES.md`. Bản cũ của

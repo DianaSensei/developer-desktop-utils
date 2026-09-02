@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -22,6 +24,49 @@ import {
  *   - phần tử bị gỡ khỏi DOM trước khi kịp có animation ra,
  *   - nội dung đang thu lại vẫn Tab vào được.
  */
+
+describe('Vòng focus — không được dính lại sau khi bấm chuột', () => {
+  // `focus:` khớp với MỌI kiểu nhận tiêu điểm, kể cả click chuột — nên vòng
+  // sáng ở lại trên control cho tới khi bấm chỗ khác. `focus-visible:` chỉ khớp
+  // khi trình duyệt đánh giá là người dùng đang đi bằng bàn phím. Trước đây
+  // `SelectTrigger` (có mặt ở gần như mọi tool) và nút đóng Dialog dùng `focus:`.
+  const files = [
+    'src/components/ui/select.tsx',
+    'src/components/ui/dialog.tsx',
+    'src/components/ui/input.tsx',
+    'src/components/ui/textarea.tsx',
+    'src/components/ui/button.tsx',
+  ];
+
+  it('không control dùng chung nào còn dùng `focus:` cho vòng sáng', () => {
+    for (const f of files) {
+      const src = readFileSync(resolve(process.cwd(), f), 'utf-8');
+      // `focus:` đứng một mình (không phải `focus-visible:` / `focus-within:`)
+      // đi kèm ring/border/outline.
+      expect(src, f).not.toMatch(/(?<!-)\bfocus:(ring|border|outline)/);
+    }
+  });
+
+  it('vòng focus có MÀU tường minh — Tailwind 4 không còn màu ring mặc định', () => {
+    // `ring-<width>` một mình đổ về `currentcolor`: vòng sáng sẽ mang màu CHỮ
+    // (trắng trên nút accent). Mọi chỗ đặt bề rộng phải đặt kèm màu.
+    for (const f of files) {
+      const src = readFileSync(resolve(process.cwd(), f), 'utf-8');
+      const widths = src.match(/focus-visible:ring-\[3px\]/g)?.length ?? 0;
+      const colors = src.match(/focus-visible:ring-focus/g)?.length ?? 0;
+      expect(colors, f).toBe(widths);
+    }
+  });
+
+  it('nút không còn quầng sáng ngả accent — design/RULES.md cấm glow', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/components/ui/button.tsx'), 'utf-8');
+    // Chỉ soi phần biến thể, không soi phần comment giải thích vì sao đã bỏ.
+    const variants = src.slice(src.indexOf('variant: {'), src.indexOf('size: {'));
+    expect(variants).not.toContain('shadow-primary');
+    // Bóng chỉ đi qua thang của kit, không có utility nào ghi thẳng box-shadow.
+    expect(variants).not.toMatch(/shadow-\[/);
+  });
+});
 
 describe('Checkbox', () => {
   it('báo đúng trạng thái cho trình đọc màn hình, kể cả "một phần"', () => {

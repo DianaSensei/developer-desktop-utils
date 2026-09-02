@@ -155,7 +155,7 @@ export function Segmented<T extends string>({
               // Vòng focus vẽ VÀO TRONG (offset âm) để không bị máng cắt mất —
               // trước đây component không có focus-visible nào, người dùng bàn
               // phím không thấy mình đang ở đâu.
-              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
+              'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
               textSize,
               active
                 ? 'font-semibold text-acc-fg'

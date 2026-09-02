@@ -156,7 +156,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         onClick={() => !disabled && setOpen((v) => !v)}
         className={cn(
           'flex h-ctl-lg items-center gap-2 rounded-md border border-sunk bg-card px-2.5 text-sm shadow-sm',
-          'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+          'focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
           disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-bg-2/50',
           className,
         )}

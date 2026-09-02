@@ -164,7 +164,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
                   type="button"
                   onClick={() => removeRow(row.id)}
                   title="Remove"
-                  className="rounded p-1 text-fg-mute/40 opacity-0 transition-all hover:text-bad group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+                  className="rounded p-1 text-fg-mute/40 opacity-0 transition-all hover:text-bad group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>

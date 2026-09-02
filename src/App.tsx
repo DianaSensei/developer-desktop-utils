@@ -862,7 +862,7 @@ function AppContent() {
                   aria-selected={on}
                   className={cn(
                     'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-2 text-xs leading-none transition-colors',
-                    'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
+                    'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                     on
                       ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                       : 'text-fg-mute hover:text-fg',
@@ -1093,7 +1093,7 @@ function AppContent() {
                           aria-selected={on}
                           className={cn(
                             'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
-                            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
+                            'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                             on
                               ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                               : 'text-fg-mute hover:text-fg',

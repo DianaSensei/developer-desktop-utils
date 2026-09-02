@@ -53,7 +53,7 @@ export const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
           'inline-flex shrink-0 items-center justify-center rounded-sm border',
           'transition-[background-color,border-color,transform] duration-fast ease-out-soft',
           'motion-safe:active:scale-90 motion-safe:active:duration-press',
-          'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
+          'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
           'disabled:pointer-events-none disabled:opacity-50',
           size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4',
           on ? 'border-acc bg-acc text-acc-fg' : 'border-sunk hover:border-line',

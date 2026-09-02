@@ -559,7 +559,7 @@ function HeaderRow({ name, value }: { name: string; value: string }) {
         onClick={copy}
         title={copied ? 'Copied' : 'Copy value'}
         className={cn(
-          'shrink-0 rounded p-0.5 text-fg-mute/60 transition-all hover:text-fg focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+          'shrink-0 rounded p-0.5 text-fg-mute/60 transition-all hover:text-fg focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
           copied ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         )}
       >
@@ -600,7 +600,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 function ActionsMenu({ onSave, onClear }: { onSave: () => void; onClear?: () => void }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
+      <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
         <MoreHorizontal className="h-3.5 w-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[11rem]">
@@ -732,7 +732,7 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex h-6 items-center gap-1 rounded-sm border border-line bg-bg px-1.5 font-mono text-[11px] text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
+      <DropdownMenuTrigger className="flex h-6 items-center gap-1 rounded-sm border border-line bg-bg px-1.5 font-mono text-[11px] text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
         <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
       </DropdownMenuTrigger>

@@ -860,7 +860,7 @@ export function EncodeHashEncrypt() {
                 aria-label={showHmacKey ? 'Hide HMAC key' : 'Show HMAC key'}
                 title={showHmacKey ? 'Hide HMAC key' : 'Show HMAC key'}
                 aria-pressed={showHmacKey}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
               >
                 {showHmacKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -1000,7 +1000,7 @@ export function EncodeHashEncrypt() {
                 aria-label={showKey ? 'Hide passphrase' : 'Show passphrase'}
                 title={showKey ? 'Hide passphrase' : 'Show passphrase'}
                 aria-pressed={showKey}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>

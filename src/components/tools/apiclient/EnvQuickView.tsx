@@ -46,7 +46,7 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
     <DropdownMenu>
       <DropdownMenuTrigger
         title="Quick view variables (Collection env, Global env, Collection Variables, Vault)"
-        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-bg hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-bg hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
       >
         <Eye className="h-4 w-4" />
       </DropdownMenuTrigger>
@@ -76,7 +76,7 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
             <button
               type="button"
               onClick={() => setRevealSecrets((v) => !v)}
-              className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+              className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
               title={revealSecrets ? 'Hide secret environment values' : 'Reveal secret environment values'}
             >
               {revealSecrets ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}

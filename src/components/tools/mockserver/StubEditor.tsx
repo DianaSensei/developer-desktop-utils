@@ -268,7 +268,7 @@ export function StubEditor({ stub, onChange, testScript }: Props) {
                     onChange={(e) => onChange({ body: e.target.value })}
                     placeholder="Base64-encoded bytes"
                     spellCheck={false}
-                    className="h-20 w-full resize-y rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+                    className="h-20 w-full resize-y rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
                   />
                   <ToolHint>
                     Served as raw bytes with a <code>Content-Disposition: attachment</code> when a download name is

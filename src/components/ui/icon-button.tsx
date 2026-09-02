@@ -51,7 +51,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         'transition-[color,background-color,transform] duration-fast ease-out-soft',
         'motion-safe:active:scale-90 motion-safe:active:duration-press',
         'hover:bg-acc hover:text-fg active:bg-acc/80',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+        'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
         'disabled:pointer-events-none disabled:opacity-50',
         size === 'xs' ? 'h-6 w-6' : 'h-ctl w-ctl',
         active && 'bg-acc/10 text-acc hover:bg-acc/15',

@@ -37,6 +37,17 @@ module.exports = {
 
       colors: {
         /* ── Accent: đổi được. KHÔNG BAO GIỜ mang nghĩa trạng thái. ──────── */
+        /* Màu vòng focus — MỘT màu duy nhất cho cả app.
+           Không dùng `ch()` vì `--acc-ring` đã là màu hoàn chỉnh (accent + alpha
+           sẵn), không phải biến kênh; nghĩa là KHÔNG viết `ring-focus/50`, alpha
+           đã nằm trong token rồi.
+
+           Vì sao phải đặt tên tường minh: Tailwind v4 bỏ màu ring mặc định của
+           v3, `ring-<width>` giờ chỉ đặt bề rộng còn màu rơi về `currentcolor`.
+           Không có class này thì vòng focus mang MÀU CHỮ của phần tử — trắng
+           trên nút accent, đen trên input. */
+        focus: 'var(--acc-ring)',
+
         acc: {
           DEFAULT: ch('acc'),
           hi: ch('acc-hi'),
@@ -88,7 +99,10 @@ module.exports = {
       width: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
       minWidth: { ctl: 'var(--h)', 'ctl-lg': 'var(--h-lg)' },
 
-      ringColor: { DEFAULT: 'var(--acc-ring)' },
+      /* `ringColor` là khoá của Tailwind v3 và KHÔNG bắc cầu sang v4 — đã thử,
+         `ring-focus` không sinh ra class nào. Màu vòng focus vì vậy nằm trong
+         `colors` bên trên (`focus`), là khoá đã chứng minh là bắc cầu được.
+         Giữ `DEFAULT` ở đây thì vô hại nhưng cũng vô dụng, nên bỏ luôn. */
 
       transitionTimingFunction: {
         'out-soft': 'var(--ease-out-soft)',
