@@ -233,10 +233,13 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
     // width the table scrolls sideways instead (the pattern docs/ai/CLAUDE.md
     // prescribes for horizontal data tables) so every cell stays usable.
     <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
-      <div className="min-w-[26rem]">
+      <div className="min-w-[24rem]">
       {/* header */}
-      <div className="grid grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)_2rem] border-b bg-bg-2/30 font-semibold">
-        <div className="border-r px-3 py-1.5">Expr</div>
+      {/* Same header treatment as KeyValueEditor's tables, so the three
+          tables a request shows (Query, Headers, Assertions) read as one
+          family instead of two styles. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
+        <div className="border-r px-3 py-1.5">Expression</div>
         <div className="border-r px-3 py-1.5">Operator</div>
         <div className="border-r px-3 py-1.5">Value</div>
         <div />
@@ -246,7 +249,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         const isGhost = a.id === ghost.id;
         const unary = UNARY_ASSERT_OPERATORS.includes(a.operator);
         return (
-          <div key={a.id} className="grid grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)_2rem] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+          <div key={a.id} className="group grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors">
             {/* expr cell with enable checkbox */}
             <div className="flex min-w-0 items-center gap-1.5 border-r px-2">
               <button
@@ -295,8 +298,8 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
             {/* action cell */}
             <div className="flex items-center justify-center">
               {!isGhost && (
-                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-fg-mute/50 transition-colors hover:text-bad">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <button type="button" onClick={() => removeRow(a.id)} title="Remove" className="rounded p-1 text-fg-mute/40 opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 hover:text-bad">
+                  <Trash2 className="h-3 w-3" />
                 </button>
               )}
             </div>
@@ -392,16 +395,21 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
   return (
     <div className="space-y-2">
       <Label className="text-xs text-fg-mute">Path</Label>
+      {/* Same four-track grid as KeyValueEditor (the trailing 2rem is
+          empty here — path params can't be removed, only disabled) so this
+          table's Value column starts at exactly the same x as the Query and
+          Headers tables above and below it. */}
       <div className="overflow-hidden rounded-md border text-xs">
-        <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] border-b bg-bg-2/30 font-semibold">
+        <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
           <div />
           <div className="border-r px-3 py-1.5">Name</div>
-          <div className="px-3 py-1.5">Value</div>
+          <div className="border-r px-3 py-1.5">Value</div>
+          <div />
         </div>
         {names.map((name) => {
           const enabled = enabledOf(name);
           return (
-            <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)] border-b last:border-b-0 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+            <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40 transition-colors">
               {/* Toggle target is the whole cell, not just the checkbox glyph —
                   same change as KeyValueEditor's, and the Name cell below joins
                   it: unlike the Name column there, this one is read-only text
@@ -442,7 +450,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
               >
                 <span className="truncate">:{name}</span>
               </div>
-              <div className="flex h-ctl min-w-0 items-center px-2">
+              <div className="flex h-ctl min-w-0 items-center border-r px-1.5">
                 <InlineCodeField
                   value={valueOf(name)}
                   onChange={(v) => setValue(name, v)}
@@ -450,6 +458,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   placeholder="Value"
                 />
               </div>
+              <div />
             </div>
           );
         })}
@@ -473,8 +482,6 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
 
   return (
     <div className="max-w-xl space-y-6">
-      <p className="text-xs text-fg-mute">Configure request settings for this item.</p>
-
       {/* Tags */}
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>

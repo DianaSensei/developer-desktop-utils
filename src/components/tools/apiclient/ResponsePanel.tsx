@@ -7,7 +7,7 @@
 // behind a progress bar rather than being replaced by a spinner — swapping the
 // whole pane out and back was the single biggest source of flicker in the tool.
 
-import { useEffect, useMemo, useRef, useState, useCallback, type Ref } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, useCallback, type Ref } from 'react';
 import {
   AlertCircle, Binary, Braces, Check, ChevronDown, Code2, Copy, Download, Eraser,
   FileCode, FileText, Filter, Hash, MoreHorizontal, Search, Send, X,
@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { IconButton } from '@/components/ui/icon-button';
 import { Callout } from '@/components/ui/callout';
+import { Keycap } from '@/components/ui/keycap';
 import { isMac } from '@/hooks/useQuickPaste';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -250,25 +251,26 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   // the previous response stays put and only the header reports progress.
   const blank = !response && !error && tests.length === 0 && logs.length === 0;
   if (blank && !sending) {
-    const mod = isMac ? '⌘' : 'Ctrl';
-    const shortcuts: [string, string][] = [
-      ['Send Request', `${mod} + Enter`],
-      ['Focus URL', `${mod} + L`],
-      ['Go to Request', `${mod} + P`],
-      ['New Request', `${mod} + B`],
-      ['Next / Previous Tab', 'Ctrl + Tab'],
-      ['Close Tab', `${mod} + W`],
-      ['Edit Environments', `${mod} + E`],
+    // Keycap, the same glyphs the Send button and the ⌘P palette print,
+    // so the shortcut reads identically everywhere it's shown.
+    const shortcuts: { label: string; key: string; mod?: boolean }[] = [
+      { label: 'Send Request', key: '⏎', mod: true },
+      { label: 'Focus URL', key: 'L', mod: true },
+      { label: 'Go to Request', key: 'P', mod: true },
+      { label: 'New Request', key: 'B', mod: true },
+      { label: 'Switch Tab', key: 'Ctrl+Tab' },
+      { label: 'Close Tab', key: 'W', mod: true },
+      { label: 'Edit Environments', key: 'E', mod: true },
     ];
     return (
       <Centered>
         <Send className="h-20 w-20 -rotate-12 stroke-[1] text-fg-mute/15" />
-        <div className="mt-6 space-y-2">
-          {shortcuts.map(([label, keys]) => (
-            <div key={label} className="flex items-center justify-end gap-6 text-xs text-fg-mute">
-              <span>{label}</span>
-              <span className="w-28 font-mono text-fg-mute/80">{keys}</span>
-            </div>
+        <div className="mt-6 grid grid-cols-[auto_auto] items-center gap-x-6 gap-y-2 text-xs text-fg-mute">
+          {shortcuts.map(({ label, key, mod }) => (
+            <Fragment key={label}>
+              <span className="text-right">{label}</span>
+              <Keycap mod={mod}>{key}</Keycap>
+            </Fragment>
           ))}
         </div>
       </Centered>
@@ -302,56 +304,67 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   // Timeline only exist alongside one) — fall back rather than render nothing.
   const activeTab: Tab = tabDefs.some((t) => t.id === tab) ? tab : 'body';
 
-  const headerRight = (
-    <>
-      {response && activeTab === 'body' && (
+  // The tab row's right side carries the status readout and nothing else.
+  // The format picker and the body actions used to sit here too, and at a
+  // 50/50 split on a laptop the cluster left the tabs ~170px — the first
+  // tab clipped to "Re »" while every other one hid in the overflow menu.
+  // They now live on their own toolbar row under the tabs (Postman's
+  // layout), which only appears once there is a response to act on.
+  const headerRight = sending ? (
+    <span className="flex items-center gap-1.5 font-medium text-fg-mute">
+      <Spinner size="sm" /> Sending…
+    </span>
+  ) : response ? (
+    // Keyed on the response's own shape, not just its presence: a fresh
+    // send always changes at least one of these, so the key changes too and
+    // React mounts a new node — which is what makes the fade-in replay on
+    // every arrival instead of only the first one.
+    <span
+      key={`${response.url}|${response.timeMs}|${response.sizeBytes}|${response.status}`}
+      className="flex items-center gap-2.5 motion-safe:animate-fade-in-up"
+    >
+      <span className={cn('font-semibold', statusColor(response.status))}>{response.status} {response.statusText}</span>
+      <span className="font-mono text-fg-mute" title="Total round-trip time">{response.timeMs} ms</span>
+      <span className="font-mono text-fg-mute" title="Body size">{formatBytes(response.sizeBytes)}</span>
+    </span>
+  ) : (
+    <span className="font-semibold text-bad">No response</span>
+  );
+
+  // Body / Headers actions. `xs` controls (24px) on a py-1 row: this is a
+  // secondary toolbar under a tab strip, not a row of primary controls, so
+  // it stays visually lighter than the 34px address bar above it.
+  const toolbar = response && (activeTab === 'body' || activeTab === 'headers') ? (
+    <div className="flex shrink-0 items-center gap-1 border-b border-line px-2 py-1">
+      {activeTab === 'body' && (
         <FormatDropdown format={format} onChange={setFormat} preview={preview} onPreview={setPreview} kind={kind} />
       )}
-      {sending ? (
-        <span className="flex items-center gap-1.5 font-medium text-fg-mute">
-          <Spinner size="sm" /> Sending…
-        </span>
-      ) : response ? (
-        // Keyed on the response's own shape, not just its presence: a fresh
-        // send always changes at least one of these, so the key changes too and
-        // React mounts a new node — which is what makes the fade-in replay on
-        // every arrival instead of only the first one.
-        <span
-          key={`${response.url}|${response.timeMs}|${response.sizeBytes}|${response.status}`}
-          className="flex items-center gap-2.5 motion-safe:animate-fade-in-up"
-        >
-          <span className={cn('font-semibold', statusColor(response.status))}>{response.status} {response.statusText}</span>
-          <span className="text-fg-mute">{response.timeMs} ms</span>
-          <span className="text-fg-mute">{formatBytes(response.sizeBytes)}</span>
-        </span>
-      ) : (
-        <span className="font-semibold text-bad">No response</span>
-      )}
+      <span className="ml-auto" />
       {activeTab === 'body' && showsSearchableCode && (
         <IconButton
+          size="xs"
           onClick={() => codeViewerRef.current?.openSearch()}
           title={`Search in response (${isMac ? '⌘F' : 'Ctrl+F'})`}
         >
-          <Search className="h-4 w-4" />
+          <Search className="h-3.5 w-3.5" />
         </IconButton>
       )}
-      {response && activeTab === 'body' && kind === 'json' && !big && (
+      {activeTab === 'body' && kind === 'json' && !big && (
         <IconButton
+          size="xs"
           onClick={() => setShowFilter((s) => !s)}
           title="Filter (JSONPath)"
-          className={cn(showFilter || filter ? 'text-acc-ink' : undefined)}
+          active={showFilter || !!filter}
         >
-          <Filter className="h-4 w-4" />
+          <Filter className="h-3.5 w-3.5" />
         </IconButton>
       )}
-      {response && (
-        <IconButton onClick={copy} title={copied ? 'Copied' : 'Copy'} className={cn(copied && 'text-ok')}>
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-        </IconButton>
-      )}
-      {response && <ActionsMenu onSave={saveResponse} onClear={onClear} />}
-    </>
-  );
+      <IconButton size="xs" onClick={copy} title={copied ? 'Copied' : activeTab === 'headers' ? 'Copy all headers' : 'Copy body'} className={cn(copied && 'text-ok')}>
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </IconButton>
+      <ActionsMenu onSave={saveResponse} onClear={onClear} />
+    </div>
+  ) : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -374,6 +387,8 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
           </>
         )}
       </div>
+
+      {toolbar}
 
       {error && (
         <div className="flex max-h-40 shrink-0 flex-col divide-y divide-bad/20 overflow-auto border-b border-bad/20">
@@ -585,8 +600,8 @@ function Centered({ children }: { children: React.ReactNode }) {
 function ActionsMenu({ onSave, onClear }: { onSave: () => void; onClear?: () => void }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger title="More" className="rounded p-1 text-fg-mute transition-colors hover:bg-acc hover:text-fg">
-        <MoreHorizontal className="h-4 w-4" />
+      <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
+        <MoreHorizontal className="h-3.5 w-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[11rem]">
         <DropdownMenuItem onClick={onSave} icon={<Download className="h-3.5 w-3.5" />}>
@@ -717,7 +732,7 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-line bg-bg px-1.5 py-0.5 font-mono text-[11px] text-fg-mute transition-colors hover:text-fg">
+      <DropdownMenuTrigger className="flex h-6 items-center gap-1 rounded-sm border border-line bg-bg px-1.5 font-mono text-[11px] text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40">
         <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
       </DropdownMenuTrigger>

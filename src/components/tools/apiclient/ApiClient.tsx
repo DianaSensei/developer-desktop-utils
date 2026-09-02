@@ -11,7 +11,6 @@ import { Plus, Search, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { Button } from '@/components/ui/button';
-import { Keycap } from '@/components/ui/keycap';
 import type { InlineCodeFieldHandle } from '@/design-system';
 import { RequestQuickOpen } from './RequestQuickOpen';
 import { Sidebar } from './Sidebar';
@@ -584,9 +583,6 @@ export function ApiClient() {
                   <Search className="h-3.5 w-3.5" /> Go to request
                 </Button>
               </div>
-              <p className="text-[11px] text-fg-mute/80">
-                All shortcuts are listed in the response pane once a request is open, e.g. <Keycap mod>⏎</Keycap> to send.
-              </p>
             </div>
           )}
         </div>
