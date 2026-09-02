@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildResolvedVars } from './vars';
+import { buildResolvedVars, substituteVars } from './vars';
 import { newEnvironment, newKeyValue } from './types';
 
 describe('buildResolvedVars', () => {
@@ -71,5 +71,29 @@ describe('buildResolvedVars', () => {
 
   it('returns an empty list when nothing is in scope anywhere', () => {
     expect(buildResolvedVars({}, null, null, [])).toEqual([]);
+  });
+});
+
+describe('substituteVars', () => {
+  it('replaces known tokens and leaves unknown ones visible', () => {
+    expect(substituteVars('{{host}}/users/{{id}}', { host: 'https://api.test' }))
+      .toBe('https://api.test/users/{{id}}');
+  });
+
+  it('tolerates whitespace inside the braces', () => {
+    expect(substituteVars('{{ host }}', { host: 'x' })).toBe('x');
+  });
+
+  it('never resolves a name off Object.prototype', () => {
+    // `name in vars` walked the prototype chain, so `{{constructor}}` was
+    // substituted with the literal text `function Object() { [native code] }`
+    // in the request that actually went out.
+    expect(substituteVars('{{constructor}}', {})).toBe('{{constructor}}');
+    expect(substituteVars('{{toString}}', { a: '1' })).toBe('{{toString}}');
+    expect(substituteVars('{{__proto__}}', {})).toBe('{{__proto__}}');
+  });
+
+  it('substitutes an empty-string value rather than treating it as unknown', () => {
+    expect(substituteVars('a{{x}}b', { x: '' })).toBe('ab');
   });
 });
