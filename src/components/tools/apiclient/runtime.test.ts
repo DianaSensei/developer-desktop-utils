@@ -197,6 +197,33 @@ describe('bru — collection var and scoped env stores', () => {
     expect(bru.getEnvName()).toBe('Staging');
     expect(bru.getEnvName('global')).toBe('Shared');
   });
+
+  it('does not resolve prototype properties as if they were set variables', () => {
+    // A collection var/env named "toString" or "constructor" is a plausible
+    // real name; before the fix `get*Var` fell through to Object.prototype
+    // and handed the script a live built-in instead of undefined, and
+    // `has*Var` falsely reported one as set.
+    const s = stores();
+    const bru = makeBru(s);
+    expect(bru.hasCollectionVar('toString')).toBe(false);
+    expect(bru.getCollectionVar('toString')).toBeUndefined();
+    expect(bru.hasCollectionVar('constructor')).toBe(false);
+    expect(bru.getCollectionVar('constructor')).toBeUndefined();
+
+    expect(bru.hasEnvVar('constructor')).toBe(false);
+    expect(bru.getEnvVar('constructor')).toBeUndefined();
+    expect(bru.hasEnvVar('toString', 'global')).toBe(false);
+    expect(bru.getEnvVar('toString', 'global')).toBeUndefined();
+
+    const withData = makeBru(stores({ data: {} }));
+    expect(withData.getIterationData('constructor')).toBeUndefined();
+
+    // A genuinely set variable by that same name still works normally —
+    // the fix only rejects the prototype fallthrough, not the key itself.
+    bru.setCollectionVar('toString', 'x');
+    expect(bru.hasCollectionVar('toString')).toBe(true);
+    expect(bru.getCollectionVar('toString')).toBe('x');
+  });
 });
 
 describe('req host object', () => {
