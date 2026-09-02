@@ -4,8 +4,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Braces, Check, ChevronDown, Code2, Database, File, FileText, FormInput,
-  Hexagon, type LucideIcon, Tag, Trash2, X,
+  Braces, Check, ChevronDown, Code2, Database, File, FileQuestion, FileText,
+  FormInput, Hexagon, type LucideIcon, Tag, Trash2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
 import { Tabs } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Callout } from '@/components/ui/callout';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Badge, InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
@@ -658,12 +659,20 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
   const setBody = (patch: Partial<typeof body>) => onChange({ body: { ...body, ...patch } });
 
   if (body.mode === 'none') {
-    // Says where the type picker is: it sits in the tab bar, not in this
-    // pane, and a bare "No Body" here left people looking for it down here.
+    // A GET with no body is a perfectly finished state, so this is a neutral
+    // empty state, not a warning — but when a body IS wanted, pointing at a
+    // menu in the tab bar cost a hunt plus two clicks. The two types that
+    // cover almost every case get a button right here; the rest stay in the
+    // menu, named so the pointer knows where to go.
     return (
-      <p className="text-xs text-fg-mute">
-        This request sends no body. Pick a type from the <span className="font-medium text-acc-ink">No Body</span> menu at the right of the tab bar.
-      </p>
+      <EmptyState
+        icon={FileQuestion}
+        title="No request body"
+        description="GET and DELETE usually send none. To add one, start here or pick another type from the menu above."
+        action={{ label: 'JSON', onClick: () => setBody({ mode: 'json' }) }}
+        secondaryAction={{ label: 'Form data', onClick: () => setBody({ mode: 'multipart' }) }}
+        className="px-4 py-10"
+      />
     );
   }
   if (body.mode === 'multipart') {

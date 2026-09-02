@@ -32,10 +32,10 @@ const AUTH_TYPES: { id: AuthType; label: string }[] = [
 function AuthField({ label, value, onValue, placeholder, vars, masked }: {
   label: string; value: string; onValue: (v: string) => void; placeholder?: string; vars?: VarMap; masked?: boolean;
 }) {
-  // `masked` fields (credentials — Bearer token, API key value, OAuth client
-  // secret/password) still need {{var}} highlighting, so this can't just be
-  // `type="password"` like Basic Auth's password below (InlineCodeField is a
-  // CodeMirror surface, not an <input>). Blur the value instead: hidden at
+  // Every credential here (Bearer token, Basic/Digest password, API key
+  // value, OAuth client secret/password) still needs {{var}} highlighting, so
+  // none of them can be a `type="password"` input — InlineCodeField is a
+  // CodeMirror surface, not an <input>. Blur the value instead: hidden at
   // rest, sharp while focused (so you can see what you're editing) or with the
   // reveal toggle held open — same idea as the Vault/env-var secret rows in
   // KeyValueEditor, just via CSS since there's no per-character mask here.
@@ -109,10 +109,14 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
       {(auth.type === 'basic' || auth.type === 'digest') && (
         <div className="space-y-2">
           <AuthField vars={vars} label="Username" value={auth.username} onValue={(v) => set({ username: v })} placeholder="Username or {{var}}" />
-          <div className="space-y-1.5">
-            <Label className="text-xs">Password</Label>
-            <Input type="password" value={auth.password} onChange={(e) => set({ password: e.target.value })} className="h-ctl text-xs" placeholder="Password or {{var}}" />
-          </div>
+          {/* Same masked AuthField as every other credential here, not a bare
+              `type="password"` Input: the two fields sat side by side in
+              different shells, and the placeholder already promised
+              "{{var}}" support that a plain input can't highlight — a typo'd
+              variable name looked exactly like a correct one. request.ts
+              substitutes this value (see `sub(req.auth.password)`), so the
+              highlighting was the only piece missing. */}
+          <AuthField vars={vars} masked label="Password" value={auth.password} onValue={(v) => set({ password: v })} placeholder="Password or {{var}}" />
           {auth.type === 'digest' && (
             <p className="text-[11px] text-fg-mute">The server's 401 challenge is answered automatically with an MD5 Digest response.</p>
           )}

@@ -2,7 +2,7 @@
 // method-colored label and a close button. The right cluster holds the
 // environment selector, history, and the request/response layout toggle.
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Clock, Columns2, Folder, Globe, Plus, Rows2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContextMenu, useContextMenu, type ContextMenuEntry } from '@/components/ui/context-menu';
@@ -88,6 +88,28 @@ export function RequestTabs({
       ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   }, [activeRequestId, historyActive]);
 
+  // Whether tabs are hidden off either end. The strip hides its scrollbar
+  // (no-scrollbar), so without an edge fade a scrolled-away tab leaves no
+  // trace at all — a tab you opened a minute ago simply isn't there, with
+  // nothing saying to scroll. The fades are the scrollbar's job, done in a
+  // way that costs no height in a 28px strip.
+  const [edges, setEdges] = useState({ start: false, end: false });
+  const measureEdges = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const start = el.scrollLeft > 1;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+  }, []);
+  useEffect(() => {
+    measureEdges();
+    const el = stripRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measureEdges);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measureEdges, openRequests.length, historyActive, activeRequestId]);
+
   // Right-click on a tab — the browser-tab vocabulary everyone already has.
   // Close Others / to the Right go through store.closeTabs in one update so
   // the tab kept stays the active one (see the store for why not N × closeTab).
@@ -109,8 +131,10 @@ export function RequestTabs({
       {/* tabs (scrollable) + new */}
       {/* Double-click on the empty part of the strip opens a new request —
           the browser-tab-bar gesture; the + button stays for discoverability. */}
+      <div className="relative flex min-w-0 flex-1 items-stretch">
       <div
         ref={stripRef}
+        onScroll={measureEdges}
         className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar"
         onDoubleClick={(e) => { if (e.target === e.currentTarget) onNewRequest(); }}
       >
@@ -184,6 +208,14 @@ export function RequestTabs({
         )}
       </div>
 
+      {/* pointer-events-none so a fade never eats a click on the tab under it.
+          via-bg/80 puts a real opaque stop inside the ramp — a bare
+          `from-bg to-transparent` over a surface that is itself ~bg washed
+          out nothing at all and read as no affordance. */}
+      {edges.start && <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-bg via-bg/80 to-transparent" />}
+      {edges.end && <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg via-bg/80 to-transparent" />}
+      </div>
+
       {/* Pinned outside the scrollable tab strip, not inside it — with many
           tabs open (or a narrower window) the strip scrolls/clips before this
           ever would, and "open a new request" is exactly the one action that
@@ -198,7 +230,17 @@ export function RequestTabs({
           CHÍNH LÀ chiều cao cả hàng, khiến pill chạm sát viền trên/dưới toolbar.
           1.5 → 1: đủ để pill không chạm viền, mà thanh tab thấp đi 4px — đây là
           thanh chrome, mọi pixel nó không dùng thì phần response dùng. */}
-      <div className="flex shrink-0 items-center gap-1 border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
+      {/* max-w-[45%] is what stops the environment cluster from eating the tab
+          strip. The strip is `flex-1 min-w-0` (basis 0), so it silently
+          absorbed every pixel the row was short while this cluster, at
+          `shrink-0` and ~380px wide, never gave any back: at a 1180px window
+          the strip measured 267px — two tabs out of eight open. A percentage
+          cap rather than a minimum on the strip: it can never push a control
+          off the (overflow-hidden) row however narrow the pane gets, and
+          above ~1300px there is slack for both, so nothing shrinks at all.
+          The two selects already elide, so the cap costs a few characters of
+          an environment name and nothing else. */}
+      <div className="flex min-w-0 max-w-[45%] shrink items-center gap-1 border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
         {/* Two independent pickers, not one — a Collection env and a Global
             env can both be active at once (Collection wins on a name
             collision; see EnvQuickView's precedence note). The folder/globe
@@ -224,7 +266,7 @@ export function RequestTabs({
               wraps onto a second line under the icon rather than eliding
               with "…". */}
           <SelectTrigger
-            className="h-ctl w-28 text-xs rounded-sm"
+            className="h-ctl w-28 min-w-[4.5rem] shrink text-xs rounded-sm"
             title="Collection environment — scoped to this collection, follows whichever collection the active request belongs to"
           >
             <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
@@ -247,7 +289,7 @@ export function RequestTabs({
           onValueChange={(v) => store.setActiveGlobalEnv(v === 'none' ? null : v)}
         >
           <SelectTrigger
-            className="h-ctl w-28 text-xs rounded-sm"
+            className="h-ctl w-28 min-w-[4.5rem] shrink text-xs rounded-sm"
             title="Global environment — applies across every collection, unaffected by which one is active"
           >
             <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
