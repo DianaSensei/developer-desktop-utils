@@ -20,6 +20,7 @@ import { Tabs } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Callout } from '@/components/ui/callout';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SettingGroup, SettingRow } from '@/components/ui/setting-row';
 import { Badge, InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from './KeyValueEditor';
 import { MultipartEditor } from './MultipartEditor';
@@ -85,8 +86,17 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {/* Headers từng là tab riêng — di chuyển vào đây làm phần thứ ba, cùng
             hình dạng với Query/Path (nhãn nhỏ + bảng), thay vì buộc người dùng
             nhảy tab để thấy trọn bộ những gì gắn liền với request này. */}
+        {/* max-w-3xl on the table panes: in the stacked layout the request
+            pane spans the whole window, and a `1fr 1fr` key/value grid there
+            gave a 7-character value like `profile` a 600px column. The cap
+            binds only above ~800px, so a side-by-side split (pane ~600px) is
+            untouched and only the stacked layout and very wide windows are
+            reined in. It does cost a long header value (a bearer token, say)
+            some visible width, but those cells scroll horizontally and the
+            trade reads better than half a screen of empty table. Matches the
+            Auth and Settings panes, which already cap at max-w-lg/xl. */}
         {tab === 'params' && (
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+          <div className="min-h-0 max-w-3xl flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
               <Label className="text-xs text-fg-mute">Query</Label>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
@@ -108,7 +118,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
         {tab === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}
         {tab === 'tests' && (
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+          <div className="flex min-h-0 max-w-3xl flex-1 flex-col gap-3 overflow-y-auto p-3">
             <div className="shrink-0 space-y-1.5">
               <Label className="text-xs">Assertions</Label>
               <AssertEditor request={request} onChange={onChange} />
@@ -482,15 +492,20 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
   };
 
   return (
-    <div className="max-w-xl space-y-6">
-      {/* Tags */}
+    // SettingGroup + SettingRow, the app's own shape for a panel of
+    // configuration, instead of the hand-rolled label/hint/Switch row this
+    // pane used to repeat. The rows now sit on one surface separated by
+    // hairlines rather than floating free in a column, and they read the
+    // same as the app's Settings page — which is what this pane is, scoped
+    // to one request.
+    <div className="max-w-xl space-y-5">
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> Tags</Label>
         <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-bg px-2 py-1.5 focus-within:ring-2 focus-within:ring-acc/40">
           {settings.tags.map((t) => (
             <span key={t} className="flex items-center gap-1 rounded bg-bg-2 px-1.5 py-0.5 text-[11px]">
               {t}
-              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-fg-mute hover:text-bad">
+              <button onClick={() => set({ tags: settings.tags.filter((x) => x !== t) })} className="text-fg-mute hover:text-bad" title={`Remove ${t}`}>
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -510,40 +525,37 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
         </div>
       </div>
 
-      <ToggleRow
-        title="URL Encoding"
-        hint="Automatically encode query parameters in the URL"
-        checked={settings.encodeUrl}
-        onChange={(encodeUrl) => set({ encodeUrl })}
-      />
-      <ToggleRow
-        title="Automatically Follow Redirects"
-        hint="Follow HTTP redirects automatically"
-        checked={settings.followRedirects}
-        onChange={(followRedirects) => set({ followRedirects })}
-      />
+      <SettingGroup title="Request">
+        <SettingRow
+          title="URL encoding"
+          description="Percent-encode query parameters before sending."
+          control={<Switch checked={settings.encodeUrl} onCheckedChange={(encodeUrl) => set({ encodeUrl })} aria-label="URL encoding" />}
+        />
+        <SettingRow
+          title="Follow redirects"
+          description="Follow 3xx responses automatically instead of returning them."
+          control={<Switch checked={settings.followRedirects} onCheckedChange={(followRedirects) => set({ followRedirects })} aria-label="Follow redirects" />}
+        />
+        <SettingRow
+          title="Max redirects"
+          description="How many hops to follow before giving up."
+          disabled={!settings.followRedirects}
+          control={<NumberField value={settings.maxRedirects} onChange={(maxRedirects) => set({ maxRedirects })} label="Max redirects" />}
+        />
+        <SettingRow
+          title="Timeout"
+          description="Milliseconds to wait before aborting. 0 waits forever."
+          control={<NumberField value={settings.timeout} onChange={(timeout) => set({ timeout })} label="Timeout in milliseconds" clearable />}
+        />
+      </SettingGroup>
 
-      <NumberRow
-        title="Max Redirects"
-        hint="Set a limit for the number of redirects to follow"
-        value={settings.maxRedirects}
-        disabled={!settings.followRedirects}
-        onChange={(maxRedirects) => set({ maxRedirects })}
-      />
-      <NumberRow
-        title="Timeout (ms)"
-        hint="Set maximum time to wait before aborting the request"
-        value={settings.timeout}
-        clearable
-        onChange={(timeout) => set({ timeout })}
-      />
-
-      <ToggleRow
-        title="SSL Certificate Verification"
-        hint="Reject a self-signed, expired, or hostname-mismatched certificate. Turn off only for a local/dev server you trust — anyone on the network can impersonate the server while this is off."
-        checked={settings.verifyTls}
-        onChange={(verifyTls) => set({ verifyTls })}
-      />
+      <SettingGroup title="Security">
+        <SettingRow
+          title="SSL certificate verification"
+          description="Reject a self-signed, expired, or hostname-mismatched certificate. Turn off only for a local/dev server you trust — anyone on the network can impersonate the server while this is off."
+          control={<Switch checked={settings.verifyTls} onCheckedChange={(verifyTls) => set({ verifyTls })} aria-label="SSL certificate verification" />}
+        />
+      </SettingGroup>
       {!settings.verifyTls && (
         <Callout tone="warning" size="sm">
           Certificate errors are being ignored for this request — including a real man-in-the-middle
@@ -554,44 +566,28 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
   );
 }
 
-function ToggleRow({ title, hint, checked, onChange }: {
-  title: string; hint: string; checked: boolean; onChange: (v: boolean) => void;
+// The number control inside a SettingRow — `clearable` adds the reset-to-0
+// affordance the Timeout row needs (0 meaning "no limit" is not something you
+// can type your way back to once a value is in the field on every platform's
+// number input).
+function NumberField({ value, onChange, label, clearable }: {
+  value: number; onChange: (v: number) => void; label: string; clearable?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="space-y-0.5">
-        <p className="text-xs font-medium">{title}</p>
-        <p className="text-[11px] text-fg-mute">{hint}</p>
-      </div>
-      <Switch checked={checked} onCheckedChange={onChange} aria-label={title} />
-    </div>
-  );
-}
-
-function NumberRow({ title, hint, value, onChange, disabled, clearable }: {
-  title: string; hint: string; value: number; onChange: (v: number) => void; disabled?: boolean; clearable?: boolean;
-}) {
-  return (
-    <div className={cn('flex items-center justify-between gap-4', disabled && 'opacity-50')}>
-      <div className="space-y-0.5">
-        <p className="text-xs font-medium">{title}</p>
-        <p className="text-[11px] text-fg-mute">{hint}</p>
-      </div>
-      <div className="relative w-28 shrink-0">
-        <Input
-          type="number"
-          min={0}
-          value={value}
-          disabled={disabled}
-          onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
-          className="h-ctl text-xs"
-        />
-        {clearable && value > 0 && (
-          <button onClick={() => onChange(0)} title="Clear" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute hover:text-fg">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+    <div className="relative w-28">
+      <Input
+        type="number"
+        min={0}
+        value={value}
+        aria-label={label}
+        onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+        className="h-ctl text-xs"
+      />
+      {clearable && value > 0 && (
+        <button onClick={() => onChange(0)} title="Clear" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute hover:text-fg">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

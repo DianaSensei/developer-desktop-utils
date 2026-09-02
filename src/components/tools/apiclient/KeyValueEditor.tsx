@@ -161,18 +161,23 @@ export function KeyValueEditor({
 
   if (bulk) {
     return (
+      // The mode toggle keeps the same corner and the same weight in both
+      // modes. It used to sit *below* the table and *above* the textarea, and
+      // switch from a muted label to an accent link — so the one control you
+      // need to get back moved ~200px and changed appearance the moment you
+      // used it.
       <div className="space-y-1.5">
-        <div className="flex justify-end">
-          <button onClick={() => setBulk(false)} className="text-[11px] font-medium text-acc hover:underline">
-            Key-Value Edit
-          </button>
-        </div>
         <TextEditor
           value={bulkText}
           onChange={parseBulk}
           placeholder={`${keyPlaceholder}: ${valuePlaceholder}`}
           vars={vars}
         />
+        <div className="flex justify-end">
+          <button onClick={() => setBulk(false)} className="text-[11px] text-fg-mute transition-colors hover:text-fg">
+            Key-Value Edit
+          </button>
+        </div>
       </div>
     );
   }

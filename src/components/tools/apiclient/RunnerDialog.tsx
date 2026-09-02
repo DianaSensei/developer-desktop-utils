@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Segmented } from '@/components/ui/segmented';
 import { Stat, type StatProps } from '@/components/ui/stat';
 import { Badge } from '@/components/ui/badge';
 import { Field } from '@/components/ui/tool-section';
@@ -440,7 +441,14 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent size="full" scrollable>
+      {/* h-[80vh], not just DialogContent's own `max-h-[85vh]`: the results
+          view drills into a per-request ResponsePanel, whose body is
+          `flex-1 min-h-0` and so resolves to zero against a parent with no
+          definite height — the detail pane rendered its tabs and toolbar with
+          nothing under them. A fixed height also stops the dialog resizing
+          between setup, a run in progress, and a detail view, which made the
+          Run button jump under the pointer. */}
+      <DialogContent size="full" scrollable className="h-[80vh]">
         <DialogHeader className="flex h-14 shrink-0 flex-row items-center border-b px-4">
           <DialogTitle className="flex w-full items-center gap-2 pr-10">
             <Play className="h-4 w-4 shrink-0 text-acc-ink" />
@@ -894,21 +902,30 @@ function RunDetailView({ entry, onBack }: { entry: RunDetail; onBack: () => void
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* A Segmented sharing the header line, not a second tab strip of its
+          own — ResponsePanel below brings its own row (Response / Headers /
+          Timeline / Tests / Console), and two stacked tab rows leave it
+          ambiguous which one a click acts on. HistoryView's detail pane, the
+          same request-vs-response switch over the same ResponsePanel, already
+          settled on exactly this; the Runner kept the stacked version. */}
       <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
-        <button onClick={onBack} className="flex items-center gap-1 rounded px-1.5 py-1 text-fg-mute hover:bg-acc hover:text-fg">
+        <button onClick={onBack} className="flex items-center gap-1 rounded px-1.5 py-1 text-fg-mute transition-colors hover:bg-acc hover:text-fg">
           <ChevronLeft className="h-3.5 w-3.5" /> Back
         </button>
         <span className={cn('font-bold uppercase', methodColor(request.method))}>{request.method}</span>
         <span className="min-w-0 truncate font-medium" title={request.name}>{request.name}</span>
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-2.5">
           {result.response && <span className={cn('font-semibold', statusColor(status))}>{status}</span>}
           {result.error && <span className="font-semibold text-bad">ERR</span>}
-          {result.response && <span className="text-fg-mute">{result.response.timeMs} ms</span>}
+          {result.response && <span className="font-mono text-fg-mute">{result.response.timeMs} ms</span>}
+          <Segmented
+            value={tab}
+            onValueChange={setTab}
+            size="sm"
+            aria-label="Request or response"
+            options={[{ value: 'request', label: 'Request' }, { value: 'response', label: 'Response' }]}
+          />
         </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-4 border-b px-3">
-        <DetailTab id="request" active={tab} onClick={setTab}>Request</DetailTab>
-        <DetailTab id="response" active={tab} onClick={setTab}>Response</DetailTab>
       </div>
       {tab === 'response' ? (
         <ResponsePanel
@@ -923,20 +940,6 @@ function RunDetailView({ entry, onBack }: { entry: RunDetail; onBack: () => void
         <RequestDetail request={request} sentUrl={result.response?.url} dataVars={dataVars} />
       )}
     </div>
-  );
-}
-
-function DetailTab({ id, active, onClick, children }: {
-  id: 'response' | 'request'; active: string; onClick: (id: 'response' | 'request') => void; children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={() => onClick(id)}
-      className={cn('-mb-px border-b-2 py-2 text-xs font-medium transition-colors',
-        active === id ? 'border-acc text-fg' : 'border-transparent text-fg-mute hover:text-fg')}
-    >
-      {children}
-    </button>
   );
 }
 
