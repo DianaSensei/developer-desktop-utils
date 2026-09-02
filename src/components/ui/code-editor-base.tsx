@@ -55,7 +55,7 @@ export function CodeSurface({
   const varsRef = useRef(vars);
   varsRef.current = vars;
   const hasVars = useRef(!!vars).current;
-  const theme = useCodeTheme(viewRef, { fontSize: '12px', activeLine: !readOnly });
+  const theme = useCodeTheme(viewRef, { activeLine: !readOnly });
 
   useEffect(() => {
     if (!containerRef.current) return;

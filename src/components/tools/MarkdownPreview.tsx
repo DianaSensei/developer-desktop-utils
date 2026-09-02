@@ -48,7 +48,7 @@ function MarkdownSourceEditor({ value, onChange, placeholder }: { value: string;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const lastValueRef = useRef(value);
-  const theme = useCodeTheme(viewRef, { fontSize: '13px', gutter: 'flush' });
+  const theme = useCodeTheme(viewRef, { gutter: 'flush' });
 
   useEffect(() => {
     if (!containerRef.current) return;
