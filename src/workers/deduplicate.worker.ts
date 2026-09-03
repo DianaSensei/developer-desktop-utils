@@ -1,3 +1,10 @@
+// `export {}` bắt buộc TypeScript coi file này là MODULE thay vì script toàn
+// cục — không có `import`/`export` nào thì `tsc` từ chối `import
+// '@/workers/deduplicate.worker'` trong test với lỗi "File is not a module".
+// Không đổi hành vi lúc chạy (Worker thật cũng không quan tâm module hay
+// script) — chỉ để `tsc --noEmit` (chạy trong `npm run build`) qua được.
+export {};
+
 type DedupeMode = 'preserve' | 'sort';
 
 interface DedupeResult {
