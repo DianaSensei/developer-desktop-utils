@@ -66,7 +66,7 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
             <Callout tone="warning">
               {resolution.message}
               {resolution.message.includes('dev build') && (
-                <> See <code className="font-mono">mcp-server/README.md</code> for the source-build setup instead.</>
+                <> See <code className="font-mono">docs/human/mcp-server.md</code> for the source-build setup instead.</>
               )}
             </Callout>
           )}

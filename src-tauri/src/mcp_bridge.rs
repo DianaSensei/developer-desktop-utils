@@ -1,8 +1,9 @@
 // MCP (Model Context Protocol) bridge — local control channel.
 //
-// A standalone MCP stdio server (see mcp-server/, run by Claude Desktop/Code —
-// NOT by this app) can't reach into the running webview directly, so this
-// module runs a small loopback-only HTTP server the sidecar calls into. Each
+// A standalone MCP stdio server (src/bin/devtool-mcp-server.rs, run by
+// Claude Desktop/Code — NOT by this app) can't reach into the running
+// webview directly, so this module runs a small loopback-only HTTP server
+// the sidecar calls into. Each
 // call is handed to the frontend as an `mcp:call` event, and the frontend
 // (src/components/tools/apiclient/mcpBridge.ts, wired up from ApiClient.tsx)
 // answers over the `mcp_respond` command — so an MCP tool call runs through
@@ -151,10 +152,12 @@ pub fn mcp_respond(
 // to this app's own executable — where Tauri's `bundle.externalBin` places it
 // on every platform (macOS: Contents/MacOS/, alongside the main binary, not
 // Contents/Resources/; Windows/Linux: the install directory). Used by the
-// Settings UI to show a ready-to-paste `claude mcp add` command without the
-// user having to hunt for the install path themselves. Returns an error in a
+// API Client Sidebar's "MCP for Claude Code…" dialog to show a
+// ready-to-paste `claude mcp add` command without the user having to hunt
+// for the install path themselves. Returns an error in a
 // dev build (`tauri dev`), where the sidecar isn't bundled next to anything —
-// see scripts/prepare-mcp-sidecar.mjs / mcp-server/ for that workflow instead.
+// run it via `cargo run --bin devtool-mcp-server` instead while developing
+// (see the checked-in .mcp.json, which does exactly that).
 #[tauri::command]
 pub fn mcp_sidecar_path() -> Result<String, String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -164,7 +167,8 @@ pub fn mcp_sidecar_path() -> Result<String, String> {
     if !path.exists() {
         return Err(
             "No bundled MCP sidecar found next to this app — this is likely a dev build (`tauri dev`). \
-             Use the Node-based setup in mcp-server/ instead while developing."
+             Run it via `cargo run --bin devtool-mcp-server` instead while developing \
+             (see the checked-in .mcp.json, which does exactly that)."
                 .to_string(),
         );
     }

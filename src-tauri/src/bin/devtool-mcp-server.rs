@@ -182,9 +182,8 @@ fn call_tool(name: &str, args: Value) -> Value {
 }
 
 // ── tool catalogue ───────────────────────────────────────────────────────
-// Kept in sync by hand with mcp-server/src/index.js (the Node sidecar, still
-// used for `.mcp.json`-based setup when developing this repo) and the actual
-// handlers in src/components/tools/apiclient/mcpBridge.ts.
+// Kept in sync by hand with the actual handlers in
+// src/components/tools/apiclient/mcpBridge.ts.
 
 fn kv_array_schema() -> Value {
     json!({

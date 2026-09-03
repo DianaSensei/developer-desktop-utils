@@ -1,30 +1,20 @@
-# DevTool MCP server (Node — source-build setup)
+# MCP for the API Client tool
 
-> **Just installed DevTool from a binary (dmg/msi/deb/AppImage)?** You don't
-> need this directory or Node.js at all — the app already bundles a
-> self-contained MCP server. Open the API Client tool → Collections' **More**
-> menu (⋮) → **MCP for Claude Code…** for a ready-to-paste `claude mcp add`
-> command pointed at it. This `mcp-server/` directory is the Node
-> reimplementation used when developing DevTool itself from source (paired
-> with the repo's checked-in `.mcp.json`) — read on only if that's you, or if
-> you're on a `tauri dev` build where the bundled sidecar isn't built yet.
-
-Lets an MCP client (Claude Desktop, Claude Code, …) inspect and drive
+Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive
 DevTool's **API Client** tool — list/read/edit collections, requests,
 scripts, and environments, and actually **send a request** through the same
 engine the Send button uses, with the result landing in the UI and History
-like any other send. Same tool set, same wire protocol to the app, as the
-bundled Rust sidecar (`src-tauri/src/bin/devtool-mcp-server.rs`) — this is
-just the version that needs no separate build step while iterating on this
-repo's source.
+like any other send. 28 tools; see the full list further down.
 
 ## How it works
 
-This is a small stdio MCP server. Your MCP client spawns it directly; it
-never runs inside the DevTool app itself. Every tool call it receives is
-forwarded over HTTP to a loopback-only control server the DevTool desktop app
-starts on launch (`src-tauri/src/mcp_bridge.rs`), which hands it to the
-running webview — so a call only succeeds while:
+A small MCP-over-stdio server — `devtool-mcp-server`
+(`src-tauri/src/bin/devtool-mcp-server.rs`) — runs as its own process; your
+MCP client spawns it directly, and it never runs inside the DevTool app
+itself. Every tool call it receives is forwarded over HTTP to a
+loopback-only control server the DevTool desktop app starts on launch
+(`src-tauri/src/mcp_bridge.rs`), which hands it to the running webview — so
+a call only succeeds while:
 
 - the DevTool desktop app is **open**, and
 - the **API Client** tool is the one currently on screen (that's where the
@@ -34,68 +24,49 @@ Anything else — app closed, or you're on a different tool — comes back as a
 clear error telling you so, not a hang.
 
 The two processes find each other automatically: on launch, DevTool writes
-its bridge's port and a random auth token to
-`<app data dir>/mcp-bridge.json` (same directory Tauri already uses for this
-app's other persisted files); this server re-reads that file on every call,
-so restarting DevTool (new port/token) doesn't require restarting this
-server too.
+its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
+(same directory Tauri already uses for this app's other persisted files);
+`devtool-mcp-server` re-reads that file on every call, so restarting DevTool
+(new port/token) doesn't require restarting the MCP server too.
 
 **Excluded on purpose:** the Vault (API Client's local secret store) isn't
 exposed here — the UI itself keeps Vault values out of generated code, cURL
 export, and history, and an MCP client reading/writing it would defeat that
 boundary.
 
-## Setup
+## Setup — installed the app from a binary?
 
-### Claude Code — zero-config
+You don't need to build anything — `devtool-mcp-server` ships inside the
+app (a Tauri sidecar, `bundle.externalBin`).
 
-The repo root ships a checked-in `.mcp.json` pointing at this server via
-`${CLAUDE_PROJECT_DIR}`, so **no `claude mcp add` and no path-typing needed.**
-Just:
+1. Open DevTool → **API Client** tool → Collections' **More** menu (⋮) →
+   **MCP for Claude Code…**.
+2. Copy the `claude mcp add` command it shows (it's already pointed at your
+   install's copy of the binary) and run it once in a terminal.
+3. Open a new Claude Code (or Claude Desktop) session and use it.
 
-```bash
-cd mcp-server
-npm install
-```
+## Setup — developing DevTool from source
 
-then open Claude Code anywhere inside this repo. The first time, it prompts
-you to approve the project's MCP server (`devtool-api-client`) — approve it
-once and it's available in every future session opened here. Skip straight
-to opening DevTool below.
+The repo root ships a checked-in `.mcp.json` that runs the same binary via
+`cargo run --release --bin devtool-mcp-server`, so Claude Code picks it up
+with zero manual setup: open Claude Code anywhere inside this repo, approve
+the project's MCP server prompt once, and it's available in every future
+session opened here (requires the same Rust toolchain building the app
+already needs — nothing extra to install). The first call compiles the
+binary (a few seconds); every call after that is instant.
 
-### Claude Code (manual) / Claude Desktop
-
-If you'd rather not use the checked-in `.mcp.json` (e.g. registering it
-globally instead of per-project), install the same way and add it to your
-client's config, pointing at this directory's `src/index.js` with plain
-`node`:
+To register it manually instead (e.g. globally, with `--scope user`):
 
 ```bash
-cd mcp-server
-npm install
+claude mcp add devtool-api-client --scope user -- cargo run --quiet --release --bin devtool-mcp-server --manifest-path /absolute/path/to/developer-desktop-utils/src-tauri/Cargo.toml
 ```
 
-**Claude Code** (`claude mcp add`, e.g. with `--scope user` for every project):
+Or build once and point at the plain binary:
 
 ```bash
-claude mcp add devtool-api-client -- node /absolute/path/to/developer-desktop-utils/mcp-server/src/index.js
+cargo build --release --bin devtool-mcp-server --manifest-path src-tauri/Cargo.toml
+claude mcp add devtool-api-client -- /absolute/path/to/developer-desktop-utils/src-tauri/target/release/devtool-mcp-server
 ```
-
-**Claude Desktop** (`claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "devtool-api-client": {
-      "command": "node",
-      "args": ["/absolute/path/to/developer-desktop-utils/mcp-server/src/index.js"]
-    }
-  }
-}
-```
-
-Restart your MCP client, open DevTool, switch to the **API Client** tool,
-and the tools below become available.
 
 ## Tools
 
@@ -147,7 +118,7 @@ request itself — edit those through `update_request`'s `patch`, not the
 
 - **"DevTool doesn't seem to have started its MCP bridge yet"** — the app
   isn't running, or hasn't finished starting. Open it and retry.
-- **"Could not reach DevTool on 127.0.0.1:<port>"** — the app was closed
+- **"Could not reach DevTool on 127.0.0.1:\<port\>"** — the app was closed
   after writing the discovery file (stale port). Restart the app.
 - **"No response from DevTool — is the app open, on the API Client tool?"**
   — the app is running but nothing answered within 30s, almost always

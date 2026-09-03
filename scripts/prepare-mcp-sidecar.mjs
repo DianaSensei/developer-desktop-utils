@@ -6,8 +6,9 @@
 //
 // Not run before `tauri dev`: the sidecar is only needed by an external MCP
 // client (Claude Code/Desktop) pointed at the installed app, not by the dev
-// loop itself. To test it locally, run this script by hand, or use the Node
-// sidecar (mcp-server/) instead, which needs no build step.
+// loop itself. To test it locally, run this script by hand, or use
+// `cargo run --bin devtool-mcp-server` directly (see the checked-in
+// .mcp.json, which does exactly that).
 
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, chmodSync, existsSync, mkdirSync } from 'node:fs';

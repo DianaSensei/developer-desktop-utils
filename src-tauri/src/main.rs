@@ -21,10 +21,11 @@ use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
 fn main() {
     tauri::Builder::default()
         .setup(|_app| {
-            // Local-only control channel an MCP stdio sidecar (mcp-server/)
-            // talks to, so an MCP client (Claude Desktop/Code) can drive the
-            // API Client tool through the exact same store/engine the UI
-            // uses. See mcp_bridge.rs for the full design.
+            // Local-only control channel the MCP stdio sidecar
+            // (src/bin/devtool-mcp-server.rs) talks to, so an MCP client
+            // (Claude Desktop/Code) can drive the API Client tool through
+            // the exact same store/engine the UI uses. See mcp_bridge.rs
+            // for the full design.
             mcp_bridge::start(_app.handle());
 
             // On macOS the OS only routes Cmd+Z/X/C/V/A to the webview when a

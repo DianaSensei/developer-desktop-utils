@@ -1,8 +1,9 @@
 // MCP bridge — frontend half.
 //
 // The Rust side (src-tauri/src/mcp_bridge.rs) runs a small loopback HTTP
-// server that an external MCP stdio sidecar (mcp-server/) talks to. Each MCP
-// tool call it receives is handed to the webview as an `mcp:call` Tauri
+// server that the MCP stdio sidecar
+// (src-tauri/src/bin/devtool-mcp-server.rs) talks to. Each MCP tool call it
+// receives is handed to the webview as an `mcp:call` Tauri
 // event; `useMcpBridge` (called once from ApiClient.tsx while it's mounted)
 // answers it by running the matching handler below against the *live* API
 // Client store, then reports the result back via the `mcp_respond` command —
