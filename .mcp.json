@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "devtool-api-client": {
+      "command": "cargo",
+      "args": [
+        "run",
+        "--quiet",
+        "--release",
+        "--bin",
+        "devtool-mcp-server",
+        "--manifest-path",
+        "${CLAUDE_PROJECT_DIR}/src-tauri/Cargo.toml"
+      ]
+    }
+  }
+}

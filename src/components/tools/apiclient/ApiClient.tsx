@@ -28,6 +28,7 @@ import { RunnerDialog } from './RunnerDialog';
 import { CookieManager } from './CookieManager';
 import { useApiStore } from './store';
 import { executeRequest, errToString } from './engine';
+import { useMcpBridge } from './mcpBridge';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import type { ApiRequest, ApiResponse, Environment, KeyValue, LogEntry, TestResult, VarMap } from './types';
@@ -270,6 +271,12 @@ export function ApiClient() {
     persistResult(req, collectionEnv, globalEnv, result, false);
     return result;
   }, [store, persistResult]);
+
+  // Lets an external MCP client (see src-tauri/src/mcp_bridge.rs) inspect and
+  // drive this exact store/engine — a Run request from MCP goes through
+  // `runRequest` just like the Runner does, landing in History like any
+  // other send.
+  useMcpBridge(store, runRequest);
 
   const send = useCallback(async () => {
     if (!activeRequest) return;

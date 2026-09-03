@@ -733,6 +733,17 @@ The HTTP plugin is **URL-scoped** — instead of a bare string, add an object wi
 ```bash
 npm run tauri:build
 ```
+`tauri.conf.json`'s `beforeBuildCommand` (`npm run build && node
+../scripts/prepare-mcp-sidecar.mjs`) also builds `devtool-mcp-server`
+(release) and copies it into `src-tauri/binaries/` under the target-triple-
+suffixed name Tauri's `bundle.externalBin` expects, so it's bundled into the
+app — see "API Client — MCP bridge" above. Wired through `beforeBuildCommand`
+(not the `tauri:build` npm script) specifically so CI's `tauri-action` picks
+it up too, since that invokes the Tauri CLI directly. `beforeDevCommand`
+does **not** run this step (the sidecar isn't needed by the dev loop itself);
+run `npm run build:mcp-sidecar` by hand if you need to test it locally
+without a full build.
+
 Output: `src-tauri/target/release/bundle/`
 - macOS: `bundle/macos/DevTool.app`, `bundle/dmg/*.dmg`
 - Windows: `bundle/msi/*.msi`, `bundle/nsis/*.exe`
@@ -915,6 +926,66 @@ Key files:
 - `useRedisData.ts` — stale-while-revalidate data cache (Overview, Admin tabs)
 - `format.ts` — `INFO` output parsing, byte/uptime/number formatting
 - `commands.ts` — CLI Console autocomplete reference list
+
+---
+
+### API Client — MCP bridge (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/apiclient/mcpBridge.ts`)
+
+An external MCP client (Claude Desktop/Code) can inspect and drive the API
+Client tool — list/read/edit collections, requests, scripts, environments,
+and actually **send a request** through the same engine the Send button
+uses (result lands in the UI + History like any other send). 28 tools; see
+`docs/human/mcp-server.md` for the full list and setup instructions.
+
+**The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
+`.setup()` (OS-assigned port, random token written to
+`<app_data_dir>/mcp-bridge.json`). It has no access to app state itself — a
+`POST /call` emits an `mcp:call` Tauri event and blocks on a
+`tokio::sync::oneshot` (30s timeout) until the frontend answers via the
+`mcp_respond` command. `mcpBridge.ts`'s `useMcpBridge(store, runRequest)` —
+called once from `ApiClient.tsx` while it's mounted — is the only listener,
+and runs the matching handler against the **live** `ApiStore`, so a call only
+succeeds while the app is open AND the API Client tool is the one on screen;
+anything else times out with a clear error rather than hanging.
+
+**One sidecar, `src-tauri/src/bin/devtool-mcp-server.rs`:** built on `rmcp`
+(the official Rust MCP SDK — protocol framing, capability negotiation, and
+tool routing all come from the crate) over its stdio transport, auto-
+discovered by Cargo from `src/bin/`. Tools are registered programmatically —
+`build_router()` turns each `tool_definitions()` entry (name/description/raw
+JSON Schema, same data driving the old hand-rolled version) into a
+`ToolRoute::new_dyn(...)` that forwards to the one generic `call_tool`
+dispatcher, rather than a macro-annotated method per tool. Talking to
+`mcp_bridge.rs` itself is still a small hand-rolled async HTTP/1.1 client
+over `tokio::net::TcpStream` (tokio's already a dependency of both `rmcp`
+and the main app) — one POST shape doesn't need a full HTTP client crate.
+Two ways this binary gets run:
+- **Bundled into the installed app** as a Tauri sidecar
+  (`tauri.conf.json`'s `bundle.externalBin`), built by
+  `scripts/prepare-mcp-sidecar.mjs` via `beforeBuildCommand` (so both
+  `npm run tauri:build` and CI's `tauri-action` pick it up) — a user who
+  installed DevTool from a binary never needs Rust or Node.js.
+  `mcp_bridge.rs`'s `mcp_sidecar_path` command resolves its absolute path at
+  runtime (next to the running app's own executable — where Tauri places
+  `externalBin` sidecars on every platform); the Sidebar's **More ⋮ → MCP
+  for Claude Code…** menu item (`McpSetupDialog.tsx`) shows a ready-to-paste
+  `claude mcp add` command built from it. Copy-only, never auto-run.
+- **Run via `cargo run --bin devtool-mcp-server`** when developing this repo
+  from source — the checked-in root `.mcp.json` does exactly this, so
+  opening Claude Code anywhere in the repo picks it up with zero manual
+  setup (needs the same Rust toolchain building the app already requires;
+  the first call compiles it, every call after is instant via Cargo's own
+  incremental cache).
+
+**Adding a tool:** add a handler function to `buildHandlers()` in
+`mcpBridge.ts` (reuse existing `store.*` actions — don't reimplement
+collection/request mutation logic), then add a matching entry to
+`tool_definitions()` (a raw JSON Schema `Value`) in `devtool-mcp-server.rs`.
+Write descriptions for an LLM caller, not a human reading the UI.
+
+**Deliberately excluded:** the Vault (`store.vault`) — the UI itself keeps
+Vault values out of generated code, cURL export, and history, so exposing it
+to an MCP client would defeat that boundary.
 
 ---
 

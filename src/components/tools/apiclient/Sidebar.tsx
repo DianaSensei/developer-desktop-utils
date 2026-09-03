@@ -19,6 +19,7 @@ import {
   MoreVertical,
   Pencil,
   Play,
+  Plug,
   Plus,
   SearchX,
   Trash2,
@@ -38,10 +39,12 @@ import { importPostman, exportPostman } from './postman';
 import { type ScriptFinding, findScripts, stripScripts } from './collectionScripts';
 import { ImportReviewDialog } from './ImportReviewDialog';
 import { importOpenApi, isOpenApiDocument, parseSpecText } from './openapi';
+import { importBru, isBrunoFile } from './bruno';
 import { pickCollectionFile, saveJsonFile } from './fileio';
 import { methodColor, methodShort } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
 import { ImportCurlDialog } from './ImportCurlDialog';
+import { McpSetupDialog } from './McpSetupDialog';
 import { collectionMatches, itemMatches } from './treeSearch';
 
 const emptyScript = (s?: RequestScript): RequestScript => s ?? { req: '', res: '' };
@@ -127,6 +130,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   const [notices, setNotices] = useState<string[]>([]);
   const [settings, setSettings] = useState<NodeSettingsTarget | null>(null);
   const [curlOpen, setCurlOpen] = useState(false);
+  const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
   // Set while the user decides what to do about an import that carries scripts.
   const [pendingImport, setPendingImport] = useState<{ collection: Collection; findings: ScriptFinding[] } | null>(null);
   // Set while a destructive action (delete collection/folder/request) awaits confirmation.
@@ -173,20 +177,30 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     try {
       const file = await pickCollectionFile();
       if (!file) return;
-      // A Postman export and an OpenAPI spec are both usually named `.json`, so
-      // the format is decided by what the document contains, not its extension.
-      const doc = await parseSpecText(file.text);
       let collection: Collection;
-      if (isOpenApiDocument(doc)) {
-        const result = importOpenApi(doc);
-        collection = result.collection;
-        setNotices(result.warnings);
-      } else if (doc && typeof doc === 'object' && Array.isArray((doc as { item?: unknown }).item)) {
-        const result = importPostman(file.text);
+      // Unlike Postman/OpenAPI (both JSON/YAML, disambiguated by content), a
+      // Bruno request is its own block-based text format — the .bru extension
+      // decides it outright, and feeding it to the JSON/YAML parser below
+      // would just fail.
+      if (isBrunoFile(file.name)) {
+        const result = importBru(file.text, file.name);
         collection = result.collection;
         setNotices(result.warnings);
       } else {
-        throw new Error(`${file.name} is neither a Postman collection nor an OpenAPI/Swagger spec`);
+        // A Postman export and an OpenAPI spec are both usually named `.json`,
+        // so the format is decided by what the document contains, not its extension.
+        const doc = await parseSpecText(file.text);
+        if (isOpenApiDocument(doc)) {
+          const result = importOpenApi(doc);
+          collection = result.collection;
+          setNotices(result.warnings);
+        } else if (doc && typeof doc === 'object' && Array.isArray((doc as { item?: unknown }).item)) {
+          const result = importPostman(file.text);
+          collection = result.collection;
+          setNotices(result.warnings);
+        } else {
+          throw new Error(`${file.name} is neither a Postman collection, an OpenAPI/Swagger spec, nor a Bruno request`);
+        }
       }
       const findings = findScripts(collection);
       if (findings.length === 0) {
@@ -236,9 +250,10 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
             <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
               <MoreVertical className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection / OpenAPI</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection / OpenAPI / .bru</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCurlOpen(true)} icon={<Code2 className="h-3.5 w-3.5" />}>Import cURL</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setMcpSetupOpen(true)} icon={<Plug className="h-3.5 w-3.5" />}>MCP for Claude Code…</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -274,7 +289,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
           <EmptyState
             icon={Boxes}
             title="No collections yet"
-            description="Create a collection, or import a Postman file / OpenAPI spec to get started."
+            description="Create a collection, or import a Postman file / OpenAPI spec / Bruno request to get started."
             action={{ label: 'New collection', onClick: () => store.addCollection() }}
             secondaryAction={{ label: 'Import…', onClick: handleImport }}
             className="px-4 py-8"
@@ -306,6 +321,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
         />
       )}
       <ImportCurlDialog store={store} open={curlOpen} onClose={() => setCurlOpen(false)} />
+      <McpSetupDialog open={mcpSetupOpen} onClose={() => setMcpSetupOpen(false)} />
       {pendingImport && (
         <ImportReviewDialog
           open

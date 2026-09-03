@@ -4,7 +4,7 @@
   "identifier": "com.desktop-devtool-app",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run build && node ../scripts/prepare-mcp-sidecar.mjs",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
@@ -32,6 +32,7 @@
   "bundle": {
     "createUpdaterArtifacts": true,
     "active": true,
+    "externalBin": ["binaries/devtool-mcp-server"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
