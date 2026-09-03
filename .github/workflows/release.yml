@@ -29,13 +29,15 @@ jobs:
           - platform: macos-latest      # ARM runner — native aarch64 build
             args: '--target aarch64-apple-darwin'
             rust-target: aarch64-apple-darwin
-          # windows-2022, not windows-latest: kept pinned from when this job still
-          # built an MSI as the safer, already-verified image (see tauri.conf.json's
-          # bundle.targets — msi was dropped there: WiX v3's light.exe repeatedly
-          # failed to run in CI, unfixable short of a runner reboot mid-job). NSIS
-          # alone has no known issue with windows-latest (Server 2025); revisit
-          # the pin if there's a reason to move off it.
-          - platform: windows-2022
+          # windows-latest again: this job used to be pinned to windows-2022
+          # because Server 2025 broke WiX v3's light.exe for the msi target. msi
+          # is dropped now (see tauri.conf.json's bundle.targets — WiX v3 is
+          # archived and its VBScript dependency is unfixable in CI), and NSIS
+          # has no known issue on windows-latest. This also matches
+          # build-cache.yml's matrix, so the Rust cache this job restores
+          # (shared-key: ${{ matrix.platform }}-...) is finally the one that
+          # workflow actually warms, instead of a key nothing else writes to.
+          - platform: windows-latest
             args: ''
             rust-target: ''
 
@@ -133,7 +135,7 @@ jobs:
       # Windows bundling downloads NSIS (and nsis_tauri_utils.dll) into
       # %LOCALAPPDATA%\tauri on every run. Cache that dir so later releases reuse it.
       - name: Cache Tauri bundler tools (Windows)
-        if: matrix.platform == 'windows-2022'
+        if: matrix.platform == 'windows-latest'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/AppData/Local/tauri
