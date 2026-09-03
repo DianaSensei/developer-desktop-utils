@@ -1,10 +1,22 @@
-# DevTool MCP server
+# DevTool MCP server (Node — source-build setup)
+
+> **Just installed DevTool from a binary (dmg/msi/deb/AppImage)?** You don't
+> need this directory or Node.js at all — the app already bundles a
+> self-contained MCP server. Open the API Client tool → Collections' **More**
+> menu (⋮) → **MCP for Claude Code…** for a ready-to-paste `claude mcp add`
+> command pointed at it. This `mcp-server/` directory is the Node
+> reimplementation used when developing DevTool itself from source (paired
+> with the repo's checked-in `.mcp.json`) — read on only if that's you, or if
+> you're on a `tauri dev` build where the bundled sidecar isn't built yet.
 
 Lets an MCP client (Claude Desktop, Claude Code, …) inspect and drive
 DevTool's **API Client** tool — list/read/edit collections, requests,
 scripts, and environments, and actually **send a request** through the same
 engine the Send button uses, with the result landing in the UI and History
-like any other send.
+like any other send. Same tool set, same wire protocol to the app, as the
+bundled Rust sidecar (`src-tauri/src/bin/devtool-mcp-server.rs`) — this is
+just the version that needs no separate build step while iterating on this
+repo's source.
 
 ## How it works
 

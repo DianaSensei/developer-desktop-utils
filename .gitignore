@@ -26,6 +26,11 @@ dist-ssr
 # Tauri
 src-tauri/target
 
+# MCP sidecar binaries — built per-platform by scripts/prepare-mcp-sidecar.mjs
+# right before `tauri build` (see package.json's tauri:build), not committed.
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
+
 # Coverage reports
 lcov.info
 **/lcov.info

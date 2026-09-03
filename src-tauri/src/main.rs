@@ -111,6 +111,7 @@ fn main() {
             ports::list_listening_ports,
             files::read_file_data_url,
             mcp_bridge::mcp_respond,
+            mcp_bridge::mcp_sidecar_path,
             kafka::kafka_list_configs,
             kafka::kafka_save_config,
             kafka::kafka_delete_config,

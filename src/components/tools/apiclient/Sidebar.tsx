@@ -19,6 +19,7 @@ import {
   MoreVertical,
   Pencil,
   Play,
+  Plug,
   Plus,
   SearchX,
   Trash2,
@@ -43,6 +44,7 @@ import { pickCollectionFile, saveJsonFile } from './fileio';
 import { methodColor, methodShort } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
 import { ImportCurlDialog } from './ImportCurlDialog';
+import { McpSetupDialog } from './McpSetupDialog';
 import { collectionMatches, itemMatches } from './treeSearch';
 
 const emptyScript = (s?: RequestScript): RequestScript => s ?? { req: '', res: '' };
@@ -128,6 +130,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   const [notices, setNotices] = useState<string[]>([]);
   const [settings, setSettings] = useState<NodeSettingsTarget | null>(null);
   const [curlOpen, setCurlOpen] = useState(false);
+  const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
   // Set while the user decides what to do about an import that carries scripts.
   const [pendingImport, setPendingImport] = useState<{ collection: Collection; findings: ScriptFinding[] } | null>(null);
   // Set while a destructive action (delete collection/folder/request) awaits confirmation.
@@ -247,9 +250,10 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
             <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
               <MoreVertical className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection / OpenAPI / .bru</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCurlOpen(true)} icon={<Code2 className="h-3.5 w-3.5" />}>Import cURL</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setMcpSetupOpen(true)} icon={<Plug className="h-3.5 w-3.5" />}>MCP for Claude Code…</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -317,6 +321,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
         />
       )}
       <ImportCurlDialog store={store} open={curlOpen} onClose={() => setCurlOpen(false)} />
+      <McpSetupDialog open={mcpSetupOpen} onClose={() => setMcpSetupOpen(false)} />
       {pendingImport && (
         <ImportReviewDialog
           open

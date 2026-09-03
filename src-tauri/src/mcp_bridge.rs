@@ -147,6 +147,30 @@ pub fn mcp_respond(
     }
 }
 
+// Resolves the absolute path to the bundled `devtool-mcp-server` sidecar next
+// to this app's own executable — where Tauri's `bundle.externalBin` places it
+// on every platform (macOS: Contents/MacOS/, alongside the main binary, not
+// Contents/Resources/; Windows/Linux: the install directory). Used by the
+// Settings UI to show a ready-to-paste `claude mcp add` command without the
+// user having to hunt for the install path themselves. Returns an error in a
+// dev build (`tauri dev`), where the sidecar isn't bundled next to anything —
+// see scripts/prepare-mcp-sidecar.mjs / mcp-server/ for that workflow instead.
+#[tauri::command]
+pub fn mcp_sidecar_path() -> Result<String, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let dir = exe.parent().ok_or("Could not resolve the app's install directory")?;
+    let name = if cfg!(windows) { "devtool-mcp-server.exe" } else { "devtool-mcp-server" };
+    let path = dir.join(name);
+    if !path.exists() {
+        return Err(
+            "No bundled MCP sidecar found next to this app — this is likely a dev build (`tauri dev`). \
+             Use the Node-based setup in mcp-server/ instead while developing."
+                .to_string(),
+        );
+    }
+    Ok(path.to_string_lossy().into_owned())
+}
+
 fn write_discovery_file(app: &AppHandle, port: u16, token: &str) -> std::io::Result<()> {
     let dir = app
         .path()
