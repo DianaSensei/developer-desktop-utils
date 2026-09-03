@@ -38,6 +38,7 @@ import { importPostman, exportPostman } from './postman';
 import { type ScriptFinding, findScripts, stripScripts } from './collectionScripts';
 import { ImportReviewDialog } from './ImportReviewDialog';
 import { importOpenApi, isOpenApiDocument, parseSpecText } from './openapi';
+import { importBru, isBrunoFile } from './bruno';
 import { pickCollectionFile, saveJsonFile } from './fileio';
 import { methodColor, methodShort } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
@@ -173,20 +174,30 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
     try {
       const file = await pickCollectionFile();
       if (!file) return;
-      // A Postman export and an OpenAPI spec are both usually named `.json`, so
-      // the format is decided by what the document contains, not its extension.
-      const doc = await parseSpecText(file.text);
       let collection: Collection;
-      if (isOpenApiDocument(doc)) {
-        const result = importOpenApi(doc);
-        collection = result.collection;
-        setNotices(result.warnings);
-      } else if (doc && typeof doc === 'object' && Array.isArray((doc as { item?: unknown }).item)) {
-        const result = importPostman(file.text);
+      // Unlike Postman/OpenAPI (both JSON/YAML, disambiguated by content), a
+      // Bruno request is its own block-based text format — the .bru extension
+      // decides it outright, and feeding it to the JSON/YAML parser below
+      // would just fail.
+      if (isBrunoFile(file.name)) {
+        const result = importBru(file.text, file.name);
         collection = result.collection;
         setNotices(result.warnings);
       } else {
-        throw new Error(`${file.name} is neither a Postman collection nor an OpenAPI/Swagger spec`);
+        // A Postman export and an OpenAPI spec are both usually named `.json`,
+        // so the format is decided by what the document contains, not its extension.
+        const doc = await parseSpecText(file.text);
+        if (isOpenApiDocument(doc)) {
+          const result = importOpenApi(doc);
+          collection = result.collection;
+          setNotices(result.warnings);
+        } else if (doc && typeof doc === 'object' && Array.isArray((doc as { item?: unknown }).item)) {
+          const result = importPostman(file.text);
+          collection = result.collection;
+          setNotices(result.warnings);
+        } else {
+          throw new Error(`${file.name} is neither a Postman collection, an OpenAPI/Swagger spec, nor a Bruno request`);
+        }
       }
       const findings = findScripts(collection);
       if (findings.length === 0) {
@@ -237,7 +248,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
               <MoreVertical className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection / OpenAPI</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection / OpenAPI / .bru</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCurlOpen(true)} icon={<Code2 className="h-3.5 w-3.5" />}>Import cURL</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -274,7 +285,7 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
           <EmptyState
             icon={Boxes}
             title="No collections yet"
-            description="Create a collection, or import a Postman file / OpenAPI spec to get started."
+            description="Create a collection, or import a Postman file / OpenAPI spec / Bruno request to get started."
             action={{ label: 'New collection', onClick: () => store.addCollection() }}
             secondaryAction={{ label: 'Import…', onClick: handleImport }}
             className="px-4 py-8"

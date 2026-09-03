@@ -34,16 +34,16 @@ export async function pickJsonFile(): Promise<string | null> {
   });
 }
 
-// Open a picker for a collection file — a Postman export (JSON) or an OpenAPI /
-// Swagger spec, which is just as often YAML. Returns the file's text contents
-// and its name (the extension is a hint the importer uses), or null if
-// cancelled.
+// Open a picker for a collection file — a Postman export (JSON), an OpenAPI /
+// Swagger spec (just as often YAML), or a single Bruno request (.bru). Returns
+// the file's text contents and its name (the extension is a hint the importer
+// uses), or null if cancelled.
 export async function pickCollectionFile(): Promise<{ name: string; text: string } | null> {
   if (isTauri) {
     const { open } = await import('@tauri-apps/plugin-dialog');
     const path = await open({
       multiple: false,
-      filters: [{ name: 'Collection or OpenAPI spec', extensions: ['json', 'yaml', 'yml'] }],
+      filters: [{ name: 'Collection, OpenAPI spec, or Bruno request', extensions: ['json', 'yaml', 'yml', 'bru'] }],
     });
     if (!path || typeof path !== 'string') return null;
     const { readTextFile } = await import('@tauri-apps/plugin-fs');
@@ -53,7 +53,7 @@ export async function pickCollectionFile(): Promise<{ name: string; text: string
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'application/json,.json,.yaml,.yml,application/yaml,text/yaml';
+    input.accept = 'application/json,.json,.yaml,.yml,application/yaml,text/yaml,.bru';
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return resolve(null);

@@ -918,6 +918,41 @@ Key files:
 
 ---
 
+### API Client — MCP bridge (`mcp-server/`, `src-tauri/src/mcp_bridge.rs`, `src/components/tools/apiclient/mcpBridge.ts`)
+
+An external MCP client (Claude Desktop/Code) can inspect and drive the API
+Client tool — list/read/edit collections, requests, scripts, environments,
+and actually **send a request** through the same engine the Send button
+uses (result lands in the UI + History like any other send).
+
+**Three pieces, one call path:** `mcp-server/` is a standalone Node stdio MCP
+server your MCP client spawns directly (`npm install` once, then point the
+client's config at `mcp-server/src/index.js`) — it never runs inside the app.
+It forwards each MCP tool call as `POST /call` to a loopback-only axum server
+`mcp_bridge.rs` starts in `.setup()` (OS-assigned port, random token written
+to `<app_data_dir>/mcp-bridge.json` for the sidecar to discover). That Rust
+server has no access to app state itself — it emits an `mcp:call` Tauri
+event and blocks on a `tokio::sync::oneshot` (30s timeout) until the
+frontend answers via the `mcp_respond` command. `mcpBridge.ts`'s
+`useMcpBridge(store, runRequest)` — called once from `ApiClient.tsx` while
+it's mounted — is the only listener, and runs the matching handler against
+the **live** `ApiStore`, so a call only succeeds while the app is open AND
+the API Client tool is the one on screen; anything else times out with a
+clear error rather than hanging.
+
+**Adding a tool:** add a handler function to `buildHandlers()` in
+`mcpBridge.ts` (reuse existing `store.*` actions — don't reimplement
+collection/request mutation logic), then register a matching
+`server.registerTool(...)` in `mcp-server/src/index.js` with a zod
+`inputSchema` and a description written for an LLM caller, not a human
+reading the UI.
+
+**Deliberately excluded:** the Vault (`store.vault`) — the UI itself keeps
+Vault values out of generated code, cURL export, and history, so exposing it
+to an MCP client would defeat that boundary.
+
+---
+
 ## Shared Components for Complex Tools
 
 ### `ViewHeader` — `src/components/ui/view-header.tsx`

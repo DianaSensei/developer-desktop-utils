@@ -6,6 +6,7 @@ mod checksum;
 mod dropped;
 mod netinfo;
 mod files;
+mod mcp_bridge;
 mod mockserver;
 mod ports;
 mod rabbit;
@@ -20,6 +21,12 @@ use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
 fn main() {
     tauri::Builder::default()
         .setup(|_app| {
+            // Local-only control channel an MCP stdio sidecar (mcp-server/)
+            // talks to, so an MCP client (Claude Desktop/Code) can drive the
+            // API Client tool through the exact same store/engine the UI
+            // uses. See mcp_bridge.rs for the full design.
+            mcp_bridge::start(_app.handle());
+
             // On macOS the OS only routes Cmd+Z/X/C/V/A to the webview when a
             // native Edit menu with PredefinedMenuItems exists. Without it, none
             // of the standard text-editing shortcuts work in <input>/<textarea>
@@ -103,6 +110,7 @@ fn main() {
             netinfo::local_network_info,
             ports::list_listening_ports,
             files::read_file_data_url,
+            mcp_bridge::mcp_respond,
             kafka::kafka_list_configs,
             kafka::kafka_save_config,
             kafka::kafka_delete_config,

@@ -25,9 +25,14 @@ export function useRowSelection<T>(rows: T[], keyOf: (row: T) => string) {
   const isSelected = useCallback((key: string) => selected.has(key), [selected]);
 
   const toggle = useCallback((key: string, index?: number, shiftKey?: boolean) => {
+    // Read the anchor before scheduling the update: `setSelected`'s updater
+    // runs later (batched), by which point the `lastIndexRef.current = index`
+    // line below has already fired — reading the ref lazily inside the
+    // updater would make `anchor` equal the new `index` itself, collapsing
+    // every shift-click range down to the single just-clicked row.
+    const anchor = lastIndexRef.current;
     setSelected((prev) => {
       const next = new Set(prev);
-      const anchor = lastIndexRef.current;
       if (shiftKey && anchor !== null && index !== undefined) {
         const [from, to] = anchor <= index ? [anchor, index] : [index, anchor];
         // A shift-click always *adds* the range (never clears it), matching the
