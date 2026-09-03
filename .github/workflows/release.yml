@@ -124,6 +124,17 @@ jobs:
             echo "__NOTES_EOF__"
           } >> "$GITHUB_ENV"
 
+      # WiX v3's light.exe (used for the .msi bundle) depends on the VBScript
+      # engine. Recent windows-latest runner images ship VBSCRIPT as an
+      # optional Feature-on-Demand that is no longer installed by default, so
+      # light.exe fails to even launch ("failed to run ...\light.exe").
+      # Installing the capability restores it. See:
+      # https://v2.tauri.app/distribute/windows-installer/
+      - name: Enable VBScript (required by WiX msi bundler)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: Add-WindowsCapability -Online -Name "VBSCRIPT~~~~"
+
       # Windows bundling downloads WiX + NSIS (and nsis_tauri_utils.dll) into
       # %LOCALAPPDATA%\tauri on every run. Cache that dir so later releases reuse it.
       - name: Cache Tauri bundler tools (Windows)
