@@ -4,7 +4,7 @@
   "identifier": "com.desktop-devtool-app",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build && node ../scripts/prepare-mcp-sidecar.mjs",
+    "beforeBuildCommand": "npm run build && npm run build:mcp-sidecar",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
