@@ -746,7 +746,7 @@ without a full build.
 
 Output: `src-tauri/target/release/bundle/`
 - macOS: `bundle/macos/DevTool.app`, `bundle/dmg/*.dmg`
-- Windows: `bundle/msi/*.msi`, `bundle/nsis/*.exe`
+- Windows: `bundle/nsis/*.exe`
 - Linux: `bundle/appimage/*.AppImage`, `bundle/deb/*.deb`
 
 ### CI/CD — GitHub Actions

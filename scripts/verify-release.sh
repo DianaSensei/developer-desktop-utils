@@ -19,7 +19,7 @@ fi
 files=("$@")
 if [ ${#files[@]} -eq 0 ]; then
   shopt -s nullglob
-  files=(DevTool*.dmg DevTool*.msi DevTool*.exe DevTool*.AppImage devtool*.deb DevTool*.app.tar.gz)
+  files=(DevTool*.dmg DevTool*.exe DevTool*.AppImage devtool*.deb DevTool*.app.tar.gz)
   shopt -u nullglob
 fi
 

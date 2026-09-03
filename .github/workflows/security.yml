@@ -1,12 +1,20 @@
 name: Security
 
+# Docs-only changes touch neither npm/Cargo dependencies nor secrets, so skip
+# the per-push/PR run for them; the monthly schedule below still gives a full
+# scan a cadence independent of what commits happen to land.
 on:
   push:
     branches: [main]
+    paths-ignore: &docs-only
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore: *docs-only
   schedule:
-    # Weekly, Monday 03:00 UTC — catches advisories published after the last commit.
-    - cron: '0 3 * * 1'
+    # Monthly, 1st at 03:00 UTC — catches advisories published against
+    # dependencies that haven't otherwise changed since the last commit.
+    - cron: '0 3 1 * *'
   workflow_dispatch:
 
 permissions:
@@ -106,8 +114,13 @@ jobs:
           comment-summary-in-pr: on-failure
 
   # ── Publish an SBOM of the full dependency tree ──────────────────────────
+  # push:main/schedule only: this just uploads an artifact, it doesn't gate
+  # anything, so a PR commit doesn't need its own SBOM — the one from the
+  # last main push (or the monthly run) is what anyone auditing the tree
+  # actually wants, and re-generating it on every PR push was pure waste.
   sbom:
     name: SBOM
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
