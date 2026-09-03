@@ -6,6 +6,9 @@ authors = ["you"]
 license = ""
 repository = ""
 edition = "2021"
+# src/bin/devtool-mcp-server.rs makes this crate build two binaries; without
+# this, `cargo run` (what `tauri dev` shells out to) can't pick one.
+default-run = "devtool"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

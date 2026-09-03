@@ -29,7 +29,14 @@ jobs:
           - platform: macos-latest      # ARM runner — native aarch64 build
             args: '--target aarch64-apple-darwin'
             rust-target: aarch64-apple-darwin
-          - platform: windows-latest
+          # Pinned to windows-2022, not windows-latest: the windows-2025 image
+          # (rolled out as the new windows-latest) breaks WiX v3's light.exe
+          # ("failed to run ...\light.exe") even with VBScript installed —
+          # candle.exe succeeds but light.exe cannot execute at all. WiX v3 is
+          # archived/unmaintained and was never validated against Server 2025,
+          # and Tauri's bundler still hard-downloads WiX v3 (wix314-binaries).
+          # windows-2022 is the last runner image confirmed to work.
+          - platform: windows-2022
             args: ''
             rust-target: ''
 
@@ -125,20 +132,20 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # WiX v3's light.exe (used for the .msi bundle) depends on the VBScript
-      # engine. Recent windows-latest runner images ship VBSCRIPT as an
-      # optional Feature-on-Demand that is no longer installed by default, so
+      # engine, which some Windows runner images ship as an optional
+      # Feature-on-Demand rather than installed by default — without it,
       # light.exe fails to even launch ("failed to run ...\light.exe").
-      # Installing the capability restores it. See:
-      # https://v2.tauri.app/distribute/windows-installer/
+      # Cheap safety net even on windows-2022 (see the platform pin above for
+      # the main fix). See: https://v2.tauri.app/distribute/windows-installer/
       - name: Enable VBScript (required by WiX msi bundler)
-        if: matrix.platform == 'windows-latest'
+        if: matrix.platform == 'windows-2022'
         shell: pwsh
         run: Add-WindowsCapability -Online -Name "VBSCRIPT~~~~"
 
       # Windows bundling downloads WiX + NSIS (and nsis_tauri_utils.dll) into
       # %LOCALAPPDATA%\tauri on every run. Cache that dir so later releases reuse it.
       - name: Cache Tauri bundler tools (Windows)
-        if: matrix.platform == 'windows-latest'
+        if: matrix.platform == 'windows-2022'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/AppData/Local/tauri
