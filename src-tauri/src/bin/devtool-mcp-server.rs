@@ -29,9 +29,8 @@ use std::time::Duration;
 use rmcp::handler::server::router::tool::{ToolRoute, ToolRouter};
 use rmcp::handler::server::tool::ToolCallContext;
 use rmcp::model::{
-    CallToolRequestParam, CallToolResult, Content, ErrorData as McpError, Implementation,
-    ListToolsResult, PaginatedRequestParam, ProtocolVersion, ServerCapabilities, ServerInfo,
-    Tool, ToolsCapability,
+    CallToolRequestParams, CallToolResult, Content, ErrorData as McpError, Implementation,
+    ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool,
 };
 use rmcp::service::RequestContext;
 use rmcp::transport::io::stdio;
@@ -452,16 +451,7 @@ fn build_router() -> ToolRouter<DevToolServer> {
             Value::Object(m) => m,
             _ => Default::default(),
         };
-        let tool = Tool {
-            name: name.clone().into(),
-            title: None,
-            description: Some(description.into()),
-            input_schema: std::sync::Arc::new(schema),
-            output_schema: None,
-            annotations: None,
-            icons: None,
-            meta: None,
-        };
+        let tool = Tool::new(name.clone(), description, schema);
         router.add_route(ToolRoute::new_dyn(tool, move |context: ToolCallContext<'_, DevToolServer>| {
             let name = name.clone();
             let args = context.arguments.clone().map(Value::Object).unwrap_or_else(|| json!({}));
@@ -474,37 +464,26 @@ fn build_router() -> ToolRouter<DevToolServer> {
 
 impl ServerHandler for DevToolServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            protocol_version: ProtocolVersion::default(),
-            instructions: Some(
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_instructions(
                 "Drives DevTool's API Client tool — collections, requests, scripts, \
                  environments — and can actually send a request. Only answers while the \
-                 DevTool desktop app is open with the API Client tool on screen."
-                    .to_string(),
-            ),
-            capabilities: ServerCapabilities {
-                tools: Some(ToolsCapability { list_changed: None }),
-                ..Default::default()
-            },
-            server_info: Implementation {
-                name: "devtool-api-client".to_string(),
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                ..Default::default()
-            },
-        }
+                 DevTool desktop app is open with the API Client tool on screen.",
+            )
+            .with_server_info(Implementation::new("devtool-api-client", env!("CARGO_PKG_VERSION")))
     }
 
     fn list_tools(
         &self,
-        _request: Option<PaginatedRequestParam>,
+        _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<ListToolsResult, McpError>> + Send + '_ {
-        std::future::ready(Ok(ListToolsResult { tools: self.tool_router.list_all(), next_cursor: None }))
+        std::future::ready(Ok(ListToolsResult { tools: self.tool_router.list_all(), ..Default::default() }))
     }
 
     fn call_tool(
         &self,
-        request: CallToolRequestParam,
+        request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<CallToolResult, McpError>> + Send + '_ {
         self.tool_router.call(ToolCallContext::new(self, request, context))

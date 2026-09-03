@@ -54,8 +54,12 @@ redis = { version = "1.6.0", features = ["tokio-comp", "tls-rustls", "tokio-rust
 bollard = "0.21"
 # Official Rust MCP SDK — only used by the devtool-mcp-server bin target
 # (src/bin/devtool-mcp-server.rs), never by the main app itself. "transport-io"
-# adds the stdio transport on top of the default feature set.
-rmcp = { version = "0.9", features = ["transport-io"] }
+# adds the stdio transport on top of the default feature set. Pinned >=1.4:
+# versions below that carry GHSA-89vp-x53w-74fx (a DNS-rebinding issue in
+# rmcp's Streamable HTTP server transport) — unreachable here since this bin
+# only ever uses the stdio transport, but GitHub's dependency review flags
+# the crate version regardless of which transport feature is enabled.
+rmcp = { version = "1.4", features = ["transport-io"] }
 
 [target.'cfg(unix)'.dependencies]
 # Direct handles onto crates bollard already pulls in transitively (its own
