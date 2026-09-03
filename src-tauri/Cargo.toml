@@ -52,6 +52,10 @@ redis = { version = "1.6.0", features = ["tokio-comp", "tls-rustls", "tokio-rust
 # to any daemon exposing a docker-compatible socket: Docker Desktop, Colima
 # (docker runtime), Rancher Desktop (moby), OrbStack, Podman (docker-compat).
 bollard = "0.21"
+# Official Rust MCP SDK — only used by the devtool-mcp-server bin target
+# (src/bin/devtool-mcp-server.rs), never by the main app itself. "transport-io"
+# adds the stdio transport on top of the default feature set.
+rmcp = { version = "0.9", features = ["transport-io"] }
 
 [target.'cfg(unix)'.dependencies]
 # Direct handles onto crates bollard already pulls in transitively (its own

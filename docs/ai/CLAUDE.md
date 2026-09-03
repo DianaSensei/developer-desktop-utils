@@ -948,10 +948,18 @@ and runs the matching handler against the **live** `ApiStore`, so a call only
 succeeds while the app is open AND the API Client tool is the one on screen;
 anything else times out with a clear error rather than hanging.
 
-**One sidecar, `src-tauri/src/bin/devtool-mcp-server.rs`:** a hand-rolled,
-dependency-free (std + serde_json only — no tokio/reqwest/MCP SDK crate)
-MCP-over-stdio binary, auto-discovered by Cargo from `src/bin/`. Two ways it
-gets run:
+**One sidecar, `src-tauri/src/bin/devtool-mcp-server.rs`:** built on `rmcp`
+(the official Rust MCP SDK — protocol framing, capability negotiation, and
+tool routing all come from the crate) over its stdio transport, auto-
+discovered by Cargo from `src/bin/`. Tools are registered programmatically —
+`build_router()` turns each `tool_definitions()` entry (name/description/raw
+JSON Schema, same data driving the old hand-rolled version) into a
+`ToolRoute::new_dyn(...)` that forwards to the one generic `call_tool`
+dispatcher, rather than a macro-annotated method per tool. Talking to
+`mcp_bridge.rs` itself is still a small hand-rolled async HTTP/1.1 client
+over `tokio::net::TcpStream` (tokio's already a dependency of both `rmcp`
+and the main app) — one POST shape doesn't need a full HTTP client crate.
+Two ways this binary gets run:
 - **Bundled into the installed app** as a Tauri sidecar
   (`tauri.conf.json`'s `bundle.externalBin`), built by
   `scripts/prepare-mcp-sidecar.mjs` via `beforeBuildCommand` (so both

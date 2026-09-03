@@ -13,25 +13,38 @@
 // design, and src/components/tools/apiclient/mcpBridge.ts for what each tool
 // actually does.
 //
-// Deliberately hand-rolled (JSON-RPC framing over stdio + a minimal blocking
-// HTTP/1.1 client) instead of pulling in tokio/reqwest/an MCP SDK crate: this
-// binary ships inside every install of the app, so keeping it to std +
-// serde_json (already a dependency of the main app) keeps its size and
-// compile footprint small, and this protocol is simple enough that hand-
-// rolling it is less risk than a new heavy dependency.
+// Built on rmcp (the official Rust MCP SDK) for the protocol itself —
+// JSON-RPC framing, capability negotiation, tool routing all come from the
+// crate rather than being hand-rolled. What IS hand-rolled: talking to
+// mcp_bridge.rs. That's a single localhost POST, so a minimal async
+// HTTP/1.1 client over a raw `tokio::net::TcpStream` (tokio is already a
+// dependency of rmcp itself, and of the main app) is less risk than pulling
+// in a full HTTP client crate for one call shape.
 
-use std::io::{self, BufRead, Read, Write};
-use std::net::TcpStream;
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::time::Duration;
+
+use rmcp::handler::server::router::tool::{ToolRoute, ToolRouter};
+use rmcp::handler::server::tool::ToolCallContext;
+use rmcp::model::{
+    CallToolRequestParam, CallToolResult, Content, ErrorData as McpError, Implementation,
+    ListToolsResult, PaginatedRequestParam, ProtocolVersion, ServerCapabilities, ServerInfo,
+    Tool, ToolsCapability,
+};
+use rmcp::service::RequestContext;
+use rmcp::transport::io::stdio;
+use rmcp::{RoleServer, ServerHandler, ServiceExt};
 
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 // Must match `identifier` in tauri.conf.json — Tauri's app_data_dir is keyed
 // off it, and mcp_bridge.rs writes its discovery file there.
 const APP_IDENTIFIER: &str = "com.desktop-devtool-app";
-const PROTOCOL_VERSION: &str = "2024-11-05";
 // How long to wait for a reply from the bridge — matches CALL_TIMEOUT in
 // mcp_bridge.rs (30s) plus slack for the local round-trip.
 const CALL_TIMEOUT: Duration = Duration::from_secs(35);
@@ -81,10 +94,6 @@ fn read_bridge_info() -> Result<BridgeInfo, String> {
         .map_err(|_| "DevTool's MCP bridge file is malformed — restart the app.".to_string())
 }
 
-// Minimal blocking HTTP/1.1 POST — avoids pulling in an HTTP client crate for
-// a single localhost call. Relies on the server (mcp_bridge.rs) always
-// sending a Content-Length header and never chunked transfer-encoding, which
-// axum's `Json` responses do.
 // Decodes an HTTP/1.1 chunked body: repeated `<hex size>\r\n<data>\r\n`,
 // terminated by a zero-size chunk. Malformed input just stops decoding at
 // whatever chunk it can't parse, rather than panicking — the caller's JSON
@@ -109,22 +118,25 @@ fn dechunk(input: &[u8]) -> Vec<u8> {
     out
 }
 
-fn http_post_json(port: u16, token: &str, body: &Value) -> Result<Value, String> {
+async fn http_post_json(port: u16, token: &str, body: &Value) -> Result<Value, String> {
     let payload = serde_json::to_vec(body).map_err(|e| e.to_string())?;
-    let mut stream = TcpStream::connect(("127.0.0.1", port))
+    let mut stream = tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(("127.0.0.1", port)))
+        .await
+        .map_err(|_| format!("Timed out connecting to DevTool on 127.0.0.1:{port}."))?
         .map_err(|e| format!("Could not reach DevTool on 127.0.0.1:{port} ({e}). Is the app open?"))?;
-    let _ = stream.set_read_timeout(Some(CALL_TIMEOUT));
-    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
 
     let request = format!(
         "POST /call HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nAuthorization: Bearer {token}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         payload.len(),
     );
-    stream.write_all(request.as_bytes()).map_err(|e| e.to_string())?;
-    stream.write_all(&payload).map_err(|e| e.to_string())?;
+    stream.write_all(request.as_bytes()).await.map_err(|e| e.to_string())?;
+    stream.write_all(&payload).await.map_err(|e| e.to_string())?;
 
     let mut raw = Vec::new();
-    stream.read_to_end(&mut raw).map_err(|e| e.to_string())?;
+    tokio::time::timeout(CALL_TIMEOUT, stream.read_to_end(&mut raw))
+        .await
+        .map_err(|_| "Timed out waiting for DevTool's response.".to_string())?
+        .map_err(|e| e.to_string())?;
 
     let split_at = raw
         .windows(4)
@@ -166,18 +178,18 @@ fn http_post_json(port: u16, token: &str, body: &Value) -> Result<Value, String>
     Ok(json.get("result").cloned().unwrap_or(Value::Null))
 }
 
-fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
+async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
     let info = read_bridge_info()?;
-    http_post_json(info.port, &info.token, &json!({ "tool": tool, "args": args }))
+    http_post_json(info.port, &info.token, &json!({ "tool": tool, "args": args })).await
 }
 
-fn call_tool(name: &str, args: Value) -> Value {
-    match call_bridge(name, args) {
+async fn call_tool(name: &str, args: Value) -> CallToolResult {
+    match call_bridge(name, args).await {
         Ok(v) => {
             let text = serde_json::to_string_pretty(&v).unwrap_or_else(|_| v.to_string());
-            json!({ "content": [{ "type": "text", "text": text }] })
+            CallToolResult::success(vec![Content::text(text)])
         }
-        Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
+        Err(e) => CallToolResult::error(vec![Content::text(e)]),
     }
 }
 
@@ -419,53 +431,95 @@ fn tool_definitions() -> Vec<Value> {
     ]
 }
 
-// ── JSON-RPC over stdio ──────────────────────────────────────────────────
+// ── rmcp server wiring ───────────────────────────────────────────────────
+// Converts each raw `tool_definitions()` entry into a rmcp `Tool` + a
+// dynamic route that forwards straight to `call_tool` — one generic
+// dispatcher rather than a hand-written method per tool, since every tool
+// here has the same shape (take a JSON args object, forward it to the
+// bridge, return its result as text).
 
-fn main() {
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
+#[derive(Clone)]
+struct DevToolServer {
+    tool_router: ToolRouter<Self>,
+}
 
-    for line in stdin.lock().lines() {
-        let Ok(line) = line else { break };
-        if line.trim().is_empty() {
-            continue;
+fn build_router() -> ToolRouter<DevToolServer> {
+    let mut router = ToolRouter::new();
+    for def in tool_definitions() {
+        let name = def.get("name").and_then(Value::as_str).unwrap_or("").to_string();
+        let description = def.get("description").and_then(Value::as_str).unwrap_or("").to_string();
+        let schema = match def.get("inputSchema").cloned().unwrap_or_else(|| json!({})) {
+            Value::Object(m) => m,
+            _ => Default::default(),
+        };
+        let tool = Tool {
+            name: name.clone().into(),
+            title: None,
+            description: Some(description.into()),
+            input_schema: std::sync::Arc::new(schema),
+            output_schema: None,
+            annotations: None,
+            icons: None,
+            meta: None,
+        };
+        router.add_route(ToolRoute::new_dyn(tool, move |context: ToolCallContext<'_, DevToolServer>| {
+            let name = name.clone();
+            let args = context.arguments.clone().map(Value::Object).unwrap_or_else(|| json!({}));
+            Box::pin(async move { Ok(call_tool(&name, args).await) })
+                as Pin<Box<dyn Future<Output = Result<CallToolResult, McpError>> + Send>>
+        }));
+    }
+    router
+}
+
+impl ServerHandler for DevToolServer {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            protocol_version: ProtocolVersion::default(),
+            instructions: Some(
+                "Drives DevTool's API Client tool — collections, requests, scripts, \
+                 environments — and can actually send a request. Only answers while the \
+                 DevTool desktop app is open with the API Client tool on screen."
+                    .to_string(),
+            ),
+            capabilities: ServerCapabilities {
+                tools: Some(ToolsCapability { list_changed: None }),
+                ..Default::default()
+            },
+            server_info: Implementation {
+                name: "devtool-api-client".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                ..Default::default()
+            },
         }
-        let Ok(msg) = serde_json::from_str::<Value>(&line) else {
-            continue; // not valid JSON — drop it rather than crash the transport
-        };
+    }
 
-        let method = msg.get("method").and_then(Value::as_str).unwrap_or("");
-        let params = msg.get("params").cloned().unwrap_or_else(|| json!({}));
+    fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParam>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<ListToolsResult, McpError>> + Send + '_ {
+        std::future::ready(Ok(ListToolsResult { tools: self.tool_router.list_all(), next_cursor: None }))
+    }
 
-        // A message with no `id` is a notification — never gets a reply, even
-        // one we don't recognize (e.g. "notifications/initialized").
-        let Some(id) = msg.get("id").cloned() else { continue };
+    fn call_tool(
+        &self,
+        request: CallToolRequestParam,
+        context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<CallToolResult, McpError>> + Send + '_ {
+        self.tool_router.call(ToolCallContext::new(self, request, context))
+    }
+}
 
-        let response = match method {
-            "initialize" => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": {
-                    "protocolVersion": PROTOCOL_VERSION,
-                    "capabilities": { "tools": {} },
-                    "serverInfo": { "name": "devtool-api-client", "version": "1.0.0" }
-                }
-            }),
-            "ping" => json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
-            "tools/list" => json!({ "jsonrpc": "2.0", "id": id, "result": { "tools": tool_definitions() } }),
-            "tools/call" => {
-                let name = params.get("name").and_then(Value::as_str).unwrap_or("");
-                let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
-                json!({ "jsonrpc": "2.0", "id": id, "result": call_tool(name, args) })
+#[tokio::main]
+async fn main() {
+    let server = DevToolServer { tool_router: build_router() };
+    match server.serve(stdio()).await {
+        Ok(service) => {
+            if let Err(e) = service.waiting().await {
+                eprintln!("devtool-mcp-server: {e}");
             }
-            other => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": { "code": -32601, "message": format!("Method not found: {other}") }
-            }),
-        };
-
-        let _ = writeln!(stdout, "{response}");
-        let _ = stdout.flush();
+        }
+        Err(e) => eprintln!("devtool-mcp-server: failed to start: {e}"),
     }
 }
