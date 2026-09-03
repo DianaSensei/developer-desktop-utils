@@ -33,111 +33,43 @@ The app is **~3–10 MB** (Tauri uses your OS's native WebView instead of bundli
 
 ## Tools
 
-24 tools, grouped by what they do. Everything runs locally; the few tools that reach the network are marked 🌐 and only act when you tell them to.
+24 tools, all local-first. Full descriptions and per-tool system access live in **[docs/human/TOOLS.md](docs/human/TOOLS.md)**; the few that reach the network (marked 🌐) only act when you tell them to.
 
-### Text & data
-| Tool | What it does |
-|------|--------------|
-| **Text Transformer** | Convert case; sort, trim, reverse; switch between single-line / multi-line / array forms |
-| **Text Counter** | Live character, word, line, and sentence counts with reading-time estimate |
-| **Deduplicate** | Remove duplicate lines or list items |
-| **Text Diff** | Side-by-side comparison with additions/removals highlighted |
-| **Regex Tester** | Live match highlighting and capture-group inspection |
-| **JSON Formatter** | Beautify, minify, validate, and tree-explore JSON |
-| **SQL Formatter** | Format SQL with keyword casing, space collapse, and clause line breaks |
-| **Markdown** | Live Markdown preview |
-
-### Encoding, hashing & crypto
-| Tool | What it does |
-|------|--------------|
-| **Encode·Hash·Encrypt** | Base64 / URL / Hex / Morse encode-decode, MD5 / SHA / HMAC hashing, and AES-256 encrypt-decrypt |
-| **JWT Debugger** | Decode and inspect JWT header & payload (no verification) |
-| **Checksum** | Compute MD5 / SHA-1 / SHA-256 / SHA-512 for any file |
-| **Image ↔ Base64** | Encode images to Base64 and render Base64 back to images |
-| **2FA Authenticator** | Generate TOTP / HOTP codes (SHA-1/256/512, 6/8 digits, 30/60s) |
-
-### Generators & pickers
-| Tool | What it does |
-|------|--------------|
-| **Generator** | UUIDs, random numbers, and random text with custom character sets |
-| **Cron Generator** | Build & validate cron expressions with a visual editor |
-| **QR Code** | Generate QR codes from text/URL (download PNG) or read one from an image |
-| **Color Picker** | Pick colors and convert between HEX, RGB, HSL, HSV |
-| **Lucky Wheel** | Spin a wheel of your own choices to pick a random winner |
-
-### Time & productivity
-| Tool | What it does |
-|------|--------------|
-| **Time Tracker** | Time tracking with timesheet and calendar views, projects, tags, and pomodoro |
-| **Meeting Notes** | Create & search timed meeting minutes that sync with the Time Tracker calendar and export to Markdown |
-| **Date / Time** | Convert timestamps, diff dates, format across any timezone |
-
-### Network & services
-| Tool | What it does |
-|------|--------------|
-| **API Client** 🌐 | Postman/Bruno-style HTTP workbench — collections, environments with `{{vars}}`, auth, pre/post scripts, tests, Postman import/export |
-| **Kafka Explorer** 🌐 | Browse topics, inspect partitions & offsets, view consumer groups, and produce messages |
-| **Network Tools** 🌐 | DNS records (A/AAAA/CNAME/NS/TXT/SOA/SRV/CAA…), propagation & DNSSEC checks, what's-my-IP, IP geolocation, local network info |
+- **Text & data** — Text Transformer, Text Counter, Deduplicate, Text Diff, Regex Tester, JSON Formatter, SQL Formatter, Markdown
+- **Encoding, hashing & crypto** — Encode·Hash·Encrypt, JWT Debugger, Checksum, Image ↔ Base64, 2FA Authenticator
+- **Generators & pickers** — Generator, Cron Generator, QR Code, Color Picker, Lucky Wheel
+- **Time & productivity** — Time Tracker, Meeting Notes, Date / Time
+- **Network & services** 🌐 — API Client, Kafka Explorer, Network Tools
 
 ---
 
 ## Privacy
 
-DevTool is **local-first by design**:
+Local-first by design: **no account, no telemetry, no analytics, no crash reporting.** Your data (time entries, meeting notes, broker configs, API collections) stays in the app's local storage and never leaves your device.
 
-- **No account, no sign-in, no telemetry, no analytics, no crash reporting** — nothing phones home.
-- **Your data stays on your machine.** Inputs, time entries, meeting notes, saved broker configs, and API collections are stored in the app's local storage / data directory and never leave your device.
-- **The only outbound traffic is user-initiated**, limited to these tools:
-  - **API Client** — requests go only to the URLs you send them to.
-  - **Kafka Explorer** — connects only to the brokers you configure (plaintext; no TLS/SASL).
-  - **Network Tools** — runs the DNS-over-HTTPS / IP-geolocation lookups you trigger.
-  - **App updater** — an optional check against GitHub Releases (toggle in **Settings → Updates**).
-- **Every other tool runs 100% offline** — text, encoding, hashing, crypto, JSON/JWT/regex/diff, checksums, generators, QR, color, time tracking, etc. make no network requests at all.
-
-A full per-tool breakdown (clipboard, file, network, what's stored) is in [docs/human/TOOLS.md](docs/human/TOOLS.md).
+The only outbound traffic is what you trigger yourself — API Client requests, Kafka Explorer connections, Network Tools lookups, and the optional update check. Every other tool is 100% offline. Full breakdown: **[docs/human/TOOLS.md](docs/human/TOOLS.md)**.
 
 ---
 
 ## Security
 
-- **Least-privilege native access.** Built on Tauri 2's capability system — the app is granted only the narrowest OS permissions each feature needs (e.g. `fs:allow-read-file`, never blanket file access). The full grant list is visible in **Settings → App Permissions**.
-- **Sandboxed architecture.** The UI runs in the OS WebView; all system access goes through a small, explicit Rust command layer — no arbitrary shell execution and no bundled Node runtime.
-- **Credentials stay local.** Secrets you enter (Kafka SASL, API Client auth/tokens) are stored on your machine and sent only to the service you target. They are kept in the local app data, not encrypted at rest — treat your machine as the trust boundary, just as you would a local `.env` or config file.
-- **Signed updates.** Release binaries and the update manifest are cryptographically signed; the in-app updater verifies the signature before applying an update.
-- **Open source & auditable.** The entire codebase is public — nothing closed is fetched or executed at runtime.
+Built on Tauri 2's least-privilege capability system (no blanket file/shell access), a sandboxed Rust command layer, and signed, attested release binaries. Credentials you enter stay local and unencrypted at rest — treat your machine as the trust boundary.
 
-### Don't trust it — verify it
-
-Every claim above is checkable without reading the whole codebase:
+Verify any of this yourself:
 
 ```bash
-# 1. Prove the binary you downloaded was built by this repo's CI, from this source.
-gh attestation verify ./DevTool_1.0.0_aarch64.dmg --repo DianaSensei/developer-desktop-utils
-
-# 2. Or check provenance + published SHA256 checksums in one go.
-./scripts/verify-release.sh v1.0.0
-
-# 3. Re-run the assertions behind every security claim we make.
-./scripts/check-security-claims.sh
+gh attestation verify ./DevTool_1.0.0_aarch64.dmg --repo DianaSensei/developer-desktop-utils   # provenance
+./scripts/verify-release.sh v1.0.0                                                              # provenance + checksums
+./scripts/check-security-claims.sh                                                              # re-run the claims below
 ```
 
-Each release also ships an **SPDX SBOM** of the full npm + Cargo dependency tree,
-and every push is scanned by CodeQL, `npm audit`, `cargo audit`, and a secret
-scanner ([Security workflow](.github/workflows/security.yml)).
+Every release ships an SPDX SBOM; every push is scanned by CodeQL, `npm audit`, `cargo audit`, and a secret scanner.
 
-**[SECURITY.md](SECURITY.md)** has the full threat model, the verification steps
-in detail, and an honest list of the limitations — including the ones that are
-uncomfortable to write down.
-
-Found a security issue? Please open a private report via the repository's **Security → Report a vulnerability** tab rather than a public issue.
+**[SECURITY.md](SECURITY.md)** has the full threat model and an honest list of limitations. Found a vulnerability? Use the repo's **Security → Report a vulnerability** tab, not a public issue.
 
 ---
 
 ## Build from source
-
-Prefer to build it yourself? The full guide — prerequisites, install, run, build installers, release process, and troubleshooting — lives in **[docs/human/SETUP.md](docs/human/SETUP.md)**.
-
-Quick start (Node 20.19+ and Rust stable required):
 
 ```bash
 git clone https://github.com/DianaSensei/developer-desktop-utils.git
@@ -146,23 +78,13 @@ npm ci
 npm run tauri:dev     # full desktop app with hot reload
 ```
 
-To build distributable installers: `npm run tauri:build` → output in `src-tauri/target/release/bundle/`.
+Needs Node 20.19+ and Rust stable. `npm run tauri:build` produces installers in `src-tauri/target/release/bundle/`. Full guide (prerequisites, troubleshooting, release process): **[docs/human/SETUP.md](docs/human/SETUP.md)**.
+
+**Stack:** [Tauri 2](https://tauri.app) · [React 18](https://react.dev) + [TypeScript](https://typescriptlang.org) · [Vite 8](https://vitejs.dev) · [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) · [React Router v6](https://reactrouter.com)
 
 ---
 
-## Tech stack
-
-| Layer | Technology |
-|-------|-----------|
-| Desktop | [Tauri 2](https://tauri.app) — Rust-backed, lightweight native shell |
-| Frontend | [React 18](https://react.dev) + [TypeScript](https://typescriptlang.org) |
-| Build | [Vite 8](https://vitejs.dev) (Rolldown bundler) |
-| Styling | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
-| Routing | [React Router v6](https://reactrouter.com) |
-
----
-
-## Contributing & docs
+## Docs
 
 - **[SECURITY.md](SECURITY.md)** — threat model, supply-chain guarantees & how to verify a build
 - **[docs/human/SETUP.md](docs/human/SETUP.md)** — setup, build & troubleshooting
