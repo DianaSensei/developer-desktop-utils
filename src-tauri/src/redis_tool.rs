@@ -804,3 +804,142 @@ pub async fn redis_config_set(
         .await
         .map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn conn(host: &str, port: u16, username: Option<&str>, password: Option<&str>, use_tls: bool) -> RedisConnection {
+        RedisConnection {
+            id: "id".to_string(),
+            name: "name".to_string(),
+            host: host.to_string(),
+            port,
+            username: username.map(str::to_string),
+            password: password.map(str::to_string),
+            use_tls,
+        }
+    }
+
+    #[test]
+    fn redis_url_plain_no_auth() {
+        let c = conn("localhost", 6379, None, None, false);
+        assert_eq!(redis_url(&c), "redis://localhost:6379/0");
+    }
+
+    #[test]
+    fn redis_url_uses_rediss_scheme_for_tls() {
+        let c = conn("localhost", 6380, None, None, true);
+        assert_eq!(redis_url(&c), "rediss://localhost:6380/0");
+    }
+
+    #[test]
+    fn redis_url_includes_auth_when_password_set() {
+        let c = conn("localhost", 6379, Some("alice"), Some("secret"), false);
+        assert_eq!(redis_url(&c), "redis://alice:secret@localhost:6379/0");
+    }
+
+    #[test]
+    fn redis_url_omits_auth_when_password_empty() {
+        let c = conn("localhost", 6379, Some("alice"), None, false);
+        assert_eq!(redis_url(&c), "redis://localhost:6379/0");
+    }
+
+    #[test]
+    fn redis_url_percent_encodes_special_chars_in_credentials() {
+        let c = conn("localhost", 6379, Some("a b"), Some("p@ss/word"), false);
+        assert_eq!(redis_url(&c), "redis://a%20b:p%40ss%2Fword@localhost:6379/0");
+    }
+
+    #[test]
+    fn value_to_reply_maps_scalars() {
+        assert!(matches!(value_to_reply(Value::Nil), RedisReply::Nil));
+        assert!(matches!(value_to_reply(Value::Int(42)), RedisReply::Int(42)));
+        assert!(matches!(value_to_reply(Value::Okay), RedisReply::Status(s) if s == "OK"));
+        match value_to_reply(Value::SimpleString("PONG".to_string())) {
+            RedisReply::Status(s) => assert_eq!(s, "PONG"),
+            other => panic!("unexpected {other:?}"),
+        }
+        match value_to_reply(Value::BulkString(b"hello".to_vec())) {
+            RedisReply::Bulk(s) => assert_eq!(s, "hello"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn value_to_reply_maps_boolean_to_int() {
+        assert!(matches!(value_to_reply(Value::Boolean(true)), RedisReply::Int(1)));
+        assert!(matches!(value_to_reply(Value::Boolean(false)), RedisReply::Int(0)));
+    }
+
+    #[test]
+    fn value_to_reply_maps_array_recursively() {
+        let v = Value::Array(vec![Value::Int(1), Value::BulkString(b"two".to_vec())]);
+        match value_to_reply(v) {
+            RedisReply::Array(items) => {
+                assert_eq!(items.len(), 2);
+                assert!(matches!(items[0], RedisReply::Int(1)));
+                match &items[1] {
+                    RedisReply::Bulk(s) => assert_eq!(s, "two"),
+                    other => panic!("unexpected {other:?}"),
+                }
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn value_to_reply_flattens_map_into_kv_pairs() {
+        let v = Value::Map(vec![(Value::BulkString(b"k".to_vec()), Value::Int(1))]);
+        match value_to_reply(v) {
+            RedisReply::Array(items) => assert_eq!(items.len(), 2),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn value_to_reply_unwraps_attribute() {
+        let v = Value::Attribute {
+            data: Box::new(Value::Int(7)),
+            attributes: vec![],
+        };
+        assert!(matches!(value_to_reply(v), RedisReply::Int(7)));
+    }
+
+    #[test]
+    fn value_to_status_string_prefers_status_or_bulk_text() {
+        assert_eq!(value_to_status_string(Value::Okay), "OK");
+        assert_eq!(value_to_status_string(Value::BulkString(b"abc".to_vec())), "abc");
+    }
+
+    #[test]
+    fn value_to_status_string_nil_is_none_literal() {
+        assert_eq!(value_to_status_string(Value::Nil), "none");
+    }
+
+    #[test]
+    fn value_to_status_string_falls_back_to_debug_for_other_variants() {
+        let s = value_to_status_string(Value::Int(5));
+        assert_eq!(s, format!("{:?}", RedisReply::Int(5)));
+    }
+
+    #[test]
+    fn value_to_i64_parses_int_variant() {
+        assert_eq!(value_to_i64(Value::Int(123)), Some(123));
+    }
+
+    #[test]
+    fn value_to_i64_parses_numeric_bulk_string() {
+        assert_eq!(value_to_i64(Value::BulkString(b"456".to_vec())), Some(456));
+    }
+
+    #[test]
+    fn value_to_i64_none_for_non_numeric_bulk_string() {
+        assert_eq!(value_to_i64(Value::BulkString(b"not-a-number".to_vec())), None);
+    }
+
+    #[test]
+    fn value_to_i64_none_for_other_variants() {
+        assert_eq!(value_to_i64(Value::Nil), None);
+    }
+}

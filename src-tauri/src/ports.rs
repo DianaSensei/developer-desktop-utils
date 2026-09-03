@@ -290,3 +290,137 @@ fn detect_js_framework_from_pkg(cwd: &Path) -> Option<String> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn os(s: &str) -> OsString {
+        OsString::from(s)
+    }
+
+    #[test]
+    fn build_command_none_for_empty_args() {
+        assert_eq!(build_command(&[]), None);
+    }
+
+    #[test]
+    fn build_command_strips_arg0_path() {
+        let cmd = vec![os("/usr/local/bin/node"), os("server.js")];
+        assert_eq!(build_command(&cmd), Some("node server.js".to_string()));
+    }
+
+    #[test]
+    fn build_command_keeps_later_args_verbatim() {
+        let cmd = vec![os("/usr/bin/python3"), os("-m"), os("/opt/app/main.py")];
+        assert_eq!(
+            build_command(&cmd),
+            Some("python3 -m /opt/app/main.py".to_string())
+        );
+    }
+
+    #[test]
+    fn build_command_none_for_blank_args() {
+        let cmd = vec![os(""), os("  ")];
+        assert_eq!(build_command(&cmd), None);
+    }
+
+    #[test]
+    fn build_command_truncates_pathological_arg_lists() {
+        let long_arg = "x".repeat(5000);
+        let cmd = vec![os("bin"), os(&long_arg)];
+        let out = build_command(&cmd).unwrap();
+        assert!(out.ends_with('…'));
+        assert!(out.chars().count() < long_arg.chars().count());
+    }
+
+    #[test]
+    fn detect_framework_matches_direct_command_signal() {
+        let cmd = vec![os("next"), os("dev")];
+        assert_eq!(detect_framework(&cmd, "node", None), Some("Next.js".to_string()));
+    }
+
+    #[test]
+    fn detect_framework_matches_direct_exe_signal() {
+        let cmd: Vec<OsString> = vec![];
+        assert_eq!(detect_framework(&cmd, "dockerd", None), Some("Docker".to_string()));
+    }
+
+    #[test]
+    fn detect_framework_matches_database_by_exe_name() {
+        let cmd: Vec<OsString> = vec![];
+        assert_eq!(detect_framework(&cmd, "redis-server", None), Some("Redis".to_string()));
+    }
+
+    #[test]
+    fn detect_framework_falls_back_to_node_without_package_json() {
+        let cmd = vec![os("node"), os("server.js")];
+        assert_eq!(detect_framework(&cmd, "node", None), Some("Node".to_string()));
+    }
+
+    #[test]
+    fn detect_framework_matches_python_from_command_line() {
+        let cmd = vec![os("python3"), os("app.py")];
+        assert_eq!(detect_framework(&cmd, "python3", None), Some("Python".to_string()));
+    }
+
+    #[test]
+    fn detect_framework_matches_java_jar() {
+        let cmd = vec![os("java"), os("-jar"), os("app.jar")];
+        assert_eq!(detect_framework(&cmd, "java", None), Some("Java".to_string()));
+    }
+
+    #[test]
+    fn detect_framework_none_when_nothing_matches() {
+        let cmd = vec![os("some-unknown-binary")];
+        assert_eq!(detect_framework(&cmd, "some-unknown-binary", None), None);
+    }
+
+    #[test]
+    fn detect_js_framework_from_pkg_prefers_most_specific_dependency() {
+        let dir = std::env::temp_dir().join(format!(
+            "devtool-ports-test-{}-{}",
+            std::process::id(),
+            "next-and-react"
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"dependencies":{"next":"14.0.0","react":"18.0.0"}}"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            detect_js_framework_from_pkg(&dir),
+            Some("Next.js".to_string())
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn detect_js_framework_from_pkg_none_when_missing() {
+        let dir = std::env::temp_dir().join(format!(
+            "devtool-ports-test-{}-{}",
+            std::process::id(),
+            "missing"
+        ));
+        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(detect_js_framework_from_pkg(&dir), None);
+    }
+
+    #[test]
+    fn detect_js_framework_from_pkg_none_for_invalid_json() {
+        let dir = std::env::temp_dir().join(format!(
+            "devtool-ports-test-{}-{}",
+            std::process::id(),
+            "invalid-json"
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("package.json"), "not json").unwrap();
+
+        assert_eq!(detect_js_framework_from_pkg(&dir), None);
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}
