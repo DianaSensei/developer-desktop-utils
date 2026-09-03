@@ -6,14 +6,17 @@ name: Tests
 # every check green, because the two tests that caught it never ran here.
 # Docs-only changes can't break the typecheck or the test suite, so skip the
 # run entirely instead of burning a runner on npm ci + tsc for a README edit.
+#
+# PR-only, no push:main trigger: branch protection requires this check to
+# pass on the PR before merge, and (unlike coverage.yml) nothing downstream
+# needs a fresh run on main — there's no baseline to keep warm here, so
+# re-running the same commit's typecheck/tests a second time after merge
+# is pure waste.
 on:
-  push:
-    branches: [main]
-    paths-ignore: &docs-only
+  pull_request:
+    paths-ignore:
       - '**/*.md'
       - 'docs/**'
-  pull_request:
-    paths-ignore: *docs-only
 
 permissions:
   contents: read
