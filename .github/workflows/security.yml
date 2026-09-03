@@ -1,7 +1,7 @@
 name: Security
 
 # Docs-only changes touch neither npm/Cargo dependencies nor secrets, so skip
-# the per-push/PR run for them; the weekly schedule below still gives a full
+# the per-push/PR run for them; the monthly schedule below still gives a full
 # scan a cadence independent of what commits happen to land.
 on:
   push:
@@ -12,8 +12,9 @@ on:
   pull_request:
     paths-ignore: *docs-only
   schedule:
-    # Weekly, Monday 03:00 UTC — catches advisories published after the last commit.
-    - cron: '0 3 * * 1'
+    # Monthly, 1st at 03:00 UTC — catches advisories published against
+    # dependencies that haven't otherwise changed since the last commit.
+    - cron: '0 3 1 * *'
   workflow_dispatch:
 
 permissions:

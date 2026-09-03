@@ -14,13 +14,14 @@ on:
     # Only the default branch is supported.
     branches: [main]
     # Docs-only changes don't move the Scorecard checks (branch protection,
-    # dependency pinning, etc.); the weekly cron keeps the score fresh regardless.
+    # dependency pinning, etc.).
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-  schedule:
-    # Weekly, Saturday 01:30 UTC.
-    - cron: '30 1 * * 6'
+  # No cron: most Scorecard checks (branch protection, pinned dependencies,
+  # SAST, dangerous workflow patterns) only change on a push to main anyway,
+  # so a weekly re-run without a new commit mostly just re-confirmed the same
+  # score. Run on demand via workflow_dispatch if the score needs a nudge.
   workflow_dispatch:
 
 permissions: read-all
