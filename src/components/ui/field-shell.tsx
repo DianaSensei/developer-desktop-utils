@@ -53,7 +53,7 @@ export function FieldShell({
       <div
         className={cn(
           'flex items-stretch overflow-hidden rounded-sm border bg-bg',
-          'transition-colors focus-within:border-acc/60 focus-within:ring-2 focus-within:ring-acc/35',
+          'transition-colors focus-within:border-acc/60 focus-within:ring-[3px] focus-within:ring-focus',
           tone ? TONE_EDGE[tone] : 'border-sunk',
         )}
       >

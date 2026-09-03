@@ -92,7 +92,7 @@ export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed 
             <CopyButton value={keyName} label="Copy key" variant="outline" size="sm" />
             <Button variant="outline" size="sm" onClick={() => setRenameOpen(true)}><Pencil className="h-3.5 w-3.5 mr-1.5" /> Rename</Button>
             <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}><Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete</Button>
-            <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+            <Button variant="outline" size="sm" busy={loading} onClick={load}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
           </>
         )}
       />

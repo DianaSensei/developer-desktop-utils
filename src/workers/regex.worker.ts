@@ -2,6 +2,10 @@
 // pattern (catastrophic backtracking / ReDoS) freezes only this worker — which
 // the UI terminates after a timeout — instead of locking up the whole app.
 
+// `export {}` bắt buộc TypeScript coi file này là MODULE thay vì script toàn
+// cục — xem ghi chú cùng nội dung trong `deduplicate.worker.ts`.
+export {};
+
 interface RegexRequest {
   id: number;
   pattern: string;

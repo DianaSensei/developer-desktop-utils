@@ -385,7 +385,7 @@ export function SqlFormatter() {
   const viewRef           = useRef<EditorView | null>(null);
   const langConfRef       = useRef(new Compartment());
   const lastDispatchedRef = useRef<string | null>(null);
-  const theme = useCodeTheme(viewRef, { fontSize: '13px', contentPadding: '10px 0' });
+  const theme = useCodeTheme(viewRef, { paddingY: 10 });
 
   // Stable refs to avoid stale closures inside editor callbacks
   const modeRef       = useRef(mode);       modeRef.current       = mode;

@@ -79,7 +79,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
         const isGhost = row.id === ghost.id;
         const isFile = row.kind === 'file' && !!row.fileName;
         return (
-          <div key={row.id} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_10rem_2rem] border-b last:border-b-0 transition-colors hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-2 focus-within:ring-inset focus-within:ring-acc/40">
+          <div key={row.id} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_10rem_2rem] border-b last:border-b-0 transition-colors hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus">
             {/* Toggle column — the whole cell is the target, with the same
                 role/aria and hover feedback KeyValueEditor's rows carry. */}
             <div className="flex items-stretch border-r">
@@ -92,7 +92,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
                   aria-checked={row.enabled}
                   aria-label={`${row.key || 'Field'} — ${row.enabled ? 'enabled' : 'disabled'}`}
                   onClick={() => editRow(row.id, { enabled: !row.enabled })}
-                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc/40"
+                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
                   title={row.enabled ? 'Disable' : 'Enable'}
                 >
                   <span
@@ -164,7 +164,7 @@ export function MultipartEditor({ rows, onChange }: Props) {
                   type="button"
                   onClick={() => removeRow(row.id)}
                   title="Remove"
-                  className="rounded p-1 text-fg-mute/40 opacity-0 transition-all hover:text-bad group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+                  className="rounded p-1 text-fg-mute/40 opacity-0 transition-all hover:text-bad group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>

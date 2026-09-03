@@ -369,7 +369,7 @@ export function MockServer() {
             onChange={(e) => setImportText(e.target.value)}
             placeholder='{ "stubs": [ … ], "host": "127.0.0.1", "port": 8787, … }'
             spellCheck={false}
-            className="h-56 w-full resize-none rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+            className="h-56 w-full resize-none rounded-md border bg-card p-2 font-mono text-[11px] focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
           />
           {importError && <Callout tone="error" size="sm">{importError}</Callout>}
           <DialogFooter>

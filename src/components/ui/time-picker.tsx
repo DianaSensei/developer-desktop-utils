@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn, pad2 } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
+import { useAnimatedOpen } from '@/hooks/useAnimatedOpen';
 
 // ---------------------------------------------------------------------------
 // Cross-platform time picker — replaces free-text / native <input type="time">.
@@ -76,9 +77,9 @@ function Column({
 }
 
 export function TimePicker({ value, onChange, disabled, className, minuteStep = 1, showSeconds = false, inline = false }: TimePickerProps) {
-  const [open, setOpen] = React.useState(false);
+  const { open, closing, visible, toggle, close } = useAnimatedOpen();
   // Inline mode has no popover to dismiss, so only arm it when open && !inline.
-  const wrapRef = useDismissable<HTMLDivElement>(open && !inline, () => setOpen(false));
+  const wrapRef = useDismissable<HTMLDivElement>(open && !inline, close);
   const hourRef = React.useRef<HTMLButtonElement>(null);
   const minRef = React.useRef<HTMLButtonElement>(null);
   const secRef = React.useRef<HTMLButtonElement>(null);
@@ -147,10 +148,10 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
       <button
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setOpen((v) => !v)}
+        onClick={() => !disabled && toggle()}
         className={cn(
           'flex h-ctl-lg items-center gap-2 rounded-md border border-sunk bg-card px-2.5 text-sm shadow-sm tabular-nums',
-          'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+          'focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
           disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-bg-2/50',
           className,
         )}
@@ -159,8 +160,13 @@ export function TimePicker({ value, onChange, disabled, className, minuteStep = 
         <span className="font-mono">{pad2(h)}:{pad2(m)}{showSeconds && `:${pad2(s)}`}</span>
       </button>
 
-      {open && !disabled && (
-        <div className="absolute z-50 mt-1.5 rounded-lg border bg-card p-3 shadow-xl">
+      {visible && !disabled && (
+        <div
+          className={cn(
+            'absolute z-50 mt-1.5 rounded-lg border bg-card p-3 shadow-xl',
+            closing ? 'pointer-events-none motion-safe:animate-pop-out' : 'motion-safe:animate-pop-in',
+          )}
+        >
           {columns}
         </div>
       )}

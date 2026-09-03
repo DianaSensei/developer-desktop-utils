@@ -157,15 +157,23 @@
     display: none;
   }
 
-  /* Bóng ngả sắc accent dưới hành động chính. */
-  .shadow-primary {
-    box-shadow: 0 2px 8px -2px hsl(var(--acc-c) / 0.35),
-                0 1px 2px -1px hsl(var(--acc-c) / 0.25);
-  }
-  .shadow-primary-lg {
-    box-shadow: 0 8px 20px -4px hsl(var(--acc-c) / 0.45),
-                0 3px 8px -3px hsl(var(--acc-c) / 0.30);
-  }
+  /* `.shadow-primary` / `.shadow-primary-lg` (quầng sáng ngả accent dưới hành
+     động chính) đã BỊ XOÁ. Hai lý do, cả hai đều là luật đã có sẵn:
+
+     1. `design/RULES.md` — "không hover-lift, không glow". Đó là một quầng sáng
+        MÀU, và nó phình từ 8px lên 20px khi rê chuột. Nút chuẩn của kit
+        (`design/preview/standalone.html`, `.btn.solid`) chỉ có `--sh-sm` và khi
+        hover thì đổi nền sang `--acc-hi`, không đụng tới bóng.
+
+     2. `design/RULES.md` — "hai hệ shadow song song". Hai utility này ghi THẲNG
+        `box-shadow`, trong khi `shadow-soft` và mọi `ring-*` của Tailwind ghi
+        qua chuỗi biến `--tw-shadow` / `--tw-ring-shadow`. Cùng thuộc tính, cùng
+        độ cụ thể, nên thứ tự trong bundle quyết định chứ không phải ý đồ: vòng
+        focus xoá sạch cái bóng, hoặc ngược lại, tuỳ tổ hợp. Xem ghi chú đầy đủ
+        trong `ui/button.tsx`.
+
+     Cần nhấn mạnh hành động chính thì dùng NỀN ĐẶC màu accent — nó đã là thứ
+     nổi nhất trên màn rồi. */
 
   /* ── Micro-interaction ────────────────────────────────────────────────
      Rê chuột đổi NỀN/VIỀN, không đổi VỊ TRÍ — `design/RULES.md`. Bản cũ của
@@ -176,21 +184,43 @@
            hover:shadow hover:border-line/70
            active:shadow-sm;
   }
+  /* Lún khi nhấn cho các control tự dựng (thẻ, hàng danh sách bấm được) —
+     `Button`/`IconButton` đã có sẵn bên trong. Nhấn trong `--dur-press`, nhả
+     trong `--dur-fast`: nhanh xuống, thong thả lên. Xem luật 3 trong
+     `design/tokens.css`. */
   .press {
-    @apply transition-transform duration-fast ease-out-soft motion-safe:active:scale-[0.96];
+    @apply transition-transform duration-fast ease-out-soft
+           motion-safe:active:scale-[0.97] motion-safe:active:duration-press;
   }
+  /* Vào của một khối nội dung. 340ms + 10px là quãng của một BỀ MẶT LỚN; dùng
+     cho một thẻ hay một hàng thì nó lê thê, nên hạ về nhịp `--dur-base` và
+     6px. Quãng đường ngắn hơn cũng có nghĩa là nội dung bên dưới bớt bị đẩy. */
   .animate-fade-in-up {
-    animation: fadeInUp var(--dur-slow) var(--ease-out-soft);
+    animation: fadeInUp var(--dur-base) var(--ease-out-soft);
   }
   .animate-scale-in {
     animation: scaleIn var(--dur-base) var(--ease-out-soft);
   }
+  /* Vào theo tầng cho danh sách. Mắt đọc ra một luồng thay vì tám thứ nảy lên
+     cùng lúc; 40ms/mục và chốt ở mục thứ 8 — quá 8 thì mục cuối chờ lâu đến
+     mức đọc ra là app chậm, chứ không phải app mượt. */
+  .stagger-in > * {
+    animation: fadeInUp var(--dur-base) var(--ease-out-soft) backwards;
+  }
+  .stagger-in > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-in > *:nth-child(2) { animation-delay: 40ms; }
+  .stagger-in > *:nth-child(3) { animation-delay: 80ms; }
+  .stagger-in > *:nth-child(4) { animation-delay: 120ms; }
+  .stagger-in > *:nth-child(5) { animation-delay: 160ms; }
+  .stagger-in > *:nth-child(6) { animation-delay: 200ms; }
+  .stagger-in > *:nth-child(7) { animation-delay: 240ms; }
+  .stagger-in > *:nth-child(n + 8) { animation-delay: 280ms; }
   @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.95); }
+    from { opacity: 0; transform: scale(0.96); }
     to { opacity: 1; transform: scale(1); }
   }
 

@@ -91,18 +91,35 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
         className={className}
         {...props}
       >
-        {/* Both icons share one box and cross-fade so the swap glides. */}
+        {/* Hai icon chung một hộp và mờ chéo nhau, nên cú tráo là trượt chứ
+            không phải nhấp.
+
+            Hai đường cong KHÁC NHAU, cố ý: icon Copy đi ra bằng `ease-in-soft`
+            (dứt khoát, nó đã xong việc), cái Check đi vào bằng `ease-spring`
+            (vọt qua một chút rồi lắc về, đọc ra là "xong rồi!"). Bản trước
+            dùng chung `duration-200 ease-out` cho cả hai chiều, nên khoảnh khắc
+            DUY NHẤT mà app xác nhận với người dùng rằng thao tác đã thành công
+            lại là khoảnh khắc phẳng nhất trong toàn bộ giao diện. */}
         <span className={cn('relative inline-flex items-center justify-center', iconClassName)}>
+          {/* Vòng sáng lan ra một lần ngay lúc copy xong. Nó không thay thế cái
+              Check — nó bắt lấy ánh mắt đang ở CHỖ KHÁC (người dùng vừa bấm
+              copy thì thường đang nhìn vùng văn bản, không nhìn cái nút). */}
+          {copied && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-full bg-ok/40 motion-safe:animate-ring-ping motion-reduce:hidden"
+            />
+          )}
           <Icon
             className={cn(
-              'absolute inset-0 m-auto transition-all duration-200 ease-out motion-reduce:transition-none',
+              'absolute inset-0 m-auto transition-all duration-fast ease-in-soft motion-reduce:transition-none',
               iconClassName,
               copied ? 'opacity-0 scale-50' : 'opacity-100 scale-100'
             )}
           />
           <Check
             className={cn(
-              'absolute inset-0 m-auto text-ok transition-all duration-200 ease-out motion-reduce:transition-none',
+              'absolute inset-0 m-auto text-ok transition-all duration-base ease-spring motion-reduce:transition-none',
               iconClassName,
               copied ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
             )}

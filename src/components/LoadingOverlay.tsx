@@ -32,7 +32,8 @@ export function LoadingOverlay({
       )}
     >
       <Spinner size="lg" className="text-acc" />
-      {message && <p className="text-sm text-fg-mute loading-text">{message}</p>}
+      {/* `loading-text` cũng là một class không tồn tại ở đâu trong repo — bỏ. */}
+      {message && <p className="text-sm text-fg-mute">{message}</p>}
     </div>
   );
 }

@@ -116,13 +116,40 @@ const GUTTER = 4;
 export function DropdownMenuContent({ align = 'start', className, children }: DropdownMenuContentProps) {
   const { open, setOpen, anchorRef, contentRef } = useDropdownMenuContext('DropdownMenuContent');
   const [pos, setPos] = React.useState<{ top: number; left?: number; right?: number } | null>(null);
+  // `true` khi menu bị lật lên trên vì dưới hết chỗ — dùng để đặt gốc biến đổi.
+  const [flipped, setFlipped] = React.useState(false);
+
+  /* ── Vì sao menu phải sống thêm một nhịp sau khi đóng ────────────────────
+     Bản trước `if (!open) return null` — menu VÀO thì có fade + zoom, mà RA
+     thì biến mất trong một khung hình. Nửa nọ nửa kia như vậy còn tệ hơn là
+     không có animation nào: mắt vừa học được rằng menu này "mọc ra", rồi lần
+     đóng đầu tiên phá vỡ đúng cái quy tắc đó.
+
+     `exiting` giữ panel trong DOM đúng `--dur-exit` để nó thu lại rồi mới bị
+     gỡ. `pointer-events-none` bật ngay từ đầu nhịp đó: panel đang biến mất
+     không được ăn cú click tiếp theo của người dùng. */
+  const [exiting, setExiting] = React.useState(false);
+  const mountedOnce = React.useRef(false);
+
+  React.useEffect(() => {
+    if (open) { mountedOnce.current = true; setExiting(false); return; }
+    if (!mountedOnce.current) return;   // chưa từng mở thì không có gì để đóng
+    setExiting(true);
+    // 130ms = `--dur-exit`. Đọc từ CSS lúc chạy thì đúng hơn về nguyên tắc,
+    // nhưng nó chỉ quyết định lúc nào GỠ khỏi DOM (animation đã xong từ
+    // trước), nên lệch vài ms là vô hại — không đáng một lần getComputedStyle
+    // mỗi lần đóng menu.
+    const t = setTimeout(() => setExiting(false), 130);
+    return () => clearTimeout(t);
+  }, [open]);
 
   // Pass 1: place it below the trigger, aligned per `align`.
   React.useLayoutEffect(() => {
-    if (!open) { setPos(null); return; }
+    if (!open) return;
     const anchor = anchorRef.current;
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
+    setFlipped(false);
     setPos(
       align === 'end'
         ? { top: rect.bottom + GUTTER, right: window.innerWidth - rect.right }
@@ -140,6 +167,7 @@ export function DropdownMenuContent({ align = 'start', className, children }: Dr
     const flippedTop = anchorRect.top - contentRect.height - GUTTER;
     if (flippedTop >= GUTTER && Math.abs(flippedTop - pos.top) > 0.5) {
       setPos((p) => (p ? { ...p, top: flippedTop } : p));
+      setFlipped(true);
     }
     // Only re-check when the candidate position changes, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,16 +197,29 @@ export function DropdownMenuContent({ align = 'start', className, children }: Dr
     };
   }, [open, setOpen, contentRef]);
 
-  if (!open || !pos) return null;
+  if ((!open && !exiting) || !pos) return null;
 
   return createPortal(
     <div
       ref={contentRef}
       role="menu"
-      style={{ position: 'fixed', top: pos.top, left: pos.left, right: pos.right }}
+      style={{
+        position: 'fixed',
+        top: pos.top,
+        left: pos.left,
+        right: pos.right,
+        /* Gốc biến đổi bám vào GÓC NEO VÀO NÚT BẤM, nên panel nở ra TỪ nút
+           thay vì phình ra từ tâm chính nó. Menu neo bên phải thì mọc từ
+           phải, menu bị lật lên trên thì mọc từ dưới lên. Đây là chi tiết
+           quyết định menu đọc ra là "cái nút này mở ra thứ này" hay chỉ là
+           "một hộp vừa hiện lên đâu đó". */
+        transformOrigin: `${align === 'end' ? 'right' : 'left'} ${flipped ? 'bottom' : 'top'}`,
+      }}
       className={cn(
         'z-50 min-w-[10rem] rounded-lg border border-line bg-card p-1 shadow-md',
-        'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-fast motion-safe:ease-out-soft',
+        exiting
+          ? 'pointer-events-none motion-safe:animate-pop-out'
+          : 'motion-safe:animate-pop-in',
         className,
       )}
     >
@@ -209,7 +250,8 @@ export const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenu
         role="menuitem"
         onClick={(e) => { onClick?.(e); if (closeOnSelect) setOpen(false); }}
         className={cn(
-          'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-acc',
+          'flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-xs',
+          'transition-colors duration-press ease-out-soft hover:bg-acc',
           active && 'bg-acc/10 text-acc',
           danger && 'text-bad hover:bg-bad/10',
           className,

@@ -328,7 +328,7 @@ export function LogsPanel({ start, stop, name }: {
             placeholder={`Search logs…  ${MOD_KEY}F`}
             aria-label="Search logs"
             aria-invalid={!!searchError}
-            className={cn('h-ctl w-full pl-7 pr-7 text-xs', searchError && 'border-bad focus:border-bad focus:ring-bad/30')}
+            className={cn('h-ctl w-full pl-7 pr-7 text-xs', searchError && 'border-bad focus-visible:border-bad focus-visible:ring-bad/30')}
           />
           {keyword && (
             <button
@@ -585,7 +585,7 @@ function IconStep({ title, onClick, children }: { title: string; onClick: () => 
       title={title}
       aria-label={title}
       onClick={onClick}
-      className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-acc/10 hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35"
+      className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-acc/10 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
     >
       {children}
     </button>
@@ -604,7 +604,7 @@ function LogToggleButton({ active, onClick, title, children }: {
       onClick={onClick}
       className={cn(
         'inline-flex h-ctl shrink-0 items-center gap-1 rounded-sm border px-2 text-[11px] font-medium transition-colors duration-fast ease-out-soft',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
+        'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus focus-visible:ring-offset-bg',
         active
           ? 'border-acc/40 bg-acc/10 text-acc'
           : 'border-line/70 text-fg-mute hover:border-line hover:text-fg',

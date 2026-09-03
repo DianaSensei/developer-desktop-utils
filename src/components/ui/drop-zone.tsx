@@ -77,7 +77,7 @@ export function DropZone({
       onClick={activate}
       className={cn(
         'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center',
-        'transition-[border-color,background-color] duration-200 ease-out',
+        'transition-[border-color,background-color] duration-fast ease-out-soft',
         dragging
           ? 'border-acc bg-acc/5'
           : 'border-fg-mute/25 hover:border-fg-mute/50 hover:bg-bg-2/30',
@@ -93,7 +93,7 @@ export function DropZone({
           onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); }}
         />
       )}
-      <Icon className={cn('h-ctl w-ctl transition-colors', dragging ? 'text-acc' : 'text-fg-mute/50')} />
+      <Icon className={cn('h-ctl w-ctl transition-colors duration-fast ease-out-soft', dragging ? 'scale-110 text-acc' : 'text-fg-mute/50')} />
       <div>
         <p className="text-sm font-medium">{title}</p>
         {hint && <p className="mt-0.5 text-xs text-fg-mute">{hint}</p>}

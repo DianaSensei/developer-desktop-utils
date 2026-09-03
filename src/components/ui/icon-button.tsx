@@ -18,6 +18,15 @@ export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEl
    * here silently rendered at 34px.
    */
   size?: 'xs' | 'sm' | 'md';
+  /**
+   * Việc gắn với nút đang chạy. Xoay icon bên trong, khoá nút lại và báo
+   * `aria-busy` — thay cho cách cũ là đổi luôn icon sang `<Spinner>`, vốn làm
+   * nút nhấp một cái vì hai glyph không cùng bề rộng.
+   *
+   * Dùng cho nút Tải lại / Làm mới: 81 nút loại này trong app, trước đây chỉ
+   * 2 nút có bất kỳ dấu hiệu nào cho biết bấm rồi thì đang có việc chạy.
+   */
+  busy?: boolean;
 }
 
 /**
@@ -27,17 +36,27 @@ export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEl
  * for accessibility since there is no visible label.
  */
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ className, active, size = 'md', type = 'button', ...props }, ref) => (
+  ({ className, active, size = 'md', type = 'button', busy, disabled, ...props }, ref) => (
     <button
       ref={ref}
       type={type}
+      disabled={disabled ?? busy}
+      aria-busy={busy || undefined}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-sm text-fg-mute transition-colors',
-        'hover:bg-acc hover:text-fg',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+        // `transition-colors` một mình là lý do nút icon đọc ra tẻ: bấm vào
+        // không có gì xảy ra dưới ngón tay, chỉ có màu nền đổi — mà màu nền
+        // thì hover đã đổi rồi. Thêm cú lún 0.90 (mạnh hơn nút chữ vì hộp
+        // nhỏ hơn, 0.97 ở 24px là không thấy) trong `--dur-press`.
+        'inline-flex shrink-0 items-center justify-center rounded-sm text-fg-mute',
+        'transition-[color,background-color,transform] duration-fast ease-out-soft',
+        'motion-safe:active:scale-90 motion-safe:active:duration-press',
+        'hover:bg-acc hover:text-fg active:bg-acc/80',
+        'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
         'disabled:pointer-events-none disabled:opacity-50',
         size === 'xs' ? 'h-6 w-6' : 'h-ctl w-ctl',
         active && 'bg-acc/10 text-acc hover:bg-acc/15',
+        // Xoay chính icon đang có, không tráo sang glyph khác.
+        busy && '[&>svg]:animate-spin',
         className,
       )}
       {...props}

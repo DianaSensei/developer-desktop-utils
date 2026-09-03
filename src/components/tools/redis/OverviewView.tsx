@@ -35,7 +35,7 @@ export function OverviewView({ conn, db, refreshKey, onRefresh }: OverviewViewPr
             Redis {server.redis_version ?? ''} · {replication.role ?? 'standalone'} · db{db}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={onRefresh}>
+        <Button variant="outline" size="sm" busy={ov.loading} onClick={onRefresh}>
           <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
         </Button>
       </div>

@@ -49,7 +49,7 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
         actions={(
           <>
             <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New topic</Button>
-            <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+            <Button variant="outline" size="sm" busy={loading} onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
           </>
         )}
       />

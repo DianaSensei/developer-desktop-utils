@@ -74,12 +74,12 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
         onChange={(e) => onRename(e.target.value)}
         placeholder="Request name"
         aria-label="Request name"
-        className="mb-1 h-6 w-full truncate rounded-sm border-0 bg-transparent px-1.5 text-sm font-semibold text-fg shadow-none transition-colors hover:bg-bg-2/50 focus-visible:bg-bg-2/70 focus-visible:ring-1 focus-visible:ring-acc/30 focus-visible:ring-offset-0"
+        className="mb-1 h-6 w-full truncate rounded-sm border-0 bg-transparent px-1.5 text-sm font-semibold text-fg shadow-none transition-colors hover:bg-bg-2/50 focus-visible:bg-bg-2/70 focus-visible:ring-[3px] focus-visible:ring-focus"
       />
       {/* h-ctl, not h-ctl-lg: this bar used to be the one control in the app
           taller than the 34px standard (--h) — 40px around 12-13px text read
           as noticeably oversized next to every other input/select/button. */}
-      <div className="flex items-center overflow-hidden rounded-lg border border-line bg-bg shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-2 focus-within:ring-acc/40">
+      <div className="flex items-center overflow-hidden rounded-lg border border-line bg-bg shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-[3px] focus-within:ring-focus">
         {/* Method selector — tinted to match the active HTTP method (Bruno-style) */}
         {/* text-xs, not the Select default text-sm: every other place this app
             prints a method — tab strip, sidebar badge, history, runner — uses
@@ -92,7 +92,7 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
         <Select value={request.method} onValueChange={(v) => onChange({ method: v as ApiRequest['method'] })}>
           <SelectTrigger
             className={cn(
-              'h-ctl w-[5.5rem] shrink-0 gap-0.5 border-0 pl-2.5 pr-1.5 text-xs font-bold uppercase tracking-wide shadow-none focus:ring-0 rounded-r-none [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-70',
+              'h-ctl w-[5.5rem] shrink-0 gap-0.5 border-0 pl-2.5 pr-1.5 text-xs font-bold uppercase tracking-wide shadow-none focus-visible:ring-0 rounded-r-none [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-70',
               methodColor(request.method),
               methodBg(request.method),
             )}

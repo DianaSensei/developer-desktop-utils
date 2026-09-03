@@ -59,7 +59,7 @@ export function ParamRow({
                 className={cn(
                   'shrink-0 cursor-help text-fg-mute/70',
                   'transition-colors hover:text-fg-mute',
-                  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+                  'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                 )}
               >
                 <HelpCircle className="h-3.5 w-3.5" />

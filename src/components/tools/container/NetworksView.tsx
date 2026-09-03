@@ -102,7 +102,7 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
               onDone={(m) => { setNotice(m); setError(null); load(); }}
               onError={(m) => { setNotice(null); setError(m); }}
             />
-            <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+            <Button variant="outline" size="sm" busy={loading} onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
           </>
         )}
       />

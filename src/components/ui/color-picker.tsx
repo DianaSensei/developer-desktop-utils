@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
+import { useAnimatedOpen } from '@/hooks/useAnimatedOpen';
 
 // ---------------------------------------------------------------------------
 // Cross-platform color picker — replaces the native <input type="color">.
@@ -109,8 +110,8 @@ export interface ColorPickerProps {
 }
 
 export function ColorPicker({ value, onChange, disabled, className, wrapClassName, title, children }: ColorPickerProps) {
-  const [open, setOpen] = React.useState(false);
-  const wrapRef = useDismissable<HTMLDivElement>(open, () => setOpen(false));
+  const { open, closing, visible, toggle, close } = useAnimatedOpen();
+  const wrapRef = useDismissable<HTMLDivElement>(open, close);
 
   // Local hue keeps the slider stable when saturation/value hit 0 (where hue
   // is otherwise undefined and would snap back to red).
@@ -143,11 +144,11 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
         disabled={disabled}
         title={title}
         aria-label="Pick a color"
-        onClick={() => !disabled && setOpen((v) => !v)}
+        onClick={() => !disabled && toggle()}
         style={{ backgroundColor: value }}
         className={cn(
           'rounded-md border border-line shadow-sm transition-shadow',
-          'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+          'focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:shadow',
           'h-6 w-6',
           className,
@@ -156,8 +157,13 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
         {children}
       </button>
 
-      {open && !disabled && (
-        <div className="absolute z-50 mt-1.5 w-56 rounded-lg border bg-card p-3 shadow-xl">
+      {visible && !disabled && (
+        <div
+          className={cn(
+            'absolute z-50 mt-1.5 w-56 rounded-lg border bg-card p-3 shadow-xl',
+            closing ? 'pointer-events-none motion-safe:animate-pop-out' : 'motion-safe:animate-pop-in',
+          )}
+        >
           {/* Saturation / Value field */}
           <div
             ref={sv.ref}
@@ -204,7 +210,7 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
               onBlur={commitHex}
               onKeyDown={(e) => { if (e.key === 'Enter') { commitHex(); (e.target as HTMLInputElement).blur(); } }}
               spellCheck={false}
-              className="h-ctl w-full rounded-md border bg-card px-2 font-mono text-xs uppercase focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40"
+              className="h-ctl w-full rounded-md border bg-card px-2 font-mono text-xs uppercase focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
             />
           </div>
         </div>

@@ -204,7 +204,7 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
         icon={FileStack}
         title="Compose"
         subtitle={`${projects.length} projects · grouped by container label`}
-        actions={<Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>}
+        actions={<Button variant="outline" size="sm" busy={loading} onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>}
       />
 
       <div className="tool-scrollable px-5 py-4 space-y-4">

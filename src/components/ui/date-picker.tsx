@@ -7,6 +7,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
+import { useAnimatedOpen } from '@/hooks/useAnimatedOpen';
 
 // ---------------------------------------------------------------------------
 // Cross-platform date picker — replaces the native <input type="date">.
@@ -31,8 +32,8 @@ export interface DatePickerProps {
 }
 
 export function DatePicker({ value, onChange, disabled, className, placeholder = 'Pick a date', inline = false, monthYearNav = false }: DatePickerProps) {
-  const [open, setOpen] = React.useState(false);
-  const wrapRef = useDismissable<HTMLDivElement>(open, () => setOpen(false));
+  const { open, closing, visible, toggle, close } = useAnimatedOpen();
+  const wrapRef = useDismissable<HTMLDivElement>(open, close);
 
   const selected = React.useMemo(() => {
     if (!value) return null;
@@ -57,7 +58,7 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
 
   const pick = (d: Date) => {
     onChange(format(d, 'yyyy-MM-dd'));
-    setOpen(false);
+    close();
   };
 
   const calendar = (
@@ -153,10 +154,10 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
       <button
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setOpen((v) => !v)}
+        onClick={() => !disabled && toggle()}
         className={cn(
           'flex h-ctl-lg items-center gap-2 rounded-md border border-sunk bg-card px-2.5 text-sm shadow-sm',
-          'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+          'focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
           disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-bg-2/50',
           className,
         )}
@@ -167,8 +168,13 @@ export function DatePicker({ value, onChange, disabled, className, placeholder =
         </span>
       </button>
 
-      {open && !disabled && (
-        <div className="absolute z-50 mt-1.5 w-64 rounded-lg border bg-card p-3 shadow-xl">
+      {visible && !disabled && (
+        <div
+          className={cn(
+            'absolute z-50 mt-1.5 w-64 rounded-lg border bg-card p-3 shadow-xl',
+            closing ? 'pointer-events-none motion-safe:animate-pop-out' : 'motion-safe:animate-pop-in',
+          )}
+        >
           {calendar}
         </div>
       )}

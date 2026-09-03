@@ -95,10 +95,39 @@ export const smartBracketSkip = Prec.highest(EditorView.inputHandler.of((view, f
 }));
 
 export interface CodeThemeOptions {
-  /** Default `12.5px`. */
+  /**
+   * Default `13px`. Was three different values (12 / 12.5 / 13) across the
+   * editable editor, the response viewer, SQL Formatter and Markdown Preview
+   * — invisible until two of them sit side by side (a request body editor
+   * next to its response viewer is the app's single most common split-pane),
+   * where the mismatch reads as sloppiness rather than as a deliberate
+   * choice. One size for every code surface now; a call site overrides only
+   * for a documented reason (there currently are none).
+   */
   fontSize?: string;
-  /** Padding inside the content column. Default `8px 0`. */
-  contentPadding?: string;
+  /** Vertical padding inside the content column (top/bottom), in px. Default 8. */
+  paddingY?: number;
+  /**
+   * Horizontal padding on BOTH edges of the content column, in px. Default 12
+   * — the app's own `px-3` control padding (`Input`, `Textarea`), so a code
+   * surface breathes the same amount as every other form control it sits next
+   * to instead of running its own tighter rhythm.
+   *
+   * Every code surface used to hard-code this at 0: `.cm-content`'s CSS
+   * `padding` shorthand only ever carried a vertical value ('8px 0', '6px 0',
+   * '10px 0'), so text on every editable and read-only surface in the app —
+   * scripts, JSON/JS/SQL bodies, API responses — ran edge-to-edge against the
+   * pane border and the scrollbar, with nothing between the last character of
+   * a long line and where the eye expects a margin to start. That reads as
+   * cramped no matter how good the syntax colors are.
+   *
+   * Left space stacks with the line-number gutter's own padding rather than
+   * replacing it — a slightly wider gutter-to-code gap than a bare `0` is the
+   * intended trade, not a rounding error. Set to `0` only for a surface with
+   * its own outer padding supplying it instead (`InlineCodeField`, whose
+   * `px-3` wrapper already does this).
+   */
+  paddingX?: number;
   /**
    * `panel` (default) tints the gutter and draws a divider — for an editor that
    * owns a bordered box. `flush` leaves it transparent and borderless, for a
@@ -112,18 +141,31 @@ export interface CodeThemeOptions {
 }
 
 /**
+ * Options with every default filled in. Split out from `codeTheme()` itself
+ * so the defaults — the one thing a future edit is likely to change without
+ * meaning to touch every code surface in the app at once — are checkable
+ * without mounting a real CodeMirror instance (`EditorView.theme()`'s return
+ * value is an opaque `StyleModule`-backed `Extension`; there's nothing in it
+ * a plain unit test can read).
+ */
+export function resolveCodeThemeOptions(opts: CodeThemeOptions = {}) {
+  return {
+    fontSize: opts.fontSize ?? '13px',
+    paddingY: opts.paddingY ?? 8,
+    paddingX: opts.paddingX ?? 12,
+    gutter: opts.gutter ?? 'panel',
+    activeLine: opts.activeLine ?? true,
+    fill: opts.fill ?? true,
+  } as const;
+}
+
+/**
  * The app's editor chrome. `dark` must match the app theme — it selects
  * CodeMirror's own `&light`/`&dark` base rules, which cover surfaces this spec
  * intentionally doesn't restate.
  */
 export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension {
-  const {
-    fontSize = '12.5px',
-    contentPadding = '8px 0',
-    gutter = 'panel',
-    activeLine = true,
-    fill = true,
-  } = opts;
+  const { fontSize, paddingY, paddingX, gutter, activeLine, fill } = resolveCodeThemeOptions(opts);
 
   return EditorView.theme(
     {
@@ -135,10 +177,36 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
         fontSize,
         fontFamily: CODE_FONT,
         backgroundColor: 'transparent',
+        // 1.6, not the browser's un-set default. CodeMirror never declared a
+        // line-height, so every editor rendered whatever the resolved font
+        // stack's own metrics happened to produce — different for IBM Plex
+        // Mono than for its fallbacks (Menlo, Consolas, Liberation Mono), so
+        // a user on Windows/Linux who never gets the web font got a visibly
+        // different rhythm than one on macOS, without either being a choice
+        // anyone made. A tool whose job is showing rows of JSON/log/response
+        // text also benefits from more air between lines than a code editor
+        // optimized for keeping a whole file on screen — 1.6 sits close to
+        // the app's own `leading-relaxed` (1.625) prose rhythm rather than a
+        // typical IDE's tighter ~1.35–1.5.
+        lineHeight: '1.6',
+        // The body-wide `-0.006em` tracking (globals.css, tuned for
+        // proportional prose) was never reset here, so it cascaded into every
+        // CodeMirror instance in the app — editors, the response viewer, the
+        // URL bar. Negative tracking on a MONOSPACE font is a correctness
+        // bug, not a style choice: the entire point of the typeface is that
+        // every glyph is exactly one cell wide, which is what makes a JSON
+        // object's keys, an aligned diff, or a column of numbers line up.
+        // Shrinking that cell by a fraction of a pixel doesn't look
+        // different at a glance, but it is the thing a "something's subtly
+        // off" reaction is reacting to.
+        letterSpacing: 'normal',
       },
       '&.cm-focused': { outline: 'none' },
       '.cm-scroller': { overflow: 'auto', minHeight: '0', fontFamily: 'inherit' },
-      '.cm-content': { caretColor: 'hsl(var(--fg-c))', padding: contentPadding },
+      '.cm-content': {
+        caretColor: 'hsl(var(--fg-c))',
+        padding: `${paddingY}px ${paddingX}px`,
+      },
       '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'hsl(var(--fg-c))', borderLeftWidth: '1.5px' },
       // CodeMirror's own placeholder decoration — renders inline in the real
       // document flow (respects the gutter, wraps multi-line text correctly),
@@ -230,9 +298,14 @@ export function codeTheme(dark: boolean, opts: CodeThemeOptions = {}): Extension
       },
       '.cm-tooltip.cm-tooltip-autocomplete': { overflow: 'hidden' },
       '.cm-tooltip-autocomplete > ul > li': {
-        padding: '3px 8px',
+        // 4px/10px, and the SAME `fontSize` the editor itself resolved to —
+        // this used to hardcode '3px 8px' + a flat 12px regardless of what
+        // size the calling editor picked, so once editors moved to a shared
+        // 13px default the autocomplete list was quietly smaller than the
+        // code you were typing into it.
+        padding: '4px 10px',
         fontFamily: CODE_FONT,
-        fontSize: '12px',
+        fontSize,
         color: 'hsl(var(--fg-c))',
       },
       '.cm-tooltip-autocomplete > ul > li[aria-selected]': {

@@ -71,7 +71,7 @@ export const InlineCodeField = forwardRef<InlineCodeFieldHandle, InlineCodeField
   const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
   const onEnterRef = useRef(onEnter); onEnterRef.current = onEnter;
   const lastValue = useRef(value);
-  const theme = useCodeTheme(viewRef, { fontSize: '12px', contentPadding: '0', fill: false, activeLine: false });
+  const theme = useCodeTheme(viewRef, { paddingY: 0, paddingX: 0, fill: false, activeLine: false });
 
   useEffect(() => {
     if (!ref.current) return;

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Plus, KeyRound, Trash2, Check } from 'lucide-react';
+import { RefreshCw, Plus, KeyRound, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Callout } from '@/components/ui/callout';
 import { Spinner, LoadingRow } from '@/components/ui/spinner';
 import { Field } from '@/components/ui/tool-section';
@@ -16,7 +17,6 @@ import {
 } from '@/components/ui/select';
 import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
-import { cn } from '@/lib/utils';
 import type { RedisConnection, KeySummary } from './types';
 import { redisApi } from './types';
 import { MathConfirmDialog } from './MathConfirmDialog';
@@ -158,7 +158,7 @@ export function KeysListView({ conn, db, refreshKey, onRefresh, onSelectKey }: K
         actions={(
           <>
             <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" /> New key</Button>
-            <Button variant="outline" size="sm" onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
+            <Button variant="outline" size="sm" busy={loading} onClick={onRefresh}><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh</Button>
           </>
         )}
       />
@@ -272,20 +272,10 @@ export function KeysListView({ conn, db, refreshKey, onRefresh, onSelectKey }: K
   );
 }
 
+/* Ô tick dùng chung — trước đây dựng tay ở đây, và cái tick BẬT RA đứt đoạn
+   trong khi cái hộp quanh nó lại có transition. Xem `ui/checkbox.tsx`. */
 function RowCheckbox({ checked, onClick, title }: { checked: boolean; onClick: () => void; title: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={cn(
-        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-        checked ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
-      )}
-    >
-      {checked && <Check className="h-2.5 w-2.5" />}
-    </button>
-  );
+  return <Checkbox size="sm" checked={checked} onClick={onClick} title={title} />;
 }
 
 const NEW_KEY_TYPES: NewKeyType[] = ['string', 'hash', 'list', 'set', 'zset', 'stream'];

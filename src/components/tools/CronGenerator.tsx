@@ -620,7 +620,7 @@ export function CronGenerator() {
           <button
             type="button"
             aria-label={`${mode} cron rule`}
-            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35"
+            className="inline-flex h-ctl w-ctl items-center justify-center rounded-sm text-fg-mute hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
           >
             <HelpCircle className="h-4 w-4" />
           </button>

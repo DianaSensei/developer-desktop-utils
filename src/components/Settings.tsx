@@ -126,7 +126,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () =
       title={label}
       onClick={onChange}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40',
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
         checked ? 'bg-acc' : 'bg-fg-mute/25'
       )}
     >
@@ -201,7 +201,7 @@ function AccentSwatches({ value, onChange, ariaLabel }: { value: AccentTone; onC
           onClick={() => onChange(tone)}
           className={cn(
             'h-5 w-5 shrink-0 rounded-full border-2 transition-transform',
-            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/40 focus-visible:ring-offset-1',
+            'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
             value === tone ? 'scale-110 border-fg' : 'border-transparent hover:scale-105',
           )}
           style={ACCENT_PREVIEW[tone]}
@@ -530,7 +530,7 @@ export function Settings() {
             value={toolQuery}
             onChange={(e) => setToolQuery(e.target.value)}
             placeholder={t('shell.search.placeholder')}
-            className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-bg-2 focus-visible:ring-1"
+            className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-bg-2"
           />
           {toolQuery && (
             <button

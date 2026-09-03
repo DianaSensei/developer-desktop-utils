@@ -48,7 +48,7 @@ export const CodeViewer = forwardRef<CodeViewerHandle, CodeViewerProps>(function
   const viewRef = useRef<EditorView | null>(null);
   // Read-only: no active-line tint, and the gutter sits flush on the pane
   // rather than in its own tinted column.
-  const theme = useCodeTheme(viewRef, { gutter: 'flush', activeLine: false, contentPadding: '6px 0' });
+  const theme = useCodeTheme(viewRef, { gutter: 'flush', activeLine: false, paddingY: 6 });
 
   const langExt = language === 'json' ? jsonLang : language === 'sql' ? sqlLang : language === 'javascript' ? jsLang : null;
 
@@ -108,7 +108,14 @@ export const CodeViewer = forwardRef<CodeViewerHandle, CodeViewerProps>(function
     <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden">
       <div ref={containerRef} className="flex flex-col flex-1 min-h-0 overflow-hidden" />
       {!value && placeholder && (
-        <div className="pointer-events-none absolute left-9 top-2 font-mono text-[11px] text-fg-mute/50">
+        // `left-12` (48px), not the old 36px: `.cm-content` now carries a real
+        // 12px left padding (see code-theme.ts) that it didn't before, so the
+        // actual first character of typed/pasted text sits 12px further right
+        // than this overlay used to assume. Both numbers are eyeballed against
+        // the gutter's own width rather than computed — CodeMirror doesn't
+        // expose it before first layout — so "close enough to read as the
+        // same baseline" is the actual bar, not pixel-exact alignment.
+        <div className="pointer-events-none absolute left-12 top-2 font-mono text-[11px] text-fg-mute/50">
           {placeholder}
         </div>
       )}

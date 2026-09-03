@@ -35,7 +35,7 @@ export function RowCheckbox({ checked, indeterminate, onToggle, title, disabled 
       title={title}
       className={cn(
         'flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border transition-colors duration-fast',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35 focus-visible:ring-offset-1 focus-visible:ring-offset-bg',
+        'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus focus-visible:ring-offset-bg',
         'active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40',
         active
           ? 'border-acc bg-acc text-acc-fg hover:bg-acc-hi hover:border-acc-hi'
@@ -82,7 +82,7 @@ export function SelectionBar({ count, unselectedVisibleCount, onSelectAllVisible
           {unselectedVisibleCount > 0 && (
             <button
               type="button"
-              className="rounded-sm text-xs text-acc underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc/35"
+              className="rounded-sm text-xs text-acc underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
               onClick={onSelectAllVisible}
             >
               Select all {(count + unselectedVisibleCount).toLocaleString()} shown

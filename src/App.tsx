@@ -571,7 +571,7 @@ function Sidebar({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('shell.search.placeholder')}
-                className="h-ctl pl-7 pr-7 text-xs rounded-md bg-bg-2/40 border-bg-2 focus-visible:ring-1"
+                className="h-ctl pl-7 pr-7 text-xs rounded-md bg-bg-2/40 border-bg-2"
               />
               {query && (
                 <button
@@ -862,7 +862,7 @@ function AppContent() {
                   aria-selected={on}
                   className={cn(
                     'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-2 text-xs leading-none transition-colors',
-                    'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
+                    'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                     on
                       ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                       : 'text-fg-mute hover:text-fg',
@@ -1093,7 +1093,7 @@ function AppContent() {
                           aria-selected={on}
                           className={cn(
                             'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
-                            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-acc focus-visible:ring-offset-0',
+                            'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                             on
                               ? 'bg-acc font-semibold text-acc-fg shadow-soft'
                               : 'text-fg-mute hover:text-fg',

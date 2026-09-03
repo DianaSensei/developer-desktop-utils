@@ -75,7 +75,7 @@ và màu HTTP method (`--method-*-c`).
 ## Utility classes
 
 - **Glass**: `.glass`, `.glass-strong`, `.glass-chrome`, `.glass-sheen`
-- **Elevation**: `.shadow-primary`, `.shadow-primary-lg`; dùng thẳng `shadow-sm`/`shadow`/`shadow-lg` (đã ánh xạ xuống 3 bậc của kit trong `tailwind-preset.cjs`)
+- **Elevation**: ba bậc của kit — `shadow-soft` / `shadow` / `shadow-lift` (bí danh `shadow-sm`/`shadow`/`shadow-lg` đã ánh xạ xuống đúng ba bậc đó trong `tailwind-preset.cjs`). Không có bậc nào ngả màu accent: `.shadow-primary` / `.shadow-primary-lg` đã bị xoá — xem `tokens.css`.
 - **Motion**: `.hover-elevate` (không còn nhấc phần tử), `.press`, `.animate-fade-in-up`, `.animate-scale-in`
 - **Chrome**: `.sidebar-chrome`, `.header-chrome`, `.content-wrapper`
 - **Typography**: `.heading-xl…xs`, `.text-body`, `.text-caption`
