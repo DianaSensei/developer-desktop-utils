@@ -67,20 +67,49 @@ and the tools below become available.
 
 ## Tools
 
+Requests & running:
+
 | Tool | Does |
 |---|---|
 | `list_collections` | Tree of every collection (id/name/method/url only). |
 | `get_collection` | One collection's own script/auth/headers/variables. |
 | `get_request` | Full definition of one request. |
-| `update_request` | Patch a request (url, method, headers, body, auth, script, tests, assertions, settings — any subset). |
+| `update_request` | Patch a request — url, method, params, headers, body, auth, **script** (pre/post-request), tests, assertions, settings: any subset. |
 | `create_request` | Add a new request to a collection/folder. |
-| `delete_request` | Remove a request. |
-| `set_node_script` | Set the pre/post-request script a collection or folder passes down to its requests. |
 | `run_request` | Actually send a request — pre-request script → send → post-response script → tests/assertions → History. |
-| `list_environments` | Every environment (global + collection-scoped). |
-| `get_environment` | One environment's variables. |
+
+Folders & tree structure:
+
+| Tool | Does |
+|---|---|
+| `add_folder` | Create a folder in a collection (optionally nested). |
+| `rename_item` | Rename a request or folder. |
+| `delete_item` | Delete a request or a folder (and its contents). |
+| `clone_item` | Duplicate a request or folder as a sibling. |
+| `move_item` / `copy_item` | Move or copy a request/folder to a new spot in the tree. |
+
+Collections:
+
+| Tool | Does |
+|---|---|
+| `add_collection` / `rename_collection` / `delete_collection` / `clone_collection` | Collection lifecycle. |
+| `set_collection_variables` | Replace a collection's Collection Variables. |
+| `set_node_script` | Set the pre/post-request **script** a collection or folder passes down to its requests (`nodeId=null` = the collection root). |
+| `set_node_auth` | Set the auth a collection or folder passes down to requests with `auth.type: "inherit"`. |
+| `set_node_headers` | Set the headers a collection or folder adds to every request under it. |
+
+Environments:
+
+| Tool | Does |
+|---|---|
+| `list_environments` / `get_environment` | Read environments and their variables. |
+| `add_environment` / `duplicate_environment` / `delete_environment` / `import_environment` | Environment lifecycle. |
 | `update_environment` | Patch an environment (most often its `variables` array). |
 | `set_active_environment` | Activate an environment, globally or for one collection. |
+
+A request's own script/auth/headers/body/tests/assertions all live on the
+request itself — edit those through `update_request`'s `patch`, not the
+`set_node_*` tools (those are only for what a collection/folder passes down).
 
 ## Troubleshooting
 

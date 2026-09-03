@@ -149,19 +149,127 @@ server.registerTool(
 );
 
 server.registerTool(
-  'delete_request',
+  'run_request',
   {
-    description: 'Delete a request by id.',
-    inputSchema: { requestId: z.string() },
+    description:
+      'Actually send a request through DevTool (same engine as the Send button): runs its pre-request script, sends it, runs the post-response script, evaluates tests/assertions, and appends it to History. Returns the response, tests, console logs, and any transport/script error. Pass environmentId to force a specific environment ("" / omit for the currently active one, null for "No Environment").',
+    inputSchema: { requestId: z.string(), environmentId: z.string().nullable().optional() },
   },
-  (args) => callTool('delete_request', args),
+  (args) => callTool('run_request', args),
+);
+
+// ─── folders & tree structure ───────────────────────────────────────────────
+
+server.registerTool(
+  'add_folder',
+  {
+    description: 'Create a folder in a collection (optionally nested inside another folder) and return its id.',
+    inputSchema: { collectionId: z.string(), name: z.string().optional(), parentId: z.string().optional() },
+  },
+  (args) => callTool('add_folder', args),
+);
+
+server.registerTool(
+  'rename_item',
+  {
+    description: 'Rename a request or folder by id.',
+    inputSchema: { itemId: z.string(), name: z.string() },
+  },
+  (args) => callTool('rename_item', args),
+);
+
+server.registerTool(
+  'delete_item',
+  {
+    description: 'Delete a request or a folder (and everything inside it) by id.',
+    inputSchema: { itemId: z.string() },
+  },
+  (args) => callTool('delete_item', args),
+);
+
+server.registerTool(
+  'clone_item',
+  {
+    description: 'Duplicate a request or folder as a new sibling right after it.',
+    inputSchema: { itemId: z.string() },
+  },
+  (args) => callTool('clone_item', args),
+);
+
+server.registerTool(
+  'move_item',
+  {
+    description:
+      'Move (cut) a request or folder to a new spot. `targetId` may be a collection id (moves to its root), or a request/folder id combined with `where`: "before"/"after" that sibling, or "inside" it (folders only).',
+    inputSchema: { sourceId: z.string(), targetId: z.string(), where: z.enum(['before', 'after', 'inside']).default('inside') },
+  },
+  (args) => callTool('move_item', args),
+);
+
+server.registerTool(
+  'copy_item',
+  {
+    description: 'Copy (not cut) a request or folder to a new spot — same targeting as move_item, but the source is left in place.',
+    inputSchema: { sourceId: z.string(), targetId: z.string(), where: z.enum(['before', 'after', 'inside']).default('inside') },
+  },
+  (args) => callTool('copy_item', args),
+);
+
+// ─── collections ─────────────────────────────────────────────────────────────
+
+server.registerTool(
+  'add_collection',
+  {
+    description: 'Create a new, empty collection and return its id.',
+    inputSchema: { name: z.string().optional() },
+  },
+  (args) => callTool('add_collection', args),
+);
+
+server.registerTool(
+  'rename_collection',
+  {
+    description: 'Rename a collection by id.',
+    inputSchema: { collectionId: z.string(), name: z.string() },
+  },
+  (args) => callTool('rename_collection', args),
+);
+
+server.registerTool(
+  'delete_collection',
+  {
+    description: 'Delete a collection (and everything inside it) by id. Also drops any environments scoped to it.',
+    inputSchema: { collectionId: z.string() },
+  },
+  (args) => callTool('delete_collection', args),
+);
+
+server.registerTool(
+  'clone_collection',
+  {
+    description: 'Duplicate a whole collection (deep copy, fresh ids for everything inside) right after the original.',
+    inputSchema: { collectionId: z.string() },
+  },
+  (args) => callTool('clone_collection', args),
+);
+
+server.registerTool(
+  'set_collection_variables',
+  {
+    description: 'Replace a collection\'s Collection Variables (shared defaults available to every request in it, regardless of active environment). Pass the full array you want it to end up with.',
+    inputSchema: {
+      collectionId: z.string(),
+      variables: z.array(z.object({ id: z.string(), key: z.string(), value: z.string(), enabled: z.boolean() })),
+    },
+  },
+  (args) => callTool('set_collection_variables', args),
 );
 
 server.registerTool(
   'set_node_script',
   {
     description:
-      'Set the pre/post-request script inherited by every request under a collection or folder (Bruno-style). Pass nodeId=null (or omit it) for the collection\'s own root script; pass a folder id for that folder\'s script.',
+      'Set the pre/post-request script inherited by every request under a collection or folder (Bruno-style). Pass nodeId=null (or omit it) for the collection\'s own root script; pass a folder id for that folder\'s script. A request\'s OWN script is a field on it instead — see update_request\'s patch.script.',
     inputSchema: {
       collectionId: z.string(),
       nodeId: z.string().nullable().optional(),
@@ -172,13 +280,27 @@ server.registerTool(
 );
 
 server.registerTool(
-  'run_request',
+  'set_node_auth',
   {
     description:
-      'Actually send a request through DevTool (same engine as the Send button): runs its pre-request script, sends it, runs the post-response script, evaluates tests/assertions, and appends it to History. Returns the response, tests, console logs, and any transport/script error. Pass environmentId to force a specific environment ("" / omit for the currently active one, null for "No Environment").',
-    inputSchema: { requestId: z.string(), environmentId: z.string().nullable().optional() },
+      'Set the auth inherited by every request under a collection or folder that has auth.type="inherit" (Bruno-style). Pass nodeId=null (or omit it) for the collection root; pass a folder id for that folder. A request\'s OWN auth is a field on it instead — see update_request\'s patch.auth.',
+    inputSchema: { collectionId: z.string(), nodeId: z.string().nullable().optional(), auth: z.record(z.string(), z.any()) },
   },
-  (args) => callTool('run_request', args),
+  (args) => callTool('set_node_auth', args),
+);
+
+server.registerTool(
+  'set_node_headers',
+  {
+    description:
+      'Set the headers added to every request under a collection or folder (Bruno-style; a request\'s own header of the same name overrides it). Pass nodeId=null (or omit it) for the collection root; pass a folder id for that folder. A request\'s OWN headers are a field on it instead — see update_request\'s patch.headers.',
+    inputSchema: {
+      collectionId: z.string(),
+      nodeId: z.string().nullable().optional(),
+      headers: z.array(z.object({ id: z.string(), key: z.string(), value: z.string(), enabled: z.boolean() })),
+    },
+  },
+  (args) => callTool('set_node_headers', args),
 );
 
 // ─── environments ───────────────────────────────────────────────────────────
@@ -221,6 +343,50 @@ server.registerTool(
     },
   },
   (args) => callTool('set_active_environment', args),
+);
+
+server.registerTool(
+  'add_environment',
+  {
+    description: 'Create a new environment and return its id. Omit collectionId (or pass none) for a global environment; pass one to scope it to that collection.',
+    inputSchema: {
+      collectionId: z.string().optional(),
+      name: z.string().optional(),
+      variables: z.array(z.object({ id: z.string(), key: z.string(), value: z.string(), enabled: z.boolean() })).optional(),
+    },
+  },
+  (args) => callTool('add_environment', args),
+);
+
+server.registerTool(
+  'duplicate_environment',
+  {
+    description: 'Clone an environment (same scope, "<name> copy", fresh ids for every variable row) and return the new id.',
+    inputSchema: { environmentId: z.string() },
+  },
+  (args) => callTool('duplicate_environment', args),
+);
+
+server.registerTool(
+  'delete_environment',
+  {
+    description: 'Delete an environment by id. Clears it from wherever it was the active choice.',
+    inputSchema: { environmentId: z.string() },
+  },
+  (args) => callTool('delete_environment', args),
+);
+
+server.registerTool(
+  'import_environment',
+  {
+    description: 'Create an environment with a name, scope, and full variable set in one call (e.g. importing one from another tool). Returns the new id.',
+    inputSchema: {
+      name: z.string(),
+      collectionId: z.string().nullable().optional(),
+      variables: z.array(z.object({ id: z.string(), key: z.string(), value: z.string(), enabled: z.boolean() })).optional(),
+    },
+  },
+  (args) => callTool('import_environment', args),
 );
 
 const transport = new StdioServerTransport();
