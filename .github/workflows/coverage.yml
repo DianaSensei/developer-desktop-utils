@@ -1,16 +1,23 @@
 name: Coverage
 
-# Docs-only changes can't move the Rust/frontend coverage numbers, so skip
-# this workflow for them — it's the most expensive one here (Tauri system
-# deps + a full Rust build), not worth paying for a README edit.
+# Skip paths that can't move the Rust coverage number or break `npm run build`
+# / `cargo llvm-cov`: docs, the local docker-compose fixtures used for manual
+# Kafka/RabbitMQ testing, and the one-off maintenance scripts (icon gen,
+# release verification, MCP-sidecar prep for the desktop build — not the
+# `npm run build` this job actually runs). This is the most expensive
+# workflow here (Tauri system deps + a full Rust build), so it's worth being
+# picky about what triggers it.
 on:
   push:
     branches: [main]
-    paths-ignore: &docs-only
+    paths-ignore: &coverage-irrelevant
       - '**/*.md'
       - 'docs/**'
+      - 'testing/**'
+      - 'scripts/**'
+      - 'docker-compose*.yml'
   pull_request:
-    paths-ignore: *docs-only
+    paths-ignore: *coverage-irrelevant
 
 permissions:
   contents: read
