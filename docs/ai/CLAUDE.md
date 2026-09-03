@@ -926,8 +926,10 @@ and actually **send a request** through the same engine the Send button
 uses (result lands in the UI + History like any other send).
 
 **Three pieces, one call path:** `mcp-server/` is a standalone Node stdio MCP
-server your MCP client spawns directly (`npm install` once, then point the
-client's config at `mcp-server/src/index.js`) — it never runs inside the app.
+server your MCP client spawns directly (`npm install` once) — it never runs
+inside the app. The repo's root `.mcp.json` (checked in, using
+`${CLAUDE_PROJECT_DIR}`) registers it for Claude Code with zero manual setup;
+`mcp-server/README.md` also covers `claude mcp add`/Claude Desktop.
 It forwards each MCP tool call as `POST /call` to a loopback-only axum server
 `mcp_bridge.rs` starts in `.setup()` (OS-assigned port, random token written
 to `<app_data_dir>/mcp-bridge.json` for the sidecar to discover). That Rust

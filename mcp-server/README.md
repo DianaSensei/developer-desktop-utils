@@ -35,15 +35,35 @@ boundary.
 
 ## Setup
 
+### Claude Code — zero-config
+
+The repo root ships a checked-in `.mcp.json` pointing at this server via
+`${CLAUDE_PROJECT_DIR}`, so **no `claude mcp add` and no path-typing needed.**
+Just:
+
 ```bash
 cd mcp-server
 npm install
 ```
 
-Then add it to your MCP client's config, pointing at this directory's
-`src/index.js` with plain `node`:
+then open Claude Code anywhere inside this repo. The first time, it prompts
+you to approve the project's MCP server (`devtool-api-client`) — approve it
+once and it's available in every future session opened here. Skip straight
+to opening DevTool below.
 
-**Claude Code** (`claude mcp add`):
+### Claude Code (manual) / Claude Desktop
+
+If you'd rather not use the checked-in `.mcp.json` (e.g. registering it
+globally instead of per-project), install the same way and add it to your
+client's config, pointing at this directory's `src/index.js` with plain
+`node`:
+
+```bash
+cd mcp-server
+npm install
+```
+
+**Claude Code** (`claude mcp add`, e.g. with `--scope user` for every project):
 
 ```bash
 claude mcp add devtool-api-client -- node /absolute/path/to/developer-desktop-utils/mcp-server/src/index.js
