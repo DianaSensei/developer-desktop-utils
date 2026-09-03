@@ -4,10 +4,16 @@ name: Tests
 # frontend and measures the Rust crate, and nothing ran `npm test`. A parser
 # regression in the API client's Vars/Assert evaluator therefore landed with
 # every check green, because the two tests that caught it never ran here.
+# Docs-only changes can't break the typecheck or the test suite, so skip the
+# run entirely instead of burning a runner on npm ci + tsc for a README edit.
 on:
   push:
     branches: [main]
+    paths-ignore: &docs-only
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore: *docs-only
 
 permissions:
   contents: read

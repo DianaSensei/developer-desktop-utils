@@ -1,9 +1,16 @@
 name: Coverage
 
+# Docs-only changes can't move the Rust/frontend coverage numbers, so skip
+# this workflow for them — it's the most expensive one here (Tauri system
+# deps + a full Rust build), not worth paying for a README edit.
 on:
   push:
     branches: [main]
+    paths-ignore: &docs-only
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore: *docs-only
 
 permissions:
   contents: read
