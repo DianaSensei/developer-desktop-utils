@@ -19,7 +19,7 @@ Grab the latest build for your OS from the [**Releases**](https://github.com/Dia
 | Platform | Minimum version | Formats |
 |----------|-----------------|---------|
 | macOS | 11 (Big Sur) | `.dmg` — Intel (x86_64) & Apple Silicon (aarch64) |
-| Windows | 10 / 11 | `.msi`, `.exe` (NSIS) |
+| Windows | 10 / 11 | `.exe` (NSIS) |
 | Linux | Ubuntu 22.04+ | `.AppImage`, `.deb` |
 
 The app is **~3–10 MB** (Tauri uses your OS's native WebView instead of bundling a browser) and updates in place via a signed in-app updater (**Settings → Updates**).

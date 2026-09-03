@@ -150,7 +150,7 @@ Then check the hash against the published `SHA256SUMS-*.txt`:
 
 ```bash
 shasum -a 256 -c SHA256SUMS-macos-latest-aarch64-apple-darwin.txt   # macOS / Linux
-certutil -hashfile DevTool_1.0.0_x64_en-US.msi SHA256   # Windows
+certutil -hashfile DevTool_1.0.0_x64-setup.exe SHA256   # Windows
 ```
 
 Or run the bundled helper, which does both:

@@ -5,7 +5,7 @@
 | Platform | Minimum version | Build output |
 |----------|----------------|-------------|
 | macOS (Apple Silicon) | macOS 11 (Big Sur) | `.dmg`, `.app` |
-| Windows | Windows 10 / 11 | `.msi`, `.exe` (NSIS) |
+| Windows | Windows 10 / 11 | `.exe` (NSIS) |
 | Linux | Ubuntu 22.04+ | `.AppImage`, `.deb` |
 
 ---
@@ -92,12 +92,11 @@ Artifacts in `src-tauri/target/release/bundle/`:
 |----------|------|----------|
 | macOS | `.dmg` | `bundle/dmg/` |
 | macOS | `.app` | `bundle/macos/` |
-| Windows | `.msi` | `bundle/msi/` |
 | Windows | `.exe` | `bundle/nsis/` |
 | Linux | `.AppImage` | `bundle/appimage/` |
 | Linux | `.deb` | `bundle/deb/` |
 
-Approximate sizes: macOS DMG 50–80 MB · Windows MSI 60–100 MB · Linux AppImage 80–120 MB.
+Approximate sizes: macOS DMG 50–80 MB · Windows NSIS setup 60–100 MB · Linux AppImage 80–120 MB.
 
 The first build takes 5–10 min (Rust compiles all dependencies from scratch). Subsequent builds are ~1 min.
 
