@@ -240,7 +240,14 @@ export function RequestTabs({
           above ~1300px there is slack for both, so nothing shrinks at all.
           The two selects already elide, so the cap costs a few characters of
           an environment name and nothing else. */}
-      <div className="flex min-w-0 max-w-[45%] shrink items-center gap-1 border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
+      {/* Below the two selects' combined floor (min-w-[4.5rem] each) plus the
+          icon buttons, the cluster can't shrink any further — at that point
+          it used to spill past the (overflow-hidden) row and clip the
+          trailing icons off-window with no way to reach them. overflow-x-auto
+          turns that hard floor into an internal scroll instead, so History
+          and the layout toggle stay reachable however narrow the window
+          gets. */}
+      <div className="flex min-w-0 max-w-[45%] shrink items-center gap-1 overflow-x-auto no-scrollbar border-l border-line py-1 pl-2 pr-1.5 text-fg-mute">
         {/* Two independent pickers, not one — a Collection env and a Global
             env can both be active at once (Collection wins on a name
             collision; see EnvQuickView's precedence note). The folder/globe
