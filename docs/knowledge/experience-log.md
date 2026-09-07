@@ -1,5 +1,51 @@
 # Experience log
 
+## [2026-09-07] api-client Runner — chạy CSV 100k dòng: state React giữ lịch sử biến run O(n) thành O(n²)
+- Nguyên nhân: `RunnerDialog.tsx` giữ toàn bộ lịch sử thực thi trong React state
+  (`setRecords(prev => [...prev, record])` sau MỖI request) và tính lại thống kê bằng
+  `useMemo(() => summarize(records), [records])`. Ở quy mô demo (vài chục iteration) không ai
+  thấy gì; với data file 100k dòng (mỗi dòng = 1 iteration) thì mỗi record tốn O(n) copy mảng +
+  O(n) quét lại thống kê + O(n) cho `records.filter(r => r.iter === viewIter)` và
+  `iterStatsMap` — tổng O(n²), UI đứng hình từ trước khi run xong. Cạnh đó `parseDataFile` chạy
+  đồng bộ trên main thread lúc chọn file, và iteration rail render `Array.from({length: iters})`
+  tức tối đa 100k nút DOM cùng lúc.
+- Số lần thử: 1/1 — nhưng chỉ vì đã tính phép nhân trước khi sửa: thử phương án "throttle lời
+  gọi setRecords" trên giấy thì vẫn ra O(n²) (mỗi lần flush vẫn copy cả mảng, mà SỐ LẦN flush
+  lại tỉ lệ với thời gian chạy, tức tỉ lệ với n), nên bỏ, chuyển hẳn sang ref.
+- Kết quả: Đã fix
+- Cách fix: tách "nơi CHỨA dữ liệu" khỏi "nơi KÍCH HOẠT render" — lịch sử nằm trong
+  `recordsRef` (append O(1)) + `byIterRef: Map<iter, RunRecord[]>` (tra cứu O(1) đúng iteration
+  đang xem), thống kê cộng dồn O(1)/record bằng `fold()`/`RunStatsAcc` (`runnerStats.ts`), và
+  một state `tick` bump theo nhịp 120ms là thứ duy nhất gây re-render. Thêm: parse file > 200k
+  ký tự trong Web Worker (`datafile.worker.ts`), virtualize iteration rail, mặc định tắt "Save
+  responses" khi file > 2.000 dòng.
+- Bài học chung: với danh sách tăng dần theo thời gian chạy (log, kết quả batch, stream
+  message), throttle lời gọi setState là KHÔNG đủ — chừng nào state còn *chứa* cả mảng thì mỗi
+  lần publish vẫn là O(độ dài hiện tại), và số lần publish tỉ lệ với n, nên tổng vẫn bậc hai.
+  Cách duy nhất khiến chi phí render độc lập với n là để dữ liệu trong ref, giữ sẵn index theo
+  đúng chiều mà UI truy vấn (ở đây là iteration), cộng dồn mọi số liệu tổng hợp O(1) mỗi phần
+  tử, và chỉ dùng state như một tín hiệu "có thay đổi". Trước khi tối ưu loại này, hãy nhân tay
+  (chi phí mỗi lần) × (số lần) — phương án nghe có vẻ hợp lý như "throttle" có thể vẫn là O(n²).
+
+## [2026-09-07] api-client Runner — virtualization dùng chiều cao dòng cố định: dòng 2 dòng chữ tràn khỏi ô 44px
+- Nguyên nhân: khi virtualize iteration rail, các dòng được đặt `position: absolute` tại
+  `top: i * ITER_ROW_H` với `ITER_ROW_H = 44`, nhưng markup thật của một dòng có data label là
+  `py-2` (16px) + dòng `text-xs` (~16px) + dòng `text-[11px]` (~16.5px) ≈ 48.5px. Không có lỗi
+  runtime, không lỗi type — chỉ là các dòng chồng nhẹ lên nhau, và càng cuộn xa sai lệch càng
+  tích lũy so với vị trí thanh cuộn.
+- Số lần thử: 1/1 — phát hiện bằng cách cộng tay chiều cao thật từ class Tailwind của dòng
+  (padding + line-height từng dòng chữ) rồi so với hằng số, trong lúc tự review diff.
+- Kết quả: Đã fix
+- Cách fix: `leading-tight` + `overflow-hidden` cho dòng, và tách hai hằng số theo chế độ:
+  `ITER_ROW_H = 36` (run thường, 1 dòng chữ) và `ITER_ROW_H_DATA = 48` (có nhãn dữ liệu, 2
+  dòng); component tự chọn theo việc có `dataRows` hay không, và mọi phép tính cuộn/spacer đều
+  dùng cùng biến đó.
+- Bài học chung: mọi virtualization theo chiều cao cố định là một *hợp đồng ngầm* giữa hằng số
+  JS và class CSS của dòng — không có gì trong TypeScript/build kiểm tra hợp đồng đó. Khi viết
+  loại component này, phải cộng tay chiều cao thật (padding + line-height × số dòng chữ) chứ
+  đừng ước lượng, ghi công thức ngay cạnh hằng số, và nếu dòng có thể có 1 hay 2 dòng chữ thì
+  phải có hằng số riêng cho từng dạng — chứ không lấy một số "đủ lớn" cho cả hai.
+
 ## [2026-08-27] API Client — {{token}} showed red in collection/folder Headers & Auth despite the variable having a value
 - Nguyên nhân: `Sidebar.tsx` build một map `envVars` cho tham số `vars` của
   `NodeSettingsDialog` (dialog Settings của collection/folder — tab Headers,

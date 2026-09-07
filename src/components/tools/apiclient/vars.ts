@@ -56,3 +56,40 @@ export function buildResolvedVars(
   }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
+
+// What a field containing {{tokens}} actually resolves to right now — for the
+// Resolved column in the Name/Value tables. Hovering each token one at a time
+// was the only way to see this before, which is fine for one variable and
+// useless for a table of twenty.
+//
+// Secrets need no special handling here: the map these previews read
+// (`varMap` in ApiClient.tsx) already substitutes `••••••••` for Vault
+// entries and secret-flagged environment variables, so a real secret has no
+// path into this string in the first place.
+export interface VarPreview {
+  /** The text with every *known* token substituted. */
+  resolved: string;
+  /** Tokens with no value anywhere — left as written in `resolved`. */
+  missing: string[];
+  /** True when the source text contains at least one {{token}}. */
+  hasTokens: boolean;
+}
+
+const TOKEN_RE = /\{\{\s*([\w.-]+)\s*\}\}/g;
+
+export function previewVars(text: string, vars: VarMap): VarPreview {
+  if (!text) return { resolved: text, missing: [], hasTokens: false };
+  const missing: string[] = [];
+  let hasTokens = false;
+  TOKEN_RE.lastIndex = 0;
+  const resolved = text.replace(TOKEN_RE, (whole, name: string) => {
+    hasTokens = true;
+    // Object.hasOwn, not `name in vars`: `in` walks the prototype chain, so
+    // `{{constructor}}` would resolve to Object.prototype's function. Same
+    // guard substituteVars above documents at length.
+    if (Object.hasOwn(vars, name)) return vars[name];
+    if (!missing.includes(name)) missing.push(name);
+    return whole;
+  });
+  return { resolved, missing, hasTokens };
+}

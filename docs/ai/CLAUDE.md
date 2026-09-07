@@ -830,6 +830,28 @@ git push origin main --tags
 
 ## Complex Tool Reference
 
+### API Client — Runner (`RunnerDialog.tsx`, `runnerStats.ts`, `runnerFlow.ts`, `runnerExport.ts`, `datafile.ts`)
+
+Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per row. **Built to handle ~100k rows**, which constrains how the results may be stored — read [decisions/runner-large-data-runs.md](../decisions/runner-large-data-runs.md) before touching this dialog.
+
+- **Never put the run history in React state.** Records live in `recordsRef` (append-only, read once at export) plus `byIterRef: Map<iter, RunRecord[]>` for O(1) access to the iteration on screen. Stats are folded O(1) per record into `accRef` (`fold`/`toStats` in `runnerStats.ts`). A `tick` state bumped on a 120 ms throttle (`scheduleFlush`/`flushNow`) is the *only* thing that triggers re-render. Re-introducing `setRecords([...prev, r])` or `summarize(records)` in a `useMemo` makes a 100k-row run O(n²) — that was the original bug.
+- **Built-in HTTP 2xx assertion:** the `Require HTTP 2xx` option (default **on**) injects `httpOkTest(...)` at the front of every execution's `tests` — including into the `ExecResult` copy kept for the detail view — so a non-2xx fails like a scripted assertion without anyone writing one. `isOk` itself stays lenient (200–399) on purpose: "only 2xx counts" is the assertion's job, so turning the option off restores the older meaning. Separately, `stats.http2xx` counts HTTP success regardless of the option (the "HTTP 2xx" tile, the by-request column, CSV `httpOk`, JSON `http`).
+- **Response-code tracking:** `stats.byStatus` (run-wide), `stats.byRequest[]` (per-request rollup — the "By request" tab), and `statusSamples` (status → iterations that produced it, capped at `STATUS_SAMPLE_CAP`; drives the click-a-code-to-jump navigation). Counts stay exact; only the sample index is capped.
+- **`VirtualIterRail`** renders only on-screen iterations. Its `ITER_ROW_H`/`ITER_ROW_H_DATA` constants must match the row markup's real height (padding + line-height per line) — nothing type-checks that contract.
+- **Data files** parse through `parseDataFileAsync` (Web Worker above 200k chars — `src/workers/datafile.worker.ts`); parsing logic stays pure in `datafile.ts`. "Save responses" defaults off above 2,000 rows.
+- **Exports stream.** `runnerExport.ts` yields chunks (`csvChunks`, `jsonReportChunks`) and `saveStreamedTextFile` (`fileio.ts`) buffers ~4 MB before each `writeTextFile(..., { append: true })` — never build the whole report as one string (a large run's JSON is hundreds of MB). `buildResultsCsv` remains only as a join-it-all convenience for tests. Each format also exports failures-only.
+- Tests: `runnerStats.test.ts` (aggregation), `runnerExport.test.ts` (CSV shape/escaping, chunk boundaries still parse as one document), `RunnerDialog.test.tsx` (the run loop, data binding, export — the throttled-flush plumbing is only observable here).
+
+### API Client — Name/Value tables (`KeyValueEditor.tsx`)
+
+Shared by query params, headers, url-encoded bodies and environment variables. Three things are easy to break here — see [decisions/keyvalue-resolved-column.md](../decisions/keyvalue-resolved-column.md):
+
+- **Resolved column**: read-only preview of what a row's `{{tokens}}` are worth now (`previewVars` in `vars.ts`, pure + tested). The cell and the show/hide rule live in `ResolvedValue.tsx` and are shared by all three request-pane tables — `KeyValueEditor`, `MultipartEditor` (form-data, which is `{{var}}`-substituted on send and so takes `vars` too) and `RequestPanel`'s path-params table; don't re-implement it in a fourth. Shown only when a table has at least one token, decided over *all* its rows so filtering can't yank the column out mid-type. Unresolved tokens render red and named — they get sent literally. Secrets need no handling here: the `vars` map the UI receives already masks Vault/secret entries at the source (`varMap` in `ApiClient.tsx`).
+- **Zebra `bg-bg-2/20` + hover `bg-bg-2/40`** — DataTable's own pair. Don't set hover equal to the stripe (it was `/20` before the stripe existed); hovering a striped row would then show nothing.
+- **Filters are render-only**: `onChange` always receives every row, so editing while filtered can't drop hidden rows. The table's own filter (past `FILTER_THRESHOLD` rows) ANDs with the caller's `filterQuery`; either one emptying the table must still explain why.
+
+Bulk edit fills its pane (`flex-1` + a vh floor) rather than `CodeSurface`'s fixed `min-h-[180px]`.
+
 ### Kafka Explorer (`src/components/tools/kafka/`)
 
 **Connect/Disconnect flow:** a broker must be explicitly connected (`handleConnect` in `KafkaExplorer.tsx`) before any views are accessible. `connectedBrokerId` is persisted in `localStorage` (`devtool:kafka:connectedBrokerId`). Connecting a new broker stops the previous broker's consumers (`kafkaConsumerStore.stopForBroker`). The right panel shows a `DisconnectedPanel` until connected.
@@ -1292,4 +1314,4 @@ is concerned.
 
 ---
 
-*Last updated: 2026-08-13*
+*Last updated: 2026-09-07*

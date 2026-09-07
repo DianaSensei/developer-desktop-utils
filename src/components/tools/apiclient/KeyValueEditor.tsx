@@ -12,9 +12,10 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Check, Copy, Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
-import { InlineCodeField, TextEditor } from '@/design-system';
+import { InlineCodeField, SearchInput, TextEditor } from '@/design-system';
 import { copyToClipboard } from '@/lib/clipboard';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
+import { ResolvedValue, showsResolvedColumn } from './ResolvedValue';
 
 interface Props {
   rows: KeyValue[];
@@ -53,6 +54,10 @@ interface Props {
 
 const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
 
+/** Rows past which the table shows its own search box. Below this, scanning
+ *  the list by eye is faster than typing a filter. */
+const FILTER_THRESHOLD = 8;
+
 const DUPLICATE_KEY_TEXT: Record<'params' | 'headers', string> = {
   params: 'Both values are sent — repeated query params are all included.',
   headers: 'Only the last value is sent — a repeated header name overwrites earlier ones.',
@@ -80,6 +85,35 @@ export function hasDuplicateNames(rows: KeyValue[], kind: 'params' | 'headers'):
   return false;
 }
 
+/**
+ * Rows → the `key: value` text shown in bulk mode. Disabled rows round-trip
+ * with a leading `//` (Postman's convention), so toggling a row off and then
+ * editing in bulk doesn't silently re-enable it.
+ */
+export function toBulkText(rows: KeyValue[]): string {
+  return rows.map((r) => `${r.enabled ? '' : '//'}${r.key}:${r.value}`).join('\n');
+}
+
+/**
+ * The inverse. Blank lines are skipped; a line with no `:` is a name with an
+ * empty value; whitespace around each part is trimmed. Exported (and pure) so
+ * the round trip can be tested without a React tree.
+ */
+export function parseBulkText(text: string): KeyValue[] {
+  const parsed: KeyValue[] = [];
+  for (const raw of text.split('\n')) {
+    let line = raw.trim();
+    if (!line) continue;
+    const enabled = !line.startsWith('//');
+    if (!enabled) line = line.slice(2).trim();
+    const idx = line.indexOf(':');
+    const k = (idx === -1 ? line : line.slice(0, idx)).trim();
+    const v = idx === -1 ? '' : line.slice(idx + 1).trim();
+    if (k || v) parsed.push({ ...newKeyValue(k, v), enabled });
+  }
+  return parsed;
+}
+
 export function KeyValueEditor({
   rows,
   onChange,
@@ -96,6 +130,7 @@ export function KeyValueEditor({
 }: Props) {
   const isMasked = (row: KeyValue) => (typeof masked === 'function' ? masked(row) : masked);
   const [bulk, setBulk] = useState(false);
+  const [ownFilter, setOwnFilter] = useState('');
   // Bulk mode keeps its own text so newlines/spacing survive while typing; rows
   // are parsed out of it in the background and committed via onChange.
   const [bulkText, setBulkText] = useState('');
@@ -126,11 +161,27 @@ export function KeyValueEditor({
   // Only the filled rows are "real"; the trailing ghost represents the next row.
   const realRows = rows.filter(isFilled);
   const ghost = ghostRef.current;
+  // Two filters, ANDed: the caller's (the environment editor's search box)
+  // and this table's own, which appears once a table is long enough to be
+  // worth searching — a urlencoded body with thirty fields is a wall of
+  // identical-looking rows otherwise.
   const q = filterQuery?.trim().toLowerCase() ?? '';
-  const visibleRows = q
-    ? realRows.filter((r) => r.key.toLowerCase().includes(q) || r.value.toLowerCase().includes(q))
-    : realRows;
+  const ownQ = ownFilter.trim().toLowerCase();
+  const matches = (r: KeyValue, needle: string) =>
+    r.key.toLowerCase().includes(needle) || r.value.toLowerCase().includes(needle);
+  const visibleRows = realRows.filter(
+    (r) => (!q || matches(r, q)) && (!ownQ || matches(r, ownQ)),
+  );
   const displayRows = [...visibleRows, ghost];
+  const showOwnFilter = realRows.length >= FILTER_THRESHOLD;
+
+  // The Resolved column earns its width only when something in this table
+  // actually uses a {{token}} — an always-on empty column in the common case
+  // (headers with literal values) would be pure noise. It appears the moment
+  // the first token is typed, which is also the moment it becomes useful.
+  // Driven by every row, not just the visible ones: filtering down to rows
+  // without tokens shouldn't drop a column out from under the table mid-type.
+  const showResolved = showsResolvedColumn(realRows.map((r) => r.value), vars);
 
   const hasDuplicateKeys = useMemo(
     () => (duplicateKeyHint ? hasDuplicateNames(realRows, duplicateKeyHint) : false),
@@ -151,28 +202,14 @@ export function KeyValueEditor({
 
   const removeRow = (id: string) => onChange(realRows.filter((r) => r.id !== id));
 
-  // Disabled rows round-trip through bulk mode with a leading `//` (Postman's
-  // convention), so toggling a row off and editing in bulk doesn't silently
-  // re-enable it.
   const enterBulk = () => {
-    setBulkText(realRows.map((r) => `${r.enabled ? '' : '//'}${r.key}:${r.value}`).join('\n'));
+    setBulkText(toBulkText(realRows));
     setBulk(true);
   };
 
   const parseBulk = (value: string) => {
     setBulkText(value);
-    const parsed: KeyValue[] = [];
-    for (const raw of value.split('\n')) {
-      let line = raw.trim();
-      if (!line) continue;
-      const enabled = !line.startsWith('//');
-      if (!enabled) line = line.slice(2).trim();
-      const idx = line.indexOf(':');
-      const k = (idx === -1 ? line : line.slice(0, idx)).trim();
-      const v = idx === -1 ? '' : line.slice(idx + 1).trim();
-      if (k || v) parsed.push({ ...newKeyValue(k, v), enabled });
-    }
-    onChange(parsed);
+    onChange(parseBulkText(value));
   };
 
   if (bulk) {
@@ -182,14 +219,30 @@ export function KeyValueEditor({
       // switch from a muted label to an accent link — so the one control you
       // need to get back moved ~200px and changed appearance the moment you
       // used it.
-      <div className="space-y-1.5">
+      //
+      // `h-full` + `flex-1` on the editor, and a viewport-fraction floor
+      // rather than CodeSurface's fixed `min-h-[180px]`: bulk edit is where
+      // someone pastes or reworks a whole set of params at once, and 180px
+      // (about 9 lines) stayed 180px no matter how large the window got. Now
+      // it fills whatever height the pane gives it, and never less than a
+      // third of the viewport.
+      <div className="flex h-full min-h-0 flex-col gap-1.5">
         <TextEditor
           value={bulkText}
           onChange={parseBulk}
           placeholder={`${keyPlaceholder}: ${valuePlaceholder}`}
           vars={vars}
+          className="min-h-[34vh] flex-1"
         />
-        <div className="flex justify-end">
+        <div className="flex shrink-0 items-center justify-between">
+          <span className="text-[11px] text-fg-mute">
+            One <code className="rounded bg-bg-2 px-1">{keyPlaceholder.toLowerCase()}: {valuePlaceholder.toLowerCase()}</code> per line
+            {/* `{'//'}`, not a bare `//`: as raw JSX children those two
+                characters read as the start of a comment to anything parsing
+                this file (a linter flagged exactly that), even though React
+                renders them as the literal text we want here. */}
+            {' · '}prefix <code className="rounded bg-bg-2 px-1">{'//'}</code> to disable a row
+          </span>
           <button onClick={() => setBulk(false)} className="text-[11px] text-fg-mute transition-colors hover:text-fg">
             Key-Value Edit
           </button>
@@ -209,160 +262,69 @@ export function KeyValueEditor({
   // The leading column is 2rem, not 1rem: the whole cell is the enable/disable
   // target (see the row below), so this width is the target's width. The dot
   // inside stays 8px — the affordance grew, the visual didn't.
-  const gridCols = secretToggle
-    ? 'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]'
-    : 'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem]';
+  const gridCols = [
+    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem]',
+    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]',
+    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem]',
+    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]',
+  ][(secretToggle ? 1 : 0) + (showResolved ? 2 : 0)];
 
   return (
     <div className="space-y-1.5">
+      {showOwnFilter && (
+        <div className="flex items-center gap-2">
+          <SearchInput
+            value={ownFilter}
+            onChange={setOwnFilter}
+            placeholder={`Filter ${realRows.length} rows…`}
+            className="h-ctl text-xs"
+            containerClassName="min-w-0 flex-1"
+            aria-label="Filter rows"
+          />
+          <span className="shrink-0 text-[11px] tabular-nums text-fg-mute">
+            {ownQ || q ? `${visibleRows.length}/${realRows.length}` : `${realRows.length} rows`}
+          </span>
+        </div>
+      )}
       <div className="overflow-hidden rounded-md border text-xs">
         {/* Header row */}
         <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>
+          {showResolved && <div className="border-r px-3 py-1.5">Resolved</div>}
           {secretToggle && <div />}
           <div />
         </div>
 
-        {displayRows.map((row) => {
-          const isGhost = row.id === ghost.id;
-          const disabled = !isGhost && !row.enabled;
-          const secret = isMasked(row);
-          return (
-            <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors', gridCols)}>
-              {/* Enable/disable. The button IS the cell — clicking anywhere in
-                  the leading column toggles the row, not just the checkbox
-                  glyph itself, so the target stays the full ~34px cell people
-                  actually aim for. The Name/Value cells keep their normal
-                  behavior: they're editors, so a click there has to place the
-                  caret, not toggle the row. */}
-              <div className="flex items-stretch">
-                {isGhost ? (
-                  <span className="w-full" />
-                ) : (
-                  <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={row.enabled}
-                    aria-label={`${row.key || keyPlaceholder} — ${row.enabled ? 'enabled' : 'disabled'}`}
-                    onClick={() => editRow(row.id, { enabled: !row.enabled })}
-                    className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
-                    title={row.enabled ? 'Disable' : 'Enable'}
-                  >
-                    <span
-                      className={cn(
-                        'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-                        row.enabled
-                          ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
-                          : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
-                      )}
-                    >
-                      {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
-                    </span>
-                  </button>
-                )}
-              </div>
-              {/* Name cell */}
-              <div className="min-w-0 border-r px-1.5">
-                <Input
-                  value={row.key}
-                  onChange={(e) => editRow(row.id, { key: e.target.value })}
-                  placeholder={keyPlaceholder}
-                  className={cn('h-ctl border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', disabled && 'opacity-40 line-through')}
-                  spellCheck={false}
-                />
-              </div>
-              {/* Value cell */}
-              <div className="min-w-0 border-r px-1.5">
-                {vars ? (
-                  <div className={cn('flex h-ctl min-w-0 items-center', disabled && 'opacity-40')}>
-                    <InlineCodeField
-                      value={row.value}
-                      onChange={(v) => editRow(row.id, { value: v })}
-                      vars={vars}
-                      placeholder={valuePlaceholder}
-                    />
-                  </div>
-                ) : secret ? (
-                  <div className={cn('flex h-ctl min-w-0 items-center gap-0.5', disabled && 'opacity-40')}>
-                    <Input
-                      type={revealed.has(row.id) ? 'text' : 'password'}
-                      value={row.value}
-                      onChange={(e) => editRow(row.id, { value: e.target.value })}
-                      placeholder={valuePlaceholder}
-                      className="h-ctl border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                      spellCheck={false}
-                      autoComplete="off"
-                    />
-                    {!isGhost && (
-                      <button
-                        type="button"
-                        onClick={() => toggleReveal(row.id)}
-                        className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
-                        title={revealed.has(row.id) ? 'Hide value' : 'Reveal value'}
-                      >
-                        {revealed.has(row.id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                      </button>
-                    )}
-                    {!isGhost && row.value && (
-                      <button
-                        type="button"
-                        onClick={() => copyValue(row)}
-                        className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
-                        title={copiedId === row.id ? 'Copied' : 'Copy value'}
-                      >
-                        {copiedId === row.id ? <Check className="h-3 w-3 text-ok" /> : <Copy className="h-3 w-3" />}
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <Input
-                    value={row.value}
-                    onChange={(e) => editRow(row.id, { value: e.target.value })}
-                    placeholder={valuePlaceholder}
-                    className={cn('h-ctl border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', disabled && 'opacity-40')}
-                    spellCheck={false}
-                  />
-                )}
-              </div>
-              {/* Secret toggle */}
-              {secretToggle && (
-                <div className="flex items-center justify-center">
-                  {!isGhost && (
-                    <button
-                      type="button"
-                      onClick={() => editRow(row.id, { secret: !row.secret })}
-                      className={cn(
-                        'rounded p-1 transition-colors',
-                        row.secret ? 'text-acc-ink hover:text-acc' : 'text-fg-mute/40 opacity-0 group-hover:opacity-100 hover:text-fg',
-                      )}
-                      title={row.secret ? 'Marked as secret — masked here and excluded from generated code/export' : 'Mark as secret'}
-                    >
-                      {row.secret ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
-                    </button>
-                  )}
-                </div>
-              )}
-              {/* Delete */}
-              <div className="flex items-center justify-center">
-                {!isGhost && (
-                  <button
-                    type="button"
-                    onClick={() => removeRow(row.id)}
-                    className="rounded p-1 text-fg-mute/40 opacity-0 transition-all group-hover:opacity-100 hover:text-bad"
-                    title="Remove"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        {q && visibleRows.length === 0 && (
+        {displayRows.map((row, i) => (
+          <KeyValueRow
+            key={row.id}
+            row={row}
+            isGhost={row.id === ghost.id}
+            // The ghost row stays unstriped — it isn't data yet.
+            striped={row.id !== ghost.id && i % 2 === 1}
+            gridCols={gridCols}
+            keyPlaceholder={keyPlaceholder}
+            valuePlaceholder={valuePlaceholder}
+            vars={vars}
+            masked={isMasked(row)}
+            showResolved={showResolved}
+            secretToggle={secretToggle}
+            revealed={revealed.has(row.id)}
+            copied={copiedId === row.id}
+            onEdit={(patch) => editRow(row.id, patch)}
+            onRemove={() => removeRow(row.id)}
+            onToggleReveal={() => toggleReveal(row.id)}
+            onCopy={() => copyValue(row)}
+          />
+        ))}
+        {/* Either filter can empty the table, so both have to be able to say
+            so — an empty table with a lone ghost row and no explanation reads
+            as data loss. */}
+        {(q || ownQ) && visibleRows.length === 0 && (
           <p className="px-3 py-3 text-center text-[11px] text-fg-mute">
-            No rows match &ldquo;{filterQuery}&rdquo; — {realRows.length} hidden.
+            No rows match &ldquo;{ownFilter.trim() || filterQuery}&rdquo; — {realRows.length} hidden.
           </p>
         )}
       </div>
@@ -379,5 +341,223 @@ export function KeyValueEditor({
         </div>
       )}
     </div>
+  );
+}
+
+// ─── one row ──────────────────────────────────────────────────────────────────
+
+interface RowProps {
+  row: KeyValue;
+  isGhost: boolean;
+  striped: boolean;
+  gridCols: string;
+  keyPlaceholder: string;
+  valuePlaceholder: string;
+  vars?: VarMap;
+  masked: boolean;
+  showResolved: boolean;
+  secretToggle: boolean;
+  revealed: boolean;
+  copied: boolean;
+  onEdit: (patch: Partial<KeyValue>) => void;
+  onRemove: () => void;
+  onToggleReveal: () => void;
+  onCopy: () => void;
+}
+
+/**
+ * One editable row. Extracted from the table's `map` callback, which had grown
+ * past what any reader (or complexity check) can hold at once: five cells,
+ * three of them conditional, plus a three-way choice of value editor.
+ *
+ * The /20 stripe and /40 hover are DataTable's own pair (Tbody zebra + Tr
+ * interactive), not new values: hover has to stay clearly stronger than the
+ * stripe, or hovering a striped row reads as no feedback at all.
+ */
+function KeyValueRow({
+  row, isGhost, striped, gridCols, keyPlaceholder, valuePlaceholder, vars, masked,
+  showResolved, secretToggle, revealed, copied, onEdit, onRemove, onToggleReveal, onCopy,
+}: Readonly<RowProps>) {
+  const disabled = !isGhost && !row.enabled;
+  return (
+    <div className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/40 focus-within:bg-bg-2/40 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors duration-fast ease-out-soft', striped && 'bg-bg-2/20', gridCols)}>
+      {/* Enable/disable. The button IS the cell — clicking anywhere in the
+          leading column toggles the row, not just the checkbox glyph itself,
+          so the target stays the full ~34px cell people actually aim for. The
+          Name/Value cells keep their normal behavior: they're editors, so a
+          click there has to place the caret, not toggle the row. */}
+      <div className="flex items-stretch">
+        {isGhost ? (
+          <span className="w-full" />
+        ) : (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={row.enabled}
+            aria-label={`${row.key || keyPlaceholder} — ${row.enabled ? 'enabled' : 'disabled'}`}
+            onClick={() => onEdit({ enabled: !row.enabled })}
+            className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
+            title={row.enabled ? 'Disable' : 'Enable'}
+          >
+            <span
+              className={cn(
+                'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+                row.enabled
+                  ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
+                  : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
+              )}
+            >
+              {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+            </span>
+          </button>
+        )}
+      </div>
+
+      {/* Name cell */}
+      <div className="min-w-0 border-r px-1.5">
+        <Input
+          value={row.key}
+          onChange={(e) => onEdit({ key: e.target.value })}
+          placeholder={keyPlaceholder}
+          className={cn('h-ctl border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', disabled && 'opacity-40 line-through')}
+          spellCheck={false}
+        />
+      </div>
+
+      {/* Value cell */}
+      <div className="min-w-0 border-r px-1.5">
+        <ValueCell
+          row={row} isGhost={isGhost} disabled={disabled} vars={vars} masked={masked}
+          valuePlaceholder={valuePlaceholder} revealed={revealed} copied={copied}
+          onEdit={onEdit} onToggleReveal={onToggleReveal} onCopy={onCopy}
+        />
+      </div>
+
+      {/* Resolved value — read-only, and only for rows that use {{tokens}}.
+          Values come from the same map the highlighter uses, which already
+          masks Vault entries and secret-flagged variables (see previewVars),
+          so nothing secret is printed here that isn't already `••••••••`
+          everywhere else. */}
+      {showResolved && (
+        <div className={cn('flex min-w-0 items-center border-r px-2.5', disabled && 'opacity-40')}>
+          {!isGhost && vars && <ResolvedValue value={row.value} vars={vars} />}
+        </div>
+      )}
+
+      {/* Secret toggle */}
+      {secretToggle && (
+        <div className="flex items-center justify-center">
+          {!isGhost && (
+            <button
+              type="button"
+              onClick={() => onEdit({ secret: !row.secret })}
+              className={cn(
+                'rounded p-1 transition-colors',
+                row.secret ? 'text-acc-ink hover:text-acc' : 'text-fg-mute/40 opacity-0 group-hover:opacity-100 hover:text-fg',
+              )}
+              title={row.secret ? 'Marked as secret — masked here and excluded from generated code/export' : 'Mark as secret'}
+            >
+              {row.secret ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Delete */}
+      <div className="flex items-center justify-center">
+        {!isGhost && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="rounded p-1 text-fg-mute/40 opacity-0 transition-all group-hover:opacity-100 hover:text-bad"
+            title="Remove"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface ValueCellProps {
+  row: KeyValue;
+  isGhost: boolean;
+  disabled: boolean;
+  vars?: VarMap;
+  masked: boolean;
+  valuePlaceholder: string;
+  revealed: boolean;
+  copied: boolean;
+  onEdit: (patch: Partial<KeyValue>) => void;
+  onToggleReveal: () => void;
+  onCopy: () => void;
+}
+
+/**
+ * The value editor, which is one of three things depending on the table:
+ * {{var}}-aware (requests), masked (Vault / secret env vars), or plain text.
+ * An if-chain rather than the nested ternary this used to be in JSX — the
+ * three branches are unrelated components, not variations of one.
+ */
+function ValueCell({
+  row, isGhost, disabled, vars, masked, valuePlaceholder, revealed, copied,
+  onEdit, onToggleReveal, onCopy,
+}: Readonly<ValueCellProps>) {
+  if (vars) {
+    return (
+      <div className={cn('flex h-ctl min-w-0 items-center', disabled && 'opacity-40')}>
+        <InlineCodeField
+          value={row.value}
+          onChange={(v) => onEdit({ value: v })}
+          vars={vars}
+          placeholder={valuePlaceholder}
+        />
+      </div>
+    );
+  }
+  if (masked) {
+    return (
+      <div className={cn('flex h-ctl min-w-0 items-center gap-0.5', disabled && 'opacity-40')}>
+        <Input
+          type={revealed ? 'text' : 'password'}
+          value={row.value}
+          onChange={(e) => onEdit({ value: e.target.value })}
+          placeholder={valuePlaceholder}
+          className="h-ctl border-0 bg-transparent px-1 font-mono text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          spellCheck={false}
+          autoComplete="off"
+        />
+        {!isGhost && (
+          <button
+            type="button"
+            onClick={onToggleReveal}
+            className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
+            title={revealed ? 'Hide value' : 'Reveal value'}
+          >
+            {revealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+          </button>
+        )}
+        {!isGhost && row.value && (
+          <button
+            type="button"
+            onClick={onCopy}
+            className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
+            title={copied ? 'Copied' : 'Copy value'}
+          >
+            {copied ? <Check className="h-3 w-3 text-ok" /> : <Copy className="h-3 w-3" />}
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <Input
+      value={row.value}
+      onChange={(e) => onEdit({ value: e.target.value })}
+      placeholder={valuePlaceholder}
+      className={cn('h-ctl border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', disabled && 'opacity-40')}
+      spellCheck={false}
+    />
   );
 }

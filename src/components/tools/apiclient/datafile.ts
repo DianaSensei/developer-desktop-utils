@@ -41,6 +41,25 @@ export function sniffDelimiter(text: string): Delimiter {
   return best;
 }
 
+// Column names come from the file, and both parsers write them straight onto
+// a row object — the shape prototype pollution is made of: a key of
+// `__proto__`, `constructor` or `prototype` reaching `obj[key] = value`
+// reassigns something on the prototype chain rather than adding a column.
+//
+// These three are refused outright rather than sanitised, because as data
+// files they are meaningless: a row's keys become {{variable}} names, and
+// substituteVars only ever resolves *own* properties (vars.ts documents the
+// bug that taught us so — `{{constructor}}` once interpolated
+// Object.prototype's function into a live request). A column nothing can
+// read is not worth the risk of accepting.
+const FORBIDDEN_COLUMNS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** Whether a column name may be written onto a row. Empty names are dropped
+ *  too — a blank header labels nothing. */
+export function isSafeColumn(name: string): boolean {
+  return name !== '' && !FORBIDDEN_COLUMNS.has(name);
+}
+
 // Parse a CSV string into objects keyed by the header row. Handles quoted
 // fields, embedded delimiters/quotes ("" → "), and CRLF/LF line endings.
 function parseCsv(text: string, delimiter: Delimiter): DataRow[] {
@@ -81,7 +100,7 @@ function parseCsv(text: string, delimiter: Delimiter): DataRow[] {
   const headers = cleaned[0].map((h) => h.trim());
   return cleaned.slice(1).map((cells) => {
     const obj: DataRow = {};
-    headers.forEach((h, i) => { if (h) obj[h] = (cells[i] ?? '').trim(); });
+    headers.forEach((h, i) => { if (isSafeColumn(h)) obj[h] = (cells[i] ?? '').trim(); });
     return obj;
   });
 }
@@ -100,7 +119,9 @@ function parseJsonRows(text: string): DataRow[] {
   return arr.map((entry) => {
     const obj: DataRow = {};
     if (entry && typeof entry === 'object') {
-      for (const [k, v] of Object.entries(entry as Record<string, unknown>)) obj[k] = toStr(v);
+      for (const [k, v] of Object.entries(entry as Record<string, unknown>)) {
+        if (isSafeColumn(k)) obj[k] = toStr(v);
+      }
     }
     return obj;
   });
@@ -149,3 +170,25 @@ export const DELIMITER_LABEL: Record<Delimiter, string> = {
   ';': 'semicolon',
   '\t': 'tab',
 };
+
+// Below this, parseDataFile's own character-by-character scan finishes fast
+// enough that a worker round-trip (structured-cloning the whole file text
+// there, and the parsed rows back) would only add latency for no benefit.
+const WORKER_THRESHOLD_CHARS = 200_000;
+
+// Same result as parseDataFile, but for a large CSV/JSON (a 100k-row export
+// is common for the Runner's data-driven mode) it runs off the main thread so
+// picking the file doesn't freeze the dialog while it parses.
+export function parseDataFileAsync(name: string, raw: string): Promise<ParsedDataFile> {
+  if (raw.length < WORKER_THRESHOLD_CHARS) return Promise.resolve(parseDataFile(name, raw));
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../../../workers/datafile.worker.ts', import.meta.url), { type: 'module' });
+    const done = (fn: () => void) => { worker.terminate(); fn(); };
+    worker.onmessage = ({ data }: MessageEvent<{ type: 'result'; parsed: ParsedDataFile } | { type: 'error'; message: string }>) => {
+      if (data.type === 'result') done(() => resolve(data.parsed));
+      else done(() => reject(new Error(data.message)));
+    };
+    worker.onerror = (e) => done(() => reject(new Error(e.message || 'Could not parse the data file.')));
+    worker.postMessage({ name, text: raw });
+  });
+}

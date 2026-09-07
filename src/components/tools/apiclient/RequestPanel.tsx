@@ -23,6 +23,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { SettingGroup, SettingRow } from '@/components/ui/setting-row';
 import { Badge, InlineCodeField, JavaScriptEditor, JsonEditor, TextEditor } from '@/design-system';
 import { KeyValueEditor } from './KeyValueEditor';
+import { ResolvedValue, showsResolvedColumn } from './ResolvedValue';
 import { MultipartEditor } from './MultipartEditor';
 import { AuthEditor } from './AuthEditor';
 import { scriptApiExtensions } from './scriptCompletion';
@@ -96,7 +97,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
             trade reads better than half a screen of empty table. Matches the
             Auth and Settings panes, which already cap at max-w-lg/xl. */}
         {tab === 'params' && (
-          <div className="min-h-0 max-w-3xl flex-1 space-y-4 overflow-y-auto p-3">
+          <div className="min-h-0 max-w-5xl flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
               <Label className="text-xs text-fg-mute">Query</Label>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
@@ -388,6 +389,10 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
   const rowOf = (name: string) => request.pathParams.find((p) => p.key === name);
   const valueOf = (name: string) => rowOf(name)?.value ?? '';
   const enabledOf = (name: string) => rowOf(name)?.enabled ?? true;
+  const showResolved = showsResolvedColumn(names.map(valueOf), vars);
+  const gridCols = showResolved
+    ? 'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem]'
+    : 'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem]';
   const setValue = (name: string, value: string) => {
     const exists = request.pathParams.some((p) => p.key === name);
     const next = exists
@@ -409,18 +414,20 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
       {/* Same four-track grid as KeyValueEditor (the trailing 2rem is
           empty here — path params can't be removed, only disabled) so this
           table's Value column starts at exactly the same x as the Query and
-          Headers tables above and below it. */}
+          Headers tables above and below it — including the Resolved column
+          when either table has tokens to resolve. */}
       <div className="overflow-hidden rounded-md border text-xs">
-        <div className="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
+        <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">Name</div>
           <div className="border-r px-3 py-1.5">Value</div>
+          {showResolved && <div className="border-r px-3 py-1.5">Resolved</div>}
           <div />
         </div>
-        {names.map((name) => {
+        {names.map((name, i) => {
           const enabled = enabledOf(name);
           return (
-            <div key={name} className="group grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors">
+            <div key={name} className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/40 focus-within:bg-bg-2/40 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors duration-fast ease-out-soft', i % 2 === 1 && 'bg-bg-2/20', gridCols)}>
               {/* Toggle target is the whole cell, not just the checkbox glyph —
                   same change as KeyValueEditor's, and the Name cell below joins
                   it: unlike the Name column there, this one is read-only text
@@ -469,6 +476,11 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                   placeholder="Value"
                 />
               </div>
+              {showResolved && (
+                <div className={cn('flex min-w-0 items-center border-r px-2.5', !enabled && 'opacity-40')}>
+                  <ResolvedValue value={valueOf(name)} vars={vars} />
+                </div>
+              )}
               <div />
             </div>
           );
@@ -674,7 +686,7 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
   if (body.mode === 'multipart') {
     return (
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <MultipartEditor rows={body.form} onChange={(form) => setBody({ form })} />
+        <MultipartEditor rows={body.form} onChange={(form) => setBody({ form })} vars={vars} />
       </div>
     );
   }

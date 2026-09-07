@@ -119,3 +119,49 @@ describe('dataColumns', () => {
     expect(dataColumns([{ a: '1' }, { b: '2' }, { a: '3', c: '4' }])).toEqual(['a', 'b', 'c']);
   });
 });
+
+// A data file is untrusted input, and both parsers write its column names
+// straight onto a row object — `obj[key] = value` with an attacker-chosen key
+// is the prototype-pollution shape (CodeQL flagged it as remote property
+// injection).
+//
+// Worth being precise about what the guard changed, since only one of these
+// was red before it: values here are always strings (toStr), and assigning a
+// string to `__proto__` is a no-op, so the two pollution cases below passed
+// already and stand as regression guards rather than proof of a past hole.
+// The case that genuinely changed is `constructor` / `prototype`: those did
+// become own properties of a row, shadowing Object.prototype's for anything
+// reading that row — and a row's keys are {{variable}} names, exactly where
+// vars.ts documents `{{constructor}}` once interpolating a function into a
+// live request.
+describe('column names that could reach the prototype chain', () => {
+  const polluted = () => (({} as Record<string, unknown>).polluted);
+
+  it('drops a __proto__ column from a CSV and leaves the rest intact', () => {
+    const parsed = parseDataFile('x.csv', '__proto__,userId\nboom,42\n');
+    expect(parsed.rows[0]).toEqual({ userId: '42' });
+    expect(parsed.columns).toEqual(['userId']);
+  });
+
+  it('drops constructor and prototype columns too', () => {
+    const parsed = parseDataFile('x.csv', 'constructor,prototype,ok\na,b,c\n');
+    expect(parsed.rows[0]).toEqual({ ok: 'c' });
+  });
+
+  it('does not pollute Object.prototype from a JSON data file', () => {
+    expect(polluted()).toBeUndefined();
+    const parsed = parseDataFile('x.json', '[{"__proto__": {"polluted": "yes"}, "id": "1"}]');
+    expect(polluted()).toBeUndefined();
+    expect(parsed.rows[0]).toEqual({ id: '1' });
+  });
+
+  it('does not pollute Object.prototype from a CSV either', () => {
+    parseDataFile('x.csv', '__proto__,id\n{"polluted":"yes"},1\n');
+    expect(polluted()).toBeUndefined();
+  });
+
+  it('leaves an ordinary row untouched — the guard only removes those names', () => {
+    const parsed = parseDataFile('x.csv', 'userId,token\n1,alpha\n');
+    expect(parsed.rows[0]).toEqual({ userId: '1', token: 'alpha' });
+  });
+});

@@ -44,7 +44,14 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent size="2xl" scrollable>
+      {/* `viewport` + a vh floor: a snippet is the one thing in this app that
+          is strictly easier to read the more width it gets (fewer forced
+          wraps in a long curl line), and at max-w-4xl this dialog used a
+          fraction of a large window. The floor is a *min*, not a fixed
+          height, so the dialog still grows with the snippet up to
+          `scrollable`'s 85vh cap rather than jumping between sizes as you
+          switch language or variant. */}
+      <DialogContent size="viewport" scrollable className="min-h-[60vh]">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <DialogTitle className="text-base">Generate Code</DialogTitle>
         </div>
@@ -79,15 +86,14 @@ export function GenerateCodeDialog({ open, onClose, request, vars, inheritedHead
           </Label>
         </div>
 
-        {/* Code preview.
-            min-h-[22rem] is load-bearing, not taste: DialogContent's
-            `scrollable` gives the dialog `max-h-[85vh]` and no definite
-            height, so this pane's `flex-1` resolved against an indefinite
-            parent and collapsed to zero — the dialog rendered as a header and
-            a toolbar with no code under it at all. A real minimum gives the
-            CodeViewer inside something to fill; longer snippets scroll within
-            it rather than growing the dialog. */}
-        <div className="relative flex min-h-[22rem] flex-1 flex-col border-t">
+        {/* Code preview. The height floor that used to live here
+            (`min-h-[22rem]`) was load-bearing — `scrollable` gives the dialog
+            no definite height, so this pane's `flex-1` collapsed to zero and
+            the dialog rendered as a header and a toolbar with no code under
+            it. That floor now sits on the dialog itself as a viewport
+            fraction, which fixes the same collapse *and* lets the pane grow
+            with the window instead of stopping at a fixed 352px. */}
+        <div className="relative flex min-h-0 flex-1 flex-col border-t">
           <CodeViewer value={code} language="text" />
           <CopyButton
             value={() => code}

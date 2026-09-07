@@ -23,12 +23,19 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
-export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full' | 'viewport';
 
 // A width scale for every dialog in the app, replacing ad-hoc per-call-site
 // max-w-* values that had drifted with no shared reasoning (sm through 5xl).
 // `md` matches the previous unstated default, so a dialog that omits `size`
 // looks exactly as it did before this scale existed.
+//
+// Every tier up to `full` is a fixed rem width: a dialog that is mostly prose
+// or form fields gets *harder* to read as it widens, so those deliberately
+// stop growing. `viewport` is the exception for content that genuinely wants
+// the room it can get — a generated code snippet, where every line the width
+// forces to wrap is a line harder to follow. On a 1920px window `full`
+// (max-w-5xl, 1024px) left nearly half the screen unused.
 const SIZE_CLASS: Record<DialogSize, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
@@ -36,6 +43,7 @@ const SIZE_CLASS: Record<DialogSize, string> = {
   xl: 'max-w-3xl',
   '2xl': 'max-w-4xl',
   full: 'max-w-5xl',
+  viewport: 'max-w-[94vw]',
 };
 
 const DialogContent = React.forwardRef<
