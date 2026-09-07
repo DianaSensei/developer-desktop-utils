@@ -4,6 +4,10 @@
 
 `KeyValueEditor` (query params, headers, urlencoded body, environment variables) nhận ba thay
 đổi, tất cả nhắm vào cùng một tình huống: một bảng **nhiều dòng**, nhiều dòng dùng `{{var}}`.
+Ô `Resolved` và điều kiện hiện cột nằm ở `ResolvedValue.tsx` dùng chung cho **cả ba** bảng trong
+pane request — `KeyValueEditor`, `MultipartEditor` (form-data) và bảng path params trong
+`RequestPanel.tsx`. Ba bảng này nằm cách nhau vài trăm pixel; một giá trị hiển thị khác nhau (hay
+tô màu khác nhau) giữa chúng sẽ đọc ra như lỗi của app chứ không phải khác biệt giữa các bảng.
 
 **1. Cột `Resolved`.** Trước đây muốn biết `{{userId}}` đang là bao nhiêu thì phải rê chuột vào
 đúng token đó và đọc tooltip — ổn với một biến, vô dụng với bảng hai mươi dòng. Nay có thêm một
@@ -58,11 +62,14 @@ cột chữ có chỗ thở.
 - **Cột xuất hiện/biến mất gây dịch layout một lần** khi token đầu tiên được gõ (hoặc token cuối
   bị xoá). Đã cân nhắc luôn hiện cột khi có `vars` để tránh hẳn, nhưng đổi lại là một cột rỗng
   thường trực ở mọi bảng headers — chọn dịch một lần.
-- **`PathParamsEditor` (RequestPanel.tsx) vẫn là bảng 4 cột viết tay** khớp grid cũ của
-  `KeyValueEditor` để cột Value thẳng hàng giữa các bảng. Khi bảng Query có cột Resolved còn nó
-  thì không, hai bảng không còn thẳng hàng. Chấp nhận được (mỗi bảng có header riêng), nhưng nếu
-  sau này thấy chướng thì hướng xử lý là cho nó dùng chung `ResolvedValue`.
-- **`MultipartEditor` (form-data) chưa có cột này** vì nó chưa nhận `vars` chút nào — thêm sẽ là
-  một thay đổi riêng, không chỉ là thêm cột.
+- ~~`PathParamsEditor` vẫn là bảng 4 cột viết tay~~ và ~~`MultipartEditor` chưa có cột này~~ —
+  đã xong: cả hai dùng chung `ResolvedValue.tsx`. `MultipartEditor` đồng thời nhận `vars` lần đầu,
+  nên ô Value của nó giờ có highlight/autocomplete `{{ }}` như mọi ô khác; trước đó form-data là
+  **bề mặt duy nhất thực sự được thay biến khi gửi** (xem nhánh `multipart` trong `request.ts`)
+  mà giao diện không hề có dấu hiệu nào rằng việc thay biến có xảy ra. Dòng kiểu **file** không
+  có ô Resolved: `value` của nó rỗng, bytes nằm ở `fileContent`.
+- **Ba bảng vẫn có thể lệch cột nhau** khi bảng này có token còn bảng kia không (mỗi bảng tự
+  quyết định theo nội dung của chính nó). Cố ý: mỗi bảng có header riêng, và ràng chúng vào nhau
+  sẽ bắt một bảng toàn giá trị nguyên văn phải mang một cột rỗng chỉ vì bảng bên cạnh cần.
 - Ô lọc của bảng là **state cục bộ**, không được nhớ: đóng/mở lại request là mất bộ lọc. Đúng ý
   đồ (bộ lọc là thao tác nhất thời), nhưng nếu ai đó muốn nó dính thì đó là chỗ sửa.

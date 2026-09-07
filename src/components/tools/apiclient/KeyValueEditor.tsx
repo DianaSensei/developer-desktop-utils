@@ -15,7 +15,7 @@ import { Callout } from '@/components/ui/callout';
 import { InlineCodeField, SearchInput, TextEditor } from '@/design-system';
 import { copyToClipboard } from '@/lib/clipboard';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
-import { previewVars } from './vars';
+import { ResolvedValue, showsResolvedColumn } from './ResolvedValue';
 
 interface Props {
   rows: KeyValue[];
@@ -152,7 +152,7 @@ export function KeyValueEditor({
   // the first token is typed, which is also the moment it becomes useful.
   // Driven by every row, not just the visible ones: filtering down to rows
   // without tokens shouldn't drop a column out from under the table mid-type.
-  const showResolved = !!vars && realRows.some((r) => previewVars(r.value, vars).hasTokens);
+  const showResolved = showsResolvedColumn(realRows.map((r) => r.value), vars);
 
   const hasDuplicateKeys = useMemo(
     () => (duplicateKeyHint ? hasDuplicateNames(realRows, duplicateKeyHint) : false),
@@ -455,35 +455,5 @@ export function KeyValueEditor({
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * What a Value cell containing {{tokens}} resolves to right now. Blank for a
- * value with no tokens — the cell exists for the rows that have them, and a
- * literal value repeated verbatim one column over would be noise.
- *
- * An unresolved token is the case worth shouting about: it is sent literally,
- * so the request goes out with `{{userId}}` in it. That reads as red text
- * naming the token, not as a resolved value.
- */
-function ResolvedValue({ value, vars }: { value: string; vars: VarMap }) {
-  const { resolved, missing, hasTokens } = previewVars(value, vars);
-  if (!hasTokens) return null;
-  if (missing.length > 0) {
-    const names = missing.map((m) => `{{${m}}}`).join(', ');
-    return (
-      <span
-        className="truncate font-mono text-[11px] text-bad"
-        title={`No value for ${names} — it will be sent literally.`}
-      >
-        {names} undefined
-      </span>
-    );
-  }
-  return (
-    <span className="truncate font-mono text-[11px] text-fg-mute" title={resolved}>
-      {resolved || <span className="italic">empty</span>}
-    </span>
   );
 }
