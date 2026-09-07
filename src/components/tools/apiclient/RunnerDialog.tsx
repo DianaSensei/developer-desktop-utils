@@ -900,7 +900,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                 label="HTTP 2xx"
                 value={totalRun ? `${stats.http2xx}/${totalRun}` : '—'}
                 sub={httpFailed ? `${httpFailed.toLocaleString()} not 2xx` : undefined}
-                tone={httpFailed ? 'danger' : totalRun ? 'success' : 'muted'}
+                tone={countTone(httpFailed, totalRun)}
               />
               <RunStat label="Assertions" value={`${assertPass}/${assertTotal}`} tone={assertTotal && assertPass < assertTotal ? 'danger' : assertTotal ? 'success' : 'muted'} />
               <RunStat label="Duration" value={formatDuration(elapsed)} icon={<Clock className="h-3 w-3" />} />
@@ -1094,11 +1094,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
 // The status codes a set of executions produced, with their counts. Each chip
 // is a jump target when sampled iterations are available: over a long run the
 // counts alone say *that* 500s happened, not *where*.
-function StatusChips({ byStatus, samples, onJump }: {
+function StatusChips({ byStatus, samples, onJump }: Readonly<{
   byStatus: Record<string, number>;
   samples?: Record<string, number[]>;
   onJump?: (code: string, samples: number[] | undefined) => void;
-}) {
+}>) {
   // 'error' (no response at all) sorts after the numeric codes.
   const entries = Object.entries(byStatus).sort((a, b) => a[0].localeCompare(b[0]));
   if (entries.length === 0) return <span className="text-fg-mute">—</span>;
@@ -1113,10 +1113,7 @@ function StatusChips({ byStatus, samples, onJump }: {
             type="button"
             disabled={!jumpable}
             onClick={() => onJump?.(code, list)}
-            title={jumpable
-              ? `Go to an iteration that returned ${code} — click again for the next one` +
-                (list!.length >= STATUS_SAMPLE_CAP ? ` (first ${STATUS_SAMPLE_CAP} tracked)` : '')
-              : undefined}
+            title={jumpTitle(code, list)}
             className={cn('-mx-0.5 rounded px-0.5 font-mono transition-colors',
               jumpable ? 'hover:bg-acc' : 'cursor-default')}
           >
@@ -1133,10 +1130,10 @@ function StatusChips({ byStatus, samples, onJump }: {
 // happened in iteration N"; this answers "how did request X do across all N"
 // — which is the only tractable question once a data file pushes the run into
 // tens of thousands of iterations.
-function ByRequestView({ stats, onJumpToStatus }: {
+function ByRequestView({ stats, onJumpToStatus }: Readonly<{
   stats: RunStats;
   onJumpToStatus: (code: string, samples: number[] | undefined) => void;
-}) {
+}>) {
   if (stats.byRequest.length === 0) {
     return <div className="flex min-w-0 flex-1 items-center justify-center p-6 text-xs text-fg-mute">No requests ran.</div>;
   }
@@ -1196,13 +1193,13 @@ function ByRequestView({ stats, onJumpToStatus }: {
 // out, long before the run itself is the bottleneck. This renders only the
 // rows actually scrolled into view (plus a small overscan), backed by a
 // spacer div so the scrollbar still reflects the true list length.
-function VirtualIterRail({ count, viewIter, onSelect, iterStats, dataRows }: {
+function VirtualIterRail({ count, viewIter, onSelect, iterStats, dataRows }: Readonly<{
   count: number;
   viewIter: number;
   onSelect: (i: number) => void;
   iterStats: (i: number) => { ok: number; total: number };
   dataRows?: DataRow[];
-}) {
+}>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportH, setViewportH] = useState(0);
@@ -1465,6 +1462,20 @@ function RequestDetail({ request, sentUrl, dataVars }: { request: ApiRequest; se
       </div>
     </div>
   );
+}
+
+/** Tile tone for a "some of N went wrong" count: red when any did, green
+ *  when none did and something ran, muted before anything has run. */
+function countTone(bad: number, total: number): StatProps['tone'] {
+  if (bad > 0) return 'danger';
+  return total > 0 ? 'success' : 'muted';
+}
+
+/** Tooltip for a status chip, or undefined when the chip isn't a jump target. */
+function jumpTitle(code: string, samples: number[] | undefined): string | undefined {
+  if (!samples?.length) return undefined;
+  const base = `Go to an iteration that returned ${code} — click again for the next one`;
+  return samples.length >= STATUS_SAMPLE_CAP ? `${base} (first ${STATUS_SAMPLE_CAP} tracked)` : base;
 }
 
 /** Runner summary tile — the shared compact Stat, used for the whole strip. */

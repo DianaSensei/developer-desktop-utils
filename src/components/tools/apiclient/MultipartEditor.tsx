@@ -25,7 +25,7 @@ const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '' || !!r.fileName
 
 const inputCls = 'h-ctl border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0';
 
-export function MultipartEditor({ rows, onChange, vars }: Props) {
+export function MultipartEditor({ rows, onChange, vars }: Readonly<Props>) {
   const ghostRef = useRef(newKeyValue());
 
   const realRows = rows.filter(isFilled);
@@ -89,124 +89,180 @@ export function MultipartEditor({ rows, onChange, vars }: Props) {
         <div />
       </div>
 
-      {displayRows.map((row, i) => {
-        const isGhost = row.id === ghost.id;
-        const isFile = row.kind === 'file' && !!row.fileName;
-        return (
-          // Zebra /20 + hover /40, the same pair as KeyValueEditor and
-          // DataTable — a form-data body is just as easy to lose your place in.
-          <div key={row.id} className={cn('group grid border-b last:border-b-0 transition-colors duration-fast ease-out-soft hover:bg-bg-2/40 focus-within:bg-bg-2/40 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus', !isGhost && i % 2 === 1 && 'bg-bg-2/20', gridCols)}>
-            {/* Toggle column — the whole cell is the target, with the same
-                role/aria and hover feedback KeyValueEditor's rows carry. */}
-            <div className="flex items-stretch border-r">
-              {isGhost ? (
-                <span className="w-full" />
-              ) : (
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={row.enabled}
-                  aria-label={`${row.key || 'Field'} — ${row.enabled ? 'enabled' : 'disabled'}`}
-                  onClick={() => editRow(row.id, { enabled: !row.enabled })}
-                  className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
-                  title={row.enabled ? 'Disable' : 'Enable'}
-                >
-                  <span
-                    className={cn(
-                      'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-                      row.enabled
-                        ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
-                        : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
-                    )}
-                  >
-                    {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
-                  </span>
-                </button>
-              )}
-            </div>
-            {/* name cell */}
-            <div className="flex min-w-0 items-center border-r px-1.5">
-              <Input
-                value={row.key}
-                onChange={(e) => editRow(row.id, { key: e.target.value })}
-                placeholder="Name"
-                className={cn(inputCls, !isGhost && !row.enabled && 'opacity-50')}
-                spellCheck={false}
-              />
-            </div>
-
-            {/* value cell: text input + upload, or a file chip */}
-            <div className="flex min-w-0 items-center gap-1 border-r px-2">
-              {isFile ? (
-                <>
-                  <FileIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
-                  <span className="flex-1 truncate" title={row.fileName}>{row.fileName}</span>
-                  <button type="button" onClick={() => clearFile(row.id)} title="Remove file" className="rounded p-0.5 text-fg-mute/60 hover:text-bad">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  {vars ? (
-                    <div className={cn('flex h-ctl min-w-0 flex-1 items-center', !isGhost && !row.enabled && 'opacity-50')}>
-                      <InlineCodeField
-                        value={row.value}
-                        onChange={(v) => editRow(row.id, { value: v })}
-                        vars={vars}
-                        placeholder="Value"
-                      />
-                    </div>
-                  ) : (
-                    <Input
-                      value={row.value}
-                      onChange={(e) => editRow(row.id, { value: e.target.value })}
-                      placeholder="Value"
-                      className={cn(inputCls, !isGhost && !row.enabled && 'opacity-50')}
-                      spellCheck={false}
-                    />
-                  )}
-                  <button type="button" onClick={() => attachFile(row.id)} title="Attach file" className="shrink-0 rounded p-0.5 text-fg-mute/60 hover:text-fg">
-                    <Upload className="h-3.5 w-3.5" />
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* resolved cell — see ResolvedValue.tsx */}
-            {showResolved && (
-              <div className={cn('flex min-w-0 items-center border-r px-2.5', !isGhost && !row.enabled && 'opacity-50')}>
-                {!isGhost && vars && !isFile && <ResolvedValue value={row.value} vars={vars} />}
-              </div>
-            )}
-            {/* content-type cell */}
-            <div className="min-w-0 border-r px-2">
-              <Input
-                value={row.contentType ?? ''}
-                onChange={(e) => editRow(row.id, { contentType: e.target.value })}
-                placeholder="Auto"
-                className={cn(inputCls, !isGhost && !row.enabled && 'opacity-50')}
-                spellCheck={false}
-              />
-            </div>
-
-            {/* Action cell — revealed on hover/focus like every other table's,
-                instead of a trash icon sitting on every row at rest. */}
-            <div className="flex items-center justify-center">
-              {!isGhost && (
-                <button
-                  type="button"
-                  onClick={() => removeRow(row.id)}
-                  title="Remove"
-                  className="rounded p-1 text-fg-mute/40 opacity-0 transition-all hover:text-bad group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {displayRows.map((row, i) => (
+        <MultipartRow
+          key={row.id}
+          row={row}
+          isGhost={row.id === ghost.id}
+          striped={row.id !== ghost.id && i % 2 === 1}
+          gridCols={gridCols}
+          vars={vars}
+          showResolved={showResolved}
+          onEdit={(patch) => editRow(row.id, patch)}
+          onRemove={() => removeRow(row.id)}
+          onAttachFile={() => attachFile(row.id)}
+          onClearFile={() => clearFile(row.id)}
+        />
+      ))}
       </div>
+    </div>
+  );
+}
+
+// ─── one row ──────────────────────────────────────────────────────────────────
+
+interface RowProps {
+  row: KeyValue;
+  isGhost: boolean;
+  striped: boolean;
+  gridCols: string;
+  vars?: VarMap;
+  showResolved: boolean;
+  onEdit: (patch: Partial<KeyValue>) => void;
+  onRemove: () => void;
+  onAttachFile: () => void;
+  onClearFile: () => void;
+}
+
+/**
+ * One form-data row. Extracted from the table's `map` callback for the same
+ * reason KeyValueEditor's was: six cells, half of them conditional, and a
+ * value cell that is itself three different things.
+ *
+ * Zebra /20 + hover /40, the same pair as KeyValueEditor and DataTable — a
+ * form-data body is just as easy to lose your place in.
+ */
+function MultipartRow({
+  row, isGhost, striped, gridCols, vars, showResolved,
+  onEdit, onRemove, onAttachFile, onClearFile,
+}: Readonly<RowProps>) {
+  const isFile = row.kind === 'file' && !!row.fileName;
+  const dim = !isGhost && !row.enabled && 'opacity-50';
+  return (
+    <div className={cn('group grid border-b last:border-b-0 transition-colors duration-fast ease-out-soft hover:bg-bg-2/40 focus-within:bg-bg-2/40 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus', striped && 'bg-bg-2/20', gridCols)}>
+      {/* Toggle column — the whole cell is the target, with the same
+          role/aria and hover feedback KeyValueEditor's rows carry. */}
+      <div className="flex items-stretch border-r">
+        {isGhost ? (
+          <span className="w-full" />
+        ) : (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={row.enabled}
+            aria-label={`${row.key || 'Field'} — ${row.enabled ? 'enabled' : 'disabled'}`}
+            onClick={() => onEdit({ enabled: !row.enabled })}
+            className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
+            title={row.enabled ? 'Disable' : 'Enable'}
+          >
+            <span
+              className={cn(
+                'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+                row.enabled
+                  ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
+                  : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
+              )}
+            >
+              {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}
+            </span>
+          </button>
+        )}
+      </div>
+
+      {/* name cell */}
+      <div className="flex min-w-0 items-center border-r px-1.5">
+        <Input
+          value={row.key}
+          onChange={(e) => onEdit({ key: e.target.value })}
+          placeholder="Name"
+          className={cn(inputCls, dim)}
+          spellCheck={false}
+        />
+      </div>
+
+      {/* value cell: text input + upload, or a file chip */}
+      <div className="flex min-w-0 items-center gap-1 border-r px-2">
+        {isFile ? (
+          <>
+            <FileIcon className="h-3.5 w-3.5 shrink-0 text-fg-mute" />
+            <span className="flex-1 truncate" title={row.fileName}>{row.fileName}</span>
+            <button type="button" onClick={onClearFile} title="Remove file" className="rounded p-0.5 text-fg-mute/60 hover:text-bad">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : (
+          <>
+            <TextValue row={row} vars={vars} dim={dim} onEdit={onEdit} />
+            <button type="button" onClick={onAttachFile} title="Attach file" className="shrink-0 rounded p-0.5 text-fg-mute/60 hover:text-fg">
+              <Upload className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* resolved cell — see ResolvedValue.tsx */}
+      {showResolved && (
+        <div className={cn('flex min-w-0 items-center border-r px-2.5', dim)}>
+          {!isGhost && vars && !isFile && <ResolvedValue value={row.value} vars={vars} />}
+        </div>
+      )}
+
+      {/* content-type cell */}
+      <div className="min-w-0 border-r px-2">
+        <Input
+          value={row.contentType ?? ''}
+          onChange={(e) => onEdit({ contentType: e.target.value })}
+          placeholder="Auto"
+          className={cn(inputCls, dim)}
+          spellCheck={false}
+        />
+      </div>
+
+      {/* Action cell — revealed on hover/focus like every other table's,
+          instead of a trash icon sitting on every row at rest. */}
+      <div className="flex items-center justify-center">
+        {!isGhost && (
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Remove"
+            className="rounded p-1 text-fg-mute/40 opacity-0 transition-all hover:text-bad group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The text half of a value cell: {{var}}-aware where variables exist, a
+ *  plain input where they don't (the editor is also used without them). */
+function TextValue({ row, vars, dim, onEdit }: Readonly<{
+  row: KeyValue;
+  vars?: VarMap;
+  dim: string | false;
+  onEdit: (patch: Partial<KeyValue>) => void;
+}>) {
+  if (!vars) {
+    return (
+      <Input
+        value={row.value}
+        onChange={(e) => onEdit({ value: e.target.value })}
+        placeholder="Value"
+        className={cn(inputCls, dim)}
+        spellCheck={false}
+      />
+    );
+  }
+  return (
+    <div className={cn('flex h-ctl min-w-0 flex-1 items-center', dim)}>
+      <InlineCodeField
+        value={row.value}
+        onChange={(v) => onEdit({ value: v })}
+        vars={vars}
+        placeholder="Value"
+      />
     </div>
   );
 }

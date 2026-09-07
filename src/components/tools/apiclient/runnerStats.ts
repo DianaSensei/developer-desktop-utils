@@ -62,13 +62,16 @@ export const HTTP_OK_TEST_NAME = 'HTTP status is 2xx (built-in)';
 
 export function httpOkTest(status: number, statusText: string, error?: string | null): TestResult {
   if (isHttp2xx(status)) return { name: HTTP_OK_TEST_NAME, passed: true };
-  return {
-    name: HTTP_OK_TEST_NAME,
-    passed: false,
-    error: status === 0
-      ? `No response${error ? `: ${error}` : ''}`
-      : `Expected 2xx, got ${status}${statusText ? ` ${statusText}` : ''}`,
-  };
+  // Built as statements rather than one nested template/ternary expression:
+  // the two failure shapes ("nothing came back" vs "the wrong code came
+  // back") read as two cases, and that is what they are.
+  let reason: string;
+  if (status === 0) {
+    reason = error ? `No response: ${error}` : 'No response';
+  } else {
+    reason = statusText ? `Expected 2xx, got ${status} ${statusText}` : `Expected 2xx, got ${status}`;
+  }
+  return { name: HTTP_OK_TEST_NAME, passed: false, error: reason };
 }
 
 // How one request behaved across every iteration it ran in. A data-driven run
@@ -144,7 +147,7 @@ function sample(index: Map<string, number[]>, code: string, iter: number): void 
   if (!existing) index.set(code, [iter]);
   // One entry per iteration: the same code twice in one iteration (two
   // requests, or a flow-control repeat) shouldn't spend two sample slots.
-  else if (existing.length < STATUS_SAMPLE_CAP && existing[existing.length - 1] !== iter) existing.push(iter);
+  else if (existing.length < STATUS_SAMPLE_CAP && existing.at(-1) !== iter) existing.push(iter);
 }
 
 // Mutable running total, folded one record at a time. A data-driven run can

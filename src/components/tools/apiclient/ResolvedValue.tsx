@@ -41,7 +41,7 @@ export function showsResolvedColumn(values: string[], vars?: VarMap): boolean {
  * ApiClient.tsx) already substitutes `••••••••` for Vault entries and
  * secret-flagged environment variables, so a real secret has no path here.
  */
-export function ResolvedValue({ value, vars }: { value: string; vars: VarMap }) {
+export function ResolvedValue({ value, vars }: Readonly<{ value: string; vars: VarMap }>) {
   const { resolved, missing, hasTokens } = previewVars(value, vars);
   if (!hasTokens) return null;
   if (missing.length > 0) {

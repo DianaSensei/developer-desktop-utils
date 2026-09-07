@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { KeyValueEditor } from './KeyValueEditor';
+import { KeyValueEditor, parseBulkText, toBulkText } from './KeyValueEditor';
 import { newKeyValue } from './types';
 import type { KeyValue } from './types';
 
@@ -149,5 +149,43 @@ describe('KeyValueEditor — empty filter result', () => {
 
     expect(screen.getByText(/No rows match/)).toBeTruthy();
     expect(screen.getByText(/9 hidden/)).toBeTruthy();
+  });
+});
+
+describe('bulk text round trip', () => {
+  it('serialises rows as key:value, marking disabled ones with //', () => {
+    expect(toBulkText([row('a', '1'), row('b', '2', { enabled: false })])).toBe('a:1\n//b:2');
+  });
+
+  it('parses back to the same names, values and enabled flags', () => {
+    const parsed = parseBulkText('a:1\n//b:2');
+    expect(parsed.map((r) => [r.key, r.value, r.enabled])).toEqual([
+      ['a', '1', true],
+      ['b', '2', false],
+    ]);
+  });
+
+  it('survives a round trip unchanged', () => {
+    const rows = [row('token', 'abc'), row('page', '2', { enabled: false })];
+    const back = parseBulkText(toBulkText(rows));
+    expect(back.map((r) => [r.key, r.value, r.enabled])).toEqual(
+      rows.map((r) => [r.key, r.value, r.enabled]),
+    );
+  });
+
+  it('skips blank lines instead of emitting empty rows', () => {
+    expect(parseBulkText('a:1\n\n   \nb:2')).toHaveLength(2);
+  });
+
+  it('treats a line with no colon as a name with an empty value', () => {
+    expect(parseBulkText('justAName')).toEqual([expect.objectContaining({ key: 'justAName', value: '' })]);
+  });
+
+  it('keeps colons inside the value — only the first one splits', () => {
+    expect(parseBulkText('url:https://api.test:8080/x')[0].value).toBe('https://api.test:8080/x');
+  });
+
+  it('trims whitespace around both halves', () => {
+    expect(parseBulkText('  name  :  value  ')[0]).toMatchObject({ key: 'name', value: 'value' });
   });
 });

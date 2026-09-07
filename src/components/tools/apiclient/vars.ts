@@ -84,7 +84,10 @@ export function previewVars(text: string, vars: VarMap): VarPreview {
   TOKEN_RE.lastIndex = 0;
   const resolved = text.replace(TOKEN_RE, (whole, name: string) => {
     hasTokens = true;
-    if (Object.prototype.hasOwnProperty.call(vars, name)) return vars[name];
+    // Object.hasOwn, not `name in vars`: `in` walks the prototype chain, so
+    // `{{constructor}}` would resolve to Object.prototype's function. Same
+    // guard substituteVars above documents at length.
+    if (Object.hasOwn(vars, name)) return vars[name];
     if (!missing.includes(name)) missing.push(name);
     return whole;
   });

@@ -18,7 +18,12 @@ import { type RunRecord, isHttp2xx, isOk, statusKey } from './runnerStats';
 // RFC 4180: quote a cell that contains the delimiter, a quote, or a newline,
 // and double any quote inside it. `\r` counts too — left bare it would end
 // the record early in Excel.
-export function csvCell(v: unknown): string {
+// `string | number` rather than `unknown`: a cell is text or a count, and an
+// object reaching here would silently become "[object Object]" in the file
+// instead of failing at the call site.
+export type CsvValue = string | number | null | undefined;
+
+export function csvCell(v: CsvValue): string {
   const s = v == null ? '' : String(v);
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
