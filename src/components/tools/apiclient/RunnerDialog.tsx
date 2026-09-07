@@ -46,7 +46,7 @@ import type { ExecResult } from './engine';
 import { MAX_STEPS_PER_ITERATION, describeJump, findDuplicateNames, nextStepIndex } from './runnerFlow';
 import {
   type RequestStats, type RunDetail, type RunRecord, type RunStats, type RunStatsAcc,
-  STATUS_SAMPLE_CAP, fold, isOk, newAcc, toStats,
+  STATUS_SAMPLE_CAP, fold, httpOkTest, isOk, newAcc, toStats,
 } from './runnerStats';
 import { buildResultsCsv } from './runnerExport';
 import type { ApiRequest, Environment, HttpMethod, VarMap } from './types';
@@ -112,6 +112,10 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   const [parallel, setParallel] = useState(false);
   const [stopOnFailure, setStopOnFailure] = useState(false);
   const [saveResponses, setSaveResponses] = useState(true);
+  // On by default: most collections only ever want "2xx and I'm happy", and
+  // writing that assertion into every request by hand is busywork. See
+  // httpOkTest — it behaves like any scripted assertion once injected.
+  const [requireHttpOk, setRequireHttpOk] = useState(true);
   const [includeTags, setIncludeTags] = useState('');
   const [excludeTags, setExcludeTags] = useState('');
 
@@ -283,8 +287,21 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
     setCurrent({ iter, name: req.name, method: req.method });
     let record: RunRecord;
     try {
-      const r = await runRequest(req, dataVars, abortRef.current?.signal, envId);
+      const raw = await runRequest(req, dataVars, abortRef.current?.signal, envId);
       if (cancelledRef.current) return null;
+      // The built-in check goes in front of the request's own assertions and
+      // is then indistinguishable from them: same counts, same Tests tab,
+      // same exports. Injected into a copy of the result too, so the detail
+      // view (which reads result.tests) shows it as well.
+      const r: ExecResult = requireHttpOk
+        ? {
+            ...raw,
+            tests: [
+              httpOkTest(raw.response?.status ?? 0, raw.response?.statusText ?? '', raw.error),
+              ...raw.tests,
+            ],
+          }
+        : raw;
       const passed = r.tests.filter((t) => t.passed).length;
       record = {
         key: `${iter}:${step}`,
@@ -311,6 +328,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
       record.jump = describeJump(r.nextRequest, names);
     } catch (e) {
       if (cancelledRef.current) return null;
+      const error = (e as Error).message;
+      // A request that threw before any response still ran, so it still gets
+      // the built-in check — otherwise the assertion totals would silently
+      // exclude exactly the executions that failed hardest.
+      const tests = requireHttpOk ? [httpOkTest(0, '', error)] : [];
       record = {
         key: `${iter}:${step}`,
         iter, step,
@@ -319,9 +341,9 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
         method: req.method,
         url: req.url,
         status: 0, statusText: '', ms: 0, sizeBytes: 0, at: Date.now(),
-        passed: 0, total: 0,
-        error: (e as Error).message,
-        tests: [],
+        passed: 0, total: tests.length,
+        error,
+        tests,
         logs: [],
         dataVars,
       };
@@ -426,7 +448,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
     setSelected(new Set(requests.map((r) => r.id)));
     setEnvId(defaultEnvId && environments.some((e) => e.id === defaultEnvId) ? defaultEnvId : null);
     setDelay(''); setIterations('1'); setParallel(false); setIncludeTags(''); setExcludeTags('');
-    setStopOnFailure(false); setSaveResponses(true);
+    setStopOnFailure(false); setSaveResponses(true); setRequireHttpOk(true);
     setDataFile(null); setDataError(null); setRowLimit(null);
     resetRun(); setPhase('setup');
   };
@@ -458,6 +480,9 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   const iterStats = (iter: number) => iterStatsRef.current.get(iter) ?? { ok: 0, total: 0 };
 
   const { total: totalRun, passed: passedRun, assertPassed: assertPass, assertTotal } = stats;
+  // Executions that did not come back 2xx — a redirect, a 4xx/5xx, or no
+  // response at all. Independent of whether the built-in check is on.
+  const httpFailed = totalRun - stats.http2xx;
 
   const plannedCount = effective.length * iters;
   const dataRow = dataRows ? dataRows[viewIter] : undefined;
@@ -496,6 +521,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
         parallel,
         stopOnFailure,
         saveResponses,
+        requireHttp2xx: requireHttpOk,
         includeTags: parseTags(includeTags),
         excludeTags: parseTags(excludeTags),
         dataFile: dataFile
@@ -512,6 +538,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
       summary: {
         iterations: { planned: iters, executed: ranIters },
         requests: { executed: stats.total, passed: stats.passed, failed: stats.failed },
+        http: { ok2xx: stats.http2xx, notOk: stats.total - stats.http2xx },
         assertions: { total: stats.assertTotal, passed: stats.assertPassed, failed: stats.assertTotal - stats.assertPassed },
         responseTimeMs: { average: stats.avgMs, min: stats.minMs, max: stats.maxMs, total: stats.sumMs },
         totalDataBytes: stats.totalBytes,
@@ -527,6 +554,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
           executed: r.total,
           passed: r.passed,
           failed: r.failed,
+          http: { ok2xx: r.http2xx, notOk: r.total - r.http2xx },
           statusCodes: r.byStatus,
           responseTimeMs: { average: r.avgMs, min: r.minMs, max: r.maxMs },
         })),
@@ -667,6 +695,12 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                       rather than one group. See SettingGroup in the kit for
                       the same shape at Settings-page density. */}
                   <div className="overflow-hidden rounded-md border divide-y divide-line-soft">
+                    <OptionRow
+                      label="Require HTTP 2xx"
+                      hint="Adds a built-in check to every request, so anything that isn't 2xx — a redirect, a 404, no response at all — counts as failed without writing a test for it."
+                      checked={requireHttpOk}
+                      onChange={setRequireHttpOk}
+                    />
                     <OptionRow
                       label="Stop run if an error occurs"
                       checked={stopOnFailure}
@@ -844,6 +878,15 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
               <RunStat label="Requests" value={`${totalRun}${running ? ` / ${plannedCount}` : ''}`} />
               <RunStat label="Passed" value={passedRun} tone="success" />
               <RunStat label="Failed" value={failedCount} tone={failedCount ? 'danger' : 'muted'} />
+              {/* HTTP success on its own terms: a run can be 2xx everywhere
+                  and still fail assertions, so this answers "is the endpoint
+                  up" where Passed/Failed answers "is the response right". */}
+              <RunStat
+                label="HTTP 2xx"
+                value={totalRun ? `${stats.http2xx}/${totalRun}` : '—'}
+                sub={httpFailed ? `${httpFailed.toLocaleString()} not 2xx` : undefined}
+                tone={httpFailed ? 'danger' : totalRun ? 'success' : 'muted'}
+              />
               <RunStat label="Assertions" value={`${assertPass}/${assertTotal}`} tone={assertTotal && assertPass < assertTotal ? 'danger' : assertTotal ? 'success' : 'muted'} />
               <RunStat label="Duration" value={formatDuration(elapsed)} icon={<Clock className="h-3 w-3" />} />
               <RunStat label="Avg time" value={stats.total ? `${stats.avgMs} ms` : '—'} />
@@ -1061,6 +1104,7 @@ function ByRequestView({ stats, onJumpToStatus }: {
           <Tr>
             <Th>Request</Th>
             <Th align="right">Runs</Th>
+            <Th align="right">HTTP 2xx</Th>
             <Th align="right">Passed</Th>
             <Th align="right">Failed</Th>
             <Th>Response codes</Th>
@@ -1077,6 +1121,9 @@ function ByRequestView({ stats, onJumpToStatus }: {
                 <span className="font-medium">{r.name}</span>
               </Td>
               <Td numeric>{r.total.toLocaleString()}</Td>
+              <Td numeric className={r.http2xx === r.total ? 'text-ok' : 'text-bad'}>
+                {r.http2xx.toLocaleString()}/{r.total.toLocaleString()}
+              </Td>
               <Td numeric className={r.passed ? 'text-ok' : undefined}>{r.passed.toLocaleString()}</Td>
               <Td numeric className={r.failed ? 'text-bad' : undefined}>{r.failed.toLocaleString()}</Td>
               <Td>

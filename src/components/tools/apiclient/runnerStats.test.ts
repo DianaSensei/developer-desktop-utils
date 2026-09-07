@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type RunRecord, STATUS_SAMPLE_CAP, fold, isOk, newAcc, statusKey, summarize, toStats,
+  type RunRecord, HTTP_OK_TEST_NAME, STATUS_SAMPLE_CAP, fold, httpOkTest, isHttp2xx, isOk,
+  newAcc, statusKey, summarize, toStats,
 } from './runnerStats';
 
 // Minimal record factory — the fields the aggregation actually reads.
@@ -55,6 +56,45 @@ describe('isOk', () => {
   });
 });
 
+describe('httpOkTest — the built-in "2xx or it failed" assertion', () => {
+  it('passes any 2xx', () => {
+    expect(httpOkTest(200, 'OK')).toEqual({ name: HTTP_OK_TEST_NAME, passed: true });
+    expect(httpOkTest(204, 'No Content').passed).toBe(true);
+    expect(httpOkTest(299, '').passed).toBe(true);
+  });
+
+  it('fails a redirect — only 2xx counts as HTTP success', () => {
+    const t = httpOkTest(302, 'Found');
+    expect(t.passed).toBe(false);
+    expect(t.error).toBe('Expected 2xx, got 302 Found');
+  });
+
+  it('fails a 4xx/5xx and names what came back instead', () => {
+    expect(httpOkTest(404, 'Not Found').error).toBe('Expected 2xx, got 404 Not Found');
+    expect(httpOkTest(500, '').error).toBe('Expected 2xx, got 500');
+  });
+
+  it('fails a request that never got a response, carrying the transport error', () => {
+    expect(httpOkTest(0, '', 'ECONNREFUSED').error).toBe('No response: ECONNREFUSED');
+    expect(httpOkTest(0, '').error).toBe('No response');
+  });
+
+  it('reads as built-in, so nobody mistakes it for an assertion they wrote', () => {
+    expect(HTTP_OK_TEST_NAME).toContain('built-in');
+  });
+});
+
+describe('isHttp2xx', () => {
+  it('accepts only the 2xx range', () => {
+    expect(isHttp2xx(200)).toBe(true);
+    expect(isHttp2xx(299)).toBe(true);
+    expect(isHttp2xx(199)).toBe(false);
+    expect(isHttp2xx(302)).toBe(false);
+    expect(isHttp2xx(404)).toBe(false);
+    expect(isHttp2xx(0)).toBe(false);
+  });
+});
+
 describe('statusKey', () => {
   it('uses the code for a real response', () => {
     expect(statusKey(rec({ status: 503 }))).toBe('503');
@@ -92,6 +132,21 @@ describe('fold / toStats', () => {
     expect(stats.assertPassed).toBe(2);
     expect(stats.totalBytes).toBe(160);
     expect(stats.byStatus).toEqual({ '200': 2, '500': 1, error: 1 });
+    // HTTP success counted independently of assertions.
+    expect(stats.http2xx).toBe(2);
+  });
+
+  it('counts HTTP success separately from assertion pass/fail', () => {
+    const stats = summarize([
+      // 2xx but a failing assertion: HTTP fine, run failed.
+      rec({ status: 200, passed: 0, total: 1 }),
+      // 3xx: a pass under isOk's lenient rule, but not HTTP 2xx.
+      rec({ step: 1, status: 302 }),
+      rec({ step: 2, status: 500 }),
+    ]);
+    expect(stats.http2xx).toBe(1);
+    expect(stats.passed).toBe(1);
+    expect(stats.total - stats.http2xx).toBe(2);
   });
 
   it('averages timing over responses only, so a failed connection does not drag it to zero', () => {
@@ -145,6 +200,12 @@ describe('per-request rollup', () => {
   it('tracks each request\'s own response codes', () => {
     expect(stats.byRequest[0].byStatus).toEqual({ '200': 2 });
     expect(stats.byRequest[1].byStatus).toEqual({ '200': 1, '500': 1, error: 1 });
+  });
+
+  it('counts HTTP 2xx per request', () => {
+    expect(stats.byRequest[0].http2xx).toBe(2);
+    // 500, 200, and a transport error → one HTTP success out of three.
+    expect(stats.byRequest[1].http2xx).toBe(1);
   });
 
   it('counts pass/fail per request', () => {

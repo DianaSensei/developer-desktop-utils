@@ -4,7 +4,7 @@
 // in an error message, a quote in a response) would corrupt the one artifact
 // the run produced.
 
-import { type RunRecord, isOk, statusKey } from './runnerStats';
+import { type RunRecord, isHttp2xx, isOk, statusKey } from './runnerStats';
 
 // RFC 4180: quote a cell that contains the delimiter, a quote, or a newline,
 // and double any quote inside it. `\r` counts too — left bare it would end
@@ -14,9 +14,13 @@ export function csvCell(v: unknown): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+// `httpOk` and `outcome` are deliberately separate columns: httpOk is the
+// HTTP verdict alone (2xx or not), outcome folds in assertions too. Filtering
+// a sheet for "which calls actually failed at the HTTP level" is the common
+// case, and it shouldn't require reading status codes by eye.
 export const CSV_COLUMNS = [
   'iteration', 'step', 'name', 'method', 'url',
-  'status', 'statusText', 'outcome', 'timeMs', 'ttfbMs', 'sizeBytes',
+  'status', 'statusText', 'httpOk', 'outcome', 'timeMs', 'ttfbMs', 'sizeBytes',
   'assertionsPassed', 'assertionsTotal', 'failedAssertions', 'error',
 ] as const;
 
@@ -38,6 +42,7 @@ export function buildResultsCsv(records: RunRecord[], dataColumns: string[] = []
       // spreadsheet filter on status can tell "no response" from a real code.
       statusKey(r),
       r.statusText,
+      isHttp2xx(r.status) ? 'yes' : 'no',
       isOk(r) ? 'pass' : 'fail',
       r.ms,
       r.ttfbMs ?? '',

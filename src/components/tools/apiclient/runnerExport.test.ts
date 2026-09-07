@@ -88,7 +88,32 @@ describe('buildResultsCsv', () => {
     const csv = buildResultsCsv([rec({ status: 0, statusText: '', error: 'ECONNREFUSED' })]);
     const row = cells(rows(csv)[1]);
     expect(row[CSV_COLUMNS.indexOf('status')]).toBe('error');
+    expect(row[CSV_COLUMNS.indexOf('httpOk')]).toBe('no');
     expect(row[CSV_COLUMNS.indexOf('error')]).toBe('ECONNREFUSED');
+  });
+
+  it('carries an httpOk column so HTTP failures filter without reading codes', () => {
+    const csv = buildResultsCsv([
+      rec({ status: 200 }),
+      rec({ step: 1, status: 302, statusText: 'Found' }),
+      rec({ step: 2, status: 500, statusText: 'Server Error' }),
+    ]);
+    const httpOk = rows(csv).slice(1).map((l) => cells(l)[CSV_COLUMNS.indexOf('httpOk')]);
+    // Only 2xx is a yes — a redirect is not an HTTP success here.
+    expect(httpOk).toEqual(['yes', 'no', 'no']);
+  });
+
+  it('keeps httpOk and outcome independent', () => {
+    // 2xx, but a scripted assertion failed: HTTP fine, run failed.
+    const csv = buildResultsCsv([rec({
+      status: 200,
+      passed: 0,
+      total: 1,
+      tests: [{ name: 'body has id', passed: false }],
+    })]);
+    const row = cells(rows(csv)[1]);
+    expect(row[CSV_COLUMNS.indexOf('httpOk')]).toBe('yes');
+    expect(row[CSV_COLUMNS.indexOf('outcome')]).toBe('fail');
   });
 
   it('marks a 2xx with a failing assertion as a fail and names the assertion', () => {

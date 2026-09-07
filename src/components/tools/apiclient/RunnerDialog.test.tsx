@@ -218,7 +218,91 @@ describe('RunnerDialog run loop', () => {
     await waitFor(() => expect(statValue('Requests')).toBe('1'));
     expect(statValue('Passed')).toBe('0');
     expect(statValue('Failed')).toBe('1');
-    expect(statValue('Assertions')).toBe('1/2');
+    // Two scripted assertions plus the built-in HTTP check, which passed.
+    expect(statValue('Assertions')).toBe('2/3');
+    // HTTP itself was fine — that is the point of counting it separately.
+    expect(statValue('HTTP 2xx')).toContain('1/1');
+  });
+});
+
+// "Most of the time a 200 is all I need, and writing that test into every
+// request is too much hassle" — so the Runner asserts it by default.
+describe('RunnerDialog built-in HTTP 2xx check', () => {
+  const httpOption = () => screen.getByRole('switch', { name: 'Require HTTP 2xx' });
+
+  it('is on by default and fails a non-2xx with no script written', async () => {
+    const runRequest = vi.fn(async () => execOk(404));
+    setup(runRequest, [login]);
+
+    expect(httpOption().getAttribute('aria-checked')).toBe('true');
+    clickRun();
+
+    await waitFor(() => expect(statValue('Requests')).toBe('1'));
+    expect(statValue('Failed')).toBe('1');
+    // Counted like any assertion, so the run reports it rather than just
+    // colouring the status code.
+    expect(statValue('Assertions')).toBe('0/1');
+    expect(statValue('HTTP 2xx')).toContain('0/1');
+  });
+
+  it('treats a redirect as a failure too — only 2xx is success', async () => {
+    const runRequest = vi.fn(async () => execOk(302));
+    setup(runRequest, [login]);
+
+    clickRun();
+
+    await waitFor(() => expect(statValue('Requests')).toBe('1'));
+    expect(statValue('Failed')).toBe('1');
+    expect(statValue('Assertions')).toBe('0/1');
+  });
+
+  it('counts a request that never responded as a failed check', async () => {
+    const runRequest = vi.fn(async () => execError('ECONNREFUSED'));
+    setup(runRequest, [login]);
+
+    clickRun();
+
+    await waitFor(() => expect(statValue('Requests')).toBe('1'));
+    expect(statValue('Assertions')).toBe('0/1');
+    expect(statValue('HTTP 2xx')).toContain('0/1');
+  });
+
+  it('passes a 2xx without inventing a failure', async () => {
+    const runRequest = vi.fn(async () => execOk(201));
+    setup(runRequest, [login]);
+
+    clickRun();
+
+    await waitFor(() => expect(statValue('Requests')).toBe('1'));
+    expect(statValue('Passed')).toBe('1');
+    expect(statValue('Assertions')).toBe('1/1');
+  });
+
+  it('turning it off restores the lenient behaviour (3xx passes, no assertions)', async () => {
+    const runRequest = vi.fn(async () => execOk(302));
+    setup(runRequest, [login]);
+
+    fireEvent.click(httpOption());
+    clickRun();
+
+    await waitFor(() => expect(statValue('Requests')).toBe('1'));
+    expect(statValue('Passed')).toBe('1');
+    expect(statValue('Assertions')).toBe('0/0');
+    // The HTTP tile still reports the truth regardless of the option.
+    expect(statValue('HTTP 2xx')).toContain('0/1');
+  });
+
+  it('still counts HTTP failures per request in the rollup', async () => {
+    const runRequest = vi.fn(async (req: ApiRequest) => (req.name === 'Login' ? execOk(200) : execOk(500)));
+    setup(runRequest);
+
+    clickRun();
+    await waitFor(() => expect(statValue('Requests')).toBe('2'));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'By request' }));
+    const table = within(screen.getByRole('table'));
+    expect(within(table.getByText('Login').closest('tr')!).getByText('1/1')).toBeTruthy();
+    expect(within(table.getByText('Get user').closest('tr')!).getByText('0/1')).toBeTruthy();
   });
 });
 
@@ -284,7 +368,7 @@ describe('RunnerDialog data-driven run', () => {
     expect(name).toBe('My-collection.run-results.csv');
 
     const lines = (text as string).split('\n');
-    expect(lines[0]).toContain('status,statusText,outcome');
+    expect(lines[0]).toContain('status,statusText,httpOk,outcome');
     expect(lines[0].endsWith('userId,token')).toBe(true);
     expect(lines).toHaveLength(4);
     expect(lines[1]).toContain('200');

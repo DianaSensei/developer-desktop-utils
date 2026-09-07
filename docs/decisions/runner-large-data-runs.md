@@ -32,7 +32,19 @@ nhìn (+ overscan), spacer div giữ đúng chiều cao thật cho thanh cuộn,
 #N" khi > 100 iteration. Chiều cao dòng là hằng số theo chế độ (`ITER_ROW_H` 36px cho run
 thường, `ITER_ROW_H_DATA` 48px khi có nhãn dữ liệu ở dòng thứ hai).
 
-**4. Tracking response code theo từng request.** `fold()` gom thêm:
+**4. Assertion HTTP 2xx mặc định (`Require HTTP 2xx`, bật sẵn).** Phần lớn collection chỉ cần
+"200 là xong", nhưng trước đây muốn điều đó được *tính* là pass/fail thì phải viết test script
+cho từng request. Nay Runner tự chèn một assertion dựng sẵn (`httpOkTest`, tên
+`HTTP status is 2xx (built-in)`) vào đầu danh sách test của mỗi lần thực thi — chèn vào cả bản
+copy `ExecResult` dùng cho detail view, nên nó hiện trong tab Tests, cộng vào tổng assertion,
+làm fail execution và có mặt trong cả hai bản export, đúng như một assertion người dùng tự viết.
+Request lỗi transport (không có response) cũng nhận check này (`No response: …`).
+
+Song song đó, `fold()` đếm `http2xx` **độc lập với assertion** (cả mức run lẫn mức request) →
+tile **HTTP 2xx** trên dashboard, cột **HTTP 2xx** trong bảng By request, cột `httpOk` trong CSV
+và khối `http` trong JSON. Chỉ số này đúng kể cả khi tắt option.
+
+**5. Tracking response code theo từng request.** `fold()` gom thêm:
 
 - `byRequest` — rollup mỗi request qua tất cả iteration (số lần chạy, pass/fail, phân bố status
   code, avg/min/max ms), hiển thị ở tab **By request**.
@@ -52,6 +64,15 @@ của data file; JSON giữ nguyên và được bổ sung `byRequest` + `status
 - **Vì sao index theo iteration.** Ngay cả khi records nằm trong ref, `records.filter(r => r.iter
   === viewIter)` mỗi lần render vẫn là O(n). `byIterRef` biến nó thành O(1) tra cứu + O(số
   request/iteration) lọc.
+- **Vì sao HTTP 2xx là một assertion chèn vào, không phải sửa `isOk`.** Sửa thẳng `isOk` thành
+  "chỉ 2xx mới pass" sẽ đổi ngầm ý nghĩa của mọi run cũ (3xx đang được coi là pass) và không có
+  cách nào tắt. Dưới dạng assertion: nó **hiện ra** trong tab Tests với lý do cụ thể
+  (`Expected 2xx, got 302 Found`), đi qua đúng một đường tính pass/fail đã có, và tắt option là
+  quay lại hành vi cũ nguyên vẹn. Đây cũng là lý do `isOk` vẫn giữ khoảng 200–399.
+- **Vì sao vừa có assertion vừa có bộ đếm `http2xx` riêng.** Hai câu hỏi khác nhau: "endpoint có
+  sống không" (HTTP 2xx) và "response có đúng không" (Passed/Failed, gồm cả assertion người dùng
+  viết). Một run 100% 2xx vẫn có thể fail assertion, và ngược lại người dùng tắt option vẫn cần
+  biết bao nhiêu call không phải 2xx — nên bộ đếm không phụ thuộc vào option.
 - **Vì sao trần cho `statusSamples`.** Index "iteration nào trả 500" mà không giới hạn thì với
   100k iteration chính nó là một chỗ rò bộ nhớ; 100 ví dụ đã nhiều hơn số người thực sự bấm
   qua. Số đếm trong `byStatus` vẫn chính xác tuyệt đối, chỉ danh sách ví dụ mới bị cắt.

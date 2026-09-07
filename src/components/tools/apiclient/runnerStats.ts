@@ -41,7 +41,35 @@ export interface RunRecord {
 
 // A run counts as passed only when it got a 2xx/3xx response, raised no
 // transport or script error, and every assertion it ran passed.
+//
+// Note the 3xx: this predicate stays deliberately lenient about redirects,
+// because "only 2xx counts" is expressed as the built-in assertion below
+// rather than baked in here — a run with that assertion off keeps the older,
+// more forgiving meaning.
 export const isOk = (r: RunRecord) => !r.error && r.status >= 200 && r.status < 400 && r.passed === r.total;
+
+/** Success in the HTTP sense alone — no assertion, no transport error. */
+export const isHttp2xx = (status: number) => status >= 200 && status < 300;
+
+// The built-in "did this request even succeed" assertion. Most collections
+// only ever want "2xx and I'm happy", and writing that same test into every
+// single request is busywork the Runner can do for them — so it is on by
+// default (the `Require HTTP 2xx` option) and behaves exactly like a scripted
+// assertion: it shows in the Tests tab, counts towards the assertion totals,
+// fails the execution, and lands in both exports. Named so a reader can tell
+// it apart from something they wrote.
+export const HTTP_OK_TEST_NAME = 'HTTP status is 2xx (built-in)';
+
+export function httpOkTest(status: number, statusText: string, error?: string | null): TestResult {
+  if (isHttp2xx(status)) return { name: HTTP_OK_TEST_NAME, passed: true };
+  return {
+    name: HTTP_OK_TEST_NAME,
+    passed: false,
+    error: status === 0
+      ? `No response${error ? `: ${error}` : ''}`
+      : `Expected 2xx, got ${status}${statusText ? ` ${statusText}` : ''}`,
+  };
+}
 
 // How one request behaved across every iteration it ran in. A data-driven run
 // executes the same handful of requests thousands of times, so "which request
@@ -54,6 +82,8 @@ export interface RequestStats {
   total: number;
   passed: number;
   failed: number;
+  /** Executions that came back 2xx — HTTP success on its own terms. */
+  http2xx: number;
   avgMs: number;
   minMs: number;
   maxMs: number;
@@ -67,6 +97,10 @@ export interface RunStats {
   total: number;
   passed: number;
   failed: number;
+  // HTTP success counted on its own, separately from passed/failed: a run can
+  // be 2xx everywhere and still fail assertions, and the two answer different
+  // questions ("is the endpoint up" vs "is the response right").
+  http2xx: number;
   assertTotal: number;
   assertPassed: number;
   sumMs: number;
@@ -92,19 +126,12 @@ export const STATUS_SAMPLE_CAP = 100;
  *  the request never came back with one (transport failure, abort, throw). */
 export const statusKey = (r: RunRecord): string => (r.status === 0 ? 'error' : String(r.status));
 
-// Mutable running total, folded one record at a time. A data-driven run can
-// produce tens of thousands of records; recomputing `summarize(records)` over
-// the whole array after every single execution is O(n) per record and O(n²)
-// over the run, which is fine at Runner's original demo scale but stalls the
-// UI thread well before a 100k-row CSV run finishes. `fold` is the O(1)-per-
-// record alternative — call it once as each record lands and read `toStats()`
-// whenever the UI needs to render.
 /** Per-request running total. `timed` is the divisor for avgMs — see RunStatsAcc. */
 interface RequestAcc {
   requestId: string;
   name: string;
   method: HttpMethod;
-  total: number; passed: number; failed: number;
+  total: number; passed: number; failed: number; http2xx: number;
   sumMs: number; minMs: number; maxMs: number; timed: number;
   byStatus: Record<string, number>;
   statusSamples: Map<string, number[]>;
@@ -120,8 +147,15 @@ function sample(index: Map<string, number[]>, code: string, iter: number): void 
   else if (existing.length < STATUS_SAMPLE_CAP && existing[existing.length - 1] !== iter) existing.push(iter);
 }
 
+// Mutable running total, folded one record at a time. A data-driven run can
+// produce tens of thousands of records; recomputing `summarize(records)` over
+// the whole array after every single execution is O(n) per record and O(n²)
+// over the run, which is fine at Runner's original demo scale but stalls the
+// UI thread well before a 100k-row CSV run finishes. `fold` is the O(1)-per-
+// record alternative — call it once as each record lands and read `toStats()`
+// whenever the UI needs to render.
 export interface RunStatsAcc {
-  total: number; passed: number; failed: number;
+  total: number; passed: number; failed: number; http2xx: number;
   assertTotal: number; assertPassed: number;
   sumMs: number; minMs: number; maxMs: number;
   /** Records with a real response, i.e. status !== 0 — what timing stats are averaged over. */
@@ -136,7 +170,7 @@ export interface RunStatsAcc {
 
 export function newAcc(): RunStatsAcc {
   return {
-    total: 0, passed: 0, failed: 0,
+    total: 0, passed: 0, failed: 0, http2xx: 0,
     assertTotal: 0, assertPassed: 0,
     sumMs: 0, minMs: 0, maxMs: 0, timed: 0,
     totalBytes: 0,
@@ -152,6 +186,7 @@ export function fold(acc: RunStatsAcc, r: RunRecord): void {
 
   acc.total++;
   if (ok) acc.passed++; else acc.failed++;
+  if (isHttp2xx(r.status)) acc.http2xx++;
   acc.assertTotal += r.total;
   acc.assertPassed += r.passed;
   acc.totalBytes += r.sizeBytes;
@@ -167,7 +202,7 @@ export function fold(acc: RunStatsAcc, r: RunRecord): void {
   if (!req) {
     req = {
       requestId: r.requestId, name: r.name, method: r.method,
-      total: 0, passed: 0, failed: 0,
+      total: 0, passed: 0, failed: 0, http2xx: 0,
       sumMs: 0, minMs: 0, maxMs: 0, timed: 0,
       byStatus: {},
       statusSamples: new Map(),
@@ -176,6 +211,7 @@ export function fold(acc: RunStatsAcc, r: RunRecord): void {
   }
   req.total++;
   if (ok) req.passed++; else req.failed++;
+  if (isHttp2xx(r.status)) req.http2xx++;
   req.byStatus[code] = (req.byStatus[code] ?? 0) + 1;
   if (r.status !== 0) {
     req.timed++;
@@ -193,7 +229,7 @@ export function toStats(acc: RunStatsAcc): RunStats {
   for (const req of acc.byRequest.values()) {
     byRequest.push({
       requestId: req.requestId, name: req.name, method: req.method,
-      total: req.total, passed: req.passed, failed: req.failed,
+      total: req.total, passed: req.passed, failed: req.failed, http2xx: req.http2xx,
       avgMs: req.timed ? Math.round(req.sumMs / req.timed) : 0,
       minMs: req.minMs, maxMs: req.maxMs,
       byStatus: req.byStatus,
@@ -201,7 +237,7 @@ export function toStats(acc: RunStatsAcc): RunStats {
     });
   }
   return {
-    total: acc.total, passed: acc.passed, failed: acc.failed,
+    total: acc.total, passed: acc.passed, failed: acc.failed, http2xx: acc.http2xx,
     assertTotal: acc.assertTotal, assertPassed: acc.assertPassed,
     sumMs: acc.sumMs, avgMs: acc.timed ? Math.round(acc.sumMs / acc.timed) : 0,
     minMs: acc.minMs, maxMs: acc.maxMs,
