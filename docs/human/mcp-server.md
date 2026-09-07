@@ -96,7 +96,7 @@ Requests & running:
 | `get_request` | Full definition of one request. |
 | `update_request` | Patch a request — url, method, params, headers, body, auth, **script** (pre/post-request), tests, assertions, settings: any subset. |
 | `create_request` | Add a new request to a collection/folder. |
-| `run_request` | Actually send a request — pre-request script → send → post-response script → tests/assertions → History. Response bodies over 20,000 chars come back truncated (`bodyTruncated`/`bodyFullLength`); binary responses omit the base64 payload (`bodyBase64Omitted`) since raw bytes aren't useful to an MCP client and are expensive in tokens. |
+| `run_request` | Actually send a request — pre-request script → send → post-response script → tests/assertions → History. Response bodies over 20,000 chars come back truncated (`bodyTruncated`/`bodyFullLength`); binary responses omit the base64 payload (`bodyBase64Omitted`); console logs are capped at 200 entries (`logsTruncated`/`logsFullCount`) with each entry cut at 2,000 chars — all since raw/unbounded output isn't useful to an MCP client and is expensive in tokens. |
 
 Folders & tree structure:
 

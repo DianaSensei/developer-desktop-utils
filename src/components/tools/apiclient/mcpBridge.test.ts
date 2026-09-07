@@ -316,6 +316,23 @@ describe('useMcpBridge — Tauri desktop', () => {
     expect((res.result as { response: { status: number } }).response.status).toBe(200);
   });
 
+  it('run_request caps an oversized log array and trims oversized individual entries', async () => {
+    const store = makeStore();
+    const id = store.collections[0].items[0].id;
+    const bigEntries = Array.from({ length: 250 }, (_, i) => ({ level: 'log' as const, text: `line ${i}` }));
+    bigEntries[0] = { level: 'log', text: 'x'.repeat(3_000) };
+    const runRequest = vi.fn().mockResolvedValue({
+      response: { status: 200, statusText: 'OK', ok: true, headers: [], body: '{}', contentType: 'application/json', timeMs: 12, sizeBytes: 2 },
+      tests: [], logs: bigEntries, error: null,
+    });
+    const res = await call(store, 'run_request', { requestId: id }, runRequest);
+    const result = res.result as { logs: { text: string }[]; logsTruncated?: boolean; logsFullCount?: number };
+    expect(result.logs).toHaveLength(200);
+    expect(result.logsTruncated).toBe(true);
+    expect(result.logsFullCount).toBe(250);
+    expect(result.logs[0].text).toHaveLength(2_000 + '… (truncated)'.length);
+  });
+
   it('run_request truncates an oversized text body and strips bodyBase64 for binary responses', async () => {
     const store = makeStore();
     const id = store.collections[0].items[0].id;

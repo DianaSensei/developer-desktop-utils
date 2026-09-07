@@ -1002,16 +1002,26 @@ return the answer directly, so it works even while the app is closed (see
 that tool for the pattern).
 
 **Keeping MCP callers token-efficient:** this surface is read by an LLM, not
-rendered in a UI, so payload size is a real cost, not just bandwidth. Don't
-return a full nested object graph when a summary will do (`get_collection`
-returns collection-level fields plus a *summarized* item tree, not every
-nested request's full body/script/tests — see `summarizeItems`); cap anything
-that can be arbitrarily large before it leaves `mcpBridge.ts` (`run_request`
-truncates oversized response bodies and drops `bodyBase64` in favor of a
-`bodyBase64Omitted` flag — see `summarizeResponseForMcp`); and prefer a
-dedicated on-demand tool over inflating every tool's description/schema for
-information only occasionally needed (`get_scripting_reference` instead of
-folding the `bru`/`req`/`res`/`pm` API into `update_request`'s description).
+rendered in a UI, so payload size is a real cost, not just bandwidth — both
+per-call (a large response) and per-session (every tool's name/description/
+schema is sent on every `list_tools`, in every session this MCP server is
+registered in, whether or not that session ever calls one). For per-call
+cost: don't return a full nested object graph when a summary will do
+(`get_collection` returns collection-level fields plus a *summarized* item
+tree, not every nested request's full body/script/tests — see
+`summarizeItems`); cap anything that can be arbitrarily large before it
+leaves `mcpBridge.ts` — not just a response body (`run_request`'s
+`summarizeResponseForMcp`, dropping `bodyBase64` for a `bodyBase64Omitted`
+flag) but also anything a script can produce unboundedly, like console output
+(`summarizeLogsForMcp` caps entry count and each entry's length — a stray
+`console.log` in a loop is just as capable of flooding the response as a
+large body). For per-session cost: prefer a dedicated on-demand tool over
+inflating every tool's description/schema for information only occasionally
+needed (`get_scripting_reference` instead of folding the `bru`/`req`/`res`/
+`pm` API into `update_request`'s description), and keep descriptions terse —
+state the contract, not a tutorial; the full detail belongs in
+`get_scripting_reference`'s content (paid for only when actually called), not
+in every tool's always-sent description.
 
 **Deliberately excluded:** the Vault (`store.vault`) — the UI itself keeps
 Vault values out of generated code, cURL export, and history, so exposing it

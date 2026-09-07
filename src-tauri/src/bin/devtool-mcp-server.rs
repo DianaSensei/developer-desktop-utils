@@ -404,7 +404,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "update_request",
-            "description": "Patch a request in place. `patch` is a partial ApiRequest object — only the fields you include are changed (e.g. { \"url\": \"...\", \"method\": \"POST\", \"body\": { \"mode\": \"json\", \"raw\": \"...\", \"form\": [] } }). Set patch.script = { req, res } to edit its pre/post-request script.",
+            "description": "Patch a request in place. `patch` is a partial ApiRequest — only included fields change (e.g. { \"url\", \"method\", \"body\": { \"mode\", \"raw\", \"form\" } }). Set patch.script = { req, res } for its pre/post-request script.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "requestId": { "type": "string" }, "patch": { "type": "object" } },
@@ -422,7 +422,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "run_request",
-            "description": "Actually send a request through DevTool (same engine as the Send button): runs its pre-request script, sends it, runs the post-response script, evaluates tests/assertions, and appends it to History. Returns the response, tests, console logs, and any transport/script error. Pass environmentId to force a specific environment (omit for the currently active one, null for \"No Environment\").",
+            "description": "Send a request through DevTool (same engine as Send): pre-request script → send → post-response script → tests/assertions → History. Returns response (body capped), tests, logs, and any error. Pass environmentId to override the active environment (null = \"No Environment\").",
             "inputSchema": {
                 "type": "object",
                 "properties": { "requestId": { "type": "string" }, "environmentId": nullable_string() },
@@ -502,7 +502,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_node_script",
-            "description": "Set the pre/post-request script inherited by every request under a collection or folder (Bruno-style). Pass nodeId=null (or omit it) for the collection's own root script; pass a folder id for that folder's script. A request's OWN script is a field on it instead — see update_request's patch.script.",
+            "description": "Set the pre/post-request script inherited by every request under a collection/folder. nodeId=null (or omitted) = collection root; a folder id = that folder. A request's own script is set via update_request's patch.script instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -519,7 +519,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_node_auth",
-            "description": "Set the auth inherited by every request under a collection or folder that has auth.type=\"inherit\" (Bruno-style). Pass nodeId=null (or omit it) for the collection root; pass a folder id for that folder. A request's OWN auth is a field on it instead — see update_request's patch.auth.",
+            "description": "Set the auth inherited by requests with auth.type=\"inherit\" under a collection/folder. nodeId=null (or omitted) = collection root; a folder id = that folder. A request's own auth is set via update_request's patch.auth instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "collectionId": { "type": "string" }, "nodeId": nullable_string(), "auth": { "type": "object" } },
@@ -528,7 +528,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_node_headers",
-            "description": "Set the headers added to every request under a collection or folder (Bruno-style; a request's own header of the same name overrides it). Pass nodeId=null (or omit it) for the collection root; pass a folder id for that folder. A request's OWN headers are a field on it instead — see update_request's patch.headers.",
+            "description": "Set the headers added to every request under a collection/folder (a request's own header of the same name overrides it). nodeId=null (or omitted) = collection root; a folder id = that folder. A request's own headers are set via update_request's patch.headers instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "collectionId": { "type": "string" }, "nodeId": nullable_string(), "headers": kv_array_schema() },
@@ -556,7 +556,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_active_environment",
-            "description": "Activate an environment. scope=\"global\" sets the active Global environment; scope=\"collection\" (default) sets the active environment for one collection — pass collectionId in that case. environmentId=null clears it (\"No Environment\").",
+            "description": "Activate an environment. scope=\"global\" sets the active Global env; scope=\"collection\" (default) sets it for one collection (pass collectionId). environmentId=null clears it (\"No Environment\").",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -587,7 +587,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "get_scripting_reference",
-            "description": "Read-only reference covering both tools' scripting engines and field shapes. API Client: the bru/req/res/pm JS scripting API, variable precedence, Assertion operators, and the Auth/RequestBody/RequestSettings/KeyValue shapes update_request/set_node_auth/set_node_headers expect. Mock Server: the Rhai response-script API (a separate language/sandbox — what `req` exposes, the return shape), and the Stub/Matcher/MockConfig field shapes mock_add_stub/mock_update_stub/mock_set_fallback/mock_set_bind expect. Call this before writing or editing a script, auth, assertions, or a stub — no app or network round-trip needed, works even if DevTool isn't open.",
+            "description": "Read-only reference for both tools' scripting APIs and field shapes: API Client's bru/req/res/pm JS engine (variable precedence, assertions, Auth/RequestBody/KeyValue shapes) and Mock Server's Rhai response-script engine (a separate language — req shape, return shape, Stub/Matcher shapes). Call before writing/editing a script, auth, assertions, or a stub. Answered locally — works even if DevTool isn't open.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
@@ -607,7 +607,7 @@ fn tool_definitions() -> Vec<Value> {
         // component's state, not anywhere the sidecar can reach on its own).
         json!({
             "name": "mock_get_config",
-            "description": "Get the mock server's bind (host/port), fallback (\"no stub matched\") response, running status, and a summarized stub list (id/enabled/name/method/path/mode/status — not each stub's matchers/headers/body/script). Use mock_get_stub for one stub's full definition.",
+            "description": "Get the mock server's bind (host/port), fallback response, running status, and a summarized stub list (id/enabled/name/method/path/mode/status — not matchers/headers/body/script). Use mock_get_stub for one stub's full definition.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
@@ -617,7 +617,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "mock_add_stub",
-            "description": "Add a new stub. `stub` is a partial Stub object used as the initial values (unset fields default: enabled=true, method=GET, mode=static; see get_scripting_reference for the Stub/Matcher field shapes, and mock_test_script for iterating on a script before saving it here). Returns the created stub. New stubs are appended, and stub order matters — first match wins — so reorder with mock_move_stub if it needs to come before an existing one.",
+            "description": "Add a new stub. `stub` is a partial Stub object for the initial values (defaults: enabled=true, method=GET, mode=static — see get_scripting_reference for field shapes). Returns the created stub, appended to the end; reorder with mock_move_stub since stub order matters (first match wins).",
             "inputSchema": { "type": "object", "properties": { "stub": { "type": "object" } } }
         }),
         json!({
@@ -675,7 +675,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "mock_test_script",
-            "description": "Run a scripted-response Rhai script against a synthetic request, without saving it to a stub first — for iterating on a script before committing it via mock_add_stub/mock_update_stub. `sample` is { method, path, query, headers, params, body } (all optional; defaults to a bare GET /); see get_scripting_reference for what `req` exposes to the script and the expected return shape.",
+            "description": "Run a Rhai response script against a synthetic request, without saving it to a stub — for iterating before mock_add_stub/mock_update_stub. `sample` is { method, path, query, headers, params, body } (all optional, defaults to GET /); see get_scripting_reference for the req/return shape.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "script": { "type": "string" }, "sample": { "type": "object" } },

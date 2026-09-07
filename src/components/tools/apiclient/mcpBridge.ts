@@ -19,7 +19,7 @@
 import { useEffect, useRef } from 'react';
 import { isTauri } from '@/lib/platform';
 import type { ApiStore } from './store';
-import type { ApiRequest, Auth, Environment, KeyValue, RequestScript, TreeItem } from './types';
+import type { ApiRequest, Auth, Environment, KeyValue, LogEntry, RequestScript, TreeItem } from './types';
 import { newEnvironment, newRequest } from './types';
 import type { ExecResult } from './engine';
 
@@ -123,6 +123,21 @@ function summarizeResponseForMcp(response: ExecResult['response']): unknown {
   };
 }
 
+// A pre/post-request script's console.log output is just as unbounded as a
+// response body (a loop over a large array, an accidental full-object dump) —
+// cap entry count and each entry's own length the same way, rather than
+// shipping whatever the script happened to log verbatim.
+const MAX_LOG_ENTRIES = 200;
+const MAX_LOG_ENTRY_CHARS = 2_000;
+
+function summarizeLogsForMcp(logs: LogEntry[]): { logs: LogEntry[]; logsTruncated?: true; logsFullCount?: number } {
+  const overflowed = logs.length > MAX_LOG_ENTRIES;
+  const capped = (overflowed ? logs.slice(0, MAX_LOG_ENTRIES) : logs).map((l) =>
+    l.text.length > MAX_LOG_ENTRY_CHARS ? { ...l, text: `${l.text.slice(0, MAX_LOG_ENTRY_CHARS)}… (truncated)` } : l,
+  );
+  return { logs: capped, ...(overflowed ? { logsTruncated: true, logsFullCount: logs.length } : {}) };
+}
+
 function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string, ToolHandler> {
   return {
     list_collections: async () =>
@@ -187,7 +202,7 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
       return {
         response: summarizeResponseForMcp(result.response),
         tests: result.tests,
-        logs: result.logs,
+        ...summarizeLogsForMcp(result.logs),
         error: result.error,
       };
     },
