@@ -259,6 +259,24 @@ export interface HistoryEntry {
 
 // ─── factories ──────────────────────────────────────────────────────────────
 
+// Counter behind the last-resort branch below. Module-scope so it survives
+// across calls; it only ever has to disambiguate ids minted in the same
+// millisecond.
+let uidSeq = 0;
+
+/**
+ * Identity for every row, request, folder and collection — React keys, the
+ * ghost-row comparison in the Name/Value tables, and the id a request is
+ * looked up by. Uniqueness is the whole contract: two rows sharing an id
+ * means editing one edits the other.
+ *
+ * `crypto` first (a scanner flags Math.random here, and crypto is available
+ * in every environment this app actually runs in). The final branch exists
+ * only for a runtime with no Web Crypto at all, and uses a counter rather
+ * than a constant suffix — a fixed string would hand every id minted in the
+ * same millisecond the same value, which is precisely the failure the
+ * contract above cannot survive.
+ */
 export const uid = (): string => {
   const c = globalThis.crypto;
   if (c?.randomUUID) return c.randomUUID();
@@ -268,7 +286,8 @@ export const uid = (): string => {
     const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
     return `id-${Date.now()}-${hex}`;
   }
-  return `id-${Date.now()}-fallback`;
+  uidSeq += 1;
+  return `id-${Date.now()}-${uidSeq}`;
 };
 
 export const newKeyValue = (key = '', value = ''): KeyValue => ({
