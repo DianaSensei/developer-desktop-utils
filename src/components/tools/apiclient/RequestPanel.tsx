@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Braces, Check, ChevronDown, Code2, Database, File, FileQuestion, FileText,
-  FormInput, Hexagon, type LucideIcon, Tag, Trash2, X,
+  FormInput, Hexagon, type LucideIcon, Tag, Trash2, Wand2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ import { scriptApiExtensions } from './scriptCompletion';
 import { scriptCallsNetwork } from './collectionScripts';
 import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet } from './scriptSnippets';
 import { SnippetMenu } from './SnippetMenu';
-import { authQueryParam, urlWithParams } from './request';
+import { authQueryParam, prettyBody, urlWithParams } from './request';
 import {
   type ApiRequest, type Assertion, type AssertOperator, type BodyMode,
   type VarMap, ASSERT_OPERATORS, UNARY_ASSERT_OPERATORS, newAssertion, newKeyValue,
@@ -79,7 +79,22 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         active={tab}
         onSelect={(id) => onTabChange(id as Tab)}
         activeClassName="text-fg"
-        right={tab === 'body' ? <BodyModeDropdown body={request.body} onChange={onChange} /> : undefined}
+        right={tab === 'body' ? (
+          <div className="flex items-center gap-2">
+            {request.body.mode === 'json' && (
+              <button
+                type="button"
+                onClick={() => onChange({ body: { ...request.body, raw: prettyBody(request.body.raw, 'application/json') } })}
+                disabled={!request.body.raw.trim()}
+                className="flex items-center gap-1 py-2 text-xs font-medium text-fg-mute transition-colors hover:text-fg disabled:pointer-events-none disabled:opacity-40"
+                title="Format JSON"
+              >
+                <Wand2 className="h-3.5 w-3.5" /> Format
+              </button>
+            )}
+            <BodyModeDropdown body={request.body} onChange={onChange} />
+          </div>
+        ) : undefined}
       />
 
       {/* tab body */}
