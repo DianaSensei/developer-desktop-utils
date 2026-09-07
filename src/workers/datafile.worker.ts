@@ -7,13 +7,17 @@
 
 import { parseDataFile } from '@/components/tools/apiclient/datafile';
 
+const TRUSTED_MESSAGE_ORIGINS = new Set<string>([self.location.origin]);
+
 function isRequest(v: unknown): v is { name: string; text: string } {
   if (typeof v !== 'object' || v === null) return false;
   const m = v as { name?: unknown; text?: unknown };
   return typeof m.name === 'string' && typeof m.text === 'string';
 }
 
-self.onmessage = ({ data }: MessageEvent<unknown>) => {
+self.onmessage = (event: MessageEvent<unknown>) => {
+  if (!TRUSTED_MESSAGE_ORIGINS.has(event.origin)) return;
+  const { data } = event;
   if (!isRequest(data)) return;
   try {
     const parsed = parseDataFile(data.name, data.text);
