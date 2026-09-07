@@ -58,32 +58,62 @@ export interface RunStats {
   byStatus: Record<string, number>;
 }
 
-export function summarize(records: RunRecord[]): RunStats {
-  const stats: RunStats = {
-    total: records.length,
-    passed: 0, failed: 0,
+// Mutable running total, folded one record at a time. A data-driven run can
+// produce tens of thousands of records; recomputing `summarize(records)` over
+// the whole array after every single execution is O(n) per record and O(n²)
+// over the run, which is fine at Runner's original demo scale but stalls the
+// UI thread well before a 100k-row CSV run finishes. `fold` is the O(1)-per-
+// record alternative — call it once as each record lands and read `toStats()`
+// whenever the UI needs to render.
+export interface RunStatsAcc {
+  total: number; passed: number; failed: number;
+  assertTotal: number; assertPassed: number;
+  sumMs: number; minMs: number; maxMs: number;
+  /** Records with a real response, i.e. status !== 0 — what timing stats are averaged over. */
+  timed: number;
+  totalBytes: number;
+  byStatus: Record<string, number>;
+}
+
+export function newAcc(): RunStatsAcc {
+  return {
+    total: 0, passed: 0, failed: 0,
     assertTotal: 0, assertPassed: 0,
-    sumMs: 0, avgMs: 0, minMs: 0, maxMs: 0,
+    sumMs: 0, minMs: 0, maxMs: 0, timed: 0,
     totalBytes: 0,
     byStatus: {},
   };
-  // Only responses that arrived count towards timing, so a connection failure
-  // doesn't drag the average down to zero.
-  let timed = 0;
-  for (const r of records) {
-    if (isOk(r)) stats.passed++; else stats.failed++;
-    stats.assertTotal += r.total;
-    stats.assertPassed += r.passed;
-    stats.totalBytes += r.sizeBytes;
-    const code = r.status === 0 ? 'error' : String(r.status);
-    stats.byStatus[code] = (stats.byStatus[code] ?? 0) + 1;
-    if (r.status !== 0) {
-      timed++;
-      stats.sumMs += r.ms;
-      stats.minMs = timed === 1 ? r.ms : Math.min(stats.minMs, r.ms);
-      stats.maxMs = Math.max(stats.maxMs, r.ms);
-    }
+}
+
+export function fold(acc: RunStatsAcc, r: RunRecord): void {
+  acc.total++;
+  if (isOk(r)) acc.passed++; else acc.failed++;
+  acc.assertTotal += r.total;
+  acc.assertPassed += r.passed;
+  acc.totalBytes += r.sizeBytes;
+  const code = r.status === 0 ? 'error' : String(r.status);
+  acc.byStatus[code] = (acc.byStatus[code] ?? 0) + 1;
+  if (r.status !== 0) {
+    acc.timed++;
+    acc.sumMs += r.ms;
+    acc.minMs = acc.timed === 1 ? r.ms : Math.min(acc.minMs, r.ms);
+    acc.maxMs = Math.max(acc.maxMs, r.ms);
   }
-  stats.avgMs = timed ? Math.round(stats.sumMs / timed) : 0;
-  return stats;
+}
+
+export function toStats(acc: RunStatsAcc): RunStats {
+  return {
+    total: acc.total, passed: acc.passed, failed: acc.failed,
+    assertTotal: acc.assertTotal, assertPassed: acc.assertPassed,
+    sumMs: acc.sumMs, avgMs: acc.timed ? Math.round(acc.sumMs / acc.timed) : 0,
+    minMs: acc.minMs, maxMs: acc.maxMs,
+    totalBytes: acc.totalBytes,
+    byStatus: acc.byStatus,
+  };
+}
+
+export function summarize(records: RunRecord[]): RunStats {
+  const acc = newAcc();
+  for (const r of records) fold(acc, r);
+  return toStats(acc);
 }

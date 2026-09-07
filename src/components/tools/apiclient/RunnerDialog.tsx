@@ -34,15 +34,16 @@ import { Badge } from '@/components/ui/badge';
 import { Field } from '@/components/ui/tool-section';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Callout } from '@/components/ui/callout';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { methodColor } from './method-color';
 import { formatBytes, statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
-import { pickDataFile, saveJsonFile } from './fileio';
-import { DELIMITER_LABEL, type DataRow, type ParsedDataFile, parseDataFile } from './datafile';
+import { pickDataFile, saveJsonFile, saveTextFile } from './fileio';
+import { DELIMITER_LABEL, type DataRow, type ParsedDataFile, parseDataFileAsync } from './datafile';
 import { type ColumnMapping, collectVarTokens, mapColumns, missingColumns } from './varUsage';
 import type { ExecResult } from './engine';
 import { MAX_STEPS_PER_ITERATION, describeJump, findDuplicateNames, nextStepIndex } from './runnerFlow';
-import { type RunDetail, type RunRecord, isOk, summarize } from './runnerStats';
+import { type RunDetail, type RunRecord, type RunStats, type RunStatsAcc, fold, isOk, newAcc, toStats } from './runnerStats';
 import type { ApiRequest, Environment, HttpMethod, VarMap } from './types';
 
 interface Props {
@@ -69,6 +70,16 @@ const parseTags = (s: string): string[] =>
   s.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
 
 type ResultFilter = 'all' | 'passed' | 'failed';
+
+// Above this row count, "Save responses" defaults off (see loadData) and the
+// iteration rail switches from a plain list to a virtualized one (see
+// VirtualIterRail) — a 100k-row data file is the case this dialog is built
+// to handle without the UI or memory footprint degrading.
+const LARGE_DATA_ROWS = 2000;
+// Row-height the virtualized iteration rail renders at (px) — must match the
+// className on each row button below.
+const ITER_ROW_H = 44;
+const EMPTY_RECORDS: RunRecord[] = [];
 
 export function RunnerDialog({ title, requests, runRequest, knownVars = [], environments, defaultEnvId, open, onClose }: Props) {
   const [phase, setPhase] = useState<'setup' | 'results'>('setup');
@@ -99,9 +110,31 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   // Data-driven runs: each row of the file binds variables for one iteration.
   const [dataFile, setDataFile] = useState<{ name: string; parsed: ParsedDataFile } | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [parsingData, setParsingData] = useState(false);
+  // Cap iterations to the file's first N rows — lets a huge CSV (this dialog
+  // is built to take ~100k rows) be validated against a handful of rows
+  // before committing to a run that could take a long time to fully unwind.
+  const [rowLimit, setRowLimit] = useState<number | null>(null);
 
-  // Run state.
-  const [records, setRecords] = useState<RunRecord[]>([]);
+  // Run state. Records are kept in refs, not React state: a data-driven run
+  // over a 100k-row file produces one record per request per row, and
+  // re-rendering the whole history array on every single completion (or
+  // rescanning it for stats) turns an O(n) run into an O(n²) one long before
+  // it finishes. `recordsRef` is the full ordered history (read once, at
+  // export); `byIterRef` indexes it per iteration so the results view only
+  // ever touches the handful of records belonging to the iteration on
+  // screen; `accRef`/`iterStatsRef` are running totals folded in O(1) per
+  // record. `tick` is bumped on a throttle to trigger the re-renders that
+  // read these refs — see scheduleFlush.
+  const recordsRef = useRef<RunRecord[]>([]);
+  const byIterRef = useRef<Map<number, RunRecord[]>>(new Map());
+  const iterStatsRef = useRef<Map<number, { ok: number; total: number }>>(new Map());
+  const accRef = useRef<RunStatsAcc>(newAcc());
+  const ranItersRef = useRef(0);
+  const [stats, setStats] = useState<RunStats>(() => toStats(newAcc()));
+  const [tick, setTick] = useState(0);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [current, setCurrent] = useState<{ iter: number; name: string; method: HttpMethod } | null>(null);
   const [viewIter, setViewIter] = useState(0);
@@ -117,8 +150,25 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   const followIterRef = useRef(true);
   const dragId = useRef<string | null>(null);
 
+  // Applies immediately (run start/stop) — bypasses the throttle so the UI
+  // never shows a stale trailing record after the run actually finished.
+  const flushNow = () => {
+    if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
+    setStats(toStats(accRef.current));
+    setRanIters(ranItersRef.current);
+    setTick((t) => t + 1);
+  };
+  const scheduleFlush = () => {
+    if (flushTimerRef.current) return;
+    flushTimerRef.current = setTimeout(() => { flushTimerRef.current = null; flushNow(); }, 120);
+  };
+  useEffect(() => () => { if (flushTimerRef.current) clearTimeout(flushTimerRef.current); }, []);
+
   const resetRun = () => {
-    setRecords([]); setDetailKey(null); setCurrent(null);
+    recordsRef.current = []; byIterRef.current = new Map(); iterStatsRef.current = new Map();
+    accRef.current = newAcc(); ranItersRef.current = 0;
+    setStats(toStats(accRef.current)); setTick(0);
+    setDetailKey(null); setCurrent(null);
     setViewIter(0); setRanIters(0); setElapsed(0); setFilter('all'); setCappedIters(new Set());
   };
 
@@ -147,7 +197,16 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
     });
   }, [order, selected, includeTags, excludeTags]);
 
-  const dataRows = dataFile?.parsed.rows;
+  const allDataRows = dataFile?.parsed.rows;
+  // rowLimit trims which rows actually feed the run (a "test with the first N
+  // rows" dry run) without discarding the loaded file — clearing the limit
+  // brings every row back. Memoized: re-slicing a large file on every render
+  // (this dialog re-renders on every throttled flush while a run is live)
+  // would itself become a recurring O(n) cost.
+  const dataRows = useMemo(
+    () => (allDataRows && rowLimit != null ? allDataRows.slice(0, rowLimit) : allDataRows),
+    [allDataRows, rowLimit],
+  );
   const iters = dataRows ? dataRows.length : Math.max(1, Number(iterations) || 1);
 
   // Which {{tokens}} the selected requests actually reference, so the data file
@@ -233,7 +292,15 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
         dataVars,
       };
     }
-    setRecords((prev) => [...prev, record]);
+    recordsRef.current.push(record);
+    fold(accRef.current, record);
+    const s = iterStatsRef.current.get(iter) ?? { ok: 0, total: 0 };
+    s.total += 1;
+    if (isOk(record)) s.ok += 1;
+    iterStatsRef.current.set(iter, s);
+    const arr = byIterRef.current.get(iter);
+    if (arr) arr.push(record); else byIterRef.current.set(iter, [record]);
+    scheduleFlush();
     return record;
   };
 
@@ -278,13 +345,18 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
           if (step >= MAX_STEPS_PER_ITERATION) capped.add(i);
         }
 
-        setRanIters(startedIters);
+        // ranIters drives the iteration rail's rendered range — updating it
+        // through React state on every iteration would re-render on every
+        // row of a 100k-row run. Folded into the same throttle as records.
+        ranItersRef.current = startedIters;
+        scheduleFlush();
       }
     } finally {
       setCurrent(null);
       setRunning(false);
       setCappedIters(capped);
-      setRanIters(startedIters);
+      ranItersRef.current = startedIters;
+      flushNow();
       if (startedAtRef.current) setElapsed(Date.now() - startedAtRef.current);
     }
   };
@@ -293,15 +365,25 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
 
   const loadData = async () => {
     setDataError(null);
+    setParsingData(true);
     try {
       const picked = await pickDataFile();
       if (!picked) return;
-      const parsed = parseDataFile(picked.name, picked.text);
+      // Off the main thread above WORKER_THRESHOLD_CHARS — a 100k-row CSV
+      // takes real time to walk and would otherwise freeze the dialog on pick.
+      const parsed = await parseDataFileAsync(picked.name, picked.text);
       setDataFile({ name: picked.name, parsed });
+      setRowLimit(null);
+      // Keeping every response in memory for a huge run risks running the
+      // app out of memory before the run finishes — default it off and let
+      // the user opt back in once they know the file is small enough.
+      if (parsed.rows.length > LARGE_DATA_ROWS) setSaveResponses(false);
       resetRun();
     } catch (e) {
       setDataFile(null);
       setDataError((e as Error)?.message || 'Could not load the data file.');
+    } finally {
+      setParsingData(false);
     }
   };
 
@@ -311,7 +393,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
     setEnvId(defaultEnvId && environments.some((e) => e.id === defaultEnvId) ? defaultEnvId : null);
     setDelay(''); setIterations('1'); setParallel(false); setIncludeTags(''); setExcludeTags('');
     setStopOnFailure(false); setSaveResponses(true);
-    setDataFile(null); setDataError(null);
+    setDataFile(null); setDataError(null); setRowLimit(null);
     resetRun(); setPhase('setup');
   };
 
@@ -335,37 +417,37 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
     });
   };
 
-  // Per-iteration pass/total, computed once per `records` change (O(records))
-  // instead of re-scanning the whole array for every iteration-rail row on
-  // every render (O(iterations × records) — records grows live while a run is
-  // in progress, and a data-driven run can have hundreds of iterations).
-  const iterStatsMap = useMemo(() => {
-    const map = new Map<number, { ok: number; total: number }>();
-    for (const r of records) {
-      const s = map.get(r.iter) ?? { ok: 0, total: 0 };
-      s.total += 1;
-      if (isOk(r)) s.ok += 1;
-      map.set(r.iter, s);
-    }
-    return map;
-  }, [records]);
-  const iterStats = (iter: number) => iterStatsMap.get(iter) ?? { ok: 0, total: 0 };
+  // Per-iteration pass/total — read straight from iterStatsRef (folded in O(1)
+  // per record as the run executes; see runOne) rather than rescanning
+  // history, which is what let a data-driven run's iteration rail cost
+  // O(iterations × records) per render.
+  const iterStats = (iter: number) => iterStatsRef.current.get(iter) ?? { ok: 0, total: 0 };
 
-  // Overall statistics across every execution in the run.
-  const stats = useMemo(() => summarize(records), [records]);
   const { total: totalRun, passed: passedRun, assertPassed: assertPass, assertTotal } = stats;
 
   const plannedCount = effective.length * iters;
   const dataRow = dataRows ? dataRows[viewIter] : undefined;
   const multiIter = ranIters > 1 || (running && iters > 1);
 
-  const iterRecords = useMemo(() => records.filter((r) => r.iter === viewIter), [records, viewIter]);
+  // byIterRef gives O(1) access to just this iteration's records instead of
+  // filtering the whole run's history on every render — the difference
+  // between a responsive results view and one that re-scans up to 100k
+  // records on every keystroke-level state change while a run is live.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const iterRecords = useMemo(() => byIterRef.current.get(viewIter) ?? EMPTY_RECORDS, [viewIter, tick]);
   const shown = useMemo(
     () => iterRecords.filter((r) => (filter === 'all' ? true : filter === 'passed' ? isOk(r) : !isOk(r))),
     [iterRecords, filter],
   );
   const failedCount = stats.failed;
-  const detailRecord = useMemo(() => records.find((r) => r.key === detailKey) ?? null, [records, detailKey]);
+  // detailKey is `${iter}:${step}` (see runOne) — look inside just that
+  // iteration's bucket instead of scanning the full run.
+  const detailRecord = useMemo(() => {
+    if (!detailKey) return null;
+    const iter = Number(detailKey.slice(0, detailKey.indexOf(':')));
+    return (byIterRef.current.get(iter) ?? []).find((r) => r.key === detailKey) ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailKey, tick]);
 
   const exportResults = async () => {
     const report = {
@@ -400,7 +482,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
         responseTimeMs: { average: stats.avgMs, min: stats.minMs, max: stats.maxMs, total: stats.sumMs },
         totalDataBytes: stats.totalBytes,
         statusCodes: stats.byStatus,
-        failures: records.filter((r) => !isOk(r)).map((r) => ({
+        failures: recordsRef.current.filter((r) => !isOk(r)).map((r) => ({
           iteration: r.iter + 1,
           step: r.step + 1,
           name: r.name,
@@ -409,7 +491,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
           failedTests: r.tests.filter((t) => !t.passed).map((t) => ({ name: t.name, error: t.error })),
         })),
       },
-      runs: records.map((r) => ({
+      runs: recordsRef.current.map((r) => ({
         iteration: r.iter + 1,
         step: r.step + 1,
         at: new Date(r.at).toISOString(),
@@ -438,6 +520,36 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
     };
     const safe = (title || 'run').replace(/[^\w.-]+/g, '-');
     await saveJsonFile(`${safe}.run-results.json`, JSON.stringify(report, null, 2));
+  };
+
+  // A CSV export alongside the JSON one: one row per executed request, with
+  // its bound data-file columns spliced in. For a data-driven run over a
+  // 100k-row CSV this is the format someone actually wants to open — a
+  // spreadsheet loads a flat table instantly, where the equivalent JSON
+  // report (deeply nested, one object per run) would be sluggish just to
+  // scroll through, and most of that structure doesn't matter for a "which
+  // rows failed and why" pass.
+  const exportResultsCsv = async () => {
+    const dataCols = dataFile?.parsed.columns ?? [];
+    const header = [
+      'iteration', 'step', 'name', 'method', 'url', 'status', 'ok', 'timeMs', 'sizeBytes',
+      'assertionsPassed', 'assertionsTotal', 'error', ...dataCols,
+    ];
+    const csvCell = (v: unknown): string => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [header.map(csvCell).join(',')];
+    for (const r of recordsRef.current) {
+      const row = [
+        r.iter + 1, r.step + 1, r.name, r.method, r.url, r.status, isOk(r) ? 'yes' : 'no',
+        r.ms, r.sizeBytes, r.passed, r.total, r.error ?? '',
+        ...dataCols.map((c) => r.dataVars?.[c] ?? ''),
+      ];
+      lines.push(row.map(csvCell).join(','));
+    }
+    const safe = (title || 'run').replace(/[^\w.-]+/g, '-');
+    await saveTextFile(`${safe}.run-results.csv`, lines.join('\n'));
   };
 
   return (
@@ -529,7 +641,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                     />
                     <OptionRow
                       label="Save responses"
-                      hint="Keep each response so you can open it afterwards."
+                      hint={
+                        (dataRows?.length ?? 0) > LARGE_DATA_ROWS
+                          ? `Off by default for ${dataRows!.length.toLocaleString()} rows — keeping every response in memory risks running out before the run finishes. Stats, pass/fail and the CSV/JSON export still cover every row either way.`
+                          : 'Keep each response so you can open it afterwards.'
+                      }
                       checked={saveResponses}
                       onChange={setSaveResponses}
                     />
@@ -554,7 +670,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                         </button>
                       </div>
                       <p className="text-[11px] text-fg-mute">
-                        {dataFile.parsed.rows.length} row{dataFile.parsed.rows.length === 1 ? '' : 's'}
+                        {dataFile.parsed.rows.length.toLocaleString()} row{dataFile.parsed.rows.length === 1 ? '' : 's'}
                         {' · '}{dataFile.parsed.columns.length} column{dataFile.parsed.columns.length === 1 ? '' : 's'}
                         {dataFile.parsed.format === 'csv' && dataFile.parsed.delimiter
                           ? ` · ${DELIMITER_LABEL[dataFile.parsed.delimiter]}-separated`
@@ -568,17 +684,47 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                         </p>
                       )}
                       <DataPreview rows={dataFile.parsed.rows} columns={dataFile.parsed.columns} />
+                      {dataFile.parsed.rows.length > 1 && (
+                        <div className="flex items-center gap-1.5 border-t pt-2">
+                          <label className="flex items-center gap-1.5 text-[11px] text-fg-mute">
+                            <Checkbox
+                              checked={rowLimit != null}
+                              onCheckedChange={(v) => setRowLimit(v ? Math.min(10, dataFile.parsed.rows.length) : null)}
+                            />
+                            Test with only the first
+                          </label>
+                          <Input
+                            value={rowLimit ?? ''}
+                            onChange={(e) => {
+                              const n = Math.max(1, Math.min(dataFile.parsed.rows.length, Number(e.target.value) || 1));
+                              setRowLimit(n);
+                            }}
+                            disabled={rowLimit == null}
+                            inputMode="numeric"
+                            className="h-6 w-14 text-[11px] disabled:opacity-50"
+                          />
+                          <span className="text-[11px] text-fg-mute">
+                            row{rowLimit === 1 ? '' : 's'} — verify the mapping before committing to all{' '}
+                            {dataFile.parsed.rows.length.toLocaleString()}.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <button
                       onClick={loadData}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2.5 text-xs text-fg-mute transition-colors hover:border-fg/30 hover:text-fg"
+                      disabled={parsingData}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed py-2.5 text-xs text-fg-mute transition-colors hover:border-fg/30 hover:text-fg disabled:opacity-60"
                     >
-                      <FileSpreadsheet className="h-3.5 w-3.5" /> Select CSV or JSON file
+                      {parsingData ? (
+                        <><Spinner size="sm" /> Parsing file…</>
+                      ) : (
+                        <><FileSpreadsheet className="h-3.5 w-3.5" /> Select CSV or JSON file</>
+                      )}
                     </button>
                   )}
                   {dataError && <p className="text-[11px] text-bad">{dataError}</p>}
-                  {!dataFile && <p className="text-[11px] text-fg-mute">Binds each row's columns to <code className="rounded bg-bg-2 px-1">{'{{var}}'}</code>, one iteration per row.</p>}
+                  {!dataFile && <p className="text-[11px] text-fg-mute">Binds each row's columns to <code className="rounded bg-bg-2 px-1">{'{{var}}'}</code>, one iteration per row. Handles large files (hundreds of thousands of rows) — parsing runs off the main thread so the dialog stays responsive.</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -643,10 +789,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
             {/* action bar */}
             <div className="flex shrink-0 items-center gap-3 border-t px-4 py-3">
               <Button onClick={run} disabled={plannedCount === 0} className="h-ctl-lg gap-1.5 px-4">
-                <Play className="h-4 w-4" /> Run {plannedCount} request{plannedCount === 1 ? '' : 's'}
+                <Play className="h-4 w-4" /> Run {plannedCount.toLocaleString()} request{plannedCount === 1 ? '' : 's'}
               </Button>
               <span className="text-xs text-fg-mute">
-                {effective.length} selected × {iters} iteration{iters === 1 ? '' : 's'}
+                {effective.length} selected × {iters.toLocaleString()} iteration{iters === 1 ? '' : 's'}
+                {rowLimit != null && ` (of ${dataFile?.parsed.rows.length.toLocaleString()} rows)`}
               </span>
               <button onClick={resetAll} className="ml-auto flex items-center gap-1 text-xs font-medium text-fg-mute hover:text-fg">
                 <RotateCcw className="h-3.5 w-3.5" /> Reset
@@ -672,14 +819,22 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                   </Button>
                 ) : (
                   <>
-                    <Button
-                      onClick={exportResults}
-                      disabled={totalRun === 0}
-                      variant="outline" size="sm"
-                      className="h-ctl gap-1.5 text-xs"
-                    >
-                      <Download className="h-3.5 w-3.5" /> Export
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        disabled={totalRun === 0}
+                        className="flex h-ctl items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors hover:bg-acc/50 disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        <Download className="h-3.5 w-3.5" /> Export
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={exportResultsCsv}>
+                          CSV — one row per request
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={exportResults}>
+                          JSON — full detail (options, tests, responses kept)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button onClick={run} size="sm" className="h-ctl gap-1.5">
                       <RotateCcw className="h-3.5 w-3.5" /> Run again
                     </Button>
@@ -708,8 +863,15 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                 </span>
                 <span>
                   <span className="font-medium text-fg/70">Iterations</span>{' '}
-                  {ranIters}/{iters}
+                  {ranIters.toLocaleString()}/{iters.toLocaleString()}
                 </span>
+                {running && ranIters > 0 && elapsed > 0 && (
+                  <span>
+                    <span className="font-medium text-fg/70">Rate</span>{' '}
+                    {(ranIters / (elapsed / 1000)).toFixed(1)} iter/s
+                    {ranIters < iters && ` · ~${formatDuration(((iters - ranIters) / (ranIters / elapsed)))} left`}
+                  </span>
+                )}
               </div>
             )}
 
@@ -726,30 +888,13 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
             <div className="flex min-h-0 flex-1">
               {/* iteration rail (data / multi-iteration runs) */}
               {multiIter && !detailKey && (
-                <div className="w-48 shrink-0 overflow-y-auto border-r">
-                  {Array.from({ length: Math.max(ranIters, running ? iters : 0) }, (_, i) => {
-                    const s = iterStats(i);
-                    const ok = s.total > 0 && s.ok === s.total;
-                    const row = dataRows?.[i];
-                    const labelVals = row ? Object.values(row).slice(0, 2).join(', ') : '';
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => { followIterRef.current = false; setViewIter(i); }}
-                        className={cn('flex w-full items-center gap-2 border-b px-3 py-2 text-left text-xs transition-colors hover:bg-acc/50',
-                          i === viewIter && 'bg-acc')}
-                      >
-                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full',
-                          s.total === 0 ? 'bg-fg-mute/30' : ok ? 'bg-ok' : 'bg-bad')} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-medium">Iteration {i + 1}</span>
-                          {labelVals && <span className="block truncate text-[11px] text-fg-mute" title={labelVals}>{labelVals}</span>}
-                        </span>
-                        {s.total > 0 && <span className={cn('shrink-0 text-[11px]', ok ? 'text-ok' : 'text-bad')}>{s.ok}/{s.total}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
+                <VirtualIterRail
+                  count={Math.max(ranIters, running ? iters : 0)}
+                  viewIter={viewIter}
+                  onSelect={(i) => { followIterRef.current = false; setViewIter(i); }}
+                  iterStats={iterStats}
+                  dataRows={dataRows}
+                />
               )}
 
               {/* request results / detail */}
@@ -816,6 +961,109 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── iteration rail (virtualized) ─────────────────────────────────────────────
+
+// A data-driven run over a 100k-row file has up to 100k iterations. Rendering
+// one button per iteration (the original implementation) means 100k live DOM
+// nodes sitting in the dialog at once — the browser stalls just laying that
+// out, long before the run itself is the bottleneck. This renders only the
+// rows actually scrolled into view (plus a small overscan), backed by a
+// spacer div so the scrollbar still reflects the true list length.
+function VirtualIterRail({ count, viewIter, onSelect, iterStats, dataRows }: {
+  count: number;
+  viewIter: number;
+  onSelect: (i: number) => void;
+  iterStats: (i: number) => { ok: number; total: number };
+  dataRows?: DataRow[];
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportH, setViewportH] = useState(0);
+  // Large data-driven runs push a jump box (input + Go) above the rail —
+  // scrolling to iteration #87,412 one screenful at a time isn't navigation.
+  const [jumpTo, setJumpTo] = useState('');
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setViewportH(el.clientHeight);
+    const ro = new ResizeObserver(() => setViewportH(el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Keep the active row in view when navigation moved it here from outside
+  // this list (the run auto-following its current iteration, or a jump).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const top = viewIter * ITER_ROW_H;
+    if (top < el.scrollTop) el.scrollTop = top;
+    else if (top + ITER_ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = top + ITER_ROW_H - el.clientHeight;
+  }, [viewIter]);
+
+  const overscan = 8;
+  const start = Math.max(0, Math.floor(scrollTop / ITER_ROW_H) - overscan);
+  const visible = Math.ceil((viewportH || 1) / ITER_ROW_H) + overscan * 2;
+  const end = Math.min(count, start + visible);
+  const rows: number[] = [];
+  for (let i = start; i < end; i++) rows.push(i);
+
+  const jump = () => {
+    const n = Math.round(Number(jumpTo));
+    if (!Number.isFinite(n) || n < 1 || n > count) return;
+    onSelect(n - 1);
+    setJumpTo('');
+  };
+
+  return (
+    <div className="flex w-48 shrink-0 flex-col border-r">
+      {count > 100 && (
+        <div className="flex shrink-0 items-center gap-1 border-b p-1.5">
+          <Input
+            value={jumpTo}
+            onChange={(e) => setJumpTo(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && jump()}
+            placeholder={`# 1–${count.toLocaleString()}`}
+            inputMode="numeric"
+            className="h-6 flex-1 text-[11px]"
+          />
+          <button onClick={jump} className="shrink-0 rounded px-1.5 py-1 text-[11px] font-medium text-fg-mute hover:bg-acc hover:text-fg">
+            Go
+          </button>
+        </div>
+      )}
+      <div ref={containerRef} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)} className="min-h-0 flex-1 overflow-y-auto">
+        <div style={{ height: count * ITER_ROW_H, position: 'relative' }}>
+          {rows.map((i) => {
+            const s = iterStats(i);
+            const ok = s.total > 0 && s.ok === s.total;
+            const row = dataRows?.[i];
+            const labelVals = row ? Object.values(row).slice(0, 2).join(', ') : '';
+            return (
+              <button
+                key={i}
+                onClick={() => onSelect(i)}
+                style={{ position: 'absolute', top: i * ITER_ROW_H, left: 0, right: 0, height: ITER_ROW_H }}
+                className={cn('flex items-center gap-2 border-b px-3 py-2 text-left text-xs transition-colors hover:bg-acc/50',
+                  i === viewIter && 'bg-acc')}
+              >
+                <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full',
+                  s.total === 0 ? 'bg-fg-mute/30' : ok ? 'bg-ok' : 'bg-bad')} />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">Iteration {i + 1}</span>
+                  {labelVals && <span className="block truncate text-[11px] text-fg-mute" title={labelVals}>{labelVals}</span>}
+                </span>
+                {s.total > 0 && <span className={cn('shrink-0 text-[11px]', ok ? 'text-ok' : 'text-bad')}>{s.ok}/{s.total}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 

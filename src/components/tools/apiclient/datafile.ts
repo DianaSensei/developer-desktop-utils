@@ -149,3 +149,25 @@ export const DELIMITER_LABEL: Record<Delimiter, string> = {
   ';': 'semicolon',
   '\t': 'tab',
 };
+
+// Below this, parseDataFile's own character-by-character scan finishes fast
+// enough that a worker round-trip (structured-cloning the whole file text
+// there, and the parsed rows back) would only add latency for no benefit.
+const WORKER_THRESHOLD_CHARS = 200_000;
+
+// Same result as parseDataFile, but for a large CSV/JSON (a 100k-row export
+// is common for the Runner's data-driven mode) it runs off the main thread so
+// picking the file doesn't freeze the dialog while it parses.
+export function parseDataFileAsync(name: string, raw: string): Promise<ParsedDataFile> {
+  if (raw.length < WORKER_THRESHOLD_CHARS) return Promise.resolve(parseDataFile(name, raw));
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../../../workers/datafile.worker.ts', import.meta.url), { type: 'module' });
+    const done = (fn: () => void) => { worker.terminate(); fn(); };
+    worker.onmessage = ({ data }: MessageEvent<{ type: 'result'; parsed: ParsedDataFile } | { type: 'error'; message: string }>) => {
+      if (data.type === 'result') done(() => resolve(data.parsed));
+      else done(() => reject(new Error(data.message)));
+    };
+    worker.onerror = (e) => done(() => reject(new Error(e.message || 'Could not parse the data file.')));
+    worker.postMessage({ name, text: raw });
+  });
+}
