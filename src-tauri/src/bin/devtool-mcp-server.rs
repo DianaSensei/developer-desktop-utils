@@ -8,10 +8,14 @@
 // writes its port + auth token to `<app_data_dir>/mcp-bridge.json` for this
 // process to read. Every MCP tool call this process receives over stdio is
 // forwarded there as a `POST /call`, which the app hands to the running
-// webview to answer — so a call only succeeds while DevTool is open with the
-// API Client tool on screen. See src-tauri/src/mcp_bridge.rs for the full
-// design, and src/components/tools/apiclient/mcpBridge.ts for what each tool
-// actually does.
+// webview to answer — so an API Client tool call (list_collections,
+// get_request, etc.) only succeeds while DevTool is open with the API Client
+// tool on screen, and a `mock_*` call only while it's open with the Mock
+// Server tool on screen (get_scripting_reference is the one exception —
+// answered locally, see its own comment below). See
+// src-tauri/src/mcp_bridge.rs for the full design, and
+// src/components/tools/apiclient/mcpBridge.ts /
+// src/components/tools/mockserver/mcpBridge.ts for what each tool actually does.
 //
 // Built on rmcp (the official Rust MCP SDK) for the protocol itself —
 // JSON-RPC framing, capability negotiation, tool routing all come from the
@@ -182,14 +186,17 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
     http_post_json(info.port, &info.token, &json!({ "tool": tool, "args": args })).await
 }
 
-// Static reference for the scripting engine and the field shapes `update_request`
-// / `set_node_auth` / `set_node_headers` patches expect — see
-// `src/components/tools/apiclient/runtime.ts` (bru/req/res/pm/expect/assert) and
-// `types.ts` (Auth/RequestBody/RequestSettings/KeyValue) for the source of truth.
-// Answered locally (no bridge round-trip, no running app required) since it's
-// static content, not live app state — and served on demand as its own tool
-// rather than folded into every other tool's description, so its ~4KB is only
-// spent when a caller actually needs it instead of on every tool listing.
+// Static reference for BOTH tools' scripting engines and the field shapes
+// their patch-style tools expect — see `src/components/tools/apiclient/
+// runtime.ts` (bru/req/res/pm/expect/assert) and `types.ts` (Auth/
+// RequestBody/RequestSettings/KeyValue) for the API Client half, and
+// `src-tauri/src/mockserver.rs` (`req_to_rhai`/`run_script`) and
+// `src/components/tools/mockserver/types.ts` (Stub/Matcher/MockConfig) for
+// the Mock Server half, as the source of truth. Answered locally (no bridge
+// round-trip, no running app required) since it's static content, not live
+// app state — and served on demand as its own tool rather than folded into
+// every other tool's description, so its size is only spent when a caller
+// actually needs it instead of on every tool listing.
 const SCRIPTING_REFERENCE: &str = r#"# DevTool API Client — scripting & field-shape reference
 
 Pre/post-request scripts are plain JS (Bruno-style), run sandboxed. A
@@ -285,6 +292,57 @@ Auth: { type: 'none'|'inherit'|'bearer'|'basic'|'digest'|'apikey'|'oauth2',
 RequestSettings: { encodeUrl, followRedirects, maxRedirects, timeout, tags: string[], verifyTls }
 
 RequestScript: { req: string, res: string }  — pre-request / post-response JS source
+
+---
+
+# Mock Server — scripting & field-shape reference (separate engine from the API Client's)
+
+A stub's response is either `mode: "static"` (fixed status/headers/body) or
+`mode: "script"`, whose `script` is Rhai — NOT JavaScript, and NOT the same
+sandbox/API as the API Client's bru/req/res above. Use mock_test_script to run
+one against a sample request before saving it via mock_add_stub/mock_update_stub.
+
+## The `req` object available to a script
+#{ method, path, body, query: #{...}, headers: #{...}, params: #{...} }
+(`params` = path placeholders matched from the stub's `path`, e.g. `/users/:id`.)
+All values are strings; `query`/`headers`/`params` are Rhai maps (`#{...}`), so
+read a key with `req.query["name"]` (bracket indexing, not dot-access, since
+the key is data not a fixed identifier).
+
+## Return value
+Either a plain string (used as the response body, status 200), or a map:
+#{ status: 201, headers: #{ "content-type": "application/json" }, body: "..." }
+`status` defaults to 200 if omitted; `headers` and `body` are optional (body
+defaults to empty). A script that throws/errors produces a 500 with the error
+as the body — mock_test_script's `error` field surfaces this directly instead.
+
+Rhai syntax notes for a JS-fluent caller: maps are `#{ key: value }` (not
+`{}`), string interpolation is `` `${var}` `` inside backticks, and there is no
+`===`/`!==` (`==`/`!=` only).
+
+## Field shapes for mock_add_stub/mock_update_stub's patch, mock_set_fallback, mock_set_bind
+
+Stub: { id, enabled, name, method: 'ANY'|'GET'|'POST'|'PUT'|'PATCH'|'DELETE'|'HEAD'|'OPTIONS',
+  path, matchers: Matcher[], mode: 'static'|'script', status, headers: KeyValue[],
+  body, bodyType: 'text'|'json'|'base64', fileName, script, delayMs }
+`path` supports `:param` placeholders (e.g. `/users/:id`), readable from
+scripts via `req.params` and matchable via a `path`-target Matcher. `bodyType`
+only governs how `body` is interpreted/served in static mode (`base64` sets
+Content-Disposition from `fileName`); it has no effect in script mode, where
+the script's returned `body` is always sent as-is. `delayMs` artificially
+delays the response (simulating latency).
+
+Matcher: { id, target: 'query'|'header'|'body'|'path', op: 'equals'|'contains'|'regex'|'exists',
+  key, value }. All of a stub's enabled matchers must pass for it to match; a
+stub with none matches every request to its method+path. For a `body` target,
+an empty `key` matches the whole body as text; a non-empty `key` is a dotted
+JSON field path (e.g. `user.name`, `tags.1`) evaluated against the parsed
+JSON body. `exists` ignores `value`.
+
+MockConfig-level fields (mock_get_config / mock_set_fallback / mock_set_bind):
+host, port (bind address — mock_set_bind, takes effect on the next mock_start),
+notFoundStatus, notFoundBody, notFoundContentType (the fallback response for
+when no stub matches — mock_set_fallback).
 "#;
 
 async fn call_tool(name: &str, args: Value) -> CallToolResult {
@@ -302,7 +360,8 @@ async fn call_tool(name: &str, args: Value) -> CallToolResult {
 
 // ── tool catalogue ───────────────────────────────────────────────────────
 // Kept in sync by hand with the actual handlers in
-// src/components/tools/apiclient/mcpBridge.ts.
+// src/components/tools/apiclient/mcpBridge.ts and
+// src/components/tools/mockserver/mcpBridge.ts.
 
 fn kv_array_schema() -> Value {
     json!({
@@ -528,7 +587,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "get_scripting_reference",
-            "description": "Read-only reference for writing pre/post-request scripts, tests, and assertions: the bru/req/res/pm scripting API, variable precedence, Assertion operators, and the field shapes update_request/set_node_auth/set_node_headers patches expect (Auth, RequestBody, RequestSettings, KeyValue). Call this before writing or editing a script, auth, or assertions — no app or network round-trip needed, works even if DevTool isn't open.",
+            "description": "Read-only reference covering both tools' scripting engines and field shapes. API Client: the bru/req/res/pm JS scripting API, variable precedence, Assertion operators, and the Auth/RequestBody/RequestSettings/KeyValue shapes update_request/set_node_auth/set_node_headers expect. Mock Server: the Rhai response-script API (a separate language/sandbox — what `req` exposes, the return shape), and the Stub/Matcher/MockConfig field shapes mock_add_stub/mock_update_stub/mock_set_fallback/mock_set_bind expect. Call this before writing or editing a script, auth, assertions, or a stub — no app or network round-trip needed, works even if DevTool isn't open.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
@@ -539,6 +598,99 @@ fn tool_definitions() -> Vec<Value> {
                 "properties": { "name": { "type": "string" }, "collectionId": nullable_string(), "variables": kv_array_schema() },
                 "required": ["name"]
             }
+        }),
+
+        // ── Mock Server ──────────────────────────────────────────────────
+        // Only answers while DevTool is open with the Mock Server tool on
+        // screen — same contract as the API Client tools above, for the same
+        // reason (the stub list and bind config live in that mounted
+        // component's state, not anywhere the sidecar can reach on its own).
+        json!({
+            "name": "mock_get_config",
+            "description": "Get the mock server's bind (host/port), fallback (\"no stub matched\") response, running status, and a summarized stub list (id/enabled/name/method/path/mode/status — not each stub's matchers/headers/body/script). Use mock_get_stub for one stub's full definition.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "mock_get_stub",
+            "description": "Get one stub's full definition: matchers, response mode, status, headers, body (or script for scripted responses), delay.",
+            "inputSchema": { "type": "object", "properties": { "stubId": { "type": "string" } }, "required": ["stubId"] }
+        }),
+        json!({
+            "name": "mock_add_stub",
+            "description": "Add a new stub. `stub` is a partial Stub object used as the initial values (unset fields default: enabled=true, method=GET, mode=static; see get_scripting_reference for the Stub/Matcher field shapes, and mock_test_script for iterating on a script before saving it here). Returns the created stub. New stubs are appended, and stub order matters — first match wins — so reorder with mock_move_stub if it needs to come before an existing one.",
+            "inputSchema": { "type": "object", "properties": { "stub": { "type": "object" } } }
+        }),
+        json!({
+            "name": "mock_update_stub",
+            "description": "Patch a stub in place. `patch` is a partial Stub object — only the fields you include are changed.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "stubId": { "type": "string" }, "patch": { "type": "object" } },
+                "required": ["stubId", "patch"]
+            }
+        }),
+        json!({
+            "name": "mock_duplicate_stub",
+            "description": "Duplicate a stub (fresh id, \"<name> copy\") as the next stub right after the original. Returns the new stub.",
+            "inputSchema": { "type": "object", "properties": { "stubId": { "type": "string" } }, "required": ["stubId"] }
+        }),
+        json!({
+            "name": "mock_delete_stub",
+            "description": "Delete a stub by id.",
+            "inputSchema": { "type": "object", "properties": { "stubId": { "type": "string" } }, "required": ["stubId"] }
+        }),
+        json!({
+            "name": "mock_move_stub",
+            "description": "Move a stub up or down one position relative to its siblings. Stub order matters — the first enabled stub whose matchers all pass wins — so this is how to reprioritize overlapping stubs.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "stubId": { "type": "string" }, "direction": { "type": "string", "enum": ["up", "down"] } },
+                "required": ["stubId", "direction"]
+            }
+        }),
+        json!({
+            "name": "mock_set_fallback",
+            "description": "Patch the \"no stub matched\" response. `patch` may include any of notFoundStatus (number), notFoundBody (string), notFoundContentType (string).",
+            "inputSchema": { "type": "object", "properties": { "patch": { "type": "object" } }, "required": ["patch"] }
+        }),
+        json!({
+            "name": "mock_set_bind",
+            "description": "Set the host and/or port the server binds to on the next mock_start. Does NOT hot-swap an already-running server (unlike stubs/fallback, which apply live) — call mock_stop then mock_start to rebind.",
+            "inputSchema": { "type": "object", "properties": { "host": { "type": "string" }, "port": { "type": "number" } } }
+        }),
+        json!({
+            "name": "mock_start",
+            "description": "Start the mock server with the current config (stubs + bind address). Returns the resulting status (running/host/port). Errors if the port is already in use.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "mock_stop",
+            "description": "Stop the mock server.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "mock_status",
+            "description": "Get the mock server's current running status (running/host/port), without the config/stub list mock_get_config also returns.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "mock_test_script",
+            "description": "Run a scripted-response Rhai script against a synthetic request, without saving it to a stub first — for iterating on a script before committing it via mock_add_stub/mock_update_stub. `sample` is { method, path, query, headers, params, body } (all optional; defaults to a bare GET /); see get_scripting_reference for what `req` exposes to the script and the expected return shape.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "script": { "type": "string" }, "sample": { "type": "object" } },
+                "required": ["script"]
+            }
+        }),
+        json!({
+            "name": "mock_get_request_log",
+            "description": "Get the most recent requests the mock server handled (newest first, capped at `limit`, default 50), each with which stub matched (or null for the fallback), status, timing, and truncated request/response bodies.",
+            "inputSchema": { "type": "object", "properties": { "limit": { "type": "number" } } }
+        }),
+        json!({
+            "name": "mock_clear_request_log",
+            "description": "Clear the mock server's request log.",
+            "inputSchema": { "type": "object", "properties": {} }
         }),
     ]
 }
@@ -589,9 +741,13 @@ impl ServerHandler for DevToolServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
-                "Drives DevTool's API Client tool — collections, requests, scripts, \
-                 environments — and can actually send a request. Only answers while the \
-                 DevTool desktop app is open with the API Client tool on screen.",
+                "Drives two DevTool tools. API Client: collections, requests, scripts, \
+                 environments — and can actually send a request. Mock Server: stubs, \
+                 matchers, the fallback response, and can start/stop the server and test a \
+                 response script. Each tool's calls only answer while the DevTool desktop \
+                 app is open with THAT tool on screen (mock_* needs Mock Server open, \
+                 everything else needs API Client open) — call get_scripting_reference for \
+                 the scripting API and field shapes shared by both.",
             )
             .with_server_info(Implementation::new("devtool-api-client", env!("CARGO_PKG_VERSION")))
     }

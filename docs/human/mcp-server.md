@@ -1,27 +1,40 @@
-# MCP for the API Client tool
+# MCP for the API Client and Mock Server tools
 
-Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive
-DevTool's **API Client** tool — list/read/edit collections, requests,
-scripts, and environments, and actually **send a request** through the same
-engine the Send button uses, with the result landing in the UI and History
-like any other send. 29 tools; see the full list further down.
+Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive two
+DevTool tools from one server:
+
+- **API Client** — list/read/edit collections, requests, scripts, and
+  environments, and actually **send a request** through the same engine the
+  Send button uses, with the result landing in the UI and History like any
+  other send.
+- **Mock Server** — list/read/edit stubs and the fallback response, **start/
+  stop** the server, test a response script before saving it, and read the
+  request log — all through the same state the UI edits.
+
+44 tools total; see the full list further down.
 
 ## How it works
 
 A small MCP-over-stdio server — `devtool-mcp-server`
 (`src-tauri/src/bin/devtool-mcp-server.rs`) — runs as its own process; your
 MCP client spawns it directly, and it never runs inside the DevTool app
-itself. Every tool call it receives is forwarded over HTTP to a
-loopback-only control server the DevTool desktop app starts on launch
-(`src-tauri/src/mcp_bridge.rs`), which hands it to the running webview — so
-a call only succeeds while:
+itself. Every tool call (other than `get_scripting_reference`, answered
+locally — see below) is forwarded over HTTP to a loopback-only control
+server the DevTool desktop app starts on launch (`src-tauri/src/
+mcp_bridge.rs`), which hands it to the running webview — so a call only
+succeeds while:
 
 - the DevTool desktop app is **open**, and
-- the **API Client** tool is the one currently on screen (that's where the
-  live store this bridges into is mounted).
+- **the tool that owns it** is the one currently on screen — an API Client
+  tool (`list_collections`, `run_request`, etc.) needs the API Client tool
+  open; a `mock_*` tool needs the Mock Server tool open (that's where each
+  tool's live state is mounted).
 
 Anything else — app closed, or you're on a different tool — comes back as a
-clear error telling you so, not a hang.
+clear error telling you so, not a hang. The two bridges (`src/components/
+tools/apiclient/mcpBridge.ts` and `src/components/tools/mockserver/
+mcpBridge.ts`) listen on the same underlying event but never collide, since
+React Router only ever mounts one tool's component tree at a time.
 
 The two processes find each other automatically: on launch, DevTool writes
 its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
@@ -44,6 +57,10 @@ app (a Tauri sidecar, `bundle.externalBin`).
 2. Copy the `claude mcp add` command it shows (it's already pointed at your
    install's copy of the binary) and run it once in a terminal.
 3. Open a new Claude Code (or Claude Desktop) session and use it.
+
+One registration covers both tools — it's the same `devtool-mcp-server`
+process either way, so there's nothing separate to set up for Mock Server's
+`mock_*` tools.
 
 ## Setup — developing DevTool from source
 
@@ -114,11 +131,26 @@ A request's own script/auth/headers/body/tests/assertions all live on the
 request itself — edit those through `update_request`'s `patch`, not the
 `set_node_*` tools (those are only for what a collection/folder passes down).
 
+Mock Server (each of these needs the **Mock Server** tool open, not API Client):
+
+| Tool | Does |
+|---|---|
+| `mock_get_config` | Bind (host/port), fallback response, running status, and a summarized stub list (id/enabled/name/method/path/mode/status — not matchers/headers/body/script). |
+| `mock_get_stub` | One stub's full definition. |
+| `mock_add_stub` / `mock_update_stub` / `mock_delete_stub` / `mock_duplicate_stub` | Stub lifecycle. `mock_update_stub` takes a partial-Stub `patch`, same shape as `update_request`. |
+| `mock_move_stub` | Reorder a stub up/down — stub order matters, first match wins. |
+| `mock_set_fallback` | Patch the "no stub matched" response (status/body/content-type). |
+| `mock_set_bind` | Set host/port for the next `mock_start` (doesn't hot-swap a running server). |
+| `mock_start` / `mock_stop` / `mock_status` | Server lifecycle. `mock_start` uses the current stub list + bind address. |
+| `mock_test_script` | Run a stub's Rhai response script against a synthetic request — for iterating before saving it. |
+| `mock_get_request_log` | Recent requests the server handled (newest first, capped, bodies truncated past 5,000 chars). |
+| `mock_clear_request_log` | Clear the request log. |
+
 Reference:
 
 | Tool | Does |
 |---|---|
-| `get_scripting_reference` | Read-only: the `bru`/`req`/`res`/`pm` scripting API, variable precedence, Assertion operators, and the `Auth`/`RequestBody`/`RequestSettings`/`KeyValue` field shapes `update_request`/`set_node_auth`/`set_node_headers` expect. Answered locally — no bridge round-trip, works even with the app closed. Call it before writing or editing a script, auth, or assertions. |
+| `get_scripting_reference` | Read-only, covers both tools. API Client: the `bru`/`req`/`res`/`pm` JS scripting API, variable precedence, Assertion operators, and the `Auth`/`RequestBody`/`RequestSettings`/`KeyValue` field shapes `update_request`/`set_node_auth`/`set_node_headers` expect. Mock Server: the Rhai response-script API (a separate language from the API Client's) and the `Stub`/`Matcher`/`MockConfig` field shapes the `mock_*` tools expect. Answered locally — no bridge round-trip, works even with the app closed. Call it before writing or editing a script, auth, assertions, or a stub. |
 
 ## Troubleshooting
 
@@ -128,4 +160,5 @@ Reference:
   after writing the discovery file (stale port). Restart the app.
 - **"No response from DevTool — is the app open, on the API Client tool?"**
   — the app is running but nothing answered within 30s, almost always
-  because a different tool is on screen. Switch to API Client.
+  because a different tool is on screen. Switch to API Client for its
+  tools, or Mock Server for the `mock_*` ones.
