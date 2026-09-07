@@ -43,6 +43,26 @@ export interface RunRecord {
 // transport or script error, and every assertion it ran passed.
 export const isOk = (r: RunRecord) => !r.error && r.status >= 200 && r.status < 400 && r.passed === r.total;
 
+// How one request behaved across every iteration it ran in. A data-driven run
+// executes the same handful of requests thousands of times, so "which request
+// is returning the 500s" is a question the per-iteration view can't answer —
+// it only ever shows one iteration at a time. This is the rollup that can.
+export interface RequestStats {
+  requestId: string;
+  name: string;
+  method: HttpMethod;
+  total: number;
+  passed: number;
+  failed: number;
+  avgMs: number;
+  minMs: number;
+  maxMs: number;
+  /** Status code → how many of this request's responses carried it. */
+  byStatus: Record<string, number>;
+  /** Status code → iterations where *this* request returned it (capped). */
+  statusSamples: Record<string, number[]>;
+}
+
 export interface RunStats {
   total: number;
   passed: number;
@@ -56,7 +76,21 @@ export interface RunStats {
   totalBytes: number;
   /** Status code → how many responses carried it (0 = no response). */
   byStatus: Record<string, number>;
+  /** Per-request rollup, in the order each request first executed. */
+  byRequest: RequestStats[];
+  // Status code → the first STATUS_SAMPLE_CAP iterations that produced it.
+  // Bounded on purpose: over 100k iterations an unbounded index of "which
+  // iterations returned 500" is itself a memory leak, and a hundred examples
+  // is already more than anyone clicks through. It exists to answer "show me
+  // where this code happened" — the counts in byStatus stay exact regardless.
+  statusSamples: Record<string, number[]>;
 }
+
+export const STATUS_SAMPLE_CAP = 100;
+
+/** The bucket key a record counts towards: its status code, or 'error' when
+ *  the request never came back with one (transport failure, abort, throw). */
+export const statusKey = (r: RunRecord): string => (r.status === 0 ? 'error' : String(r.status));
 
 // Mutable running total, folded one record at a time. A data-driven run can
 // produce tens of thousands of records; recomputing `summarize(records)` over
@@ -65,6 +99,27 @@ export interface RunStats {
 // UI thread well before a 100k-row CSV run finishes. `fold` is the O(1)-per-
 // record alternative — call it once as each record lands and read `toStats()`
 // whenever the UI needs to render.
+/** Per-request running total. `timed` is the divisor for avgMs — see RunStatsAcc. */
+interface RequestAcc {
+  requestId: string;
+  name: string;
+  method: HttpMethod;
+  total: number; passed: number; failed: number;
+  sumMs: number; minMs: number; maxMs: number; timed: number;
+  byStatus: Record<string, number>;
+  statusSamples: Map<string, number[]>;
+}
+
+// Appends `iter` to a capped, iteration-deduplicated sample list. Shared by
+// the run-wide and per-request indexes so both bound the same way.
+function sample(index: Map<string, number[]>, code: string, iter: number): void {
+  const existing = index.get(code);
+  if (!existing) index.set(code, [iter]);
+  // One entry per iteration: the same code twice in one iteration (two
+  // requests, or a flow-control repeat) shouldn't spend two sample slots.
+  else if (existing.length < STATUS_SAMPLE_CAP && existing[existing.length - 1] !== iter) existing.push(iter);
+}
+
 export interface RunStatsAcc {
   total: number; passed: number; failed: number;
   assertTotal: number; assertPassed: number;
@@ -73,6 +128,10 @@ export interface RunStatsAcc {
   timed: number;
   totalBytes: number;
   byStatus: Record<string, number>;
+  /** Keyed by requestId; insertion order is first-executed order. */
+  byRequest: Map<string, RequestAcc>;
+  /** Status code → iterations that produced it, capped at STATUS_SAMPLE_CAP. */
+  statusSamples: Map<string, number[]>;
 }
 
 export function newAcc(): RunStatsAcc {
@@ -82,16 +141,20 @@ export function newAcc(): RunStatsAcc {
     sumMs: 0, minMs: 0, maxMs: 0, timed: 0,
     totalBytes: 0,
     byStatus: {},
+    byRequest: new Map(),
+    statusSamples: new Map(),
   };
 }
 
 export function fold(acc: RunStatsAcc, r: RunRecord): void {
+  const ok = isOk(r);
+  const code = statusKey(r);
+
   acc.total++;
-  if (isOk(r)) acc.passed++; else acc.failed++;
+  if (ok) acc.passed++; else acc.failed++;
   acc.assertTotal += r.total;
   acc.assertPassed += r.passed;
   acc.totalBytes += r.sizeBytes;
-  const code = r.status === 0 ? 'error' : String(r.status);
   acc.byStatus[code] = (acc.byStatus[code] ?? 0) + 1;
   if (r.status !== 0) {
     acc.timed++;
@@ -99,9 +162,44 @@ export function fold(acc: RunStatsAcc, r: RunRecord): void {
     acc.minMs = acc.timed === 1 ? r.ms : Math.min(acc.minMs, r.ms);
     acc.maxMs = Math.max(acc.maxMs, r.ms);
   }
+
+  let req = acc.byRequest.get(r.requestId);
+  if (!req) {
+    req = {
+      requestId: r.requestId, name: r.name, method: r.method,
+      total: 0, passed: 0, failed: 0,
+      sumMs: 0, minMs: 0, maxMs: 0, timed: 0,
+      byStatus: {},
+      statusSamples: new Map(),
+    };
+    acc.byRequest.set(r.requestId, req);
+  }
+  req.total++;
+  if (ok) req.passed++; else req.failed++;
+  req.byStatus[code] = (req.byStatus[code] ?? 0) + 1;
+  if (r.status !== 0) {
+    req.timed++;
+    req.sumMs += r.ms;
+    req.minMs = req.timed === 1 ? r.ms : Math.min(req.minMs, r.ms);
+    req.maxMs = Math.max(req.maxMs, r.ms);
+  }
+
+  sample(acc.statusSamples, code, r.iter);
+  sample(req.statusSamples, code, r.iter);
 }
 
 export function toStats(acc: RunStatsAcc): RunStats {
+  const byRequest: RequestStats[] = [];
+  for (const req of acc.byRequest.values()) {
+    byRequest.push({
+      requestId: req.requestId, name: req.name, method: req.method,
+      total: req.total, passed: req.passed, failed: req.failed,
+      avgMs: req.timed ? Math.round(req.sumMs / req.timed) : 0,
+      minMs: req.minMs, maxMs: req.maxMs,
+      byStatus: req.byStatus,
+      statusSamples: Object.fromEntries(req.statusSamples),
+    });
+  }
   return {
     total: acc.total, passed: acc.passed, failed: acc.failed,
     assertTotal: acc.assertTotal, assertPassed: acc.assertPassed,
@@ -109,6 +207,8 @@ export function toStats(acc: RunStatsAcc): RunStats {
     minMs: acc.minMs, maxMs: acc.maxMs,
     totalBytes: acc.totalBytes,
     byStatus: acc.byStatus,
+    byRequest,
+    statusSamples: Object.fromEntries(acc.statusSamples),
   };
 }
 

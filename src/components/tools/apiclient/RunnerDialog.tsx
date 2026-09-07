@@ -35,6 +35,7 @@ import { Field } from '@/components/ui/tool-section';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Callout } from '@/components/ui/callout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { methodColor } from './method-color';
 import { formatBytes, statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
@@ -43,7 +44,11 @@ import { DELIMITER_LABEL, type DataRow, type ParsedDataFile, parseDataFileAsync 
 import { type ColumnMapping, collectVarTokens, mapColumns, missingColumns } from './varUsage';
 import type { ExecResult } from './engine';
 import { MAX_STEPS_PER_ITERATION, describeJump, findDuplicateNames, nextStepIndex } from './runnerFlow';
-import { type RunDetail, type RunRecord, type RunStats, type RunStatsAcc, fold, isOk, newAcc, toStats } from './runnerStats';
+import {
+  type RequestStats, type RunDetail, type RunRecord, type RunStats, type RunStatsAcc,
+  STATUS_SAMPLE_CAP, fold, isOk, newAcc, toStats,
+} from './runnerStats';
+import { buildResultsCsv } from './runnerExport';
 import type { ApiRequest, Environment, HttpMethod, VarMap } from './types';
 
 interface Props {
@@ -76,9 +81,12 @@ type ResultFilter = 'all' | 'passed' | 'failed';
 // VirtualIterRail) — a 100k-row data file is the case this dialog is built
 // to handle without the UI or memory footprint degrading.
 const LARGE_DATA_ROWS = 2000;
-// Row-height the virtualized iteration rail renders at (px) — must match the
-// className on each row button below.
-const ITER_ROW_H = 44;
+// Row heights the virtualized iteration rail renders at (px). Virtualization
+// needs a height it can multiply, so these must match what the row markup
+// actually occupies: `py-2` (16) plus one `leading-tight` line (15) for a
+// plain iteration, plus a second 11px line (14) when a data row labels it.
+const ITER_ROW_H = 36;
+const ITER_ROW_H_DATA = 48;
 const EMPTY_RECORDS: RunRecord[] = [];
 
 export function RunnerDialog({ title, requests, runRequest, knownVars = [], environments, defaultEnvId, open, onClose }: Props) {
@@ -131,12 +139,18 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   const iterStatsRef = useRef<Map<number, { ok: number; total: number }>>(new Map());
   const accRef = useRef<RunStatsAcc>(newAcc());
   const ranItersRef = useRef(0);
+  // Status code → which of its sampled iterations the next click lands on.
+  const statusCursorRef = useRef<Map<string, number>>(new Map());
   const [stats, setStats] = useState<RunStats>(() => toStats(newAcc()));
   const [tick, setTick] = useState(0);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [current, setCurrent] = useState<{ iter: number; name: string; method: HttpMethod } | null>(null);
+  // 'sequence' walks one iteration at a time; 'requests' rolls every iteration
+  // up per request — the only view that answers "which request returns the
+  // 500s" once a run spans more iterations than anyone can page through.
+  const [resultView, setResultView] = useState<'sequence' | 'requests'>('sequence');
   const [viewIter, setViewIter] = useState(0);
   const [ranIters, setRanIters] = useState(0);
   const [running, setRunning] = useState(false);
@@ -165,11 +179,31 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   useEffect(() => () => { if (flushTimerRef.current) clearTimeout(flushTimerRef.current); }, []);
 
   const resetRun = () => {
+    // A flush scheduled by the previous run must not land on the new one —
+    // it would publish the fresh (empty) accumulator under the old run's
+    // tick and, worse, keep the timer alive past the reset.
+    if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
     recordsRef.current = []; byIterRef.current = new Map(); iterStatsRef.current = new Map();
     accRef.current = newAcc(); ranItersRef.current = 0;
+    statusCursorRef.current = new Map();
     setStats(toStats(accRef.current)); setTick(0);
-    setDetailKey(null); setCurrent(null);
+    setDetailKey(null); setCurrent(null); setResultView('sequence');
     setViewIter(0); setRanIters(0); setElapsed(0); setFilter('all'); setCappedIters(new Set());
+  };
+
+  // Clicking a status code jumps to an iteration that produced it, cycling
+  // through the sampled iterations on repeat clicks. With 100k iterations,
+  // "where did the 500s happen" is otherwise unanswerable — the sequence
+  // view only ever shows one iteration.
+  const jumpToStatus = (code: string, samples: number[] | undefined) => {
+    if (!samples?.length) return;
+    const next = ((statusCursorRef.current.get(code) ?? -1) + 1) % samples.length;
+    statusCursorRef.current.set(code, next);
+    followIterRef.current = false;
+    setResultView('sequence');
+    setFilter('all');
+    setDetailKey(null);
+    setViewIter(samples[next]);
   };
 
   // Reset everything when the requests prop changes (a different node was run).
@@ -482,6 +516,20 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
         responseTimeMs: { average: stats.avgMs, min: stats.minMs, max: stats.maxMs, total: stats.sumMs },
         totalDataBytes: stats.totalBytes,
         statusCodes: stats.byStatus,
+        // Which iterations produced each code (capped — see STATUS_SAMPLE_CAP),
+        // 1-based to match every other iteration number in this report.
+        statusCodeSamples: Object.fromEntries(
+          Object.entries(stats.statusSamples).map(([code, iterIdx]) => [code, iterIdx.map((i) => i + 1)]),
+        ),
+        byRequest: stats.byRequest.map((r) => ({
+          name: r.name,
+          method: r.method,
+          executed: r.total,
+          passed: r.passed,
+          failed: r.failed,
+          statusCodes: r.byStatus,
+          responseTimeMs: { average: r.avgMs, min: r.minMs, max: r.maxMs },
+        })),
         failures: recordsRef.current.filter((r) => !isOk(r)).map((r) => ({
           iteration: r.iter + 1,
           step: r.step + 1,
@@ -528,28 +576,12 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   // spreadsheet loads a flat table instantly, where the equivalent JSON
   // report (deeply nested, one object per run) would be sluggish just to
   // scroll through, and most of that structure doesn't matter for a "which
-  // rows failed and why" pass.
+  // rows failed, with what status code" pass. Row shape lives in
+  // runnerExport.ts so the escaping and column layout are testable.
   const exportResultsCsv = async () => {
-    const dataCols = dataFile?.parsed.columns ?? [];
-    const header = [
-      'iteration', 'step', 'name', 'method', 'url', 'status', 'ok', 'timeMs', 'sizeBytes',
-      'assertionsPassed', 'assertionsTotal', 'error', ...dataCols,
-    ];
-    const csvCell = (v: unknown): string => {
-      const s = v == null ? '' : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const lines = [header.map(csvCell).join(',')];
-    for (const r of recordsRef.current) {
-      const row = [
-        r.iter + 1, r.step + 1, r.name, r.method, r.url, r.status, isOk(r) ? 'yes' : 'no',
-        r.ms, r.sizeBytes, r.passed, r.total, r.error ?? '',
-        ...dataCols.map((c) => r.dataVars?.[c] ?? ''),
-      ];
-      lines.push(row.map(csvCell).join(','));
-    }
+    const csv = buildResultsCsv(recordsRef.current, dataFile?.parsed.columns ?? []);
     const safe = (title || 'run').replace(/[^\w.-]+/g, '-');
-    await saveTextFile(`${safe}.run-results.csv`, lines.join('\n'));
+    await saveTextFile(`${safe}.run-results.csv`, csv);
   };
 
   return (
@@ -611,8 +643,9 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                 </Field>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Iterations">
+                  <Field label="Iterations" htmlFor="runner-iterations">
                     <Input
+                      id="runner-iterations"
                       value={dataRows ? String(dataRows.length) : iterations}
                       onChange={(e) => setIterations(e.target.value)}
                       disabled={!!dataFile}
@@ -620,8 +653,8 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                       className="h-ctl text-xs disabled:opacity-60"
                     />
                   </Field>
-                  <Field label="Delay (ms)">
-                    <Input value={delay} onChange={(e) => setDelay(e.target.value)} placeholder="0" inputMode="numeric" className="h-ctl text-xs" />
+                  <Field label="Delay (ms)" htmlFor="runner-delay">
+                    <Input id="runner-delay" value={delay} onChange={(e) => setDelay(e.target.value)} placeholder="0" inputMode="numeric" className="h-ctl text-xs" />
                   </Field>
                 </div>
 
@@ -701,6 +734,9 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                             }}
                             disabled={rowLimit == null}
                             inputMode="numeric"
+                            // The visible label wraps the checkbox, not this
+                            // box, so it needs a name of its own.
+                            aria-label="Rows to run"
                             className="h-6 w-14 text-[11px] disabled:opacity-50"
                           />
                           <span className="text-[11px] text-fg-mute">
@@ -728,11 +764,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Include tags">
-                    <Input value={includeTags} onChange={(e) => setIncludeTags(e.target.value)} placeholder="smoke" className="h-ctl text-xs" />
+                  <Field label="Include tags" htmlFor="runner-include-tags">
+                    <Input id="runner-include-tags" value={includeTags} onChange={(e) => setIncludeTags(e.target.value)} placeholder="smoke" className="h-ctl text-xs" />
                   </Field>
-                  <Field label="Exclude tags">
-                    <Input value={excludeTags} onChange={(e) => setExcludeTags(e.target.value)} placeholder="slow" className="h-ctl text-xs" />
+                  <Field label="Exclude tags" htmlFor="runner-exclude-tags">
+                    <Input id="runner-exclude-tags" value={excludeTags} onChange={(e) => setExcludeTags(e.target.value)} placeholder="slow" className="h-ctl text-xs" />
                   </Field>
                 </div>
               </div>
@@ -848,14 +884,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
               <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1.5 text-[11px] text-fg-mute">
                 <span className="flex flex-wrap items-center gap-x-2">
                   <span className="font-medium text-fg/70">Status</span>
-                  {Object.entries(stats.byStatus)
-                    .sort((a, b) => a[0].localeCompare(b[0]))
-                    .map(([code, count]) => (
-                      <span key={code} className="font-mono">
-                        <span className={code === 'error' ? 'text-bad' : statusColor(Number(code))}>{code}</span>
-                        <span className="text-fg-mute"> ×{count}</span>
-                      </span>
-                    ))}
+                  <StatusChips byStatus={stats.byStatus} samples={stats.statusSamples} onJump={jumpToStatus} />
                 </span>
                 <span>
                   <span className="font-medium text-fg/70">Response time</span>{' '}
@@ -872,6 +901,14 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                     {ranIters < iters && ` · ~${formatDuration(((iters - ranIters) / (ranIters / elapsed)))} left`}
                   </span>
                 )}
+                <Segmented
+                  value={resultView}
+                  onValueChange={setResultView}
+                  size="sm"
+                  aria-label="Results grouping"
+                  className="ml-auto"
+                  options={[{ value: 'sequence', label: 'Iterations' }, { value: 'requests', label: 'By request' }]}
+                />
               </div>
             )}
 
@@ -886,8 +923,10 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
             </div>
 
             <div className="flex min-h-0 flex-1">
+              {resultView === 'requests' && <ByRequestView stats={stats} onJumpToStatus={jumpToStatus} />}
+
               {/* iteration rail (data / multi-iteration runs) */}
-              {multiIter && !detailKey && (
+              {resultView === 'sequence' && multiIter && !detailKey && (
                 <VirtualIterRail
                   count={Math.max(ranIters, running ? iters : 0)}
                   viewIter={viewIter}
@@ -898,7 +937,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
               )}
 
               {/* request results / detail */}
-              <div className="flex min-w-0 flex-1 flex-col">
+              <div className={cn('flex min-w-0 flex-1 flex-col', resultView === 'requests' && 'hidden')}>
                 {detailRecord?.detail ? (
                   <RunDetailView entry={detailRecord.detail} onBack={() => setDetailKey(null)} />
                 ) : (
@@ -964,6 +1003,101 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   );
 }
 
+// ─── response-code tracking ───────────────────────────────────────────────────
+
+// The status codes a set of executions produced, with their counts. Each chip
+// is a jump target when sampled iterations are available: over a long run the
+// counts alone say *that* 500s happened, not *where*.
+function StatusChips({ byStatus, samples, onJump }: {
+  byStatus: Record<string, number>;
+  samples?: Record<string, number[]>;
+  onJump?: (code: string, samples: number[] | undefined) => void;
+}) {
+  // 'error' (no response at all) sorts after the numeric codes.
+  const entries = Object.entries(byStatus).sort((a, b) => a[0].localeCompare(b[0]));
+  if (entries.length === 0) return <span className="text-fg-mute">—</span>;
+  return (
+    <>
+      {entries.map(([code, count]) => {
+        const list = samples?.[code];
+        const jumpable = !!onJump && !!list?.length;
+        return (
+          <button
+            key={code}
+            type="button"
+            disabled={!jumpable}
+            onClick={() => onJump?.(code, list)}
+            title={jumpable
+              ? `Go to an iteration that returned ${code} — click again for the next one` +
+                (list!.length >= STATUS_SAMPLE_CAP ? ` (first ${STATUS_SAMPLE_CAP} tracked)` : '')
+              : undefined}
+            className={cn('-mx-0.5 rounded px-0.5 font-mono transition-colors',
+              jumpable ? 'hover:bg-acc' : 'cursor-default')}
+          >
+            <span className={code === 'error' ? 'text-bad' : statusColor(Number(code))}>{code}</span>
+            <span className="text-fg-mute"> ×{count.toLocaleString()}</span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+// Every iteration rolled up per request. The sequence view answers "what
+// happened in iteration N"; this answers "how did request X do across all N"
+// — which is the only tractable question once a data file pushes the run into
+// tens of thousands of iterations.
+function ByRequestView({ stats, onJumpToStatus }: {
+  stats: RunStats;
+  onJumpToStatus: (code: string, samples: number[] | undefined) => void;
+}) {
+  if (stats.byRequest.length === 0) {
+    return <div className="flex min-w-0 flex-1 items-center justify-center p-6 text-xs text-fg-mute">No requests ran.</div>;
+  }
+  return (
+    <div className="min-h-0 min-w-0 flex-1 overflow-auto p-3">
+      <DataTable density="compact">
+        <Thead sticky>
+          <Tr>
+            <Th>Request</Th>
+            <Th align="right">Runs</Th>
+            <Th align="right">Passed</Th>
+            <Th align="right">Failed</Th>
+            <Th>Response codes</Th>
+            <Th align="right">Avg</Th>
+            <Th align="right">Min</Th>
+            <Th align="right">Max</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
+          {stats.byRequest.map((r: RequestStats) => (
+            <Tr key={r.requestId}>
+              <Td>
+                <span className={cn('mr-2 font-bold uppercase', methodColor(r.method))}>{r.method}</span>
+                <span className="font-medium">{r.name}</span>
+              </Td>
+              <Td numeric>{r.total.toLocaleString()}</Td>
+              <Td numeric className={r.passed ? 'text-ok' : undefined}>{r.passed.toLocaleString()}</Td>
+              <Td numeric className={r.failed ? 'text-bad' : undefined}>{r.failed.toLocaleString()}</Td>
+              <Td>
+                <span className="flex flex-wrap items-center gap-x-2 text-[11px]">
+                  <StatusChips byStatus={r.byStatus} samples={r.statusSamples} onJump={onJumpToStatus} />
+                </span>
+              </Td>
+              <Td numeric>{r.avgMs} ms</Td>
+              <Td numeric>{r.minMs} ms</Td>
+              <Td numeric>{r.maxMs} ms</Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </DataTable>
+      <p className="mt-2 text-[11px] text-fg-mute">
+        Click a response code to jump to an iteration that returned it.
+      </p>
+    </div>
+  );
+}
+
 // ─── iteration rail (virtualized) ─────────────────────────────────────────────
 
 // A data-driven run over a 100k-row file has up to 100k iterations. Rendering
@@ -985,6 +1119,9 @@ function VirtualIterRail({ count, viewIter, onSelect, iterStats, dataRows }: {
   // Large data-driven runs push a jump box (input + Go) above the rail —
   // scrolling to iteration #87,412 one screenful at a time isn't navigation.
   const [jumpTo, setJumpTo] = useState('');
+  // Data-bound rows carry a second line (the row's first values), so they need
+  // the taller slot; a plain iterated run would just look sparse at that height.
+  const rowH = dataRows ? ITER_ROW_H_DATA : ITER_ROW_H;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -1000,14 +1137,14 @@ function VirtualIterRail({ count, viewIter, onSelect, iterStats, dataRows }: {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const top = viewIter * ITER_ROW_H;
+    const top = viewIter * rowH;
     if (top < el.scrollTop) el.scrollTop = top;
-    else if (top + ITER_ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = top + ITER_ROW_H - el.clientHeight;
-  }, [viewIter]);
+    else if (top + rowH > el.scrollTop + el.clientHeight) el.scrollTop = top + rowH - el.clientHeight;
+  }, [viewIter, rowH]);
 
   const overscan = 8;
-  const start = Math.max(0, Math.floor(scrollTop / ITER_ROW_H) - overscan);
-  const visible = Math.ceil((viewportH || 1) / ITER_ROW_H) + overscan * 2;
+  const start = Math.max(0, Math.floor(scrollTop / rowH) - overscan);
+  const visible = Math.ceil((viewportH || 1) / rowH) + overscan * 2;
   const end = Math.min(count, start + visible);
   const rows: number[] = [];
   for (let i = start; i < end; i++) rows.push(i);
@@ -1037,7 +1174,7 @@ function VirtualIterRail({ count, viewIter, onSelect, iterStats, dataRows }: {
         </div>
       )}
       <div ref={containerRef} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)} className="min-h-0 flex-1 overflow-y-auto">
-        <div style={{ height: count * ITER_ROW_H, position: 'relative' }}>
+        <div style={{ height: count * rowH, position: 'relative' }}>
           {rows.map((i) => {
             const s = iterStats(i);
             const ok = s.total > 0 && s.ok === s.total;
@@ -1047,15 +1184,15 @@ function VirtualIterRail({ count, viewIter, onSelect, iterStats, dataRows }: {
               <button
                 key={i}
                 onClick={() => onSelect(i)}
-                style={{ position: 'absolute', top: i * ITER_ROW_H, left: 0, right: 0, height: ITER_ROW_H }}
-                className={cn('flex items-center gap-2 border-b px-3 py-2 text-left text-xs transition-colors hover:bg-acc/50',
+                style={{ position: 'absolute', top: i * rowH, left: 0, right: 0, height: rowH }}
+                className={cn('flex items-center gap-2 overflow-hidden border-b px-3 py-2 text-left text-xs leading-tight transition-colors hover:bg-acc/50',
                   i === viewIter && 'bg-acc')}
               >
                 <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full',
                   s.total === 0 ? 'bg-fg-mute/30' : ok ? 'bg-ok' : 'bg-bad')} />
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium">Iteration {i + 1}</span>
-                  {labelVals && <span className="block truncate text-[11px] text-fg-mute" title={labelVals}>{labelVals}</span>}
+                  {labelVals && <span className="mt-0.5 block truncate text-[11px] text-fg-mute" title={labelVals}>{labelVals}</span>}
                 </span>
                 {s.total > 0 && <span className={cn('shrink-0 text-[11px]', ok ? 'text-ok' : 'text-bad')}>{s.ok}/{s.total}</span>}
               </button>
@@ -1085,7 +1222,13 @@ function RecordRow({ record: r, onOpen }: { record: RunRecord; onOpen: () => voi
         <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(r.method))}>{r.method}</span>
         <span className="min-w-0 flex-1 truncate font-medium" title={r.url}>{r.name}</span>
         {r.total > 0 && <span className={cn('shrink-0', r.passed === r.total ? 'text-ok' : 'text-bad')}>{r.passed}/{r.total} tests</span>}
-        <span className={cn('w-12 shrink-0 text-right font-semibold', r.error ? 'text-bad' : statusColor(r.status))}>{r.error ? 'ERR' : r.status}</span>
+        <span
+          className={cn('w-12 shrink-0 text-right font-semibold', r.error ? 'text-bad' : statusColor(r.status))}
+          // The reason phrase (or the transport error) behind the bare code.
+          title={r.error || (r.statusText ? `${r.status} ${r.statusText}` : undefined)}
+        >
+          {r.error ? 'ERR' : r.status}
+        </span>
         <span className="w-16 shrink-0 text-right text-fg-mute">{r.ms} ms</span>
         {r.detail && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-mute/30 group-hover:text-fg-mute" />}
       </button>

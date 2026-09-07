@@ -830,6 +830,16 @@ git push origin main --tags
 
 ## Complex Tool Reference
 
+### API Client — Runner (`RunnerDialog.tsx`, `runnerStats.ts`, `runnerFlow.ts`, `runnerExport.ts`, `datafile.ts`)
+
+Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per row. **Built to handle ~100k rows**, which constrains how the results may be stored — read [decisions/runner-large-data-runs.md](../decisions/runner-large-data-runs.md) before touching this dialog.
+
+- **Never put the run history in React state.** Records live in `recordsRef` (append-only, read once at export) plus `byIterRef: Map<iter, RunRecord[]>` for O(1) access to the iteration on screen. Stats are folded O(1) per record into `accRef` (`fold`/`toStats` in `runnerStats.ts`). A `tick` state bumped on a 120 ms throttle (`scheduleFlush`/`flushNow`) is the *only* thing that triggers re-render. Re-introducing `setRecords([...prev, r])` or `summarize(records)` in a `useMemo` makes a 100k-row run O(n²) — that was the original bug.
+- **Response-code tracking:** `stats.byStatus` (run-wide), `stats.byRequest[]` (per-request rollup — the "By request" tab), and `statusSamples` (status → iterations that produced it, capped at `STATUS_SAMPLE_CAP`; drives the click-a-code-to-jump navigation). Counts stay exact; only the sample index is capped.
+- **`VirtualIterRail`** renders only on-screen iterations. Its `ITER_ROW_H`/`ITER_ROW_H_DATA` constants must match the row markup's real height (padding + line-height per line) — nothing type-checks that contract.
+- **Data files** parse through `parseDataFileAsync` (Web Worker above 200k chars — `src/workers/datafile.worker.ts`); parsing logic stays pure in `datafile.ts`. "Save responses" defaults off above 2,000 rows.
+- Tests: `runnerStats.test.ts` (aggregation), `runnerExport.test.ts` (CSV shape/escaping), `RunnerDialog.test.tsx` (the run loop, data binding, export — the throttled-flush plumbing is only observable here).
+
 ### Kafka Explorer (`src/components/tools/kafka/`)
 
 **Connect/Disconnect flow:** a broker must be explicitly connected (`handleConnect` in `KafkaExplorer.tsx`) before any views are accessible. `connectedBrokerId` is persisted in `localStorage` (`devtool:kafka:connectedBrokerId`). Connecting a new broker stops the previous broker's consumers (`kafkaConsumerStore.stopForBroker`). The right panel shows a `DisconnectedPanel` until connected.
@@ -1292,4 +1302,4 @@ is concerned.
 
 ---
 
-*Last updated: 2026-08-13*
+*Last updated: 2026-09-07*
