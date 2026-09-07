@@ -259,8 +259,17 @@ export interface HistoryEntry {
 
 // ─── factories ──────────────────────────────────────────────────────────────
 
-export const uid = (): string =>
-  (globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+export const uid = (): string => {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  if (c?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    c.getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `id-${Date.now()}-${hex}`;
+  }
+  return `id-${Date.now()}-fallback`;
+};
 
 export const newKeyValue = (key = '', value = ''): KeyValue => ({
   id: uid(), key, value, enabled: true,
