@@ -41,6 +41,25 @@ export function sniffDelimiter(text: string): Delimiter {
   return best;
 }
 
+// Column names come from the file, and both parsers write them straight onto
+// a row object — the shape prototype pollution is made of: a key of
+// `__proto__`, `constructor` or `prototype` reaching `obj[key] = value`
+// reassigns something on the prototype chain rather than adding a column.
+//
+// These three are refused outright rather than sanitised, because as data
+// files they are meaningless: a row's keys become {{variable}} names, and
+// substituteVars only ever resolves *own* properties (vars.ts documents the
+// bug that taught us so — `{{constructor}}` once interpolated
+// Object.prototype's function into a live request). A column nothing can
+// read is not worth the risk of accepting.
+const FORBIDDEN_COLUMNS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** Whether a column name may be written onto a row. Empty names are dropped
+ *  too — a blank header labels nothing. */
+export function isSafeColumn(name: string): boolean {
+  return name !== '' && !FORBIDDEN_COLUMNS.has(name);
+}
+
 // Parse a CSV string into objects keyed by the header row. Handles quoted
 // fields, embedded delimiters/quotes ("" → "), and CRLF/LF line endings.
 function parseCsv(text: string, delimiter: Delimiter): DataRow[] {
@@ -81,7 +100,7 @@ function parseCsv(text: string, delimiter: Delimiter): DataRow[] {
   const headers = cleaned[0].map((h) => h.trim());
   return cleaned.slice(1).map((cells) => {
     const obj: DataRow = {};
-    headers.forEach((h, i) => { if (h) obj[h] = (cells[i] ?? '').trim(); });
+    headers.forEach((h, i) => { if (isSafeColumn(h)) obj[h] = (cells[i] ?? '').trim(); });
     return obj;
   });
 }
@@ -100,7 +119,9 @@ function parseJsonRows(text: string): DataRow[] {
   return arr.map((entry) => {
     const obj: DataRow = {};
     if (entry && typeof entry === 'object') {
-      for (const [k, v] of Object.entries(entry as Record<string, unknown>)) obj[k] = toStr(v);
+      for (const [k, v] of Object.entries(entry as Record<string, unknown>)) {
+        if (isSafeColumn(k)) obj[k] = toStr(v);
+      }
     }
     return obj;
   });
