@@ -22,6 +22,7 @@ import { RequestLog } from './RequestLog';
 import { useMockServer, isTauri } from './useMockServer';
 import { newStub, type MockConfig, type Stub } from './types';
 import { liveConnections } from '@/lib/liveConnections';
+import { useMcpBridge } from './mcpBridge';
 
 // Sentinel selection id for the editable "no-match" fallback response.
 const FALLBACK_ID = '__fallback__';
@@ -34,8 +35,13 @@ const badgeClass = (method: string) =>
     : methodBadgeStyle(method as HttpMethod);
 
 export function MockServer() {
-  const { config, setConfig, updateConfig, updateStub, status, log, error, busy, start, stop, testScript, clearLog } =
-    useMockServer();
+  const mockServer = useMockServer();
+  const {
+    config, setConfig, updateConfig, updateStub,
+    addStub: hookAddStub, duplicateStub: hookDuplicateStub, deleteStub, moveStub,
+    status, log, error, busy, start, stop, testScript, clearLog,
+  } = mockServer;
+  useMcpBridge(mockServer);
 
   // Sidebar/header chấm xanh khi server đang chạy — cùng cơ chế Kafka/RabbitMQ
   // dùng cho "đang kết nối". Trước đây Mock Server không đăng ký gì vào đây,
@@ -88,33 +94,11 @@ export function MockServer() {
 
   const selected = config.stubs.find((s) => s.id === selectedId) ?? null;
 
-  const addStub = () => {
-    const s = newStub();
-    setConfig((prev) => ({ ...prev, stubs: [...prev.stubs, s] }));
-    setSelectedId(s.id);
-  };
+  const addStub = () => setSelectedId(hookAddStub().id);
   const duplicateStub = (stub: Stub) => {
-    const copy = { ...structuredClone(stub), id: crypto.randomUUID(), name: `${stub.name} copy` };
-    setConfig((prev) => {
-      const i = prev.stubs.findIndex((s) => s.id === stub.id);
-      const stubs = [...prev.stubs];
-      stubs.splice(i + 1, 0, copy);
-      return { ...prev, stubs };
-    });
-    setSelectedId(copy.id);
+    const copy = hookDuplicateStub(stub.id);
+    if (copy) setSelectedId(copy.id);
   };
-  const deleteStub = (id: string) => setConfig((prev) => ({ ...prev, stubs: prev.stubs.filter((s) => s.id !== id) }));
-
-  // Order matters (first match wins), so let users reorder stubs.
-  const moveStub = (id: string, dir: -1 | 1) =>
-    setConfig((prev) => {
-      const i = prev.stubs.findIndex((s) => s.id === id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= prev.stubs.length) return prev;
-      const stubs = [...prev.stubs];
-      [stubs[i], stubs[j]] = [stubs[j], stubs[i]];
-      return { ...prev, stubs };
-    });
 
   const exportJson = () => JSON.stringify(config, null, 2);
   const doImport = () => {
@@ -279,12 +263,12 @@ export function MockServer() {
         />
 
         {status.running ? (
-          <Button type="button" variant="destructive" size="sm" className="h-ctl text-xs" onClick={stop} disabled={busy}>
+          <Button type="button" variant="destructive" size="sm" className="h-ctl text-xs" onClick={() => { void stop().catch(() => {}); }} disabled={busy}>
             <Square className="mr-1 h-3.5 w-3.5" />
             Stop
           </Button>
         ) : (
-          <Button type="button" size="sm" className="h-ctl text-xs" onClick={start} disabled={busy || !isTauri}>
+          <Button type="button" size="sm" className="h-ctl text-xs" onClick={() => { void start().catch(() => {}); }} disabled={busy || !isTauri}>
             <Play className="mr-1 h-3.5 w-3.5" />
             Start
           </Button>

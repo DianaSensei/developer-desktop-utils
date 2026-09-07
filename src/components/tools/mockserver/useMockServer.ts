@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { defaultConfig, type MockConfig, type MockStatus, type ScriptResult, type Stub } from './types';
+import { defaultConfig, newStub, type MockConfig, type MockStatus, type ScriptResult, type Stub } from './types';
 import { clearRequestLog, getRequestLog, subscribeRequestLog } from './requestLogStore';
 import { isTauri } from '@/lib/platform';
 export { isTauri };
@@ -46,27 +46,34 @@ export function useMockServer() {
     };
   }, [config.stubs, config.notFoundStatus, config.notFoundBody, config.notFoundContentType]);
 
-  const start = useCallback(async () => {
+  // Both re-throw after recording `error` for the UI, so a caller that wants
+  // the outcome (the MCP bridge) can await/catch it directly instead of
+  // re-reading state; the toolbar's onClick swallows the rejection since it
+  // already renders `error`.
+  const start = useCallback(async (): Promise<MockStatus> => {
     setError(null);
     setBusy(true);
     try {
       const cfg = configRef.current;
       const next = await invoke<MockStatus>('mock_start', { config: cfg, host: cfg.host, port: cfg.port });
       setStatus(next);
+      return next;
     } catch (e) {
       setError(String(e));
+      throw e;
     } finally {
       setBusy(false);
     }
   }, []);
 
-  const stop = useCallback(async () => {
+  const stop = useCallback(async (): Promise<void> => {
     setBusy(true);
     try {
       await invoke('mock_stop');
       setStatus({ running: false, host: '', port: 0 });
     } catch (e) {
       setError(String(e));
+      throw e;
     } finally {
       setBusy(false);
     }
@@ -83,6 +90,47 @@ export function useMockServer() {
     [setConfig],
   );
 
+  // Stub list mutations — shared by the UI (MockServer.tsx's toolbar/row
+  // actions) and the MCP bridge, so there's one place that knows how to
+  // add/clone/delete/reorder a stub rather than two.
+  const addStub = useCallback((patch?: Partial<Stub>): Stub => {
+    const s: Stub = { ...newStub(), ...patch };
+    setConfig((prev) => ({ ...prev, stubs: [...prev.stubs, s] }));
+    return s;
+  }, [setConfig]);
+
+  const duplicateStub = useCallback((id: string): Stub | null => {
+    const source = configRef.current.stubs.find((s) => s.id === id);
+    if (!source) return null;
+    const copy: Stub = { ...structuredClone(source), id: crypto.randomUUID(), name: `${source.name} copy` };
+    setConfig((prev) => {
+      const i = prev.stubs.findIndex((s) => s.id === id);
+      if (i < 0) return prev;
+      const stubs = [...prev.stubs];
+      stubs.splice(i + 1, 0, copy);
+      return { ...prev, stubs };
+    });
+    return copy;
+  }, [setConfig]);
+
+  const deleteStub = useCallback(
+    (id: string) => setConfig((prev) => ({ ...prev, stubs: prev.stubs.filter((s) => s.id !== id) })),
+    [setConfig],
+  );
+
+  // Order matters (first match wins), so both the UI and the MCP bridge can
+  // reorder stubs relative to each other.
+  const moveStub = useCallback((id: string, dir: -1 | 1) => {
+    setConfig((prev) => {
+      const i = prev.stubs.findIndex((s) => s.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.stubs.length) return prev;
+      const stubs = [...prev.stubs];
+      [stubs[i], stubs[j]] = [stubs[j], stubs[i]];
+      return { ...prev, stubs };
+    });
+  }, [setConfig]);
+
   const testScript = useCallback(
     (script: string, sample: Record<string, unknown>) =>
       invoke<ScriptResult>('mock_test_script', { script, sample }),
@@ -96,6 +144,10 @@ export function useMockServer() {
     setConfig,
     updateConfig,
     updateStub,
+    addStub,
+    duplicateStub,
+    deleteStub,
+    moveStub,
     status,
     log,
     error,
@@ -106,3 +158,5 @@ export function useMockServer() {
     clearLog,
   };
 }
+
+export type MockServerState = ReturnType<typeof useMockServer>;

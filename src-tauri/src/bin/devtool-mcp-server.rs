@@ -8,10 +8,14 @@
 // writes its port + auth token to `<app_data_dir>/mcp-bridge.json` for this
 // process to read. Every MCP tool call this process receives over stdio is
 // forwarded there as a `POST /call`, which the app hands to the running
-// webview to answer — so a call only succeeds while DevTool is open with the
-// API Client tool on screen. See src-tauri/src/mcp_bridge.rs for the full
-// design, and src/components/tools/apiclient/mcpBridge.ts for what each tool
-// actually does.
+// webview to answer — so an API Client tool call (list_collections,
+// get_request, etc.) only succeeds while DevTool is open with the API Client
+// tool on screen, and a `mock_*` call only while it's open with the Mock
+// Server tool on screen (get_scripting_reference is the one exception —
+// answered locally, see its own comment below). See
+// src-tauri/src/mcp_bridge.rs for the full design, and
+// src/components/tools/apiclient/mcpBridge.ts /
+// src/components/tools/mockserver/mcpBridge.ts for what each tool actually does.
 //
 // Built on rmcp (the official Rust MCP SDK) for the protocol itself —
 // JSON-RPC framing, capability negotiation, tool routing all come from the
@@ -182,10 +186,172 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
     http_post_json(info.port, &info.token, &json!({ "tool": tool, "args": args })).await
 }
 
+// Static reference for BOTH tools' scripting engines and the field shapes
+// their patch-style tools expect — see `src/components/tools/apiclient/
+// runtime.ts` (bru/req/res/pm/expect/assert) and `types.ts` (Auth/
+// RequestBody/RequestSettings/KeyValue) for the API Client half, and
+// `src-tauri/src/mockserver.rs` (`req_to_rhai`/`run_script`) and
+// `src/components/tools/mockserver/types.ts` (Stub/Matcher/MockConfig) for
+// the Mock Server half, as the source of truth. Answered locally (no bridge
+// round-trip, no running app required) since it's static content, not live
+// app state — and served on demand as its own tool rather than folded into
+// every other tool's description, so its size is only spent when a caller
+// actually needs it instead of on every tool listing.
+const SCRIPTING_REFERENCE: &str = r#"# DevTool API Client — scripting & field-shape reference
+
+Pre/post-request scripts are plain JS (Bruno-style), run sandboxed. A
+request's own script/auth/headers live on the request itself (patch via
+update_request); a collection/folder's inherited script/auth/headers are set
+via set_node_script/set_node_auth/set_node_headers (nodeId=null = collection
+root, nodeId=<folderId> = that folder). A request's own header/auth of the
+same name overrides what it inherits; auth.type="inherit" pulls from the
+nearest ancestor's auth.
+
+## Variable precedence (both {{var}} substitution and bru.getVars())
+collectionVar < globalEnv < collectionEnv < data-file row
+(Vault is intentionally excluded from this whole MCP surface.)
+
+## bru.* — variables & flow control (available in both req/res scripts)
+- getCollectionVar(k) / setCollectionVar(k, v) / hasCollectionVar(k) / deleteCollectionVar(k)
+- getEnvVar(k, scope?) / setEnvVar(k, v, scope='collection') / hasEnvVar(k, scope?) / deleteEnvVar(k, scope='collection')
+  scope is 'collection' | 'global'; a read with no scope falls through collection -> global.
+- getEnvName(scope?)  — active environment's name
+- getIterationData(k) — current data-file row (data-driven runs only)
+- interpolate(text)   — expands {{tokens}} exactly like the send pipeline
+- getVars()           — merged VarMap at current precedence
+- setNextRequest(name | null) — Runner flow control (ignored for a single Send)
+- sleep(ms)           — pauses the script; rejects if the send is cancelled
+
+## req.* — pre-request script only (mutates the outgoing request draft)
+url / method (getters), getName(), getUrl()/setUrl(url), getMethod()/setMethod(m),
+getHeaders()/getHeader(name)/setHeader(name, value)/deleteHeader(name),
+getParams()/getParam(name)/setParam(name, value)/deleteParam(name),
+getTimeout()/setTimeout(ms), setMaxRedirects(n), disableRedirects(),
+getBody() (parses JSON body mode), setBody(data) (object -> JSON body, else text body)
+
+## res.* — post-response script / test / assert only
+status, statusText, headers, body (getters); responseTime;
+getStatus()/getStatusText()/getHeader(name)/getHeaders()/getBody()/setBody(v)/
+getResponseTime()/getSize()/getContentType()/getUrl()/isOk()
+
+## test(name, fn) + expect(actual, message?) — Chai-style BDD subset
+Chains (no-ops): to/be/been/is/that/which/and/has/have/with/of/at/itself/deep/own/nested/any/all, .not (negates)
+Terminal matchers: .equal(v) .eql(v) .a(type)/.an(type) .above(n) .least(n) .below(n) .most(n)
+.include(v)/.contain(v) .match(re) .lengthOf(n) .property(name, value?) .keys(...names)
+.oneOf(list) .closeTo(n, delta)/.approximately(n, delta) .greaterThan(n)/.lessThan(n)
+.instanceOf(ctor) .throw(expected?)/.throws(expected?)
+Getters: .ok .true .false .null .undefined .exist .NaN .finite .empty
+
+## assert.* — Chai `assert` style (callable: assert(cond, msg))
+ok/isOk, isNotOk, fail, equal, notEqual, strictEqual, notStrictEqual, deepEqual,
+notDeepEqual, isTrue, isFalse, isNull, isNotNull, isUndefined, isDefined, exists,
+isArray, isString, isNumber, isBoolean, isObject, isFunction, include, match,
+lengthOf, typeOf
+
+## pm.* / postman.* — Postman-compatibility shim (for imported Postman scripts)
+pm.test, pm.expect — same as test()/expect() above
+pm.environment.{get,set,has,unset,name,replaceIn(text)} — collection-scoped env
+pm.collectionVariables.{get,set,has,unset}
+pm.globals.{get,set,has,unset} — global env
+pm.iterationData.get(k)
+pm.request — same as req.* (post-response scripts only)
+pm.execution.setNextRequest(name)  |  postman.setNextRequest(name) (legacy form)
+pm.response — code, status, responseTime, responseSize, json(), text(), size(),
+  headers.get(name)/has(name), to.have.status(n|text)/header(name, value?)/body(text?)/jsonBody(),
+  to.be.ok/success/redirection/clientError/serverError/error/accepted/badRequest/unauthorized/forbidden/notFound
+
+console.log/info/warn/error/debug/trace/dir/table(v) are all available and captured as script logs.
+
+## Declarative Assertions (the request's `assertions` array — NOT run as JS)
+Each row: { expr, operator, value, enabled }. `expr` is a restricted expression
+language over `res`/`req`/`bru` — property paths, indices, one level of method
+calls, literals, arithmetic/comparison/logical operators (e.g. `res.status`,
+`res.body.items[0].id`, `res.status === 200`) — no assignment, no arbitrary code.
+operator is one of: equals, notEquals, gt, gte, lt, lte, in, notIn, contains,
+notContains, length, matches, notMatches, startsWith, endsWith, between,
+isEmpty, isNotEmpty, isNull, isUndefined, isDefined, isTruthy, isFalsy, isJson,
+isNumber, isString, isBoolean, isArray (the isX/is*Empty/isTruthy/isFalsy family
+and isDefined/isUndefined/isNull take no `value`).
+
+## Field shapes for update_request's patch / set_node_auth / set_node_headers
+
+KeyValue (params/headers/form rows, and env/collection variables):
+{ id, key, value, enabled, kind?: 'text'|'file', contentType?, fileName?, fileType?, fileContent?(base64), secret? }
+`secret: true` (env variables only) masks the value in the UI and keeps it out
+of generated code/cURL/history — this is the UI's own scoping, unrelated to
+and much weaker than the Vault, which this MCP surface never exposes at all.
+
+RequestBody: { mode: 'none'|'json'|'xml'|'text'|'sparql'|'graphql'|'multipart'|'urlencoded'|'file',
+  raw, form: KeyValue[], graphql?: { query, variables }, fileName?, fileType?, fileContent?(base64) }
+
+Auth: { type: 'none'|'inherit'|'bearer'|'basic'|'digest'|'apikey'|'oauth2',
+  token, username, password,
+  apiKey: { key, value, placement: 'header'|'query' },
+  oauth2: { grantType: 'client_credentials'|'password', tokenUrl, clientId, clientSecret, scope, username, password } }
+
+RequestSettings: { encodeUrl, followRedirects, maxRedirects, timeout, tags: string[], verifyTls }
+
+RequestScript: { req: string, res: string }  — pre-request / post-response JS source
+
+---
+
+# Mock Server — scripting & field-shape reference (separate engine from the API Client's)
+
+A stub's response is either `mode: "static"` (fixed status/headers/body) or
+`mode: "script"`, whose `script` is Rhai — NOT JavaScript, and NOT the same
+sandbox/API as the API Client's bru/req/res above. Use mock_test_script to run
+one against a sample request before saving it via mock_add_stub/mock_update_stub.
+
+## The `req` object available to a script
+#{ method, path, body, query: #{...}, headers: #{...}, params: #{...} }
+(`params` = path placeholders matched from the stub's `path`, e.g. `/users/:id`.)
+All values are strings; `query`/`headers`/`params` are Rhai maps (`#{...}`), so
+read a key with `req.query["name"]` (bracket indexing, not dot-access, since
+the key is data not a fixed identifier).
+
+## Return value
+Either a plain string (used as the response body, status 200), or a map:
+#{ status: 201, headers: #{ "content-type": "application/json" }, body: "..." }
+`status` defaults to 200 if omitted; `headers` and `body` are optional (body
+defaults to empty). A script that throws/errors produces a 500 with the error
+as the body — mock_test_script's `error` field surfaces this directly instead.
+
+Rhai syntax notes for a JS-fluent caller: maps are `#{ key: value }` (not
+`{}`), string interpolation is `` `${var}` `` inside backticks, and there is no
+`===`/`!==` (`==`/`!=` only).
+
+## Field shapes for mock_add_stub/mock_update_stub's patch, mock_set_fallback, mock_set_bind
+
+Stub: { id, enabled, name, method: 'ANY'|'GET'|'POST'|'PUT'|'PATCH'|'DELETE'|'HEAD'|'OPTIONS',
+  path, matchers: Matcher[], mode: 'static'|'script', status, headers: KeyValue[],
+  body, bodyType: 'text'|'json'|'base64', fileName, script, delayMs }
+`path` supports `:param` placeholders (e.g. `/users/:id`), readable from
+scripts via `req.params` and matchable via a `path`-target Matcher. `bodyType`
+only governs how `body` is interpreted/served in static mode (`base64` sets
+Content-Disposition from `fileName`); it has no effect in script mode, where
+the script's returned `body` is always sent as-is. `delayMs` artificially
+delays the response (simulating latency).
+
+Matcher: { id, target: 'query'|'header'|'body'|'path', op: 'equals'|'contains'|'regex'|'exists',
+  key, value }. All of a stub's enabled matchers must pass for it to match; a
+stub with none matches every request to its method+path. For a `body` target,
+an empty `key` matches the whole body as text; a non-empty `key` is a dotted
+JSON field path (e.g. `user.name`, `tags.1`) evaluated against the parsed
+JSON body. `exists` ignores `value`.
+
+MockConfig-level fields (mock_get_config / mock_set_fallback / mock_set_bind):
+host, port (bind address — mock_set_bind, takes effect on the next mock_start),
+notFoundStatus, notFoundBody, notFoundContentType (the fallback response for
+when no stub matches — mock_set_fallback).
+"#;
+
 async fn call_tool(name: &str, args: Value) -> CallToolResult {
     match call_bridge(name, args).await {
+        // Compact, not pretty-printed: indentation whitespace is pure token
+        // overhead once this lands in Claude's context, and the JSON reads
+        // fine compact for a model.
         Ok(v) => {
-            let text = serde_json::to_string_pretty(&v).unwrap_or_else(|_| v.to_string());
+            let text = serde_json::to_string(&v).unwrap_or_else(|_| v.to_string());
             CallToolResult::success(vec![Content::text(text)])
         }
         Err(e) => CallToolResult::error(vec![Content::text(e)]),
@@ -194,7 +360,8 @@ async fn call_tool(name: &str, args: Value) -> CallToolResult {
 
 // ── tool catalogue ───────────────────────────────────────────────────────
 // Kept in sync by hand with the actual handlers in
-// src/components/tools/apiclient/mcpBridge.ts.
+// src/components/tools/apiclient/mcpBridge.ts and
+// src/components/tools/mockserver/mcpBridge.ts.
 
 fn kv_array_schema() -> Value {
     json!({
@@ -237,7 +404,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "update_request",
-            "description": "Patch a request in place. `patch` is a partial ApiRequest object — only the fields you include are changed (e.g. { \"url\": \"...\", \"method\": \"POST\", \"body\": { \"mode\": \"json\", \"raw\": \"...\", \"form\": [] } }). Set patch.script = { req, res } to edit its pre/post-request script.",
+            "description": "Patch a request in place. `patch` is a partial ApiRequest — only included fields change (e.g. { \"url\", \"method\", \"body\": { \"mode\", \"raw\", \"form\" } }). Set patch.script = { req, res } for its pre/post-request script.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "requestId": { "type": "string" }, "patch": { "type": "object" } },
@@ -255,7 +422,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "run_request",
-            "description": "Actually send a request through DevTool (same engine as the Send button): runs its pre-request script, sends it, runs the post-response script, evaluates tests/assertions, and appends it to History. Returns the response, tests, console logs, and any transport/script error. Pass environmentId to force a specific environment (omit for the currently active one, null for \"No Environment\").",
+            "description": "Send a request through DevTool (same engine as Send): pre-request script → send → post-response script → tests/assertions → History. Returns response (body capped), tests, logs, and any error. Pass environmentId to override the active environment (null = \"No Environment\").",
             "inputSchema": {
                 "type": "object",
                 "properties": { "requestId": { "type": "string" }, "environmentId": nullable_string() },
@@ -335,7 +502,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_node_script",
-            "description": "Set the pre/post-request script inherited by every request under a collection or folder (Bruno-style). Pass nodeId=null (or omit it) for the collection's own root script; pass a folder id for that folder's script. A request's OWN script is a field on it instead — see update_request's patch.script.",
+            "description": "Set the pre/post-request script inherited by every request under a collection/folder. nodeId=null (or omitted) = collection root; a folder id = that folder. A request's own script is set via update_request's patch.script instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -352,7 +519,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_node_auth",
-            "description": "Set the auth inherited by every request under a collection or folder that has auth.type=\"inherit\" (Bruno-style). Pass nodeId=null (or omit it) for the collection root; pass a folder id for that folder. A request's OWN auth is a field on it instead — see update_request's patch.auth.",
+            "description": "Set the auth inherited by requests with auth.type=\"inherit\" under a collection/folder. nodeId=null (or omitted) = collection root; a folder id = that folder. A request's own auth is set via update_request's patch.auth instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "collectionId": { "type": "string" }, "nodeId": nullable_string(), "auth": { "type": "object" } },
@@ -361,7 +528,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_node_headers",
-            "description": "Set the headers added to every request under a collection or folder (Bruno-style; a request's own header of the same name overrides it). Pass nodeId=null (or omit it) for the collection root; pass a folder id for that folder. A request's OWN headers are a field on it instead — see update_request's patch.headers.",
+            "description": "Set the headers added to every request under a collection/folder (a request's own header of the same name overrides it). nodeId=null (or omitted) = collection root; a folder id = that folder. A request's own headers are set via update_request's patch.headers instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "collectionId": { "type": "string" }, "nodeId": nullable_string(), "headers": kv_array_schema() },
@@ -389,7 +556,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_active_environment",
-            "description": "Activate an environment. scope=\"global\" sets the active Global environment; scope=\"collection\" (default) sets the active environment for one collection — pass collectionId in that case. environmentId=null clears it (\"No Environment\").",
+            "description": "Activate an environment. scope=\"global\" sets the active Global env; scope=\"collection\" (default) sets it for one collection (pass collectionId). environmentId=null clears it (\"No Environment\").",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -419,6 +586,11 @@ fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": { "environmentId": { "type": "string" } }, "required": ["environmentId"] }
         }),
         json!({
+            "name": "get_scripting_reference",
+            "description": "Read-only reference for both tools' scripting APIs and field shapes: API Client's bru/req/res/pm JS engine (variable precedence, assertions, Auth/RequestBody/KeyValue shapes) and Mock Server's Rhai response-script engine (a separate language — req shape, return shape, Stub/Matcher shapes). Call before writing/editing a script, auth, assertions, or a stub. Answered locally — works even if DevTool isn't open.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
             "name": "import_environment",
             "description": "Create an environment with a name, scope, and full variable set in one call (e.g. importing one from another tool). Returns the new id.",
             "inputSchema": {
@@ -426,6 +598,99 @@ fn tool_definitions() -> Vec<Value> {
                 "properties": { "name": { "type": "string" }, "collectionId": nullable_string(), "variables": kv_array_schema() },
                 "required": ["name"]
             }
+        }),
+
+        // ── Mock Server ──────────────────────────────────────────────────
+        // Only answers while DevTool is open with the Mock Server tool on
+        // screen — same contract as the API Client tools above, for the same
+        // reason (the stub list and bind config live in that mounted
+        // component's state, not anywhere the sidecar can reach on its own).
+        json!({
+            "name": "mock_get_config",
+            "description": "Get the mock server's bind (host/port), fallback response, running status, and a summarized stub list (id/enabled/name/method/path/mode/status — not matchers/headers/body/script). Use mock_get_stub for one stub's full definition.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "mock_get_stub",
+            "description": "Get one stub's full definition: matchers, response mode, status, headers, body (or script for scripted responses), delay.",
+            "inputSchema": { "type": "object", "properties": { "stubId": { "type": "string" } }, "required": ["stubId"] }
+        }),
+        json!({
+            "name": "mock_add_stub",
+            "description": "Add a new stub. `stub` is a partial Stub object for the initial values (defaults: enabled=true, method=GET, mode=static — see get_scripting_reference for field shapes). Returns the created stub, appended to the end; reorder with mock_move_stub since stub order matters (first match wins).",
+            "inputSchema": { "type": "object", "properties": { "stub": { "type": "object" } } }
+        }),
+        json!({
+            "name": "mock_update_stub",
+            "description": "Patch a stub in place. `patch` is a partial Stub object — only the fields you include are changed.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "stubId": { "type": "string" }, "patch": { "type": "object" } },
+                "required": ["stubId", "patch"]
+            }
+        }),
+        json!({
+            "name": "mock_duplicate_stub",
+            "description": "Duplicate a stub (fresh id, \"<name> copy\") as the next stub right after the original. Returns the new stub.",
+            "inputSchema": { "type": "object", "properties": { "stubId": { "type": "string" } }, "required": ["stubId"] }
+        }),
+        json!({
+            "name": "mock_delete_stub",
+            "description": "Delete a stub by id.",
+            "inputSchema": { "type": "object", "properties": { "stubId": { "type": "string" } }, "required": ["stubId"] }
+        }),
+        json!({
+            "name": "mock_move_stub",
+            "description": "Move a stub up or down one position relative to its siblings. Stub order matters — the first enabled stub whose matchers all pass wins — so this is how to reprioritize overlapping stubs.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "stubId": { "type": "string" }, "direction": { "type": "string", "enum": ["up", "down"] } },
+                "required": ["stubId", "direction"]
+            }
+        }),
+        json!({
+            "name": "mock_set_fallback",
+            "description": "Patch the \"no stub matched\" response. `patch` may include any of notFoundStatus (number), notFoundBody (string), notFoundContentType (string).",
+            "inputSchema": { "type": "object", "properties": { "patch": { "type": "object" } }, "required": ["patch"] }
+        }),
+        json!({
+            "name": "mock_set_bind",
+            "description": "Set the host and/or port the server binds to on the next mock_start. Does NOT hot-swap an already-running server (unlike stubs/fallback, which apply live) — call mock_stop then mock_start to rebind.",
+            "inputSchema": { "type": "object", "properties": { "host": { "type": "string" }, "port": { "type": "number" } } }
+        }),
+        json!({
+            "name": "mock_start",
+            "description": "Start the mock server with the current config (stubs + bind address). Returns the resulting status (running/host/port). Errors if the port is already in use.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "mock_stop",
+            "description": "Stop the mock server.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "mock_status",
+            "description": "Get the mock server's current running status (running/host/port), without the config/stub list mock_get_config also returns.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "mock_test_script",
+            "description": "Run a Rhai response script against a synthetic request, without saving it to a stub — for iterating before mock_add_stub/mock_update_stub. `sample` is { method, path, query, headers, params, body } (all optional, defaults to GET /); see get_scripting_reference for the req/return shape.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "script": { "type": "string" }, "sample": { "type": "object" } },
+                "required": ["script"]
+            }
+        }),
+        json!({
+            "name": "mock_get_request_log",
+            "description": "Get the most recent requests the mock server handled (newest first, capped at `limit`, default 50), each with which stub matched (or null for the fallback), status, timing, and truncated request/response bodies.",
+            "inputSchema": { "type": "object", "properties": { "limit": { "type": "number" } } }
+        }),
+        json!({
+            "name": "mock_clear_request_log",
+            "description": "Clear the mock server's request log.",
+            "inputSchema": { "type": "object", "properties": {} }
         }),
     ]
 }
@@ -452,6 +717,16 @@ fn build_router() -> ToolRouter<DevToolServer> {
             _ => Default::default(),
         };
         let tool = Tool::new(name.clone(), description, schema);
+        // get_scripting_reference is static content, not live app state — answer
+        // it locally instead of round-tripping through the bridge, so it works
+        // even while DevTool is closed or on a different tool.
+        if name == "get_scripting_reference" {
+            router.add_route(ToolRoute::new_dyn(tool, |_context: ToolCallContext<'_, DevToolServer>| {
+                Box::pin(async move { Ok(CallToolResult::success(vec![Content::text(SCRIPTING_REFERENCE)])) })
+                    as Pin<Box<dyn Future<Output = Result<CallToolResult, McpError>> + Send>>
+            }));
+            continue;
+        }
         router.add_route(ToolRoute::new_dyn(tool, move |context: ToolCallContext<'_, DevToolServer>| {
             let name = name.clone();
             let args = context.arguments.clone().map(Value::Object).unwrap_or_else(|| json!({}));
@@ -466,9 +741,13 @@ impl ServerHandler for DevToolServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
-                "Drives DevTool's API Client tool — collections, requests, scripts, \
-                 environments — and can actually send a request. Only answers while the \
-                 DevTool desktop app is open with the API Client tool on screen.",
+                "Drives two DevTool tools. API Client: collections, requests, scripts, \
+                 environments — and can actually send a request. Mock Server: stubs, \
+                 matchers, the fallback response, and can start/stop the server and test a \
+                 response script. Each tool's calls only answer while the DevTool desktop \
+                 app is open with THAT tool on screen (mock_* needs Mock Server open, \
+                 everything else needs API Client open) — call get_scripting_reference for \
+                 the scripting API and field shapes shared by both.",
             )
             .with_server_info(Implementation::new("devtool-api-client", env!("CARGO_PKG_VERSION")))
     }

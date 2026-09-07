@@ -929,24 +929,34 @@ Key files:
 
 ---
 
-### API Client — MCP bridge (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/apiclient/mcpBridge.ts`)
+### MCP bridge — API Client + Mock Server (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/apiclient/mcpBridge.ts`, `src/components/tools/mockserver/mcpBridge.ts`)
 
-An external MCP client (Claude Desktop/Code) can inspect and drive the API
-Client tool — list/read/edit collections, requests, scripts, environments,
-and actually **send a request** through the same engine the Send button
-uses (result lands in the UI + History like any other send). 28 tools; see
-`docs/human/mcp-server.md` for the full list and setup instructions.
+An external MCP client (Claude Desktop/Code) can inspect and drive two
+DevTool tools through one server. API Client: list/read/edit collections,
+requests, scripts, environments, and actually **send a request** through the
+same engine the Send button uses (result lands in the UI + History like any
+other send). Mock Server: list/read/edit stubs and the fallback response,
+**start/stop** the server, test a Rhai response script, and read the request
+log. 44 tools; see `docs/human/mcp-server.md` for the full list and setup
+instructions.
 
 **The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
 `.setup()` (OS-assigned port, random token written to
 `<app_data_dir>/mcp-bridge.json`). It has no access to app state itself — a
 `POST /call` emits an `mcp:call` Tauri event and blocks on a
 `tokio::sync::oneshot` (30s timeout) until the frontend answers via the
-`mcp_respond` command. `mcpBridge.ts`'s `useMcpBridge(store, runRequest)` —
-called once from `ApiClient.tsx` while it's mounted — is the only listener,
-and runs the matching handler against the **live** `ApiStore`, so a call only
-succeeds while the app is open AND the API Client tool is the one on screen;
-anything else times out with a clear error rather than hanging.
+`mcp_respond` command. Two frontend listeners answer it: `apiclient/
+mcpBridge.ts`'s `useMcpBridge(store, runRequest)` (mounted from
+`ApiClient.tsx`) runs the matching handler against the **live** `ApiStore`;
+`mockserver/mcpBridge.ts`'s `useMcpBridge(state)` (mounted from
+`MockServer.tsx`) does the same against `useMockServer()`'s return value.
+Each ignores tool names it doesn't own rather than erroring, so — since
+React Router unmounts the previous route on every tool switch — only one of
+the two is ever actually listening at a time regardless. A call only
+succeeds while the app is open AND the tool that owns it is the one on
+screen; anything else times out with a clear error rather than hanging
+(`get_scripting_reference` is the one tool answered without any of this,
+directly by the sidecar — see below).
 
 **One sidecar, `src-tauri/src/bin/devtool-mcp-server.rs`:** built on `rmcp`
 (the official Rust MCP SDK — protocol framing, capability negotiation, and
@@ -977,11 +987,41 @@ Two ways this binary gets run:
   the first call compiles it, every call after is instant via Cargo's own
   incremental cache).
 
-**Adding a tool:** add a handler function to `buildHandlers()` in
-`mcpBridge.ts` (reuse existing `store.*` actions — don't reimplement
-collection/request mutation logic), then add a matching entry to
-`tool_definitions()` (a raw JSON Schema `Value`) in `devtool-mcp-server.rs`.
-Write descriptions for an LLM caller, not a human reading the UI.
+**Adding a tool:** add a handler function to `buildHandlers()` in the
+matching frontend's `mcpBridge.ts` (reuse existing state-mutating actions —
+`ApiStore.*` for API Client, `useMockServer()`'s returned functions for Mock
+Server — don't reimplement mutation logic; if the action doesn't exist yet
+there either, add it there first so the UI and the MCP bridge share one
+implementation, as `useMockServer.ts`'s `addStub`/`duplicateStub`/
+`deleteStub`/`moveStub` do), then add a matching entry to `tool_definitions()`
+(a raw JSON Schema `Value`) in `devtool-mcp-server.rs`. Write descriptions for
+an LLM caller, not a human reading the UI. A tool that answers from **static
+content rather than live app state** (like `get_scripting_reference`) skips
+the bridge entirely — special-case its name in `build_router()`'s loop to
+return the answer directly, so it works even while the app is closed (see
+that tool for the pattern).
+
+**Keeping MCP callers token-efficient:** this surface is read by an LLM, not
+rendered in a UI, so payload size is a real cost, not just bandwidth — both
+per-call (a large response) and per-session (every tool's name/description/
+schema is sent on every `list_tools`, in every session this MCP server is
+registered in, whether or not that session ever calls one). For per-call
+cost: don't return a full nested object graph when a summary will do
+(`get_collection` returns collection-level fields plus a *summarized* item
+tree, not every nested request's full body/script/tests — see
+`summarizeItems`); cap anything that can be arbitrarily large before it
+leaves `mcpBridge.ts` — not just a response body (`run_request`'s
+`summarizeResponseForMcp`, dropping `bodyBase64` for a `bodyBase64Omitted`
+flag) but also anything a script can produce unboundedly, like console output
+(`summarizeLogsForMcp` caps entry count and each entry's length — a stray
+`console.log` in a loop is just as capable of flooding the response as a
+large body). For per-session cost: prefer a dedicated on-demand tool over
+inflating every tool's description/schema for information only occasionally
+needed (`get_scripting_reference` instead of folding the `bru`/`req`/`res`/
+`pm` API into `update_request`'s description), and keep descriptions terse —
+state the contract, not a tutorial; the full detail belongs in
+`get_scripting_reference`'s content (paid for only when actually called), not
+in every tool's always-sent description.
 
 **Deliberately excluded:** the Vault (`store.vault`) — the UI itself keeps
 Vault values out of generated code, cURL export, and history, so exposing it

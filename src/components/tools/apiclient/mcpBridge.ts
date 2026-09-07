@@ -19,7 +19,7 @@
 import { useEffect, useRef } from 'react';
 import { isTauri } from '@/lib/platform';
 import type { ApiStore } from './store';
-import type { ApiRequest, Auth, Environment, KeyValue, RequestScript, TreeItem } from './types';
+import type { ApiRequest, Auth, Environment, KeyValue, LogEntry, RequestScript, TreeItem } from './types';
 import { newEnvironment, newRequest } from './types';
 import type { ExecResult } from './engine';
 
@@ -103,12 +103,54 @@ function summarizeItems(items: TreeItem[]): unknown[] {
   );
 }
 
+// Response bodies can be arbitrarily large (a multi-MB JSON dump, an image's
+// base64) — returning them verbatim to an MCP client burns tokens (or blows
+// past the model's context) for no benefit, since a human isn't reading raw
+// base64 either way. Cap text bodies and drop bodyBase64 entirely in favor of
+// a note, mirroring what get_request/get_collection already do by omitting
+// bulk fields the caller didn't ask for.
+const MAX_RESPONSE_BODY_CHARS = 20_000;
+
+function summarizeResponseForMcp(response: ExecResult['response']): unknown {
+  if (!response) return response;
+  const { bodyBase64: _bodyBase64, body, ...rest } = response;
+  const truncated = body.length > MAX_RESPONSE_BODY_CHARS;
+  return {
+    ...rest,
+    body: truncated ? body.slice(0, MAX_RESPONSE_BODY_CHARS) : body,
+    ...(truncated ? { bodyTruncated: true, bodyFullLength: body.length } : {}),
+    ...(response.binary ? { bodyBase64Omitted: true } : {}),
+  };
+}
+
+// A pre/post-request script's console.log output is just as unbounded as a
+// response body (a loop over a large array, an accidental full-object dump) —
+// cap entry count and each entry's own length the same way, rather than
+// shipping whatever the script happened to log verbatim.
+const MAX_LOG_ENTRIES = 200;
+const MAX_LOG_ENTRY_CHARS = 2_000;
+
+function summarizeLogsForMcp(logs: LogEntry[]): { logs: LogEntry[]; logsTruncated?: true; logsFullCount?: number } {
+  const overflowed = logs.length > MAX_LOG_ENTRIES;
+  const capped = (overflowed ? logs.slice(0, MAX_LOG_ENTRIES) : logs).map((l) =>
+    l.text.length > MAX_LOG_ENTRY_CHARS ? { ...l, text: `${l.text.slice(0, MAX_LOG_ENTRY_CHARS)}… (truncated)` } : l,
+  );
+  return { logs: capped, ...(overflowed ? { logsTruncated: true, logsFullCount: logs.length } : {}) };
+}
+
 function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string, ToolHandler> {
   return {
     list_collections: async () =>
       store.collections.map((c) => ({ id: c.id, name: c.name, items: summarizeItems(c.items) })),
 
-    get_collection: async (args) => requireCollection(store, requireString(args.collectionId, 'collectionId')),
+    // Returns collection-level fields (script/auth/variables/headers) plus a
+    // summarized item tree (id/name/method/url) — not full nested request
+    // bodies/scripts/tests, which would multiply token cost with the number
+    // of requests in the collection. Use get_request for a specific one.
+    get_collection: async (args) => {
+      const c = requireCollection(store, requireString(args.collectionId, 'collectionId'));
+      return { ...c, items: summarizeItems(c.items) };
+    },
 
     list_environments: async () =>
       store.environments.map((e) => ({ id: e.id, name: e.name, collectionId: e.collectionId ?? null })),
@@ -157,7 +199,12 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
       const { request } = findRequestWithCollection(store, id);
       const envId = args.environmentId === undefined ? undefined : (args.environmentId as string | null);
       const result = await runRequest(request, {}, undefined, envId);
-      return { response: result.response, tests: result.tests, logs: result.logs, error: result.error };
+      return {
+        response: summarizeResponseForMcp(result.response),
+        tests: result.tests,
+        ...summarizeLogsForMcp(result.logs),
+        error: result.error,
+      };
     },
 
     // ── folders & tree structure ────────────────────────────────────────
