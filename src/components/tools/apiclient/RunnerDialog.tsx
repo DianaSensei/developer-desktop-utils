@@ -34,12 +34,14 @@ import { Badge } from '@/components/ui/badge';
 import { Field } from '@/components/ui/tool-section';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Callout } from '@/components/ui/callout';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
 import { methodColor } from './method-color';
 import { formatBytes, statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
-import { pickDataFile, saveJsonFile, saveTextFile } from './fileio';
+import { pickDataFile, saveStreamedTextFile } from './fileio';
 import { DELIMITER_LABEL, type DataRow, type ParsedDataFile, parseDataFileAsync } from './datafile';
 import { type ColumnMapping, collectVarTokens, mapColumns, missingColumns } from './varUsage';
 import type { ExecResult } from './engine';
@@ -48,7 +50,7 @@ import {
   type RequestStats, type RunDetail, type RunRecord, type RunStats, type RunStatsAcc,
   STATUS_SAMPLE_CAP, fold, httpOkTest, isOk, newAcc, toStats,
 } from './runnerStats';
-import { buildResultsCsv } from './runnerExport';
+import { type RunReportHead, csvChunks, failureEntries, jsonReportChunks } from './runnerExport';
 import type { ApiRequest, Environment, HttpMethod, VarMap } from './types';
 
 interface Props {
@@ -75,6 +77,8 @@ const parseTags = (s: string): string[] =>
   s.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
 
 type ResultFilter = 'all' | 'passed' | 'failed';
+/** Which executions an export covers. */
+type ExportScope = 'all' | 'failed';
 
 // Above this row count, "Save responses" defaults off (see loadData) and the
 // iteration rail switches from a plain list to a virtualized one (see
@@ -160,6 +164,11 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   const [running, setRunning] = useState(false);
   const [filter, setFilter] = useState<ResultFilter>('all');
   const [elapsed, setElapsed] = useState(0);
+  // Label of the export in flight, or null. A large run takes real time to
+  // serialise, and a menu that just closed with nothing happening reads as a
+  // broken button.
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   // Iterations stopped by the step ceiling (a setNextRequest cycle).
   const [cappedIters, setCappedIters] = useState<Set<number>>(() => new Set());
   const startedAtRef = useRef<number | null>(null);
@@ -508,13 +517,40 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailKey, tick]);
 
-  const exportResults = async () => {
-    const report = {
+  // Both exports stream: a run over a large data file produces far more
+  // report than fits comfortably in one string (see runnerExport.ts), and the
+  // writer flushes in bounded batches (see saveStreamedTextFile). `scope`
+  // trims the records to failures only — usually the only part anyone reads
+  // after a 100k-row run.
+  const exportRecords = (scope: ExportScope) =>
+    scope === 'failed' ? recordsRef.current.filter((r) => !isOk(r)) : recordsRef.current;
+
+  const fileBase = () => (title || 'run').replace(/[^\w.-]+/g, '-');
+
+  const runExport = async (label: string, write: () => Promise<boolean>) => {
+    setExporting(label);
+    setExportError(null);
+    try {
+      await write();
+    } catch (e) {
+      // Surfaced in the results view, not the setup pane's dataError — an
+      // export is started from here and its failure has to be visible here.
+      setExportError(`${label} export failed: ${(e as Error)?.message || String(e)}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const exportResults = async (scope: ExportScope) => {
+    const records = exportRecords(scope);
+    const { failures, failuresTruncated, failuresTotal } = failureEntries(recordsRef.current);
+    const head: RunReportHead = {
       collection: title,
       startedAt: startedAtRef.current ? new Date(startedAtRef.current).toISOString() : null,
       finishedAt: new Date().toISOString(),
       durationMs: elapsed,
       options: {
+        scope: scope === 'failed' ? 'failures only' : 'all requests',
         environment: envId ? (environments.find((e) => e.id === envId)?.name ?? envId) : null,
         iterations: iters,
         delayMs,
@@ -558,44 +594,20 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
           statusCodes: r.byStatus,
           responseTimeMs: { average: r.avgMs, min: r.minMs, max: r.maxMs },
         })),
-        failures: recordsRef.current.filter((r) => !isOk(r)).map((r) => ({
-          iteration: r.iter + 1,
-          step: r.step + 1,
-          name: r.name,
-          status: r.status,
-          error: r.error ?? undefined,
-          failedTests: r.tests.filter((t) => !t.passed).map((t) => ({ name: t.name, error: t.error })),
-        })),
+        // A convenience index into `runs`, capped so a run where most rows
+        // failed doesn't repeat itself inside its own summary.
+        failures,
+        failuresTruncated,
+        failuresTotal,
       },
-      runs: recordsRef.current.map((r) => ({
-        iteration: r.iter + 1,
-        step: r.step + 1,
-        at: new Date(r.at).toISOString(),
-        name: r.name,
-        method: r.method,
-        url: r.url,
-        status: r.status,
-        statusText: r.statusText,
-        timeMs: r.ms,
-        timings: r.ttfbMs === undefined ? undefined : { ttfbMs: r.ttfbMs, downloadMs: r.downloadMs },
-        sizeBytes: r.sizeBytes,
-        error: r.error ?? undefined,
-        iterationData: r.dataVars,
-        nextRequest: r.jump ? { to: r.jump.to, resolved: !r.jump.missing } : undefined,
-        tests: r.tests.map((t) => ({ name: t.name, passed: t.passed, error: t.error })),
-        console: r.logs.map((l) => ({ level: l.level, text: l.text })),
-        // Present only when the run kept responses.
-        response: r.detail?.result.response
-          ? {
-              headers: Object.fromEntries(r.detail.result.response.headers),
-              contentType: r.detail.result.response.contentType,
-              body: r.detail.result.response.body,
-            }
-          : undefined,
-      })),
     };
-    const safe = (title || 'run').replace(/[^\w.-]+/g, '-');
-    await saveJsonFile(`${safe}.run-results.json`, JSON.stringify(report, null, 2));
+    const suffix = scope === 'failed' ? '.failures' : '';
+    await saveStreamedTextFile(
+      `${fileBase()}.run-results${suffix}.json`,
+      jsonReportChunks(head, records),
+      { extensions: ['json'], filterName: 'JSON' },
+    );
+    return true;
   };
 
   // A CSV export alongside the JSON one: one row per executed request, with
@@ -606,10 +618,13 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   // scroll through, and most of that structure doesn't matter for a "which
   // rows failed, with what status code" pass. Row shape lives in
   // runnerExport.ts so the escaping and column layout are testable.
-  const exportResultsCsv = async () => {
-    const csv = buildResultsCsv(recordsRef.current, dataFile?.parsed.columns ?? []);
-    const safe = (title || 'run').replace(/[^\w.-]+/g, '-');
-    await saveTextFile(`${safe}.run-results.csv`, csv);
+  const exportResultsCsv = async (scope: ExportScope) => {
+    const suffix = scope === 'failed' ? '.failures' : '';
+    return saveStreamedTextFile(
+      `${fileBase()}.run-results${suffix}.csv`,
+      csvChunks(exportRecords(scope), dataFile?.parsed.columns ?? []),
+      { extensions: ['csv'], filterName: 'CSV' },
+    );
   };
 
   return (
@@ -900,17 +915,35 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                   <>
                     <DropdownMenu>
                       <DropdownMenuTrigger
-                        disabled={totalRun === 0}
+                        disabled={totalRun === 0 || exporting !== null}
                         className="flex h-ctl items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors hover:bg-acc/50 disabled:pointer-events-none disabled:opacity-50"
                       >
-                        <Download className="h-3.5 w-3.5" /> Export
+                        {exporting
+                          ? <><Spinner size="sm" /> Exporting {exporting}…</>
+                          : <><Download className="h-3.5 w-3.5" /> Export</>}
                       </DropdownMenuTrigger>
+                      {/* Each item names its own format: two rows reading
+                          "All 3 requests" would be indistinguishable to a
+                          screen reader, whatever heading sits above them. */}
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={exportResultsCsv}>
-                          CSV — one row per request
+                        <DropdownMenuItem onClick={() => runExport('CSV', () => exportResultsCsv('all'))}>
+                          CSV — all {totalRun.toLocaleString()} requests
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={exportResults}>
-                          JSON — full detail (options, tests, responses kept)
+                        <DropdownMenuItem
+                          disabled={failedCount === 0}
+                          onClick={() => runExport('CSV', () => exportResultsCsv('failed'))}
+                        >
+                          CSV — failures only ({failedCount.toLocaleString()})
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => runExport('JSON', () => exportResults('all'))}>
+                          JSON — all {totalRun.toLocaleString()} requests
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={failedCount === 0}
+                          onClick={() => runExport('JSON', () => exportResults('failed'))}
+                        >
+                          JSON — failures only ({failedCount.toLocaleString()})
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -921,6 +954,16 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                 )}
               </div>
             </div>
+
+            {exportError && (
+              <div className="shrink-0 border-b px-3 py-2">
+                <Callout tone="error" size="sm" actions={
+                  <button onClick={() => setExportError(null)} className="text-[11px] font-medium hover:underline">Dismiss</button>
+                }>
+                  {exportError}
+                </Callout>
+              </div>
+            )}
 
             {/* full breakdown of what the run measured */}
             {totalRun > 0 && (

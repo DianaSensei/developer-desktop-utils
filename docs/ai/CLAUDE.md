@@ -839,7 +839,8 @@ Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per
 - **Response-code tracking:** `stats.byStatus` (run-wide), `stats.byRequest[]` (per-request rollup — the "By request" tab), and `statusSamples` (status → iterations that produced it, capped at `STATUS_SAMPLE_CAP`; drives the click-a-code-to-jump navigation). Counts stay exact; only the sample index is capped.
 - **`VirtualIterRail`** renders only on-screen iterations. Its `ITER_ROW_H`/`ITER_ROW_H_DATA` constants must match the row markup's real height (padding + line-height per line) — nothing type-checks that contract.
 - **Data files** parse through `parseDataFileAsync` (Web Worker above 200k chars — `src/workers/datafile.worker.ts`); parsing logic stays pure in `datafile.ts`. "Save responses" defaults off above 2,000 rows.
-- Tests: `runnerStats.test.ts` (aggregation), `runnerExport.test.ts` (CSV shape/escaping), `RunnerDialog.test.tsx` (the run loop, data binding, export — the throttled-flush plumbing is only observable here).
+- **Exports stream.** `runnerExport.ts` yields chunks (`csvChunks`, `jsonReportChunks`) and `saveStreamedTextFile` (`fileio.ts`) buffers ~4 MB before each `writeTextFile(..., { append: true })` — never build the whole report as one string (a large run's JSON is hundreds of MB). `buildResultsCsv` remains only as a join-it-all convenience for tests. Each format also exports failures-only.
+- Tests: `runnerStats.test.ts` (aggregation), `runnerExport.test.ts` (CSV shape/escaping, chunk boundaries still parse as one document), `RunnerDialog.test.tsx` (the run loop, data binding, export — the throttled-flush plumbing is only observable here).
 
 ### Kafka Explorer (`src/components/tools/kafka/`)
 

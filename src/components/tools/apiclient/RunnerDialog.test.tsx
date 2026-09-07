@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { RunnerDialog } from './RunnerDialog';
 import { newRequest } from './types';
-import { pickDataFile, saveTextFile } from './fileio';
+import { pickDataFile, saveStreamedTextFile } from './fileio';
 import type { ExecResult } from './engine';
 import type { ApiRequest, TestResult, VarMap } from './types';
 
@@ -19,9 +19,16 @@ import type { ApiRequest, TestResult, VarMap } from './types';
 // the real code.
 vi.mock('./fileio', () => ({
   pickDataFile: vi.fn(),
+  saveStreamedTextFile: vi.fn(async () => true),
   saveTextFile: vi.fn(async () => {}),
   saveJsonFile: vi.fn(async () => {}),
 }));
+
+/** The text a streamed export would have written, joined from its chunks. */
+function writtenExport(call = 0): { name: string; text: string } {
+  const [name, chunks] = vi.mocked(saveStreamedTextFile).mock.calls[call];
+  return { name, text: [...chunks].join('') };
+}
 
 function execOk(status: number, ms = 10, tests: TestResult[] = []): ExecResult {
   return {
@@ -79,7 +86,7 @@ function setup(
 
 beforeEach(() => {
   vi.mocked(pickDataFile).mockReset();
-  vi.mocked(saveTextFile).mockClear();
+  vi.mocked(saveStreamedTextFile).mockClear();
 });
 
 const clickRun = () => fireEvent.click(screen.getByRole('button', { name: /Run \d+ request/ }));
@@ -351,23 +358,32 @@ describe('RunnerDialog data-driven run', () => {
     expect(runRequest).toHaveBeenCalledTimes(1);
   });
 
-  it('exports a CSV whose rows carry the status code and the data that produced them', async () => {
+  // Second of three rows fails, so "failures only" has something to trim to.
+  const runThree = () => {
     let call = 0;
     const runRequest = vi.fn(async () => { call += 1; return execOk(call === 2 ? 500 : 200); });
     setup(runRequest, [getUser]);
+    return runRequest;
+  };
 
+  const openExport = async (item: RegExp) => {
+    fireEvent.click(screen.getByRole('button', { name: /Export/ }));
+    const menu = within(await screen.findByRole('menu'));
+    fireEvent.click(menu.getByRole('menuitem', { name: item }));
+    await waitFor(() => expect(saveStreamedTextFile).toHaveBeenCalled());
+  };
+
+  it('exports a CSV whose rows carry the status code and the data that produced them', async () => {
+    runThree();
     await loadCsv();
     clickRun();
     await waitFor(() => expect(statValue('Requests')).toBe('3'));
 
-    fireEvent.click(screen.getByRole('button', { name: /Export/ }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: /CSV/ }));
-
-    await waitFor(() => expect(saveTextFile).toHaveBeenCalled());
-    const [name, text] = vi.mocked(saveTextFile).mock.calls[0];
+    await openExport(/CSV — all 3 requests/);
+    const { name, text } = writtenExport();
     expect(name).toBe('My-collection.run-results.csv');
 
-    const lines = (text as string).split('\n');
+    const lines = text.split('\n');
     expect(lines[0]).toContain('status,statusText,httpOk,outcome');
     expect(lines[0].endsWith('userId,token')).toBe(true);
     expect(lines).toHaveLength(4);
@@ -377,4 +393,46 @@ describe('RunnerDialog data-driven run', () => {
     expect(lines[2]).toContain('fail');
     expect(lines[2].endsWith('2,beta')).toBe(true);
   });
+
+  it('exports failures only when asked — the usual read after a huge run', async () => {
+    runThree();
+    await loadCsv();
+    clickRun();
+    await waitFor(() => expect(statValue('Requests')).toBe('3'));
+
+    await openExport(/CSV — failures only \(1\)/);
+    const { name, text } = writtenExport();
+    expect(name).toBe('My-collection.run-results.failures.csv');
+
+    const lines = text.split('\n');
+    // Header plus the single failing row, carrying the data row behind it.
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('500');
+    expect(lines[1].endsWith('2,beta')).toBe(true);
+  });
+
+  it('streams the JSON report as valid, parseable JSON', async () => {
+    runThree();
+    await loadCsv();
+    clickRun();
+    await waitFor(() => expect(statValue('Requests')).toBe('3'));
+
+    await openExport(/JSON — all 3 requests/);
+
+    const { name, text } = writtenExport();
+    expect(name).toBe('My-collection.run-results.json');
+
+    // The point of chunking is that the pieces still form one valid document.
+    const report = JSON.parse(text);
+    expect(report.collection).toBe('My collection');
+    expect(report.summary.requests).toMatchObject({ executed: 3, failed: 1 });
+    expect(report.summary.http).toMatchObject({ ok2xx: 2, notOk: 1 });
+    expect(report.runs).toHaveLength(3);
+    expect(report.runs[1]).toMatchObject({ status: 500, httpOk: false, outcome: 'fail' });
+    expect(report.runs[1].iterationData).toEqual({ userId: '2', token: 'beta' });
+    // The failure index is present alongside the full run list.
+    expect(report.summary.failures).toHaveLength(1);
+    expect(report.summary.failuresTruncated).toBe(false);
+  });
+
 });

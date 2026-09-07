@@ -135,6 +135,87 @@ export async function saveTextFile(suggestedName: string, text: string): Promise
   URL.revokeObjectURL(url);
 }
 
+// Write a file the caller produces in pieces, without ever holding the whole
+// thing as one string. A Runner export over a 100k-row data file is hundreds
+// of MB; `saveTextFile(name, chunks.join(''))` would need that entire result
+// contiguous in memory (plus the pieces it was built from) before writing a
+// single byte. Here the pieces are buffered only up to FLUSH_BYTES and then
+// appended, so peak memory stays flat regardless of run size.
+//
+// Returns false when the user cancelled the picker, true once written.
+// `onProgress` reports bytes written so a long export can show progress.
+const FLUSH_BYTES = 4 * 1024 * 1024;
+
+export async function saveStreamedTextFile(
+  suggestedName: string,
+  chunks: Iterable<string>,
+  opts: { extensions?: string[]; filterName?: string; onProgress?: (bytes: number) => void } = {},
+): Promise<boolean> {
+  const { extensions, filterName = 'File', onProgress } = opts;
+
+  if (isTauri) {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const path = await save({
+      defaultPath: suggestedName,
+      filters: extensions ? [{ name: filterName, extensions }] : undefined,
+    });
+    if (!path) return false;
+    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+
+    let buffer: string[] = [];
+    let buffered = 0;
+    let written = 0;
+    let started = false;
+    // The first write truncates; every later one appends. Batched at
+    // FLUSH_BYTES rather than per chunk because each write is a Tauri IPC
+    // round-trip — a few dozen large writes, not thousands of small ones.
+    const flush = async () => {
+      if (!buffered) return;
+      const text = buffer.join('');
+      buffer = [];
+      buffered = 0;
+      await writeTextFile(path, text, started ? { append: true } : undefined);
+      started = true;
+      written += text.length;
+      onProgress?.(written);
+    };
+
+    for (const chunk of chunks) {
+      buffer.push(chunk);
+      buffered += chunk.length;
+      if (buffered >= FLUSH_BYTES) await flush();
+    }
+    await flush();
+    // An export with no chunks at all still has to create the file.
+    if (!started) await writeTextFile(path, '');
+    return true;
+  }
+
+  // Web: a Blob takes the array of pieces directly, so the browser
+  // concatenates them itself instead of us building one giant JS string.
+  const parts: string[] = [];
+  let written = 0;
+  for (const chunk of chunks) {
+    parts.push(chunk);
+    written += chunk.length;
+    // Yield to the event loop periodically so building a very large export
+    // doesn't lock the UI for its whole duration.
+    if (parts.length % 500 === 0) {
+      onProgress?.(written);
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  }
+  onProgress?.(written);
+  const blob = new Blob(parts, { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = suggestedName;
+  a.click();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
 // Save raw bytes (given as base64) to a file the user picks. Used for binary
 // responses — images, PDFs, archives — where the text path would corrupt them.
 export async function saveBinaryFile(suggestedName: string, base64: string): Promise<void> {

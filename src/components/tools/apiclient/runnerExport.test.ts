@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CSV_COLUMNS, buildResultsCsv, csvCell } from './runnerExport';
+import {
+  CSV_COLUMNS, FAILURE_LIST_CAP, buildResultsCsv, csvCell, csvChunks, failureEntries,
+  jsonReportChunks, type RunReportHead,
+} from './runnerExport';
 import type { RunRecord } from './runnerStats';
 
 function rec(over: Partial<RunRecord> = {}): RunRecord {
@@ -149,5 +152,100 @@ describe('buildResultsCsv', () => {
     // One record is still exactly one line: the comma inside the error is quoted.
     expect(rows(csv)).toHaveLength(2);
     expect(csv).toContain('"bad request, retry ""later"""');
+  });
+});
+
+// The exports stream in chunks so a 100k-row run never has to exist as one
+// string. What matters is that chunking changes nothing about the result.
+describe('csvChunks', () => {
+  const many = (n: number) => Array.from({ length: n }, (_, i) => rec({ iter: i, status: i % 3 ? 200 : 500 }));
+
+  it('joins back into exactly what buildResultsCsv produces', () => {
+    const records = many(5);
+    expect([...csvChunks(records, ['userId'])].join('')).toBe(buildResultsCsv(records, ['userId']));
+  });
+
+  it('emits more than one chunk once the run is large, and still one line per record', () => {
+    const records = many(5000);
+    const chunks = [...csvChunks(records)];
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.join('').split('\n')).toHaveLength(5001); // header + 5000 rows
+  });
+
+  it('emits just the header for an empty run', () => {
+    expect([...csvChunks([])].join('')).toBe([...CSV_COLUMNS].join(','));
+  });
+});
+
+describe('failureEntries', () => {
+  it('indexes only the failures, counting them all', () => {
+    const { failures, failuresTotal, failuresTruncated } = failureEntries([
+      rec({ status: 200 }),
+      rec({ step: 1, status: 500 }),
+      rec({ step: 2, status: 0, error: 'boom' }),
+    ]);
+    expect(failures).toHaveLength(2);
+    expect(failuresTotal).toBe(2);
+    expect(failuresTruncated).toBe(false);
+  });
+
+  it('caps the list but keeps the true total, so a mostly-failing run cannot repeat itself', () => {
+    const records = Array.from({ length: FAILURE_LIST_CAP + 250 }, (_, i) => rec({ iter: i, status: 500 }));
+    const { failures, failuresTotal, failuresTruncated } = failureEntries(records);
+    expect(failures).toHaveLength(FAILURE_LIST_CAP);
+    expect(failuresTotal).toBe(FAILURE_LIST_CAP + 250);
+    expect(failuresTruncated).toBe(true);
+  });
+});
+
+describe('jsonReportChunks', () => {
+  const head: RunReportHead = {
+    collection: 'My collection',
+    startedAt: '2026-09-07T00:00:00.000Z',
+    finishedAt: '2026-09-07T00:01:00.000Z',
+    durationMs: 60_000,
+    options: { iterations: 3, nested: { deep: true } },
+    summary: { requests: { executed: 3 } },
+  };
+  const parse = (records: RunRecord[]) => JSON.parse([...jsonReportChunks(head, records)].join(''));
+
+  it('produces valid JSON with the head intact', () => {
+    const report = parse([rec({ status: 200 })]);
+    expect(report.collection).toBe('My collection');
+    expect(report.durationMs).toBe(60_000);
+    // Nested structures in the head survive — it is still JSON.stringify's work.
+    expect(report.options.nested).toEqual({ deep: true });
+    expect(report.summary.requests.executed).toBe(3);
+  });
+
+  it('is valid JSON with no runs at all', () => {
+    expect(parse([]).runs).toEqual([]);
+  });
+
+  it('stays valid across chunk boundaries for a large run', () => {
+    // Well past JSON_RUNS_PER_CHUNK, so the batching seam is exercised.
+    const records = Array.from({ length: 1200 }, (_, i) => rec({ iter: i, status: i % 2 ? 200 : 404 }));
+    const chunks = [...jsonReportChunks(head, records)];
+    expect(chunks.length).toBeGreaterThan(2);
+    const report = JSON.parse(chunks.join(''));
+    expect(report.runs).toHaveLength(1200);
+    expect(report.runs[0].iteration).toBe(1);
+    expect(report.runs[1199].iteration).toBe(1200);
+  });
+
+  it('records the HTTP verdict and outcome per run', () => {
+    const report = parse([
+      rec({ status: 200 }),
+      rec({ step: 1, status: 302, statusText: 'Found' }),
+      rec({ step: 2, status: 0, error: 'ECONNREFUSED' }),
+    ]);
+    expect(report.runs[0]).toMatchObject({ httpOk: true, outcome: 'pass' });
+    expect(report.runs[1]).toMatchObject({ httpOk: false, status: 302, outcome: 'pass' });
+    expect(report.runs[2]).toMatchObject({ httpOk: false, outcome: 'fail', error: 'ECONNREFUSED' });
+  });
+
+  it('carries the iteration data that produced each run', () => {
+    const report = parse([rec({ dataVars: { userId: '7' } })]);
+    expect(report.runs[0].iterationData).toEqual({ userId: '7' });
   });
 });

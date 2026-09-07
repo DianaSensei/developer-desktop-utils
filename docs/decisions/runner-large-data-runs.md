@@ -52,8 +52,20 @@ và khối `http` trong JSON. Chỉ số này đúng kể cả khi tắt option.
   (`STATUS_SAMPLE_CAP = 100`), cả ở mức run lẫn mức từng request. Click vào chip status là nhảy
   tới một iteration có code đó (click tiếp thì sang cái kế).
 
-Export: thêm CSV (`runnerExport.ts`, thuần + có test) một dòng / một request đã chạy, kèm cột
-của data file; JSON giữ nguyên và được bổ sung `byRequest` + `statusCodeSamples`.
+**6. Export theo luồng (streaming), không dựng chuỗi khổng lồ.** `runnerExport.ts` sinh **generator
+các chunk** (`csvChunks`, `jsonReportChunks`) thay vì một chuỗi; `saveStreamedTextFile`
+(`fileio.ts`) gom tới 4MB rồi mới ghi — lần đầu `writeTextFile` (ghi đè), các lần sau
+`writeTextFile(..., { append: true })`, nên bộ nhớ đỉnh phẳng bất kể run to cỡ nào và không cần
+capability mới (append là option của chính lệnh đã được cấp). Bản web đẩy thẳng mảng chunk vào
+`new Blob(parts)` — trình duyệt tự nối, không qua một chuỗi JS khổng lồ.
+
+Menu Export có 4 mục: CSV/JSON × (tất cả / **chỉ failure**). Với run 100k dòng thì "chỉ failure"
+mới là thứ người ta thực sự mở. Danh sách `failures` nhúng trong summary bị cắt ở
+`FAILURE_LIST_CAP = 1000` (kèm `failuresTruncated`/`failuresTotal`) vì nó chỉ là chỉ mục trỏ vào
+`runs`, không phải dữ liệu mới.
+
+Export: CSV (`runnerExport.ts`, thuần + có test) một dòng / một request đã chạy, kèm cột
+của data file; JSON được bổ sung `byRequest` + `statusCodeSamples` + `http`.
 
 ## Lý do
 
@@ -92,8 +104,10 @@ của data file; JSON giữ nguyên và được bổ sung `byRequest` + `status
   vẫn giữ `tests`, `logs`, `dataVars`. Với 100k iteration × nhiều request/iteration, đây là
   giới hạn kế tiếp sẽ chạm tới. Hướng xử lý nếu cần: ghi thẳng ra file theo luồng (streaming
   export) thay vì tích trong RAM, hoặc chỉ giữ chi tiết của các record fail.
-- **Export dựng một chuỗi lớn trong RAM.** `buildResultsCsv` join toàn bộ rồi mới ghi; JSON còn
-  nặng hơn. Với run cực lớn nên chuyển sang ghi theo chunk (fs plugin có API append).
+- ~~**Export dựng một chuỗi lớn trong RAM.**~~ Đã xử lý: cả hai định dạng nay stream theo chunk
+  (mục 6 ở trên). `buildResultsCsv` vẫn còn nhưng chỉ là tiện ích join cho test và run nhỏ —
+  đường export thật không gọi nó. Lưu ý còn lại: mỗi lần flush là một IPC round-trip, nên đừng
+  hạ `FLUSH_BYTES` xuống nhỏ.
 - **`ITER_ROW_H*` phải khớp markup.** Virtualization nhân chiều cao dòng theo hằng số; sửa
   padding/leading của dòng rail mà quên sửa hằng số sẽ làm các dòng chồng lên nhau hoặc hở khe.
 - **Chạy song song (parallel) + data file**: mỗi iteration vẫn chạy tuần tự với nhau, chỉ các
