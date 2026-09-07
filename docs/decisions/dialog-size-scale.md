@@ -5,8 +5,8 @@
 Thêm hai prop đóng (closed) vào `DialogContent` (`src/components/ui/dialog.tsx`) thay cho việc mỗi
 dialog tự gõ `max-w-*`/`h-[NNvh]` riêng:
 
-- `size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'` (mặc định `md`, đúng bằng `max-w-md` cũ —
-  dialog nào không truyền `size` vẫn render y hệt trước khi có scale này).
+- `size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full' | 'viewport'` (mặc định `md`, đúng bằng
+  `max-w-md` cũ — dialog nào không truyền `size` vẫn render y hệt trước khi có scale này).
 - `scrollable?: boolean` — dành cho dialog phức hợp (có header/tab/footer riêng, không phải dạng
   "text căn giữa + nút" mặc định của Radix): chuyển từ `grid` sang `flex flex-col`, đặt
   `max-h-[85vh] overflow-hidden`, và reset `gap-4 p-6` mặc định thành `gap-0 p-0` (vì dialog dạng
@@ -43,6 +43,21 @@ dung tràn ra sẽ không có cách nào cuộn tới.
   hợp. `scrollable` chỉ đảm bảo *dialog* không tràn viewport; việc pane nào cuộn ra sao vẫn do
   từng dialog tự quyết, theo đúng pattern `min-h-0 flex-1 overflow-y-auto` đã dùng nhất quán ở
   `RunnerDialog`/`GenerateCodeDialog` từ trước.
+
+## Bổ sung: tier `viewport` (2026-09-07)
+
+Mọi tier từ `sm` đến `full` đều là bề rộng cố định theo rem, và đó là chủ ý: dialog chủ yếu là
+chữ hoặc form thì càng rộng càng **khó đọc** (mắt phải quét ngang xa hơn), nên chúng dừng lại.
+`viewport` (`max-w-[94vw]`) là ngoại lệ cho loại nội dung thực sự hưởng lợi từ mọi pixel bề
+ngang — cụ thể là snippet code trong `GenerateCodeDialog`: mỗi dòng bị wrap là một dòng khó theo
+dõi hơn, mà ở `max-w-4xl` (896px) dialog này bỏ không gần nửa màn hình 1920px.
+
+`GenerateCodeDialog` đồng thời đổi `min-h-[22rem]` (đặt ở pane code) thành `min-h-[60vh]` đặt ở
+chính dialog. Hai việc trong một: (1) vẫn giữ nguyên tác dụng ban đầu của cái floor đó — cho
+`flex-1` của pane một chiều cao xác định để bám vào, nếu không nó co về 0 và dialog render ra
+header + toolbar mà không có code nào bên dưới; (2) nay floor co giãn theo cửa sổ thay vì đứng
+im ở 352px. Vẫn là `min`, không phải `h` cố định, nên dialog vẫn nở theo độ dài snippet tới trần
+`85vh` của `scrollable` thay vì nhảy kích thước mỗi lần đổi ngôn ngữ/variant.
 
 ## Rủi ro / follow-up đã biết
 

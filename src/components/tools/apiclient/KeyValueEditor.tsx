@@ -12,9 +12,10 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Check, Copy, Eye, EyeOff, Lock, Trash2, Unlock } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
-import { InlineCodeField, TextEditor } from '@/design-system';
+import { InlineCodeField, SearchInput, TextEditor } from '@/design-system';
 import { copyToClipboard } from '@/lib/clipboard';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
+import { previewVars } from './vars';
 
 interface Props {
   rows: KeyValue[];
@@ -52,6 +53,10 @@ interface Props {
 }
 
 const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
+
+/** Rows past which the table shows its own search box. Below this, scanning
+ *  the list by eye is faster than typing a filter. */
+const FILTER_THRESHOLD = 8;
 
 const DUPLICATE_KEY_TEXT: Record<'params' | 'headers', string> = {
   params: 'Both values are sent — repeated query params are all included.',
@@ -96,6 +101,7 @@ export function KeyValueEditor({
 }: Props) {
   const isMasked = (row: KeyValue) => (typeof masked === 'function' ? masked(row) : masked);
   const [bulk, setBulk] = useState(false);
+  const [ownFilter, setOwnFilter] = useState('');
   // Bulk mode keeps its own text so newlines/spacing survive while typing; rows
   // are parsed out of it in the background and committed via onChange.
   const [bulkText, setBulkText] = useState('');
@@ -126,11 +132,27 @@ export function KeyValueEditor({
   // Only the filled rows are "real"; the trailing ghost represents the next row.
   const realRows = rows.filter(isFilled);
   const ghost = ghostRef.current;
+  // Two filters, ANDed: the caller's (the environment editor's search box)
+  // and this table's own, which appears once a table is long enough to be
+  // worth searching — a urlencoded body with thirty fields is a wall of
+  // identical-looking rows otherwise.
   const q = filterQuery?.trim().toLowerCase() ?? '';
-  const visibleRows = q
-    ? realRows.filter((r) => r.key.toLowerCase().includes(q) || r.value.toLowerCase().includes(q))
-    : realRows;
+  const ownQ = ownFilter.trim().toLowerCase();
+  const matches = (r: KeyValue, needle: string) =>
+    r.key.toLowerCase().includes(needle) || r.value.toLowerCase().includes(needle);
+  const visibleRows = realRows.filter(
+    (r) => (!q || matches(r, q)) && (!ownQ || matches(r, ownQ)),
+  );
   const displayRows = [...visibleRows, ghost];
+  const showOwnFilter = realRows.length >= FILTER_THRESHOLD;
+
+  // The Resolved column earns its width only when something in this table
+  // actually uses a {{token}} — an always-on empty column in the common case
+  // (headers with literal values) would be pure noise. It appears the moment
+  // the first token is typed, which is also the moment it becomes useful.
+  // Driven by every row, not just the visible ones: filtering down to rows
+  // without tokens shouldn't drop a column out from under the table mid-type.
+  const showResolved = !!vars && realRows.some((r) => previewVars(r.value, vars).hasTokens);
 
   const hasDuplicateKeys = useMemo(
     () => (duplicateKeyHint ? hasDuplicateNames(realRows, duplicateKeyHint) : false),
@@ -182,14 +204,26 @@ export function KeyValueEditor({
       // switch from a muted label to an accent link — so the one control you
       // need to get back moved ~200px and changed appearance the moment you
       // used it.
-      <div className="space-y-1.5">
+      //
+      // `h-full` + `flex-1` on the editor, and a viewport-fraction floor
+      // rather than CodeSurface's fixed `min-h-[180px]`: bulk edit is where
+      // someone pastes or reworks a whole set of params at once, and 180px
+      // (about 9 lines) stayed 180px no matter how large the window got. Now
+      // it fills whatever height the pane gives it, and never less than a
+      // third of the viewport.
+      <div className="flex h-full min-h-0 flex-col gap-1.5">
         <TextEditor
           value={bulkText}
           onChange={parseBulk}
           placeholder={`${keyPlaceholder}: ${valuePlaceholder}`}
           vars={vars}
+          className="min-h-[34vh] flex-1"
         />
-        <div className="flex justify-end">
+        <div className="flex shrink-0 items-center justify-between">
+          <span className="text-[11px] text-fg-mute">
+            One <code className="rounded bg-bg-2 px-1">{keyPlaceholder.toLowerCase()}: {valuePlaceholder.toLowerCase()}</code> per line
+            {' · '}prefix <code className="rounded bg-bg-2 px-1">//</code> to disable a row
+          </span>
           <button onClick={() => setBulk(false)} className="text-[11px] text-fg-mute transition-colors hover:text-fg">
             Key-Value Edit
           </button>
@@ -209,28 +243,57 @@ export function KeyValueEditor({
   // The leading column is 2rem, not 1rem: the whole cell is the enable/disable
   // target (see the row below), so this width is the target's width. The dot
   // inside stays 8px — the affordance grew, the visual didn't.
-  const gridCols = secretToggle
-    ? 'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]'
-    : 'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem]';
+  const gridCols = [
+    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem]',
+    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]',
+    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem]',
+    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]',
+  ][(secretToggle ? 1 : 0) + (showResolved ? 2 : 0)];
 
   return (
     <div className="space-y-1.5">
+      {showOwnFilter && (
+        <div className="flex items-center gap-2">
+          <SearchInput
+            value={ownFilter}
+            onChange={setOwnFilter}
+            placeholder={`Filter ${realRows.length} rows…`}
+            className="h-ctl text-xs"
+            containerClassName="min-w-0 flex-1"
+            aria-label="Filter rows"
+          />
+          <span className="shrink-0 text-[11px] tabular-nums text-fg-mute">
+            {ownQ || q ? `${visibleRows.length}/${realRows.length}` : `${realRows.length} rows`}
+          </span>
+        </div>
+      )}
       <div className="overflow-hidden rounded-md border text-xs">
         {/* Header row */}
         <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>
+          {showResolved && <div className="border-r px-3 py-1.5">Resolved</div>}
           {secretToggle && <div />}
           <div />
         </div>
 
-        {displayRows.map((row) => {
+        {displayRows.map((row, i) => {
           const isGhost = row.id === ghost.id;
           const disabled = !isGhost && !row.enabled;
           const secret = isMasked(row);
           return (
-            <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors', gridCols)}>
+            // Zebra striping: with twenty near-identical rows, tracking one
+            // across to its Value (and now Resolved) cell is the whole task,
+            // and an unbroken field of rows is exactly what makes that hard.
+            // The ghost row stays unstriped — it isn't data yet.
+            //
+            // The /20 stripe and /40 hover are DataTable's own pair (Tbody
+            // zebra + Tr interactive), not new values: hover has to stay
+            // clearly stronger than the stripe or hovering a striped row
+            // reads as no feedback at all. Hover was /20 before this, which
+            // would have been exactly the stripe.
+            <div key={row.id} className={cn('group grid border-b last:border-b-0 hover:bg-bg-2/40 focus-within:bg-bg-2/40 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors duration-fast ease-out-soft', !isGhost && i % 2 === 1 && 'bg-bg-2/20', gridCols)}>
               {/* Enable/disable. The button IS the cell — clicking anywhere in
                   the leading column toggles the row, not just the checkbox
                   glyph itself, so the target stays the full ~34px cell people
@@ -326,6 +389,16 @@ export function KeyValueEditor({
                   />
                 )}
               </div>
+              {/* Resolved value — read-only, and only for rows that use
+                  {{tokens}}. Values come from the same map the highlighter
+                  uses, which already masks Vault entries and secret-flagged
+                  variables (see previewVars), so nothing secret is printed
+                  here that isn't already `••••••••` everywhere else. */}
+              {showResolved && (
+                <div className={cn('flex min-w-0 items-center border-r px-2.5', disabled && 'opacity-40')}>
+                  {!isGhost && vars && <ResolvedValue value={row.value} vars={vars} />}
+                </div>
+              )}
               {/* Secret toggle */}
               {secretToggle && (
                 <div className="flex items-center justify-center">
@@ -360,9 +433,12 @@ export function KeyValueEditor({
             </div>
           );
         })}
-        {q && visibleRows.length === 0 && (
+        {/* Either filter can empty the table, so both have to be able to say
+            so — an empty table with a lone ghost row and no explanation reads
+            as data loss. */}
+        {(q || ownQ) && visibleRows.length === 0 && (
           <p className="px-3 py-3 text-center text-[11px] text-fg-mute">
-            No rows match &ldquo;{filterQuery}&rdquo; — {realRows.length} hidden.
+            No rows match &ldquo;{ownFilter.trim() || filterQuery}&rdquo; — {realRows.length} hidden.
           </p>
         )}
       </div>
@@ -379,5 +455,35 @@ export function KeyValueEditor({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * What a Value cell containing {{tokens}} resolves to right now. Blank for a
+ * value with no tokens — the cell exists for the rows that have them, and a
+ * literal value repeated verbatim one column over would be noise.
+ *
+ * An unresolved token is the case worth shouting about: it is sent literally,
+ * so the request goes out with `{{userId}}` in it. That reads as red text
+ * naming the token, not as a resolved value.
+ */
+function ResolvedValue({ value, vars }: { value: string; vars: VarMap }) {
+  const { resolved, missing, hasTokens } = previewVars(value, vars);
+  if (!hasTokens) return null;
+  if (missing.length > 0) {
+    const names = missing.map((m) => `{{${m}}}`).join(', ');
+    return (
+      <span
+        className="truncate font-mono text-[11px] text-bad"
+        title={`No value for ${names} — it will be sent literally.`}
+      >
+        {names} undefined
+      </span>
+    );
+  }
+  return (
+    <span className="truncate font-mono text-[11px] text-fg-mute" title={resolved}>
+      {resolved || <span className="italic">empty</span>}
+    </span>
   );
 }

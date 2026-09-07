@@ -96,7 +96,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
             trade reads better than half a screen of empty table. Matches the
             Auth and Settings panes, which already cap at max-w-lg/xl. */}
         {tab === 'params' && (
-          <div className="min-h-0 max-w-3xl flex-1 space-y-4 overflow-y-auto p-3">
+          <div className="min-h-0 max-w-5xl flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
               <Label className="text-xs text-fg-mute">Query</Label>
               {/* Editing params rewrites the URL's query string (kept in sync). */}

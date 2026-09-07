@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildResolvedVars, substituteVars } from './vars';
+import { buildResolvedVars, previewVars, substituteVars } from './vars';
 import { newEnvironment, newKeyValue } from './types';
 
 describe('buildResolvedVars', () => {
@@ -95,5 +95,66 @@ describe('substituteVars', () => {
 
   it('substitutes an empty-string value rather than treating it as unknown', () => {
     expect(substituteVars('a{{x}}b', { x: '' })).toBe('ab');
+  });
+});
+
+describe('previewVars', () => {
+  const vars = { baseUrl: 'https://api.test', userId: '42', empty: '' };
+
+  it('reports no tokens for a literal value', () => {
+    expect(previewVars('/users/42', vars)).toEqual({
+      resolved: '/users/42', missing: [], hasTokens: false,
+    });
+  });
+
+  it('substitutes every known token', () => {
+    expect(previewVars('{{baseUrl}}/users/{{userId}}', vars)).toEqual({
+      resolved: 'https://api.test/users/42', missing: [], hasTokens: true,
+    });
+  });
+
+  it('tolerates whitespace inside the braces, as the highlighter does', () => {
+    expect(previewVars('{{ userId }}', vars).resolved).toBe('42');
+  });
+
+  it('names an unknown token and leaves it written as-is', () => {
+    const p = previewVars('{{baseUrl}}/{{missingOne}}', vars);
+    expect(p.resolved).toBe('https://api.test/{{missingOne}}');
+    expect(p.missing).toEqual(['missingOne']);
+    expect(p.hasTokens).toBe(true);
+  });
+
+  it('lists each unknown token once, however often it appears', () => {
+    expect(previewVars('{{a}}/{{a}}/{{b}}', vars).missing).toEqual(['a', 'b']);
+  });
+
+  it('treats a variable defined as an empty string as defined', () => {
+    const p = previewVars('{{empty}}', vars);
+    expect(p.resolved).toBe('');
+    expect(p.missing).toEqual([]);
+    expect(p.hasTokens).toBe(true);
+  });
+
+  it('does not resolve inherited Object properties', () => {
+    // Same guard substituteVars has: `{{constructor}}` must stay literal
+    // rather than interpolating Object.prototype's function.
+    const p = previewVars('{{constructor}}', vars);
+    expect(p.resolved).toBe('{{constructor}}');
+    expect(p.missing).toEqual(['constructor']);
+  });
+
+  it('ignores a stray brace pair that is not a token', () => {
+    expect(previewVars('{{ }}', vars)).toMatchObject({ hasTokens: false });
+  });
+
+  it('handles an empty value without inventing tokens', () => {
+    expect(previewVars('', vars)).toEqual({ resolved: '', missing: [], hasTokens: false });
+  });
+
+  it('shows the masked placeholder for a secret, never a real value', () => {
+    // The map handed to the UI already masks Vault/secret entries, so the
+    // preview can only ever repeat the mask.
+    const masked = { 'vault.apiKey': '••••••••' };
+    expect(previewVars('Bearer {{vault.apiKey}}', masked).resolved).toBe('Bearer ••••••••');
   });
 });

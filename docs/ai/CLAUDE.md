@@ -842,6 +842,16 @@ Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per
 - **Exports stream.** `runnerExport.ts` yields chunks (`csvChunks`, `jsonReportChunks`) and `saveStreamedTextFile` (`fileio.ts`) buffers ~4 MB before each `writeTextFile(..., { append: true })` — never build the whole report as one string (a large run's JSON is hundreds of MB). `buildResultsCsv` remains only as a join-it-all convenience for tests. Each format also exports failures-only.
 - Tests: `runnerStats.test.ts` (aggregation), `runnerExport.test.ts` (CSV shape/escaping, chunk boundaries still parse as one document), `RunnerDialog.test.tsx` (the run loop, data binding, export — the throttled-flush plumbing is only observable here).
 
+### API Client — Name/Value tables (`KeyValueEditor.tsx`)
+
+Shared by query params, headers, url-encoded bodies and environment variables. Three things are easy to break here — see [decisions/keyvalue-resolved-column.md](../decisions/keyvalue-resolved-column.md):
+
+- **Resolved column**: read-only preview of what a row's `{{tokens}}` are worth now (`previewVars` in `vars.ts`, pure + tested). Shown only when the table has at least one token, decided over *all* rows so filtering can't yank the column out mid-type. Unresolved tokens render red and named — they get sent literally. Secrets need no handling here: the `vars` map the UI receives already masks Vault/secret entries at the source (`varMap` in `ApiClient.tsx`).
+- **Zebra `bg-bg-2/20` + hover `bg-bg-2/40`** — DataTable's own pair. Don't set hover equal to the stripe (it was `/20` before the stripe existed); hovering a striped row would then show nothing.
+- **Filters are render-only**: `onChange` always receives every row, so editing while filtered can't drop hidden rows. The table's own filter (past `FILTER_THRESHOLD` rows) ANDs with the caller's `filterQuery`; either one emptying the table must still explain why.
+
+Bulk edit fills its pane (`flex-1` + a vh floor) rather than `CodeSurface`'s fixed `min-h-[180px]`.
+
 ### Kafka Explorer (`src/components/tools/kafka/`)
 
 **Connect/Disconnect flow:** a broker must be explicitly connected (`handleConnect` in `KafkaExplorer.tsx`) before any views are accessible. `connectedBrokerId` is persisted in `localStorage` (`devtool:kafka:connectedBrokerId`). Connecting a new broker stops the previous broker's consumers (`kafkaConsumerStore.stopForBroker`). The right panel shows a `DisconnectedPanel` until connected.
