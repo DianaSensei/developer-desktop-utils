@@ -184,8 +184,11 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
 
 async fn call_tool(name: &str, args: Value) -> CallToolResult {
     match call_bridge(name, args).await {
+        // Compact, not pretty-printed: indentation whitespace is pure token
+        // overhead once this lands in Claude's context, and the JSON reads
+        // fine compact for a model.
         Ok(v) => {
-            let text = serde_json::to_string_pretty(&v).unwrap_or_else(|_| v.to_string());
+            let text = serde_json::to_string(&v).unwrap_or_else(|_| v.to_string());
             CallToolResult::success(vec![Content::text(text)])
         }
         Err(e) => CallToolResult::error(vec![Content::text(e)]),

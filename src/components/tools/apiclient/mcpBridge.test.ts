@@ -124,6 +124,17 @@ describe('useMcpBridge — Tauri desktop', () => {
     ]);
   });
 
+  it('get_collection returns collection-level fields with a summarized item tree (not full request bodies)', async () => {
+    const store = makeStore();
+    const res = await call(store, 'get_collection', { collectionId: 'c1' });
+    expect(res.error).toBeNull();
+    expect(res.result).toEqual({
+      id: 'c1',
+      name: 'Demo',
+      items: [{ id: store.collections[0].items[0].id, type: 'request', name: 'Get thing', method: 'GET', url: '/thing' }],
+    });
+  });
+
   it('get_request finds a nested request and errors on an unknown id', async () => {
     const store = makeStore();
     const id = store.collections[0].items[0].id;
@@ -303,6 +314,27 @@ describe('useMcpBridge — Tauri desktop', () => {
     const res = await call(store, 'run_request', { requestId: id, environmentId: 'e1' }, runRequest);
     expect(runRequest).toHaveBeenCalledWith(expect.objectContaining({ id }), {}, undefined, 'e1');
     expect((res.result as { response: { status: number } }).response.status).toBe(200);
+  });
+
+  it('run_request truncates an oversized text body and strips bodyBase64 for binary responses', async () => {
+    const store = makeStore();
+    const id = store.collections[0].items[0].id;
+    const bigBody = 'x'.repeat(25_000);
+    const runRequest = vi.fn().mockResolvedValue({
+      response: {
+        status: 200, statusText: 'OK', ok: true, headers: [], body: bigBody,
+        contentType: 'application/octet-stream', timeMs: 12, sizeBytes: 25_000,
+        binary: true, bodyBase64: Buffer.from(bigBody).toString('base64'),
+      },
+      tests: [], logs: [], error: null,
+    });
+    const res = await call(store, 'run_request', { requestId: id }, runRequest);
+    const response = (res.result as { response: Record<string, unknown> }).response;
+    expect(response.body).toHaveLength(20_000);
+    expect(response.bodyTruncated).toBe(true);
+    expect(response.bodyFullLength).toBe(25_000);
+    expect(response.bodyBase64Omitted).toBe(true);
+    expect(response).not.toHaveProperty('bodyBase64');
   });
 
   it('an unknown tool name reports an error instead of throwing', async () => {

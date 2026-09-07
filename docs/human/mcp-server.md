@@ -75,11 +75,11 @@ Requests & running:
 | Tool | Does |
 |---|---|
 | `list_collections` | Tree of every collection (id/name/method/url only). |
-| `get_collection` | One collection's own script/auth/headers/variables. |
+| `get_collection` | One collection's own script/auth/headers/variables, plus a summarized item tree (id/name/method/url — not every request's full body/script/tests, which would multiply token cost with collection size). |
 | `get_request` | Full definition of one request. |
 | `update_request` | Patch a request — url, method, params, headers, body, auth, **script** (pre/post-request), tests, assertions, settings: any subset. |
 | `create_request` | Add a new request to a collection/folder. |
-| `run_request` | Actually send a request — pre-request script → send → post-response script → tests/assertions → History. |
+| `run_request` | Actually send a request — pre-request script → send → post-response script → tests/assertions → History. Response bodies over 20,000 chars come back truncated (`bodyTruncated`/`bodyFullLength`); binary responses omit the base64 payload (`bodyBase64Omitted`) since raw bytes aren't useful to an MCP client and are expensive in tokens. |
 
 Folders & tree structure:
 
