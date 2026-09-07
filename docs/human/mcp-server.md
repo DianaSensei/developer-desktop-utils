@@ -4,7 +4,7 @@ Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive
 DevTool's **API Client** tool — list/read/edit collections, requests,
 scripts, and environments, and actually **send a request** through the same
 engine the Send button uses, with the result landing in the UI and History
-like any other send. 28 tools; see the full list further down.
+like any other send. 29 tools; see the full list further down.
 
 ## How it works
 
@@ -113,6 +113,12 @@ Environments:
 A request's own script/auth/headers/body/tests/assertions all live on the
 request itself — edit those through `update_request`'s `patch`, not the
 `set_node_*` tools (those are only for what a collection/folder passes down).
+
+Reference:
+
+| Tool | Does |
+|---|---|
+| `get_scripting_reference` | Read-only: the `bru`/`req`/`res`/`pm` scripting API, variable precedence, Assertion operators, and the `Auth`/`RequestBody`/`RequestSettings`/`KeyValue` field shapes `update_request`/`set_node_auth`/`set_node_headers` expect. Answered locally — no bridge round-trip, works even with the app closed. Call it before writing or editing a script, auth, or assertions. |
 
 ## Troubleshooting
 

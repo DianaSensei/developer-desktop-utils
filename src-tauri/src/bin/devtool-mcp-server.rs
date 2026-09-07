@@ -182,6 +182,111 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
     http_post_json(info.port, &info.token, &json!({ "tool": tool, "args": args })).await
 }
 
+// Static reference for the scripting engine and the field shapes `update_request`
+// / `set_node_auth` / `set_node_headers` patches expect — see
+// `src/components/tools/apiclient/runtime.ts` (bru/req/res/pm/expect/assert) and
+// `types.ts` (Auth/RequestBody/RequestSettings/KeyValue) for the source of truth.
+// Answered locally (no bridge round-trip, no running app required) since it's
+// static content, not live app state — and served on demand as its own tool
+// rather than folded into every other tool's description, so its ~4KB is only
+// spent when a caller actually needs it instead of on every tool listing.
+const SCRIPTING_REFERENCE: &str = r#"# DevTool API Client — scripting & field-shape reference
+
+Pre/post-request scripts are plain JS (Bruno-style), run sandboxed. A
+request's own script/auth/headers live on the request itself (patch via
+update_request); a collection/folder's inherited script/auth/headers are set
+via set_node_script/set_node_auth/set_node_headers (nodeId=null = collection
+root, nodeId=<folderId> = that folder). A request's own header/auth of the
+same name overrides what it inherits; auth.type="inherit" pulls from the
+nearest ancestor's auth.
+
+## Variable precedence (both {{var}} substitution and bru.getVars())
+collectionVar < globalEnv < collectionEnv < data-file row
+(Vault is intentionally excluded from this whole MCP surface.)
+
+## bru.* — variables & flow control (available in both req/res scripts)
+- getCollectionVar(k) / setCollectionVar(k, v) / hasCollectionVar(k) / deleteCollectionVar(k)
+- getEnvVar(k, scope?) / setEnvVar(k, v, scope='collection') / hasEnvVar(k, scope?) / deleteEnvVar(k, scope='collection')
+  scope is 'collection' | 'global'; a read with no scope falls through collection -> global.
+- getEnvName(scope?)  — active environment's name
+- getIterationData(k) — current data-file row (data-driven runs only)
+- interpolate(text)   — expands {{tokens}} exactly like the send pipeline
+- getVars()           — merged VarMap at current precedence
+- setNextRequest(name | null) — Runner flow control (ignored for a single Send)
+- sleep(ms)           — pauses the script; rejects if the send is cancelled
+
+## req.* — pre-request script only (mutates the outgoing request draft)
+url / method (getters), getName(), getUrl()/setUrl(url), getMethod()/setMethod(m),
+getHeaders()/getHeader(name)/setHeader(name, value)/deleteHeader(name),
+getParams()/getParam(name)/setParam(name, value)/deleteParam(name),
+getTimeout()/setTimeout(ms), setMaxRedirects(n), disableRedirects(),
+getBody() (parses JSON body mode), setBody(data) (object -> JSON body, else text body)
+
+## res.* — post-response script / test / assert only
+status, statusText, headers, body (getters); responseTime;
+getStatus()/getStatusText()/getHeader(name)/getHeaders()/getBody()/setBody(v)/
+getResponseTime()/getSize()/getContentType()/getUrl()/isOk()
+
+## test(name, fn) + expect(actual, message?) — Chai-style BDD subset
+Chains (no-ops): to/be/been/is/that/which/and/has/have/with/of/at/itself/deep/own/nested/any/all, .not (negates)
+Terminal matchers: .equal(v) .eql(v) .a(type)/.an(type) .above(n) .least(n) .below(n) .most(n)
+.include(v)/.contain(v) .match(re) .lengthOf(n) .property(name, value?) .keys(...names)
+.oneOf(list) .closeTo(n, delta)/.approximately(n, delta) .greaterThan(n)/.lessThan(n)
+.instanceOf(ctor) .throw(expected?)/.throws(expected?)
+Getters: .ok .true .false .null .undefined .exist .NaN .finite .empty
+
+## assert.* — Chai `assert` style (callable: assert(cond, msg))
+ok/isOk, isNotOk, fail, equal, notEqual, strictEqual, notStrictEqual, deepEqual,
+notDeepEqual, isTrue, isFalse, isNull, isNotNull, isUndefined, isDefined, exists,
+isArray, isString, isNumber, isBoolean, isObject, isFunction, include, match,
+lengthOf, typeOf
+
+## pm.* / postman.* — Postman-compatibility shim (for imported Postman scripts)
+pm.test, pm.expect — same as test()/expect() above
+pm.environment.{get,set,has,unset,name,replaceIn(text)} — collection-scoped env
+pm.collectionVariables.{get,set,has,unset}
+pm.globals.{get,set,has,unset} — global env
+pm.iterationData.get(k)
+pm.request — same as req.* (post-response scripts only)
+pm.execution.setNextRequest(name)  |  postman.setNextRequest(name) (legacy form)
+pm.response — code, status, responseTime, responseSize, json(), text(), size(),
+  headers.get(name)/has(name), to.have.status(n|text)/header(name, value?)/body(text?)/jsonBody(),
+  to.be.ok/success/redirection/clientError/serverError/error/accepted/badRequest/unauthorized/forbidden/notFound
+
+console.log/info/warn/error/debug/trace/dir/table(v) are all available and captured as script logs.
+
+## Declarative Assertions (the request's `assertions` array — NOT run as JS)
+Each row: { expr, operator, value, enabled }. `expr` is a restricted expression
+language over `res`/`req`/`bru` — property paths, indices, one level of method
+calls, literals, arithmetic/comparison/logical operators (e.g. `res.status`,
+`res.body.items[0].id`, `res.status === 200`) — no assignment, no arbitrary code.
+operator is one of: equals, notEquals, gt, gte, lt, lte, in, notIn, contains,
+notContains, length, matches, notMatches, startsWith, endsWith, between,
+isEmpty, isNotEmpty, isNull, isUndefined, isDefined, isTruthy, isFalsy, isJson,
+isNumber, isString, isBoolean, isArray (the isX/is*Empty/isTruthy/isFalsy family
+and isDefined/isUndefined/isNull take no `value`).
+
+## Field shapes for update_request's patch / set_node_auth / set_node_headers
+
+KeyValue (params/headers/form rows, and env/collection variables):
+{ id, key, value, enabled, kind?: 'text'|'file', contentType?, fileName?, fileType?, fileContent?(base64), secret? }
+`secret: true` (env variables only) masks the value in the UI and keeps it out
+of generated code/cURL/history — this is the UI's own scoping, unrelated to
+and much weaker than the Vault, which this MCP surface never exposes at all.
+
+RequestBody: { mode: 'none'|'json'|'xml'|'text'|'sparql'|'graphql'|'multipart'|'urlencoded'|'file',
+  raw, form: KeyValue[], graphql?: { query, variables }, fileName?, fileType?, fileContent?(base64) }
+
+Auth: { type: 'none'|'inherit'|'bearer'|'basic'|'digest'|'apikey'|'oauth2',
+  token, username, password,
+  apiKey: { key, value, placement: 'header'|'query' },
+  oauth2: { grantType: 'client_credentials'|'password', tokenUrl, clientId, clientSecret, scope, username, password } }
+
+RequestSettings: { encodeUrl, followRedirects, maxRedirects, timeout, tags: string[], verifyTls }
+
+RequestScript: { req: string, res: string }  — pre-request / post-response JS source
+"#;
+
 async fn call_tool(name: &str, args: Value) -> CallToolResult {
     match call_bridge(name, args).await {
         // Compact, not pretty-printed: indentation whitespace is pure token
@@ -422,6 +527,11 @@ fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": { "environmentId": { "type": "string" } }, "required": ["environmentId"] }
         }),
         json!({
+            "name": "get_scripting_reference",
+            "description": "Read-only reference for writing pre/post-request scripts, tests, and assertions: the bru/req/res/pm scripting API, variable precedence, Assertion operators, and the field shapes update_request/set_node_auth/set_node_headers patches expect (Auth, RequestBody, RequestSettings, KeyValue). Call this before writing or editing a script, auth, or assertions — no app or network round-trip needed, works even if DevTool isn't open.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
             "name": "import_environment",
             "description": "Create an environment with a name, scope, and full variable set in one call (e.g. importing one from another tool). Returns the new id.",
             "inputSchema": {
@@ -455,6 +565,16 @@ fn build_router() -> ToolRouter<DevToolServer> {
             _ => Default::default(),
         };
         let tool = Tool::new(name.clone(), description, schema);
+        // get_scripting_reference is static content, not live app state — answer
+        // it locally instead of round-tripping through the bridge, so it works
+        // even while DevTool is closed or on a different tool.
+        if name == "get_scripting_reference" {
+            router.add_route(ToolRoute::new_dyn(tool, |_context: ToolCallContext<'_, DevToolServer>| {
+                Box::pin(async move { Ok(CallToolResult::success(vec![Content::text(SCRIPTING_REFERENCE)])) })
+                    as Pin<Box<dyn Future<Output = Result<CallToolResult, McpError>> + Send>>
+            }));
+            continue;
+        }
         router.add_route(ToolRoute::new_dyn(tool, move |context: ToolCallContext<'_, DevToolServer>| {
             let name = name.clone();
             let args = context.arguments.clone().map(Value::Object).unwrap_or_else(|| json!({}));

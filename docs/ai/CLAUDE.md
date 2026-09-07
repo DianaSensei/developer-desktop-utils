@@ -934,7 +934,7 @@ Key files:
 An external MCP client (Claude Desktop/Code) can inspect and drive the API
 Client tool — list/read/edit collections, requests, scripts, environments,
 and actually **send a request** through the same engine the Send button
-uses (result lands in the UI + History like any other send). 28 tools; see
+uses (result lands in the UI + History like any other send). 29 tools; see
 `docs/human/mcp-server.md` for the full list and setup instructions.
 
 **The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
@@ -981,7 +981,23 @@ Two ways this binary gets run:
 `mcpBridge.ts` (reuse existing `store.*` actions — don't reimplement
 collection/request mutation logic), then add a matching entry to
 `tool_definitions()` (a raw JSON Schema `Value`) in `devtool-mcp-server.rs`.
-Write descriptions for an LLM caller, not a human reading the UI.
+Write descriptions for an LLM caller, not a human reading the UI. A tool that
+answers from **static content rather than live app state** (like
+`get_scripting_reference`) skips the bridge entirely — special-case its name
+in `build_router()`'s loop to return the answer directly, so it works even
+while the app is closed (see that tool for the pattern).
+
+**Keeping MCP callers token-efficient:** this surface is read by an LLM, not
+rendered in a UI, so payload size is a real cost, not just bandwidth. Don't
+return a full nested object graph when a summary will do (`get_collection`
+returns collection-level fields plus a *summarized* item tree, not every
+nested request's full body/script/tests — see `summarizeItems`); cap anything
+that can be arbitrarily large before it leaves `mcpBridge.ts` (`run_request`
+truncates oversized response bodies and drops `bodyBase64` in favor of a
+`bodyBase64Omitted` flag — see `summarizeResponseForMcp`); and prefer a
+dedicated on-demand tool over inflating every tool's description/schema for
+information only occasionally needed (`get_scripting_reference` instead of
+folding the `bru`/`req`/`res`/`pm` API into `update_request`'s description).
 
 **Deliberately excluded:** the Vault (`store.vault`) — the UI itself keeps
 Vault values out of generated code, cURL export, and history, so exposing it
