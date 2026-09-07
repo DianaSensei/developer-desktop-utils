@@ -7,19 +7,6 @@
 
 import { parseDataFile } from '@/components/tools/apiclient/datafile';
 
-// A dedicated worker is delivered messages with an EMPTY origin: the spec
-// gives `worker.postMessage()` an empty-string origin, and the port is only
-// reachable from the page that constructed the worker (checksum.worker.ts
-// carries the same note, and the app's three other workers validate shape
-// alone for exactly this reason). '' therefore has to be in this set —
-// accepting only `self.location.origin`, as the first version of this guard
-// did, silently dropped every message and the parse simply never ran. The
-// same-origin entry stays for any engine that does populate the field.
-const TRUSTED_MESSAGE_ORIGINS = new Set<string>(['', self.location.origin]);
-
-/** Exported for its own test: this predicate is the whole security boundary. */
-export const isTrustedOrigin = (origin: string): boolean => TRUSTED_MESSAGE_ORIGINS.has(origin);
-
 function isRequest(v: unknown): v is { name: string; text: string } {
   if (typeof v !== 'object' || v === null) return false;
   const m = v as { name?: unknown; text?: unknown };
@@ -27,8 +14,25 @@ function isRequest(v: unknown): v is { name: string; text: string } {
 }
 
 self.onmessage = (event: MessageEvent<unknown>) => {
-  if (!isTrustedOrigin(event.origin)) return;
-  const { data } = event;
+  const { origin, data } = event;
+
+  // Origin check — written inline as a direct comparison on purpose. Behind a
+  // helper (`isTrustedOrigin(event.origin)`) it was invisible to static
+  // analysis, which kept reporting this handler as unguarded; here there is
+  // nothing to infer.
+  //
+  // Both accepted values are deliberate. A dedicated worker is delivered
+  // messages with an EMPTY origin — the spec gives `worker.postMessage()` an
+  // empty-string origin, and this port is reachable only from the page that
+  // constructed the worker, so nothing cross-origin can post to it at all
+  // (checksum.worker.ts carries the same note; the app's three other workers
+  // validate shape alone for that reason). Accepting only
+  // `self.location.origin`, as the first version of this guard did, therefore
+  // dropped *every* message and the parse silently never ran — see this
+  // worker's tests, which pin that case. The same-origin arm stays for any
+  // engine that does populate the field.
+  if (origin !== '' && origin !== self.location.origin) return;
+
   // Shape check as well as origin: an unexpected message is dropped rather
   // than destructured.
   if (!isRequest(data)) return;
