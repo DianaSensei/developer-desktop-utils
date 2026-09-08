@@ -5,7 +5,7 @@ import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
-  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard,
+  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard, Plug,
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -39,6 +39,7 @@ import { useUpdate } from '@/contexts/UpdateContext';
 import { AppLogo } from '@/components/AppLogo';
 import { ExperimentalBadge } from '@/components/ExperimentalBadge';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
 
 /** Format an hour (0–23) as a friendly 12-hour label, e.g. 6 → "6:00 AM". */
 function formatHour(hour: number): string {
@@ -267,6 +268,7 @@ export function Settings() {
   const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall, openUpdateDialog } = useUpdate();
   const { config, setField, resetConfig } = useAppConfig();
   const { locale, setLocale, t } = useLocale();
+  const { enabled: mcpBackgroundEnabled, setEnabled: setMcpBackgroundEnabled } = useMcpBackgroundBridge();
   const [configOpen, setConfigOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -780,6 +782,33 @@ export function Settings() {
           })}
         </div>
         </>
+        )}
+      </section>
+
+      {/* MCP section */}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+          {t('settings.mcp.title')}
+          <Plug className="h-3.5 w-3.5 text-fg-mute" />
+        </h2>
+        {!isTauri ? (
+          <p className="text-[11px] text-warn">{t('settings.mcp.webWarning')}</p>
+        ) : (
+          <div className="rounded-lg border divide-y text-xs">
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <p className="font-medium">{t('settings.mcp.backgroundTitle')}</p>
+                <p className="text-[11px] text-fg-mute mt-0.5 max-w-md">
+                  {t('settings.mcp.backgroundDescription')}
+                </p>
+              </div>
+              <Toggle
+                checked={mcpBackgroundEnabled}
+                onChange={() => setMcpBackgroundEnabled((v) => !v)}
+                label={t('settings.mcp.backgroundTitle')}
+              />
+            </div>
+          </div>
         )}
       </section>
 

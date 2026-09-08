@@ -249,4 +249,14 @@ describe('useMcpBridge (Mock Server) — Tauri desktop', () => {
     unmount();
     expect(unlisten).toHaveBeenCalledTimes(1);
   });
+
+  it('enabled=false skips registering the listener', async () => {
+    vi.resetModules();
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+    listenMock.mockClear();
+    const { useMcpBridge } = await import('./mcpBridge');
+    renderHook(() => useMcpBridge(makeState(), false));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(listenMock).not.toHaveBeenCalled();
+  });
 });

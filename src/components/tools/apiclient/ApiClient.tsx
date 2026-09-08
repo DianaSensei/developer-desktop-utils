@@ -26,12 +26,13 @@ import { VaultManager } from './VaultManager';
 import { GenerateCodeDialog } from './GenerateCodeDialog';
 import { RunnerDialog } from './RunnerDialog';
 import { CookieManager } from './CookieManager';
-import { useApiStore } from './store';
 import { executeRequest, errToString } from './engine';
 import { useMcpBridge } from './mcpBridge';
+import { useApiClientRuntime } from './mcpRuntimeContext';
+import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
 import { useAppConfig } from '@/contexts/AppConfigContext';
-import type { ApiRequest, ApiResponse, Environment, KeyValue, LogEntry, TestResult, VarMap } from './types';
+import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 import { buildResolvedVars } from './vars';
 
 export type SplitDirection = 'horizontal' | 'vertical';
@@ -48,9 +49,10 @@ interface RunState {
 const EMPTY_RUN: RunState = { response: null, error: null, sending: false, tests: [], logs: [] };
 
 export function ApiClient() {
-  const store = useApiStore();
+  const { store, runRequest, persistResult } = useApiClientRuntime();
   const { activeRequest } = store;
   const { config } = useAppConfig();
+  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
   // Read through a ref so the send/run callbacks don't churn when unrelated
   // config values change.
   const scriptTimeoutRef = useRef(config.apiClient.scriptTimeoutMs);
@@ -172,111 +174,19 @@ export function ApiClient() {
     setRuns((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY_RUN), ...patch } }));
   }, []);
 
-  // Fold a script's changed values back into a variable-row array, adding new
-  // rows for names that didn't exist before — shared by all three persisted
-  // stores a script can write into (Collection Variables, Collection env,
-  // Global env).
-  const mergeVarsIntoRows = (rows: KeyValue[], vars: VarMap): KeyValue[] => {
-    const merged = rows.map((v) => (v.key in vars ? { ...v, value: vars[v.key] } : v));
-    const existing = new Set(rows.map((v) => v.key));
-    for (const [k, val] of Object.entries(vars)) {
-      if (!existing.has(k)) merged.push({ id: `s-${Date.now()}-${k}`, key: k, value: val, enabled: true });
-    }
-    return merged;
-  };
-
-  // After a run, persist collection-var/env-var changes and (unless
-  // suppressed) record a history entry. `collectionEnv`/`globalEnv`
-  // must be the same environments (or null) that were actually passed to
-  // executeRequest for this run — never re-derived from
-  // `store.activeCollectionEnv`/`store.activeGlobalEnv`, which reflect
-  // whatever tab/collection is merely "active" and can differ from the
-  // collection the run's own request belongs to (see `getEnvsForRequest` in
-  // store.ts).
-  const persistResult = useCallback((
-    req: ApiRequest,
-    collectionEnv: Environment | null,
-    globalEnv: Environment | null,
-    result: Awaited<ReturnType<typeof executeRequest>>,
-    recordHistory = true,
-  ) => {
-    // Capture any Set-Cookie into the jar (scoped to the URL that returned them).
-    if (store.cookiesEnabled && result.response?.setCookies?.length) {
-      store.captureCookies(result.response.url ?? req.url, result.response.setCookies);
-    }
-    if (result.collectionEnvChanged && collectionEnv) {
-      store.updateEnvironment(collectionEnv.id, { variables: mergeVarsIntoRows(collectionEnv.variables, result.collectionEnvVars) });
-    }
-    if (result.globalEnvChanged && globalEnv) {
-      store.updateEnvironment(globalEnv.id, { variables: mergeVarsIntoRows(globalEnv.variables, result.globalEnvVars) });
-    }
-    if (result.collectionVarsChanged) {
-      const owningCollectionId = store.getOwningCollectionId(req.id);
-      const collection = owningCollectionId ? store.collections.find((c) => c.id === owningCollectionId) : null;
-      if (owningCollectionId && collection) {
-        store.setCollectionVariables(owningCollectionId, mergeVarsIntoRows(collection.variables ?? [], result.collectionVars));
-      }
-    }
-    if (!recordHistory) return;
-    // Values that must never be persisted in plaintext if the server happened
-    // to echo them back in the response (see redactText in store.ts). Secret-
-    // flagged environment variables get the same treatment as vault values.
-    const secretEnvValues = [...(collectionEnv?.variables ?? []), ...(globalEnv?.variables ?? [])]
-      .filter((v) => v.secret && v.value).map((v) => v.value);
-    const sensitiveValues = [...Object.values(store.vaultVars), ...secretEnvValues];
-    store.addHistory({
-      method: req.method, url: req.url,
-      status: result.response?.status ?? 0,
-      ok: result.response?.ok ?? false,
-      timeMs: result.response?.timeMs ?? 0,
-      error: result.error ?? undefined,
-      request: JSON.parse(JSON.stringify(req)) as ApiRequest,
-      response: result.response,
-      tests: result.tests,
-      logs: result.logs,
-    }, sensitiveValues);
-  }, [store]);
-
-  // Run one request (used by the Runner); resolves inherited scripts/auth/envs
-  // per id — never `store.activeCollectionEnv`/`store.activeGlobalEnv`, since
-  // the Runner may run a collection other than whatever tab/collection is
-  // currently open (a collection-scoped environment must only apply to its
-  // own collection's requests; see `getEnvsForRequest` in store.ts). Runner
-  // results are deliberately kept out of History: a 20-request × 5-iteration
-  // run would otherwise evict every manually-sent entry from the 50-entry
-  // log, and the Runner already keeps the full request/response for each of
-  // its runs.
-  //
-  // `envId` lets the Runner pin a specific environment for its own run,
-  // independent of whatever is globally active — `undefined` (any other
-  // caller) keeps the normal per-request auto-resolution (both collection and
-  // global env); the Runner always passes a concrete id or `null` ("No
-  // Environment"), routed into whichever of the two slots that environment's
-  // own scope belongs to (Runner still only ever forces one at a time).
-  const runRequest = useCallback(async (req: ApiRequest, dataVars?: VarMap, signal?: AbortSignal, envId?: string | null) => {
-    const jar = store.cookiesEnabled ? store.cookies : [];
-    let collectionEnv: Environment | null;
-    let globalEnv: Environment | null;
-    if (envId === undefined) {
-      ({ collectionEnv, globalEnv } = store.getEnvsForRequest(req.id));
-    } else if (envId === null) {
-      collectionEnv = null;
-      globalEnv = null;
-    } else {
-      const forced = store.environments.find((e) => e.id === envId) ?? null;
-      collectionEnv = forced?.collectionId ? forced : null;
-      globalEnv = forced && !forced.collectionId ? forced : null;
-    }
-    const result = await executeRequest(req, collectionEnv, globalEnv, signal, store.getInherited(req.id), jar, dataVars, scriptTimeoutRef.current, store.vaultVars, store.getCollectionVars(req.id));
-    persistResult(req, collectionEnv, globalEnv, result, false);
-    return result;
-  }, [store, persistResult]);
+  // `runRequest`/`persistResult` (used by the Runner, `send()` below, and the
+  // MCP bridge) now live in useApiRunner.ts, shared via ApiClientRuntimeProvider
+  // — see mcpRuntimeContext.tsx for why this must be a single shared instance rather
+  // than one per mount.
 
   // Lets an external MCP client (see src-tauri/src/mcp_bridge.rs) inspect and
   // drive this exact store/engine — a Run request from MCP goes through
   // `runRequest` just like the Runner does, landing in History like any
-  // other send.
-  useMcpBridge(store, runRequest);
+  // other send. Skipped while the background bridge (Settings → MCP) is on:
+  // that one instance, mounted once at the app root, already answers for
+  // this store regardless of which tool is on screen — listening here too
+  // would double-answer the same `mcp:call` event.
+  useMcpBridge(store, runRequest, !mcpBackgroundEnabled);
 
   const send = useCallback(async () => {
     if (!activeRequest) return;

@@ -31,6 +31,10 @@ import { buildNavEntries, countFavoriteEntries, GROUP_OF_TOOL, type NavEntry } f
 import { toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { CommandPalette } from '@/components/CommandPalette';
+import { OpenToolsStrip } from '@/components/OpenToolsStrip';
+import { McpBackgroundBridge } from '@/components/McpBackgroundBridge';
+import { ApiClientRuntimeProvider } from '@/components/tools/apiclient/mcpRuntimeContext';
+import { MockServerRuntimeProvider } from '@/components/tools/mockserver/mcpRuntimeContext';
 import { ExperimentalGate } from '@/components/ExperimentalGate';
 import { ExperimentalDot, ExperimentalMark } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
@@ -1163,6 +1167,7 @@ function AppContent() {
           </div>
         </div>
         )}
+        <OpenToolsStrip />
         {isFullHeight ? (
           <div className="flex-1 min-h-0 overflow-hidden">
             {/* key on pathname re-triggers the entrance animation on each tool switch */}
@@ -1203,12 +1208,17 @@ function App() {
           <OnboardingProvider>
             <UpdateProvider>
               <MeetingsProvider>
-                <Router>
-                  <AppContent />
-                  <UpdateDialog />
-                  <OnboardingFlow />
-                  <CommandPalette />
-                </Router>
+                <ApiClientRuntimeProvider>
+                  <MockServerRuntimeProvider>
+                    <Router>
+                      <AppContent />
+                      <UpdateDialog />
+                      <OnboardingFlow />
+                      <CommandPalette />
+                      <McpBackgroundBridge />
+                    </Router>
+                  </MockServerRuntimeProvider>
+                </ApiClientRuntimeProvider>
               </MeetingsProvider>
             </UpdateProvider>
           </OnboardingProvider>

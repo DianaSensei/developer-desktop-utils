@@ -676,6 +676,26 @@ boolean `devtool-dark-mode` key to the new enum (`'true'` → `'dark'`,
 
 ---
 
+## Open Tools Strip
+
+`src/components/OpenToolsStrip.tsx` + `src/hooks/useOpenTools.ts` — a
+browser-tab-style row of the tools visited this session, rendered once above
+the routed tool content in `App.tsx` (one injection point covers all three
+titlebar-chrome variants). `useOpenTools(activeToolId)` tracks visited
+`featureId`s in visit order, in-memory only (resets on app restart —
+deliberately not persisted, since "this session" is exactly what it tracks),
+capped at 8 with the oldest evicted past that. `'settings'` is excluded, same
+as CommandPalette's fallback-path logic. Distinct from **Favorites**
+(hand-picked, persisted) and the sidebar's own drag order: this is purely
+"what have I had open since I launched the app". The strip hides itself
+entirely below 2 open tools (nothing to switch back to yet), and a tool
+disabled after being opened drops out of it rather than sitting there as a
+dead tab. The × button removes a tool from the strip only — it does not
+navigate away or disable the tool, so closing the currently-active tab's tab
+just stops highlighting it there.
+
+---
+
 ## Sidebar Live Connection Indicator
 
 `src/lib/liveConnections.ts` maintains a module-scope `Set<string>` of currently-connected tool `featureId`s (e.g. `'rabbit-client'`, `'kafka-explorer'`). It is seeded on startup from each tool's persisted connected-id key in `localStorage`, so the dot is correct before the tool component mounts.
@@ -968,17 +988,42 @@ instructions.
 `POST /call` emits an `mcp:call` Tauri event and blocks on a
 `tokio::sync::oneshot` (30s timeout) until the frontend answers via the
 `mcp_respond` command. Two frontend listeners answer it: `apiclient/
-mcpBridge.ts`'s `useMcpBridge(store, runRequest)` (mounted from
-`ApiClient.tsx`) runs the matching handler against the **live** `ApiStore`;
-`mockserver/mcpBridge.ts`'s `useMcpBridge(state)` (mounted from
-`MockServer.tsx`) does the same against `useMockServer()`'s return value.
-Each ignores tool names it doesn't own rather than erroring, so — since
-React Router unmounts the previous route on every tool switch — only one of
-the two is ever actually listening at a time regardless. A call only
-succeeds while the app is open AND the tool that owns it is the one on
-screen; anything else times out with a clear error rather than hanging
-(`get_scripting_reference` is the one tool answered without any of this,
-directly by the sidecar — see below).
+mcpBridge.ts`'s `useMcpBridge(store, runRequest, enabled)` runs the matching
+handler against the **live** `ApiStore`; `mockserver/mcpBridge.ts`'s
+`useMcpBridge(state, enabled)` does the same against `useMockServer()`'s
+return value. Each ignores tool names it doesn't own rather than erroring,
+since both can now be listening on the shared `mcp:call` event at once (see
+below).
+
+**Where the store lives, and why it's shared:** `apiclient/
+mcpRuntimeContext.tsx` and `mockserver/mcpRuntimeContext.tsx` each hold one
+`useApiStore()`/`useMockServer()` instance in a context, provided once at
+the app root (`ApiClientRuntimeProvider`/`MockServerRuntimeProvider` in
+`App.tsx`, always mounted — cheap, since neither hook does I/O beyond an
+initial localStorage read). `ApiClient.tsx`/`MockServer.tsx` read it via
+`useApiClientRuntime()`/`useMockServerRuntime()` instead of instantiating
+their own. This used to not matter — React Router unmounts the previous
+route on every tool switch, so at most one instance of either store was ever
+alive. It matters now because of the background bridge below: two
+independent instances mounted at once would let a UI edit and a concurrent
+MCP edit each overwrite localStorage with their own stale snapshot of
+everything else, silently dropping whichever wrote second.
+
+**Background bridge (Settings → MCP):** by default, each bridge only
+answers while its own tool is the one on screen — `useMcpBridge(..., enabled)`
+is called with `enabled = !mcpBackgroundEnabled` from `ApiClient.tsx`/
+`MockServer.tsx`. `useMcpBackgroundBridge()` (`src/hooks/
+useMcpBackgroundBridge.ts`) is an opt-in, persisted, off-by-default toggle
+(per the "no silent network calls" rule above) that lets an MCP client drive
+either tool regardless of which one is on screen. When it's on,
+`McpBackgroundBridge.tsx` — mounted once at the app root, reading both
+runtime contexts — calls both `useMcpBridge`s itself with `enabled = true`;
+the per-tool calls stay `enabled = false` at the same time so the two mount
+points never both listen and double-answer the same call. A call only ever
+succeeds while the app is open, and — unless the background bridge is on —
+only while the tool that owns it is the one on screen; anything else times
+out with a clear error rather than hanging (`get_scripting_reference` is the
+one tool answered without any of this, directly by the sidecar — see below).
 
 **One sidecar, `src-tauri/src/bin/devtool-mcp-server.rs`:** built on `rmcp`
 (the official Rust MCP SDK — protocol framing, capability negotiation, and

@@ -3,19 +3,21 @@
 // Same shape as the API Client's bridge (`../apiclient/mcpBridge.ts`): the Rust
 // sidecar (`src-tauri/src/bin/devtool-mcp-server.rs`) forwards each tool call to
 // the loopback control server (`src-tauri/src/mcp_bridge.rs`) as an `mcp:call`
-// Tauri event; `useMcpBridge` (called once from `MockServer.tsx` while it's
-// mounted) answers it by running the matching handler below against the
-// *live* `useMockServer()` state, then reports back via `mcp_respond` — so an
-// MCP tool call reuses the exact same stub-mutation functions and Tauri
-// commands (`mock_start`/`mock_stop`/`mock_test_script`) the UI uses. Only one
-// tool's bridge is ever mounted at a time (React Router unmounts the previous
-// route), so this and the API Client's listener never collide on the same
-// `mcp:call` event.
+// Tauri event; `useMcpBridge` answers it by running the matching handler below
+// against the *live* `useMockServer()` state, then reports back via
+// `mcp_respond` — so an MCP tool call reuses the exact same stub-mutation
+// functions and Tauri commands (`mock_start`/`mock_stop`/`mock_test_script`)
+// the UI uses.
 //
-// A call only succeeds while the app is open AND the Mock Server tool is the
-// one currently on screen — same contract as the API Client bridge, and for
-// the same reason: `config`/`status` only exist as this mounted component's
-// state.
+// Two mount points call this hook: `MockServer.tsx` (while the tool is on
+// screen — always works, no setting needed) and, when the user opts in via
+// Settings → MCP, `McpBackgroundBridge.tsx` at the app root (works
+// regardless of which tool is on screen — see `useMcpBackgroundBridge`).
+// `enabled` lets a caller mount the hook without it actually registering a
+// listener, so the two mount points don't both listen at once and
+// double-answer the same call. Both this bridge and the API Client's ignore
+// tool names they don't own (rather than erroring) since either may now be
+// listening on the shared `mcp:call` event at the same time.
 
 import { useEffect, useRef } from 'react';
 import { isTauri } from '@/lib/platform';
@@ -167,12 +169,12 @@ function buildHandlers(state: MockServerState): Record<string, ToolHandler> {
 // for long-lived event listeners that read changing React state (see
 // docs/ai/CLAUDE.md's "Stable refs for long-lived event listeners") — same
 // pattern as the API Client's `useMcpBridge`.
-export function useMcpBridge(state: MockServerState): void {
+export function useMcpBridge(state: MockServerState, enabled = true): void {
   const handlersRef = useRef<Record<string, ToolHandler>>({});
   handlersRef.current = buildHandlers(state);
 
   useEffect(() => {
-    if (!isTauri) return;
+    if (!isTauri || !enabled) return;
     let cancelled = false;
     let unlisten: (() => void) | null = null;
 
@@ -201,5 +203,5 @@ export function useMcpBridge(state: MockServerState): void {
       cancelled = true;
       unlisten?.();
     };
-  }, []);
+  }, [enabled]);
 }
