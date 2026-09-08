@@ -150,7 +150,7 @@ Reference:
 
 | Tool | Does |
 |---|---|
-| `get_scripting_reference` | Read-only, covers both tools. API Client: the `bru`/`req`/`res`/`pm` JS scripting API, variable precedence, Assertion operators, and the `Auth`/`RequestBody`/`RequestSettings`/`KeyValue` field shapes `update_request`/`set_node_auth`/`set_node_headers` expect. Mock Server: the Rhai response-script API (a separate language from the API Client's) and the `Stub`/`Matcher`/`MockConfig` field shapes the `mock_*` tools expect. Answered locally — no bridge round-trip, works even with the app closed. Call it before writing or editing a script, auth, assertions, or a stub. |
+| `get_scripting_reference` | Read-only, covers both tools. API Client: the `dt`/`req`/`res`/`pm` JS scripting API, variable precedence, Assertion operators, and the `Auth`/`RequestBody`/`RequestSettings`/`KeyValue` field shapes `update_request`/`set_node_auth`/`set_node_headers` expect. Mock Server: the Rhai response-script API (a separate language from the API Client's) and the `Stub`/`Matcher`/`MockConfig` field shapes the `mock_*` tools expect. Answered locally — no bridge round-trip, works even with the app closed. Call it before writing or editing a script, auth, assertions, or a stub. |
 
 ## Troubleshooting
 

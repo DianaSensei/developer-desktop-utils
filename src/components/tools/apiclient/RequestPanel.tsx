@@ -145,7 +145,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
                 <SnippetMenu snippets={POST_RESPONSE_SNIPPETS} onInsert={(s) => onChange({ tests: appendSnippet(request.tests, s) })} />
               </div>
               <p className="text-[11px] text-fg-mute">
-                Post-response — use <code className="rounded bg-bg-2 px-1">test()</code> and <code className="rounded bg-bg-2 px-1">expect()</code> with <code className="rounded bg-bg-2 px-1">res</code>, <code className="rounded bg-bg-2 px-1">bru</code>.
+                Post-response — use <code className="rounded bg-bg-2 px-1">test()</code> and <code className="rounded bg-bg-2 px-1">expect()</code> with <code className="rounded bg-bg-2 px-1">res</code>, <code className="rounded bg-bg-2 px-1">dt</code>.
               </p>
               <JavaScriptEditor
                 value={request.tests}
@@ -214,14 +214,14 @@ function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p
       </div>
       <p className="text-[11px] text-fg-mute">
         {isReq
-          ? <>Runs before send; mutate <code className="rounded bg-bg-2 px-1">req</code>, set <code className="rounded bg-bg-2 px-1">bru</code> vars.</>
-          : <>Runs after response; read <code className="rounded bg-bg-2 px-1">res</code>, set <code className="rounded bg-bg-2 px-1">bru</code> vars.</>}
+          ? <>Runs before send; mutate <code className="rounded bg-bg-2 px-1">req</code>, set <code className="rounded bg-bg-2 px-1">dt</code> vars.</>
+          : <>Runs after response; read <code className="rounded bg-bg-2 px-1">res</code>, set <code className="rounded bg-bg-2 px-1">dt</code> vars.</>}
       </p>
       <JavaScriptEditor
         key={phase}
         value={phaseScript}
         onChange={setPhaseScript}
-        placeholder={isReq ? "req.setHeader('X-Trace', 'abc');\nbru.setEnvVar('ts', Date.now());" : "bru.setEnvVar('token', res.getBody().token);"}
+        placeholder={isReq ? "req.setHeader('X-Trace', 'abc');\ndt.setEnvVar('ts', Date.now());" : "dt.setEnvVar('token', res.getBody().token);"}
         extraExtensions={scriptApiExtensions}
       />
       {scriptCallsNetwork(phaseScript) && <NetworkCallNotice />}

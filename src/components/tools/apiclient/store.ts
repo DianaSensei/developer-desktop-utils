@@ -99,7 +99,7 @@ function trimHistoryEntry(
   //
   //   error  — reqwest names the URL it failed on, and an API key placed as a
   //            query param is resolved into that URL before it is sent.
-  //   logs   — `console.log(bru.getEnvVar('token'))` while debugging a script
+  //   logs   — `console.log(dt.getEnvVar('token'))` while debugging a script
   //            is ordinary, and every line is persisted.
   //   tests  — an assertion failure quotes the values it compared.
   //

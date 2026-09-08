@@ -188,7 +188,7 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
 
 // Static reference for BOTH tools' scripting engines and the field shapes
 // their patch-style tools expect — see `src/components/tools/apiclient/
-// runtime.ts` (bru/req/res/pm/expect/assert) and `types.ts` (Auth/
+// runtime.ts` (dt/req/res/pm/expect/assert) and `types.ts` (Auth/
 // RequestBody/RequestSettings/KeyValue) for the API Client half, and
 // `src-tauri/src/mockserver.rs` (`req_to_rhai`/`run_script`) and
 // `src/components/tools/mockserver/types.ts` (Stub/Matcher/MockConfig) for
@@ -199,19 +199,39 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
 // actually needs it instead of on every tool listing.
 const SCRIPTING_REFERENCE: &str = r#"# DevTool API Client — scripting & field-shape reference
 
-Pre/post-request scripts are plain JS (Bruno-style), run sandboxed. A
-request's own script/auth/headers live on the request itself (patch via
-update_request); a collection/folder's inherited script/auth/headers are set
-via set_node_script/set_node_auth/set_node_headers (nodeId=null = collection
+Pre/post-request scripts are plain JS (Bruno-shaped API, own naming — see
+"Naming: dt, not bru" below), run sandboxed. A request's own script/auth/
+headers live on the request itself (patch via update_request); a
+collection/folder's inherited script/auth/headers are set via
+set_node_script/set_node_auth/set_node_headers (nodeId=null = collection
 root, nodeId=<folderId> = that folder). A request's own header/auth of the
 same name overrides what it inherits; auth.type="inherit" pulls from the
 nearest ancestor's auth.
 
-## Variable precedence (both {{var}} substitution and bru.getVars())
+## Naming: dt, not bru
+This engine's variable/flow-control global is `dt` — same shape as Bruno's
+own `bru` (getCollectionVar, setEnvVar, interpolate, setNextRequest, sleep,
+...), different name, so it reads as this app's own primitive rather than
+something borrowed from another app. A script written against real Bruno
+that calls `bru.*` will NOT work here — there is no `bru` compatibility
+alias, only `dt`. Postman's `pm.*`/`postman.*` shim is unaffected by this
+and still uses Postman's own real names, for import compatibility with
+scripts written against Postman.
+
+## Execution order (one send)
+inherited pre-request scripts (collection, then folder, outer to inner) ->
+the request's own pre-request script -> the HTTP send -> the request's own
+post-response script -> inherited post-response scripts -> the test script
+-> declarative assertions. A pre-request failure stops the send entirely (a
+request built by a script that threw is not worth sending); a
+post-response/test/assertion failure is recorded and everything after it
+still runs.
+
+## Variable precedence (both {{var}} substitution and dt.getVars())
 collectionVar < globalEnv < collectionEnv < data-file row
 (Vault is intentionally excluded from this whole MCP surface.)
 
-## bru.* — variables & flow control (available in both req/res scripts)
+## dt.* — variables & flow control (available in both req/res scripts)
 - getCollectionVar(k) / setCollectionVar(k, v) / hasCollectionVar(k) / deleteCollectionVar(k)
 - getEnvVar(k, scope?) / setEnvVar(k, v, scope='collection') / hasEnvVar(k, scope?) / deleteEnvVar(k, scope='collection')
   scope is 'collection' | 'global'; a read with no scope falls through collection -> global.
@@ -285,7 +305,7 @@ from now (a duration), matching the real package — NOT an absolute Unix timest
 
 ## Declarative Assertions (the request's `assertions` array — NOT run as JS)
 Each row: { expr, operator, value, enabled }. `expr` is a restricted expression
-language over `res`/`req`/`bru` — property paths, indices, one level of method
+language over `res`/`req`/`dt` — property paths, indices, one level of method
 calls, literals, arithmetic/comparison/logical operators (e.g. `res.status`,
 `res.body.items[0].id`, `res.status === 200`) — no assignment, no arbitrary code.
 operator is one of: equals, notEquals, gt, gte, lt, lte, in, notIn, contains,
@@ -320,7 +340,7 @@ RequestScript: { req: string, res: string }  — pre-request / post-response JS 
 
 A stub's response is either `mode: "static"` (fixed status/headers/body) or
 `mode: "script"`, whose `script` is Rhai — NOT JavaScript, and NOT the same
-sandbox/API as the API Client's bru/req/res above. Use mock_test_script to run
+sandbox/API as the API Client's dt/req/res above. Use mock_test_script to run
 one against a sample request before saving it via mock_add_stub/mock_update_stub.
 
 ## The `req` object available to a script
@@ -608,7 +628,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "get_scripting_reference",
-            "description": "Read-only reference for both tools' scripting APIs and field shapes: API Client's bru/req/res/pm JS engine (variable precedence, assertions, Auth/RequestBody/KeyValue shapes) and Mock Server's Rhai response-script engine (a separate language — req shape, return shape, Stub/Matcher shapes). Call before writing/editing a script, auth, assertions, or a stub. Answered locally — works even if DevTool isn't open.",
+            "description": "Read-only reference for both tools' scripting APIs and field shapes: API Client's dt/req/res/pm JS engine (variable precedence, assertions, Auth/RequestBody/KeyValue shapes) and Mock Server's Rhai response-script engine (a separate language — req shape, return shape, Stub/Matcher shapes). Call before writing/editing a script, auth, assertions, or a stub. Answered locally — works even if DevTool isn't open.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({

@@ -8,7 +8,7 @@
 //
 // The fields scanned here are exactly the ones request.ts substitutes into, so
 // "used" means used — not merely "the word appears somewhere in the request".
-// Scripts are deliberately excluded: they read data through bru.getEnvVar()/
+// Scripts are deliberately excluded: they read data through dt.getEnvVar()/
 // getCollectionVar(), not
 // {{token}} substitution, so scanning their text would report false positives.
 

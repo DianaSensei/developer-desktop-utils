@@ -120,7 +120,7 @@ describe('executeRequest — variables', () => {
     const r = await executeRequest(
       req({
         url: 'https://{{host}}/x',
-        script: { req: '', res: "bru.setEnvVar('token', res.getBody().token);" },
+        script: { req: '', res: "dt.setEnvVar('token', res.getBody().token);" },
       }),
       env({ host: 'api.test' }, 'c1'), null,
     );
@@ -135,7 +135,7 @@ describe('executeRequest — variables', () => {
     const r = await executeRequest(
       req({
         url: 'https://{{host}}/x',
-        script: { req: '', res: "bru.setEnvVar('token', res.getBody().token, 'global');" },
+        script: { req: '', res: "dt.setEnvVar('token', res.getBody().token, 'global');" },
       }),
       null, env({ host: 'global.test' }),
     );
@@ -145,10 +145,10 @@ describe('executeRequest — variables', () => {
     expect(r.collectionEnvChanged).toBe(false);
   });
 
-  it('persists a script write to Collection Variables via bru.setCollectionVar', async () => {
+  it('persists a script write to Collection Variables via dt.setCollectionVar', async () => {
     stubJson('{"limit":42}');
     const r = await executeRequest(
-      req({ script: { req: '', res: "bru.setCollectionVar('limit', String(res.getBody().limit));" } }),
+      req({ script: { req: '', res: "dt.setCollectionVar('limit', String(res.getBody().limit));" } }),
       null, null,
     );
     expect(r.collectionVarsChanged).toBe(true);
@@ -314,7 +314,7 @@ describe('executeRequest — flow control', () => {
   it('surfaces setNextRequest on the result', async () => {
     stubJson('{}');
     const r = await executeRequest(
-      req({ script: { req: '', res: "bru.setNextRequest('Cleanup');" } }),
+      req({ script: { req: '', res: "dt.setNextRequest('Cleanup');" } }),
       null, null,
     );
     expect(r.nextRequest).toBe('Cleanup');
@@ -322,7 +322,7 @@ describe('executeRequest — flow control', () => {
 
   it('surfaces null for an early end of iteration', async () => {
     stubJson('{}');
-    const r = await executeRequest(req({ tests: 'bru.setNextRequest(null);' }), null, null);
+    const r = await executeRequest(req({ tests: 'dt.setNextRequest(null);' }), null, null);
     expect(r.nextRequest).toBeNull();
   });
 

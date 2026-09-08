@@ -1084,7 +1084,7 @@ flag) but also anything a script can produce unboundedly, like console output
 `console.log` in a loop is just as capable of flooding the response as a
 large body). For per-session cost: prefer a dedicated on-demand tool over
 inflating every tool's description/schema for information only occasionally
-needed (`get_scripting_reference` instead of folding the `bru`/`req`/`res`/
+needed (`get_scripting_reference` instead of folding the `dt`/`req`/`res`/
 `pm` API into `update_request`'s description), and keep descriptions terse —
 state the contract, not a tutorial; the full detail belongs in
 `get_scripting_reference`'s content (paid for only when actually called), not
@@ -1154,7 +1154,7 @@ Because `Alt-↑`/`Alt-↓` are taken, the Diff tool's chunk-navigation (`DiffMe
 
 - `JsonEditor`/`SqlEditor` — `jsonParseLinter()` / a generic syntax-error linter (`src/components/ui/syntax-lint.ts`, flags whatever the lezer parser already marks as an error node — cheap, approximate, no real linter package needed).
 - `JavaScriptEditor` — **no** linter by default, because it also renders Mock Server's Rhai scripts (JS-like highlighting only; a JS-grammar linter would flag valid Rhai as broken). Pass `extraExtensions` to opt in per call site.
-- ApiClient's pre-request/post-response/test script editors pass `extraExtensions={scriptApiExtensions}` (`src/components/tools/apiclient/scriptCompletion.ts`) — bru/pm/req/res/assert/console autocomplete plus the syntax-error linter, since those scripts really do run as JavaScript. Built on `scopeCompletionSource` from `@codemirror/lang-javascript` against a hand-maintained plain-object shape of the real runtime API (kept in sync with `runtime.ts` by hand); the fluent `expect(x).to.be.true` chain is out of reach since it resolves through a function call, which the path walker doesn't follow.
+- ApiClient's pre-request/post-response/test script editors pass `extraExtensions={scriptApiExtensions}` (`src/components/tools/apiclient/scriptCompletion.ts`) — dt/pm/req/res/assert/console autocomplete plus the syntax-error linter, since those scripts really do run as JavaScript. Built on `scopeCompletionSource` from `@codemirror/lang-javascript` against a hand-maintained plain-object shape of the real runtime API (kept in sync with `runtime.ts` by hand); the fluent `expect(x).to.be.true` chain is out of reach since it resolves through a function call, which the path walker doesn't follow.
 - `{{variable}}` completion/highlight/hover (`src/components/ui/var-support.ts`) is a separate, older mechanism (URL bar, key/value tables, request body) — unrelated to the two above.
 
 ---

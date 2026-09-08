@@ -68,9 +68,9 @@ describe('requestVarTokens', () => {
     }))).toEqual(['u']);
   });
 
-  it('does not scan scripts, which read data through bru.getEnvVar/getCollectionVar', () => {
+  it('does not scan scripts, which read data through dt.getEnvVar/getCollectionVar', () => {
     expect(tokens(req({
-      script: { req: "bru.setCollectionVar('x', '{{notReallyUsed}}');", res: '' },
+      script: { req: "dt.setCollectionVar('x', '{{notReallyUsed}}');", res: '' },
       tests: 'expect("{{alsoNot}}").to.exist;',
     }))).toEqual([]);
   });

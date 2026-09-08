@@ -59,12 +59,12 @@ export function JsonSyntaxEditor(props: CodeEditorProps) {
 
 export interface JavaScriptEditorProps extends CodeEditorProps {
   /** Extra extensions layered onto the base JS editor — e.g. ApiClient's
-   *  bru/pm/req/res completion source plus its syntax-error lint gutter (see
+   *  dt/pm/req/res completion source plus its syntax-error lint gutter (see
    *  `scriptApiExtensions` in scriptCompletion.ts). Not baked in here because
    *  `JavaScriptEditor` also renders Mock Server's Rhai scripts, which merely
    *  borrow JS highlighting — a JS-grammar syntax linter would flag valid
    *  Rhai as an error the moment its syntax diverges from JS's, and the
-   *  bru/pm/req/res completions are meaningless there. Omit for a plain JS
+   *  dt/pm/req/res completions are meaningless there. Omit for a plain JS
    *  (or Rhai-via-JS-highlighting) editor. */
   extraExtensions?: Extension[];
 }

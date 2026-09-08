@@ -15,7 +15,7 @@
 // returned copies back out.
 
 import {
-  evalAssertions, makeBru, makeReq, makeRes, runScript,
+  evalAssertions, makeDt, makeReq, makeRes, runScript,
   type RunControl, type ScriptRun, type VarStores,
 } from './runtime';
 import type {
@@ -105,25 +105,25 @@ export async function runPhase(input: PhaseInput, signal?: AbortSignal): Promise
       const ok = await run(
         label('Inherited pre-request script', i, input.inherited.length),
         input.inherited[i],
-        { bru: makeBru(stores), req: makeReq(draft) },
+        { dt: makeDt(stores), req: makeReq(draft) },
       );
       if (!ok) return result();
     }
-    await run('Pre-request script', input.script, { bru: makeBru(stores), req: makeReq(draft) });
+    await run('Pre-request script', input.script, { dt: makeDt(stores), req: makeReq(draft) });
     return result();
   }
 
   const res = makeRes(input.response);
-  const bru = makeBru(stores);
-  await run('Post-response script', input.script, { bru, req: makeReq(draft), res });
+  const dt = makeDt(stores);
+  await run('Post-response script', input.script, { dt, req: makeReq(draft), res });
   for (let i = 0; i < input.inherited.length; i++) {
     await run(
       label('Inherited post-response script', i, input.inherited.length),
       input.inherited[i],
-      { bru, req: makeReq(draft), res },
+      { dt, req: makeReq(draft), res },
     );
   }
-  await run('Test script', input.tests, { bru, req: makeReq(draft), res });
-  out.tests.push(...evalAssertions(input.assertions, { res, bru }));
+  await run('Test script', input.tests, { dt, req: makeReq(draft), res });
+  out.tests.push(...evalAssertions(input.assertions, { res, dt }));
   return result();
 }

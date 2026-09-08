@@ -8,7 +8,7 @@ Environment, thay vì làm Environment kế thừa lẫn nhau (Global + Collecti
 Precedence khi substitute `{{var}}` (điểm hợp nhất duy nhất — `engine.ts`'s `varMap()`):
 
 ```
-vault  <  collection variables  <  environment  <  data-file row (Runner)  <  runtime (bru.setVar/script)
+vault  <  collection variables  <  environment  <  data-file row (Runner)  <  runtime (dt.setVar/script)
 ```
 
 Collection variables là **default dùng chung cho mọi request trong collection**, bất kể
