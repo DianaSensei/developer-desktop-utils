@@ -12,9 +12,17 @@
 //
 // Loopback-only (127.0.0.1, OS-assigned port), gated by a random token
 // written alongside the port to `<app_data_dir>/mcp-bridge.json` on
-// startup — the sidecar reads that file to find both. Only useful while the
-// app is running AND the API Client tool is the one currently mounted; any
-// other case just times out with a clear error (see CALL_TIMEOUT below).
+// startup — the sidecar reads that file to find both. This module only
+// emits the event and waits (CALL_TIMEOUT below) — it has no idea whether
+// anything is actually listening for it. By default, a tool call only
+// succeeds while the app is running AND the tool that owns it (API Client
+// or Mock Server) is the one currently mounted, because that's the only
+// time either frontend bridge (apiclient/mcpBridge.ts,
+// mockserver/mcpBridge.ts) is registered. Settings → MCP → "Background MCP
+// bridge" (McpBackgroundBridge.tsx, off by default) mounts both
+// unconditionally instead, so a call succeeds regardless of which tool is
+// on screen — any other case (app closed, both the specific tool AND the
+// background setting are off) just times out with a clear error.
 
 use std::collections::HashMap;
 use std::io::{Error as IoError, ErrorKind};
@@ -126,7 +134,7 @@ async fn call(
             (
                 StatusCode::GATEWAY_TIMEOUT,
                 Json(serde_json::json!({
-                    "error": "No response from DevTool — is the app open, on the API Client tool?"
+                    "error": "No response from DevTool — open the app with the tool that owns this call on screen, or turn on Settings → MCP → Background MCP bridge to skip that requirement."
                 })),
             ).into_response()
         }

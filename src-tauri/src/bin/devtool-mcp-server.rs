@@ -9,9 +9,11 @@
 // process to read. Every MCP tool call this process receives over stdio is
 // forwarded there as a `POST /call`, which the app hands to the running
 // webview to answer — so an API Client tool call (list_collections,
-// get_request, etc.) only succeeds while DevTool is open with the API Client
-// tool on screen, and a `mock_*` call only while it's open with the Mock
-// Server tool on screen (get_scripting_reference is the one exception —
+// get_request, etc.) only succeeds while DevTool is open, and, by default,
+// with the API Client tool on screen (a `mock_*` call needs the Mock Server
+// tool on screen the same way) — unless the user has turned on Settings →
+// MCP → Background MCP bridge, which drops that "on screen" requirement
+// entirely (get_scripting_reference is the one exception either way —
 // answered locally, see its own comment below). See
 // src-tauri/src/mcp_bridge.rs for the full design, and
 // src/components/tools/apiclient/mcpBridge.ts /
@@ -794,10 +796,14 @@ impl ServerHandler for DevToolServer {
                 "Drives two DevTool tools. API Client: collections, requests, scripts, \
                  environments — and can actually send a request. Mock Server: stubs, \
                  matchers, the fallback response, and can start/stop the server and test a \
-                 response script. Each tool's calls only answer while the DevTool desktop \
-                 app is open with THAT tool on screen (mock_* needs Mock Server open, \
-                 everything else needs API Client open) — call get_scripting_reference for \
-                 the scripting API and field shapes shared by both.",
+                 response script. By default each tool's calls only answer while the \
+                 DevTool desktop app is open with THAT tool on screen (mock_* needs Mock \
+                 Server open, everything else needs API Client open) — if a call times out, \
+                 that is almost always why; ask the user to either switch to the right tool \
+                 or turn on Settings → MCP → Background MCP bridge in DevTool, which makes \
+                 calls answer regardless of which tool is on screen. Call \
+                 get_scripting_reference for the scripting API and field shapes shared by \
+                 both.",
             )
             .with_server_info(Implementation::new("devtool-api-client", env!("CARGO_PKG_VERSION")))
     }

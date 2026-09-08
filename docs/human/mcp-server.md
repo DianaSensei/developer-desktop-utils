@@ -22,19 +22,31 @@ itself. Every tool call (other than `get_scripting_reference`, answered
 locally — see below) is forwarded over HTTP to a loopback-only control
 server the DevTool desktop app starts on launch (`src-tauri/src/
 mcp_bridge.rs`), which hands it to the running webview — so a call only
-succeeds while:
+succeeds while the DevTool desktop app is **open**, and one of these two is
+true:
 
-- the DevTool desktop app is **open**, and
-- **the tool that owns it** is the one currently on screen — an API Client
-  tool (`list_collections`, `run_request`, etc.) needs the API Client tool
-  open; a `mock_*` tool needs the Mock Server tool open (that's where each
-  tool's live state is mounted).
+- **Default** — **the tool that owns the call** is the one currently on
+  screen: an API Client tool (`list_collections`, `run_request`, etc.)
+  needs the API Client tool open; a `mock_*` tool needs the Mock Server
+  tool open (that's where each tool's live state is mounted).
+- **Settings → MCP → Background MCP bridge** (off by default) — turn this
+  on and both tools answer regardless of which one is on screen, or even
+  while you're on a completely different tool. Off by default per this
+  app's "no silent network calls" rule — it's an explicit opt-in, not
+  something that starts listening on its own.
 
-Anything else — app closed, or you're on a different tool — comes back as a
-clear error telling you so, not a hang. The two bridges (`src/components/
-tools/apiclient/mcpBridge.ts` and `src/components/tools/mockserver/
-mcpBridge.ts`) listen on the same underlying event but never collide, since
-React Router only ever mounts one tool's component tree at a time.
+Anything else — app closed, or neither condition above holds — comes back
+as a clear error telling you so, not a hang. The two bridges
+(`src/components/tools/apiclient/mcpBridge.ts` and
+`src/components/tools/mockserver/mcpBridge.ts`) listen on the same
+underlying event but never collide: each ignores tool names it doesn't own,
+and by default only one is ever mounted at a time anyway (React Router
+mounts one tool's component tree at a time) — the background bridge
+(`src/components/McpBackgroundBridge.tsx`) is the one case where both are
+deliberately mounted together, sharing the exact same store each tool's own
+UI reads (see `apiclient/mcpRuntimeContext.tsx` /
+`mockserver/mcpRuntimeContext.tsx`) so a UI edit and an MCP edit can't
+silently clobber each other.
 
 The two processes find each other automatically: on launch, DevTool writes
 its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
@@ -61,6 +73,12 @@ app (a Tauri sidecar, `bundle.externalBin`).
 One registration covers both tools — it's the same `devtool-mcp-server`
 process either way, so there's nothing separate to set up for Mock Server's
 `mock_*` tools.
+
+By default an MCP client only gets an answer while the tool it's asking
+about is the one on screen (see "How it works" above). If you want it to
+work regardless of which tool you're looking at, turn on **Settings → MCP →
+Background MCP bridge** — off by default, so nothing changes here unless
+you opt in.
 
 ## Setup — developing DevTool from source
 
@@ -158,7 +176,10 @@ Reference:
   isn't running, or hasn't finished starting. Open it and retry.
 - **"Could not reach DevTool on 127.0.0.1:\<port\>"** — the app was closed
   after writing the discovery file (stale port). Restart the app.
-- **"No response from DevTool — is the app open, on the API Client tool?"**
-  — the app is running but nothing answered within 30s, almost always
-  because a different tool is on screen. Switch to API Client for its
-  tools, or Mock Server for the `mock_*` ones.
+- **"No response from DevTool — open the app with the tool that owns this
+  call on screen, or turn on Settings → MCP → Background MCP bridge…"** —
+  the app is running but nothing answered within 30s, almost always because
+  a different tool is on screen and the background bridge is off. Either
+  switch to API Client for its tools (or Mock Server for the `mock_*`
+  ones), or turn on Settings → MCP → Background MCP bridge so it stops
+  mattering which tool is on screen.
