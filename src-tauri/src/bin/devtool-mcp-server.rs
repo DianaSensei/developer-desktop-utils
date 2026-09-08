@@ -262,6 +262,27 @@ pm.response — code, status, responseTime, responseSize, json(), text(), size()
 
 console.log/info/warn/error/debug/trace/dir/table(v) are all available and captured as script logs.
 
+## require(name) — curated bundled modules (never require(anything))
+'crypto-js', 'uuid', 'lodash', 'jwt-decode' ({ jwtDecode }), 'dayjs', 'jose', 'jsonwebtoken'.
+
+'jose' is exposed with its native API (SignJWT, jwtVerify, importPKCS8, importSPKI,
+generateKeyPair, ...) — see https://github.com/panva/jose for the full surface.
+
+'jsonwebtoken' is a same-shaped shim over 'jose' (the real npm package is Node-only —
+crypto/Buffer — and cannot run in this app's webview at all): { sign, verify, decode,
+JsonWebTokenError, TokenExpiredError, NotBeforeError }. Two deliberate differences
+from the real package:
+- sign(payload, secretOrPrivateKeyPem, opts) and verify(token, secretOrPublicKeyPem, opts)
+  are both async (await them) — Web Crypto has no synchronous signing API.
+- verify() REQUIRES opts.algorithms (e.g. { algorithms: ['HS256'] }) — the token's own
+  "alg" header is never trusted to pick the algorithm, since that is exactly how
+  algorithm-confusion attacks work.
+Supported algorithms: HS256/384/512 (secretOrPrivateKeyPem is a plain string/Uint8Array
+secret), RS256/384/512 and PS256/384/512 and ES256/384/512 and EdDSA (secretOrPrivateKeyPem
+must be a PEM string — PKCS8 "-----BEGIN PRIVATE KEY-----" to sign, SPKI
+"-----BEGIN PUBLIC KEY-----" to verify). sign()'s numeric expiresIn/notBefore are seconds
+from now (a duration), matching the real package — NOT an absolute Unix timestamp.
+
 ## Declarative Assertions (the request's `assertions` array — NOT run as JS)
 Each row: { expr, operator, value, enabled }. `expr` is a restricted expression
 language over `res`/`req`/`bru` — property paths, indices, one level of method
