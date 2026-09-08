@@ -44,6 +44,43 @@ describe('requireModule', () => {
     expect(decoded.a).toBe(1);
   });
 
+  it('resolves ajv and validates a payload against a JSON schema', () => {
+    const AjvCtor = requireModule('ajv') as new () => {
+      compile: (schema: object) => ((data: unknown) => boolean) & { errors?: unknown[] | null };
+    };
+    const ajv = new AjvCtor();
+    const validate = ajv.compile({
+      type: 'object', required: ['id'], properties: { id: { type: 'number' } },
+    });
+    expect(validate({ id: 1 })).toBe(true);
+    expect(validate({ id: 'not-a-number' })).toBe(false);
+    expect(validate.errors?.length).toBeGreaterThan(0);
+  });
+
+  it('resolves xml2js and parses XML into a plain object', async () => {
+    const mod = requireModule('xml2js') as typeof import('xml2js');
+    const result = await mod.parseStringPromise('<root><name>Ada</name></root>');
+    expect(result).toEqual({ root: { name: ['Ada'] } });
+  });
+
+  it('resolves cheerio and can query parsed HTML', () => {
+    const mod = requireModule('cheerio') as typeof import('cheerio');
+    const $ = mod.load('<ul><li class="item">a</li><li class="item">b</li></ul>');
+    expect($('.item').length).toBe(2);
+    expect($('.item').first().text()).toBe('a');
+  });
+
+  it('resolves nanoid and generates URL-safe ids of the requested length', () => {
+    const mod = requireModule('nanoid') as {
+      nanoid: (size?: number) => string;
+      customAlphabet: (alphabet: string, size: number) => () => string;
+    };
+    expect(mod.nanoid()).toHaveLength(21);
+    expect(mod.nanoid(10)).toHaveLength(10);
+    const digitsOnly = mod.customAlphabet('0123456789', 6);
+    expect(digitsOnly()).toMatch(/^\d{6}$/);
+  });
+
   it('throws a clear error for an unavailable module, listing what is bundled', () => {
     expect(() => requireModule('left-pad')).toThrow(/left-pad.*not available/);
     expect(() => requireModule('left-pad')).toThrow(/jwt-decode/);

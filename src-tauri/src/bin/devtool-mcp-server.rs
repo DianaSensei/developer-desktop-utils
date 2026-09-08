@@ -283,7 +283,9 @@ pm.response — code, status, responseTime, responseSize, json(), text(), size()
 console.log/info/warn/error/debug/trace/dir/table(v) are all available and captured as script logs.
 
 ## require(name) — curated bundled modules (never require(anything))
-'crypto-js', 'uuid', 'lodash', 'jwt-decode' ({ jwtDecode }), 'dayjs', 'jose', 'jsonwebtoken'.
+'crypto-js', 'uuid', 'nanoid', 'lodash', 'jwt-decode' ({ jwtDecode }), 'dayjs', 'jose',
+'jsonwebtoken', 'ajv', 'xml2js', 'cheerio' — the same set Postman's and Bruno's own
+script sandboxes bundle.
 
 'jose' is exposed with its native API (SignJWT, jwtVerify, importPKCS8, importSPKI,
 generateKeyPair, ...) — see https://github.com/panva/jose for the full surface.
@@ -302,6 +304,13 @@ secret), RS256/384/512 and PS256/384/512 and ES256/384/512 and EdDSA (secretOrPr
 must be a PEM string — PKCS8 "-----BEGIN PRIVATE KEY-----" to sign, SPKI
 "-----BEGIN PUBLIC KEY-----" to verify). sign()'s numeric expiresIn/notBefore are seconds
 from now (a duration), matching the real package — NOT an absolute Unix timestamp.
+
+'ajv' is the class itself (const Ajv = require('ajv'); new Ajv().compile(schema)),
+matching Postman/Bruno's own require('ajv') shape — use it to schema-validate a JSON
+response body. 'xml2js' (parseString/parseStringPromise) parses an XML/SOAP response
+into a plain object. 'cheerio' (require('cheerio').load(html)) queries/scrapes an HTML
+response with a jQuery-like API. 'nanoid' is { nanoid, customAlphabet } — a second,
+shorter/URL-safe id generator alongside 'uuid'.
 
 ## Declarative Assertions (the request's `assertions` array — NOT run as JS)
 Each row: { expr, operator, value, enabled }. `expr` is a restricted expression

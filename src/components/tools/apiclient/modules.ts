@@ -22,6 +22,20 @@
 // package is Node-only (`crypto`/`Buffer`) and cannot run here at all —
 // unlike Postman/Bruno, whose desktop apps are Electron and so really do
 // have a Node.js process behind their sandbox, this app's webview has none.
+//
+// `ajv`, `xml2js`, `cheerio`, `nanoid` close the remaining gap against what
+// Postman's and Bruno's own script sandboxes bundle (both documented
+// `require()` lists reviewed directly — Postman's "Bundled libraries"
+// reference and Bruno's "Inbuilt libraries" docs): schema-validate a JSON
+// response (`ajv`), parse an XML/SOAP response into an object (`xml2js`),
+// query/scrape an HTML response (`cheerio`), and a second ID generator
+// alongside `uuid` (`nanoid` — Bruno bundles both, `uuid` for RFC4122,
+// `nanoid` for shorter URL-safe ids). Not added: `moment` (superseded by
+// `dayjs`, already bundled — see above), `chai` (this engine already ships
+// its own `expect`/`assert`, not a `require()`d module — see runtime.ts),
+// `tv4` (deprecated even in Postman's own docs, in favor of `ajv`), and
+// `atob`/`btoa` (already global in every Worker/browser context, not
+// something a script needs `require()` for at all).
 
 import CryptoJS from 'crypto-js';
 import * as uuid from 'uuid';
@@ -30,6 +44,10 @@ import { jwtDecode } from 'jwt-decode';
 import dayjs from 'dayjs';
 import * as jose from 'jose';
 import jsonwebtoken from './jsonwebtokenShim';
+import Ajv from 'ajv';
+import * as xml2js from 'xml2js';
+import * as cheerio from 'cheerio';
+import { nanoid, customAlphabet } from 'nanoid';
 
 const MODULES: Record<string, unknown> = {
   'crypto-js': CryptoJS,
@@ -44,6 +62,13 @@ const MODULES: Record<string, unknown> = {
   // deliberate differences (sign/verify are async; verify requires
   // `algorithms` to be named explicitly).
   jsonwebtoken,
+  // `new (require('ajv'))()` — matches Postman/Bruno's own `require('ajv')`
+  // shape (the class itself, not a pre-built instance), so a schema-
+  // validation script written for either ports over unchanged.
+  ajv: Ajv,
+  xml2js,
+  cheerio,
+  nanoid: { nanoid, customAlphabet },
   // common aliases
   'crypto-js/crypto-js': CryptoJS,
 };
