@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Braces, Check, ChevronDown, Code2, Database, File, FileQuestion, FileText,
-  FormInput, Hexagon, type LucideIcon, Tag, Trash2, Wand2, X,
+  FormInput, Hexagon, type LucideIcon, Sparkles, Tag, Trash2, Wand2, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -97,6 +97,8 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         ) : undefined}
       />
 
+      {(tab === 'script' || tab === 'tests') && <McpScriptingHint />}
+
       {/* tab body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* Headers từng là tab riêng — di chuyển vào đây làm phần thứ ba, cùng
@@ -172,6 +174,22 @@ function NetworkCallNotice() {
       This script can make its own network request, separate from the Send button — review it
       before running scripts from a source you don't fully trust.
     </Callout>
+  );
+}
+
+// A script/test-writing tip, not a warning — kept as a plain muted line
+// rather than a Callout so it doesn't compete with NetworkCallNotice above
+// for attention. MCP lets an external client (Claude Code, Claude Desktop)
+// list/edit/send through this exact store and engine (see mcpBridge.ts), so
+// "write this script" and "verify it actually works" both mean the assistant
+// can run the real request, not just draft text.
+function McpScriptingHint() {
+  return (
+    <p className="flex shrink-0 items-center gap-1.5 px-3 pt-2 text-[11px] text-fg-mute">
+      <Sparkles className="h-3 w-3 shrink-0" />
+      Ask Claude to write or verify this — connect it to DevTool first via{' '}
+      <strong className="font-medium text-fg">Sidebar → More ⋮ → MCP for Claude Code…</strong>
+    </p>
   );
 }
 
