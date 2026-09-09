@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Play, Square, Plus, Copy as CopyIcon, Trash2, AlertTriangle, PanelRightClose, PanelRightOpen,
-  ChevronUp, ChevronDown, Upload, FileJson, Ban,
+  ChevronUp, ChevronDown, Upload, FileJson, Ban, Plug,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
@@ -25,6 +25,7 @@ import { liveConnections } from '@/lib/liveConnections';
 import { useMcpBridge } from './mcpBridge';
 import { useMockServerRuntime } from './mcpRuntimeContext';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { McpSetupDialog } from '@/components/McpSetupDialog';
 
 // Sentinel selection id for the editable "no-match" fallback response.
 const FALLBACK_ID = '__fallback__';
@@ -60,6 +61,7 @@ export function MockServer() {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
+  const [mcpSetupOpen, setMcpSetupOpen] = useState(false);
 
   // Stub list is a fixed-width sidebar (px, persisted) so it stays narrow and
   // stable regardless of whether the request log is shown — the editor and log
@@ -300,6 +302,17 @@ export function MockServer() {
           variant="ghost"
           size="sm"
           className="ml-auto h-ctl text-xs text-fg-mute"
+          onClick={() => setMcpSetupOpen(true)}
+        >
+          <Plug className="mr-1 h-3.5 w-3.5" />
+          MCP
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-ctl text-xs text-fg-mute"
           onClick={() => setLogVisible((v) => !v)}
         >
           {logVisible ? <PanelRightClose className="mr-1 h-3.5 w-3.5" /> : <PanelRightOpen className="mr-1 h-3.5 w-3.5" />}
@@ -372,6 +385,8 @@ export function MockServer() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <McpSetupDialog open={mcpSetupOpen} onClose={() => setMcpSetupOpen(false)} />
     </div>
   );
 }

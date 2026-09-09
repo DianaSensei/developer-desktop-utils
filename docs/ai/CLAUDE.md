@@ -1062,9 +1062,18 @@ Two ways this binary gets run:
   installed DevTool from a binary never needs Rust or Node.js.
   `mcp_bridge.rs`'s `mcp_sidecar_path` command resolves its absolute path at
   runtime (next to the running app's own executable — where Tauri places
-  `externalBin` sidecars on every platform); the Sidebar's **More ⋮ → MCP
-  for Claude Code…** menu item (`McpSetupDialog.tsx`) shows a ready-to-paste
-  `claude mcp add` command built from it. Copy-only, never auto-run.
+  `externalBin` sidecars on every platform); `src/components/
+  McpSetupDialog.tsx` shows a ready-to-paste `claude mcp add` command built
+  from it, plus a live `Switch` bound to `useMcpBackgroundBridge()` — the
+  same persisted setting Settings → MCP's toggle reads/writes, so flipping
+  it from either place takes effect immediately and isn't gated on whether
+  API Client or Mock Server has ever been opened (it's an app-level
+  setting, not local to either tool). Deliberately kept as ONE shared
+  component (not duplicated per tool) since the two tools register through
+  the exact same sidecar process. Two entry points open it: API Client's
+  Sidebar **More ⋮ → MCP for Claude Code…** (`apiclient/Sidebar.tsx`) and
+  Mock Server's toolbar **MCP** button (`mockserver/MockServer.tsx`).
+  Copy-only, never auto-run.
 - **Run via `cargo run --bin devtool-mcp-server`** when developing this repo
   from source — the checked-in root `.mcp.json` does exactly this, so
   opening Claude Code anywhere in the repo picks it up with zero manual

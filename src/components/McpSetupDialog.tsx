@@ -12,12 +12,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Callout } from '@/components/ui/callout';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { isTauri } from '@/lib/platform';
+import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
 
 type Resolution = { status: 'loading' } | { status: 'ready'; path: string } | { status: 'error'; message: string };
 
 export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [resolution, setResolution] = useState<Resolution>({ status: 'loading' });
+  // Same persisted setting as Settings → MCP → Background MCP bridge — one
+  // shared value (usePersistentState), so flipping it here or there is the
+  // same action either way, in sync immediately without navigating away, and
+  // regardless of whether API Client or Mock Server has ever been opened
+  // before (it's an app-level setting, not scoped to either tool's own
+  // local state).
+  const { enabled: backgroundEnabled, setEnabled: setBackgroundEnabled } = useMcpBackgroundBridge();
 
   useEffect(() => {
     if (!open) return;
@@ -53,10 +62,25 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
           <p className="text-fg-mute">
             Lets an MCP client (Claude Code, Claude Desktop) list, edit, and actually{' '}
             <span className="text-fg">send</span> requests in this API Client — collections, scripts,
-            environments, the works — while this app is open with this tool on screen. Turn on
-            <span className="text-fg"> Settings → MCP → Background MCP bridge</span> to let it answer
-            even while a different tool is on screen.
+            environments — and drive Mock Server's stubs the same way, all through this one
+            registration.
           </p>
+
+          <div className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2.5">
+            <div>
+              <p className="text-xs font-medium">Background MCP bridge</p>
+              <p className="text-[11px] text-fg-mute mt-0.5">
+                {backgroundEnabled
+                  ? 'On — answers regardless of which tool is on screen, or whether the window is focused.'
+                  : 'Off — only answers while API Client (or Mock Server for mock_* tools) is the one on screen.'}
+              </p>
+            </div>
+            <Switch
+              checked={backgroundEnabled}
+              onCheckedChange={setBackgroundEnabled}
+              aria-label="Background MCP bridge"
+            />
+          </div>
 
           {resolution.status === 'loading' && (
             <div className="flex items-center gap-2 text-fg-mute">
@@ -81,9 +105,10 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
                 <CopyButton value={command} iconClassName="h-3.5 w-3.5" />
               </div>
               <p className="text-[11px] text-fg-mute">
-                Then open a new Claude Code session and ask it about your collections — by default it
-                only answers while DevTool is open with the API Client tool on screen, unless you've
-                turned on the background bridge in Settings → MCP.
+                Then open a new Claude Code session and ask it about your collections or stubs —
+                with the background bridge above off, API Client's tools only answer while API
+                Client is on screen (Mock Server's <code className="font-mono">mock_*</code> tools
+                the same way for Mock Server).
               </p>
             </div>
           )}

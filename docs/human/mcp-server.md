@@ -72,8 +72,9 @@ boundary.
 You don't need to build anything — `devtool-mcp-server` ships inside the
 app (a Tauri sidecar, `bundle.externalBin`).
 
-1. Open DevTool → **API Client** tool → Collections' **More** menu (⋮) →
-   **MCP for Claude Code…**.
+1. Open the **MCP for Claude Code…** dialog — either **API Client** →
+   Collections' **More** menu (⋮), or **Mock Server** → toolbar **MCP**
+   button. Same dialog either way.
 2. Copy the `claude mcp add` command it shows (it's already pointed at your
    install's copy of the binary) and run it once in a terminal.
 3. Open a new Claude Code (or Claude Desktop) session and use it.
@@ -82,11 +83,15 @@ One registration covers both tools — it's the same `devtool-mcp-server`
 process either way, so there's nothing separate to set up for Mock Server's
 `mock_*` tools.
 
+The same dialog also has a **Background MCP bridge** toggle — the exact
+setting Settings → MCP has, just reachable without leaving the tool. Flip it
+from either place; it's one shared value, so both stay in sync immediately
+and neither depends on whether API Client or Mock Server has ever been
+opened before.
+
 By default an MCP client only gets an answer while the tool it's asking
-about is the one on screen (see "How it works" above). If you want it to
-work regardless of which tool you're looking at, turn on **Settings → MCP →
-Background MCP bridge** — off by default, so nothing changes here unless
-you opt in.
+about is the one on screen (see "How it works" above) — off by default, so
+nothing changes here unless you opt in.
 
 ## Setup — developing DevTool from source
 
