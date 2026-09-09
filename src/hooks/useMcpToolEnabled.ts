@@ -10,12 +10,18 @@ import { usePersistentState } from './usePersistentState';
  *
  * Keyed by the same tool ids TOOL_DEFS/FeatureContext already use
  * ('api-client', 'mock-server', 'redis-client', 'kafka-explorer',
- * 'rabbit-client') so a label only has to be looked up once, from
- * TOOL_DEFS, rather than duplicated here.
+ * 'rabbit-client', 'container-manager', 'base64', 'jwt', 'json') so a
+ * label only has to be looked up once, from TOOL_DEFS, rather than
+ * duplicated here.
  */
-export type McpToolId = 'api-client' | 'mock-server' | 'redis-client' | 'kafka-explorer' | 'rabbit-client';
+export type McpToolId =
+  | 'api-client' | 'mock-server' | 'redis-client' | 'kafka-explorer' | 'rabbit-client'
+  | 'container-manager' | 'base64' | 'jwt' | 'json';
 
-export const MCP_TOOL_IDS: McpToolId[] = ['api-client', 'mock-server', 'redis-client', 'kafka-explorer', 'rabbit-client'];
+export const MCP_TOOL_IDS: McpToolId[] = [
+  'api-client', 'mock-server', 'redis-client', 'kafka-explorer', 'rabbit-client',
+  'container-manager', 'base64', 'jwt', 'json',
+];
 
 /**
  * One-line summary of what an MCP client can actually do to each tool while
@@ -30,6 +36,10 @@ export const MCP_TOOL_CAPABILITIES: Record<McpToolId, string> = {
   'redis-client': 'Connection profiles only: list/add/edit/delete/test, plus connect/disconnect. No key browsing/editing, Pub/Sub, or admin commands.',
   'kafka-explorer': 'Connection profiles only: list/add/edit/delete/test, plus connect/disconnect. No topics, consumer groups, or produce/consume.',
   'rabbit-client': 'Connection profiles only: list/add/edit/delete/test, plus connect/disconnect. No queues, exchanges, publish/consume, or RPC.',
+  'container-manager': 'Connection profiles, plus full container lifecycle: list/inspect/start/stop/restart/pause/remove, logs, live stats, and image list/remove.',
+  'base64': 'Stateless encode/decode (Base64, URL, Hex, Morse, …), hashing (MD5/SHA family, HMAC), and AES/3DES/Rabbit encrypt/decrypt — always answers, no connection or open tool required.',
+  'jwt': 'Stateless JWT header/payload decode (no signature verification) — always answers, no connection or open tool required.',
+  'json': 'Stateless JSON format/minify/validate/stringify (lenient parser: comments, trailing commas, single quotes) — always answers, no connection or open tool required.',
 };
 
 const KEY = 'devtool-mcp-tool-enabled';

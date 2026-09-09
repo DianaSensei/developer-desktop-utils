@@ -1,6 +1,6 @@
-# MCP for DevTool's API Client, Mock Server, Redis Client, Kafka Explorer, and RabbitMQ Client
+# MCP for DevTool
 
-Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive five
+Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive nine
 DevTool tools from one server:
 
 - **API Client** — list/read/edit collections, requests, scripts, and
@@ -16,8 +16,19 @@ DevTool tools from one server:
   for Redis, no topic/consumer-group/produce/consume tools for Kafka, no
   queue/exchange/publish/consume/RPC tools for RabbitMQ — deliberately
   scoped to connection setup, not data access.
+- **Containers** — connection profiles PLUS full lifecycle: list/inspect/
+  start/stop/restart/pause/unpause/remove, recent logs, one-shot CPU/memory
+  stats, and image list/inspect/remove — all against whichever connection
+  `container_connect` last activated.
+- **Encode·Hash·Encrypt**, **JWT Debugger**, and **JSON Formatter** —
+  **stateless**: every tool is a pure function of its own call arguments, no
+  saved connection or open tool required. Encode/decode 14 codecs, hash/HMAC
+  9 algorithms, AES/3DES/Rabbit encrypt/decrypt; decode a JWT's header/
+  payload (no signature verification); format/minify/validate/stringify
+  JSON with a lenient parser (comments, trailing commas, single quotes,
+  unquoted keys all accepted, same as the UI).
 
-76 tools total; see the full list further down. Three of those
+109 tools total; see the full list further down. Three of those
 (`devtool_mcp_status`, `devtool_mcp_set_background`,
 `devtool_mcp_set_tool_enabled`) manage the MCP integration itself — see
 "DevTool MCP management" below.
@@ -38,42 +49,58 @@ true:
   screen: an API Client tool (`list_collections`, `run_request`, etc.)
   needs the API Client tool open; `mock_*` needs Mock Server open; `redis_*`
   needs Redis Client open; `kafka_*` needs Kafka Explorer open; `rabbit_*`
-  needs RabbitMQ Client open (that's where each tool's live state is mounted).
+  needs RabbitMQ Client open; `container_*` needs Containers open (that's
+  where each tool's live state is mounted).
 - **Settings → MCP → Background MCP bridge** (off by default) — turn this
-  on and all five tools answer regardless of which one is on screen, or even
-  while you're on a completely different tool. Off by default per this
-  app's "no silent network calls" rule — it's an explicit opt-in, not
-  something that starts listening on its own.
+  on and all six of those tools answer regardless of which one is on
+  screen, or even while you're on a completely different tool. Off by
+  default per this app's "no silent network calls" rule — it's an explicit
+  opt-in, not something that starts listening on its own.
 
-There's a third, stricter layer on top of both: **Settings → MCP → Per-tool
-MCP access** — a kill switch per tool (all on by default). A tool switched
-off there never answers any of its MCP calls, on screen or in the
-background; it's the only way to make one tool permanently unreachable over
-MCP while leaving the others working normally.
+**Encode·Hash·Encrypt, JWT Debugger, and JSON Formatter are exceptions to
+all of the above** — `codec_*`/`hash_*`/`encrypt_text`/`decrypt_text`,
+`jwt_decode`, and `json_*` are pure functions of their own call arguments
+(no saved connection, no persisted state at all), so there's nothing for
+"on screen" vs "background" to even mean. They always answer as soon as the
+DevTool app is open, background bridge on or off.
 
-Anything else — app closed, a tool switched off, or neither on-screen/
-background condition above holds — comes back as a clear error telling you
-so, not a hang. The five bridges
-(`src/components/tools/apiclient/mcpBridge.ts`,
+There's a third, stricter layer on top of the on-screen/background split:
+**Settings → MCP → Per-tool MCP access** — a kill switch per tool (all on
+by default, all nine tools included). A tool switched off there never
+answers any of its MCP calls — for the six connection-based tools that
+means on screen or in the background; for the three stateless ones, always.
+It's the only way to make one tool permanently unreachable over MCP while
+leaving the others working normally.
+
+Anything else — app closed, a tool switched off, or (for the six
+connection-based tools) neither on-screen/background condition above holds
+— comes back as a clear error telling you so, not a hang. The six
+connection-based bridges (`src/components/tools/apiclient/mcpBridge.ts`,
 `src/components/tools/mockserver/mcpBridge.ts`,
 `src/components/tools/redis/mcpBridge.ts`,
-`src/components/tools/kafka/mcpBridge.ts`, and
-`src/components/tools/rabbit/mcpBridge.ts`) listen on the same underlying
-event but never collide: each ignores tool names it doesn't own, and by
-default only one tool's own bridge is ever mounted at a time anyway (React
-Router mounts one tool's component tree at a time) — the background bridge
-(`src/components/McpBackgroundBridge.tsx`) is the one case where all five
-are deliberately mounted together, sharing the exact same
-store/state each tool's own UI reads (see `apiclient/mcpRuntimeContext.tsx`,
-`mockserver/mcpRuntimeContext.tsx`, `redis/mcpRuntimeContext.tsx`,
-`kafka/mcpRuntimeContext.tsx`, `rabbit/mcpRuntimeContext.tsx`) so a UI edit
-and an MCP edit can't silently clobber each other.
+`src/components/tools/kafka/mcpBridge.ts`,
+`src/components/tools/rabbit/mcpBridge.ts`, and
+`src/components/tools/container/mcpBridge.ts`) listen on the same
+underlying event but never collide: each ignores tool names it doesn't
+own, and by default only one tool's own bridge is ever mounted at a time
+anyway (React Router mounts one tool's component tree at a time) — the
+background bridge (`src/components/McpBackgroundBridge.tsx`) is the one
+case where all six are deliberately mounted together, sharing the exact
+same store/state each tool's own UI reads (see
+`apiclient/mcpRuntimeContext.tsx`, `mockserver/mcpRuntimeContext.tsx`,
+`redis/mcpRuntimeContext.tsx`, `kafka/mcpRuntimeContext.tsx`,
+`rabbit/mcpRuntimeContext.tsx`, `container/mcpRuntimeContext.tsx`) so a UI
+edit and an MCP edit can't silently clobber each other.
 
-A sixth listener, `src/components/McpManageBridge.tsx`, is **always**
+The three stateless tools share a **seventh** listener,
+`src/components/McpUtilityBridge.tsx`, mounted once, unconditionally, at
+the app root — no runtime context, since there's no state to share.
+
+An **eighth** listener, `src/components/McpManageBridge.tsx`, is always
 mounted regardless of the Background MCP bridge setting or the per-tool
 toggles — see "DevTool MCP management" below. It only answers three tool
 names of its own (`devtool_mcp_status`, `devtool_mcp_set_background`,
-`devtool_mcp_set_tool_enabled`) and, like the other five, ignores
+`devtool_mcp_set_tool_enabled`) and, like the other seven, ignores
 everything else.
 
 The two processes find each other automatically: on launch, DevTool writes
@@ -92,7 +119,13 @@ stored in plain JSON in the app data dir and already returned unmasked by
 the app's own `redis_list_configs`/`kafka_list_configs`/`rabbit_list_configs`
 commands — so `redis_list_connections`/`kafka_list_connections`/
 `rabbit_list_connections` return them unmasked too, for the same reason
-`get_request` doesn't mask `auth.password`.
+`get_request` doesn't mask `auth.password`. `encrypt_text`/`decrypt_text`/
+`hash_hmac`'s `key` is a different case again: it's a call argument the
+MCP caller supplies fresh each time, never read from the tool's own saved
+`devtool:hash:key`/`devtool:hash:hmacKey` fields — there's no persisted
+secret this bridge could leak in the first place. Containers has nothing
+comparable to exclude — `socketPath` is a filesystem path, not a
+credential.
 
 ## Setup — installed the app from a binary?
 
@@ -106,10 +139,11 @@ app (a Tauri sidecar, `bundle.externalBin`).
    install's copy of the binary) and run it once in a terminal.
 3. Open a new Claude Code (or Claude Desktop) session and use it.
 
-One registration covers all five tools — it's the same `devtool-mcp-server`
+One registration covers all nine tools — it's the same `devtool-mcp-server`
 process either way, so there's nothing separate to set up for Mock Server's
-`mock_*`, Redis Client's `redis_*`, Kafka Explorer's `kafka_*`, or RabbitMQ
-Client's `rabbit_*` tools.
+`mock_*`, Redis Client's `redis_*`, Kafka Explorer's `kafka_*`, RabbitMQ
+Client's `rabbit_*`, Containers' `container_*`, or the stateless
+`codec_*`/`hash_*`/`encrypt_text`/`decrypt_text`/`jwt_decode`/`json_*` tools.
 
 The same dialog also has the **Background MCP bridge** toggle and the
 **Per-tool MCP access** list — the exact settings Settings → MCP has, just
@@ -241,12 +275,45 @@ tools):
 | `rabbit_connect` / `rabbit_disconnect` | Mark a saved connection as active (same as the Connect/Disconnect buttons); stops any live consumers running against the previously-connected connection. |
 | `rabbit_connection_status` | Current selected/connected connection id. |
 
+Containers (each needs the **Containers** tool open, not API Client —
+connection management PLUS full lifecycle; lifecycle/image tools operate on
+whichever connection `container_connect` last activated, not a per-call
+argument):
+
+| Tool | Does |
+|---|---|
+| `container_list_connections` / `container_get_connection` | Read saved connection profiles (id/name/socketPath — a Unix socket or Windows named pipe path). |
+| `container_add_connection` / `container_update_connection` / `container_delete_connection` | Connection profile lifecycle. `container_update_connection` takes a partial patch — flat fields, no nested merge needed. |
+| `container_test_connection` | Verify a saved connection can reach the daemon, without marking it as connected. |
+| `container_connect` / `container_disconnect` | Mark a saved connection as active (same as the Connect/Disconnect buttons) — every tool below operates on this connection. |
+| `container_connection_status` | Current selected/connected connection id. |
+| `container_list` | List containers (`all=false` default: running only; `all=true`: includes stopped). |
+| `container_inspect` | One container's curated details — image, status, health, command, env, labels, mounts, ports, networks, resource limits. |
+| `container_start` / `container_stop` / `container_restart` / `container_pause` / `container_unpause` | Container lifecycle actions. |
+| `container_remove` | Remove a container (`force=true` even if running). |
+| `container_logs` | Recent log output — collects whatever the daemon streams back within ~1.5s, not a live tail; call again for newer output. `tail`/`since`/`until`/`timestamps` match the daemon's own flags. |
+| `container_stats` | One CPU/memory/network usage sample (not a live stream — call again for a fresh one). |
+| `container_list_images` / `container_image_details` / `container_remove_image` | Image list, curated details, and removal. |
+
+Encode·Hash·Encrypt, JWT Debugger, and JSON Formatter (**stateless — always
+answer, no connection or open tool required, background bridge on or off**;
+gated only by their own Per-tool MCP access toggle):
+
+| Tool | Does |
+|---|---|
+| `codec_encode` / `codec_decode` | Encode/decode with one of 14 codecs: base64, base62, rot13, url, html, quoted-printable, huffman, rle, morse, punycode, hex, octal, binary, decimal. |
+| `hash_compute` | Hash text. Omit `algorithm` for every algorithm at once (md5, ripemd160, sha1, sha224, sha256, sha384, sha512, sha3-256, sha3-512); pass one for just that hash. |
+| `hash_hmac` | Compute an HMAC (md5, ripemd160, sha1, sha224, sha256, sha384, or sha512 — SHA-3 has no dedicated per-length HMAC function). |
+| `encrypt_text` / `decrypt_text` | Encrypt/decrypt with a caller-supplied passphrase. `aes-gcm` is recommended (PBKDF2-SHA256 600k-round stretching, authenticated); `aes-cbc`/`ctr`/`ecb`/`cfb`/`ofb`, `tripledes`, `rabbit` exist for crypto-js interop only. |
+| `jwt_decode` | Decode a JWT's header and payload — does NOT verify the signature. |
+| `json_format` / `json_minify` / `json_to_string` / `json_validate` | Pretty-print, minify, re-escape as a string literal, or validate JSON — all accept a lenient superset (comments, trailing commas, single quotes, unquoted keys), same parser the UI uses. |
+
 DevTool MCP management (always answers, regardless of the Background MCP
 bridge setting or the per-tool toggles — that's the point):
 
 | Tool | Does |
 |---|---|
-| `devtool_mcp_status` | Current MCP integration state: whether the Background MCP bridge is on, the per-tool `toolsEnabled` map (api-client/mock-server/redis-client/kafka-explorer/rabbit-client), plus the mock server's running status/URL. Call this first if a call unexpectedly times out. |
+| `devtool_mcp_status` | Current MCP integration state: whether the Background MCP bridge is on, the per-tool `toolsEnabled` map (api-client/mock-server/redis-client/kafka-explorer/rabbit-client/container-manager/base64/jwt/json), plus the mock server's running status/URL. Call this first if a call unexpectedly times out. |
 | `devtool_mcp_set_background` | Turn the Background MCP bridge on or off (mirrors Settings → MCP → Background MCP bridge). Lets a caller enable "answer regardless of which tool is on screen / focus" mode itself, without asking the user to click the toggle. |
 | `devtool_mcp_set_tool_enabled` | Turn one tool's MCP access on or off (mirrors Settings → MCP → Per-tool MCP access). A disabled tool never answers any of its calls, on screen or in the background — stricter than, and independent of, the background bridge. |
 
@@ -266,11 +333,13 @@ Reference:
   call on screen, or turn on Settings → MCP → Background MCP bridge…"** —
   the app is running but nothing answered within 30s. Two possible causes,
   check both:
-  - A different tool is on screen and the background bridge is off. Either
+  - A different tool is on screen and the background bridge is off (this
+    can't be the cause for `codec_*`/`hash_*`/`encrypt_text`/`decrypt_text`/
+    `jwt_decode`/`json_*` — those never need a tool on screen). Either
     switch to the owning tool (API Client for its tools, Mock Server for
     `mock_*`, Redis Client for `redis_*`, Kafka Explorer for `kafka_*`,
-    RabbitMQ Client for `rabbit_*`), or call `devtool_mcp_set_background`
-    with `enabled: true` (or turn on
+    RabbitMQ Client for `rabbit_*`, Containers for `container_*`), or call
+    `devtool_mcp_set_background` with `enabled: true` (or turn on
     Settings → MCP → Background MCP bridge by hand) so it stops mattering
     which tool is on screen or whether the app window is focused.
   - The owning tool is switched off in **Settings → MCP → Per-tool MCP

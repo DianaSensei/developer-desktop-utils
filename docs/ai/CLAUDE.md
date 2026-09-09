@@ -1000,9 +1000,9 @@ Key files:
 
 ---
 
-### MCP bridge — API Client + Mock Server + Redis Client + Kafka Explorer (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/{apiclient,mockserver,redis,kafka}/mcpBridge.ts`)
+### MCP bridge — API Client + Mock Server + Redis/Kafka/RabbitMQ/Container Clients + Encode·Hash·Encrypt + JWT Debugger + JSON Formatter (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/{apiclient,mockserver,redis,kafka,rabbit,container}/mcpBridge.ts`, `src/components/tools/{codec,jwt,json}McpBridge.ts`)
 
-An external MCP client (Claude Desktop/Code) can inspect and drive five
+An external MCP client (Claude Desktop/Code) can inspect and drive nine
 DevTool tools through one server. API Client: list/read/edit collections,
 requests, scripts, environments, and actually **send a request** through the
 same engine the Send button uses (result lands in the UI + History like any
@@ -1016,12 +1016,21 @@ only** — list/add/update/delete/test saved connection profiles, plus
 connect/disconnect. Deliberately excludes data operations (no Redis
 key/pub-sub/admin tools, no Kafka topic/consumer-group/produce/consume
 tools, no RabbitMQ queue/exchange/publish/consume/RPC tools) — a narrower
-surface than API Client/Mock Server on purpose. Plus three management
-tools (`devtool_mcp_status`, `devtool_mcp_set_background`,
+surface than API Client/Mock Server on purpose. Containers (`container_*`):
+connection management PLUS full lifecycle (list/inspect/start/stop/
+restart/pause/unpause/remove, one-shot logs/stats) and image list/inspect/
+remove — the one connection-based tool with the wider scope, by explicit
+request. Encode·Hash·Encrypt (`codec_*`/`hash_*`/`encrypt_text`/
+`decrypt_text`), JWT Debugger (`jwt_decode`), and JSON Formatter (`json_*`)
+are **stateless** — pure functions of their own call arguments, no
+persisted state read or written at all, so unlike every tool above they
+need no "tool on screen" and answer regardless of the Background MCP
+bridge setting (see "Stateless utility bridges" below). Plus three
+management tools (`devtool_mcp_status`, `devtool_mcp_set_background`,
 `devtool_mcp_set_tool_enabled`) that let a caller check and flip the
 Background MCP bridge setting and each tool's own MCP kill switch itself
 instead of asking the user to click it.
-76 tools; see `docs/human/mcp-server.md` for the full list and setup
+109 tools; see `docs/human/mcp-server.md` for the full list and setup
 instructions.
 
 **The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
@@ -1029,81 +1038,117 @@ instructions.
 `<app_data_dir>/mcp-bridge.json`). It has no access to app state itself — a
 `POST /call` emits an `mcp:call` Tauri event and blocks on a
 `tokio::sync::oneshot` (30s timeout) until the frontend answers via the
-`mcp_respond` command. Five frontend listeners answer it — `apiclient/
-mcpBridge.ts`'s `useMcpBridge(store, runRequest, enabled)` against the
-**live** `ApiStore`; `mockserver/mcpBridge.ts`'s `useMcpBridge(state,
-enabled)` against `useMockServer()`'s return value; `redis/mcpBridge.ts`'s,
-`kafka/mcpBridge.ts`'s, and `rabbit/mcpBridge.ts`'s `useMcpBridge(state,
-enabled)` against `useRedisState()`'s/`useKafkaState()`'s/`useRabbitState()`'s
-return value for connect/disconnect (connection CRUD itself needs no React
-state — `redisApi`/`kafkaApi`/`rabbitApi` are thin Tauri-invoke wrappers
-over a JSON file in the app data dir, callable directly; RabbitMQ's
-connect/test additionally call `rabbitMgmt.testConnection`, a plain HTTP
-request, when the profile isn't AMQP-only). Each ignores tool names it
-doesn't own rather than erroring, since all five can now be listening on
-the shared `mcp:call` event at once (see below).
+`mcp_respond` command. Six frontend listeners answer it, one per
+connection-based tool — `apiclient/mcpBridge.ts`'s `useMcpBridge(store,
+runRequest, enabled)` against the **live** `ApiStore`; `mockserver/
+mcpBridge.ts`'s `useMcpBridge(state, enabled)` against `useMockServer()`'s
+return value; `redis/mcpBridge.ts`'s, `kafka/mcpBridge.ts`'s,
+`rabbit/mcpBridge.ts`'s, and `container/mcpBridge.ts`'s `useMcpBridge(state,
+enabled)` against `useRedisState()`'s/`useKafkaState()`'s/
+`useRabbitState()`'s/`useContainerState()`'s return value (connection CRUD
+itself needs no React state — `redisApi`/`kafkaApi`/`rabbitApi`/
+`containerApi` are thin Tauri-invoke wrappers over a JSON file in the app
+data dir, callable directly; RabbitMQ's connect/test additionally call
+`rabbitMgmt.testConnection`, a plain HTTP request, when the profile isn't
+AMQP-only; Containers' lifecycle/image tools resolve the state's
+`connectedConnId` to a full `ContainerConnection` and pass THAT to
+`containerApi.list`/`start`/`stop`/etc., since those take a connection
+object per call rather than an id). Each ignores tool names it doesn't own
+rather than erroring, since all six can now be listening on the shared
+`mcp:call` event at once (see below). A seventh, stateless bridge
+(`McpUtilityBridge.tsx`) covers the three utility tools — see "Stateless
+utility bridges" below.
 
 **Where the store lives, and why it's shared:** `apiclient/
 mcpRuntimeContext.tsx`, `mockserver/mcpRuntimeContext.tsx`,
-`redis/mcpRuntimeContext.tsx`, `kafka/mcpRuntimeContext.tsx`, and
-`rabbit/mcpRuntimeContext.tsx` each hold one
-`useApiStore()`/`useMockServer()`/`useRedisState()`/`useKafkaState()`/
-`useRabbitState()` instance in a context, provided once at the app root
+`redis/mcpRuntimeContext.tsx`, `kafka/mcpRuntimeContext.tsx`,
+`rabbit/mcpRuntimeContext.tsx`, and `container/mcpRuntimeContext.tsx` each
+hold one `useApiStore()`/`useMockServer()`/`useRedisState()`/
+`useKafkaState()`/`useRabbitState()`/`useContainerState()` instance in a
+context, provided once at the app root
 (`ApiClientRuntimeProvider`/`MockServerRuntimeProvider`/
-`RedisRuntimeProvider`/`KafkaRuntimeProvider`/`RabbitRuntimeProvider` in
-`App.tsx`, always mounted — cheap, since none of these hooks does I/O
-beyond an initial localStorage read).
+`RedisRuntimeProvider`/`KafkaRuntimeProvider`/`RabbitRuntimeProvider`/
+`ContainerRuntimeProvider` in `App.tsx`, always mounted — cheap, since none
+of these hooks does I/O beyond an initial localStorage read).
 `ApiClient.tsx`/`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`/
-`RabbitClient.tsx` read it via `useApiClientRuntime()`/
-`useMockServerRuntime()`/`useRedisRuntime()`/`useKafkaRuntime()`/
-`useRabbitRuntime()` instead of instantiating
-their own. This used to not matter — React Router unmounts the previous
-route on every tool switch, so at most one instance of either store was ever
-alive. It matters now because of the background bridge below: two
-independent instances mounted at once would let a UI edit and a concurrent
-MCP edit each overwrite localStorage with their own stale snapshot of
-everything else, silently dropping whichever wrote second.
+`RabbitClient.tsx`/`ContainerManager.tsx` read it via
+`useApiClientRuntime()`/`useMockServerRuntime()`/`useRedisRuntime()`/
+`useKafkaRuntime()`/`useRabbitRuntime()`/`useContainerRuntime()` instead of
+instantiating their own. This used to not matter — React Router unmounts
+the previous route on every tool switch, so at most one instance of either
+store was ever alive. It matters now because of the background bridge
+below: two independent instances mounted at once would let a UI edit and a
+concurrent MCP edit each overwrite localStorage with their own stale
+snapshot of everything else, silently dropping whichever wrote second.
 
 **Background bridge (Settings → MCP):** by default, each bridge only
 answers while its own tool is the one on screen — `useMcpBridge(..., enabled)`
 is called with `enabled = mcpToolEnabled && !mcpBackgroundEnabled` from
 `ApiClient.tsx`/`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`/
-`RabbitClient.tsx`. `useMcpBackgroundBridge()`
+`RabbitClient.tsx`/`ContainerManager.tsx`. `useMcpBackgroundBridge()`
 (`src/hooks/useMcpBackgroundBridge.ts`) is an opt-in, persisted,
 off-by-default toggle (per the "no silent network calls" rule above) that
-lets an MCP client drive any of the five tools regardless of which one is
-on screen. When it's on, `McpBackgroundBridge.tsx` — mounted once at the
-app root, reading all five runtime contexts — calls all five
-`useMcpBridge`s itself with `enabled = isEnabled(toolId)` (still gated by
-the per-tool toggle below, just not by "on screen"); the per-tool calls
+lets an MCP client drive any of the six connection-based tools regardless
+of which one is on screen. When it's on, `McpBackgroundBridge.tsx` —
+mounted once at the app root, reading all six runtime contexts — calls all
+six `useMcpBridge`s itself with `enabled = isEnabled(toolId)` (still gated
+by the per-tool toggle below, just not by "on screen"); the per-tool calls
 stay `enabled = false` at the same time so no mount point ever
 double-answers the same call. A call only ever succeeds while the app is
 open, the tool is enabled (see next paragraph), and — unless the background
 bridge is on — only while the tool that owns it is the one on screen;
 anything else times out with a clear error rather than hanging
 (`get_scripting_reference` is the one tool answered without any of this,
-directly by the sidecar — see below).
+directly by the sidecar — see below). This entire on-screen/background
+distinction is specific to the six connection-based tools — see next.
+
+**Stateless utility bridges (`src/components/McpUtilityBridge.tsx`,
+`src/components/tools/{codec,jwt,json}McpBridge.ts`):** Encode·Hash·Encrypt,
+JWT Debugger, and JSON Formatter read/write no persisted state at all —
+every handler is a pure function of its own call arguments. That removes
+the entire reason the six bridges above need an on-screen/background
+distinction (two listeners can't race over state that doesn't exist), so
+`McpUtilityBridge` is mounted exactly once, unconditionally, at the app
+root — no runtime context, no `enabled` prop threaded through a tool
+component. It answers regardless of whether its tool is open, closed, or
+the app is showing something else, with no Background MCP bridge toggle
+needed to reach that. The only gate left is the per-tool kill switch (next
+paragraph). `codecMcpBridge.ts`'s `buildCodecHandlers()` re-exports and
+reuses `EncodeHashEncrypt.tsx`'s own `CODECS`/`ALGORITHMS`/
+`HMAC_ALGORITHMS`/`computeHash`/`computeHmac`/`ENCRYPT_ALGOS`/`doEncrypt`/
+`doDecrypt` (all `export`ed from that file for exactly this) plus
+`lib/aesGcm.ts`'s `encryptAesGcm`/`decryptAesGcm`, so there is one
+implementation of each codec/hash/cipher, not a second copy for MCP — same
+for `jsonMcpBridge.ts` reusing `JsonFormatter.tsx`'s exported
+`parseInput`/`serialize`/`quoteText`/`INDENT_OPTIONS`. A caller supplies
+its own encryption key/passphrase per call; nothing here ever reads the
+tool's own persisted `devtool:hash:key`/`devtool:hash:hmacKey` fields, so
+there's no separate secret store this bridge could leak (unlike the Vault
+exclusion below).
 
 **Per-tool kill switch (`src/hooks/useMcpToolEnabled.ts`, Settings → MCP →
 Per-tool MCP access):** a second, independent, stricter gate layered UNDER
 the background bridge — `useMcpToolEnabledMap()` persists a
 `Record<McpToolId, boolean>` (`McpToolId` = `'api-client' | 'mock-server' |
-'redis-client' | 'kafka-explorer' | 'rabbit-client'`, the same ids
-`TOOL_DEFS`/`FeatureContext` use), absent-key-means-enabled so it changes
-nothing for anyone who hasn't touched it. A tool switched off here is
-`enabled=false` in BOTH mount points (its own component AND
-`McpBackgroundBridge.tsx`), so it never answers any of its MCP calls at
-all, on screen or in the background — this is the difference from the
-background bridge, which only ever widens *when* a tool answers, never
-*whether* it can at all. `Settings.tsx` and `McpSetupDialog.tsx` both
-render one row per `MCP_TOOL_IDS` entry (label looked up from `TOOL_DEFS`,
-capability blurb from `MCP_TOOL_CAPABILITIES`) bound to the same persisted
-map, so flipping it from either place stays in sync immediately, and both
-lists pick up a new tool automatically the moment it's added to
-`MCP_TOOL_IDS` — no separate UI change needed per tool.
+'redis-client' | 'kafka-explorer' | 'rabbit-client' | 'container-manager' |
+'base64' | 'jwt' | 'json'`, the same ids `TOOL_DEFS`/`FeatureContext` use),
+absent-key-means-enabled so it changes nothing for anyone who hasn't
+touched it. A tool switched off here is `enabled=false` everywhere it's
+checked — both mount points for a connection-based tool (its own component
+AND `McpBackgroundBridge.tsx`), or the single check inside
+`McpUtilityBridge.tsx` for the three stateless ones — so it never answers
+any of its MCP calls at all, on screen or in the background; for the
+stateless tools that means "at all", full stop. This is the difference
+from the background bridge, which only ever widens *when* a connection-
+based tool answers, never *whether* it can at all. `Settings.tsx` and
+`McpSetupDialog.tsx` both render one row per `MCP_TOOL_IDS` entry (label
+looked up from `TOOL_DEFS`, capability blurb from `MCP_TOOL_CAPABILITIES`)
+bound to the same persisted map, so flipping it from either place stays in
+sync immediately, and both lists pick up a new tool automatically the
+moment it's added to `MCP_TOOL_IDS` — no separate UI change needed per tool.
 
 **Managing the bridge from MCP itself (`src/components/McpManageBridge.tsx`):**
-a sixth `mcp:call` listener, mounted once at the app root next to
+an eighth `mcp:call` listener, mounted once at the app root next to
 `McpBackgroundBridge`, that is **never** gated by the background-bridge
 toggle OR the per-tool toggles — it exists specifically so an MCP caller
 can flip either (and check their state) without the user opening Settings.
@@ -1112,8 +1157,8 @@ state + `toolsEnabled` map + mock server status), `devtool_mcp_set_background`
 (writes `useMcpBackgroundBridge`'s persisted setting), and
 `devtool_mcp_set_tool_enabled` (writes one entry in
 `useMcpToolEnabledMap`'s persisted map, validating `tool` against
-`MCP_TOOL_IDS`) — and, like the other five bridges, ignores every other
-tool name so all six can share the one `mcp:call` event safely. Still
+`MCP_TOOL_IDS`) — and, like the other seven bridges, ignores every other
+tool name so all eight can share the one `mcp:call` event safely. Still
 bound by the same hard constraint as everything else here: it only answers
 while the DevTool app process is open, since that's what actually runs the
 webview `mcp:call` listener — there's no way to reach a fully closed app.

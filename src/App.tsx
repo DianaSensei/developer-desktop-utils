@@ -34,11 +34,13 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { OpenToolsStrip } from '@/components/OpenToolsStrip';
 import { McpBackgroundBridge } from '@/components/McpBackgroundBridge';
 import { McpManageBridge } from '@/components/McpManageBridge';
+import { McpUtilityBridge } from '@/components/McpUtilityBridge';
 import { ApiClientRuntimeProvider } from '@/components/tools/apiclient/mcpRuntimeContext';
 import { MockServerRuntimeProvider } from '@/components/tools/mockserver/mcpRuntimeContext';
 import { RedisRuntimeProvider } from '@/components/tools/redis/mcpRuntimeContext';
 import { KafkaRuntimeProvider } from '@/components/tools/kafka/mcpRuntimeContext';
 import { RabbitRuntimeProvider } from '@/components/tools/rabbit/mcpRuntimeContext';
+import { ContainerRuntimeProvider } from '@/components/tools/container/mcpRuntimeContext';
 import { ExperimentalGate } from '@/components/ExperimentalGate';
 import { ExperimentalDot, ExperimentalMark } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
@@ -1217,14 +1219,17 @@ function App() {
                     <RedisRuntimeProvider>
                       <KafkaRuntimeProvider>
                         <RabbitRuntimeProvider>
-                          <Router>
-                            <AppContent />
-                            <UpdateDialog />
-                            <OnboardingFlow />
-                            <CommandPalette />
-                            <McpBackgroundBridge />
-                            <McpManageBridge />
-                          </Router>
+                          <ContainerRuntimeProvider>
+                            <Router>
+                              <AppContent />
+                              <UpdateDialog />
+                              <OnboardingFlow />
+                              <CommandPalette />
+                              <McpBackgroundBridge />
+                              <McpManageBridge />
+                              <McpUtilityBridge />
+                            </Router>
+                          </ContainerRuntimeProvider>
                         </RabbitRuntimeProvider>
                       </KafkaRuntimeProvider>
                     </RedisRuntimeProvider>

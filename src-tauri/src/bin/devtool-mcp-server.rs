@@ -975,6 +975,285 @@ fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
 
+        // ── Encode·Hash·Encrypt — stateless, answered by McpUtilityBridge.tsx
+        // (mounted unconditionally at the app root, not gated by the
+        // Background MCP bridge or "tool on screen" — only by Settings →
+        // MCP → Per-tool MCP access for the `base64` tool id). Every call
+        // is a pure function of its own arguments; nothing here is ever
+        // read from or written to app state.
+        json!({
+            "name": "codec_encode",
+            "description": "Encode text with a codec. `algorithm` is one of: base64, base62, rot13, url, html, quoted-printable, huffman, rle, morse, punycode, hex, octal, binary, decimal.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string" },
+                    "algorithm": { "type": "string", "enum": ["base64", "base62", "rot13", "url", "html", "quoted-printable", "huffman", "rle", "morse", "punycode", "hex", "octal", "binary", "decimal"] }
+                },
+                "required": ["text", "algorithm"]
+            }
+        }),
+        json!({
+            "name": "codec_decode",
+            "description": "Decode text with a codec — same `algorithm` list as codec_encode.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string" },
+                    "algorithm": { "type": "string", "enum": ["base64", "base62", "rot13", "url", "html", "quoted-printable", "huffman", "rle", "morse", "punycode", "hex", "octal", "binary", "decimal"] }
+                },
+                "required": ["text", "algorithm"]
+            }
+        }),
+        json!({
+            "name": "hash_compute",
+            "description": "Hash text. Omit `algorithm` to get every algorithm at once (md5, ripemd160, sha1, sha224, sha256, sha384, sha512, sha3-256, sha3-512), as { algorithm: hash }; pass one to get just that hash as { algorithm, hash }.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string" },
+                    "algorithm": { "type": "string", "enum": ["md5", "ripemd160", "sha1", "sha224", "sha256", "sha384", "sha512", "sha3-256", "sha3-512"] },
+                    "upperHex": { "type": "boolean" }
+                },
+                "required": ["text"]
+            }
+        }),
+        json!({
+            "name": "hash_hmac",
+            "description": "Compute an HMAC. `algorithm` is one of: md5, ripemd160, sha1, sha224, sha256, sha384, sha512 (SHA-3 has no dedicated per-length HMAC function, so it's excluded here, same as the UI).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string" },
+                    "key": { "type": "string" },
+                    "algorithm": { "type": "string", "enum": ["md5", "ripemd160", "sha1", "sha224", "sha256", "sha384", "sha512"] },
+                    "upperHex": { "type": "boolean" }
+                },
+                "required": ["text", "key", "algorithm"]
+            }
+        }),
+        json!({
+            "name": "encrypt_text",
+            "description": "Encrypt text with a passphrase. `algorithm`: \"aes-gcm\" is recommended (PBKDF2-SHA256 600k-round key stretching, authenticated, random salt+IV) — the rest (aes-cbc/ctr/ecb/cfb/ofb, tripledes, rabbit) exist for crypto-js interop only (weak key stretching, unauthenticated; aes-ecb also leaks plaintext structure). `key` is supplied by the caller — never read from the app's own saved passphrase.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string" },
+                    "key": { "type": "string" },
+                    "algorithm": { "type": "string", "enum": ["aes-gcm", "aes-cbc", "aes-ctr", "aes-ecb", "aes-cfb", "aes-ofb", "tripledes", "rabbit"] }
+                },
+                "required": ["text", "key", "algorithm"]
+            }
+        }),
+        json!({
+            "name": "decrypt_text",
+            "description": "Decrypt text encrypted with encrypt_text (or, for the crypto-js algorithms, anything crypto-js itself produced). `algorithm` must match what encrypted it.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "ciphertext": { "type": "string" },
+                    "key": { "type": "string" },
+                    "algorithm": { "type": "string", "enum": ["aes-gcm", "aes-cbc", "aes-ctr", "aes-ecb", "aes-cfb", "aes-ofb", "tripledes", "rabbit"] }
+                },
+                "required": ["ciphertext", "key", "algorithm"]
+            }
+        }),
+
+        // ── JWT Debugger — stateless, same McpUtilityBridge.tsx as above,
+        // gated by the `jwt` tool id.
+        json!({
+            "name": "jwt_decode",
+            "description": "Decode a JWT's header and payload. Decode-only — does NOT verify the signature (no verification key available).",
+            "inputSchema": { "type": "object", "properties": { "token": { "type": "string" } }, "required": ["token"] }
+        }),
+
+        // ── JSON Formatter — stateless, same McpUtilityBridge.tsx as above,
+        // gated by the `json` tool id. All four accept lenient input: single
+        // quotes, unquoted object keys, trailing commas, // and /* */
+        // comments, and a JSON-string-literal wrapper — same parser the UI
+        // itself uses.
+        json!({
+            "name": "json_format",
+            "description": "Pretty-print JSON (or JSON-ish input — see tool description). `indent` is \"2\" (default), \"4\", or \"tab\"; `quote` is `\"` (default) or `'`.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string" },
+                    "indent": { "type": "string", "enum": ["2", "4", "tab"] },
+                    "quote": { "type": "string", "enum": ["\"", "'"] }
+                },
+                "required": ["text"]
+            }
+        }),
+        json!({
+            "name": "json_minify",
+            "description": "Minify JSON (or JSON-ish input) to a single line, no whitespace.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "text": { "type": "string" }, "quote": { "type": "string", "enum": ["\"", "'"] } },
+                "required": ["text"]
+            }
+        }),
+        json!({
+            "name": "json_to_string",
+            "description": "Minify JSON, then re-encode the result as a single escaped string literal — for embedding a JSON payload inside another string (a shell command, a source file, …).",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "text": { "type": "string" }, "quote": { "type": "string", "enum": ["\"", "'"] } },
+                "required": ["text"]
+            }
+        }),
+        json!({
+            "name": "json_validate",
+            "description": "Check whether input parses (leniently — see tool description). Returns { valid: true } or { valid: false, error }.",
+            "inputSchema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] }
+        }),
+
+        // ── Containers — connection management AND full lifecycle, unlike
+        // Redis/Kafka/RabbitMQ above (connection-only by design). Lifecycle/
+        // image tools operate on whichever connection is currently ACTIVE
+        // (set via container_connect) — there is no per-call connection
+        // argument, same as mock_* operating on "the" mock server. Only
+        // answers while DevTool is open with the Containers tool on screen,
+        // unless Settings → MCP → Background MCP bridge is on (same
+        // contract as every other connection-based tool here).
+        json!({
+            "name": "container_list_connections",
+            "description": "List every saved container-runtime connection profile (id, name, socketPath — a Unix socket or Windows named pipe path for a Docker-compatible daemon: Docker Desktop, colima, Rancher Desktop, OrbStack, Podman, …).",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "container_get_connection",
+            "description": "Get one saved container connection profile by id.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "container_add_connection",
+            "description": "Save a new container connection profile and return it (with its generated id). Both `name` and `socketPath` are required — there's no default socket path since it varies by runtime/OS.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "name": { "type": "string" }, "socketPath": { "type": "string" } },
+                "required": ["name", "socketPath"]
+            }
+        }),
+        json!({
+            "name": "container_update_connection",
+            "description": "Patch a saved container connection profile. `patch` is a partial object — only included fields change.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "connectionId": { "type": "string" }, "patch": { "type": "object" } },
+                "required": ["connectionId", "patch"]
+            }
+        }),
+        json!({
+            "name": "container_delete_connection",
+            "description": "Delete a saved container connection profile by id. The daemon itself is unaffected — only the local saved profile.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "container_test_connection",
+            "description": "Verify a saved connection can reach the daemon, without marking it as the connected one.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "container_connect",
+            "description": "Test and mark a saved connection as the active one (same as pressing Connect in the Containers UI). Every container_list/inspect/start/stop/…/image_* tool operates on this active connection.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "container_disconnect",
+            "description": "Clear the active container connection (same as pressing Disconnect).",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "container_connection_status",
+            "description": "Get the currently selected/connected container connection id.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "container_list",
+            "description": "List containers on the active connection. `all=false` (default) shows running containers only; `all=true` includes stopped ones too.",
+            "inputSchema": { "type": "object", "properties": { "all": { "type": "boolean" } } }
+        }),
+        json!({
+            "name": "container_inspect",
+            "description": "Get one container's curated details: image, status, health, command, entrypoint, restart policy, env, labels, mounts, ports, networks, and cgroup resource limits.",
+            "inputSchema": { "type": "object", "properties": { "containerId": { "type": "string" } }, "required": ["containerId"] }
+        }),
+        json!({
+            "name": "container_start",
+            "description": "Start a stopped container.",
+            "inputSchema": { "type": "object", "properties": { "containerId": { "type": "string" } }, "required": ["containerId"] }
+        }),
+        json!({
+            "name": "container_stop",
+            "description": "Stop a running container.",
+            "inputSchema": { "type": "object", "properties": { "containerId": { "type": "string" } }, "required": ["containerId"] }
+        }),
+        json!({
+            "name": "container_restart",
+            "description": "Restart a container.",
+            "inputSchema": { "type": "object", "properties": { "containerId": { "type": "string" } }, "required": ["containerId"] }
+        }),
+        json!({
+            "name": "container_pause",
+            "description": "Pause a running container's processes (SIGSTOP-equivalent, freezes without stopping).",
+            "inputSchema": { "type": "object", "properties": { "containerId": { "type": "string" } }, "required": ["containerId"] }
+        }),
+        json!({
+            "name": "container_unpause",
+            "description": "Resume a paused container.",
+            "inputSchema": { "type": "object", "properties": { "containerId": { "type": "string" } }, "required": ["containerId"] }
+        }),
+        json!({
+            "name": "container_remove",
+            "description": "Remove a container. `force=true` removes it even if running (same as `docker rm -f`).",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "containerId": { "type": "string" }, "force": { "type": "boolean" } },
+                "required": ["containerId"]
+            }
+        }),
+        json!({
+            "name": "container_logs",
+            "description": "Get a container's recent log output. This collects whatever the daemon streams back within about 1.5s, not a live tail — call again for newer output. `tail` (default \"100\") is a line count or \"all\"; `since`/`until` are Unix seconds (0 = no bound); `timestamps` prefixes each line with when the daemon logged it.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "containerId": { "type": "string" },
+                    "tail": { "type": "string" },
+                    "since": { "type": "number" },
+                    "until": { "type": "number" },
+                    "timestamps": { "type": "boolean" }
+                },
+                "required": ["containerId"]
+            }
+        }),
+        json!({
+            "name": "container_stats",
+            "description": "Get one CPU/memory/network usage sample for a running container (not a live stream — call again for a fresh sample).",
+            "inputSchema": { "type": "object", "properties": { "containerId": { "type": "string" } }, "required": ["containerId"] }
+        }),
+        json!({
+            "name": "container_list_images",
+            "description": "List images on the active connection (id, repo tags, created, size).",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "container_image_details",
+            "description": "Get one image's curated details: repo tags/digests, size, architecture/os, cmd, entrypoint, env, working dir, exposed ports, labels, layer count.",
+            "inputSchema": { "type": "object", "properties": { "imageId": { "type": "string" } }, "required": ["imageId"] }
+        }),
+        json!({
+            "name": "container_remove_image",
+            "description": "Remove an image. `force=true` removes it even if a stopped container still references it.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "imageId": { "type": "string" }, "force": { "type": "boolean" } },
+                "required": ["imageId"]
+            }
+        }),
+
         // ── DevTool MCP management ──────────────────────────────────────
         // Unlike every tool above, these three are answered by an always-on
         // listener (McpManageBridge.tsx) that is never gated by the
@@ -987,7 +1266,7 @@ fn tool_definitions() -> Vec<Value> {
         // mcp_bridge.rs).
         json!({
             "name": "devtool_mcp_status",
-            "description": "Get DevTool's current MCP integration state: whether the Background MCP bridge is on, the per-tool enabled/disabled map (toolsEnabled: api-client/mock-server/redis-client/kafka-explorer/rabbit-client), and the mock server's running status. Call this first if a tool's calls unexpectedly time out — a disabled tool times out exactly like \"wrong tool on screen\" does, since it never registers a listener either.",
+            "description": "Get DevTool's current MCP integration state: whether the Background MCP bridge is on, the per-tool enabled/disabled map (toolsEnabled: api-client/mock-server/redis-client/kafka-explorer/rabbit-client/container-manager/base64/jwt/json), and the mock server's running status. Call this first if a tool's calls unexpectedly time out — a disabled tool times out exactly like \"wrong tool on screen\" does, since it never registers a listener either (except base64/jwt/json, which have no \"on screen\" requirement at all — a disabled one there just never answers).",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
@@ -1001,11 +1280,11 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "devtool_mcp_set_tool_enabled",
-            "description": "Turn one tool's MCP access on or off (mirrors Settings → MCP → Per-tool MCP access). A disabled tool never answers any of its MCP tool calls, on screen or in the background — this is a separate, stricter switch than devtool_mcp_set_background. `tool` is one of: api-client, mock-server, redis-client, kafka-explorer, rabbit-client.",
+            "description": "Turn one tool's MCP access on or off (mirrors Settings → MCP → Per-tool MCP access). A disabled tool never answers any of its MCP tool calls — for the three stateless utility tools (base64/jwt/json) that means at all; for the rest, on screen or in the background. This is a separate, stricter switch than devtool_mcp_set_background. `tool` is one of: api-client, mock-server, redis-client, kafka-explorer, rabbit-client, container-manager, base64, jwt, json.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "tool": { "type": "string", "enum": ["api-client", "mock-server", "redis-client", "kafka-explorer", "rabbit-client"] },
+                    "tool": { "type": "string", "enum": ["api-client", "mock-server", "redis-client", "kafka-explorer", "rabbit-client", "container-manager", "base64", "jwt", "json"] },
                     "enabled": { "type": "boolean" }
                 },
                 "required": ["tool", "enabled"]
@@ -1060,19 +1339,26 @@ impl ServerHandler for DevToolServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
-                "Drives five DevTool tools. API Client: collections, requests, scripts, \
+                "Drives nine DevTool tools. API Client: collections, requests, scripts, \
                  environments — and can actually send a request. Mock Server: stubs, \
                  matchers, the fallback response, and can start/stop the server and test a \
                  response script. Redis Client, Kafka Explorer, and RabbitMQ Client \
                  (redis_*/kafka_*/rabbit_* tools): saved connection profiles only — \
                  list/add/update/delete/test, plus connect/disconnect — no key/topic/queue/\
-                 exchange/produce/consume/publish/RPC operations for any of the three. By \
-                 default each tool's calls only answer while the DevTool desktop app is open \
-                 with THAT tool on screen (mock_* needs Mock Server open, redis_* needs Redis \
-                 Client open, kafka_* needs Kafka Explorer open, rabbit_* needs RabbitMQ \
-                 Client open, everything else needs API Client open) — if a call times out, \
-                 that is almost always why; call \
-                 devtool_mcp_set_background with enabled:true to lift that requirement \
+                 exchange/produce/consume/publish/RPC operations for any of the three. \
+                 Containers (container_* tools): connection profiles PLUS full lifecycle — \
+                 list/inspect/start/stop/restart/pause/remove, logs, one-shot stats, and \
+                 image list/inspect/remove — all against whichever connection \
+                 container_connect last activated. Encode·Hash·Encrypt (codec_*/hash_*/\
+                 encrypt_text/decrypt_text), JWT Debugger (jwt_decode), and JSON Formatter \
+                 (json_*) are stateless — pure functions of their own arguments, no saved \
+                 connection or open tool required, always answer regardless of the settings \
+                 below. By default every OTHER tool's calls only answer while the DevTool \
+                 desktop app is open with THAT tool on screen (mock_* needs Mock Server open, \
+                 redis_* needs Redis Client open, kafka_* needs Kafka Explorer open, rabbit_* \
+                 needs RabbitMQ Client open, container_* needs Containers open, everything \
+                 else needs API Client open) — if a call times out, that is almost always why; \
+                 call devtool_mcp_set_background with enabled:true to lift that requirement \
                  yourself (mirrors Settings → MCP → Background MCP bridge) instead of asking \
                  the user to switch tools or click it manually. A tool can also be switched \
                  off entirely (Settings → MCP → Per-tool MCP access) — devtool_mcp_status's \
