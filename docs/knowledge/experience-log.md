@@ -207,7 +207,7 @@
   không phải "collection đang active". `runRequest` chuyển sang dùng hàm này thay vì
   `store.activeEnv`. Đồng thời sửa `persistResult` để nhận **đúng object environment đã áp
   dụng cho lượt chạy đó** làm tham số thay vì tự đọc lại `store.activeEnv` — nếu không, việc
-  ghi ngược biến do script set (`bru.setEnvVar`) vẫn có thể lưu nhầm vào environment của tab
+  ghi ngược biến do script set (`dt.setEnvVar`) vẫn có thể lưu nhầm vào environment của tab
   đang mở dù nó không phải environment thực sự vừa được dùng để chạy request đó. `activeEnv`/
   `activeEnvMismatched` (theo tab) được giữ nguyên vì UI (dropdown chọn environment, cảnh báo
   "Inactive here" ở `RequestTabs.tsx`) đúng là cần phản ánh theo tab đang mở, không phải theo

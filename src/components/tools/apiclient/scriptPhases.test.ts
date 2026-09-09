@@ -18,8 +18,8 @@ describe('pre phase', () => {
       phase: 'pre',
       draft: newRequest(),
       stores: stores(),
-      inherited: ["bru.setCollectionVar('order', 'a');", "bru.setCollectionVar('order', bru.getCollectionVar('order') + 'b');"],
-      script: "bru.setCollectionVar('order', bru.getCollectionVar('order') + 'c');",
+      inherited: ["dt.setCollectionVar('order', 'a');", "dt.setCollectionVar('order', dt.getCollectionVar('order') + 'b');"],
+      script: "dt.setCollectionVar('order', dt.getCollectionVar('order') + 'c');",
     });
     expect(out.stores.collectionVar.order).toBe('abc');
     expect(out.errors).toEqual([]);
@@ -30,8 +30,8 @@ describe('pre phase', () => {
       phase: 'pre',
       draft: newRequest(),
       stores: stores(),
-      inherited: ['throw new Error("boom");', "bru.setCollectionVar('reached', 'yes');"],
-      script: "bru.setCollectionVar('own', 'yes');",
+      inherited: ['throw new Error("boom");', "dt.setCollectionVar('reached', 'yes');"],
+      script: "dt.setCollectionVar('own', 'yes');",
     });
     expect(out.errors).toHaveLength(1);
     expect(out.errors[0]).toContain('Inherited pre-request script #1');
@@ -92,8 +92,8 @@ describe('post phase', () => {
       stores: stores(),
       response: response(),
       inherited: [],
-      script: "bru.setCollectionVar('captured', res.getBody().id);",
-      tests: 'test("captured", () => expect(bru.getCollectionVar("captured")).to.equal("7"));',
+      script: "dt.setCollectionVar('captured', res.getBody().id);",
+      tests: 'test("captured", () => expect(dt.getCollectionVar("captured")).to.equal("7"));',
       assertions: [],
     });
     expect(out.tests).toEqual([{ name: 'captured', passed: true }]);
@@ -130,14 +130,14 @@ describe('post phase', () => {
 });
 
 describe('abort signal', () => {
-  it('propagates to bru.sleep', async () => {
+  it('propagates to dt.sleep', async () => {
     const ctl = new AbortController();
     const pending = runPhase({
       phase: 'pre',
       draft: newRequest(),
       stores: stores(),
       inherited: [],
-      script: 'await bru.sleep(5000);',
+      script: 'await dt.sleep(5000);',
     }, ctl.signal);
     ctl.abort();
     const out = await pending;
@@ -158,18 +158,18 @@ describe('runner flow control', () => {
   });
 
   it('reports nothing when no script asks for a jump', async () => {
-    const out = await post("bru.setCollectionVar('x', '1');");
+    const out = await post("dt.setCollectionVar('x', '1');");
     expect(out.control.nextRequest).toBeUndefined();
     expect('nextRequest' in out.control).toBe(false);
   });
 
-  it('captures a named jump from bru.setNextRequest', async () => {
-    const out = await post("bru.setNextRequest('Login');");
+  it('captures a named jump from dt.setNextRequest', async () => {
+    const out = await post("dt.setNextRequest('Login');");
     expect(out.control.nextRequest).toBe('Login');
   });
 
   it('captures null as end-of-iteration', async () => {
-    const out = await post('bru.setNextRequest(null);');
+    const out = await post('dt.setNextRequest(null);');
     expect(out.control.nextRequest).toBeNull();
     expect('nextRequest' in out.control).toBe(true);
   });
@@ -185,7 +185,7 @@ describe('runner flow control', () => {
   });
 
   it('lets a later script override an earlier jump', async () => {
-    const out = await post("bru.setNextRequest('First');", "bru.setNextRequest('Second');");
+    const out = await post("dt.setNextRequest('First');", "dt.setNextRequest('Second');");
     expect(out.control.nextRequest).toBe('Second');
   });
 
@@ -195,7 +195,7 @@ describe('runner flow control', () => {
       draft: newRequest(),
       stores: stores(),
       inherited: [],
-      script: "bru.setNextRequest('Somewhere'); bru.setCollectionVar('ran', 'yes');",
+      script: "dt.setNextRequest('Somewhere'); dt.setCollectionVar('ran', 'yes');",
     });
     // The call is accepted (no crash) and recorded; a plain Send just ignores it.
     expect(out.stores.collectionVar.ran).toBe('yes');

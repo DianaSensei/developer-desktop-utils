@@ -4,12 +4,19 @@
 // server that the MCP stdio sidecar
 // (src-tauri/src/bin/devtool-mcp-server.rs) talks to. Each MCP tool call it
 // receives is handed to the webview as an `mcp:call` Tauri
-// event; `useMcpBridge` (called once from ApiClient.tsx while it's mounted)
-// answers it by running the matching handler below against the *live* API
-// Client store, then reports the result back via the `mcp_respond` command —
-// so an MCP tool call runs through the exact same store and request-sending
-// engine (`runRequest`, from ApiClient.tsx) the user's own UI uses, and shows
-// up in the UI/History like any other send.
+// event; `useMcpBridge` answers it by running the matching handler below
+// against the *live* API Client store, then reports the result back via the
+// `mcp_respond` command — so an MCP tool call runs through the exact same
+// store and request-sending engine (`runRequest`) the user's own UI uses,
+// and shows up in the UI/History like any other send.
+//
+// Two mount points call this hook: `ApiClient.tsx` (while the tool is on
+// screen — always works, no setting needed) and, when the user opts in via
+// Settings → MCP, `McpBackgroundBridge.tsx` at the app root (works
+// regardless of which tool is on screen — see
+// `useMcpBackgroundBridge`). `enabled` lets a caller mount the hook without
+// it actually registering a listener, so the two mount points don't both
+// listen at once and double-answer the same call.
 //
 // Deliberately excluded from this surface: the Vault (`store.vault`). It
 // holds secrets the UI itself keeps out of generated code, cURL export, and
@@ -363,12 +370,12 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
 // the *latest* store/runRequest via a ref, matching this repo's convention
 // for long-lived event listeners that read changing React state (see
 // docs/ai/CLAUDE.md's "Stable refs for long-lived event listeners").
-export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn): void {
+export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn, enabled = true): void {
   const handlersRef = useRef<Record<string, ToolHandler>>({});
   handlersRef.current = buildHandlers(store, runRequest);
 
   useEffect(() => {
-    if (!isTauri) return;
+    if (!isTauri || !enabled) return;
     let cancelled = false;
     let unlisten: (() => void) | null = null;
 
@@ -377,9 +384,13 @@ export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn): void {
       const { invoke } = await import('@tauri-apps/api/core');
       const fn = await listen<McpCallEvent>('mcp:call', async (event) => {
         const { id, tool, args } = event.payload;
+        const handler = handlersRef.current[tool];
+        // Not one of this bridge's tools (e.g. a Mock Server tool while both
+        // bridges are listening in the background) — leave it alone rather
+        // than answering "unknown tool", since the two bridges share one
+        // event and only one of them owns any given tool name.
+        if (!handler) return;
         try {
-          const handler = handlersRef.current[tool];
-          if (!handler) throw new Error(`Unknown MCP tool "${tool}"`);
           const result = await handler(args ?? {});
           await invoke('mcp_respond', { id, result: result ?? null, error: null });
         } catch (e) {
@@ -394,5 +405,5 @@ export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn): void {
       cancelled = true;
       unlisten?.();
     };
-  }, []);
+  }, [enabled]);
 }

@@ -1,7 +1,7 @@
-// Autocomplete for the bru/pm/req/res/assert/console scripting API — the
+// Autocomplete for the dt/pm/req/res/assert/console scripting API — the
 // sandbox `runScript` (runtime.ts) actually binds into pre-request,
 // post-response, and test scripts. Without this, the editor only offers JS
-// keywords and locally-declared names; typing `bru.` or `pm.response.to.have.`
+// keywords and locally-declared names; typing `dt.` or `pm.response.to.have.`
 // gives nothing, unlike Postman/Bruno's own script editors.
 //
 // Built on `scopeCompletionSource` from @codemirror/lang-javascript rather
@@ -12,7 +12,7 @@
 // names and `typeof` (function vs. property, for the icon) matter.
 //
 // Kept in sync with runtime.ts by hand — there's no practical way to derive
-// this statically from the real `makeBru`/`makeReq`/`makeRes`/`makePm`
+// this statically from the real `makeDt`/`makeReq`/`makeRes`/`makePm`
 // factories, since their shape depends on closures built at call time.
 
 import { javascriptLanguage, scopeCompletionSource } from '@codemirror/lang-javascript';
@@ -45,7 +45,7 @@ const resShape = ns({
   getContentType: noop, getUrl: noop, isOk: noop,
 });
 
-const bruShape = ns({
+const dtShape = ns({
   getCollectionVar: noop, setCollectionVar: noop, hasCollectionVar: noop, deleteCollectionVar: noop,
   getEnvVar: noop, setEnvVar: noop, hasEnvVar: noop, deleteEnvVar: noop, getEnvName: noop,
   getIterationData: noop, interpolate: noop, getVars: noop,
@@ -95,7 +95,7 @@ const consoleShape = ns({
 });
 
 const scriptScope = ns({
-  bru: bruShape,
+  dt: dtShape,
   req: reqShape,
   res: resShape,
   pm: pmShape,
@@ -106,11 +106,11 @@ const scriptScope = ns({
 });
 
 // Exposed only for scriptCompletion.test.ts's parity guard, which asserts
-// every real method on runtime.ts's makeBru/makeReq/makeRes/makePm/makeAssert/
+// every real method on runtime.ts's makeDt/makeReq/makeRes/makePm/makeAssert/
 // makeConsole is present here — so a future runtime.ts change can't silently
 // go stale in autocomplete without a failing test flagging it.
 export const scriptCompletionShapes = {
-  bru: bruShape, req: reqShape, res: resShape, pm: pmShape, assert: assertShape, console: consoleShape,
+  dt: dtShape, req: reqShape, res: resShape, pm: pmShape, assert: assertShape, console: consoleShape,
 };
 
 const scriptApiCompletion = javascriptLanguage.data.of({
@@ -118,7 +118,7 @@ const scriptApiCompletion = javascriptLanguage.data.of({
 });
 
 /** Layer onto a `JavaScriptEditor`'s `extraExtensions` for any pre-request,
- *  post-response, or test script surface: the bru/pm/req/res completion
+ *  post-response, or test script surface: the dt/pm/req/res completion
  *  source above, plus a syntax-error lint gutter — safe here (unlike the
  *  Mock Server's Rhai editor) because these scripts really are executed as
  *  JavaScript (`runScript` in runtime.ts). */

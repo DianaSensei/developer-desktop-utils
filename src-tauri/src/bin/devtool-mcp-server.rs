@@ -9,9 +9,11 @@
 // process to read. Every MCP tool call this process receives over stdio is
 // forwarded there as a `POST /call`, which the app hands to the running
 // webview to answer — so an API Client tool call (list_collections,
-// get_request, etc.) only succeeds while DevTool is open with the API Client
-// tool on screen, and a `mock_*` call only while it's open with the Mock
-// Server tool on screen (get_scripting_reference is the one exception —
+// get_request, etc.) only succeeds while DevTool is open, and, by default,
+// with the API Client tool on screen (a `mock_*` call needs the Mock Server
+// tool on screen the same way) — unless the user has turned on Settings →
+// MCP → Background MCP bridge, which drops that "on screen" requirement
+// entirely (get_scripting_reference is the one exception either way —
 // answered locally, see its own comment below). See
 // src-tauri/src/mcp_bridge.rs for the full design, and
 // src/components/tools/apiclient/mcpBridge.ts /
@@ -188,7 +190,7 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
 
 // Static reference for BOTH tools' scripting engines and the field shapes
 // their patch-style tools expect — see `src/components/tools/apiclient/
-// runtime.ts` (bru/req/res/pm/expect/assert) and `types.ts` (Auth/
+// runtime.ts` (dt/req/res/pm/expect/assert) and `types.ts` (Auth/
 // RequestBody/RequestSettings/KeyValue) for the API Client half, and
 // `src-tauri/src/mockserver.rs` (`req_to_rhai`/`run_script`) and
 // `src/components/tools/mockserver/types.ts` (Stub/Matcher/MockConfig) for
@@ -199,19 +201,39 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
 // actually needs it instead of on every tool listing.
 const SCRIPTING_REFERENCE: &str = r#"# DevTool API Client — scripting & field-shape reference
 
-Pre/post-request scripts are plain JS (Bruno-style), run sandboxed. A
-request's own script/auth/headers live on the request itself (patch via
-update_request); a collection/folder's inherited script/auth/headers are set
-via set_node_script/set_node_auth/set_node_headers (nodeId=null = collection
+Pre/post-request scripts are plain JS (Bruno-shaped API, own naming — see
+"Naming: dt, not bru" below), run sandboxed. A request's own script/auth/
+headers live on the request itself (patch via update_request); a
+collection/folder's inherited script/auth/headers are set via
+set_node_script/set_node_auth/set_node_headers (nodeId=null = collection
 root, nodeId=<folderId> = that folder). A request's own header/auth of the
 same name overrides what it inherits; auth.type="inherit" pulls from the
 nearest ancestor's auth.
 
-## Variable precedence (both {{var}} substitution and bru.getVars())
+## Naming: dt, not bru
+This engine's variable/flow-control global is `dt` — same shape as Bruno's
+own `bru` (getCollectionVar, setEnvVar, interpolate, setNextRequest, sleep,
+...), different name, so it reads as this app's own primitive rather than
+something borrowed from another app. A script written against real Bruno
+that calls `bru.*` will NOT work here — there is no `bru` compatibility
+alias, only `dt`. Postman's `pm.*`/`postman.*` shim is unaffected by this
+and still uses Postman's own real names, for import compatibility with
+scripts written against Postman.
+
+## Execution order (one send)
+inherited pre-request scripts (collection, then folder, outer to inner) ->
+the request's own pre-request script -> the HTTP send -> the request's own
+post-response script -> inherited post-response scripts -> the test script
+-> declarative assertions. A pre-request failure stops the send entirely (a
+request built by a script that threw is not worth sending); a
+post-response/test/assertion failure is recorded and everything after it
+still runs.
+
+## Variable precedence (both {{var}} substitution and dt.getVars())
 collectionVar < globalEnv < collectionEnv < data-file row
 (Vault is intentionally excluded from this whole MCP surface.)
 
-## bru.* — variables & flow control (available in both req/res scripts)
+## dt.* — variables & flow control (available in both req/res scripts)
 - getCollectionVar(k) / setCollectionVar(k, v) / hasCollectionVar(k) / deleteCollectionVar(k)
 - getEnvVar(k, scope?) / setEnvVar(k, v, scope='collection') / hasEnvVar(k, scope?) / deleteEnvVar(k, scope='collection')
   scope is 'collection' | 'global'; a read with no scope falls through collection -> global.
@@ -262,9 +284,39 @@ pm.response — code, status, responseTime, responseSize, json(), text(), size()
 
 console.log/info/warn/error/debug/trace/dir/table(v) are all available and captured as script logs.
 
+## require(name) — curated bundled modules (never require(anything))
+'crypto-js', 'uuid', 'nanoid', 'lodash', 'jwt-decode' ({ jwtDecode }), 'dayjs', 'jose',
+'jsonwebtoken', 'ajv', 'xml2js', 'cheerio' — the same set Postman's and Bruno's own
+script sandboxes bundle.
+
+'jose' is exposed with its native API (SignJWT, jwtVerify, importPKCS8, importSPKI,
+generateKeyPair, ...) — see https://github.com/panva/jose for the full surface.
+
+'jsonwebtoken' is a same-shaped shim over 'jose' (the real npm package is Node-only —
+crypto/Buffer — and cannot run in this app's webview at all): { sign, verify, decode,
+JsonWebTokenError, TokenExpiredError, NotBeforeError }. Two deliberate differences
+from the real package:
+- sign(payload, secretOrPrivateKeyPem, opts) and verify(token, secretOrPublicKeyPem, opts)
+  are both async (await them) — Web Crypto has no synchronous signing API.
+- verify() REQUIRES opts.algorithms (e.g. { algorithms: ['HS256'] }) — the token's own
+  "alg" header is never trusted to pick the algorithm, since that is exactly how
+  algorithm-confusion attacks work.
+Supported algorithms: HS256/384/512 (secretOrPrivateKeyPem is a plain string/Uint8Array
+secret), RS256/384/512 and PS256/384/512 and ES256/384/512 and EdDSA (secretOrPrivateKeyPem
+must be a PEM string — PKCS8 "-----BEGIN PRIVATE KEY-----" to sign, SPKI
+"-----BEGIN PUBLIC KEY-----" to verify). sign()'s numeric expiresIn/notBefore are seconds
+from now (a duration), matching the real package — NOT an absolute Unix timestamp.
+
+'ajv' is the class itself (const Ajv = require('ajv'); new Ajv().compile(schema)),
+matching Postman/Bruno's own require('ajv') shape — use it to schema-validate a JSON
+response body. 'xml2js' (parseString/parseStringPromise) parses an XML/SOAP response
+into a plain object. 'cheerio' (require('cheerio').load(html)) queries/scrapes an HTML
+response with a jQuery-like API. 'nanoid' is { nanoid, customAlphabet } — a second,
+shorter/URL-safe id generator alongside 'uuid'.
+
 ## Declarative Assertions (the request's `assertions` array — NOT run as JS)
 Each row: { expr, operator, value, enabled }. `expr` is a restricted expression
-language over `res`/`req`/`bru` — property paths, indices, one level of method
+language over `res`/`req`/`dt` — property paths, indices, one level of method
 calls, literals, arithmetic/comparison/logical operators (e.g. `res.status`,
 `res.body.items[0].id`, `res.status === 200`) — no assignment, no arbitrary code.
 operator is one of: equals, notEquals, gt, gte, lt, lte, in, notIn, contains,
@@ -299,7 +351,7 @@ RequestScript: { req: string, res: string }  — pre-request / post-response JS 
 
 A stub's response is either `mode: "static"` (fixed status/headers/body) or
 `mode: "script"`, whose `script` is Rhai — NOT JavaScript, and NOT the same
-sandbox/API as the API Client's bru/req/res above. Use mock_test_script to run
+sandbox/API as the API Client's dt/req/res above. Use mock_test_script to run
 one against a sample request before saving it via mock_add_stub/mock_update_stub.
 
 ## The `req` object available to a script
@@ -587,7 +639,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "get_scripting_reference",
-            "description": "Read-only reference for both tools' scripting APIs and field shapes: API Client's bru/req/res/pm JS engine (variable precedence, assertions, Auth/RequestBody/KeyValue shapes) and Mock Server's Rhai response-script engine (a separate language — req shape, return shape, Stub/Matcher shapes). Call before writing/editing a script, auth, assertions, or a stub. Answered locally — works even if DevTool isn't open.",
+            "description": "Read-only reference for both tools' scripting APIs and field shapes: API Client's dt/req/res/pm JS engine (variable precedence, assertions, Auth/RequestBody/KeyValue shapes) and Mock Server's Rhai response-script engine (a separate language — req shape, return shape, Stub/Matcher shapes). Call before writing/editing a script, auth, assertions, or a stub. Answered locally — works even if DevTool isn't open.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
@@ -744,10 +796,14 @@ impl ServerHandler for DevToolServer {
                 "Drives two DevTool tools. API Client: collections, requests, scripts, \
                  environments — and can actually send a request. Mock Server: stubs, \
                  matchers, the fallback response, and can start/stop the server and test a \
-                 response script. Each tool's calls only answer while the DevTool desktop \
-                 app is open with THAT tool on screen (mock_* needs Mock Server open, \
-                 everything else needs API Client open) — call get_scripting_reference for \
-                 the scripting API and field shapes shared by both.",
+                 response script. By default each tool's calls only answer while the \
+                 DevTool desktop app is open with THAT tool on screen (mock_* needs Mock \
+                 Server open, everything else needs API Client open) — if a call times out, \
+                 that is almost always why; ask the user to either switch to the right tool \
+                 or turn on Settings → MCP → Background MCP bridge in DevTool, which makes \
+                 calls answer regardless of which tool is on screen. Call \
+                 get_scripting_reference for the scripting API and field shapes shared by \
+                 both.",
             )
             .with_server_info(Implementation::new("devtool-api-client", env!("CARGO_PKG_VERSION")))
     }

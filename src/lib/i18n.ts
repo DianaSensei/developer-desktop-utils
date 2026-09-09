@@ -143,6 +143,10 @@ export const DICTIONARY = {
   'shell.titlebar.close': { vi: 'Đóng', en: 'Close' },
   'shell.titlebar.themeCycleTap': { vi: 'Giao diện: {{theme}} (chạm để đổi)', en: 'Theme: {{theme}} (tap to cycle)' },
 
+  // ── Open tools strip — tools visited this session, click to jump back ──
+  'shell.openTools.label': { vi: 'Tool đã mở trong phiên này', en: 'Tools opened this session' },
+  'shell.openTools.close': { vi: 'Đóng {{label}} khỏi dải tool đã mở', en: 'Close {{label}} from open tools' },
+
   // ── ⌘K command palette — a11y-only title ────────────────────────────────
   'palette.title': { vi: 'Bảng lệnh', en: 'Command palette' },
 
@@ -182,6 +186,18 @@ export const DICTIONARY = {
   'settings.permissions.webWarning': {
     vi: 'Đang chạy trong trình duyệt — các quyền liệt kê dưới đây chỉ áp dụng cho bản desktop.',
     en: 'Running in browser — permissions listed below apply to the desktop app only.',
+  },
+
+  // ── Settings — MCP ────────────────────────────────────────────────────────
+  'settings.mcp.title': { vi: 'Cầu nối MCP', en: 'MCP' },
+  'settings.mcp.backgroundTitle': { vi: 'Bridge MCP chạy nền', en: 'Background MCP bridge' },
+  'settings.mcp.backgroundDescription': {
+    vi: 'Cho phép Claude Desktop/Code điều khiển API Client và Mock Server qua MCP dù đang xem tool khác. Mặc định API Client/Mock Server chỉ trả lời MCP khi chính tool đó đang mở trên màn hình.',
+    en: 'Lets Claude Desktop/Code drive API Client and Mock Server over MCP even while a different tool is on screen. By default, each only answers MCP calls while it is the tool actually open.',
+  },
+  'settings.mcp.webWarning': {
+    vi: 'Đang chạy trong trình duyệt — MCP chỉ khả dụng trên bản desktop.',
+    en: 'Running in browser — MCP is only available in the desktop app.',
   },
 
   // ── Settings — About ──────────────────────────────────────────────────────

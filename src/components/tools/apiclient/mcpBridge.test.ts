@@ -354,10 +354,24 @@ describe('useMcpBridge — Tauri desktop', () => {
     expect(response).not.toHaveProperty('bodyBase64');
   });
 
-  it('an unknown tool name reports an error instead of throwing', async () => {
-    const res = await call(makeStore(), 'not_a_real_tool', {});
-    expect(res.result).toBeNull();
-    expect(res.error).toMatch(/Unknown MCP tool/);
+  it('an unknown tool name is left alone rather than answered — another bridge may own it', async () => {
+    await renderBridge(makeStore(), vi.fn());
+    await waitFor(() => expect(capturedCb).toBeDefined());
+    invokeMock.mockClear();
+    capturedCb!({ payload: { id: 'call-unknown', tool: 'not_a_real_tool', args: {} } });
+    // Give any (incorrect) async response a tick to land, then assert none did.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('enabled=false skips registering the listener', async () => {
+    vi.resetModules();
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+    listenMock.mockClear();
+    const { useMcpBridge } = await import('./mcpBridge');
+    renderHook(() => useMcpBridge(makeStore(), vi.fn() as never, false));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(listenMock).not.toHaveBeenCalled();
   });
 
   it('unmount calls the Tauri unlisten function', async () => {

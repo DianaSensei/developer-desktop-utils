@@ -1,6 +1,6 @@
 // Static one-click snippets for the script editors — Postman/Bruno both ship
 // a "add test" style snippet menu; this editor had none. Purely an authoring
-// aid: no new engine capability, just template text against the real bru/req/
+// aid: no new engine capability, just template text against the real dt/req/
 // res API these scripts already run with (see runtime.ts).
 
 export interface ScriptSnippet {
@@ -15,7 +15,7 @@ export const PRE_REQUEST_SNIPPETS: ScriptSnippet[] = [
   },
   {
     label: 'Read an environment variable',
-    code: `const token = bru.getEnvVar('token');`,
+    code: `const token = dt.getEnvVar('token');`,
   },
 ];
 
@@ -34,7 +34,7 @@ export const POST_RESPONSE_SNIPPETS: ScriptSnippet[] = [
   },
   {
     label: 'Set an environment variable from the response',
-    code: `bru.setEnvVar('token', res.getBody().token);`,
+    code: `dt.setEnvVar('token', res.getBody().token);`,
   },
 ];
 

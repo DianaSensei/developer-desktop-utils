@@ -3,9 +3,17 @@
 // Pre-request and post-response scripts, the test runner, and declarative
 // assertions all execute here. Scripts run via the AsyncFunction
 // constructor inside the app's own JS context with a curated set of globals
-// (`bru`, `req`, `res`, `expect`, `test`, `assert`, `console`). This is the same
+// (`dt`, `req`, `res`, `expect`, `test`, `assert`, `console`). This is the same
 // trust model as Postman/Bruno: the scripts are the user's own, run locally, and
 // nothing is sent anywhere except the HTTP request itself.
+//
+// `dt` (not Bruno's own `bru`) is this app's own name for the variable/flow-
+// control API below — same shape as Bruno's `bru`, different name, so it
+// reads as DevTool's own primitive rather than something borrowed from
+// another app. A script pasted in from real Bruno that calls `bru.*` will
+// not resolve `bru` and will error — there is no compatibility shim for the
+// name itself (see `pm`/`postman` below, which stays the *actual* Postman
+// name for import compatibility, unaffected by this).
 
 import type {
   ApiRequest, ApiResponse, Assertion, LogEntry, TestResult, VarMap,
@@ -250,7 +258,7 @@ export function makeExpect() {
   return (actual: unknown, message?: string) => new Expectation(actual, false, message);
 }
 
-// ─── res / req / bru host objects ───────────────────────────────────────────
+// ─── res / req / dt host objects ────────────────────────────────────────────
 
 // Parse a response body once: JSON when it looks like JSON, else the raw text.
 function parseBody(res: ApiResponse): unknown {
@@ -261,7 +269,7 @@ function parseBody(res: ApiResponse): unknown {
 }
 
 // Keys that would walk up to Object.prototype instead of landing on the map.
-// Variable names reach `bru.setCollectionVar`/`setEnvVar` from scripts and from
+// Variable names reach `dt.setCollectionVar`/`setEnvVar` from scripts and from
 // collection files that may have been imported from somewhere untrusted, so a
 // write keyed on one of
 // these is prototype pollution rather than a variable. Spelled out as a
@@ -368,15 +376,15 @@ export interface RunControl {
   nextRequest?: string | null;
 }
 
-// Which environment tier bru.*EnvVar targets. Reads with no scope fall
+// Which environment tier dt.*EnvVar targets. Reads with no scope fall
 // through collection -> global; writes with no scope default to
 // 'collection' (a write can't merge, it has to land somewhere specific).
 export type EnvScope = 'collection' | 'global';
 
 export interface VarStores {
-  collectionVar: VarMap; // bru.setCollectionVar / getCollectionVar (persisted)
-  collectionEnv: VarMap; // bru.setEnvVar(...,'collection') / getEnvVar (persisted)
-  globalEnv: VarMap;     // bru.setEnvVar(...,'global') / getEnvVar (persisted)
+  collectionVar: VarMap; // dt.setCollectionVar / getCollectionVar (persisted)
+  collectionEnv: VarMap; // dt.setEnvVar(...,'collection') / getEnvVar (persisted)
+  globalEnv: VarMap;     // dt.setEnvVar(...,'global') / getEnvVar (persisted)
   collectionEnvName: string | null;
   globalEnvName: string | null;
   data?: VarMap;     // current data-file row (read-only; data-driven runs)
@@ -393,14 +401,14 @@ export interface VarStores {
 // named "toString" or "constructor" is a perfectly ordinary variable name a
 // user might pick, but a bare `obj[k]` / `k in obj` resolves it against
 // Object.prototype instead of reporting "not set". That hands a script a
-// live built-in (`bru.getCollectionVar('toString')` -> `Object.prototype.
-// toString`) where it expected `undefined`, and makes `bru.hasCollectionVar`
+// live built-in (`dt.getCollectionVar('toString')` -> `Object.prototype.
+// toString`) where it expected `undefined`, and makes `dt.hasCollectionVar`
 // falsely report a variable that was never set. Same class of bug as the
 // `getHeader('constructor')` case noted above `isSafeKey`, just unguarded
 // here instead of designed out.
 const hasOwn = (obj: VarMap, k: string): boolean => Object.prototype.hasOwnProperty.call(obj, k);
 
-export function makeBru(stores: VarStores) {
+export function makeDt(stores: VarStores) {
   // Same precedence as the {{substitution}} map in engine.ts (vault aside,
   // which never enters these stores — see engine.ts):
   // collectionVar < globalEnv < collectionEnv < data.
@@ -427,7 +435,7 @@ export function makeBru(stores: VarStores) {
     deleteEnvVar: (k: string, scope: EnvScope = 'collection') => { delete envStore(scope)[k]; },
     getEnvName: (scope?: EnvScope) =>
       (scope === 'global' ? stores.globalEnvName : scope === 'collection' ? stores.collectionEnvName : (stores.collectionEnvName ?? stores.globalEnvName)),
-    // Postman parity: bru.getIterationData('x') reads the current data row.
+    // Postman parity: dt.getIterationData('x') reads the current data row.
     getIterationData: (k: string) => (stores.data && hasOwn(stores.data, k) ? stores.data[k] : undefined),
     // Expand {{tokens}} in a string exactly as the send pipeline would.
     interpolate: (text: string) => substituteVars(String(text ?? ''), allVars()),
@@ -476,15 +484,15 @@ function safeStringify(v: unknown): string {
 // ─── pm.* (Postman) compatibility shim ──────────────────────────────────────
 
 interface PmDeps {
-  bru?: ReturnType<typeof makeBru>;
+  dt?: ReturnType<typeof makeDt>;
   req?: ReturnType<typeof makeReq>;
   res?: ReturnType<typeof makeRes>;
   expect: ReturnType<typeof makeExpect>;
   test: (name: string, fn: () => unknown) => Promise<void>;
 }
 
-// Maps Postman's `pm` API onto our bru/req/res primitives.
-export function makePm({ bru, req, res, expect, test }: PmDeps) {
+// Maps Postman's `pm` API onto our dt/req/res primitives.
+export function makePm({ dt, req, res, expect, test }: PmDeps) {
   const varBag = (get: (k: string) => unknown, set: (k: string, v: unknown) => void) => ({
     get, set,
     has: (k: string) => get(k) !== undefined,
@@ -495,23 +503,23 @@ export function makePm({ bru, req, res, expect, test }: PmDeps) {
     expect,
     info: { requestName: req?.getName?.() ?? '', requestId: '' },
     // pm.environment defaults to the collection-scoped env, same as a bare
-    // bru.getEnvVar/setEnvVar call — Postman's own "environment" is the
+    // dt.getEnvVar/setEnvVar call — Postman's own "environment" is the
     // one-active-set-at-a-time notion, and Collection env is the closer
     // analog of the two.
-    environment: bru
-      ? { ...varBag(bru.getEnvVar, bru.setEnvVar), name: bru.getEnvName(), replaceIn: (text: string) => bru.interpolate(text) }
+    environment: dt
+      ? { ...varBag(dt.getEnvVar, dt.setEnvVar), name: dt.getEnvName(), replaceIn: (text: string) => dt.interpolate(text) }
       : undefined,
     // Collection/global variables have their own persisted stores — route
     // each to its own bucket.
-    collectionVariables: bru ? { ...varBag(bru.getCollectionVar, bru.setCollectionVar) } : undefined,
-    globals: bru
-      ? { ...varBag((k) => bru.getEnvVar(k, 'global'), (k, v) => bru.setEnvVar(k, v, 'global')) }
+    collectionVariables: dt ? { ...varBag(dt.getCollectionVar, dt.setCollectionVar) } : undefined,
+    globals: dt
+      ? { ...varBag((k) => dt.getEnvVar(k, 'global'), (k, v) => dt.setEnvVar(k, v, 'global')) }
       : undefined,
-    iterationData: bru ? { get: (k: string) => bru.getIterationData(k) } : undefined,
+    iterationData: dt ? { get: (k: string) => dt.getIterationData(k) } : undefined,
     request: req,
     // Postman's current flow-control namespace. `skipRequest` isn't meaningful
     // once a request is already executing, so only setNextRequest is mapped.
-    execution: bru ? { setNextRequest: (name: string | null) => bru.setNextRequest(name) } : undefined,
+    execution: dt ? { setNextRequest: (name: string | null) => dt.setNextRequest(name) } : undefined,
   };
   if (res) {
     const body = res.getBody();
@@ -644,9 +652,9 @@ export async function runScript(
   };
   // Postman compatibility shim — maps `pm.*` onto the same primitives so many
   // imported Postman scripts run without rewriting.
-  const bru = scope.bru as ReturnType<typeof makeBru> | undefined;
+  const dt = scope.dt as ReturnType<typeof makeDt> | undefined;
   globals.pm = makePm({
-    bru,
+    dt,
     req: scope.req as ReturnType<typeof makeReq> | undefined,
     res: scope.res as ReturnType<typeof makeRes> | undefined,
     expect, test,
@@ -654,7 +662,7 @@ export async function runScript(
   // Postman's pre-pm global, still the form most collection scripts use for
   // flow control: `postman.setNextRequest("Login")`.
   globals.postman = {
-    setNextRequest: (name: string | null) => bru?.setNextRequest(name),
+    setNextRequest: (name: string | null) => dt?.setNextRequest(name),
   };
 
   const names = Object.keys(globals);
@@ -859,7 +867,7 @@ class VarExprParser {
   private postfix(): unknown {
     let val = this.primary();
     // `receiver` tracks the object a method was read from, so a call binds
-    // `this` correctly for `bru.getCollectionVar('x')` / `res.getStatus()`.
+    // `this` correctly for `dt.getCollectionVar('x')` / `res.getStatus()`.
     let receiver: unknown = undefined;
     for (;;) {
       if (this.eatOp('.')) {

@@ -58,13 +58,13 @@ describe('runPhaseSandboxed — no sandbox means no execution', () => {
 
   it('refuses to run when no worker is available', async () => {
     // jsdom provides no Worker, and no factory is installed.
-    await expect(runPhaseSandboxed(prePhase('bru.setCollectionVar("x", "1");')))
+    await expect(runPhaseSandboxed(prePhase('dt.setCollectionVar("x", "1");')))
       .rejects.toBeInstanceOf(ScriptSandboxUnavailableError);
   });
 
   it('refuses to run when the worker fails to construct', async () => {
     __setSandboxWorkerFactory(() => { throw new Error('no workers here'); });
-    await expect(runPhaseSandboxed(prePhase('bru.setCollectionVar("y", "2");')))
+    await expect(runPhaseSandboxed(prePhase('dt.setCollectionVar("y", "2");')))
       .rejects.toBeInstanceOf(ScriptSandboxUnavailableError);
   });
 

@@ -61,6 +61,13 @@ export function ImportReviewDialog({
             Scripts can read your environment variables — including any tokens stored there — and
             can make their own network calls. Only keep them if you trust where this file came from.
           </p>
+          <p>
+            If this came from real Bruno, its scripts call <code className="rounded bg-bg-2 px-1 font-mono">bru.*</code> —
+            this app's own scripting API is <code className="rounded bg-bg-2 px-1 font-mono">dt.*</code> instead (same
+            methods, different name; no <code className="rounded bg-bg-2 px-1 font-mono">bru</code> alias). A kept-as-is
+            Bruno script needs that rename before it will run here — a Postman script's <code className="rounded bg-bg-2 px-1 font-mono">pm.*</code> calls
+            are unaffected and keep working as imported.
+          </p>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">

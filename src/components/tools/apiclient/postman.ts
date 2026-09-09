@@ -203,7 +203,8 @@ function importRequest(item: PmItem, warn: (msg: string) => void): ApiRequest {
   const method = (r.method ?? 'GET').toUpperCase();
   const url = typeof r.url === 'object' ? r.url : undefined;
   // Postman scripts use the `pm.*` API; the text is preserved so it can be
-  // adapted to Bruno's `bru`/`req`/`res` API after import.
+  // adapted to this app's `dt`/`req`/`res` API after import (`pm.*` itself
+  // keeps working unmodified via the compatibility shim — see runtime.ts).
   const preReq = execText(item.event?.find((e) => e.listen === 'prerequest'));
   const test = execText(item.event?.find((e) => e.listen === 'test'));
   const pathParams = mapKv(url?.variable);

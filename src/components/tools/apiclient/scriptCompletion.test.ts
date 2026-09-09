@@ -4,13 +4,13 @@
 // scriptCompletion.ts's own header comment), so instead: build a real
 // instance of each factory, walk its own-enumerable-key paths, and assert
 // every one of them exists in the corresponding shadow shape. A future
-// rename/addition to makeBru/makeReq/makeRes/makePm/makeAssert/makeConsole
+// rename/addition to makeDt/makeReq/makeRes/makePm/makeAssert/makeConsole
 // that isn't mirrored here now fails a test instead of silently going stale.
 
 import { describe, expect, it } from 'vitest';
 import { scriptCompletionShapes } from './scriptCompletion';
 import {
-  makeAssert, makeBru, makeConsole, makeExpect, makePm, makeReq, makeRes,
+  makeAssert, makeDt, makeConsole, makeExpect, makePm, makeReq, makeRes,
 } from './runtime';
 import { newRequest, type ApiResponse } from './types';
 
@@ -65,9 +65,9 @@ const fakeResponse: ApiResponse = {
 };
 
 describe('scriptCompletion shape parity', () => {
-  it('bru', () => {
-    const real = pathsOf(makeBru({ collectionVar: {}, collectionEnv: {}, globalEnv: {}, collectionEnvName: null, globalEnvName: null }));
-    assertNoMissing(real, pathsOf(scriptCompletionShapes.bru));
+  it('dt', () => {
+    const real = pathsOf(makeDt({ collectionVar: {}, collectionEnv: {}, globalEnv: {}, collectionEnvName: null, globalEnvName: null }));
+    assertNoMissing(real, pathsOf(scriptCompletionShapes.dt));
   });
 
   it('req', () => {
@@ -91,10 +91,10 @@ describe('scriptCompletion shape parity', () => {
   });
 
   it('pm', () => {
-    const bru = makeBru({ collectionVar: {}, collectionEnv: {}, globalEnv: {}, collectionEnvName: null, globalEnvName: null });
+    const dt = makeDt({ collectionVar: {}, collectionEnv: {}, globalEnv: {}, collectionEnvName: null, globalEnvName: null });
     const req = makeReq(newRequest({ url: 'https://api.test/x' }));
     const res = makeRes(fakeResponse);
-    const real = pathsOf(makePm({ bru, req, res, expect: makeExpect(), test: async () => {} }));
+    const real = pathsOf(makePm({ dt, req, res, expect: makeExpect(), test: async () => {} }));
     assertNoMissing(real, pathsOf(scriptCompletionShapes.pm));
   });
 });

@@ -6,7 +6,7 @@
 // so such a script froze the entire app until it was force-quit.
 //
 // As a side effect scripts no longer reach `window`, `document`, or the app's
-// storage: they get the same `bru`/`req`/`res`/`pm` surface as before, plus the
+// storage: they get the same `dt`/`req`/`res`/`pm` surface as before, plus the
 // bundled `require()` modules, and nothing else.
 
 import { runPhase, type PhaseInput, type PhaseOutput } from './scriptPhases';
@@ -19,7 +19,7 @@ export interface WorkerDone { type: 'done'; id: number; output: PhaseOutput }
 export interface WorkerFailed { type: 'failed'; id: number; message: string }
 export type OutMessage = WorkerDone | WorkerFailed;
 
-// One controller per in-flight run, so `bru.sleep()` and other abort-aware
+// One controller per in-flight run, so `dt.sleep()` and other abort-aware
 // helpers stop promptly when the user cancels the send.
 const inFlight = new Map<number, AbortController>();
 

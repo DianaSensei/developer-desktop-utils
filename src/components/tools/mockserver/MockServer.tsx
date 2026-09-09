@@ -19,10 +19,12 @@ import type { HttpMethod } from '../apiclient/types';
 import { StubEditor } from './StubEditor';
 import { FallbackEditor } from './FallbackEditor';
 import { RequestLog } from './RequestLog';
-import { useMockServer, isTauri } from './useMockServer';
+import { isTauri } from './useMockServer';
 import { newStub, type MockConfig, type Stub } from './types';
 import { liveConnections } from '@/lib/liveConnections';
 import { useMcpBridge } from './mcpBridge';
+import { useMockServerRuntime } from './mcpRuntimeContext';
+import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
 
 // Sentinel selection id for the editable "no-match" fallback response.
 const FALLBACK_ID = '__fallback__';
@@ -35,13 +37,17 @@ const badgeClass = (method: string) =>
     : methodBadgeStyle(method as HttpMethod);
 
 export function MockServer() {
-  const mockServer = useMockServer();
+  const mockServer = useMockServerRuntime();
   const {
     config, setConfig, updateConfig, updateStub,
     addStub: hookAddStub, duplicateStub: hookDuplicateStub, deleteStub, moveStub,
     status, log, error, busy, start, stop, testScript, clearLog,
   } = mockServer;
-  useMcpBridge(mockServer);
+  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
+  // Skipped while the background bridge (Settings → MCP) is on — that one
+  // instance, mounted once at the app root, already answers for this exact
+  // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
+  useMcpBridge(mockServer, !mcpBackgroundEnabled);
 
   // Sidebar/header chấm xanh khi server đang chạy — cùng cơ chế Kafka/RabbitMQ
   // dùng cho "đang kết nối". Trước đây Mock Server không đăng ký gì vào đây,

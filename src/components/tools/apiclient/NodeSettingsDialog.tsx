@@ -150,7 +150,7 @@ function ScriptPane({ kind, phase, onPhaseChange, script, onScriptChange }: {
           key={phase}
           value={value}
           onChange={(v) => onScriptChange((s) => (isReq ? { ...s, req: v } : { ...s, res: v }))}
-          placeholder={isReq ? "bru.setEnvVar('base', 'https://api.example.com');" : "console.log('done', res.getStatus());"}
+          placeholder={isReq ? "dt.setEnvVar('base', 'https://api.example.com');" : "console.log('done', res.getStatus());"}
           extraExtensions={scriptApiExtensions}
         />
       </div>
