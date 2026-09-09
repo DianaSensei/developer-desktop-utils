@@ -456,7 +456,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "update_request",
-            "description": "Patch a request in place. `patch` is a partial ApiRequest — only included fields change (e.g. { \"url\", \"method\", \"body\": { \"mode\", \"raw\", \"form\" } }). Set patch.script = { req, res } for its pre/post-request script.",
+            "description": "Patch a request in place. `patch` is a partial ApiRequest — only included top-level fields change (e.g. { \"url\", \"method\" }). For the nested object fields — script ({req, res}), auth, body, settings — you may pass either the full object or just the part you're changing: patch.script = { \"req\": \"...\" } alone updates only the pre-request script and leaves the post-response script (res) untouched, same for auth.apiKey/.oauth2 and body.graphql. Array fields (params/headers/pathParams/assertions) still fully replace — pass every row you want kept.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "requestId": { "type": "string" }, "patch": { "type": "object" } },
@@ -554,7 +554,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_node_script",
-            "description": "Set the pre/post-request script inherited by every request under a collection/folder. nodeId=null (or omitted) = collection root; a folder id = that folder. A request's own script is set via update_request's patch.script instead.",
+            "description": "Set the pre/post-request script inherited by every request under a collection/folder. nodeId=null (or omitted) = collection root; a folder id = that folder. `script` may be the full { req, res } object or just one of them — e.g. { \"req\": \"...\" } alone updates only the pre-request script and leaves the existing post-response script (res) untouched. A request's own script is set via update_request's patch.script instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -562,8 +562,7 @@ fn tool_definitions() -> Vec<Value> {
                     "nodeId": nullable_string(),
                     "script": {
                         "type": "object",
-                        "properties": { "req": { "type": "string" }, "res": { "type": "string" } },
-                        "required": ["req", "res"]
+                        "properties": { "req": { "type": "string" }, "res": { "type": "string" } }
                     }
                 },
                 "required": ["collectionId", "script"]
@@ -571,7 +570,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "set_node_auth",
-            "description": "Set the auth inherited by requests with auth.type=\"inherit\" under a collection/folder. nodeId=null (or omitted) = collection root; a folder id = that folder. A request's own auth is set via update_request's patch.auth instead.",
+            "description": "Set the auth inherited by requests with auth.type=\"inherit\" under a collection/folder. nodeId=null (or omitted) = collection root; a folder id = that folder. `auth` may be the full Auth object or just the fields you're changing (including a nested partial apiKey/oauth2) — merges onto the node's existing auth rather than replacing it outright. A request's own auth is set via update_request's patch.auth instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "collectionId": { "type": "string" }, "nodeId": nullable_string(), "auth": { "type": "object" } },

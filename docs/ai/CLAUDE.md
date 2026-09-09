@@ -1072,6 +1072,21 @@ Two ways this binary gets run:
   the first call compiles it, every call after is instant via Cargo's own
   incremental cache).
 
+**Patch semantics for nested object fields:** `store.updateRequest`/
+`setNodeScript`/`setNodeAuth` all do a shallow top-level merge (`{...item,
+...patch}`), so a caller's `patch.script = { req: "..." }` would otherwise
+silently wipe `script.res` (same risk for `auth`, `body`, `settings`, and
+`auth`'s own nested `apiKey`/`oauth2`). `apiclient/mcpBridge.ts`'s
+`mergeScript`/`mergeAuth`/`mergeBody`/`mergeSettings` merge one level
+deeper before calling the store, so `update_request`'s `patch.script`/
+`.auth`/`.body`/`.settings` and `set_node_script`/`set_node_auth`'s
+`script`/`auth` args accept either a full object (same result as a plain
+replace) or just the part being changed. Array-valued fields (params,
+headers, variables, etc.) still fully replace on write, matching every
+other array field across this MCP surface (`set_collection_variables`,
+`set_node_headers`, `set_environment_variable`'s single-row exception
+aside) — only object-valued fields get this deeper merge.
+
 **Adding a tool:** add a handler function to `buildHandlers()` in the
 matching frontend's `mcpBridge.ts` (reuse existing state-mutating actions —
 `ApiStore.*` for API Client, `useMockServer()`'s returned functions for Mock
