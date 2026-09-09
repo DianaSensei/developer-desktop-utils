@@ -15,7 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { isTauri } from '@/lib/platform';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
-import { useMcpToolEnabledMap, MCP_TOOL_IDS } from '@/hooks/useMcpToolEnabled';
+import { useMcpToolEnabledMap, MCP_TOOL_IDS, MCP_TOOL_CAPABILITIES } from '@/hooks/useMcpToolEnabled';
 import { TOOL_DEFS } from '@/lib/toolDefs';
 
 type Resolution = { status: 'loading' } | { status: 'ready'; path: string } | { status: 'error'; message: string };
@@ -99,7 +99,10 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
               const enabled = isToolEnabled(id);
               return (
                 <div key={id} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="text-xs">{label}</span>
+                  <div className="min-w-0 pr-2">
+                    <p className="text-xs">{label}</p>
+                    <p className="text-[11px] text-fg-mute mt-0.5">{MCP_TOOL_CAPABILITIES[id]}</p>
+                  </div>
                   <Switch
                     checked={enabled}
                     onCheckedChange={(v) => setToolEnabled(id, v)}

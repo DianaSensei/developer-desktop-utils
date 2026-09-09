@@ -40,7 +40,7 @@ import { AppLogo } from '@/components/AppLogo';
 import { ExperimentalBadge } from '@/components/ExperimentalBadge';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
-import { useMcpToolEnabledMap, MCP_TOOL_IDS } from '@/hooks/useMcpToolEnabled';
+import { useMcpToolEnabledMap, MCP_TOOL_IDS, MCP_TOOL_CAPABILITIES } from '@/hooks/useMcpToolEnabled';
 
 /** Format an hour (0–23) as a friendly 12-hour label, e.g. 6 → "6:00 AM". */
 function formatHour(hour: number): string {
@@ -825,7 +825,10 @@ export function Settings() {
                 const enabled = isMcpToolEnabled(id);
                 return (
                   <div key={id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                    <span className="font-medium">{label}</span>
+                    <div className="min-w-0 pr-2">
+                      <p className="font-medium">{label}</p>
+                      <p className="text-[11px] text-fg-mute mt-0.5">{MCP_TOOL_CAPABILITIES[id]}</p>
+                    </div>
                     <Toggle
                       checked={enabled}
                       onChange={() => setMcpToolEnabled(id, !enabled)}
