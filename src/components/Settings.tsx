@@ -40,6 +40,7 @@ import { AppLogo } from '@/components/AppLogo';
 import { ExperimentalBadge } from '@/components/ExperimentalBadge';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabledMap, MCP_TOOL_IDS, MCP_TOOL_CAPABILITIES } from '@/hooks/useMcpToolEnabled';
 
 /** Format an hour (0–23) as a friendly 12-hour label, e.g. 6 → "6:00 AM". */
 function formatHour(hour: number): string {
@@ -269,6 +270,7 @@ export function Settings() {
   const { config, setField, resetConfig } = useAppConfig();
   const { locale, setLocale, t } = useLocale();
   const { enabled: mcpBackgroundEnabled, setEnabled: setMcpBackgroundEnabled } = useMcpBackgroundBridge();
+  const { isEnabled: isMcpToolEnabled, setToolEnabled: setMcpToolEnabled } = useMcpToolEnabledMap();
   const [configOpen, setConfigOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -794,21 +796,49 @@ export function Settings() {
         {!isTauri ? (
           <p className="text-[11px] text-warn">{t('settings.mcp.webWarning')}</p>
         ) : (
-          <div className="rounded-lg border divide-y text-xs">
-            <div className="flex items-center justify-between gap-3 px-4 py-3">
-              <div>
-                <p className="font-medium">{t('settings.mcp.backgroundTitle')}</p>
+          <>
+            <div className="rounded-lg border divide-y text-xs">
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="font-medium">{t('settings.mcp.backgroundTitle')}</p>
+                  <p className="text-[11px] text-fg-mute mt-0.5 max-w-md">
+                    {t('settings.mcp.backgroundDescription')}
+                  </p>
+                </div>
+                <Toggle
+                  checked={mcpBackgroundEnabled}
+                  onChange={() => setMcpBackgroundEnabled((v) => !v)}
+                  label={t('settings.mcp.backgroundTitle')}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border divide-y text-xs">
+              <div className="px-4 py-2.5">
+                <p className="font-medium">{t('settings.mcp.perToolTitle')}</p>
                 <p className="text-[11px] text-fg-mute mt-0.5 max-w-md">
-                  {t('settings.mcp.backgroundDescription')}
+                  {t('settings.mcp.perToolDescription')}
                 </p>
               </div>
-              <Toggle
-                checked={mcpBackgroundEnabled}
-                onChange={() => setMcpBackgroundEnabled((v) => !v)}
-                label={t('settings.mcp.backgroundTitle')}
-              />
+              {MCP_TOOL_IDS.map((id) => {
+                const label = TOOL_DEFS.find((td) => td.id === id)?.label ?? id;
+                const enabled = isMcpToolEnabled(id);
+                return (
+                  <div key={id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0 pr-2">
+                      <p className="font-medium">{label}</p>
+                      <p className="text-[11px] text-fg-mute mt-0.5">{MCP_TOOL_CAPABILITIES[id]}</p>
+                    </div>
+                    <Toggle
+                      checked={enabled}
+                      onChange={() => setMcpToolEnabled(id, !enabled)}
+                      label={label}
+                    />
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          </>
         )}
       </section>
 

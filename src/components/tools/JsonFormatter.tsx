@@ -21,10 +21,10 @@ import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { SplitPane } from '@/components/ui/split-pane';
 
-type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type Mode = 'beautify' | 'string' | 'minify';
 
-const INDENT_OPTIONS: Record<string, { unit: string; size: number }> = {
+export const INDENT_OPTIONS: Record<string, { unit: string; size: number }> = {
   '2': { unit: '  ', size: 2 },
   '4': { unit: '    ', size: 4 },
   tab: { unit: '\t', size: 4 },
@@ -259,7 +259,7 @@ function unescapeJsonString(str: string): string {
 // Parse, also accepting JSON that arrives as an escaped string — both the
 // quoted form ("{\"a\":1}") and the naked form ({\"a\":1} without surrounding
 // quotes), including multi-line payloads.
-function parseInput(text: string): JsonValue {
+export function parseInput(text: string): JsonValue {
   const trimmed = text.trim();
   try {
     return unwrapStructured(parseLenient(trimmed));
@@ -284,7 +284,7 @@ function parseInput(text: string): JsonValue {
 }
 
 // --- Serialization ---------------------------------------------------------
-function quoteText(value: string, quote: string) {
+export function quoteText(value: string, quote: string) {
   let out = quote;
   for (const ch of value) {
     if (ch === quote) out += '\\' + quote;
@@ -300,7 +300,7 @@ function quoteText(value: string, quote: string) {
   return out + quote;
 }
 
-function serialize(value: JsonValue, indentUnit: string, quote: string): string {
+export function serialize(value: JsonValue, indentUnit: string, quote: string): string {
   const nl = indentUnit ? '\n' : '';
   const sep = indentUnit ? ': ' : ':';
 

@@ -30,7 +30,7 @@ type CryptoMode = 'encrypt' | 'decrypt';
 
 // ─── Encoding codecs ──────────────────────────────────────────────────────────
 
-interface Codec {
+export interface Codec {
   id: string;
   label: string;
   description: string;
@@ -359,7 +359,7 @@ const punycode = (() => {
   return { encode, decode };
 })();
 
-const CODECS: Codec[] = [
+export const CODECS: Codec[] = [
   { id: 'base64',   label: 'Base64',            description: 'Binary-to-text encoding using 64 ASCII characters (UTF-8 safe).', encode: base64Encode, decode: base64Decode },
   { id: 'base62',   label: 'Base62',            description: 'Big-integer encoding with 0-9, A-Z, a-z (no padding characters).', encode: base62Encode, decode: base62Decode },
   { id: 'rot13',    label: 'ROT13',             description: 'Letter substitution cipher rotating by 13 places (symmetric).', encode: rot13, decode: rot13 },
@@ -378,7 +378,7 @@ const CODECS: Codec[] = [
 
 // ─── Hash algorithms ──────────────────────────────────────────────────────────
 
-const ALGORITHMS = [
+export const ALGORITHMS = [
   { id: 'md5',      label: 'MD5',        bits: 128, chars: 32,  desc: 'Fast · avoid for passwords, OK for checksums' },
   { id: 'ripemd160',label: 'RIPEMD-160', bits: 160, chars: 40,  desc: 'Legacy Bitcoin hash · alternative to SHA-1' },
   { id: 'sha1',     label: 'SHA-1',      bits: 160, chars: 40,  desc: 'Legacy · not recommended for new projects' },
@@ -390,15 +390,15 @@ const ALGORITHMS = [
   { id: 'sha3-512', label: 'SHA-3/512',  bits: 512, chars: 128, desc: 'Modern Keccak · maximum SHA-3 strength' },
 ] as const;
 
-type AlgoId = (typeof ALGORITHMS)[number]['id'];
+export type AlgoId = (typeof ALGORITHMS)[number]['id'];
 
 // SHA-3 uses a single-length HmacSHA3 (512-bit), which would be misleading for sha3-256.
 // Show HMAC only for algorithms with a dedicated per-length HmacXXX function.
-const HMAC_ALGORITHMS = ALGORITHMS.filter(
+export const HMAC_ALGORITHMS = ALGORITHMS.filter(
   (a) => !['sha3-256', 'sha3-512'].includes(a.id)
 );
 
-function computeHash(id: AlgoId, input: string): string {
+export function computeHash(id: AlgoId, input: string): string {
   switch (id) {
     case 'md5':       return CryptoJS.MD5(input).toString();
     case 'ripemd160': return CryptoJS.RIPEMD160(input).toString();
@@ -412,7 +412,7 @@ function computeHash(id: AlgoId, input: string): string {
   }
 }
 
-function computeHmac(id: AlgoId, input: string, key: string): string {
+export function computeHmac(id: AlgoId, input: string, key: string): string {
   switch (id) {
     case 'md5':       return CryptoJS.HmacMD5(input, key).toString();
     case 'ripemd160': return CryptoJS.HmacRIPEMD160(input, key).toString();
@@ -440,7 +440,7 @@ function computeHmac(id: AlgoId, input: string, key: string): string {
 //
 // ECB additionally leaks plaintext structure, which is a separate problem from
 // the KDF, so it keeps its own louder warning.
-const ENCRYPT_ALGOS = [
+export const ENCRYPT_ALGOS = [
   { id: 'aes-gcm',   label: 'AES-256 GCM',  family: 'webcrypto', desc: 'Recommended · PBKDF2-SHA256 (600k) key stretching, authenticated, random salt + IV per message', weak: false },
   { id: 'aes-cbc',   label: 'AES-256 CBC',  family: 'crypto-js', desc: 'crypto-js interop · random IV per message, but MD5 key stretching and no authentication',        weak: false },
   { id: 'aes-ctr',   label: 'AES-256 CTR',  family: 'crypto-js', desc: 'crypto-js interop · stream mode, no padding needed',                                             weak: false },
@@ -451,13 +451,13 @@ const ENCRYPT_ALGOS = [
   { id: 'rabbit',    label: 'Rabbit',       family: 'crypto-js', desc: 'Fast stream cipher · compact key setup, 128-bit key',                                            weak: false },
 ] as const;
 
-type EncryptAlgo = (typeof ENCRYPT_ALGOS)[number]['id'];
+export type EncryptAlgo = (typeof ENCRYPT_ALGOS)[number]['id'];
 
 // The crypto-js half of the table. `aes-gcm` never reaches here — it is async
 // and goes through `lib/aesGcm.ts` instead.
-type CryptoJsAlgo = Exclude<EncryptAlgo, 'aes-gcm'>;
+export type CryptoJsAlgo = Exclude<EncryptAlgo, 'aes-gcm'>;
 
-function doEncrypt(algo: CryptoJsAlgo, plaintext: string, key: string): string {
+export function doEncrypt(algo: CryptoJsAlgo, plaintext: string, key: string): string {
   switch (algo) {
     case 'aes-cbc':
       return CryptoJS.AES.encrypt(plaintext, key).toString();
@@ -479,7 +479,7 @@ function doEncrypt(algo: CryptoJsAlgo, plaintext: string, key: string): string {
   }
 }
 
-function doDecrypt(algo: CryptoJsAlgo, ciphertext: string, key: string): string {
+export function doDecrypt(algo: CryptoJsAlgo, ciphertext: string, key: string): string {
   switch (algo) {
     case 'aes-cbc': {
       const b = CryptoJS.AES.decrypt(ciphertext, key);

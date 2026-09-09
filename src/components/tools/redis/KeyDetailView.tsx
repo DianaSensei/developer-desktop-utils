@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyRound, Trash2, Pencil, Plus, X, Save, RefreshCw } from 'lucide-react';
+import { KeyRound, Trash2, Pencil, Plus, X, Save, RefreshCw, FileJson } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -310,17 +310,33 @@ function TtlRow({ seconds, onSet }: { seconds: number | null; onSet: (seconds: n
 
 // ── String ───────────────────────────────────────────────────────────────────
 
+function isValidJsonString(s: string): boolean {
+  if (!s.trim()) return false;
+  try { JSON.parse(s); return true; } catch { return false; }
+}
+
 function StringEditor({ initial, onSave }: { initial: string; onSave: (v: string) => Promise<void> }) {
   const [draft, setDraft] = useState(initial);
   const [busy, setBusy] = useState(false);
   useEffect(() => setDraft(initial), [initial]);
   const dirty = draft !== initial;
+  const canViewAsJson = isValidJsonString(draft);
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs text-fg-mute">Value · {draft.length.toLocaleString()} chars</span>
         <div className="flex items-center gap-1.5">
+          {canViewAsJson && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDraft(JSON.stringify(JSON.parse(draft), null, 2))}
+              title="Pretty-print this value as JSON"
+            >
+              <FileJson className="h-3.5 w-3.5 mr-1.5" /> View as JSON
+            </Button>
+          )}
           <CopyButton value={draft} label="Copy" variant="outline" size="sm" />
           <Button size="sm" disabled={!dirty || busy} onClick={async () => { setBusy(true); try { await onSave(draft); } finally { setBusy(false); } }}>
             <Save className="h-3.5 w-3.5 mr-1.5" /> {busy ? 'Saving…' : 'Save'}

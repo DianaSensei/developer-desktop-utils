@@ -7,7 +7,10 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { containerApi, type ContainerConnection } from './types';
 import { liveConnections } from '@/lib/liveConnections';
-import { useContainerState } from './useContainerState';
+import { useContainerRuntime } from './mcpRuntimeContext';
+import { useMcpBridge } from './mcpBridge';
+import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { LeftPanel } from './LeftPanel';
 import { OverviewView } from './OverviewView';
 import { ContainersView } from './ContainersView';
@@ -26,11 +29,20 @@ const LEFT_DEFAULT = 220;
 let cachedConnections: ContainerConnection[] | null = null;
 
 export function ContainerManager() {
+  const containerState = useContainerRuntime();
   const {
     selectedConnId, setSelectedConnId, connectedConnId, setConnectedConnId,
     view, showOverview, showContainers, showImages, showVolumes, showNetworks, showCompose,
     refreshKey, refresh,
-  } = useContainerState();
+  } = containerState;
+
+  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
+  const { enabled: mcpToolEnabled } = useMcpToolEnabled('container-manager');
+  // Skipped while the background bridge (Settings → MCP) is on — that one
+  // instance, mounted once at the app root, already answers for this exact
+  // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
+  // Also skipped outright when the per-tool MCP toggle is off for Containers.
+  useMcpBridge(containerState, mcpToolEnabled && !mcpBackgroundEnabled);
 
   const [connections, setConnections] = useState<ContainerConnection[]>(cachedConnections ?? []);
   const [connLoading, setConnLoading] = useState(cachedConnections === null);

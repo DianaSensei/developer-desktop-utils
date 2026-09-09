@@ -192,8 +192,13 @@ export const DICTIONARY = {
   'settings.mcp.title': { vi: 'Cầu nối MCP', en: 'MCP' },
   'settings.mcp.backgroundTitle': { vi: 'Bridge MCP chạy nền', en: 'Background MCP bridge' },
   'settings.mcp.backgroundDescription': {
-    vi: 'Cho phép Claude Desktop/Code điều khiển API Client và Mock Server qua MCP dù đang xem tool khác. Mặc định API Client/Mock Server chỉ trả lời MCP khi chính tool đó đang mở trên màn hình.',
-    en: 'Lets Claude Desktop/Code drive API Client and Mock Server over MCP even while a different tool is on screen. By default, each only answers MCP calls while it is the tool actually open.',
+    vi: 'Cho phép Claude Desktop/Code điều khiển API Client, Mock Server, Redis Client và Kafka Explorer qua MCP dù đang xem tool khác. Mặc định mỗi tool chỉ trả lời MCP khi chính tool đó đang mở trên màn hình.',
+    en: 'Lets Claude Desktop/Code drive API Client, Mock Server, Redis Client, and Kafka Explorer over MCP even while a different tool is on screen. By default, each only answers MCP calls while it is the tool actually open.',
+  },
+  'settings.mcp.perToolTitle': { vi: 'Truy cập MCP theo từng tool', en: 'Per-tool MCP access' },
+  'settings.mcp.perToolDescription': {
+    vi: 'Tắt một tool ở đây thì tool đó không bao giờ trả lời MCP call nữa — dù đang mở trên màn hình hay bridge chạy nền đang bật.',
+    en: 'Turning a tool off here means it never answers an MCP call again — whether it’s on screen or the background bridge is on.',
   },
   'settings.mcp.webWarning': {
     vi: 'Đang chạy trong trình duyệt — MCP chỉ khả dụng trên bản desktop.',

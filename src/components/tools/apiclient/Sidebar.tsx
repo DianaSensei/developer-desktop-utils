@@ -44,7 +44,7 @@ import { pickCollectionFile, saveJsonFile } from './fileio';
 import { methodColor, methodShort } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
 import { ImportCurlDialog } from './ImportCurlDialog';
-import { McpSetupDialog } from './McpSetupDialog';
+import { McpSetupDialog } from '@/components/McpSetupDialog';
 import { collectionMatches, itemMatches } from './treeSearch';
 
 const emptyScript = (s?: RequestScript): RequestScript => s ?? { req: '', res: '' };

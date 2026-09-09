@@ -30,6 +30,7 @@ import { executeRequest, errToString } from './engine';
 import { useMcpBridge } from './mcpBridge';
 import { useApiClientRuntime } from './mcpRuntimeContext';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
@@ -53,6 +54,7 @@ export function ApiClient() {
   const { activeRequest } = store;
   const { config } = useAppConfig();
   const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
+  const { enabled: mcpToolEnabled } = useMcpToolEnabled('api-client');
   // Read through a ref so the send/run callbacks don't churn when unrelated
   // config values change.
   const scriptTimeoutRef = useRef(config.apiClient.scriptTimeoutMs);
@@ -185,8 +187,9 @@ export function ApiClient() {
   // other send. Skipped while the background bridge (Settings → MCP) is on:
   // that one instance, mounted once at the app root, already answers for
   // this store regardless of which tool is on screen — listening here too
-  // would double-answer the same `mcp:call` event.
-  useMcpBridge(store, runRequest, !mcpBackgroundEnabled);
+  // would double-answer the same `mcp:call` event. Also skipped outright
+  // when the per-tool MCP toggle (Settings → MCP) is off for API Client.
+  useMcpBridge(store, runRequest, mcpToolEnabled && !mcpBackgroundEnabled);
 
   const send = useCallback(async () => {
     if (!activeRequest) return;

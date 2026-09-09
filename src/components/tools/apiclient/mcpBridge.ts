@@ -26,8 +26,8 @@
 import { useEffect, useRef } from 'react';
 import { isTauri } from '@/lib/platform';
 import type { ApiStore } from './store';
-import type { ApiRequest, Auth, Environment, KeyValue, LogEntry, RequestScript, TreeItem } from './types';
-import { newEnvironment, newRequest } from './types';
+import type { ApiRequest, Auth, Environment, KeyValue, LogEntry, RequestBody, RequestScript, RequestSettings, TreeItem } from './types';
+import { newAuth, newEnvironment, newRequest, uid } from './types';
 import type { ExecResult } from './engine';
 
 export type RunRequestFn = (
@@ -91,6 +91,17 @@ function requireCollection(store: ApiStore, id: string) {
   return c;
 }
 
+// Resolves the collection root (nodeId=null) or a folder within it — the two
+// kinds of node set_node_script/set_node_auth/set_node_headers can target —
+// so their own current script/auth can be read for a partial-patch merge.
+function requireNode(store: ApiStore, collectionId: string, nodeId: string | null): { script?: RequestScript; auth?: Auth } {
+  const c = requireCollection(store, collectionId);
+  if (!nodeId) return c;
+  const item = findItemIn(c.items, nodeId);
+  if (!item || item.type !== 'folder') throw new Error(`No folder with id "${nodeId}" in collection "${collectionId}"`);
+  return item;
+}
+
 function requireEnvironment(store: ApiStore, id: string) {
   const e = store.environments.find((e) => e.id === id);
   if (!e) throw new Error(`No environment with id "${id}"`);
@@ -100,6 +111,45 @@ function requireEnvironment(store: ApiStore, id: string) {
 function requireString(v: unknown, name: string): string {
   if (typeof v !== 'string' || !v) throw new Error(`"${name}" is required and must be a string`);
   return v;
+}
+
+// update_request/set_node_script/set_node_auth all accept either a full
+// replacement object or a partial patch for these nested fields (script,
+// auth, body, settings) — store.updateRequest/setNodeScript/setNodeAuth
+// themselves do a shallow top-level merge, which would otherwise silently
+// drop sibling fields a caller didn't mention (e.g. patching only
+// script.req would wipe out script.res). These merge one level deeper so a
+// caller can touch req without resending res, or one auth/body/settings
+// field without resending the rest — while a full object still produces the
+// same result as a plain replace.
+
+function mergeScript(current: RequestScript | undefined, patch: unknown): RequestScript {
+  const base = current ?? { req: '', res: '' };
+  return { ...base, ...((patch ?? {}) as Partial<RequestScript>) };
+}
+
+function mergeAuth(current: Auth | undefined, patch: unknown): Auth {
+  const base = current ?? newAuth();
+  const p = (patch ?? {}) as Partial<Auth>;
+  return {
+    ...base,
+    ...p,
+    apiKey: { ...base.apiKey, ...(p.apiKey ?? {}) },
+    oauth2: { ...base.oauth2, ...(p.oauth2 ?? {}) },
+  };
+}
+
+function mergeBody(current: RequestBody, patch: unknown): RequestBody {
+  const p = (patch ?? {}) as Partial<RequestBody>;
+  return {
+    ...current,
+    ...p,
+    ...(p.graphql ? { graphql: { ...(current.graphql ?? { query: '', variables: '' }), ...p.graphql } } : {}),
+  };
+}
+
+function mergeSettings(current: RequestSettings, patch: unknown): RequestSettings {
+  return { ...current, ...((patch ?? {}) as Partial<RequestSettings>) };
 }
 
 function summarizeItems(items: TreeItem[]): unknown[] {
@@ -164,11 +214,58 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
 
     get_environment: async (args) => requireEnvironment(store, requireString(args.environmentId, 'environmentId')),
 
+    // Whole-environment patch — `patch.variables` replaces the entire array,
+    // same contract as set_collection_variables/set_node_headers. `patch` may
+    // also include `collectionId` to move the environment between global
+    // (null) and a collection's scope. For touching one or a few variables
+    // without resending the rest, use set_environment_variable /
+    // delete_environment_variable instead.
     update_environment: async (args) => {
       const id = requireString(args.environmentId, 'environmentId');
       requireEnvironment(store, id);
       store.updateEnvironment(id, (args.patch ?? {}) as Partial<Environment>);
       return { ok: true };
+    },
+
+    // Upsert one variable by key — creates it (enabled by default) if no
+    // existing row has that key, otherwise patches only the fields passed.
+    // Only replaces the one row; every other variable is left untouched.
+    set_environment_variable: async (args) => {
+      const id = requireString(args.environmentId, 'environmentId');
+      const env = requireEnvironment(store, id);
+      const key = requireString(args.key, 'key');
+      const idx = env.variables.findIndex((v) => v.key === key);
+      const variables = [...env.variables];
+      if (idx >= 0) {
+        variables[idx] = {
+          ...variables[idx],
+          ...(typeof args.value === 'string' ? { value: args.value } : {}),
+          ...(typeof args.enabled === 'boolean' ? { enabled: args.enabled } : {}),
+          ...(typeof args.secret === 'boolean' ? { secret: args.secret } : {}),
+        };
+      } else {
+        variables.push({
+          id: uid(),
+          key,
+          value: typeof args.value === 'string' ? args.value : '',
+          enabled: typeof args.enabled === 'boolean' ? args.enabled : true,
+          ...(typeof args.secret === 'boolean' ? { secret: args.secret } : {}),
+        });
+      }
+      store.updateEnvironment(id, { variables });
+      return { ok: true, variable: variables[idx >= 0 ? idx : variables.length - 1] };
+    },
+
+    // Remove one variable by key. No-op (ok:true, deleted:false) if the key
+    // wasn't present, rather than erroring.
+    delete_environment_variable: async (args) => {
+      const id = requireString(args.environmentId, 'environmentId');
+      const env = requireEnvironment(store, id);
+      const key = requireString(args.key, 'key');
+      const variables = env.variables.filter((v) => v.key !== key);
+      const deleted = variables.length !== env.variables.length;
+      if (deleted) store.updateEnvironment(id, { variables });
+      return { ok: true, deleted };
     },
 
     set_active_environment: async (args) => {
@@ -185,10 +282,21 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
 
     get_request: async (args) => findRequestWithCollection(store, requireString(args.requestId, 'requestId')).request,
 
+    // `patch.script`/`.auth`/`.body`/`.settings` may be a full object (same
+    // as a plain replace) or a partial one — e.g. { script: { req: "..." } }
+    // changes only the pre-request script and leaves the post-response one
+    // (script.res) as-is, rather than clobbering it. See mergeScript/
+    // mergeAuth/mergeBody/mergeSettings above.
     update_request: async (args) => {
       const id = requireString(args.requestId, 'requestId');
-      findRequestWithCollection(store, id);
-      store.updateRequest(id, (args.patch ?? {}) as Partial<ApiRequest>);
+      const { request } = findRequestWithCollection(store, id);
+      const patch = (args.patch ?? {}) as Partial<ApiRequest>;
+      const merged: Partial<ApiRequest> = { ...patch };
+      if ('script' in patch) merged.script = mergeScript(request.script, patch.script);
+      if ('auth' in patch) merged.auth = mergeAuth(request.auth, patch.auth);
+      if ('body' in patch) merged.body = mergeBody(request.body, patch.body);
+      if ('settings' in patch) merged.settings = mergeSettings(request.settings, patch.settings);
+      store.updateRequest(id, merged);
       return findRequestWithCollection(store, id).request;
     },
 
@@ -306,19 +414,25 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
     // ── every request under them. A request's OWN script/auth/headers are ──
     // ── just fields on it (see update_request's patch.script/.auth/.headers) ──
 
+    // `script` may be a full { req, res } object or a partial one — merges
+    // onto whatever this node's own script already is, same as
+    // update_request's patch.script (see mergeScript above).
     set_node_script: async (args) => {
       const collectionId = requireString(args.collectionId, 'collectionId');
-      requireCollection(store, collectionId);
       const nodeId = typeof args.nodeId === 'string' ? args.nodeId : null;
-      store.setNodeScript(collectionId, nodeId, (args.script ?? { req: '', res: '' }) as RequestScript);
+      const node = requireNode(store, collectionId, nodeId);
+      store.setNodeScript(collectionId, nodeId, mergeScript(node.script, args.script));
       return { ok: true };
     },
 
+    // `auth` may be a full Auth object or a partial one — merges onto
+    // whatever this node's own auth already is, same as update_request's
+    // patch.auth (see mergeAuth above).
     set_node_auth: async (args) => {
       const collectionId = requireString(args.collectionId, 'collectionId');
-      requireCollection(store, collectionId);
       const nodeId = typeof args.nodeId === 'string' ? args.nodeId : null;
-      store.setNodeAuth(collectionId, nodeId, (args.auth ?? {}) as Auth);
+      const node = requireNode(store, collectionId, nodeId);
+      store.setNodeAuth(collectionId, nodeId, mergeAuth(node.auth, args.auth));
       return { ok: true };
     },
 

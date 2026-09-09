@@ -158,6 +158,57 @@ describe('useMcpBridge — Tauri desktop', () => {
     expect((res.result as ApiRequest).url).toBe('/new-url');
   });
 
+  it('update_request patch.script only touches the given side (req/res), leaving the other untouched', async () => {
+    const store = makeStore();
+    const req = store.collections[0].items[0] as ApiRequest;
+    req.script = { req: 'existing pre-script', res: 'existing post-script' };
+
+    await call(store, 'update_request', { requestId: req.id, patch: { script: { req: 'new pre-script' } } });
+    expect(store.updateRequest).toHaveBeenCalledWith(req.id, {
+      script: { req: 'new pre-script', res: 'existing post-script' },
+    });
+  });
+
+  it('update_request patch.auth merges a partial nested apiKey patch without dropping the rest of auth', async () => {
+    const store = makeStore();
+    const req = store.collections[0].items[0] as ApiRequest;
+    req.auth = {
+      type: 'apikey', token: '', username: '', password: '',
+      apiKey: { key: 'X-Api-Key', value: 'old-value', placement: 'header' },
+      oauth2: { grantType: 'client_credentials', tokenUrl: '', clientId: '', clientSecret: '', scope: '', username: '', password: '' },
+    };
+
+    await call(store, 'update_request', { requestId: req.id, patch: { auth: { apiKey: { value: 'new-value' } } } });
+    expect(store.updateRequest).toHaveBeenCalledWith(req.id, {
+      auth: expect.objectContaining({
+        type: 'apikey',
+        apiKey: { key: 'X-Api-Key', value: 'new-value', placement: 'header' },
+      }),
+    });
+  });
+
+  it('update_request patch.body merges onto the existing body, leaving unrelated fields (e.g. form) intact', async () => {
+    const store = makeStore();
+    const req = store.collections[0].items[0] as ApiRequest;
+    req.body = { mode: 'json', raw: '{}', form: [{ id: 'f1', key: 'a', value: 'b', enabled: true }] };
+
+    await call(store, 'update_request', { requestId: req.id, patch: { body: { raw: '{"x":1}' } } });
+    expect(store.updateRequest).toHaveBeenCalledWith(req.id, {
+      body: { mode: 'json', raw: '{"x":1}', form: [{ id: 'f1', key: 'a', value: 'b', enabled: true }] },
+    });
+  });
+
+  it('update_request patch.settings merges onto the existing settings', async () => {
+    const store = makeStore();
+    const req = store.collections[0].items[0] as ApiRequest;
+    req.settings = { encodeUrl: true, followRedirects: false, maxRedirects: 3, timeout: 5000, tags: ['slow'], verifyTls: true };
+
+    await call(store, 'update_request', { requestId: req.id, patch: { settings: { timeout: 9000 } } });
+    expect(store.updateRequest).toHaveBeenCalledWith(req.id, {
+      settings: { encodeUrl: true, followRedirects: false, maxRedirects: 3, timeout: 9000, tags: ['slow'], verifyTls: true },
+    });
+  });
+
   it('create_request adds a request under the given collection/folder', async () => {
     const store = makeStore();
     const res = await call(store, 'create_request', { collectionId: 'c1', request: { name: 'New', url: '/x' } });
@@ -243,10 +294,46 @@ describe('useMcpBridge — Tauri desktop', () => {
   it('set_node_auth / set_node_headers default nodeId to null for the collection root', async () => {
     const store = makeStore();
     await call(store, 'set_node_auth', { collectionId: 'c1', auth: { type: 'bearer', token: 't' } });
-    expect(store.setNodeAuth).toHaveBeenCalledWith('c1', null, { type: 'bearer', token: 't' });
+    // Merges onto the (absent) existing auth, so a full Auth object comes out
+    // even though only type/token were passed — see mergeAuth.
+    expect(store.setNodeAuth).toHaveBeenCalledWith('c1', null, expect.objectContaining({
+      type: 'bearer', token: 't',
+      apiKey: { key: '', value: '', placement: 'header' },
+      oauth2: expect.objectContaining({ grantType: 'client_credentials' }),
+    }));
 
     await call(store, 'set_node_headers', { collectionId: 'c1', nodeId: 'f1', headers: [{ id: 'h1', key: 'X', value: 'Y', enabled: true }] });
     expect(store.setNodeHeaders).toHaveBeenCalledWith('c1', 'f1', [{ id: 'h1', key: 'X', value: 'Y', enabled: true }]);
+  });
+
+  it('set_node_script merges a partial patch onto the node\'s existing script instead of replacing it', async () => {
+    const store = makeStore();
+    store.collections[0].script = { req: 'existing pre-script', res: 'existing post-script' };
+
+    await call(store, 'set_node_script', { collectionId: 'c1', script: { req: 'new pre-script' } });
+    expect(store.setNodeScript).toHaveBeenCalledWith('c1', null, { req: 'new pre-script', res: 'existing post-script' });
+  });
+
+  it('set_node_script errors for an unknown folder id, without calling setNodeScript', async () => {
+    const store = makeStore();
+    const res = await call(store, 'set_node_script', { collectionId: 'c1', nodeId: 'missing-folder', script: { req: 'x' } });
+    expect(res.error).toMatch(/No folder with id/);
+    expect(store.setNodeScript).not.toHaveBeenCalled();
+  });
+
+  it('set_node_auth merges a partial nested apiKey patch onto the node\'s existing auth', async () => {
+    const store = makeStore();
+    store.collections[0].auth = {
+      type: 'apikey', token: '', username: '', password: '',
+      apiKey: { key: 'X-Api-Key', value: 'old-value', placement: 'header' },
+      oauth2: { grantType: 'client_credentials', tokenUrl: '', clientId: '', clientSecret: '', scope: '', username: '', password: '' },
+    };
+
+    await call(store, 'set_node_auth', { collectionId: 'c1', auth: { apiKey: { value: 'new-value' } } });
+    expect(store.setNodeAuth).toHaveBeenCalledWith('c1', null, expect.objectContaining({
+      type: 'apikey',
+      apiKey: { key: 'X-Api-Key', value: 'new-value', placement: 'header' },
+    }));
   });
 
   it('add_environment creates then optionally names/seeds variables', async () => {
@@ -286,6 +373,43 @@ describe('useMcpBridge — Tauri desktop', () => {
 
     const missing = await call(store, 'get_environment', { environmentId: 'nope' });
     expect(missing.error).toMatch(/No environment with id/);
+  });
+
+  it('set_environment_variable creates a new row when the key is absent, patches only given fields when present', async () => {
+    const store = makeStore();
+
+    const created = await call(store, 'set_environment_variable', { environmentId: 'e1', key: 'API_KEY', value: 'abc' });
+    expect(store.updateEnvironment).toHaveBeenLastCalledWith('e1', {
+      variables: [expect.objectContaining({ key: 'API_KEY', value: 'abc', enabled: true })],
+    });
+    expect(created.result).toMatchObject({ variable: { key: 'API_KEY', value: 'abc', enabled: true } });
+
+    // Simulate the store applying that write, then patch just `enabled`.
+    store.environments[0].variables = [{ id: 'v1', key: 'API_KEY', value: 'abc', enabled: true }];
+    const patched = await call(store, 'set_environment_variable', { environmentId: 'e1', key: 'API_KEY', enabled: false });
+    expect(store.updateEnvironment).toHaveBeenLastCalledWith('e1', {
+      variables: [{ id: 'v1', key: 'API_KEY', value: 'abc', enabled: false }],
+    });
+    expect(patched.result).toMatchObject({ variable: { key: 'API_KEY', value: 'abc', enabled: false } });
+  });
+
+  it('delete_environment_variable removes only the matching key and no-ops when absent', async () => {
+    const store = makeStore();
+    store.environments[0].variables = [
+      { id: 'v1', key: 'KEEP', value: '1', enabled: true },
+      { id: 'v2', key: 'DROP', value: '2', enabled: true },
+    ];
+
+    const res = await call(store, 'delete_environment_variable', { environmentId: 'e1', key: 'DROP' });
+    expect(store.updateEnvironment).toHaveBeenCalledWith('e1', {
+      variables: [{ id: 'v1', key: 'KEEP', value: '1', enabled: true }],
+    });
+    expect(res.result).toEqual({ ok: true, deleted: true });
+
+    (store.updateEnvironment as ReturnType<typeof vi.fn>).mockClear();
+    const noop = await call(store, 'delete_environment_variable', { environmentId: 'e1', key: 'NOPE' });
+    expect(store.updateEnvironment).not.toHaveBeenCalled();
+    expect(noop.result).toEqual({ ok: true, deleted: false });
   });
 
   it('set_active_environment routes to global vs. collection scope', async () => {
