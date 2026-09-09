@@ -1,6 +1,6 @@
-# MCP for DevTool's API Client, Mock Server, Redis Client, and Kafka Explorer
+# MCP for DevTool's API Client, Mock Server, Redis Client, Kafka Explorer, and RabbitMQ Client
 
-Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive four
+Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive five
 DevTool tools from one server:
 
 - **API Client** — list/read/edit collections, requests, scripts, and
@@ -10,13 +10,14 @@ DevTool tools from one server:
 - **Mock Server** — list/read/edit stubs and the fallback response, **start/
   stop** the server, test a response script before saving it, and read the
   request log — all through the same state the UI edits.
-- **Redis Client** and **Kafka Explorer** — **connection management only**:
-  list/add/update/delete/test saved connection profiles, plus connect/
-  disconnect. No key/pub-sub/admin tools for Redis, no topic/consumer-group/
-  produce/consume tools for Kafka — deliberately scoped to connection setup,
-  not data access.
+- **Redis Client**, **Kafka Explorer**, and **RabbitMQ Client** —
+  **connection management only**: list/add/update/delete/test saved
+  connection profiles, plus connect/disconnect. No key/pub-sub/admin tools
+  for Redis, no topic/consumer-group/produce/consume tools for Kafka, no
+  queue/exchange/publish/consume/RPC tools for RabbitMQ — deliberately
+  scoped to connection setup, not data access.
 
-67 tools total; see the full list further down. Three of those
+76 tools total; see the full list further down. Three of those
 (`devtool_mcp_status`, `devtool_mcp_set_background`,
 `devtool_mcp_set_tool_enabled`) manage the MCP integration itself — see
 "DevTool MCP management" below.
@@ -36,10 +37,10 @@ true:
 - **Default** — **the tool that owns the call** is the one currently on
   screen: an API Client tool (`list_collections`, `run_request`, etc.)
   needs the API Client tool open; `mock_*` needs Mock Server open; `redis_*`
-  needs Redis Client open; `kafka_*` needs Kafka Explorer open (that's where
-  each tool's live state is mounted).
+  needs Redis Client open; `kafka_*` needs Kafka Explorer open; `rabbit_*`
+  needs RabbitMQ Client open (that's where each tool's live state is mounted).
 - **Settings → MCP → Background MCP bridge** (off by default) — turn this
-  on and all four tools answer regardless of which one is on screen, or even
+  on and all five tools answer regardless of which one is on screen, or even
   while you're on a completely different tool. Off by default per this
   app's "no silent network calls" rule — it's an explicit opt-in, not
   something that starts listening on its own.
@@ -52,26 +53,27 @@ MCP while leaving the others working normally.
 
 Anything else — app closed, a tool switched off, or neither on-screen/
 background condition above holds — comes back as a clear error telling you
-so, not a hang. The four bridges
+so, not a hang. The five bridges
 (`src/components/tools/apiclient/mcpBridge.ts`,
 `src/components/tools/mockserver/mcpBridge.ts`,
-`src/components/tools/redis/mcpBridge.ts`, and
-`src/components/tools/kafka/mcpBridge.ts`) listen on the same underlying
+`src/components/tools/redis/mcpBridge.ts`,
+`src/components/tools/kafka/mcpBridge.ts`, and
+`src/components/tools/rabbit/mcpBridge.ts`) listen on the same underlying
 event but never collide: each ignores tool names it doesn't own, and by
 default only one tool's own bridge is ever mounted at a time anyway (React
 Router mounts one tool's component tree at a time) — the background bridge
-(`src/components/McpBackgroundBridge.tsx`) is the one case where all four
+(`src/components/McpBackgroundBridge.tsx`) is the one case where all five
 are deliberately mounted together, sharing the exact same
 store/state each tool's own UI reads (see `apiclient/mcpRuntimeContext.tsx`,
 `mockserver/mcpRuntimeContext.tsx`, `redis/mcpRuntimeContext.tsx`,
-`kafka/mcpRuntimeContext.tsx`) so a UI edit and an MCP edit can't silently
-clobber each other.
+`kafka/mcpRuntimeContext.tsx`, `rabbit/mcpRuntimeContext.tsx`) so a UI edit
+and an MCP edit can't silently clobber each other.
 
-A fifth listener, `src/components/McpManageBridge.tsx`, is **always**
+A sixth listener, `src/components/McpManageBridge.tsx`, is **always**
 mounted regardless of the Background MCP bridge setting or the per-tool
 toggles — see "DevTool MCP management" below. It only answers three tool
 names of its own (`devtool_mcp_status`, `devtool_mcp_set_background`,
-`devtool_mcp_set_tool_enabled`) and, like the other four, ignores
+`devtool_mcp_set_tool_enabled`) and, like the other five, ignores
 everything else.
 
 The two processes find each other automatically: on launch, DevTool writes
@@ -83,12 +85,14 @@ its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
 **Excluded on purpose:** the Vault (API Client's local secret store) isn't
 exposed here — the UI itself keeps Vault values out of generated code, cURL
 export, and history, and an MCP client reading/writing it would defeat that
-boundary. Redis/Kafka connection passwords are a different case: they're
-part of the saved connection profile itself (same as API Client's Basic
-Auth password), stored in plain JSON in the app data dir and already
-returned unmasked by the app's own `redis_list_configs`/`kafka_list_configs`
-commands — so `redis_list_connections`/`kafka_list_connections` return them
-unmasked too, for the same reason `get_request` doesn't mask `auth.password`.
+boundary. Redis/Kafka/RabbitMQ connection passwords (and RabbitMQ's TLS
+client identity fields) are a different case: they're part of the saved
+connection profile itself (same as API Client's Basic Auth password),
+stored in plain JSON in the app data dir and already returned unmasked by
+the app's own `redis_list_configs`/`kafka_list_configs`/`rabbit_list_configs`
+commands — so `redis_list_connections`/`kafka_list_connections`/
+`rabbit_list_connections` return them unmasked too, for the same reason
+`get_request` doesn't mask `auth.password`.
 
 ## Setup — installed the app from a binary?
 
@@ -102,9 +106,10 @@ app (a Tauri sidecar, `bundle.externalBin`).
    install's copy of the binary) and run it once in a terminal.
 3. Open a new Claude Code (or Claude Desktop) session and use it.
 
-One registration covers all four tools — it's the same `devtool-mcp-server`
+One registration covers all five tools — it's the same `devtool-mcp-server`
 process either way, so there's nothing separate to set up for Mock Server's
-`mock_*`, Redis Client's `redis_*`, or Kafka Explorer's `kafka_*` tools.
+`mock_*`, Redis Client's `redis_*`, Kafka Explorer's `kafka_*`, or RabbitMQ
+Client's `rabbit_*` tools.
 
 The same dialog also has the **Background MCP bridge** toggle and the
 **Per-tool MCP access** list — the exact settings Settings → MCP has, just
@@ -224,12 +229,24 @@ connection management only, no topic/consumer-group/produce/consume tools):
 | `kafka_connect` / `kafka_disconnect` | Mark a saved broker as active (same as the Connect/Disconnect buttons); stops any realtime consumers running against the previously-connected broker. |
 | `kafka_connection_status` | Current selected/connected broker id. |
 
+RabbitMQ Client (each needs the **RabbitMQ Client** tool open, not API
+Client — connection management only, no queue/exchange/publish/consume/RPC
+tools):
+
+| Tool | Does |
+|---|---|
+| `rabbit_list_connections` / `rabbit_get_connection` | Read saved connection profiles (id/name/host/port/vhost/username/password/useTls/amqpPort/amqpOnly, plus optional TLS/heartbeat/extraHosts fields), unmasked. |
+| `rabbit_add_connection` / `rabbit_update_connection` / `rabbit_delete_connection` | Connection profile lifecycle. `rabbit_update_connection` takes a partial patch — flat fields, no nested merge needed. |
+| `rabbit_test_connection` | Verify a saved connection is reachable over AMQP (and the management API too, unless `amqpOnly`), without marking it as connected. |
+| `rabbit_connect` / `rabbit_disconnect` | Mark a saved connection as active (same as the Connect/Disconnect buttons); stops any live consumers running against the previously-connected connection. |
+| `rabbit_connection_status` | Current selected/connected connection id. |
+
 DevTool MCP management (always answers, regardless of the Background MCP
 bridge setting or the per-tool toggles — that's the point):
 
 | Tool | Does |
 |---|---|
-| `devtool_mcp_status` | Current MCP integration state: whether the Background MCP bridge is on, the per-tool `toolsEnabled` map (api-client/mock-server/redis-client/kafka-explorer), plus the mock server's running status/URL. Call this first if a call unexpectedly times out. |
+| `devtool_mcp_status` | Current MCP integration state: whether the Background MCP bridge is on, the per-tool `toolsEnabled` map (api-client/mock-server/redis-client/kafka-explorer/rabbit-client), plus the mock server's running status/URL. Call this first if a call unexpectedly times out. |
 | `devtool_mcp_set_background` | Turn the Background MCP bridge on or off (mirrors Settings → MCP → Background MCP bridge). Lets a caller enable "answer regardless of which tool is on screen / focus" mode itself, without asking the user to click the toggle. |
 | `devtool_mcp_set_tool_enabled` | Turn one tool's MCP access on or off (mirrors Settings → MCP → Per-tool MCP access). A disabled tool never answers any of its calls, on screen or in the background — stricter than, and independent of, the background bridge. |
 
@@ -251,8 +268,9 @@ Reference:
   check both:
   - A different tool is on screen and the background bridge is off. Either
     switch to the owning tool (API Client for its tools, Mock Server for
-    `mock_*`, Redis Client for `redis_*`, Kafka Explorer for `kafka_*`), or
-    call `devtool_mcp_set_background` with `enabled: true` (or turn on
+    `mock_*`, Redis Client for `redis_*`, Kafka Explorer for `kafka_*`,
+    RabbitMQ Client for `rabbit_*`), or call `devtool_mcp_set_background`
+    with `enabled: true` (or turn on
     Settings → MCP → Background MCP bridge by hand) so it stops mattering
     which tool is on screen or whether the app window is focused.
   - The owning tool is switched off in **Settings → MCP → Per-tool MCP

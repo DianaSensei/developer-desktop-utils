@@ -9,13 +9,13 @@ import { usePersistentState } from './usePersistentState';
  * enabled, so this doesn't change behavior for anyone who hasn't touched it.
  *
  * Keyed by the same tool ids TOOL_DEFS/FeatureContext already use
- * ('api-client', 'mock-server', 'redis-client', 'kafka-explorer') so a
- * label only has to be looked up once, from TOOL_DEFS, rather than
- * duplicated here.
+ * ('api-client', 'mock-server', 'redis-client', 'kafka-explorer',
+ * 'rabbit-client') so a label only has to be looked up once, from
+ * TOOL_DEFS, rather than duplicated here.
  */
-export type McpToolId = 'api-client' | 'mock-server' | 'redis-client' | 'kafka-explorer';
+export type McpToolId = 'api-client' | 'mock-server' | 'redis-client' | 'kafka-explorer' | 'rabbit-client';
 
-export const MCP_TOOL_IDS: McpToolId[] = ['api-client', 'mock-server', 'redis-client', 'kafka-explorer'];
+export const MCP_TOOL_IDS: McpToolId[] = ['api-client', 'mock-server', 'redis-client', 'kafka-explorer', 'rabbit-client'];
 
 /**
  * One-line summary of what an MCP client can actually do to each tool while
@@ -29,6 +29,7 @@ export const MCP_TOOL_CAPABILITIES: Record<McpToolId, string> = {
   'mock-server': 'Read/edit stubs and the fallback response, start/stop the server, test a response script, and read the request log.',
   'redis-client': 'Connection profiles only: list/add/edit/delete/test, plus connect/disconnect. No key browsing/editing, Pub/Sub, or admin commands.',
   'kafka-explorer': 'Connection profiles only: list/add/edit/delete/test, plus connect/disconnect. No topics, consumer groups, or produce/consume.',
+  'rabbit-client': 'Connection profiles only: list/add/edit/delete/test, plus connect/disconnect. No queues, exchanges, publish/consume, or RPC.',
 };
 
 const KEY = 'devtool-mcp-tool-enabled';

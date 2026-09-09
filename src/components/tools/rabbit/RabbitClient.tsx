@@ -9,7 +9,10 @@ import { cn } from '@/lib/utils';
 import { rabbitApi, type RabbitConnection } from './types';
 import { rabbitMgmt } from './api';
 import { liveConnections } from '@/lib/liveConnections';
-import { useRabbitState } from './useRabbitState';
+import { useRabbitRuntime } from './mcpRuntimeContext';
+import { useMcpBridge } from './mcpBridge';
+import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { LeftPanel } from './LeftPanel';
 import { OverviewView } from './OverviewView';
 import { ConnectionsView } from './ConnectionsView';
@@ -32,12 +35,21 @@ const LEFT_DEFAULT = 264;
 let cachedConnections: RabbitConnection[] | null = null;
 
 export function RabbitClient() {
+  const rabbitState = useRabbitRuntime();
   const {
     selectedConnId, setSelectedConnId, connectedConnId, setConnectedConnId,
     view, selectedQueue, selectedExchange, rpcPrefill, consumerPrefill, consumeDetailQueue,
     showOverview, showConnections, showRpc, showConsumers, openConsumer, showQueues, showExchanges, selectQueue, selectExchange,
     refreshKey, refresh,
-  } = useRabbitState();
+  } = rabbitState;
+
+  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
+  const { enabled: mcpToolEnabled } = useMcpToolEnabled('rabbit-client');
+  // Skipped while the background bridge (Settings → MCP) is on — that one
+  // instance, mounted once at the app root, already answers for this exact
+  // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
+  // Also skipped outright when the per-tool MCP toggle is off for RabbitMQ Client.
+  useMcpBridge(rabbitState, mcpToolEnabled && !mcpBackgroundEnabled);
 
   const [connections, setConnections] = useState<RabbitConnection[]>(cachedConnections ?? []);
   const [connLoading, setConnLoading] = useState(cachedConnections === null);

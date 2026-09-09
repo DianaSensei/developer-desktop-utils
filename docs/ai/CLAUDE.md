@@ -934,10 +934,21 @@ Key files:
 
 **Live indicator:** `useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected])` in `RabbitClient.tsx`.
 
+**MCP (`mcpBridge.ts`, `mcpRuntimeContext.tsx`):** `rabbit_*` tools cover
+connection profile management only (list/add/update/delete/test/connect/
+disconnect) — no queue/exchange/publish/consume/RPC tools, unlike the API
+Client/Mock Server MCP surface. See "MCP bridge" further down for the
+shared architecture; `RabbitClient.tsx` reads `useRabbitState()` via
+`useRabbitRuntime()` (not directly) so the MCP bridge and the UI share one
+instance of `connectedConnId`/`selectedConnId`. `rabbit_test_connection`/
+`rabbit_connect` run the same two-step check as `handleConnect` (AMQP test,
+plus the management API test when the profile isn't `amqpOnly`).
+
 Key files:
 - `RabbitClient.tsx` — root component, connect/disconnect, resize, routing
 - `LeftPanel.tsx` — connection selector + status dot + Connect/Disconnect button
 - `useRabbitState.ts` — navigation state + persisted `connectedConnId`
+- `mcpRuntimeContext.tsx` / `mcpBridge.ts` — MCP connection-management tools
 - `ConnectionForm.tsx` — AMQP-first form: Addresses (comma-separated multi-host), optional management API toggle, Advanced (vhost), Paste URI collapsible
 - `api.ts` — `rabbitMgmt` HTTP client + `QUEUE_LIST_QUERY` / `EXCHANGE_LIST_QUERY` constants
 - `types.ts` — `RabbitConnection`, `rabbitApi` Tauri invoke wrappers
@@ -991,7 +1002,7 @@ Key files:
 
 ### MCP bridge — API Client + Mock Server + Redis Client + Kafka Explorer (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/{apiclient,mockserver,redis,kafka}/mcpBridge.ts`)
 
-An external MCP client (Claude Desktop/Code) can inspect and drive four
+An external MCP client (Claude Desktop/Code) can inspect and drive five
 DevTool tools through one server. API Client: list/read/edit collections,
 requests, scripts, environments, and actually **send a request** through the
 same engine the Send button uses (result lands in the UI + History like any
@@ -999,16 +1010,18 @@ other send). Mock Server: list/read/edit stubs and the fallback response,
 **start/stop** the server, test a Rhai response script, and read the request
 log — including `set_environment_variable`/`delete_environment_variable` for
 touching one or a few environment variables without resending the whole
-array via `update_environment`. Redis Client (`redis_*`) and Kafka Explorer
-(`kafka_*`): **connection management only** — list/add/update/delete/test
-saved connection profiles, plus connect/disconnect. Deliberately excludes
-data operations (no Redis key/pub-sub/admin tools, no Kafka topic/consumer-
-group/produce/consume tools) — a narrower surface than API Client/Mock
-Server on purpose. Plus three management tools (`devtool_mcp_status`,
-`devtool_mcp_set_background`, `devtool_mcp_set_tool_enabled`) that let a
-caller check and flip the Background MCP bridge setting and each tool's
-own MCP kill switch itself instead of asking the user to click it.
-67 tools; see `docs/human/mcp-server.md` for the full list and setup
+array via `update_environment`. Redis Client (`redis_*`), Kafka Explorer
+(`kafka_*`), and RabbitMQ Client (`rabbit_*`): **connection management
+only** — list/add/update/delete/test saved connection profiles, plus
+connect/disconnect. Deliberately excludes data operations (no Redis
+key/pub-sub/admin tools, no Kafka topic/consumer-group/produce/consume
+tools, no RabbitMQ queue/exchange/publish/consume/RPC tools) — a narrower
+surface than API Client/Mock Server on purpose. Plus three management
+tools (`devtool_mcp_status`, `devtool_mcp_set_background`,
+`devtool_mcp_set_tool_enabled`) that let a caller check and flip the
+Background MCP bridge setting and each tool's own MCP kill switch itself
+instead of asking the user to click it.
+76 tools; see `docs/human/mcp-server.md` for the full list and setup
 instructions.
 
 **The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
@@ -1016,29 +1029,34 @@ instructions.
 `<app_data_dir>/mcp-bridge.json`). It has no access to app state itself — a
 `POST /call` emits an `mcp:call` Tauri event and blocks on a
 `tokio::sync::oneshot` (30s timeout) until the frontend answers via the
-`mcp_respond` command. Four frontend listeners answer it — `apiclient/
+`mcp_respond` command. Five frontend listeners answer it — `apiclient/
 mcpBridge.ts`'s `useMcpBridge(store, runRequest, enabled)` against the
 **live** `ApiStore`; `mockserver/mcpBridge.ts`'s `useMcpBridge(state,
-enabled)` against `useMockServer()`'s return value; `redis/mcpBridge.ts`'s
-and `kafka/mcpBridge.ts`'s `useMcpBridge(state, enabled)` against
-`useRedisState()`'s/`useKafkaState()`'s return value for connect/disconnect
-(connection CRUD itself needs no React state — `redisApi`/`kafkaApi` are
-thin Tauri-invoke wrappers over a JSON file in the app data dir, callable
-directly). Each ignores tool names it doesn't own rather than erroring,
-since all four can now be listening on the shared `mcp:call` event at once
-(see below).
+enabled)` against `useMockServer()`'s return value; `redis/mcpBridge.ts`'s,
+`kafka/mcpBridge.ts`'s, and `rabbit/mcpBridge.ts`'s `useMcpBridge(state,
+enabled)` against `useRedisState()`'s/`useKafkaState()`'s/`useRabbitState()`'s
+return value for connect/disconnect (connection CRUD itself needs no React
+state — `redisApi`/`kafkaApi`/`rabbitApi` are thin Tauri-invoke wrappers
+over a JSON file in the app data dir, callable directly; RabbitMQ's
+connect/test additionally call `rabbitMgmt.testConnection`, a plain HTTP
+request, when the profile isn't AMQP-only). Each ignores tool names it
+doesn't own rather than erroring, since all five can now be listening on
+the shared `mcp:call` event at once (see below).
 
 **Where the store lives, and why it's shared:** `apiclient/
 mcpRuntimeContext.tsx`, `mockserver/mcpRuntimeContext.tsx`,
-`redis/mcpRuntimeContext.tsx`, and `kafka/mcpRuntimeContext.tsx` each hold
-one `useApiStore()`/`useMockServer()`/`useRedisState()`/`useKafkaState()`
-instance in a context, provided once at the app root
+`redis/mcpRuntimeContext.tsx`, `kafka/mcpRuntimeContext.tsx`, and
+`rabbit/mcpRuntimeContext.tsx` each hold one
+`useApiStore()`/`useMockServer()`/`useRedisState()`/`useKafkaState()`/
+`useRabbitState()` instance in a context, provided once at the app root
 (`ApiClientRuntimeProvider`/`MockServerRuntimeProvider`/
-`RedisRuntimeProvider`/`KafkaRuntimeProvider` in `App.tsx`, always mounted —
-cheap, since none of these hooks does I/O beyond an initial localStorage
-read). `ApiClient.tsx`/`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`
-read it via `useApiClientRuntime()`/`useMockServerRuntime()`/
-`useRedisRuntime()`/`useKafkaRuntime()` instead of instantiating
+`RedisRuntimeProvider`/`KafkaRuntimeProvider`/`RabbitRuntimeProvider` in
+`App.tsx`, always mounted — cheap, since none of these hooks does I/O
+beyond an initial localStorage read).
+`ApiClient.tsx`/`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`/
+`RabbitClient.tsx` read it via `useApiClientRuntime()`/
+`useMockServerRuntime()`/`useRedisRuntime()`/`useKafkaRuntime()`/
+`useRabbitRuntime()` instead of instantiating
 their own. This used to not matter — React Router unmounts the previous
 route on every tool switch, so at most one instance of either store was ever
 alive. It matters now because of the background bridge below: two
@@ -1049,14 +1067,15 @@ everything else, silently dropping whichever wrote second.
 **Background bridge (Settings → MCP):** by default, each bridge only
 answers while its own tool is the one on screen — `useMcpBridge(..., enabled)`
 is called with `enabled = mcpToolEnabled && !mcpBackgroundEnabled` from
-`ApiClient.tsx`/`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`.
-`useMcpBackgroundBridge()` (`src/hooks/useMcpBackgroundBridge.ts`) is an
-opt-in, persisted, off-by-default toggle (per the "no silent network calls"
-rule above) that lets an MCP client drive any of the four tools regardless
-of which one is on screen. When it's on, `McpBackgroundBridge.tsx` —
-mounted once at the app root, reading all four runtime contexts — calls all
-four `useMcpBridge`s itself with `enabled = isEnabled(toolId)` (still gated
-by the per-tool toggle below, just not by "on screen"); the per-tool calls
+`ApiClient.tsx`/`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`/
+`RabbitClient.tsx`. `useMcpBackgroundBridge()`
+(`src/hooks/useMcpBackgroundBridge.ts`) is an opt-in, persisted,
+off-by-default toggle (per the "no silent network calls" rule above) that
+lets an MCP client drive any of the five tools regardless of which one is
+on screen. When it's on, `McpBackgroundBridge.tsx` — mounted once at the
+app root, reading all five runtime contexts — calls all five
+`useMcpBridge`s itself with `enabled = isEnabled(toolId)` (still gated by
+the per-tool toggle below, just not by "on screen"); the per-tool calls
 stay `enabled = false` at the same time so no mount point ever
 double-answers the same call. A call only ever succeeds while the app is
 open, the tool is enabled (see next paragraph), and — unless the background
@@ -1069,19 +1088,22 @@ directly by the sidecar — see below).
 Per-tool MCP access):** a second, independent, stricter gate layered UNDER
 the background bridge — `useMcpToolEnabledMap()` persists a
 `Record<McpToolId, boolean>` (`McpToolId` = `'api-client' | 'mock-server' |
-'redis-client' | 'kafka-explorer'`, the same ids `TOOL_DEFS`/
-`FeatureContext` use), absent-key-means-enabled so it changes nothing for
-anyone who hasn't touched it. A tool switched off here is `enabled=false`
-in BOTH mount points (its own component AND `McpBackgroundBridge.tsx`), so
-it never answers any of its MCP calls at all, on screen or in the
-background — this is the difference from the background bridge, which only
-ever widens *when* a tool answers, never *whether* it can at all.
-`Settings.tsx` and `McpSetupDialog.tsx` both render one row per
-`MCP_TOOL_IDS` entry (label looked up from `TOOL_DEFS`) bound to the same
-persisted map, so flipping it from either place stays in sync immediately.
+'redis-client' | 'kafka-explorer' | 'rabbit-client'`, the same ids
+`TOOL_DEFS`/`FeatureContext` use), absent-key-means-enabled so it changes
+nothing for anyone who hasn't touched it. A tool switched off here is
+`enabled=false` in BOTH mount points (its own component AND
+`McpBackgroundBridge.tsx`), so it never answers any of its MCP calls at
+all, on screen or in the background — this is the difference from the
+background bridge, which only ever widens *when* a tool answers, never
+*whether* it can at all. `Settings.tsx` and `McpSetupDialog.tsx` both
+render one row per `MCP_TOOL_IDS` entry (label looked up from `TOOL_DEFS`,
+capability blurb from `MCP_TOOL_CAPABILITIES`) bound to the same persisted
+map, so flipping it from either place stays in sync immediately, and both
+lists pick up a new tool automatically the moment it's added to
+`MCP_TOOL_IDS` — no separate UI change needed per tool.
 
 **Managing the bridge from MCP itself (`src/components/McpManageBridge.tsx`):**
-a fifth `mcp:call` listener, mounted once at the app root next to
+a sixth `mcp:call` listener, mounted once at the app root next to
 `McpBackgroundBridge`, that is **never** gated by the background-bridge
 toggle OR the per-tool toggles — it exists specifically so an MCP caller
 can flip either (and check their state) without the user opening Settings.
@@ -1090,8 +1112,8 @@ state + `toolsEnabled` map + mock server status), `devtool_mcp_set_background`
 (writes `useMcpBackgroundBridge`'s persisted setting), and
 `devtool_mcp_set_tool_enabled` (writes one entry in
 `useMcpToolEnabledMap`'s persisted map, validating `tool` against
-`MCP_TOOL_IDS`) — and, like the other four bridges, ignores every other
-tool name so all five can share the one `mcp:call` event safely. Still
+`MCP_TOOL_IDS`) — and, like the other five bridges, ignores every other
+tool name so all six can share the one `mcp:call` event safely. Still
 bound by the same hard constraint as everything else here: it only answers
 while the DevTool app process is open, since that's what actually runs the
 webview `mcp:call` listener — there's no way to reach a fully closed app.

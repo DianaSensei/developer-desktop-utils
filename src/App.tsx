@@ -38,6 +38,7 @@ import { ApiClientRuntimeProvider } from '@/components/tools/apiclient/mcpRuntim
 import { MockServerRuntimeProvider } from '@/components/tools/mockserver/mcpRuntimeContext';
 import { RedisRuntimeProvider } from '@/components/tools/redis/mcpRuntimeContext';
 import { KafkaRuntimeProvider } from '@/components/tools/kafka/mcpRuntimeContext';
+import { RabbitRuntimeProvider } from '@/components/tools/rabbit/mcpRuntimeContext';
 import { ExperimentalGate } from '@/components/ExperimentalGate';
 import { ExperimentalDot, ExperimentalMark } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
@@ -1215,14 +1216,16 @@ function App() {
                   <MockServerRuntimeProvider>
                     <RedisRuntimeProvider>
                       <KafkaRuntimeProvider>
-                        <Router>
-                          <AppContent />
-                          <UpdateDialog />
-                          <OnboardingFlow />
-                          <CommandPalette />
-                          <McpBackgroundBridge />
-                          <McpManageBridge />
-                        </Router>
+                        <RabbitRuntimeProvider>
+                          <Router>
+                            <AppContent />
+                            <UpdateDialog />
+                            <OnboardingFlow />
+                            <CommandPalette />
+                            <McpBackgroundBridge />
+                            <McpManageBridge />
+                          </Router>
+                        </RabbitRuntimeProvider>
                       </KafkaRuntimeProvider>
                     </RedisRuntimeProvider>
                   </MockServerRuntimeProvider>

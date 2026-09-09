@@ -904,6 +904,77 @@ fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
 
+        // ── RabbitMQ Client — connection management only ────────────────
+        // No queue/exchange/publish/consume/RPC tools — same scoping as
+        // Redis/Kafka above: saved connection profiles and connect/
+        // disconnect only. Only answers while DevTool is open with the
+        // RabbitMQ Client tool on screen, unless Settings → MCP →
+        // Background MCP bridge is on (same contract as every other tool
+        // here — see mcp_bridge.rs).
+        json!({
+            "name": "rabbit_list_connections",
+            "description": "List every saved RabbitMQ connection profile (id, name, host, port, vhost, username, password, useTls, amqpPort, amqpOnly, and optional TLS/heartbeat/extraHosts fields). Values are returned as stored, unmasked, same as the app's own connection form.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "rabbit_get_connection",
+            "description": "Get one saved RabbitMQ connection profile by id.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "rabbit_add_connection",
+            "description": "Save a new RabbitMQ connection profile and return it (with its generated id). `name`/`host` required; `port` defaults to 15672 (management), `vhost` to \"/\", `username`/`password` to \"guest\", `amqpPort` to 5672, `amqpOnly` to true (no management HTTP API — AMQP-only topology probes).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" },
+                    "host": { "type": "string" },
+                    "port": { "type": "number", "description": "Management API port." },
+                    "vhost": { "type": "string" },
+                    "username": { "type": "string" },
+                    "password": { "type": "string" },
+                    "useTls": { "type": "boolean" },
+                    "amqpPort": { "type": "number" },
+                    "amqpOnly": { "type": "boolean" }
+                },
+                "required": ["name"]
+            }
+        }),
+        json!({
+            "name": "rabbit_update_connection",
+            "description": "Patch a saved RabbitMQ connection profile. `patch` is a partial object — only included fields change.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "connectionId": { "type": "string" }, "patch": { "type": "object" } },
+                "required": ["connectionId", "patch"]
+            }
+        }),
+        json!({
+            "name": "rabbit_delete_connection",
+            "description": "Delete a saved RabbitMQ connection profile by id. The broker itself is unaffected — only the local saved profile.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "rabbit_test_connection",
+            "description": "Verify a saved connection is reachable over AMQP (and the management API too, unless amqpOnly), without marking it as the connected one.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "rabbit_connect",
+            "description": "Test and mark a saved connection as the active one in the RabbitMQ Client UI (same as pressing Connect). Stops any live consumers still running against a previously-connected connection, since only one connection is live at a time.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "rabbit_disconnect",
+            "description": "Clear the active RabbitMQ connection (same as pressing Disconnect) and stop any live consumers running against it.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "rabbit_connection_status",
+            "description": "Get the currently selected/connected RabbitMQ connection id.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+
         // ── DevTool MCP management ──────────────────────────────────────
         // Unlike every tool above, these three are answered by an always-on
         // listener (McpManageBridge.tsx) that is never gated by the
@@ -916,7 +987,7 @@ fn tool_definitions() -> Vec<Value> {
         // mcp_bridge.rs).
         json!({
             "name": "devtool_mcp_status",
-            "description": "Get DevTool's current MCP integration state: whether the Background MCP bridge is on, the per-tool enabled/disabled map (toolsEnabled: api-client/mock-server/redis-client/kafka-explorer), and the mock server's running status. Call this first if a tool's calls unexpectedly time out — a disabled tool times out exactly like \"wrong tool on screen\" does, since it never registers a listener either.",
+            "description": "Get DevTool's current MCP integration state: whether the Background MCP bridge is on, the per-tool enabled/disabled map (toolsEnabled: api-client/mock-server/redis-client/kafka-explorer/rabbit-client), and the mock server's running status. Call this first if a tool's calls unexpectedly time out — a disabled tool times out exactly like \"wrong tool on screen\" does, since it never registers a listener either.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
@@ -930,11 +1001,11 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "devtool_mcp_set_tool_enabled",
-            "description": "Turn one tool's MCP access on or off (mirrors Settings → MCP → Per-tool MCP access). A disabled tool never answers any of its MCP tool calls, on screen or in the background — this is a separate, stricter switch than devtool_mcp_set_background. `tool` is one of: api-client, mock-server, redis-client, kafka-explorer.",
+            "description": "Turn one tool's MCP access on or off (mirrors Settings → MCP → Per-tool MCP access). A disabled tool never answers any of its MCP tool calls, on screen or in the background — this is a separate, stricter switch than devtool_mcp_set_background. `tool` is one of: api-client, mock-server, redis-client, kafka-explorer, rabbit-client.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "tool": { "type": "string", "enum": ["api-client", "mock-server", "redis-client", "kafka-explorer"] },
+                    "tool": { "type": "string", "enum": ["api-client", "mock-server", "redis-client", "kafka-explorer", "rabbit-client"] },
                     "enabled": { "type": "boolean" }
                 },
                 "required": ["tool", "enabled"]
@@ -989,16 +1060,18 @@ impl ServerHandler for DevToolServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
-                "Drives four DevTool tools. API Client: collections, requests, scripts, \
+                "Drives five DevTool tools. API Client: collections, requests, scripts, \
                  environments — and can actually send a request. Mock Server: stubs, \
                  matchers, the fallback response, and can start/stop the server and test a \
-                 response script. Redis Client and Kafka Explorer (redis_*/kafka_* tools): \
-                 saved connection profiles only — list/add/update/delete/test, plus \
-                 connect/disconnect — no key/topic/produce/consume operations for either. By \
+                 response script. Redis Client, Kafka Explorer, and RabbitMQ Client \
+                 (redis_*/kafka_*/rabbit_* tools): saved connection profiles only — \
+                 list/add/update/delete/test, plus connect/disconnect — no key/topic/queue/\
+                 exchange/produce/consume/publish/RPC operations for any of the three. By \
                  default each tool's calls only answer while the DevTool desktop app is open \
                  with THAT tool on screen (mock_* needs Mock Server open, redis_* needs Redis \
-                 Client open, kafka_* needs Kafka Explorer open, everything else needs API \
-                 Client open) — if a call times out, that is almost always why; call \
+                 Client open, kafka_* needs Kafka Explorer open, rabbit_* needs RabbitMQ \
+                 Client open, everything else needs API Client open) — if a call times out, \
+                 that is almost always why; call \
                  devtool_mcp_set_background with enabled:true to lift that requirement \
                  yourself (mirrors Settings → MCP → Background MCP bridge) instead of asking \
                  the user to switch tools or click it manually. A tool can also be switched \
