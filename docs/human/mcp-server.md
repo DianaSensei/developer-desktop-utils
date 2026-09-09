@@ -16,8 +16,9 @@ DevTool tools from one server:
   produce/consume tools for Kafka — deliberately scoped to connection setup,
   not data access.
 
-66 tools total; see the full list further down. Two of those (`devtool_mcp_status`,
-`devtool_mcp_set_background`) manage the MCP integration itself — see
+67 tools total; see the full list further down. Three of those
+(`devtool_mcp_status`, `devtool_mcp_set_background`,
+`devtool_mcp_set_tool_enabled`) manage the MCP integration itself — see
 "DevTool MCP management" below.
 
 ## How it works
@@ -43,8 +44,15 @@ true:
   app's "no silent network calls" rule — it's an explicit opt-in, not
   something that starts listening on its own.
 
-Anything else — app closed, or neither condition above holds — comes back
-as a clear error telling you so, not a hang. The four bridges
+There's a third, stricter layer on top of both: **Settings → MCP → Per-tool
+MCP access** — a kill switch per tool (all on by default). A tool switched
+off there never answers any of its MCP calls, on screen or in the
+background; it's the only way to make one tool permanently unreachable over
+MCP while leaving the others working normally.
+
+Anything else — app closed, a tool switched off, or neither on-screen/
+background condition above holds — comes back as a clear error telling you
+so, not a hang. The four bridges
 (`src/components/tools/apiclient/mcpBridge.ts`,
 `src/components/tools/mockserver/mcpBridge.ts`,
 `src/components/tools/redis/mcpBridge.ts`, and
@@ -59,11 +67,12 @@ store/state each tool's own UI reads (see `apiclient/mcpRuntimeContext.tsx`,
 `kafka/mcpRuntimeContext.tsx`) so a UI edit and an MCP edit can't silently
 clobber each other.
 
-A third listener, `src/components/McpManageBridge.tsx`, is **always**
-mounted regardless of the Background MCP bridge setting — see "DevTool MCP
-management" below. It only answers two tool names of its own
-(`devtool_mcp_status`, `devtool_mcp_set_background`) and, like the other
-two, ignores everything else.
+A fifth listener, `src/components/McpManageBridge.tsx`, is **always**
+mounted regardless of the Background MCP bridge setting or the per-tool
+toggles — see "DevTool MCP management" below. It only answers three tool
+names of its own (`devtool_mcp_status`, `devtool_mcp_set_background`,
+`devtool_mcp_set_tool_enabled`) and, like the other four, ignores
+everything else.
 
 The two processes find each other automatically: on launch, DevTool writes
 its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
@@ -97,15 +106,16 @@ One registration covers all four tools — it's the same `devtool-mcp-server`
 process either way, so there's nothing separate to set up for Mock Server's
 `mock_*`, Redis Client's `redis_*`, or Kafka Explorer's `kafka_*` tools.
 
-The same dialog also has a **Background MCP bridge** toggle — the exact
-setting Settings → MCP has, just reachable without leaving the tool. Flip it
-from either place; it's one shared value, so both stay in sync immediately
-and neither depends on whether API Client or Mock Server has ever been
-opened before.
+The same dialog also has the **Background MCP bridge** toggle and the
+**Per-tool MCP access** list — the exact settings Settings → MCP has, just
+reachable without leaving the tool. Flip either from either place; each is
+one shared value, so both stay in sync immediately and neither depends on
+whether API Client or Mock Server has ever been opened before.
 
 By default an MCP client only gets an answer while the tool it's asking
-about is the one on screen (see "How it works" above) — off by default, so
-nothing changes here unless you opt in.
+about is the one on screen (see "How it works" above), and every tool
+starts out enabled — off by default/on by default respectively, so nothing
+changes here unless you opt in (or explicitly turn a tool off).
 
 ## Setup — developing DevTool from source
 
@@ -215,12 +225,13 @@ connection management only, no topic/consumer-group/produce/consume tools):
 | `kafka_connection_status` | Current selected/connected broker id. |
 
 DevTool MCP management (always answers, regardless of the Background MCP
-bridge setting — that's the point):
+bridge setting or the per-tool toggles — that's the point):
 
 | Tool | Does |
 |---|---|
-| `devtool_mcp_status` | Current MCP integration state: whether the Background MCP bridge is on, plus the mock server's running status/URL. Call this first if a call unexpectedly times out. |
+| `devtool_mcp_status` | Current MCP integration state: whether the Background MCP bridge is on, the per-tool `toolsEnabled` map (api-client/mock-server/redis-client/kafka-explorer), plus the mock server's running status/URL. Call this first if a call unexpectedly times out. |
 | `devtool_mcp_set_background` | Turn the Background MCP bridge on or off (mirrors Settings → MCP → Background MCP bridge). Lets a caller enable "answer regardless of which tool is on screen / focus" mode itself, without asking the user to click the toggle. |
+| `devtool_mcp_set_tool_enabled` | Turn one tool's MCP access on or off (mirrors Settings → MCP → Per-tool MCP access). A disabled tool never answers any of its calls, on screen or in the background — stricter than, and independent of, the background bridge. |
 
 Reference:
 
@@ -236,10 +247,16 @@ Reference:
   after writing the discovery file (stale port). Restart the app.
 - **"No response from DevTool — open the app with the tool that owns this
   call on screen, or turn on Settings → MCP → Background MCP bridge…"** —
-  the app is running but nothing answered within 30s, almost always because
-  a different tool is on screen and the background bridge is off. Either
-  switch to the owning tool (API Client for its tools, Mock Server for
-  `mock_*`, Redis Client for `redis_*`, Kafka Explorer for `kafka_*`), or
-  call `devtool_mcp_set_background` with `enabled: true` (or turn on
-  Settings → MCP → Background MCP bridge by hand) so it stops mattering
-  which tool is on screen or whether the app window is focused.
+  the app is running but nothing answered within 30s. Two possible causes,
+  check both:
+  - A different tool is on screen and the background bridge is off. Either
+    switch to the owning tool (API Client for its tools, Mock Server for
+    `mock_*`, Redis Client for `redis_*`, Kafka Explorer for `kafka_*`), or
+    call `devtool_mcp_set_background` with `enabled: true` (or turn on
+    Settings → MCP → Background MCP bridge by hand) so it stops mattering
+    which tool is on screen or whether the app window is focused.
+  - The owning tool is switched off in **Settings → MCP → Per-tool MCP
+    access**. Call `devtool_mcp_status` to check `toolsEnabled`, then
+    `devtool_mcp_set_tool_enabled` with `{ tool, enabled: true }` (or flip it
+    by hand) — this is independent of the background bridge, so it stays
+    the cause even with that toggle on.

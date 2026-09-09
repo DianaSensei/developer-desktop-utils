@@ -8,8 +8,11 @@
 // sharing matters.
 //
 // Renders nothing; it exists purely to hold the `useMcpBridge` calls. When
-// the setting is off, all of them are still called (rules of hooks) but
-// with `enabled=false`, so none registers a Tauri listener.
+// the background setting is off, all of them are still called (rules of
+// hooks) but with `enabled=false`, so none registers a Tauri listener. Each
+// call is additionally gated by that tool's own per-tool MCP toggle
+// (useMcpToolEnabled, Settings → MCP) — a tool switched off there never
+// answers here either, background bridge or not.
 
 import { useMcpBridge as useApiClientMcpBridge } from './tools/apiclient/mcpBridge';
 import { useApiClientRuntime } from './tools/apiclient/mcpRuntimeContext';
@@ -20,18 +23,20 @@ import { useRedisRuntime } from './tools/redis/mcpRuntimeContext';
 import { useMcpBridge as useKafkaMcpBridge } from './tools/kafka/mcpBridge';
 import { useKafkaRuntime } from './tools/kafka/mcpRuntimeContext';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabledMap } from '@/hooks/useMcpToolEnabled';
 
 export function McpBackgroundBridge() {
   const { enabled } = useMcpBackgroundBridge();
+  const { isEnabled } = useMcpToolEnabledMap();
   const { store, runRequest } = useApiClientRuntime();
   const mockServer = useMockServerRuntime();
   const redisState = useRedisRuntime();
   const kafkaState = useKafkaRuntime();
 
-  useApiClientMcpBridge(store, runRequest, enabled);
-  useMockServerMcpBridge(mockServer, enabled);
-  useRedisMcpBridge(redisState, enabled);
-  useKafkaMcpBridge(kafkaState, enabled);
+  useApiClientMcpBridge(store, runRequest, enabled && isEnabled('api-client'));
+  useMockServerMcpBridge(mockServer, enabled && isEnabled('mock-server'));
+  useRedisMcpBridge(redisState, enabled && isEnabled('redis-client'));
+  useKafkaMcpBridge(kafkaState, enabled && isEnabled('kafka-explorer'));
 
   return null;
 }

@@ -25,6 +25,7 @@ import { liveConnections } from '@/lib/liveConnections';
 import { useMcpBridge } from './mcpBridge';
 import { useMockServerRuntime } from './mcpRuntimeContext';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { McpSetupDialog } from '@/components/McpSetupDialog';
 
 // Sentinel selection id for the editable "no-match" fallback response.
@@ -45,10 +46,12 @@ export function MockServer() {
     status, log, error, busy, start, stop, testScript, clearLog,
   } = mockServer;
   const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
+  const { enabled: mcpToolEnabled } = useMcpToolEnabled('mock-server');
   // Skipped while the background bridge (Settings → MCP) is on — that one
   // instance, mounted once at the app root, already answers for this exact
   // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
-  useMcpBridge(mockServer, !mcpBackgroundEnabled);
+  // Also skipped outright when the per-tool MCP toggle is off for Mock Server.
+  useMcpBridge(mockServer, mcpToolEnabled && !mcpBackgroundEnabled);
 
   // Sidebar/header chấm xanh khi server đang chạy — cùng cơ chế Kafka/RabbitMQ
   // dùng cho "đang kết nối". Trước đây Mock Server không đăng ký gì vào đây,

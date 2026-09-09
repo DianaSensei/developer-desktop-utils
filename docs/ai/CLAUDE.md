@@ -1004,10 +1004,11 @@ array via `update_environment`. Redis Client (`redis_*`) and Kafka Explorer
 saved connection profiles, plus connect/disconnect. Deliberately excludes
 data operations (no Redis key/pub-sub/admin tools, no Kafka topic/consumer-
 group/produce/consume tools) — a narrower surface than API Client/Mock
-Server on purpose. Plus two management tools (`devtool_mcp_status`,
-`devtool_mcp_set_background`) that let a caller check and flip the
-Background MCP bridge setting itself instead of asking the user to click it.
-66 tools; see `docs/human/mcp-server.md` for the full list and setup
+Server on purpose. Plus three management tools (`devtool_mcp_status`,
+`devtool_mcp_set_background`, `devtool_mcp_set_tool_enabled`) that let a
+caller check and flip the Background MCP bridge setting and each tool's
+own MCP kill switch itself instead of asking the user to click it.
+67 tools; see `docs/human/mcp-server.md` for the full list and setup
 instructions.
 
 **The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
@@ -1047,30 +1048,50 @@ everything else, silently dropping whichever wrote second.
 
 **Background bridge (Settings → MCP):** by default, each bridge only
 answers while its own tool is the one on screen — `useMcpBridge(..., enabled)`
-is called with `enabled = !mcpBackgroundEnabled` from `ApiClient.tsx`/
-`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`.
+is called with `enabled = mcpToolEnabled && !mcpBackgroundEnabled` from
+`ApiClient.tsx`/`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`.
 `useMcpBackgroundBridge()` (`src/hooks/useMcpBackgroundBridge.ts`) is an
 opt-in, persisted, off-by-default toggle (per the "no silent network calls"
 rule above) that lets an MCP client drive any of the four tools regardless
 of which one is on screen. When it's on, `McpBackgroundBridge.tsx` —
 mounted once at the app root, reading all four runtime contexts — calls all
-four `useMcpBridge`s itself with `enabled = true`; the per-tool calls stay
-`enabled = false` at the same time so no mount point ever double-answers
-the same call. A call only ever succeeds while the app is open, and —
-unless the background bridge is on — only while the tool that owns it is
-the one on screen; anything else times out with a clear error rather than
-hanging (`get_scripting_reference` is the one tool answered without any of
-this, directly by the sidecar — see below).
+four `useMcpBridge`s itself with `enabled = isEnabled(toolId)` (still gated
+by the per-tool toggle below, just not by "on screen"); the per-tool calls
+stay `enabled = false` at the same time so no mount point ever
+double-answers the same call. A call only ever succeeds while the app is
+open, the tool is enabled (see next paragraph), and — unless the background
+bridge is on — only while the tool that owns it is the one on screen;
+anything else times out with a clear error rather than hanging
+(`get_scripting_reference` is the one tool answered without any of this,
+directly by the sidecar — see below).
+
+**Per-tool kill switch (`src/hooks/useMcpToolEnabled.ts`, Settings → MCP →
+Per-tool MCP access):** a second, independent, stricter gate layered UNDER
+the background bridge — `useMcpToolEnabledMap()` persists a
+`Record<McpToolId, boolean>` (`McpToolId` = `'api-client' | 'mock-server' |
+'redis-client' | 'kafka-explorer'`, the same ids `TOOL_DEFS`/
+`FeatureContext` use), absent-key-means-enabled so it changes nothing for
+anyone who hasn't touched it. A tool switched off here is `enabled=false`
+in BOTH mount points (its own component AND `McpBackgroundBridge.tsx`), so
+it never answers any of its MCP calls at all, on screen or in the
+background — this is the difference from the background bridge, which only
+ever widens *when* a tool answers, never *whether* it can at all.
+`Settings.tsx` and `McpSetupDialog.tsx` both render one row per
+`MCP_TOOL_IDS` entry (label looked up from `TOOL_DEFS`) bound to the same
+persisted map, so flipping it from either place stays in sync immediately.
 
 **Managing the bridge from MCP itself (`src/components/McpManageBridge.tsx`):**
-a third `mcp:call` listener, mounted once at the app root next to
+a fifth `mcp:call` listener, mounted once at the app root next to
 `McpBackgroundBridge`, that is **never** gated by the background-bridge
-toggle — it exists specifically so an MCP caller can flip that toggle (and
-check its state) without the user opening Settings. It answers exactly two
-tool names — `devtool_mcp_status` (background-bridge state + mock server
-status) and `devtool_mcp_set_background` (writes `useMcpBackgroundBridge`'s
-persisted setting) — and, like the other two bridges, ignores every other
-tool name so all three can share the one `mcp:call` event safely. Still
+toggle OR the per-tool toggles — it exists specifically so an MCP caller
+can flip either (and check their state) without the user opening Settings.
+It answers three tool names — `devtool_mcp_status` (background-bridge
+state + `toolsEnabled` map + mock server status), `devtool_mcp_set_background`
+(writes `useMcpBackgroundBridge`'s persisted setting), and
+`devtool_mcp_set_tool_enabled` (writes one entry in
+`useMcpToolEnabledMap`'s persisted map, validating `tool` against
+`MCP_TOOL_IDS`) — and, like the other four bridges, ignores every other
+tool name so all five can share the one `mcp:call` event safely. Still
 bound by the same hard constraint as everything else here: it only answers
 while the DevTool app process is open, since that's what actually runs the
 webview `mcp:call` listener — there's no way to reach a fully closed app.

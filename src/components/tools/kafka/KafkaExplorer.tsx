@@ -15,6 +15,7 @@ import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 import { useKafkaRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { kafkaApi } from './types';
 import { kafkaConsumerStore } from './kafkaConsumerStore';
 import { liveConnections } from '@/lib/liveConnections';
@@ -52,10 +53,12 @@ export function KafkaExplorer() {
   } = kafkaState;
 
   const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
+  const { enabled: mcpToolEnabled } = useMcpToolEnabled('kafka-explorer');
   // Skipped while the background bridge (Settings → MCP) is on — that one
   // instance, mounted once at the app root, already answers for this exact
   // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
-  useMcpBridge(kafkaState, !mcpBackgroundEnabled);
+  // Also skipped outright when the per-tool MCP toggle is off for Kafka Explorer.
+  useMcpBridge(kafkaState, mcpToolEnabled && !mcpBackgroundEnabled);
 
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);

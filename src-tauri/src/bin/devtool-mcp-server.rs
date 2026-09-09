@@ -905,26 +905,39 @@ fn tool_definitions() -> Vec<Value> {
         }),
 
         // ── DevTool MCP management ──────────────────────────────────────
-        // Unlike every tool above, these two are answered by an always-on
+        // Unlike every tool above, these three are answered by an always-on
         // listener (McpManageBridge.tsx) that is never gated by the
-        // Background MCP bridge setting — that's the whole point: they let a
-        // caller check and flip that setting itself, so API Client / Mock
-        // Server tools can be driven with neither one open nor focused
-        // without anyone touching Settings → MCP by hand first. Still
-        // requires DevTool to be running (there is no way to reach a fully
-        // closed app — see mcp_bridge.rs).
+        // Background MCP bridge setting OR the per-tool toggles — that's the
+        // whole point: they let a caller check and flip either itself, so
+        // any tool can be driven (or re-enabled after being switched off)
+        // with neither it nor Settings open, without anyone touching
+        // Settings → MCP by hand first. Still requires DevTool to be
+        // running (there is no way to reach a fully closed app — see
+        // mcp_bridge.rs).
         json!({
             "name": "devtool_mcp_status",
-            "description": "Get DevTool's current MCP integration state: whether the Background MCP bridge is on (API Client / Mock Server tools answer regardless of which is on screen) and the mock server's running status. Call this first if a mock_*/list_collections-style call unexpectedly times out.",
+            "description": "Get DevTool's current MCP integration state: whether the Background MCP bridge is on, the per-tool enabled/disabled map (toolsEnabled: api-client/mock-server/redis-client/kafka-explorer), and the mock server's running status. Call this first if a tool's calls unexpectedly time out — a disabled tool times out exactly like \"wrong tool on screen\" does, since it never registers a listener either.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
             "name": "devtool_mcp_set_background",
-            "description": "Turn DevTool's Background MCP bridge on or off (mirrors the Settings → MCP toggle). When on, API Client and Mock Server MCP tools answer regardless of which tool is on screen or whether the app window is focused — call this with enabled:true instead of asking the user to click it manually.",
+            "description": "Turn DevTool's Background MCP bridge on or off (mirrors the Settings → MCP toggle). When on, every enabled tool's MCP tools answer regardless of which tool is on screen or whether the app window is focused — call this with enabled:true instead of asking the user to click it manually.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "enabled": { "type": "boolean" } },
                 "required": ["enabled"]
+            }
+        }),
+        json!({
+            "name": "devtool_mcp_set_tool_enabled",
+            "description": "Turn one tool's MCP access on or off (mirrors Settings → MCP → Per-tool MCP access). A disabled tool never answers any of its MCP tool calls, on screen or in the background — this is a separate, stricter switch than devtool_mcp_set_background. `tool` is one of: api-client, mock-server, redis-client, kafka-explorer.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "tool": { "type": "string", "enum": ["api-client", "mock-server", "redis-client", "kafka-explorer"] },
+                    "enabled": { "type": "boolean" }
+                },
+                "required": ["tool", "enabled"]
             }
         }),
     ]
@@ -988,8 +1001,10 @@ impl ServerHandler for DevToolServer {
                  Client open) — if a call times out, that is almost always why; call \
                  devtool_mcp_set_background with enabled:true to lift that requirement \
                  yourself (mirrors Settings → MCP → Background MCP bridge) instead of asking \
-                 the user to switch tools or click it manually — devtool_mcp_status reports \
-                 whether it's already on. Call get_scripting_reference for the API \
+                 the user to switch tools or click it manually. A tool can also be switched \
+                 off entirely (Settings → MCP → Per-tool MCP access) — devtool_mcp_status's \
+                 toolsEnabled reports which; devtool_mcp_set_tool_enabled flips one, but only \
+                 the user should ever choose to disable a tool. Call get_scripting_reference for the API \
                  Client/Mock Server scripting API and field shapes shared by those two.",
             )
             .with_server_info(Implementation::new("devtool-api-client", env!("CARGO_PKG_VERSION")))

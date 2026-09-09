@@ -15,6 +15,8 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { isTauri } from '@/lib/platform';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabledMap, MCP_TOOL_IDS } from '@/hooks/useMcpToolEnabled';
+import { TOOL_DEFS } from '@/lib/toolDefs';
 
 type Resolution = { status: 'loading' } | { status: 'ready'; path: string } | { status: 'error'; message: string };
 
@@ -27,6 +29,9 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
   // before (it's an app-level setting, not scoped to either tool's own
   // local state).
   const { enabled: backgroundEnabled, setEnabled: setBackgroundEnabled } = useMcpBackgroundBridge();
+  // Per-tool kill switch — independent of the background toggle above, and
+  // (same reasoning) one shared value with Settings → MCP's own list.
+  const { isEnabled: isToolEnabled, setToolEnabled } = useMcpToolEnabledMap();
 
   useEffect(() => {
     if (!open) return;
@@ -62,8 +67,8 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
           <p className="text-fg-mute">
             Lets an MCP client (Claude Code, Claude Desktop) list, edit, and actually{' '}
             <span className="text-fg">send</span> requests in this API Client — collections, scripts,
-            environments — and drive Mock Server's stubs the same way, all through this one
-            registration.
+            environments — drive Mock Server's stubs, and manage Redis Client / Kafka Explorer
+            connection profiles, all through this one registration.
           </p>
 
           <div className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-2.5">
@@ -72,7 +77,7 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
               <p className="text-[11px] text-fg-mute mt-0.5">
                 {backgroundEnabled
                   ? 'On — answers regardless of which tool is on screen, or whether the window is focused.'
-                  : 'Off — only answers while API Client (or Mock Server for mock_* tools) is the one on screen.'}
+                  : 'Off — each tool only answers MCP calls while it is the one on screen.'}
               </p>
             </div>
             <Switch
@@ -80,6 +85,29 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
               onCheckedChange={setBackgroundEnabled}
               aria-label="Background MCP bridge"
             />
+          </div>
+
+          <div className="rounded-md border border-line divide-y divide-line">
+            <div className="px-3 py-2">
+              <p className="text-xs font-medium">Per-tool MCP access</p>
+              <p className="text-[11px] text-fg-mute mt-0.5">
+                Off means that tool never answers an MCP call — on screen or in the background.
+              </p>
+            </div>
+            {MCP_TOOL_IDS.map((id) => {
+              const label = TOOL_DEFS.find((td) => td.id === id)?.label ?? id;
+              const enabled = isToolEnabled(id);
+              return (
+                <div key={id} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-xs">{label}</span>
+                  <Switch
+                    checked={enabled}
+                    onCheckedChange={(v) => setToolEnabled(id, v)}
+                    aria-label={`${label} MCP access`}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {resolution.status === 'loading' && (
@@ -105,10 +133,9 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
                 <CopyButton value={command} iconClassName="h-3.5 w-3.5" />
               </div>
               <p className="text-[11px] text-fg-mute">
-                Then open a new Claude Code session and ask it about your collections or stubs —
-                with the background bridge above off, API Client's tools only answer while API
-                Client is on screen (Mock Server's <code className="font-mono">mock_*</code> tools
-                the same way for Mock Server).
+                Then open a new Claude Code session and ask it about your collections, stubs, or
+                connections — with the background bridge above off, each tool's MCP tools only
+                answer while that tool is the one on screen.
               </p>
             </div>
           )}

@@ -10,6 +10,7 @@ import { liveConnections } from '@/lib/liveConnections';
 import { useRedisRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
+import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { LeftPanel } from './LeftPanel';
 import { OverviewView } from './OverviewView';
 import { KeysListView } from './KeysListView';
@@ -37,10 +38,12 @@ export function RedisClient() {
   } = redisState;
 
   const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
+  const { enabled: mcpToolEnabled } = useMcpToolEnabled('redis-client');
   // Skipped while the background bridge (Settings → MCP) is on — that one
   // instance, mounted once at the app root, already answers for this exact
   // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
-  useMcpBridge(redisState, !mcpBackgroundEnabled);
+  // Also skipped outright when the per-tool MCP toggle is off for Redis Client.
+  useMcpBridge(redisState, mcpToolEnabled && !mcpBackgroundEnabled);
 
   const [connections, setConnections] = useState<RedisConnection[]>(cachedConnections ?? []);
   const [connLoading, setConnLoading] = useState(cachedConnections === null);
