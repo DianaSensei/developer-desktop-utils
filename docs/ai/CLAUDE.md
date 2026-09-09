@@ -979,11 +979,13 @@ requests, scripts, environments, and actually **send a request** through the
 same engine the Send button uses (result lands in the UI + History like any
 other send). Mock Server: list/read/edit stubs and the fallback response,
 **start/stop** the server, test a Rhai response script, and read the request
-log. Plus two management tools (`devtool_mcp_status`,
-`devtool_mcp_set_background`) that let a caller check and flip the
-Background MCP bridge setting itself instead of asking the user to click it.
-46 tools; see `docs/human/mcp-server.md` for the full list and setup
-instructions.
+log — including `set_environment_variable`/`delete_environment_variable` for
+touching one or a few environment variables without resending the whole
+array via `update_environment`. Plus two management tools
+(`devtool_mcp_status`, `devtool_mcp_set_background`) that let a caller check
+and flip the Background MCP bridge setting itself instead of asking the user
+to click it. 48 tools; see `docs/human/mcp-server.md` for the full list and
+setup instructions.
 
 **The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
 `.setup()` (OS-assigned port, random token written to

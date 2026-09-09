@@ -288,6 +288,43 @@ describe('useMcpBridge — Tauri desktop', () => {
     expect(missing.error).toMatch(/No environment with id/);
   });
 
+  it('set_environment_variable creates a new row when the key is absent, patches only given fields when present', async () => {
+    const store = makeStore();
+
+    const created = await call(store, 'set_environment_variable', { environmentId: 'e1', key: 'API_KEY', value: 'abc' });
+    expect(store.updateEnvironment).toHaveBeenLastCalledWith('e1', {
+      variables: [expect.objectContaining({ key: 'API_KEY', value: 'abc', enabled: true })],
+    });
+    expect(created.result).toMatchObject({ variable: { key: 'API_KEY', value: 'abc', enabled: true } });
+
+    // Simulate the store applying that write, then patch just `enabled`.
+    store.environments[0].variables = [{ id: 'v1', key: 'API_KEY', value: 'abc', enabled: true }];
+    const patched = await call(store, 'set_environment_variable', { environmentId: 'e1', key: 'API_KEY', enabled: false });
+    expect(store.updateEnvironment).toHaveBeenLastCalledWith('e1', {
+      variables: [{ id: 'v1', key: 'API_KEY', value: 'abc', enabled: false }],
+    });
+    expect(patched.result).toMatchObject({ variable: { key: 'API_KEY', value: 'abc', enabled: false } });
+  });
+
+  it('delete_environment_variable removes only the matching key and no-ops when absent', async () => {
+    const store = makeStore();
+    store.environments[0].variables = [
+      { id: 'v1', key: 'KEEP', value: '1', enabled: true },
+      { id: 'v2', key: 'DROP', value: '2', enabled: true },
+    ];
+
+    const res = await call(store, 'delete_environment_variable', { environmentId: 'e1', key: 'DROP' });
+    expect(store.updateEnvironment).toHaveBeenCalledWith('e1', {
+      variables: [{ id: 'v1', key: 'KEEP', value: '1', enabled: true }],
+    });
+    expect(res.result).toEqual({ ok: true, deleted: true });
+
+    (store.updateEnvironment as ReturnType<typeof vi.fn>).mockClear();
+    const noop = await call(store, 'delete_environment_variable', { environmentId: 'e1', key: 'NOPE' });
+    expect(store.updateEnvironment).not.toHaveBeenCalled();
+    expect(noop.result).toEqual({ ok: true, deleted: false });
+  });
+
   it('set_active_environment routes to global vs. collection scope', async () => {
     const store = makeStore();
     await call(store, 'set_active_environment', { scope: 'global', environmentId: 'e1' });

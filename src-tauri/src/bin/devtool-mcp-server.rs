@@ -599,11 +599,35 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "update_environment",
-            "description": "Patch an environment. `patch` is a partial Environment object, most commonly { \"variables\": [...] } — pass the full variables array you want it to end up with.",
+            "description": "Patch an environment. `patch` is a partial Environment object — { \"variables\": [...] } replaces the ENTIRE variables array (pass every row you want kept, not just changed ones), { \"name\": ... } renames it, { \"collectionId\": ... } moves it between global (null) and a collection's scope. To add/edit/remove one or a few variables without resending the rest, use set_environment_variable / delete_environment_variable instead.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "environmentId": { "type": "string" }, "patch": { "type": "object" } },
                 "required": ["environmentId", "patch"]
+            }
+        }),
+        json!({
+            "name": "set_environment_variable",
+            "description": "Add or update ONE variable in an environment by key, leaving every other variable untouched — cheaper and safer than update_environment when only a few variables need to change. Creates the variable (enabled by default) if no row with that key exists yet; otherwise patches only the fields you pass (value/enabled/secret). Returns the resulting variable row.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "environmentId": { "type": "string" },
+                    "key": { "type": "string" },
+                    "value": { "type": "string" },
+                    "enabled": { "type": "boolean" },
+                    "secret": { "type": "boolean", "description": "Masks the value in the editor and excludes it from generated code/cURL export/history, like the Vault." }
+                },
+                "required": ["environmentId", "key"]
+            }
+        }),
+        json!({
+            "name": "delete_environment_variable",
+            "description": "Remove one variable from an environment by key, leaving every other variable untouched. No-op (deleted:false) if the key isn't present.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "environmentId": { "type": "string" }, "key": { "type": "string" } },
+                "required": ["environmentId", "key"]
             }
         }),
         json!({
@@ -621,7 +645,7 @@ fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "add_environment",
-            "description": "Create a new environment and return its id. Omit collectionId for a global environment; pass one to scope it to that collection.",
+            "description": "Create a new environment and return its id. Omit collectionId for a global environment (available everywhere); pass one to scope it to that collection (Bruno-style — only available while working inside that collection). A collection can have any number of scoped environments (e.g. \"Local\"/\"Staging\"/\"Prod\"), same as the global list.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "collectionId": { "type": "string" }, "name": { "type": "string" }, "variables": kv_array_schema() }

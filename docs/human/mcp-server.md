@@ -11,7 +11,7 @@ DevTool tools from one server:
   stop** the server, test a response script before saving it, and read the
   request log — all through the same state the UI edits.
 
-46 tools total; see the full list further down. Two of those (`devtool_mcp_status`,
+48 tools total; see the full list further down. Two of those (`devtool_mcp_status`,
 `devtool_mcp_set_background`) manage the MCP integration itself — see
 "DevTool MCP management" below.
 
@@ -149,8 +149,9 @@ Environments:
 | Tool | Does |
 |---|---|
 | `list_environments` / `get_environment` | Read environments and their variables. |
-| `add_environment` / `duplicate_environment` / `delete_environment` / `import_environment` | Environment lifecycle. |
-| `update_environment` | Patch an environment (most often its `variables` array). |
+| `add_environment` / `duplicate_environment` / `delete_environment` / `import_environment` | Environment lifecycle. Omit `collectionId` for a global environment, or pass one to scope it to that collection (Bruno-style) — a collection can have any number of its own scoped environments. |
+| `update_environment` | Patch an environment — `variables` replaces the entire array, `name` renames it, `collectionId` moves it between global and a collection's scope. |
+| `set_environment_variable` / `delete_environment_variable` | Add/edit or remove ONE variable by key, leaving the rest of the environment untouched — cheaper than resending the whole `variables` array through `update_environment` for a small change. |
 | `set_active_environment` | Activate an environment, globally or for one collection. |
 
 A request's own script/auth/headers/body/tests/assertions all live on the

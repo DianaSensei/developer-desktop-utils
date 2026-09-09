@@ -27,7 +27,7 @@ import { useEffect, useRef } from 'react';
 import { isTauri } from '@/lib/platform';
 import type { ApiStore } from './store';
 import type { ApiRequest, Auth, Environment, KeyValue, LogEntry, RequestScript, TreeItem } from './types';
-import { newEnvironment, newRequest } from './types';
+import { newEnvironment, newRequest, uid } from './types';
 import type { ExecResult } from './engine';
 
 export type RunRequestFn = (
@@ -164,11 +164,58 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
 
     get_environment: async (args) => requireEnvironment(store, requireString(args.environmentId, 'environmentId')),
 
+    // Whole-environment patch — `patch.variables` replaces the entire array,
+    // same contract as set_collection_variables/set_node_headers. `patch` may
+    // also include `collectionId` to move the environment between global
+    // (null) and a collection's scope. For touching one or a few variables
+    // without resending the rest, use set_environment_variable /
+    // delete_environment_variable instead.
     update_environment: async (args) => {
       const id = requireString(args.environmentId, 'environmentId');
       requireEnvironment(store, id);
       store.updateEnvironment(id, (args.patch ?? {}) as Partial<Environment>);
       return { ok: true };
+    },
+
+    // Upsert one variable by key — creates it (enabled by default) if no
+    // existing row has that key, otherwise patches only the fields passed.
+    // Only replaces the one row; every other variable is left untouched.
+    set_environment_variable: async (args) => {
+      const id = requireString(args.environmentId, 'environmentId');
+      const env = requireEnvironment(store, id);
+      const key = requireString(args.key, 'key');
+      const idx = env.variables.findIndex((v) => v.key === key);
+      const variables = [...env.variables];
+      if (idx >= 0) {
+        variables[idx] = {
+          ...variables[idx],
+          ...(typeof args.value === 'string' ? { value: args.value } : {}),
+          ...(typeof args.enabled === 'boolean' ? { enabled: args.enabled } : {}),
+          ...(typeof args.secret === 'boolean' ? { secret: args.secret } : {}),
+        };
+      } else {
+        variables.push({
+          id: uid(),
+          key,
+          value: typeof args.value === 'string' ? args.value : '',
+          enabled: typeof args.enabled === 'boolean' ? args.enabled : true,
+          ...(typeof args.secret === 'boolean' ? { secret: args.secret } : {}),
+        });
+      }
+      store.updateEnvironment(id, { variables });
+      return { ok: true, variable: variables[idx >= 0 ? idx : variables.length - 1] };
+    },
+
+    // Remove one variable by key. No-op (ok:true, deleted:false) if the key
+    // wasn't present, rather than erroring.
+    delete_environment_variable: async (args) => {
+      const id = requireString(args.environmentId, 'environmentId');
+      const env = requireEnvironment(store, id);
+      const key = requireString(args.key, 'key');
+      const variables = env.variables.filter((v) => v.key !== key);
+      const deleted = variables.length !== env.variables.length;
+      if (deleted) store.updateEnvironment(id, { variables });
+      return { ok: true, deleted };
     },
 
     set_active_environment: async (args) => {
