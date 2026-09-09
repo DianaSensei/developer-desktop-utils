@@ -11,7 +11,9 @@ DevTool tools from one server:
   stop** the server, test a response script before saving it, and read the
   request log — all through the same state the UI edits.
 
-44 tools total; see the full list further down.
+46 tools total; see the full list further down. Two of those (`devtool_mcp_status`,
+`devtool_mcp_set_background`) manage the MCP integration itself — see
+"DevTool MCP management" below.
 
 ## How it works
 
@@ -47,6 +49,12 @@ deliberately mounted together, sharing the exact same store each tool's own
 UI reads (see `apiclient/mcpRuntimeContext.tsx` /
 `mockserver/mcpRuntimeContext.tsx`) so a UI edit and an MCP edit can't
 silently clobber each other.
+
+A third listener, `src/components/McpManageBridge.tsx`, is **always**
+mounted regardless of the Background MCP bridge setting — see "DevTool MCP
+management" below. It only answers two tool names of its own
+(`devtool_mcp_status`, `devtool_mcp_set_background`) and, like the other
+two, ignores everything else.
 
 The two processes find each other automatically: on launch, DevTool writes
 its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
@@ -164,6 +172,14 @@ Mock Server (each of these needs the **Mock Server** tool open, not API Client):
 | `mock_get_request_log` | Recent requests the server handled (newest first, capped, bodies truncated past 5,000 chars). |
 | `mock_clear_request_log` | Clear the request log. |
 
+DevTool MCP management (always answers, regardless of the Background MCP
+bridge setting — that's the point):
+
+| Tool | Does |
+|---|---|
+| `devtool_mcp_status` | Current MCP integration state: whether the Background MCP bridge is on, plus the mock server's running status/URL. Call this first if a call unexpectedly times out. |
+| `devtool_mcp_set_background` | Turn the Background MCP bridge on or off (mirrors Settings → MCP → Background MCP bridge). Lets a caller enable "answer regardless of which tool is on screen / focus" mode itself, without asking the user to click the toggle. |
+
 Reference:
 
 | Tool | Does |
@@ -181,5 +197,6 @@ Reference:
   the app is running but nothing answered within 30s, almost always because
   a different tool is on screen and the background bridge is off. Either
   switch to API Client for its tools (or Mock Server for the `mock_*`
-  ones), or turn on Settings → MCP → Background MCP bridge so it stops
-  mattering which tool is on screen.
+  ones), or call `devtool_mcp_set_background` with `enabled: true` (or turn
+  on Settings → MCP → Background MCP bridge by hand) so it stops mattering
+  which tool is on screen or whether the app window is focused.

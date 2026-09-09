@@ -979,7 +979,10 @@ requests, scripts, environments, and actually **send a request** through the
 same engine the Send button uses (result lands in the UI + History like any
 other send). Mock Server: list/read/edit stubs and the fallback response,
 **start/stop** the server, test a Rhai response script, and read the request
-log. 44 tools; see `docs/human/mcp-server.md` for the full list and setup
+log. Plus two management tools (`devtool_mcp_status`,
+`devtool_mcp_set_background`) that let a caller check and flip the
+Background MCP bridge setting itself instead of asking the user to click it.
+46 tools; see `docs/human/mcp-server.md` for the full list and setup
 instructions.
 
 **The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
@@ -1024,6 +1027,19 @@ succeeds while the app is open, and — unless the background bridge is on —
 only while the tool that owns it is the one on screen; anything else times
 out with a clear error rather than hanging (`get_scripting_reference` is the
 one tool answered without any of this, directly by the sidecar — see below).
+
+**Managing the bridge from MCP itself (`src/components/McpManageBridge.tsx`):**
+a third `mcp:call` listener, mounted once at the app root next to
+`McpBackgroundBridge`, that is **never** gated by the background-bridge
+toggle — it exists specifically so an MCP caller can flip that toggle (and
+check its state) without the user opening Settings. It answers exactly two
+tool names — `devtool_mcp_status` (background-bridge state + mock server
+status) and `devtool_mcp_set_background` (writes `useMcpBackgroundBridge`'s
+persisted setting) — and, like the other two bridges, ignores every other
+tool name so all three can share the one `mcp:call` event safely. Still
+bound by the same hard constraint as everything else here: it only answers
+while the DevTool app process is open, since that's what actually runs the
+webview `mcp:call` listener — there's no way to reach a fully closed app.
 
 **One sidecar, `src-tauri/src/bin/devtool-mcp-server.rs`:** built on `rmcp`
 (the official Rust MCP SDK — protocol framing, capability negotiation, and

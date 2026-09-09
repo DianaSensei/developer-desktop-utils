@@ -744,6 +744,30 @@ fn tool_definitions() -> Vec<Value> {
             "description": "Clear the mock server's request log.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
+
+        // ── DevTool MCP management ──────────────────────────────────────
+        // Unlike every tool above, these two are answered by an always-on
+        // listener (McpManageBridge.tsx) that is never gated by the
+        // Background MCP bridge setting — that's the whole point: they let a
+        // caller check and flip that setting itself, so API Client / Mock
+        // Server tools can be driven with neither one open nor focused
+        // without anyone touching Settings → MCP by hand first. Still
+        // requires DevTool to be running (there is no way to reach a fully
+        // closed app — see mcp_bridge.rs).
+        json!({
+            "name": "devtool_mcp_status",
+            "description": "Get DevTool's current MCP integration state: whether the Background MCP bridge is on (API Client / Mock Server tools answer regardless of which is on screen) and the mock server's running status. Call this first if a mock_*/list_collections-style call unexpectedly times out.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "devtool_mcp_set_background",
+            "description": "Turn DevTool's Background MCP bridge on or off (mirrors the Settings → MCP toggle). When on, API Client and Mock Server MCP tools answer regardless of which tool is on screen or whether the app window is focused — call this with enabled:true instead of asking the user to click it manually.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "enabled": { "type": "boolean" } },
+                "required": ["enabled"]
+            }
+        }),
     ]
 }
 
@@ -799,9 +823,10 @@ impl ServerHandler for DevToolServer {
                  response script. By default each tool's calls only answer while the \
                  DevTool desktop app is open with THAT tool on screen (mock_* needs Mock \
                  Server open, everything else needs API Client open) — if a call times out, \
-                 that is almost always why; ask the user to either switch to the right tool \
-                 or turn on Settings → MCP → Background MCP bridge in DevTool, which makes \
-                 calls answer regardless of which tool is on screen. Call \
+                 that is almost always why; call devtool_mcp_set_background with enabled:true \
+                 to lift that requirement yourself (mirrors Settings → MCP → Background MCP \
+                 bridge) instead of asking the user to switch tools or click it manually — \
+                 devtool_mcp_status reports whether it's already on. Call \
                  get_scripting_reference for the scripting API and field shapes shared by \
                  both.",
             )

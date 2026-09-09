@@ -33,6 +33,7 @@ import { useLiveConnections } from '@/lib/liveConnections';
 import { CommandPalette } from '@/components/CommandPalette';
 import { OpenToolsStrip } from '@/components/OpenToolsStrip';
 import { McpBackgroundBridge } from '@/components/McpBackgroundBridge';
+import { McpManageBridge } from '@/components/McpManageBridge';
 import { ApiClientRuntimeProvider } from '@/components/tools/apiclient/mcpRuntimeContext';
 import { MockServerRuntimeProvider } from '@/components/tools/mockserver/mcpRuntimeContext';
 import { ExperimentalGate } from '@/components/ExperimentalGate';
@@ -1216,6 +1217,7 @@ function App() {
                       <OnboardingFlow />
                       <CommandPalette />
                       <McpBackgroundBridge />
+                      <McpManageBridge />
                     </Router>
                   </MockServerRuntimeProvider>
                 </ApiClientRuntimeProvider>
