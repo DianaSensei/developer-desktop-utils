@@ -1,6 +1,6 @@
-# MCP for the API Client and Mock Server tools
+# MCP for DevTool's API Client, Mock Server, Redis Client, and Kafka Explorer
 
-Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive two
+Lets an MCP client (Claude Code, Claude Desktop, …) inspect and drive four
 DevTool tools from one server:
 
 - **API Client** — list/read/edit collections, requests, scripts, and
@@ -10,8 +10,13 @@ DevTool tools from one server:
 - **Mock Server** — list/read/edit stubs and the fallback response, **start/
   stop** the server, test a response script before saving it, and read the
   request log — all through the same state the UI edits.
+- **Redis Client** and **Kafka Explorer** — **connection management only**:
+  list/add/update/delete/test saved connection profiles, plus connect/
+  disconnect. No key/pub-sub/admin tools for Redis, no topic/consumer-group/
+  produce/consume tools for Kafka — deliberately scoped to connection setup,
+  not data access.
 
-48 tools total; see the full list further down. Two of those (`devtool_mcp_status`,
+66 tools total; see the full list further down. Two of those (`devtool_mcp_status`,
 `devtool_mcp_set_background`) manage the MCP integration itself — see
 "DevTool MCP management" below.
 
@@ -29,26 +34,30 @@ true:
 
 - **Default** — **the tool that owns the call** is the one currently on
   screen: an API Client tool (`list_collections`, `run_request`, etc.)
-  needs the API Client tool open; a `mock_*` tool needs the Mock Server
-  tool open (that's where each tool's live state is mounted).
+  needs the API Client tool open; `mock_*` needs Mock Server open; `redis_*`
+  needs Redis Client open; `kafka_*` needs Kafka Explorer open (that's where
+  each tool's live state is mounted).
 - **Settings → MCP → Background MCP bridge** (off by default) — turn this
-  on and both tools answer regardless of which one is on screen, or even
+  on and all four tools answer regardless of which one is on screen, or even
   while you're on a completely different tool. Off by default per this
   app's "no silent network calls" rule — it's an explicit opt-in, not
   something that starts listening on its own.
 
 Anything else — app closed, or neither condition above holds — comes back
-as a clear error telling you so, not a hang. The two bridges
-(`src/components/tools/apiclient/mcpBridge.ts` and
-`src/components/tools/mockserver/mcpBridge.ts`) listen on the same
-underlying event but never collide: each ignores tool names it doesn't own,
-and by default only one is ever mounted at a time anyway (React Router
-mounts one tool's component tree at a time) — the background bridge
-(`src/components/McpBackgroundBridge.tsx`) is the one case where both are
-deliberately mounted together, sharing the exact same store each tool's own
-UI reads (see `apiclient/mcpRuntimeContext.tsx` /
-`mockserver/mcpRuntimeContext.tsx`) so a UI edit and an MCP edit can't
-silently clobber each other.
+as a clear error telling you so, not a hang. The four bridges
+(`src/components/tools/apiclient/mcpBridge.ts`,
+`src/components/tools/mockserver/mcpBridge.ts`,
+`src/components/tools/redis/mcpBridge.ts`, and
+`src/components/tools/kafka/mcpBridge.ts`) listen on the same underlying
+event but never collide: each ignores tool names it doesn't own, and by
+default only one tool's own bridge is ever mounted at a time anyway (React
+Router mounts one tool's component tree at a time) — the background bridge
+(`src/components/McpBackgroundBridge.tsx`) is the one case where all four
+are deliberately mounted together, sharing the exact same
+store/state each tool's own UI reads (see `apiclient/mcpRuntimeContext.tsx`,
+`mockserver/mcpRuntimeContext.tsx`, `redis/mcpRuntimeContext.tsx`,
+`kafka/mcpRuntimeContext.tsx`) so a UI edit and an MCP edit can't silently
+clobber each other.
 
 A third listener, `src/components/McpManageBridge.tsx`, is **always**
 mounted regardless of the Background MCP bridge setting — see "DevTool MCP
@@ -65,7 +74,12 @@ its bridge's port and a random auth token to `<app data dir>/mcp-bridge.json`
 **Excluded on purpose:** the Vault (API Client's local secret store) isn't
 exposed here — the UI itself keeps Vault values out of generated code, cURL
 export, and history, and an MCP client reading/writing it would defeat that
-boundary.
+boundary. Redis/Kafka connection passwords are a different case: they're
+part of the saved connection profile itself (same as API Client's Basic
+Auth password), stored in plain JSON in the app data dir and already
+returned unmasked by the app's own `redis_list_configs`/`kafka_list_configs`
+commands — so `redis_list_connections`/`kafka_list_connections` return them
+unmasked too, for the same reason `get_request` doesn't mask `auth.password`.
 
 ## Setup — installed the app from a binary?
 
@@ -79,9 +93,9 @@ app (a Tauri sidecar, `bundle.externalBin`).
    install's copy of the binary) and run it once in a terminal.
 3. Open a new Claude Code (or Claude Desktop) session and use it.
 
-One registration covers both tools — it's the same `devtool-mcp-server`
+One registration covers all four tools — it's the same `devtool-mcp-server`
 process either way, so there's nothing separate to set up for Mock Server's
-`mock_*` tools.
+`mock_*`, Redis Client's `redis_*`, or Kafka Explorer's `kafka_*` tools.
 
 The same dialog also has a **Background MCP bridge** toggle — the exact
 setting Settings → MCP has, just reachable without leaving the tool. Flip it
@@ -178,6 +192,28 @@ Mock Server (each of these needs the **Mock Server** tool open, not API Client):
 | `mock_get_request_log` | Recent requests the server handled (newest first, capped, bodies truncated past 5,000 chars). |
 | `mock_clear_request_log` | Clear the request log. |
 
+Redis Client (each needs the **Redis Client** tool open, not API Client —
+connection management only, no key/pub-sub/admin tools):
+
+| Tool | Does |
+|---|---|
+| `redis_list_connections` / `redis_get_connection` | Read saved connection profiles (id/name/host/port/username/password/useTls), unmasked. |
+| `redis_add_connection` / `redis_update_connection` / `redis_delete_connection` | Connection profile lifecycle. `redis_update_connection` takes a partial patch — flat fields, no nested merge needed. |
+| `redis_test_connection` | Verify a saved connection is reachable, without marking it as connected. |
+| `redis_connect` / `redis_disconnect` | Mark a saved connection as active (same as the Connect/Disconnect buttons); `redis_connect` can also set the active logical db (0–15). |
+| `redis_connection_status` | Current selected/connected connection id and db. |
+
+Kafka Explorer (each needs the **Kafka Explorer** tool open, not API Client —
+connection management only, no topic/consumer-group/produce/consume tools):
+
+| Tool | Does |
+|---|---|
+| `kafka_list_connections` / `kafka_get_connection` | Read saved broker profiles (id/name/bootstrapServers/saslMechanism/saslUsername/saslPassword/sslEnabled), unmasked. |
+| `kafka_add_connection` / `kafka_update_connection` / `kafka_delete_connection` | Broker profile lifecycle. `kafka_update_connection` takes a partial patch — flat fields, no nested merge needed. |
+| `kafka_test_connection` | Verify a saved broker is reachable, without marking it as connected. |
+| `kafka_connect` / `kafka_disconnect` | Mark a saved broker as active (same as the Connect/Disconnect buttons); stops any realtime consumers running against the previously-connected broker. |
+| `kafka_connection_status` | Current selected/connected broker id. |
+
 DevTool MCP management (always answers, regardless of the Background MCP
 bridge setting — that's the point):
 
@@ -202,7 +238,8 @@ Reference:
   call on screen, or turn on Settings → MCP → Background MCP bridge…"** —
   the app is running but nothing answered within 30s, almost always because
   a different tool is on screen and the background bridge is off. Either
-  switch to API Client for its tools (or Mock Server for the `mock_*`
-  ones), or call `devtool_mcp_set_background` with `enabled: true` (or turn
-  on Settings → MCP → Background MCP bridge by hand) so it stops mattering
+  switch to the owning tool (API Client for its tools, Mock Server for
+  `mock_*`, Redis Client for `redis_*`, Kafka Explorer for `kafka_*`), or
+  call `devtool_mcp_set_background` with `enabled: true` (or turn on
+  Settings → MCP → Background MCP bridge by hand) so it stops mattering
   which tool is on screen or whether the app window is focused.

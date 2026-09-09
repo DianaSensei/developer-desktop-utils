@@ -768,6 +768,142 @@ fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
 
+        // ── Redis Client — connection management only ───────────────────
+        // No key/value/pub-sub/admin tools — this surface is deliberately
+        // scoped to saved connection profiles: list/add/update/delete/test,
+        // plus connect/disconnect. Only answers while DevTool is open with
+        // the Redis Client tool on screen, unless Settings → MCP →
+        // Background MCP bridge is on (same contract as every other tool
+        // here — see mcp_bridge.rs).
+        json!({
+            "name": "redis_list_connections",
+            "description": "List every saved Redis connection profile (id, name, host, port, username, password, useTls). Values are returned as stored, unmasked, same as the app's own connection form.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "redis_get_connection",
+            "description": "Get one saved Redis connection profile by id.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "redis_add_connection",
+            "description": "Save a new Redis connection profile and return it (with its generated id). `name`/`host` required; `port` defaults to 6379, `useTls` to false.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" },
+                    "host": { "type": "string" },
+                    "port": { "type": "number" },
+                    "username": { "type": "string" },
+                    "password": { "type": "string" },
+                    "useTls": { "type": "boolean" }
+                },
+                "required": ["name"]
+            }
+        }),
+        json!({
+            "name": "redis_update_connection",
+            "description": "Patch a saved Redis connection profile. `patch` is a partial object — only included fields change.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "connectionId": { "type": "string" }, "patch": { "type": "object" } },
+                "required": ["connectionId", "patch"]
+            }
+        }),
+        json!({
+            "name": "redis_delete_connection",
+            "description": "Delete a saved Redis connection profile by id. The server itself is unaffected — only the local saved profile.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "redis_test_connection",
+            "description": "Verify a saved connection is reachable, without marking it as the connected one.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "redis_connect",
+            "description": "Test and mark a saved connection as the active one in the Redis Client UI (same as pressing Connect). Optionally also switch the active logical db (0-15) via `db`.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "connectionId": { "type": "string" }, "db": { "type": "number" } },
+                "required": ["connectionId"]
+            }
+        }),
+        json!({
+            "name": "redis_disconnect",
+            "description": "Clear the active Redis connection (same as pressing Disconnect).",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "redis_connection_status",
+            "description": "Get the currently selected/connected Redis connection id and active db.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+
+        // ── Kafka Explorer — connection management only ─────────────────
+        // No topic/consumer-group/produce/consume tools — same scoping as
+        // Redis above: saved broker profiles and connect/disconnect only.
+        json!({
+            "name": "kafka_list_connections",
+            "description": "List every saved Kafka broker profile (id, name, bootstrapServers, saslMechanism, saslUsername, saslPassword, sslEnabled). Values are returned as stored, unmasked, same as the app's own connection form.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "kafka_get_connection",
+            "description": "Get one saved Kafka broker profile by id.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "kafka_add_connection",
+            "description": "Save a new Kafka broker profile and return it (with its generated id). `name`/`bootstrapServers` required; `sslEnabled` defaults to false.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" },
+                    "bootstrapServers": { "type": "string", "description": "Comma-separated host:port list." },
+                    "saslMechanism": { "type": "string" },
+                    "saslUsername": { "type": "string" },
+                    "saslPassword": { "type": "string" },
+                    "sslEnabled": { "type": "boolean" }
+                },
+                "required": ["name", "bootstrapServers"]
+            }
+        }),
+        json!({
+            "name": "kafka_update_connection",
+            "description": "Patch a saved Kafka broker profile. `patch` is a partial object — only included fields change.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "connectionId": { "type": "string" }, "patch": { "type": "object" } },
+                "required": ["connectionId", "patch"]
+            }
+        }),
+        json!({
+            "name": "kafka_delete_connection",
+            "description": "Delete a saved Kafka broker profile by id. The broker itself is unaffected — only the local saved profile.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "kafka_test_connection",
+            "description": "Verify a saved broker is reachable, without marking it as the connected one.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "kafka_connect",
+            "description": "Test and mark a saved broker as the active one in the Kafka Explorer UI (same as pressing Connect). Stops any realtime consumers still running against a previously-connected broker, since only one broker is live at a time.",
+            "inputSchema": { "type": "object", "properties": { "connectionId": { "type": "string" } }, "required": ["connectionId"] }
+        }),
+        json!({
+            "name": "kafka_disconnect",
+            "description": "Clear the active Kafka broker (same as pressing Disconnect) and stop any realtime consumers running against it.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "kafka_connection_status",
+            "description": "Get the currently selected/connected Kafka broker id.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+
         // ── DevTool MCP management ──────────────────────────────────────
         // Unlike every tool above, these two are answered by an always-on
         // listener (McpManageBridge.tsx) that is never gated by the
@@ -840,18 +976,21 @@ impl ServerHandler for DevToolServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
-                "Drives two DevTool tools. API Client: collections, requests, scripts, \
+                "Drives four DevTool tools. API Client: collections, requests, scripts, \
                  environments — and can actually send a request. Mock Server: stubs, \
                  matchers, the fallback response, and can start/stop the server and test a \
-                 response script. By default each tool's calls only answer while the \
-                 DevTool desktop app is open with THAT tool on screen (mock_* needs Mock \
-                 Server open, everything else needs API Client open) — if a call times out, \
-                 that is almost always why; call devtool_mcp_set_background with enabled:true \
-                 to lift that requirement yourself (mirrors Settings → MCP → Background MCP \
-                 bridge) instead of asking the user to switch tools or click it manually — \
-                 devtool_mcp_status reports whether it's already on. Call \
-                 get_scripting_reference for the scripting API and field shapes shared by \
-                 both.",
+                 response script. Redis Client and Kafka Explorer (redis_*/kafka_* tools): \
+                 saved connection profiles only — list/add/update/delete/test, plus \
+                 connect/disconnect — no key/topic/produce/consume operations for either. By \
+                 default each tool's calls only answer while the DevTool desktop app is open \
+                 with THAT tool on screen (mock_* needs Mock Server open, redis_* needs Redis \
+                 Client open, kafka_* needs Kafka Explorer open, everything else needs API \
+                 Client open) — if a call times out, that is almost always why; call \
+                 devtool_mcp_set_background with enabled:true to lift that requirement \
+                 yourself (mirrors Settings → MCP → Background MCP bridge) instead of asking \
+                 the user to switch tools or click it manually — devtool_mcp_status reports \
+                 whether it's already on. Call get_scripting_reference for the API \
+                 Client/Mock Server scripting API and field shapes shared by those two.",
             )
             .with_server_info(Implementation::new("devtool-api-client", env!("CARGO_PKG_VERSION")))
     }

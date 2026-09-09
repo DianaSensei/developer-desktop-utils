@@ -886,10 +886,19 @@ Bulk edit fills its pane (`flex-1` + a vh floor) rather than `CodeSurface`'s fix
 
 **Live indicator:** `useEffect(() => { liveConnections.set('kafka-explorer', isConnected); }, [isConnected])` in `KafkaExplorer.tsx`.
 
+**MCP (`mcpBridge.ts`, `mcpRuntimeContext.tsx`):** `kafka_*` tools cover
+connection profile management only (list/add/update/delete/test/connect/
+disconnect) — no topic/consumer-group/produce/consume tools, unlike the API
+Client/Mock Server MCP surface. See "MCP bridge" further down for the
+shared architecture; `KafkaExplorer.tsx` reads `useKafkaState()` via
+`useKafkaRuntime()` (not directly) so the MCP bridge and the UI share one
+instance of `connectedBrokerId`/`selectedBrokerId`.
+
 Key files:
 - `KafkaExplorer.tsx` — root component, connect/disconnect, resize, routing
 - `LeftPanel.tsx` — broker selector + status dot + Connect/Disconnect button
 - `useKafkaState.ts` — navigation state + persisted `connectedBrokerId`
+- `mcpRuntimeContext.tsx` / `mcpBridge.ts` — MCP connection-management tools
 - `kafkaConsumerStore.ts` — module-scope consumer registry + `stopForBroker(id)`
 - `kafkaInputHistoryStore.ts` — per-broker topic/key history
 - `produceDraft.ts` — in-memory produce form state
@@ -959,10 +968,19 @@ Key files:
 
 **Live indicator:** `useEffect(() => { liveConnections.set('redis-client', isConnected); }, [isConnected])` in `RedisClient.tsx`.
 
+**MCP (`mcpBridge.ts`, `mcpRuntimeContext.tsx`):** `redis_*` tools cover
+connection profile management only (list/add/update/delete/test/connect/
+disconnect) — no key/pub-sub/admin tools, unlike the API Client/Mock Server
+MCP surface. See "MCP bridge" further down for the shared architecture;
+`RedisClient.tsx` reads `useRedisState()` via `useRedisRuntime()` (not
+directly) so the MCP bridge and the UI share one instance of
+`connectedConnId`/`selectedConnId`/`db`.
+
 Key files:
 - `RedisClient.tsx` — root component, connect/disconnect, resize, routing
 - `LeftPanel.tsx` — connection selector + status dot + Connect/Disconnect button + view nav
 - `useRedisState.ts` — navigation state (`RedisView`) + persisted `connectedConnId`/`db`
+- `mcpRuntimeContext.tsx` / `mcpBridge.ts` — MCP connection-management tools
 - `ConnectionForm.tsx` — host/port/username/password/TLS form
 - `types.ts` — `RedisConnection`, `KeyValue`, `PubSubMessage`, `redisApi` Tauri invoke wrappers
 - `useRedisData.ts` — stale-while-revalidate data cache (Overview, Admin tabs)
@@ -971,9 +989,9 @@ Key files:
 
 ---
 
-### MCP bridge — API Client + Mock Server (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/apiclient/mcpBridge.ts`, `src/components/tools/mockserver/mcpBridge.ts`)
+### MCP bridge — API Client + Mock Server + Redis Client + Kafka Explorer (`src-tauri/src/mcp_bridge.rs`, `src-tauri/src/bin/devtool-mcp-server.rs`, `src/components/tools/{apiclient,mockserver,redis,kafka}/mcpBridge.ts`)
 
-An external MCP client (Claude Desktop/Code) can inspect and drive two
+An external MCP client (Claude Desktop/Code) can inspect and drive four
 DevTool tools through one server. API Client: list/read/edit collections,
 requests, scripts, environments, and actually **send a request** through the
 same engine the Send button uses (result lands in the UI + History like any
@@ -981,32 +999,45 @@ other send). Mock Server: list/read/edit stubs and the fallback response,
 **start/stop** the server, test a Rhai response script, and read the request
 log — including `set_environment_variable`/`delete_environment_variable` for
 touching one or a few environment variables without resending the whole
-array via `update_environment`. Plus two management tools
-(`devtool_mcp_status`, `devtool_mcp_set_background`) that let a caller check
-and flip the Background MCP bridge setting itself instead of asking the user
-to click it. 48 tools; see `docs/human/mcp-server.md` for the full list and
-setup instructions.
+array via `update_environment`. Redis Client (`redis_*`) and Kafka Explorer
+(`kafka_*`): **connection management only** — list/add/update/delete/test
+saved connection profiles, plus connect/disconnect. Deliberately excludes
+data operations (no Redis key/pub-sub/admin tools, no Kafka topic/consumer-
+group/produce/consume tools) — a narrower surface than API Client/Mock
+Server on purpose. Plus two management tools (`devtool_mcp_status`,
+`devtool_mcp_set_background`) that let a caller check and flip the
+Background MCP bridge setting itself instead of asking the user to click it.
+66 tools; see `docs/human/mcp-server.md` for the full list and setup
+instructions.
 
 **The bridge:** `mcp_bridge.rs` starts a loopback-only axum server in
 `.setup()` (OS-assigned port, random token written to
 `<app_data_dir>/mcp-bridge.json`). It has no access to app state itself — a
 `POST /call` emits an `mcp:call` Tauri event and blocks on a
 `tokio::sync::oneshot` (30s timeout) until the frontend answers via the
-`mcp_respond` command. Two frontend listeners answer it: `apiclient/
-mcpBridge.ts`'s `useMcpBridge(store, runRequest, enabled)` runs the matching
-handler against the **live** `ApiStore`; `mockserver/mcpBridge.ts`'s
-`useMcpBridge(state, enabled)` does the same against `useMockServer()`'s
-return value. Each ignores tool names it doesn't own rather than erroring,
-since both can now be listening on the shared `mcp:call` event at once (see
-below).
+`mcp_respond` command. Four frontend listeners answer it — `apiclient/
+mcpBridge.ts`'s `useMcpBridge(store, runRequest, enabled)` against the
+**live** `ApiStore`; `mockserver/mcpBridge.ts`'s `useMcpBridge(state,
+enabled)` against `useMockServer()`'s return value; `redis/mcpBridge.ts`'s
+and `kafka/mcpBridge.ts`'s `useMcpBridge(state, enabled)` against
+`useRedisState()`'s/`useKafkaState()`'s return value for connect/disconnect
+(connection CRUD itself needs no React state — `redisApi`/`kafkaApi` are
+thin Tauri-invoke wrappers over a JSON file in the app data dir, callable
+directly). Each ignores tool names it doesn't own rather than erroring,
+since all four can now be listening on the shared `mcp:call` event at once
+(see below).
 
 **Where the store lives, and why it's shared:** `apiclient/
-mcpRuntimeContext.tsx` and `mockserver/mcpRuntimeContext.tsx` each hold one
-`useApiStore()`/`useMockServer()` instance in a context, provided once at
-the app root (`ApiClientRuntimeProvider`/`MockServerRuntimeProvider` in
-`App.tsx`, always mounted — cheap, since neither hook does I/O beyond an
-initial localStorage read). `ApiClient.tsx`/`MockServer.tsx` read it via
-`useApiClientRuntime()`/`useMockServerRuntime()` instead of instantiating
+mcpRuntimeContext.tsx`, `mockserver/mcpRuntimeContext.tsx`,
+`redis/mcpRuntimeContext.tsx`, and `kafka/mcpRuntimeContext.tsx` each hold
+one `useApiStore()`/`useMockServer()`/`useRedisState()`/`useKafkaState()`
+instance in a context, provided once at the app root
+(`ApiClientRuntimeProvider`/`MockServerRuntimeProvider`/
+`RedisRuntimeProvider`/`KafkaRuntimeProvider` in `App.tsx`, always mounted —
+cheap, since none of these hooks does I/O beyond an initial localStorage
+read). `ApiClient.tsx`/`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`
+read it via `useApiClientRuntime()`/`useMockServerRuntime()`/
+`useRedisRuntime()`/`useKafkaRuntime()` instead of instantiating
 their own. This used to not matter — React Router unmounts the previous
 route on every tool switch, so at most one instance of either store was ever
 alive. It matters now because of the background bridge below: two
@@ -1017,18 +1048,19 @@ everything else, silently dropping whichever wrote second.
 **Background bridge (Settings → MCP):** by default, each bridge only
 answers while its own tool is the one on screen — `useMcpBridge(..., enabled)`
 is called with `enabled = !mcpBackgroundEnabled` from `ApiClient.tsx`/
-`MockServer.tsx`. `useMcpBackgroundBridge()` (`src/hooks/
-useMcpBackgroundBridge.ts`) is an opt-in, persisted, off-by-default toggle
-(per the "no silent network calls" rule above) that lets an MCP client drive
-either tool regardless of which one is on screen. When it's on,
-`McpBackgroundBridge.tsx` — mounted once at the app root, reading both
-runtime contexts — calls both `useMcpBridge`s itself with `enabled = true`;
-the per-tool calls stay `enabled = false` at the same time so the two mount
-points never both listen and double-answer the same call. A call only ever
-succeeds while the app is open, and — unless the background bridge is on —
-only while the tool that owns it is the one on screen; anything else times
-out with a clear error rather than hanging (`get_scripting_reference` is the
-one tool answered without any of this, directly by the sidecar — see below).
+`MockServer.tsx`/`RedisClient.tsx`/`KafkaExplorer.tsx`.
+`useMcpBackgroundBridge()` (`src/hooks/useMcpBackgroundBridge.ts`) is an
+opt-in, persisted, off-by-default toggle (per the "no silent network calls"
+rule above) that lets an MCP client drive any of the four tools regardless
+of which one is on screen. When it's on, `McpBackgroundBridge.tsx` —
+mounted once at the app root, reading all four runtime contexts — calls all
+four `useMcpBridge`s itself with `enabled = true`; the per-tool calls stay
+`enabled = false` at the same time so no mount point ever double-answers
+the same call. A call only ever succeeds while the app is open, and —
+unless the background bridge is on — only while the tool that owns it is
+the one on screen; anything else times out with a clear error rather than
+hanging (`get_scripting_reference` is the one tool answered without any of
+this, directly by the sidecar — see below).
 
 **Managing the bridge from MCP itself (`src/components/McpManageBridge.tsx`):**
 a third `mcp:call` listener, mounted once at the app root next to

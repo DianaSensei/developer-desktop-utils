@@ -39,8 +39,8 @@ function buildHandlers(deps: Deps): Record<string, ToolHandler> {
     devtool_mcp_status: async () => ({
       backgroundBridgeEnabled: deps.backgroundEnabled,
       note: deps.backgroundEnabled
-        ? 'API Client and Mock Server tools answer MCP calls regardless of which tool is on screen.'
-        : 'API Client / Mock Server tools only answer MCP calls while that tool is the one on screen. Call devtool_mcp_set_background with enabled:true to lift that.',
+        ? 'API Client, Mock Server, Redis Client, and Kafka Explorer tools all answer MCP calls regardless of which tool is on screen.'
+        : 'API Client / Mock Server / Redis Client / Kafka Explorer tools only answer MCP calls while that tool is the one on screen. Call devtool_mcp_set_background with enabled:true to lift that.',
       mockServer: {
         running: deps.mockServer.running,
         url: deps.mockServer.running ? `http://${deps.mockServer.host}:${deps.mockServer.port}` : null,
