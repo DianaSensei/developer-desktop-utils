@@ -5,7 +5,7 @@ import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
   RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle, ChevronDown,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
-  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard, Plug,
+  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard, Plug, SquareDashed,
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -16,6 +16,10 @@ import {
   ACCENT_TONES, getAccentPreference, setAccentPreference,
   applyAccentToDocument, type AccentTone,
 } from '@/lib/accentPreference';
+import {
+  CORNER_STYLES, getCornerPreference, setCornerPreference,
+  applyCornerToDocument, type CornerStyle,
+} from '@/lib/cornerPreference';
 import {
   FONT_PREFERENCES, getFontPreference, setFontPreference,
   applyFontToDocument, type FontPreference,
@@ -233,6 +237,12 @@ const FONT_LABEL_KEY: Record<FontPreference, TranslationKey> = {
   classic: 'settings.font.classic',
 };
 
+const CORNER_LABEL_KEY: Record<CornerStyle, TranslationKey> = {
+  sharp: 'settings.corner.sharp',
+  default: 'settings.corner.default',
+  round: 'settings.corner.round',
+};
+
 const MONO_FONT_LABEL_KEY: Record<MonoFontPreference, TranslationKey> = {
   'ibm-plex-mono': 'settings.monoFont.ibmPlexMono',
   'fira-code': 'settings.monoFont.firaCode',
@@ -284,6 +294,12 @@ export function Settings() {
     setAccent(tone);
     setAccentPreference(tone);
     applyAccentToDocument(tone);
+  };
+  const [corner, setCorner] = useState<CornerStyle>(() => getCornerPreference());
+  const changeCorner = (style: CornerStyle) => {
+    setCorner(style);
+    setCornerPreference(style);
+    applyCornerToDocument(style);
   };
   const [font, setFont] = useState<FontPreference>(() => getFontPreference());
   const changeFont = (pref: FontPreference) => {
@@ -441,6 +457,20 @@ export function Settings() {
           title={t('settings.tone.label')}
           description={t('settings.tone.description')}
           control={<AccentSwatches value={accent} onChange={changeAccent} ariaLabel={t('settings.tone.label')} />}
+        />
+        <SettingRow
+          icon={SquareDashed}
+          title={t('settings.corner.label')}
+          description={t('settings.corner.description')}
+          control={
+            <Segmented
+              size="sm"
+              aria-label={t('settings.corner.label')}
+              value={corner}
+              onValueChange={(v) => changeCorner(v as CornerStyle)}
+              options={CORNER_STYLES.map((c) => ({ value: c, label: t(CORNER_LABEL_KEY[c]) }))}
+            />
+          }
         />
         <SettingRow
           icon={Type}

@@ -46,6 +46,7 @@ import '@fontsource/fira-code/latin-700.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
 import { applyAccentToDocument, getAccentPreference } from './lib/accentPreference';
+import { applyCornerToDocument, getCornerPreference } from './lib/cornerPreference';
 import { applyFontToDocument, getFontPreference } from './lib/fontPreference';
 import { applyMonoFontToDocument, getMonoFontPreference } from './lib/monoFontPreference';
 import { isTauri } from './lib/platform';
@@ -73,6 +74,7 @@ async function bootstrap() {
   // như dark-mode hệ thống, chỉ cần áp một lần lúc khởi động; đổi tại chỗ về
   // sau do Settings tự set thẳng lên <html> khi người dùng bấm chọn.
   applyAccentToDocument(getAccentPreference());
+  applyCornerToDocument(getCornerPreference());
   applyFontToDocument(getFontPreference());
   applyMonoFontToDocument(getMonoFontPreference());
 

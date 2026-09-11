@@ -77,6 +77,10 @@ module.exports = {
 
       /* Thang rời nhau — mỗi bậc mang một nghĩa. Xem TOKENS.md. */
       borderRadius: {
+        /* `rounded` trần. Không khai báo thì Tailwind giữ 0.25rem cứng và 151
+           chỗ dùng nó đứng ngoài preset [data-corner] — xem --r-default trong
+           tokens.css. Token mặc định bằng đúng 0.25rem nên không đổi hình. */
+        DEFAULT: 'var(--r-default)',
         xs: 'var(--r-xs)',
         sm: 'var(--r-sm)',
         md: 'var(--r-md)',

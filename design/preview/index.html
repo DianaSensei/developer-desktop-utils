@@ -407,6 +407,12 @@ h3{font-size:17px;font-weight:600;letter-spacing:-.012em;margin:0 0 8px}
       </div>
     </div>
     <div class="tgroup">
+      <span class="tlabel t" data-vi="Bo góc" data-en="Corners">Bo góc</span>
+      <div class="mini" role="group" aria-label="Kiểu bo góc">
+        <button id="bCS" data-corner="sharp" aria-pressed="false">Vuông</button><button id="bCD" data-corner="default" aria-pressed="true">Mặc định</button><button id="bCR" data-corner="round" aria-pressed="false">Tròn</button>
+      </div>
+    </div>
+    <div class="tgroup">
       <span class="tlabel">Lang</span>
       <div class="mini" role="group" aria-label="Ngôn ngữ giao diện">
         <button id="bVI" aria-pressed="true">VI</button><button id="bEN" aria-pressed="false">EN</button>
@@ -991,6 +997,18 @@ h3{font-size:17px;font-weight:600;letter-spacing:-.012em;margin:0 0 8px}
       root.style.setProperty('--a-h',b.dataset.h);
       root.style.setProperty('--a-s',b.dataset.s);
       root.style.setProperty('--a-l',b.dataset.l);
+    });
+  });
+
+  /* ── kiểu bo góc: đổi cả thang --r-*, mọi component tự theo ──
+     Giống app: chỉ đặt data-corner lên phần tử gốc, không component nào biết
+     mình vừa bị đổi. Nếu một khối ở lại hình cũ thì khối đó viết cứng bán kính. */
+  var cornerBtns = document.querySelectorAll('[data-corner]');
+  cornerBtns.forEach(function(b){
+    b.addEventListener('click',function(){
+      cornerBtns.forEach(function(o){o.setAttribute('aria-pressed','false')});
+      b.setAttribute('aria-pressed','true');
+      root.dataset.corner = b.dataset.corner;
     });
   });
 

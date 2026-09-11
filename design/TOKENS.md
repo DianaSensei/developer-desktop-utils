@@ -111,6 +111,12 @@ Hai dạng, như mọi màu khác trong kit:
 - `--cat-N-c` — kênh, cho nền có alpha: `bg-[hsl(var(--cat-1-c)/0.30)]`
 - `--cat-N` — bọc sẵn, khi không cần alpha: `text-[var(--cat-3)]`
 
+**Không gán nghĩa cố định cho một ô trong bảng này.** `--cat-3` là *số thứ tự*, không
+phải *nghĩa*: dùng nó cho "bước HMAC" hay "mã trạng thái 3xx" thì lần chỉnh màu highlight
+ở Regex Tester sẽ đổi luôn hai chỗ kia, và không ai nối được hai việc đó với nhau. Cần
+màu mang nghĩa thì đặt token tên nghĩa rồi trỏ vào hue: `--step-hmac: var(--cat-3)`.
+(Hiện còn vài chỗ đang vi phạm — xem `reference/ANALYSIS-DBX.md` mục 5.)
+
 ---
 
 ## Màu quy ước ngành — cú pháp và HTTP method
@@ -156,6 +162,7 @@ Thang mới cách nhau đủ xa để mỗi bậc mang một nghĩa:
 
 | Token | px | Dùng cho |
 |---|---|---|
+| `--r-default` | 4 | ô tick 16px, keycap, viền trong control nhỏ — **và là giá trị của `rounded` trần** |
 | `--r-xs` | 6 | chip, keycap, nút nhỏ |
 | `--r-sm` | 10 | input, nút, ô nhỏ trong thẻ |
 | `--r-md` | 14 | thẻ thường, dải nhuộm |
@@ -165,6 +172,32 @@ Thang mới cách nhau đủ xa để mỗi bậc mang một nghĩa:
 
 **Quy tắc lồng góc**: bán kính trong = bán kính ngoài − đệm.
 Panel `--r-lg` (18px) đệm 4px → ô trong dùng 14px (`--r-md`).
+
+### Ba preset — người dùng chọn
+
+Cả thang đổi theo `data-corner` trên `<html>` (Settings → Kiểu bo góc). Bo góc là gu
+chia rẽ mạnh nhất giữa người quen IDE và người quen app hiện đại, nên đừng chọn hộ —
+xem `reference/ANALYSIS-DBX.md` mục 1.
+
+| | `--r-default` | `--r-xs` | `--r-sm` | `--r-md` | `--r-lg` | `--r-xl` |
+|---|---|---|---|---|---|---|
+| `sharp` (dáng IDE) | 2 | 2 | 3 | 4 | 6 | 8 |
+| `default` | 4 | 6 | 10 | 14 | 18 | 24 |
+| `round` | 6 | 8 | 14 | 20 | 26 | 32 |
+
+`--r-full` **không** nằm trong preset: pill vẫn là pill ở cả ba. Bán kính đầy không phải
+một bậc trên thang, nó là một *hình dạng* khác.
+
+Quy tắc lồng góc vẫn đúng ở cả ba preset vì cả thang dịch cùng nhau: thẻ `round`
+(`--r-lg` 26px) đệm 6px → ô trong `--r-md` 20px.
+
+**Điều kiện để preset có tác dụng**: mọi bán kính đọc từ token. Một chỗ `rounded-[12px]`
+là một chỗ ở lại hình cũ — `guard.test.ts` rule `hardcodedRadius` canh, ngưỡng 0.
+
+> Cạm bẫy đã vấp: `borderRadius` khai trong `theme.extend` **không phủ khoá `DEFAULT`**,
+> nên `rounded` trần trả `0.25rem` cứng ở 151 chỗ, nằm ngoài hệ token. Nay `DEFAULT` trỏ
+> vào `--r-default` (4px = đúng 0.25rem, không chỗ nào đổi hình). Rút ra: **utility trần
+> của Tailwind là giá trị cứng cho tới khi được khai báo tường minh.**
 
 ---
 
@@ -237,6 +270,7 @@ cho bề mặt bật ra, `tick-draw` cho nét tick tự vẽ, `shimmer` cho kh�
 | `--acc` | `bg-acc` `text-acc` `border-acc` |
 | `--acc-tint` | `bg-acc-tint` |
 | `--ok` `--ok-tint` `--ok-edge` | `text-ok` `bg-ok-tint` `border-ok-edge` |
+| `--r-default` | `rounded` (trần) |
 | `--r-md` | `rounded-md` |
 | `--h` | `h-ctl` |
 | `--sh` | `shadow-soft` |

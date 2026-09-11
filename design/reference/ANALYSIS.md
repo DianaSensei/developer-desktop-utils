@@ -3,6 +3,9 @@
 Ghi lại **vì sao** hệ này thành ra như vậy, để lần sau không phải suy luận lại từ đầu.
 Ba nguồn, 15 ảnh, ba đợt.
 
+> Nguồn thứ tư — **DBX**, đọc từ mã nguồn chứ không từ ảnh — nằm riêng ở
+> [`ANALYSIS-DBX.md`](ANALYSIS-DBX.md).
+
 ---
 
 ## Nguồn 1 · Sony Color Lab (web, công cụ chuyên dụng)

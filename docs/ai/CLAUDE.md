@@ -132,6 +132,10 @@ AppConfigProvider          ← tunable numbers (src/config/appConfig.ts)
 >   Live sample page: `design/preview/index.html` (opens directly in a browser).
 > - **Values the app currently compiles** → [`src/design-system/`](../../src/design-system/)
 >   (`tokens.css`, `tailwind-preset.cjs`, `index.ts`).
+> - **Radius**: every corner reads from the `--r-*` scale, because the user picks a corner
+>   style in Settings (`[data-corner]`: sharp / default / round). `rounded-[12px]` is a
+>   guard failure — use `rounded-xs`…`rounded-xl`, `rounded-full`, or bare `rounded`
+>   (`--r-default`, 4px). See `design/reference/ANALYSIS-DBX.md`.
 > - **App-specific concerns the kit does not cover** (layout utilities, cross-platform
 >   webview parity, accessibility checklist) → [../design/DESIGN-SYSTEM.md](../design/DESIGN-SYSTEM.md).
 >

@@ -128,6 +128,15 @@
   /* ── Bo góc: thang RỜI NHAU ───────────────────────────────────────────
      Thang cũ (--radius: 1rem → sm/md/lg = 12/14/16px) có ba bậc mà mắt không
      phân biệt được, nên vô dụng. Thang này cách nhau đủ xa để có ý nghĩa. */
+  /* Bậc nhỏ nhất, đứng dưới --r-xs: ô tick 16px, keycap, viền trong của một
+     control nhỏ — chỗ mà 6px đã đọc ra là tròn.
+
+     Đây cũng là giá trị của `rounded` trần: 151 chỗ trong repo dùng nó, và nếu
+     không khai báo thì Tailwind trả 0.25rem CỨNG, nằm ngoài thang token, nên
+     preset bo góc bên dưới không với tới được. Trỏ `borderRadius.DEFAULT` vào
+     token này (xem tailwind-preset.cjs) là cách 151 chỗ đó đi theo preset mà
+     không phải sửa chỗ nào — 4px bằng đúng 0.25rem nên không gì đổi hình. */
+  --r-default: 4px;
   --r-xs:   6px;   /* chip, keycap, nút nhỏ */
   --r-sm:  10px;   /* input, nút, ô nhỏ trong thẻ */
   --r-md:  14px;   /* thẻ thường, dải nhuộm */
@@ -154,12 +163,44 @@
           Consolas, "Liberation Mono", monospace;
 
   /* ── Chuyển động: một nhịp duy nhất ───────────────────────────────────
-     Rê chuột đổi nền/viền — KHÔNG đổi vị trí. Không hover-lift. */
+     Rê chuột đổi nền/viền — KHÔNG đổi vị trí. Không hover-lift.
+
+     BỐN LUẬT, áp cho mọi component. Ba luật đầu là thứ phân biệt một giao
+     diện được CHỈNH với một giao diện chỉ "có gắn transition":
+
+     1. VÀO CHẬM, RA NHANH. Một panel mở ra là thông tin mới — mắt cần thời
+        gian bắt lấy nó, nên vào bằng `--dur-base` + `--ease-out-soft`. Cũng
+        panel đó đóng lại thì người dùng đã quyết định xong rồi, đứng đợi nó
+        bay ra là bực — nên ra bằng `--dur-exit` + `--ease-in-soft`, nhanh
+        hơn gần một nửa. Vào và ra CÙNG một thời lượng là dấu hiệu số một của
+        chuyển động chưa ai ngồi chỉnh.
+
+     2. CÀNG NHỎ CÀNG NHANH. Một cái tick 14px và một hộp thoại toàn màn hình
+        không thể cùng 220ms — cái tick sẽ lờ đờ, hộp thoại sẽ giật. Chọn
+        theo quãng đường phần tử đi, không theo thói quen:
+          `--dur-press` 90ms  → phản hồi dưới ngón tay (nhấn, tick, hover dày đặc)
+          `--dur-fast`  150ms → đổi màu, đổi icon, chip
+          `--dur-base`  220ms → menu, popover, con trượt tab/segmented
+          `--dur-slow`  340ms → bề mặt lớn: dialog, sheet, overlay toàn màn
+
+     3. PHẢN HỒI NHẤN LÀ TỨC THÌ. Lún xuống trong `--dur-press`, nhả ra trong
+        `--dur-fast`. Nhấn mà chờ 200ms mới thấy gì thì nút đọc ra là "hỏng",
+        không phải "mượt".
+
+     4. MỘT CHUYỂN ĐỘNG PHẢI TRẢ LỜI ĐƯỢC "ĐỂ LÀM GÌ". Phản hồi, thứ bậc,
+        hay chuyển trạng thái — nếu không nói được thì cắt. Đây là app công
+        cụ, không phải trang giới thiệu. */
   --ease-out-soft: cubic-bezier(.22, 1, .36, 1);
   --ease-spring:   cubic-bezier(.34, 1.45, .64, 1);
+  /* Đường cong RA: bắt đầu chậm rồi vọt đi. Ngược hẳn với out-soft, và đó là
+     ý đồ — phần tử biến mất phải dứt khoát, không "trôi" ra. */
+  --ease-in-soft:  cubic-bezier(.4, 0, .9, .3);
+  --dur-press: 90ms;
   --dur-fast: 150ms;
   --dur-base: 220ms;
   --dur-slow: 340ms;
+  /* Thời lượng RA dùng chung, để luật 1 chỉ nằm ở một chỗ. */
+  --dur-exit: 130ms;
 
   color-scheme: light;
 }
@@ -237,6 +278,30 @@
    (l44) chỉ đạt 3.31:1, không đạt cả ngưỡng phi văn bản 3:1 lẫn văn bản
    4.5:1. l35 đạt 4.94:1, còn dư biên so với 4.5. */
 [data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 35%; }
+
+/* ============================================================================
+   PRESET BO GÓC — cùng cơ chế với accent: thang bán kính là SÁU CON SỐ, đổi
+   preset là đổi cả sáu, không sửa component nào. Đặt data-corner trên <html>.
+
+   Vì sao có: bo góc là thứ gu người dùng chia rẽ mạnh nhất trong app công cụ —
+   người quen IDE (VS Code, JetBrains) thấy thang 14–24px "mềm quá", người quen
+   app hiện đại thấy thang 2–4px "thô". Tham khảo DBX: nó cho chọn
+   `none / small / large` ngay trong Settings và đó là một trong số ít tuỳ chọn
+   giao diện người dùng thật sự đụng tới. Xem `design/reference/ANALYSIS-DBX.md`.
+
+   Điều kiện để làm được: MỌI bán kính trong app phải đọc từ `--r-*`. Một chỗ
+   viết cứng `rounded-[12px]` là một chỗ không đổi theo preset — nhìn ra ngay vì
+   nó lệch với hàng xóm. `guard.test.ts` canh việc này.
+
+   `--r-full` KHÔNG nằm trong preset: pill vẫn là pill ở cả ba lựa chọn. Bán
+   kính đầy không phải một bậc trên thang, nó là một HÌNH DẠNG khác.
+   ========================================================================== */
+[data-corner="default"] { --r-default: 4px; --r-xs:  6px; --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px; }
+/* Dáng IDE: đủ bo để không cắt vào mắt, không đủ để đọc ra là "app tiêu dùng". */
+[data-corner="sharp"]   { --r-default: 2px; --r-xs:  2px; --r-sm:  3px; --r-md:  4px; --r-lg:  6px; --r-xl:  8px; }
+/* Mềm hơn mặc định một bậc rưỡi. Kiểm lại luật "bán kính trong = ngoài − đệm":
+   thẻ --r-lg 26px với đệm 8px thì ô trong dùng --r-md 20px — vẫn khớp. */
+[data-corner="round"]   { --r-default: 6px; --r-xs:  8px; --r-sm: 14px; --r-md: 20px; --r-lg: 26px; --r-xl: 32px; }
 
 /* ============================================================================
    PRESET FONT — chỉ đổi lại `--sans` (mặt chữ UI chung); `--mono` không đổi
@@ -717,6 +782,12 @@ h3{font-size:17px;font-weight:600;letter-spacing:-.012em;margin:0 0 8px}
       <span class="tlabel">Theme</span>
       <div class="mini" role="group" aria-label="Chế độ sáng tối">
         <button id="bL" aria-pressed="true">Sáng</button><button id="bD" aria-pressed="false">Tối</button>
+      </div>
+    </div>
+    <div class="tgroup">
+      <span class="tlabel t" data-vi="Bo góc" data-en="Corners">Bo góc</span>
+      <div class="mini" role="group" aria-label="Kiểu bo góc">
+        <button id="bCS" data-corner="sharp" aria-pressed="false">Vuông</button><button id="bCD" data-corner="default" aria-pressed="true">Mặc định</button><button id="bCR" data-corner="round" aria-pressed="false">Tròn</button>
       </div>
     </div>
     <div class="tgroup">
@@ -1304,6 +1375,18 @@ h3{font-size:17px;font-weight:600;letter-spacing:-.012em;margin:0 0 8px}
       root.style.setProperty('--a-h',b.dataset.h);
       root.style.setProperty('--a-s',b.dataset.s);
       root.style.setProperty('--a-l',b.dataset.l);
+    });
+  });
+
+  /* ── kiểu bo góc: đổi cả thang --r-*, mọi component tự theo ──
+     Giống app: chỉ đặt data-corner lên phần tử gốc, không component nào biết
+     mình vừa bị đổi. Nếu một khối ở lại hình cũ thì khối đó viết cứng bán kính. */
+  var cornerBtns = document.querySelectorAll('[data-corner]');
+  cornerBtns.forEach(function(b){
+    b.addEventListener('click',function(){
+      cornerBtns.forEach(function(o){o.setAttribute('aria-pressed','false')});
+      b.setAttribute('aria-pressed','true');
+      root.dataset.corner = b.dataset.corner;
     });
   });
 

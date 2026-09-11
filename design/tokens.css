@@ -122,6 +122,15 @@
   /* ── Bo góc: thang RỜI NHAU ───────────────────────────────────────────
      Thang cũ (--radius: 1rem → sm/md/lg = 12/14/16px) có ba bậc mà mắt không
      phân biệt được, nên vô dụng. Thang này cách nhau đủ xa để có ý nghĩa. */
+  /* Bậc nhỏ nhất, đứng dưới --r-xs: ô tick 16px, keycap, viền trong của một
+     control nhỏ — chỗ mà 6px đã đọc ra là tròn.
+
+     Đây cũng là giá trị của `rounded` trần: 151 chỗ trong repo dùng nó, và nếu
+     không khai báo thì Tailwind trả 0.25rem CỨNG, nằm ngoài thang token, nên
+     preset bo góc bên dưới không với tới được. Trỏ `borderRadius.DEFAULT` vào
+     token này (xem tailwind-preset.cjs) là cách 151 chỗ đó đi theo preset mà
+     không phải sửa chỗ nào — 4px bằng đúng 0.25rem nên không gì đổi hình. */
+  --r-default: 4px;
   --r-xs:   6px;   /* chip, keycap, nút nhỏ */
   --r-sm:  10px;   /* input, nút, ô nhỏ trong thẻ */
   --r-md:  14px;   /* thẻ thường, dải nhuộm */
@@ -263,6 +272,30 @@
    (l44) chỉ đạt 3.31:1, không đạt cả ngưỡng phi văn bản 3:1 lẫn văn bản
    4.5:1. l35 đạt 4.94:1, còn dư biên so với 4.5. */
 [data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 35%; }
+
+/* ============================================================================
+   PRESET BO GÓC — cùng cơ chế với accent: thang bán kính là SÁU CON SỐ, đổi
+   preset là đổi cả sáu, không sửa component nào. Đặt data-corner trên <html>.
+
+   Vì sao có: bo góc là thứ gu người dùng chia rẽ mạnh nhất trong app công cụ —
+   người quen IDE (VS Code, JetBrains) thấy thang 14–24px "mềm quá", người quen
+   app hiện đại thấy thang 2–4px "thô". Tham khảo DBX: nó cho chọn
+   `none / small / large` ngay trong Settings và đó là một trong số ít tuỳ chọn
+   giao diện người dùng thật sự đụng tới. Xem `design/reference/ANALYSIS-DBX.md`.
+
+   Điều kiện để làm được: MỌI bán kính trong app phải đọc từ `--r-*`. Một chỗ
+   viết cứng `rounded-[12px]` là một chỗ không đổi theo preset — nhìn ra ngay vì
+   nó lệch với hàng xóm. `guard.test.ts` canh việc này.
+
+   `--r-full` KHÔNG nằm trong preset: pill vẫn là pill ở cả ba lựa chọn. Bán
+   kính đầy không phải một bậc trên thang, nó là một HÌNH DẠNG khác.
+   ========================================================================== */
+[data-corner="default"] { --r-default: 4px; --r-xs:  6px; --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px; }
+/* Dáng IDE: đủ bo để không cắt vào mắt, không đủ để đọc ra là "app tiêu dùng". */
+[data-corner="sharp"]   { --r-default: 2px; --r-xs:  2px; --r-sm:  3px; --r-md:  4px; --r-lg:  6px; --r-xl:  8px; }
+/* Mềm hơn mặc định một bậc rưỡi. Kiểm lại luật "bán kính trong = ngoài − đệm":
+   thẻ --r-lg 26px với đệm 8px thì ô trong dùng --r-md 20px — vẫn khớp. */
+[data-corner="round"]   { --r-default: 6px; --r-xs:  8px; --r-sm: 14px; --r-md: 20px; --r-lg: 26px; --r-xl: 32px; }
 
 /* ============================================================================
    PRESET FONT — chỉ đổi lại `--sans` (mặt chữ UI chung); `--mono` không đổi

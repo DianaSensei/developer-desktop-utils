@@ -89,6 +89,14 @@ const RULES: Rule[] = [
     why: 'Bí danh bắc cầu của G1. Chuyển sang shadow / shadow-soft / shadow-lift.',
   },
   {
+    key: 'hardcodedRadius',
+    label: 'bo góc viết cứng',
+    // `rounded-[12px]` không đọc token nên đứng ngoài preset [data-corner]:
+    // đổi kiểu bo góc trong Settings thì chỗ đó ở lại, lệch với hàng xóm.
+    pattern: /rounded(?:-[a-z]+)?-\[[0-9.]+(?:px|rem)\]/g,
+    why: 'Dùng bậc có tên: rounded-xs / -sm / -md / -lg / -xl / -full.',
+  },
+  {
     key: 'hoverLift',
     label: 'nhấc phần tử khi rê chuột',
     pattern: /hover:-translate-y/g,

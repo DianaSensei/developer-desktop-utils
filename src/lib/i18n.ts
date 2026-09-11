@@ -82,6 +82,14 @@ export const DICTIONARY = {
     vi: 'Đổi màu nhấn của toàn app. Trạng thái (hợp lệ/lỗi/cảnh báo) không đổi theo.',
     en: "Changes the app's accent color. Status colors (valid/error/warning) stay fixed.",
   },
+  'settings.corner.label': { vi: 'Kiểu bo góc', en: 'Corner style' },
+  'settings.corner.description': {
+    vi: 'Độ bo góc của thẻ, nút và ô nhập trong toàn app. "Vuông" cho dáng IDE, "Tròn" cho dáng mềm.',
+    en: 'Corner rounding for cards, buttons and inputs across the app. "Sharp" reads as an IDE, "Round" as a softer app.',
+  },
+  'settings.corner.sharp': { vi: 'Vuông', en: 'Sharp' },
+  'settings.corner.default': { vi: 'Mặc định', en: 'Default' },
+  'settings.corner.round': { vi: 'Tròn', en: 'Round' },
   'settings.font.label': { vi: 'Mặt chữ', en: 'Font' },
   'settings.font.description': {
     vi: 'Đổi mặt chữ giao diện chung, dùng mặt chữ hệ thống đã cài sẵn — không cần tải font mới.',

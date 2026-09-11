@@ -14,7 +14,9 @@ design/
 ├── preview/
 │   ├── index.html        ★ Trang mẫu SỐNG — mở trực tiếp bằng browser
 │   └── build-standalone.mjs  Dựng bản một-file (xem cuối trang)
-└── reference/ANALYSIS.md   Vì sao hệ này thành ra như vậy
+└── reference/
+    ├── ANALYSIS.md         Vì sao hệ này thành ra như vậy (Sony · Larme · MoMo)
+    └── ANALYSIS-DBX.md     Đối chiếu với DBX — đã lấy gì, bỏ gì, và vì sao
 ```
 
 ---
@@ -27,6 +29,7 @@ design/
 | Sửa màu / bo góc / chiều cao | `tokens.css` (chỉ ở đây), rồi `TOKENS.md` để hiểu hệ quả |
 | Review PR chạm UI | Checklist cuối `RULES.md` |
 | Biết vì sao có quy tắc này | `reference/ANALYSIS.md` |
+| Đối chiếu với một app công cụ khác | `reference/ANALYSIS-DBX.md` |
 | Nhìn thấy tận mắt | mở `preview/index.html` |
 
 ---
@@ -39,12 +42,14 @@ xdg-open design/preview/index.html      # Linux
 open design/preview/index.html          # macOS
 ```
 
-Ba nút trên thanh đầu trang **chạy thật**, không phải ảnh chụp:
+Bốn nút trên thanh đầu trang **chạy thật**, không phải ảnh chụp:
 
 1. **4 tone** — đổi swatch, cả trang đổi theo kể cả xám nền, đường kẻ và bóng đổ.
    Nhưng **không chip trạng thái nào đổi màu**. Đó là phép thử của cả hệ.
-2. **Sáng / Tối**
-3. **VI / EN** — tiếng Việt dài hơn tiếng Anh ~25%; đây là bài kiểm tra layout.
+2. **Bo góc** — Vuông / Mặc định / Tròn. Cả thang `--r-*` đổi cùng lúc; khối nào ở lại
+   hình cũ là khối đó viết cứng bán kính.
+3. **Sáng / Tối**
+4. **VI / EN** — tiếng Việt dài hơn tiếng Anh ~25%; đây là bài kiểm tra layout.
 
 ---
 
