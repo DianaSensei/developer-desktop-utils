@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Layers } from 'lucide-react';
-import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
@@ -410,45 +410,70 @@ export function RegexTester() {
                   <p className="text-sm text-fg-mute">No matches found</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {result.matches.map((m, idx) => (
-                    <div key={idx} className="rounded-md border border-line bg-sunk p-3">
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="rounded-xs bg-acc-tint px-1.5 py-0.5 text-[11px] font-medium text-acc-ink">
-                              #{idx + 1}
-                            </span>
-                            <span className="text-[11px] text-fg-mute">
-                              pos {m.index}–{(m.index ?? 0) + m[0].length} · {m[0].length} char{m[0].length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <p className="font-mono text-sm text-fg break-all">&quot;{m[0]}&quot;</p>
-                        </div>
-                        <CopyButton value={m[0]} className="h-6 w-6 shrink-0" iconClassName="h-3 w-3" />
-                      </div>
-                      {m.length > 1 && (
-                        <div className="mt-2 space-y-1 border-l-2 border-line pl-2">
-                          {m.slice(1).map((g, gIdx) => {
-                            const name = groupNames[gIdx];
+                /* ── Vì sao THẺ đổi thành LƯỚI ───────────────────────────────
+                   Mỗi match trước đây là một thẻ cao ~108px: hàng chip `#1`,
+                   hàng `pos 0–19 · 19 chars`, hàng giá trị, nút copy. Năm match
+                   là hết màn hình. Nhưng dữ liệu ở đây là BẢNG thuần tuý — mọi
+                   match có đúng cùng một bộ trường — nên thẻ chỉ làm mỗi việc
+                   là thổi phồng nó lên gấp ba.
+
+                   Lưới: một match một dòng ~26px, ~20 match trên cùng khoảng
+                   không đó, cột thẳng hàng nên so `pos`/`len` giữa các match
+                   chỉ cần đưa mắt xuống thay vì đọc lại từng thẻ. Cột được tô
+                   theo KIỂU (số xanh dương, chuỗi xanh lá) và tiêu đề cột ghi
+                   rõ đơn vị — `index`, `chars` — nên không phải đoán `19` là
+                   thứ tự hay độ dài. Group rỗng hiện `NULL` in nghiêng, khác
+                   hẳn chuỗi rỗng.
+
+                   Nhóm bắt (capture group) trở thành CỘT, không phải khối lồng
+                   trong thẻ: `<domain>` của match này nằm thẳng cột với
+                   `<domain>` của match kia — đó mới là thứ người ta mở Regex
+                   Tester ra để nhìn. */
+                <div className="overflow-hidden rounded-sm border border-line">
+                  <DataTable density="compact" className="font-mono">
+                    <Thead sticky>
+                      <Tr>
+                        <Th className="w-10 whitespace-nowrap">#</Th>
+                        {/* Cột số giữ bề rộng CỐ ĐỊNH, cột giá trị ăn hết phần
+                            còn lại. Không ràng buộc thì hai cột số dãn ra bằng
+                            cột nội dung và bảng đọc ra rỗng tuếch ở giữa. */}
+                        <Th className="w-20 whitespace-nowrap" align="right" sub="index" subTone="number">Pos</Th>
+                        <Th className="w-20 whitespace-nowrap" align="right" sub="chars" subTone="number">Len</Th>
+                        <Th className="w-full whitespace-nowrap" sub="string" subTone="string">Match</Th>
+                        {groupNames.map((name, gIdx) => (
+                          <Th key={gIdx} className="whitespace-nowrap" sub="string" subTone="string">
+                            {name ? `<${name}>` : `Group ${gIdx + 1}`}
+                          </Th>
+                        ))}
+                        <Th className="w-9" aria-label="Copy" />
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {result.matches.map((m, idx) => (
+                        <Tr key={idx}>
+                          <Td className="text-fg-faint" numeric>{idx + 1}</Td>
+                          <Td numeric tone="number">{m.index}</Td>
+                          <Td numeric tone="number">{m[0].length}</Td>
+                          <Td tone="string" className="max-w-[26rem] truncate" title={m[0]}>{m[0]}</Td>
+                          {groupNames.map((_, gIdx) => {
+                            const g = m[gIdx + 1];
                             return (
-                              <div key={gIdx} className="flex items-center gap-2">
-                                <span className="shrink-0 rounded-xs bg-bg-2 px-1.5 py-0.5 font-mono text-[11px] font-medium text-fg-mute">
-                                  {name ? `<${name}>` : `Group ${gIdx + 1}`}
-                                </span>
-                                <span className="font-mono text-xs text-fg-mute break-all">
-                                  {g !== undefined ? `"${g}"` : <span className="opacity-40">undefined</span>}
-                                </span>
-                                {g !== undefined && (
-                                  <CopyButton value={g} className="h-5 w-5 shrink-0 ml-auto" iconClassName="h-2.5 w-2.5" />
-                                )}
-                              </div>
+                              <Td key={gIdx} tone="string" className="max-w-[14rem] truncate" title={g ?? undefined}>
+                                {g === undefined ? null : g}
+                              </Td>
                             );
                           })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                          <Td className="w-9 py-0">
+                            <CopyButton value={m[0]} className="h-6 w-6" iconClassName="h-3 w-3" />
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </DataTable>
+                  <DataTableStatus
+                    rows={result.matches.length}
+                    note={`/${pattern}/${flags}`}
+                  />
                 </div>
               )
             )}

@@ -155,6 +155,39 @@
   --edge-lite: inset 0 1px 0 hsl(0 0% 100% / .16);
   --edge-dark: inset 0 -1px 0 hsl(var(--a-h) 34% 14% / .14);
 
+  /* ── KIỂU DỮ LIỆU: hệ thứ tư, mang NGHĨA cố định ──────────────────────
+     Ba hệ đã có nói về giao diện: accent = "tương tác được", trạng thái =
+     "tốt/xấu", phân loại = "cái này khác cái kia". Không hệ nào nói được về
+     chính DỮ LIỆU đang hiện trên màn.
+
+     Đó là khoảng trống làm app "hiển thị" dữ liệu thay vì "mô tả" dữ liệu:
+     một ô chứa `0`, một ô chứa `"0"`, một ô rỗng và một ô NULL hiện ra y hệt
+     nhau, và người dùng phải tự đoán. DBX tô màu theo kiểu (`--data-grid-type-*`)
+     nên liếc một cái là biết cột nào là số, cột nào là chuỗi, chỗ nào NULL.
+
+     Vì sao KHÔNG dùng `--cat-N`: đó là bảng XOAY VÒNG, ô thứ ba không có
+     nghĩa gì cố định (xem RULES.md). Kiểu dữ liệu thì nghĩa cố định vĩnh
+     viễn — `string` luôn là `string`. Phải là token mang tên nghĩa.
+
+     Vì sao KHÔNG dùng accent: đổi tone sang tím thì cột số đổi màu theo, dù
+     kiểu của nó chẳng liên quan gì tới gu màu của người dùng. Cùng lý do với
+     hệ trạng thái — độc lập accent, không đổi khi swap tone. */
+  --type-string-c:  152 45% 34%;   /* chuỗi   */
+  --type-number-c:  214 72% 45%;   /* số nguyên, số thực */
+  --type-bool-c:     26 78% 42%;   /* true / false */
+  --type-date-c:    275 52% 50%;   /* thời gian */
+  --type-null-c:    var(--a-h) 10% 55%;  /* NULL / không có giá trị — xám, nhạt hơn chữ thường */
+  --type-binary-c:    2 55% 47%;   /* blob, bytes */
+  --type-object-c:  322 50% 46%;   /* object, array, json */
+
+  --type-string: hsl(var(--type-string-c));
+  --type-number: hsl(var(--type-number-c));
+  --type-bool:   hsl(var(--type-bool-c));
+  --type-date:   hsl(var(--type-date-c));
+  --type-null:   hsl(var(--type-null-c));
+  --type-binary: hsl(var(--type-binary-c));
+  --type-object: hsl(var(--type-object-c));
+
   /* ── Bóng: ngả sắc accent, không phải đen thuần ───────────────────────
      Chỉ ba bậc. Một tầng nổi dùng --sh; lồng sâu hơn dùng viền, không bóng. */
   --sh-sm: 0 1px 2px hsl(var(--a-h) 30% 20% / .06);
@@ -297,6 +330,16 @@
      quét sơn. Mép tối thì ngược lại, đậm hơn — nền càng tối càng cần. */
   --edge-lite: inset 0 1px 0 hsl(0 0% 100% / .07);
   --edge-dark: inset 0 -1px 0 rgb(0 0 0 / .28);
+
+  /* Nền tối: sáng hơn và bớt bão hoà, như bảng phân loại — nếu giữ nguyên độ
+     sáng của bản sáng thì chữ chìm hẳn vào nền. */
+  --type-string-c:  150 45% 62%;
+  --type-number-c:  212 78% 70%;
+  --type-bool-c:     28 75% 65%;
+  --type-date-c:    274 58% 74%;
+  --type-null-c:    var(--a-h) 10% 48%;
+  --type-binary-c:    4 62% 68%;
+  --type-object-c:  322 55% 70%;
 
   --sh-sm: 0 1px 2px rgb(0 0 0 / .45);
   --sh:    0 1px 2px rgb(0 0 0 / .45), 0 10px 24px -14px rgb(0 0 0 / .8);

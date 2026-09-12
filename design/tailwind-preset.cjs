@@ -68,6 +68,13 @@ module.exports = {
         fg: { DEFAULT: ch('fg'), mute: ch('fg-mute'), faint: ch('fg-faint') },
         line: { DEFAULT: ch('line'), soft: ch('line-soft'), strong: ch('line-strong') },
 
+        /* ── Kiểu DỮ LIỆU: nghĩa cố định, độc lập accent. Xem tokens.css. ── */
+        type: {
+          string: ch('type-string'), number: ch('type-number'), bool: ch('type-bool'),
+          date: ch('type-date'), null: ch('type-null'), binary: ch('type-binary'),
+          object: ch('type-object'),
+        },
+
         /* ── Trạng thái: nghĩa CỐ ĐỊNH, không đổi khi swap tone ──────────── */
         ok:   { DEFAULT: ch('ok'),   tint: ch('ok-tint'),   edge: ch('ok-edge') },
         warn: { DEFAULT: ch('warn'), tint: ch('warn-tint'), edge: ch('warn-edge') },
