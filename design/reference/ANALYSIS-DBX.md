@@ -254,6 +254,84 @@ nổi"*, không nói *"vật này bấm được"*. Mặt trên vẫn là mảng
 
 ---
 
+## Đợt 3 · Trang Settings của DBX — 8 ảnh, một trang thật
+
+Khác hai đợt trước (đọc ảnh sản phẩm + CSS website), đợt này là ảnh chụp MÀN HÌNH SETTINGS
+thật của DBX — cùng loại trang với `Settings.tsx` của DevTool, so sánh trực tiếp được.
+
+### Đã lấy
+
+**1 · ⭐ Nav trái theo mục, thay vì một trang cuộn dài.** Đây là phát hiện lớn nhất đợt
+này, và đã áp dụng ngay: Settings của DevTool trước đó là MỘT trang cuộn dài — Appearance
+không gấp, còn Tools/Keyboard Shortcuts/App Permissions/Configuration mỗi mục tự có
+accordion riêng (mặc định ĐÓNG), MCP/About/Data & Storage luôn mở. Xem đủ tám mục phải
+cuộn qua hàng nghìn pixel, và các accordion phải bấm mở tay mỗi lần quay lại trang.
+
+DBX: một danh sách mục cố định bên trái (Appearance/Editor/SQL Formatter/Navigation/
+Data/Database Backups/Tunnels/Shortcuts/Snippets/Sync/AI/MCP/About), bên phải chỉ hiện
+ĐÚNG một mục, cuộn riêng khỏi nav. Bấm vào mục tự là hành động "mở" — không cần accordion
+lồng bên trong.
+
+→ Đã làm: gộp 4 state đóng/mở rời (`toolsOpen`/`shortcutsOpen`/`permsOpen`/`configOpen`)
+thành một `activeSection`; xoá 4 nút chevron. Settings chuyển `fullHeight: true` (như API
+Client) để tự quản lý layout hai cột + scroll riêng từng cột.
+
+**2 · Nav trái KHÔNG icon.** DBX cố ý để danh sách mục chỉ có chữ, không icon — khác hẳn
+sidebar chính của app (đầy icon). Nhận ra đây không phải thiếu sót mà là cách phân biệt
+HAI TẦNG điều hướng: tầng ngoài (sidebar chính — "đi tới tool nào") có icon vì phải quét
+nhanh giữa 24 tool khác hình dạng nhau; tầng trong (nav Settings — "đi tới mục nào của
+CÙNG MỘT trang") không cần, vì chỉ có 8 mục, đều là chữ, và thêm icon vào đây chỉ tạo ra
+một sidebar icon thứ hai cạnh sidebar thứ nhất — rối chứ không rõ hơn.
+
+→ Đã làm: nav Settings dùng đúng mẫu này (`border-line bg-card` khi chọn, không icon).
+
+**3 · Live Preview — thấy trước khi chọn, không phải tưởng tượng qua tên.** Trang Editor
+của DBX: đổi Font Family hay cỡ chữ thì một khối code mẫu (SQL thật, có cú pháp tô màu,
+số dòng) render lại NGAY bên dưới — không phải rời Settings đi tìm một ô nào đó để so
+sánh. Áp đúng một chỗ: "Code font" của DevTool — hai lựa chọn (IBM Plex Mono/Fira Code)
+chỉ khác nhau ở LIGATURE (`=>`, `!==`, `>=`), thứ không đọc ra được từ tên.
+
+→ Đã làm: `SettingRow` nhận prop `preview` — dải xem trước dưới hàng, ngăn bằng viền
+mảnh. KHÔNG áp cho hàng "Font" phía trên: đổi `--sans` áp NGAY lên toàn app, bản thân
+màn Settings đã LÀ bản xem trước, thêm dải nữa là lặp. Bài học chung: live preview chỉ
+đáng làm khi lựa chọn KHÓ HÌNH DUNG từ tên — không phải cứ có control là thêm preview.
+
+### Đã đọc, chưa lấy — kèm lý do
+
+**4 · Tiêu đề mục lặp lại trong nội dung — DBX tự mâu thuẫn.** Trang Appearance của DBX
+có eyebrow "APPEARANCE" lặp lại tên mục đã chọn ở nav. Nhưng Editor/SQL Formatter/Data/
+Database Backups thì KHÔNG — nội dung vào thẳng "Live Preview"/"Toggle fold"/... Không
+thể lấy "đúng theo DBX" vì DBX không nhất quán ở điểm này. Đã chọn theo đa số: 7/8 mục
+bỏ tiêu đề lặp (nav đã hiện tên mục, lặp lại là dư); giữ lại đúng cho Appearance — vừa
+khớp trang Appearance của chính DBX, vừa là mục duy nhất có hiệu ứng thấy ngay khi bấm
+(lý do gốc nó đứng đầu danh sách từ trước).
+
+**5 · Ô "Search settings".** Cả 8 ảnh DBX đều có ô tìm ngay dưới "⚙ Settings". Không thêm
+— đây là một tính năng riêng (tìm xuyên suốt mọi mục), không phải một phần của việc "gộp
+nav trái" đã được yêu cầu. Thêm nó là mở rộng phạm vi tự ý, không phải làm đúng việc đã
+hỏi. Ghi lại làm việc tương lai nếu có nhu cầu thật.
+
+**6 · Grid toggle dày đặc không icon** (Toolbar/Editor advanced trong ảnh DBX — nhiều cột,
+label + `?` + toggle, không mô tả). DevTool's Settings hiện tại luôn có mô tả một dòng
+dưới mỗi tiêu đề (đúng luật "24 tool đầy tham số mà không giải thích gì" từ ANALYSIS.md
+gốc — Sony Color Lab). Hai triết lý ngược nhau: DBX ưu tiên MẬT ĐỘ cho power-user đã quen
+control; DevTool ưu tiên GIẢI THÍCH vì nhiều tool ít dùng, người dùng quay lại sau nhiều
+tháng cần nhắc lại control đó làm gì. Không đổi — đây là lựa chọn có chủ đích từ trước,
+không phải thiếu sót.
+
+**7 · Nút Reset/Import/Export config gộp ở đầu trang** (SQL Formatter: Import config /
+Export config / Restore defaults). DevTool có "Reset" cho Tools và Configuration riêng
+lẻ, chưa có import/export toàn bộ settings ra file. Có giá trị thật (sao lưu cấu hình
+trước khi thử nghiệm) nhưng là một TÍNH NĂNG mới, không phải một điều chỉnh layout —
+ngoài phạm vi đợt này.
+
+**8 · Card "read-only info" 2×2** (About: DBX Version/Runtime/OS/Architecture, mỗi ô một
+khung riêng). About của DevTool gộp version+update-check vào một hàng thay vì 4 ô — đã
+đủ gọn cho 1 giá trị chính (version); nhân bản thành lưới 2×2 cho ngần ấy thông tin sẽ
+tốn diện tích hơn không đáng, không mang lại gì thêm.
+
+---
+
 ## Ba câu rút gọn
 
 1. **Hệ token chỉ chặt đúng tới ranh giới bạn viết ra.** `theme.extend` bỏ sót `DEFAULT`,
