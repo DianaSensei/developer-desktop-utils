@@ -5,7 +5,7 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
-import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -244,92 +244,97 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
           rows.length === 0
             ? <p className="text-sm text-fg-mute">{f ? 'No matching containers.' : 'No containers.'}</p>
             : (
-              <DataTable>
-                <Thead>
-                  <Tr>
-                    <Th className="w-8">
-                      <RowCheckbox
-                        checked={selection.allVisibleSelected}
-                        indeterminate={selection.someVisibleSelected}
-                        onToggle={selection.toggleAllVisible}
-                        title="Select all shown"
-                      />
-                    </Th>
-                    <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
-                    <Th sortDirection={directionFor('image')} onSortClick={() => toggleSort('image')}>Image</Th>
-                    <Th sortDirection={directionFor('state')} onSortClick={() => toggleSort('state')}>State</Th>
-                    <Th sortDirection={directionFor('status')} onSortClick={() => toggleSort('status')}>Status</Th>
-                    {liveStats && (
-                      <>
-                        <Th align="right" sortDirection={directionFor('cpu')} onSortClick={() => toggleSort('cpu')}>CPU</Th>
-                        <Th align="right" sortDirection={directionFor('mem')} onSortClick={() => toggleSort('mem')}>Memory</Th>
-                      </>
-                    )}
-                    <Th sortDirection={directionFor('ports')} onSortClick={() => toggleSort('ports')}>Ports</Th>
-                    <Th align="right"></Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {rows.map((c, index) => (
-                    <Tr key={c.Id} interactive selected={selection.isSelected(c.Id)} onClick={() => setDetailsTarget(c)}>
-                      <Td onClick={(e) => e.stopPropagation()}>
+              <div className="overflow-hidden rounded-sm border border-line">
+                <DataTable containerClassName="rounded-none border-0">
+                  <Thead>
+                    <Tr>
+                      <Th className="w-8">
                         <RowCheckbox
-                          checked={selection.isSelected(c.Id)}
-                          onToggle={(e) => selection.toggle(c.Id, index, e.shiftKey)}
-                          title="Select container"
+                          checked={selection.allVisibleSelected}
+                          indeterminate={selection.someVisibleSelected}
+                          onToggle={selection.toggleAllVisible}
+                          title="Select all shown"
                         />
-                      </Td>
-                      <Td mono>{containerName(c)}</Td>
-                      <Td mono>{c.Image}</Td>
-                      <Td><Badge tone={stateTone(c.State)}>{c.State ?? 'unknown'}</Badge></Td>
-                      <Td>{c.Status}</Td>
+                      </Th>
+                      <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
+                      <Th sortDirection={directionFor('image')} onSortClick={() => toggleSort('image')} sub="repo:tag" subTone="string">Image</Th>
+                      <Th sortDirection={directionFor('state')} onSortClick={() => toggleSort('state')}>State</Th>
+                      <Th sortDirection={directionFor('status')} onSortClick={() => toggleSort('status')}>Status</Th>
                       {liveStats && (
                         <>
-                          <Td numeric><UsageCell frame={stats[c.Id]} kind="cpu" running={c.State === 'running'} /></Td>
-                          <Td numeric><UsageCell frame={stats[c.Id]} kind="mem" running={c.State === 'running'} /></Td>
+                          <Th align="right" sortDirection={directionFor('cpu')} onSortClick={() => toggleSort('cpu')} sub="%" subTone="number">CPU</Th>
+                          <Th align="right" sortDirection={directionFor('mem')} onSortClick={() => toggleSort('mem')} sub="bytes" subTone="number">Memory</Th>
                         </>
                       )}
-                      <Td mono>{formatPorts(c)}</Td>
-                      <Td align="right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(c)}>
-                            <Info className="h-3.5 w-3.5" />
-                          </IconButton>
-                          {c.State === 'running' ? (
-                            <IconButton size="sm" title="Stop" disabled={busyIds.has(c.Id)} onClick={() => runAction(c.Id, () => containerApi.stop(connection, c.Id))}>
-                              <Square className="h-3.5 w-3.5" />
-                            </IconButton>
-                          ) : (
-                            <IconButton size="sm" title="Start" disabled={busyIds.has(c.Id)} onClick={() => runAction(c.Id, () => containerApi.start(connection, c.Id))}>
-                              <Play className="h-3.5 w-3.5" />
-                            </IconButton>
-                          )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              title="More actions"
-                              className="inline-flex shrink-0 items-center justify-center rounded-sm h-ctl w-ctl text-fg-mute transition-colors hover:bg-acc hover:text-fg"
-                            >
-                              <MoreHorizontal className="h-3.5 w-3.5" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setLogsTarget(c)}>Logs</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setLimitsTarget(c)}>Resource limits…</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => runAction(c.Id, () => containerApi.restart(connection, c.Id))}>Restart</DropdownMenuItem>
-                              {c.State === 'running' ? (
-                                <DropdownMenuItem onClick={() => runAction(c.Id, () => containerApi.pause(connection, c.Id))}>Pause</DropdownMenuItem>
-                              ) : c.State === 'paused' ? (
-                                <DropdownMenuItem onClick={() => runAction(c.Id, () => containerApi.unpause(connection, c.Id))}>Unpause</DropdownMenuItem>
-                              ) : null}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-bad" onClick={() => setRemoveTarget(c)}>Remove</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </Td>
+                      <Th sortDirection={directionFor('ports')} onSortClick={() => toggleSort('ports')} sub="host→ctr" subTone="number">Ports</Th>
+                      <Th align="right"></Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </DataTable>
+                  </Thead>
+                  <Tbody>
+                    {rows.map((c, index) => (
+                      <Tr key={c.Id} interactive selected={selection.isSelected(c.Id)} onClick={() => setDetailsTarget(c)}>
+                        <Td onClick={(e) => e.stopPropagation()}>
+                          <RowCheckbox
+                            checked={selection.isSelected(c.Id)}
+                            onToggle={(e) => selection.toggle(c.Id, index, e.shiftKey)}
+                            title="Select container"
+                          />
+                        </Td>
+                        <Td mono>{containerName(c)}</Td>
+                        <Td mono>{c.Image}</Td>
+                        <Td><Badge tone={stateTone(c.State)}>{c.State ?? 'unknown'}</Badge></Td>
+                        <Td>{c.Status}</Td>
+                        {liveStats && (
+                          <>
+                            <Td numeric><UsageCell frame={stats[c.Id]} kind="cpu" running={c.State === 'running'} /></Td>
+                            <Td numeric><UsageCell frame={stats[c.Id]} kind="mem" running={c.State === 'running'} /></Td>
+                          </>
+                        )}
+                        <Td mono>{formatPorts(c)}</Td>
+                        <Td align="right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(c)}>
+                              <Info className="h-3.5 w-3.5" />
+                            </IconButton>
+                            {c.State === 'running' ? (
+                              <IconButton size="sm" title="Stop" disabled={busyIds.has(c.Id)} onClick={() => runAction(c.Id, () => containerApi.stop(connection, c.Id))}>
+                                <Square className="h-3.5 w-3.5" />
+                              </IconButton>
+                            ) : (
+                              <IconButton size="sm" title="Start" disabled={busyIds.has(c.Id)} onClick={() => runAction(c.Id, () => containerApi.start(connection, c.Id))}>
+                                <Play className="h-3.5 w-3.5" />
+                              </IconButton>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger
+                                title="More actions"
+                                className="inline-flex shrink-0 items-center justify-center rounded-sm h-ctl w-ctl text-fg-mute transition-colors hover:bg-acc hover:text-fg"
+                              >
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setLogsTarget(c)}>Logs</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setLimitsTarget(c)}>Resource limits…</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => runAction(c.Id, () => containerApi.restart(connection, c.Id))}>Restart</DropdownMenuItem>
+                                {c.State === 'running' ? (
+                                  <DropdownMenuItem onClick={() => runAction(c.Id, () => containerApi.pause(connection, c.Id))}>Pause</DropdownMenuItem>
+                                ) : c.State === 'paused' ? (
+                                  <DropdownMenuItem onClick={() => runAction(c.Id, () => containerApi.unpause(connection, c.Id))}>Unpause</DropdownMenuItem>
+                                ) : null}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-bad" onClick={() => setRemoveTarget(c)}>Remove</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </DataTable>
+                {/* Tiêu đề trang ghi TỔNG số, còn bảng thì đang LỌC — hai con số khác
+                    nhau và trước đây không chỗ nào nói ra. Dòng này nói cả hai. */}
+                <DataTableStatus rows={containers.length} shown={rows.length} note={f ? `filter: "${f}"` : undefined} />
+              </div>
             )
         )}
       </div>

@@ -87,22 +87,22 @@ function MgmtQueueListView({ conn, refreshKey, onRefresh, onSelectQueue }: Queue
                 <DataTable>
                   <Thead>
                     <Tr>
-                      <Th>Name</Th>
-                      <Th align="right">Ready</Th>
-                      <Th align="right">Unacked</Th>
-                      <Th align="right">Total</Th>
-                      <Th align="right">Consumers</Th>
-                      <Th>State</Th>
+                      <Th sub="queue" subTone="string">Name</Th>
+                      <Th align="right" sub="msgs" subTone="number">Ready</Th>
+                      <Th align="right" sub="msgs" subTone="number">Unacked</Th>
+                      <Th align="right" sub="msgs" subTone="number">Total</Th>
+                      <Th align="right" sub="count" subTone="number">Consumers</Th>
+                      <Th sub="enum" subTone="string">State</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
                     {items.map((q) => (
                       <Tr key={q.name} interactive onClick={() => onSelectQueue(q.name)}>
-                        <Td mono>{q.name}</Td>
-                        <Td numeric>{formatNumber(q.messages_ready)}</Td>
-                        <Td numeric>{formatNumber(q.messages_unacknowledged)}</Td>
-                        <Td numeric>{formatNumber(q.messages)}</Td>
-                        <Td numeric>{formatNumber(q.consumers)}</Td>
+                        <Td mono tone="string">{q.name}</Td>
+                        <Td numeric tone="number">{formatNumber(q.messages_ready)}</Td>
+                        <Td numeric tone="number">{formatNumber(q.messages_unacknowledged)}</Td>
+                        <Td numeric tone="number">{formatNumber(q.messages)}</Td>
+                        <Td numeric tone="number">{formatNumber(q.consumers)}</Td>
                         <Td>{q.state ?? '—'}</Td>
                       </Tr>
                     ))}

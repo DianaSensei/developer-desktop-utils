@@ -1142,15 +1142,17 @@ function ByRequestView({ stats, onJumpToStatus }: Readonly<{
       <DataTable density="compact">
         <Thead sticky>
           <Tr>
-            <Th>Request</Th>
-            <Th align="right">Runs</Th>
-            <Th align="right">HTTP 2xx</Th>
-            <Th align="right">Passed</Th>
-            <Th align="right">Failed</Th>
-            <Th>Response codes</Th>
-            <Th align="right">Avg</Th>
-            <Th align="right">Min</Th>
-            <Th align="right">Max</Th>
+            <Th sub="method · name" subTone="string">Request</Th>
+            <Th align="right" sub="count" subTone="number">Runs</Th>
+            <Th align="right" sub="ok/total" subTone="number">HTTP 2xx</Th>
+            <Th align="right" sub="assertions" subTone="number">Passed</Th>
+            <Th align="right" sub="assertions" subTone="number">Failed</Th>
+            <Th sub="status" subTone="number">Response codes</Th>
+            {/* Ba cột này trước đây chỉ ghi Avg/Min/Max — không có đơn vị thì
+                `1240` là mili-giây hay micro-giây là phải đoán. */}
+            <Th align="right" sub="ms" subTone="number">Avg</Th>
+            <Th align="right" sub="ms" subTone="number">Min</Th>
+            <Th align="right" sub="ms" subTone="number">Max</Th>
           </Tr>
         </Thead>
         <Tbody>

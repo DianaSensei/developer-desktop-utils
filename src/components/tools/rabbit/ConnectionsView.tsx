@@ -61,8 +61,10 @@ export function ConnectionsView({ conn, refreshKey, onRefresh }: ConnectionsView
                 <Thead>
                   <Tr>
                     <Th>Name</Th><Th>User</Th><Th>State</Th><Th>Protocol</Th>
-                    <Th>Channels</Th><Th>Peer</Th><Th>TLS</Th>
-                    <Th align="right">From client</Th><Th align="right">To client</Th>
+                    <Th align="right" sub="count" subTone="number">Channels</Th><Th sub="host:port" subTone="string">Peer</Th><Th sub="bool" subTone="bool">TLS</Th>
+                    {/* Hai cột này là BYTE, không phải số gói tin — `1.2M` mà
+                        không có đơn vị thì đọc ra là "1,2 triệu message". */}
+                    <Th align="right" sub="bytes" subTone="number">From client</Th><Th align="right" sub="bytes" subTone="number">To client</Th>
                   </Tr>
                 </Thead>
                 <Tbody>

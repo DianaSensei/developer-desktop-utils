@@ -6,7 +6,7 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow, Spinner } from '@/components/ui/spinner';
-import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
@@ -140,65 +140,70 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
           rows.length === 0
             ? <p className="text-sm text-fg-mute">{f ? 'No matching volumes.' : 'No volumes.'}</p>
             : (
-              <DataTable>
-                <Thead>
-                  <Tr>
-                    <Th className="w-8">
-                      <RowCheckbox
-                        checked={selection.allVisibleSelected}
-                        indeterminate={selection.someVisibleSelected}
-                        onToggle={selection.toggleAllVisible}
-                        title="Select all shown"
-                      />
-                    </Th>
-                    <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
-                    <Th sortDirection={directionFor('driver')} onSortClick={() => toggleSort('driver')}>Driver</Th>
-                    <Th sortDirection={directionFor('used')} onSortClick={() => toggleSort('used')}>In use</Th>
-                    <Th align="right" sortDirection={directionFor('size')} onSortClick={() => toggleSort('size')}>Size</Th>
-                    <Th sortDirection={directionFor('mountpoint')} onSortClick={() => toggleSort('mountpoint')}>Mountpoint</Th>
-                    <Th align="right"></Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {rows.map((v, index) => (
-                    <Tr key={v.Name} interactive selected={selection.isSelected(v.Name)} onClick={() => setDetailsTarget(v.Name)}>
-                      <Td onClick={(e) => e.stopPropagation()}>
+              <div className="overflow-hidden rounded-sm border border-line">
+                <DataTable containerClassName="rounded-none border-0">
+                  <Thead>
+                    <Tr>
+                      <Th className="w-8">
                         <RowCheckbox
-                          checked={selection.isSelected(v.Name)}
-                          onToggle={(e) => selection.toggle(v.Name, index, e.shiftKey)}
-                          title="Select volume"
+                          checked={selection.allVisibleSelected}
+                          indeterminate={selection.someVisibleSelected}
+                          onToggle={selection.toggleAllVisible}
+                          title="Select all shown"
                         />
-                      </Td>
-                      <Td mono>{v.Name}</Td>
-                      <Td>{v.Driver}</Td>
-                      <Td>
-                        <span title={describeUsers(usage.byVolume.get(v.Name))}>
-                          {(() => {
-                            const users = usage.byVolume.get(v.Name);
-                            return users && users.length > 0
-                              ? <Badge tone="success">{users.length} container{users.length > 1 ? 's' : ''}</Badge>
-                              : <Badge tone="neutral">unused</Badge>;
-                          })()}
-                        </span>
-                      </Td>
-                      <Td numeric>
-                        {sizesLoading && !(v.Name in sizeByName) ? <Spinner size="sm" /> : formatBytes(sizeByName[v.Name])}
-                      </Td>
-                      <Td mono>{v.Mountpoint}</Td>
-                      <Td align="right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(v.Name)}>
-                            <Info className="h-3.5 w-3.5" />
-                          </IconButton>
-                          <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(v)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </IconButton>
-                        </div>
-                      </Td>
+                      </Th>
+                      <Th sortDirection={directionFor('name')} onSortClick={() => toggleSort('name')}>Name</Th>
+                      <Th sortDirection={directionFor('driver')} onSortClick={() => toggleSort('driver')}>Driver</Th>
+                      <Th sortDirection={directionFor('used')} onSortClick={() => toggleSort('used')}>In use</Th>
+                      <Th align="right" sortDirection={directionFor('size')} onSortClick={() => toggleSort('size')} sub="bytes" subTone="number">Size</Th>
+                      <Th sortDirection={directionFor('mountpoint')} onSortClick={() => toggleSort('mountpoint')} sub="path" subTone="string">Mountpoint</Th>
+                      <Th align="right"></Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </DataTable>
+                  </Thead>
+                  <Tbody>
+                    {rows.map((v, index) => (
+                      <Tr key={v.Name} interactive selected={selection.isSelected(v.Name)} onClick={() => setDetailsTarget(v.Name)}>
+                        <Td onClick={(e) => e.stopPropagation()}>
+                          <RowCheckbox
+                            checked={selection.isSelected(v.Name)}
+                            onToggle={(e) => selection.toggle(v.Name, index, e.shiftKey)}
+                            title="Select volume"
+                          />
+                        </Td>
+                        <Td mono>{v.Name}</Td>
+                        <Td>{v.Driver}</Td>
+                        <Td>
+                          <span title={describeUsers(usage.byVolume.get(v.Name))}>
+                            {(() => {
+                              const users = usage.byVolume.get(v.Name);
+                              return users && users.length > 0
+                                ? <Badge tone="success">{users.length} container{users.length > 1 ? 's' : ''}</Badge>
+                                : <Badge tone="neutral">unused</Badge>;
+                            })()}
+                          </span>
+                        </Td>
+                        <Td numeric>
+                          {sizesLoading && !(v.Name in sizeByName) ? <Spinner size="sm" /> : formatBytes(sizeByName[v.Name])}
+                        </Td>
+                        <Td mono>{v.Mountpoint}</Td>
+                        <Td align="right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(v.Name)}>
+                              <Info className="h-3.5 w-3.5" />
+                            </IconButton>
+                            <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(v)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </IconButton>
+                          </div>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </DataTable>
+                {/* Tiêu đề trang ghi TỔNG số, còn bảng thì đang LỌC — hai con số khác
+                    nhau và trước đây không chỗ nào nói ra. Dòng này nói cả hai. */}
+                <DataTableStatus rows={volumes.length} shown={rows.length} note={f ? `filter: "${f}"` : undefined} />
+              </div>
             )
         )}
       </div>

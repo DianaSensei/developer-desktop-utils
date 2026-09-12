@@ -10,7 +10,7 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
-import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
 import { kafkaApi, type TopicSummary } from './types';
 
 interface TopicListViewProps {
@@ -65,24 +65,29 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
           rows.length === 0
             ? <p className="text-sm text-fg-mute">{f ? 'No matching topics.' : 'No topics yet.'}</p>
             : (
-              <DataTable>
-                <Thead>
-                  <Tr>
-                    <Th>Name</Th>
-                    <Th align="right">Partitions</Th>
-                    <Th align="right">Replication</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {rows.map((t) => (
-                    <Tr key={t.name} interactive onClick={() => onSelectTopic(t.name)}>
-                      <Td mono>{t.name}</Td>
-                      <Td numeric>{t.partitionCount}</Td>
-                      <Td numeric>{t.replicationFactor}</Td>
+              <div className="overflow-hidden rounded-sm border border-line">
+                <DataTable containerClassName="rounded-none border-0">
+                  <Thead>
+                    <Tr>
+                      <Th sub="topic" subTone="string">Name</Th>
+                      <Th align="right" sub="count" subTone="number">Partitions</Th>
+                      <Th align="right" sub="factor" subTone="number">Replication</Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </DataTable>
+                  </Thead>
+                  <Tbody>
+                    {rows.map((t) => (
+                      <Tr key={t.name} interactive onClick={() => onSelectTopic(t.name)}>
+                        <Td mono tone="string">{t.name}</Td>
+                        <Td numeric tone="number">{t.partitionCount}</Td>
+                        <Td numeric tone="number">{t.replicationFactor}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </DataTable>
+                {/* Tiêu đề trang ghi TỔNG số, còn bảng thì đang LỌC — hai con số khác
+                    nhau và trước đây không chỗ nào nói ra. Dòng này nói cả hai. */}
+                <DataTableStatus rows={topics.length} shown={rows.length} note={f ? `filter: "${f}"` : undefined} />
+              </div>
             )
         )}
       </div>

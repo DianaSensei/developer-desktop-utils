@@ -113,11 +113,11 @@ export function OverviewView({ connection, refreshKey, onRefresh }: {
               <DataTable density="compact">
                 <Thead>
                   <Tr>
-                    <Th>Type</Th>
-                    <Th align="right">Active</Th>
-                    <Th align="right">Total</Th>
-                    <Th align="right">Size</Th>
-                    <Th align="right">Reclaimable</Th>
+                    <Th sub="resource" subTone="string">Type</Th>
+                    <Th align="right" sub="count" subTone="number">Active</Th>
+                    <Th align="right" sub="count" subTone="number">Total</Th>
+                    <Th align="right" sub="bytes" subTone="number">Size</Th>
+                    <Th align="right" sub="bytes" subTone="number">Reclaimable</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
