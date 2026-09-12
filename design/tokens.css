@@ -179,18 +179,18 @@
      token này (xem tailwind-preset.cjs) là cách 151 chỗ đó đi theo preset mà
      không phải sửa chỗ nào — 4px bằng đúng 0.25rem nên không gì đổi hình. */
   --r-default: 4px;
-  --r-xs:   6px;   /* chip, keycap, nút nhỏ */
-  --r-sm:  10px;   /* input, nút, ô nhỏ trong thẻ */
-  --r-md:  14px;   /* thẻ thường, dải nhuộm */
-  --r-lg:  18px;   /* panel, khung tool */
-  --r-xl:  24px;   /* modal, sheet */
+  --r-xs:   5px;   /* chip, keycap, nút nhỏ */
+  --r-sm:   6px;   /* input, nút, ô nhỏ trong thẻ */
+  --r-md:   8px;   /* thẻ thường, dải nhuộm */
+  --r-lg:  10px;   /* panel, khung tool */
+  --r-xl:  14px;   /* modal, sheet */
   --r-full: 999px;
 
   /* ── Chiều cao control: MỘT giá trị, không ba ─────────────────────────
      Repo hiện trộn h-7 (28px) / h-8 (32px) / h-9 (36px) → mọi hàng control
      đều lệch nhau vài pixel. Chỉ còn hai bậc. */
-  --h:    34px;
-  --h-lg: 40px;
+  --h:    32px;
+  --h-lg: 38px;
 
   /* ── Mặt chữ ──────────────────────────────────────────────────────────
      `mono` chưa từng được khai báo trong preset Tailwind của repo, dù
