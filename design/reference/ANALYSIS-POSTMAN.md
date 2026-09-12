@@ -64,6 +64,44 @@ component UI) — cần bạn xác nhận có muốn làm không trước khi đ
 
 ---
 
+## Đợt 2 · Styling — so trực tiếp ảnh với ảnh, không phải tính năng
+
+Đợt đầu so sai trục: đọc Postman như một danh sách TÍNH NĂNG (Bulk Edit, History, auth kế
+thừa...) trong khi câu hỏi là STYLE — màu, viền, mật độ, hình dạng control. Đợt này sửa lại:
+chụp ảnh thật của API Client (dark mode, cùng ngữ cảnh Params/Headers) rồi so pixel-với-pixel
+với 4 ảnh Postman, đọc thẳng CSS/theme thay vì đoán.
+
+### Đã khớp hoặc vượt — xác nhận từ code
+
+**Tô `{{variable}}` trong URL.** `var-support.ts` tự ghi *"Postman-style"* trong comment —
+và đã vượt: không chỉ chữ màu mà còn NỀN MỀM + bo góc, xanh khi biết/đỏ khi lạ, tooltip hiện
+giá trị khi hover, autocomplete khi gõ `{{`. Ảnh Postman chỉ thấy một màu, không phân biệt
+biết/lạ, không thấy tooltip.
+
+**Màu method (GET xanh/POST cam/PATCH...).** Cùng công thức "màu quy ước ngành đi qua
+token" như Postman — xem `method-color.ts`, ba thang riêng (text/bg/badge) cho ba ngữ cảnh
+khác nhau (dropdown, thanh địa chỉ, cây sidebar). Đúng tinh thần "đây là thứ người dùng
+Postman đã thuộc, đổi đi là bắt học lại" mà chính comment trong file đã ghi.
+
+### Khác biệt thật — một lựa chọn triết lý, không phải lỗi
+
+**Đóng khung (DevTool/DBX) và tràn phẳng (Postman).** Bảng QUERY/HEADERS của DevTool đóng
+khung viền đầy đủ quanh cả header lẫn body — đúng kết luận "độ đặc đến từ ranh giới" rút ra
+từ đợt DBX trước. Bảng Params/Headers của Postman thì TRÀN — không viền ngoài, chỉ có
+đường kẻ dưới hàng tiêu đề, hoà thẳng vào nền trang, không đọc ra là "một cái hộp" khi ít
+dữ liệu (một dòng thêm-mới trống).
+
+Đây là hai triết lý khác nhau thật sự, không phải một bên đúng một bên sai:
+- **DBX/DevTool**: viền đậm, thang tông giãn rộng — độ đặc đến từ ranh giới rõ ràng.
+- **Postman**: gần như không viền, dựa vào khoảng trắng + trọng lượng chữ — độ đặc đến từ
+  tiết chế, không phải khung.
+
+Đã hỏi và CHỌN giữ nguyên kiểu đóng khung — nhất quán với phần còn lại của app đã xây cả
+phiên theo hướng DBX. Ghi lại ở đây để không phải đo lại nếu sau này có ai hỏi "sao không
+làm phẳng như Postman" — đã cân nhắc, có chủ đích, không phải bỏ sót.
+
+---
+
 ## Một câu rút gọn
 
 Không phải mọi nguồn tham khảo đều sinh ra việc phải làm — đối chiếu cẩn thận với code
