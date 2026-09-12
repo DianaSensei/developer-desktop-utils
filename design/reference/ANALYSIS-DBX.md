@@ -69,29 +69,41 @@ token, và nó im lặng cho tới ngày token đó cần đổi.
 
 ## Đã đọc, chưa lấy — kèm lý do
 
-### 3 · Lớp tương thích WebView cũ — **cần quyết định, không phải gu**
+### 3 · Lớp tương thích WebView cũ — đã đo lại, rủi ro **thấp hơn nhiều** so với DBX
 
 DBX dò khả năng CSS lúc khởi động (`lib/ui/legacyWebView.ts`: `oklch`, `color-mix`,
 `:has()`, `100dvh`, `min()`, cú pháp media query dạng khoảng) và gắn
 `html.dbx-legacy-webview` trước khi app mount. Hơn **1.000 dòng** CSS dự phòng treo vào
-class đó, phần lớn là **viết tay lại các utility breakpoint của Tailwind**.
+class đó, phần lớn là viết tay lại các utility breakpoint của Tailwind.
 
-Không ai bỏ 1.000 dòng vào chỗ này vì thích. Nguyên nhân: **Tailwind v4 nhắm Safari 16.4+**,
-còn Tauri trên Linux chạy WebKitGTK của bản phân phối. WebKitGTK trên Ubuntu 22.04 (nền
-mà DevTool tuyên bố hỗ trợ trong `docs/ai/CLAUDE.md`) ở khoảng Safari 15 — **không parse
-được** cú pháp `@media (width >= 40rem)` mà Tailwind v4 sinh ra. Khi đó **toàn bộ utility
-responsive chết lặng**: không lỗi, không cảnh báo, chỉ là layout sai ở đúng nền tảng ít
-người ngồi test nhất.
+Nguyên nhân chung: **Tailwind v4 nhắm Safari 16.4+**, còn Tauri trên Linux chạy WebKitGTK
+của bản phân phối — trên Ubuntu 22.04 là dòng 2.36 (ngang Safari 15.4). Câu hỏi đúng
+không phải "Tailwind v4 sinh ra gì" mà **"cái gì thật sự nằm trong file CSS đã build"**.
+Đo trên `dist/assets/*.css` của chính repo này:
 
-DevTool dùng Tailwind **v4.3** và tuyên bố hỗ trợ Ubuntu 22.04+ → cùng vùng rủi ro.
-Điểm nhẹ hơn DBX: `src/` hiện **không dùng** `:has()`, `color-mix()` hay `oklch` (đã
-kiểm: 0 chỗ), vì hệ token đi bằng `hsl()` — nên rủi ro thu về **một** thứ: cú pháp media
-query dạng khoảng, tức các bổ ngữ `sm:` / `lg:`.
+| Thứ WebView cũ hay vỡ | Trong bundle | Vì sao |
+|---|---|---|
+| Media query dạng khoảng `(width >= 40rem)` | **0** — toàn bộ là `(min-width: 40rem)` | `vite.config.ts` đặt `build.target = 'safari14'`, esbuild hạ cú pháp xuống |
+| `oklch()`, `:has()`, `@container`, `100dvh` | **0** | Hệ token đi bằng `hsl()`; `src/` không dùng ba thứ kia |
+| `color-mix()` | 316 lần, **nhưng** mỗi lần đều nằm trong `@supports (color: color-mix(...))` và có dòng thường đứng trước | Tailwind v4 tự sinh cặp fallback |
+| `@property` | 74 lần, kèm khối fallback `@layer properties { @supports … { *, ::before, ::after { --tw-*: initial } } }` | Tailwind v4 tự sinh |
+| `@layer theme/base/utilities` | **có** — và đây là ngưỡng thật sự | Không hỗ trợ cascade layer thì **toàn bộ** khối bị bỏ qua → app hiện trần trụi, không lỗi |
 
-Chưa làm vì đây là quyết định cần người xác nhận, không phải việc dọn dẹp:
-**(a)** dựng một nền Ubuntu 22.04 thật, mở app, xem có vỡ không — chưa đo thì chưa biết
-nó là bug thật hay chỉ là rủi ro trên giấy; **(b)** nếu vỡ: hoặc hạ tuyên bố hỗ trợ
-xuống Ubuntu 24.04, hoặc thêm lớp dự phòng như DBX. Xin xác nhận trước khi đi tiếp.
+Nên rủi ro thu về **một dòng duy nhất**: WebView phải hiểu `@layer`, tức **WebKitGTK ≥ 2.36**
+(Safari 15.4, 3/2022). Đó đúng bằng bản Ubuntu 22.04 phát hành kèm, và Tauri 2 vốn đã yêu
+cầu `webkit2gtk-4.1` — nên nền thấp nhất đang tuyên bố hỗ trợ *nhiều khả năng* vừa đủ qua.
+
+Kết luận khác hẳn DBX, và lý do rất cụ thể: DBX phải dựng 1.000 dòng dự phòng vì nó **dùng
+thật** `oklch`, `:has()`, `color-mix` không bọc `@supports` trong CSS viết tay của nó.
+DevTool không dùng ba thứ đó — **kỷ luật token bằng `hsl()` đã trả công ở đúng chỗ này.**
+
+Còn lại hai việc nhỏ, không phải lớp tương thích:
+
+- **Chưa ai mở app trên Ubuntu 22.04 thật.** Bảng trên nói CSS *hợp lệ cú pháp*, không nói
+  giao diện *nhìn đúng*. Một lần chạy thử là đủ kết luận.
+- **Dev server không có lưới an toàn đó.** `build.target` chỉ áp lúc build; `npm run dev`
+  phục vụ CSS thô. Nếu có ngày lỗi chỉ xuất hiện khi dev trên Linux mà bản build thì không,
+  đây là chỗ nhìn đầu tiên.
 
 ### 4 · `.dbx-control-chrome` — một class cho toàn bộ viền/nền/hover/focus của control
 
@@ -169,4 +181,6 @@ nhau, không phải một thiếu sót — giữ nguyên bản của DevTool.
 2. **Token phải mang tên của *nghĩa*, không phải tên của *chỗ đứng trong bảng*.**
    `--cat-3` là số thứ tự; `--step-hmac` là nghĩa. Chỉ cái sau chỉnh riêng được.
 3. **Nền tảng cũ nhất bạn tuyên bố hỗ trợ là một cam kết CSS**, không chỉ một dòng trong
-   README. Tailwind v4 + WebKitGTK cũ hỏng **im lặng** — mục 3 ở trên cần một lần đo thật.
+   README — và cam kết đó phải **đo trên file đã build**, không suy từ phiên bản Tailwind.
+   Đo rồi mới thấy rủi ro nằm ở `@layer` chứ không ở media query, và nhỏ hơn nhiều so với
+   dự đoán ban đầu (mục 3).
