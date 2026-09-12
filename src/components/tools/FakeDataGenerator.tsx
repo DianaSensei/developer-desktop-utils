@@ -144,7 +144,7 @@ export function FakeDataGenerator() {
                     value={f.name}
                     onChange={(e) => updateField(f.id, { name: e.target.value })}
                     placeholder="field name"
-                    className="h-ctl flex-1 text-xs font-mono rounded-md"
+                    className="h-ctl flex-1 text-xs font-mono rounded-sm"
                   />
                   <button
                     onClick={() => removeField(f.id)}
@@ -156,7 +156,7 @@ export function FakeDataGenerator() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Select value={f.type} onValueChange={(v) => updateField(f.id, { type: v as FakerType })}>
-                    <SelectTrigger className="h-ctl flex-1 text-xs rounded-md"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-ctl flex-1 text-xs rounded-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {FAKER_TYPE_GROUPS.map((g) => (
                         <SelectGroup key={g.group}>
@@ -169,16 +169,16 @@ export function FakeDataGenerator() {
                 </div>
                 {(f.type === 'int' || f.type === 'float') && (
                   <div className="flex items-center gap-1.5">
-                    <Input type="number" value={f.min ?? 0} onChange={(e) => updateField(f.id, { min: parseFloat(e.target.value) || 0 })} placeholder="min" className="h-ctl text-xs rounded-md" />
-                    <Input type="number" value={f.max ?? 1000} onChange={(e) => updateField(f.id, { max: parseFloat(e.target.value) || 0 })} placeholder="max" className="h-ctl text-xs rounded-md" />
+                    <Input type="number" value={f.min ?? 0} onChange={(e) => updateField(f.id, { min: parseFloat(e.target.value) || 0 })} placeholder="min" className="h-ctl text-xs rounded-sm" />
+                    <Input type="number" value={f.max ?? 1000} onChange={(e) => updateField(f.id, { max: parseFloat(e.target.value) || 0 })} placeholder="max" className="h-ctl text-xs rounded-sm" />
                     {f.type === 'float' && (
-                      <Input type="number" min={0} max={10} value={f.decimals ?? 2} onChange={(e) => updateField(f.id, { decimals: parseInt(e.target.value) || 0 })} title="decimals" className="h-ctl w-16 text-xs rounded-md" />
+                      <Input type="number" min={0} max={10} value={f.decimals ?? 2} onChange={(e) => updateField(f.id, { decimals: parseInt(e.target.value) || 0 })} title="decimals" className="h-ctl w-16 text-xs rounded-sm" />
                     )}
                   </div>
                 )}
                 {(f.type === 'date' || f.type === 'birthdate') && (
                   <Select value={f.dateFormat ?? (f.type === 'birthdate' ? 'isoDate' : 'iso')} onValueChange={(v) => updateField(f.id, { dateFormat: v as DateFormat })}>
-                    <SelectTrigger className="h-ctl text-xs rounded-md"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-ctl text-xs rounded-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {DATE_FORMATS.map((d) => (
                         <SelectItem key={d.value} value={d.value}>
@@ -196,7 +196,7 @@ export function FakeDataGenerator() {
                     value={f.values ?? ''}
                     onChange={(e) => updateField(f.id, { values: e.target.value })}
                     placeholder="comma,separated,values"
-                    className="h-ctl text-xs font-mono rounded-md"
+                    className="h-ctl text-xs font-mono rounded-sm"
                   />
                 )}
               </div>

@@ -82,7 +82,7 @@ export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
             <div
               key={c.name}
               className={cn(
-                'grid gap-4 px-4 py-1.5 text-xs border-b border-line/30 hover:bg-bg-2/20',
+                'grid gap-4 px-4 py-1.5 text-xs border-b border-line-soft hover:bg-bg-2/20',
                 i % 2 === 1 && 'bg-bg-2/5',
               )}
               style={{ gridTemplateColumns: '1fr 1fr' }}

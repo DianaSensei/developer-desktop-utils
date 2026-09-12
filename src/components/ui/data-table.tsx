@@ -3,9 +3,9 @@
 // connections and channels, the API Client runner's data preview.
 //
 // All eight of those had independently arrived at nearly the same markup —
-// `overflow-x-auto rounded-lg border border-line/50` wrapping a
+// `overflow-x-auto rounded-lg border border-line-soft` wrapping a
 // `w-full text-xs` table with a `bg-bg-2/20` header and `divide-y
-// divide-line/40` rows — but with drifting cell padding (`px-3` vs `px-3.5`)
+// divide-line-soft` rows — but with drifting cell padding (`px-3` vs `px-3.5`)
 // and header tint (`bg-bg-2/20` vs `bg-bg-2/30`). These parts fix the
 // geometry in one place.
 //
@@ -62,7 +62,11 @@ export interface DataTableProps extends React.TableHTMLAttributes<HTMLTableEleme
 export function DataTable({ className, containerClassName, density = 'default', children, ...props }: DataTableProps) {
   return (
     <DensityContext.Provider value={density}>
-      <div className={cn('overflow-x-auto rounded-lg border border-line/50', containerClassName)}>
+      {/* `rounded-lg` (18px) là bán kính của PANEL, không phải của một lưới dữ
+          liệu dày đặc: góc tròn 18px bọc quanh những ô vuông góc đọc ra lệch
+          hẳn ở hàng đầu và hàng cuối. Lưới lấy `--r-sm`. Viền ở độ đục đầy —
+          một cái khung hoặc có hoặc không, 50% là không quyết. */}
+      <div className={cn('overflow-x-auto rounded-sm border border-line', containerClassName)}>
         <table className={cn('w-full text-xs', className)} {...props}>
           {children}
         </table>
@@ -80,8 +84,11 @@ export function Thead({ sticky, className, ...props }: TheadProps) {
   return (
     <thead
       className={cn(
-        'border-b border-line/50 bg-bg-2/20',
-        sticky && 'sticky top-0 z-10 backdrop-blur',
+        // Hàng tiêu đề là CHROME: nó điều khiển (sắp xếp), không phải dữ liệu.
+        // `bg-bg-2/20` cũ trên mặt `--card` trắng ra ≈98% — không đọc ra là
+        // một hàng tiêu đề, nên mắt phải dựa vào chữ in đậm để đoán.
+        'border-b border-line bg-chrome',
+        sticky && 'sticky top-0 z-10',
         className,
       )}
       {...props}
@@ -97,7 +104,7 @@ export interface TbodyProps extends React.HTMLAttributes<HTMLTableSectionElement
 export function Tbody({ zebra, className, ...props }: TbodyProps) {
   return (
     <tbody
-      className={cn(zebra ? '[&>tr:nth-child(odd)]:bg-bg-2/20' : 'divide-y divide-line/40', className)}
+      className={cn(zebra ? '[&>tr:nth-child(odd)]:bg-bg-2/20' : 'divide-y divide-line-soft', className)}
       {...props}
     />
   );
@@ -144,7 +151,9 @@ export function Th({ align = 'left', className, sortDirection, onSortClick, chil
     <th
       className={cn(
         DENSITY_CELL[density].head,
-        'font-medium text-fg-mute',
+        // Chữ nhỏ viết hoa giãn rộng: tiêu đề cột phải đọc ra là NHÃN, không
+        // phải một dòng dữ liệu in đậm. Cùng công thức với `PaneHeader`.
+        'text-[11px] font-semibold uppercase tracking-wider text-fg-mute',
         ALIGN_CLASS[align],
         className,
       )}

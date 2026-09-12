@@ -907,7 +907,7 @@ export function Settings() {
               <div className="flex items-center gap-2">
                 {autoCheckEnabled && (
                   <Select value={String(checkHour)} onValueChange={(v) => setCheckHour(Number(v))}>
-                    <SelectTrigger className="h-ctl w-28 text-xs rounded-lg">
+                    <SelectTrigger className="h-ctl w-28 text-xs rounded-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1118,7 +1118,7 @@ export function Settings() {
                         const v = e.target.value;
                         if (v !== '') setField(f, Number(v));
                       }}
-                      className="h-ctl w-24 text-center text-xs rounded-lg"
+                      className="h-ctl w-24 text-center text-xs rounded-sm"
                     />
                     {f.unit && <span className="w-5 text-[11px] text-fg-mute">{f.unit}</span>}
                   </div>

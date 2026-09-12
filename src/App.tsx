@@ -567,7 +567,7 @@ function Sidebar({
             <button
               onClick={() => { pendingSearchFocus.current = true; onToggleCollapse(); }}
               title={t('shell.sidebar.searchToolsTitle')}
-              className="flex items-center justify-center h-ctl w-ctl rounded-md text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
+              className="flex items-center justify-center h-ctl w-ctl rounded-sm text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
             >
               <Search className="h-3.5 w-3.5" />
             </button>
@@ -581,7 +581,7 @@ function Sidebar({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('shell.search.placeholder')}
-                className="h-ctl pl-7 pr-7 text-xs rounded-md bg-bg-2/40 border-line"
+                className="h-ctl pl-7 pr-7 text-xs"
               />
               {query && (
                 <button
@@ -1103,7 +1103,7 @@ function AppContent() {
                   key={`${activeTool.path}-tabs`}
                   role="tablist"
                   aria-label={activeGroup!.label}
-                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
+                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-sm bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
                 >
                   {activeGroupTabs.map((def) => {
                       const p = toolPath(def.id);

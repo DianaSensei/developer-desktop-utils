@@ -289,7 +289,7 @@ function HexToggle({ value, onChange }: { value: boolean; onChange: (v: boolean)
     <button
       type="button" onClick={() => onChange(!value)}
       className={cn(
-        'text-[11px] font-mono px-2 h-ctl rounded-md border transition-colors',
+        'text-[11px] font-mono px-2 h-ctl rounded-sm border transition-colors',
         value ? 'border-acc/50 bg-acc/10 text-acc' : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg'
       )}
     >
@@ -525,7 +525,7 @@ function JsonInputSection({
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-fg-mute font-medium">Sep</span>
           <Select value={jsonSeparator} onValueChange={(v) => onUpdate({ jsonSeparator: v })}>
-            <SelectTrigger className="h-ctl w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl w-36 text-xs rounded-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               {SEP_OPTIONS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
             </SelectContent>
@@ -570,7 +570,7 @@ function JsonInputSection({
             <span className="flex-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">Value</span>
           </div>
           {/* Rows */}
-          <div className="px-3 divide-y divide-line/30">
+          <div className="px-3 divide-y divide-line-soft">
             {jsonFields.map((field, i) => (
               <FieldRow
                 key={field.id}
@@ -608,7 +608,7 @@ function StepOutputBar({ result }: { result: StepResult | undefined }) {
       'flex items-start gap-2 px-3 py-2 border-t text-xs font-mono',
       result.error
         ? 'bg-bad/5 border-bad/20 text-bad'
-        : 'bg-bg-2/20 border-line/40 text-fg-mute'
+        : 'bg-bg-2/20 border-line-soft text-fg-mute'
     )}>
       <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-px text-fg-mute/50" />
       <span className="flex-1 min-w-0">
@@ -648,7 +648,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
       result?.error ? 'border-bad/30' : 'border-line'
     )}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-bg-2/20 border-b border-line/40">
+      <div className="flex items-center gap-2 px-3 py-2 bg-bg-2/20 border-b border-line-soft">
         <div className={cn(
           'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold',
           result?.error ? 'bg-bad/20 text-bad' : 'bg-acc/15 text-acc'
@@ -729,7 +729,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {step.op === 'hash' && (
           <div className="flex flex-wrap items-center gap-2">
             <Select value={step.algorithm ?? 'sha256'} onValueChange={(v) => onUpdate({ algorithm: v })}>
-              <SelectTrigger className="h-ctl w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-ctl w-36 text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {HASH_ALGOS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label} ({a.bits}-bit)</SelectItem>)}
               </SelectContent>
@@ -743,7 +743,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Select value={step.algorithm ?? 'sha256'} onValueChange={(v) => onUpdate({ algorithm: v })}>
-                <SelectTrigger className="h-ctl w-36 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-ctl w-36 text-xs rounded-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {HASH_ALGOS.map((a) => <SelectItem key={a.id} value={a.id}>{a.label} ({a.bits}-bit)</SelectItem>)}
                 </SelectContent>
@@ -775,7 +775,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {/* Encode / Decode */}
         {(step.op === 'encode' || step.op === 'decode') && (
           <Select value={step.codec ?? 'base64'} onValueChange={(v) => onUpdate({ codec: v })}>
-            <SelectTrigger className="h-ctl w-44 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-ctl w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               {CODECS.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
             </SelectContent>
@@ -785,7 +785,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {/* Prepend / Append */}
         {(step.op === 'prepend' || step.op === 'append') && (
           <div className="flex items-center gap-2">
-            <code className="text-[11px] text-fg-mute bg-bg-2/40 border border-line/60 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
+            <code className="text-[11px] text-fg-mute bg-bg-2/40 border border-line rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
               {step.op === 'prepend' ? '[text] + value' : 'value + [text]'}
             </code>
             <Input

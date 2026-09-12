@@ -786,7 +786,7 @@ export function EncodeHashEncrypt() {
                 'text-[11px] font-mono px-2 py-0.5 rounded border transition-colors',
                 upperHex
                   ? 'border-acc/40 bg-acc/10 text-acc'
-                  : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg hover:border-line/80'
+                  : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg hover:border-line'
               )}
             >
               {upperHex ? 'ABC' : 'abc'}
@@ -822,7 +822,7 @@ export function EncodeHashEncrypt() {
                   </div>
                   <p className="text-[11px] text-fg-mute/60 px-3 pb-2">{desc}</p>
                   {isVerifying && (
-                    <div className="px-3 pb-3 border-t border-line/50 pt-2.5 space-y-2">
+                    <div className="px-3 pb-3 border-t border-line-soft pt-2.5 space-y-2">
                       <p className="text-[11px] text-fg-mute font-medium">Verify {label} hash</p>
                       <div className="flex items-center gap-2">
                         <Input

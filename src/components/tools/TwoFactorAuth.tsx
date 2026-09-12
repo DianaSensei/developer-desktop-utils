@@ -213,7 +213,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       {/* ── Header ── */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <div
-          className="w-ctl h-ctl rounded-md flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none"
+          className="w-ctl h-ctl rounded-sm flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none"
           style={avatarStyle(account.name)}
         >
           {initials(account.name)}

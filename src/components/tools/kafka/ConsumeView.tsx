@@ -72,7 +72,7 @@ export function ConsumeView({ brokerId, refreshKey, onRefresh, prefill, detailTo
             {sessions.length === 0
               ? <p className="text-sm text-fg-mute">No consumers running. Start one above to watch a topic in realtime.</p>
               : (
-                <div className="rounded-lg border divide-y divide-line/40 overflow-hidden">
+                <div className="rounded-lg border divide-y divide-line-soft overflow-hidden">
                   {sessions.map((s) => <ConsumerListRow key={s.topic} session={s} onOpen={() => onOpenConsumer(s.topic)} />)}
                 </div>
               )}
@@ -281,7 +281,7 @@ function ConsumerDetail({ session: s, onBack }: { session: KafkaConsumerSession;
         {shown.length === 0
           ? <p className="px-5 py-4 text-sm text-fg-mute">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
           : (
-            <div className="divide-y divide-line/40">
+            <div className="divide-y divide-line-soft">
               {shown.map((m) => <MessageRow key={`${m.partition}-${m.offset}`} m={m} format={format} />)}
               {matches.length > shown.length && (
                 <p className="px-5 py-2 text-[11px] text-fg-mute">
@@ -327,7 +327,7 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
 
       {/* Expanded detail — full value, key, and headers for tracing. */}
       {expanded && (
-        <div className="px-3 pb-3 pt-1 space-y-2.5 bg-bg-2/10 border-t border-line/30">
+        <div className="px-3 pb-3 pt-1 space-y-2.5 bg-bg-2/10 border-t border-line-soft">
           <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-fg-mute pt-1">
             <span>partition <span className="text-fg">{m.partition}</span></span>
             <span>offset <span className="text-fg">{m.offset}</span></span>
@@ -341,7 +341,7 @@ function MessageRow({ m, format }: { m: KafkaConsumedMessage; format: ValueForma
           {headerEntries.length > 0 && (
             <div>
               <div className="text-[11px] font-medium text-fg-mute mb-1">Headers</div>
-              <div className="rounded-md border divide-y divide-line/40 overflow-hidden">
+              <div className="rounded-md border divide-y divide-line-soft overflow-hidden">
                 {headerEntries.map(([k, v]) => (
                   <div key={k} className="flex gap-3 px-2.5 py-1 text-[11px] font-mono">
                     <span className="text-fg-mute shrink-0">{k}</span>

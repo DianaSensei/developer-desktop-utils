@@ -73,14 +73,14 @@ export function MultipartEditor({ rows, onChange, vars }: Readonly<Props>) {
     // Content-Type is a fixed 10rem column, so a narrow pane squeezes Key and
     // Value instead; scroll sideways below the min width rather than shrink
     // them to unusable slivers.
-    <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
+    <div className="overflow-x-auto overflow-y-hidden rounded-sm border border-line text-xs">
       <div className={showResolved ? 'min-w-[34rem]' : 'min-w-[26rem]'}>
       {/* Header and grid match KeyValueEditor's: an uppercase muted caption
           rather than bold title case, "Name" rather than "Key", and a leading
           2rem toggle column so the Name cell starts at the same x as it does
           in the Query/Headers/Path tables above. This editor was the one table
           in the tool that kept the old treatment. */}
-      <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', gridCols)}>
+      <div className={cn('grid border-b border-line bg-chrome text-[11px] font-semibold uppercase tracking-wider text-fg-mute', gridCols)}>
         <div />
         <div className="border-r px-3 py-1.5">Name</div>
         <div className="border-r px-3 py-1.5">Value</div>

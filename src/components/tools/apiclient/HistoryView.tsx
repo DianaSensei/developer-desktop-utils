@@ -206,7 +206,7 @@ function HistoryRow({ entry, showHost, selected, onClick }: {
       onClick={onClick}
       title={entry.url}
       className={cn(
-        'relative flex w-full items-center gap-2.5 border-b border-line/40 px-3 py-2 text-left text-xs transition-colors',
+        'relative flex w-full items-center gap-2.5 border-b border-line-soft px-3 py-2 text-left text-xs transition-colors',
         selected ? 'bg-acc-tint text-acc-ink' : 'hover:bg-bg-2/60',
       )}
     >

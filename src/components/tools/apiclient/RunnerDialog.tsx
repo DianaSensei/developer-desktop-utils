@@ -916,7 +916,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         disabled={totalRun === 0 || exporting !== null}
-                        className="flex h-ctl items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors hover:bg-acc/50 disabled:pointer-events-none disabled:opacity-50"
+                        className="flex h-ctl items-center gap-1.5 rounded-sm border px-2.5 text-xs font-medium transition-colors hover:bg-acc/50 disabled:pointer-events-none disabled:opacity-50"
                       >
                         {exporting
                           ? <><Spinner size="sm" /> Exporting {exporting}…</>

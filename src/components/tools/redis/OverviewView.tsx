@@ -73,7 +73,7 @@ export function OverviewView({ conn, db, refreshKey, onRefresh }: OverviewViewPr
               </StatGrid>
             </div>
 
-            <div className="divide-y divide-line/40 rounded-lg border border-line/50">
+            <div className="divide-y divide-line-soft rounded-lg border border-line-soft">
               {Object.entries(sections).map(([name, kv]) => (
                 <CollapsibleSection key={name} title={name} defaultOpen={false} headerClassName="px-3" bodyClassName="px-3">
                   <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-x-4 gap-y-1 text-xs">

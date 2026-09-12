@@ -135,7 +135,7 @@ export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProp
                     key={d.socketPath}
                     type="button"
                     onClick={() => setForm((f) => ({ ...f, name: f.name || d.label, socketPath: d.socketPath }))}
-                    className="text-[11px] px-2 py-1 rounded-md border border-line/60 hover:bg-bg-2/60 transition-colors"
+                    className="text-[11px] px-2 py-1 rounded-md border border-line hover:bg-bg-2/60 transition-colors"
                   >
                     {d.label}
                   </button>

@@ -181,7 +181,7 @@
      dưới con trỏ. */
   .hover-elevate {
     @apply transition-[box-shadow,border-color,background-color] duration-base ease-out-soft
-           hover:shadow hover:border-line/70
+           hover:shadow hover:border-line
            active:shadow-sm;
   }
   /* Lún khi nhấn cho các control tự dựng (thẻ, hàng danh sách bấm được) —

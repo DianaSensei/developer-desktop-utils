@@ -275,7 +275,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         title="Export environment"
-                        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-acc hover:text-fg"
+                        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg"
                       >
                         <Download className="h-4 w-4" />
                       </DropdownMenuTrigger>

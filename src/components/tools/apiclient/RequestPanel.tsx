@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { SectionLabel } from '@/components/ui/section-label';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -116,7 +117,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'params' && (
           <div className="min-h-0 max-w-5xl flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
-              <Label className="text-xs text-fg-mute">Query</Label>
+              <SectionLabel>Query</SectionLabel>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
               <KeyValueEditor rows={request.params} onChange={(params) => onChange({ params, url: urlWithParams(request.url, params) })} vars={vars} duplicateKeyHint="params" />
               <AuthQueryParamRow request={request} />
@@ -124,7 +125,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
             <PathParamsEditor request={request} onChange={onChange} vars={vars} />
             <div className="space-y-2">
               <div className="flex items-center gap-1.5">
-                <Label className="text-xs text-fg-mute">Headers</Label>
+                <SectionLabel>Headers</SectionLabel>
                 {enabledHeaders > 0 && <Badge tone="neutral" pill>{enabledHeaders}</Badge>}
               </div>
               <KeyValueEditor rows={request.headers} onChange={(headers) => onChange({ headers })} keyPlaceholder="Header" vars={vars} duplicateKeyHint="headers" />
@@ -443,7 +444,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-fg-mute">Path</Label>
+      <SectionLabel>Path</SectionLabel>
       {/* Same four-track grid as KeyValueEditor (the trailing 2rem is
           empty here — path params can't be removed, only disabled) so this
           table's Value column starts at exactly the same x as the Query and
@@ -739,11 +740,11 @@ function BodyEditor({ request, onChange, vars }: { request: ApiRequest; onChange
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex min-h-0 flex-[2] flex-col gap-1.5">
-          <Label className="text-xs text-fg-mute">Query</Label>
+          <SectionLabel>Query</SectionLabel>
           <TextEditor value={g.query} onChange={(query) => setG({ query })} placeholder={'query {\n  field\n}'} vars={vars} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-          <Label className="text-xs text-fg-mute">Variables</Label>
+          <SectionLabel>Variables</SectionLabel>
           <JsonEditor value={g.variables} onChange={(variables) => setG({ variables })} placeholder={'{\n  "id": 1\n}'} vars={vars} />
         </div>
       </div>

@@ -286,9 +286,14 @@ export function KeyValueEditor({
           </span>
         </div>
       )}
-      <div className="overflow-hidden rounded-md border text-xs">
+      {/* Bảng này cố ý sao đúng hình học của `DataTable` (xem ghi chú ở hàng
+          bên dưới) — nên khi `DataTable` đổi thì chỗ này phải đổi theo, nếu
+          không hai bảng cạnh nhau trong cùng một app lại lệch nhau: `--r-sm`
+          thay `rounded-md`, viền đủ độ đục, hàng tiêu đề là `--chrome` đặc
+          thay vì 40% của một tông vốn đã nhạt. */}
+      <div className="overflow-hidden rounded-sm border border-line text-xs">
         {/* Header row */}
-        <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', gridCols)}>
+        <div className={cn('grid border-b border-line bg-chrome text-[11px] font-semibold uppercase tracking-wider text-fg-mute', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>

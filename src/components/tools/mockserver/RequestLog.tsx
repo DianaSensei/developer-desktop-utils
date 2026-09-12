@@ -64,7 +64,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
                 type="button"
                 onClick={() => setSelectedId(e.id === selectedId ? null : e.id)}
                 className={
-                  'flex w-full items-center gap-2 border-b border-line/60 px-3 py-1.5 text-left text-xs transition-colors hover:bg-bg-2/40 ' +
+                  'flex w-full items-center gap-2 border-b border-line px-3 py-1.5 text-left text-xs transition-colors hover:bg-bg-2/40 ' +
                   (e.id === selectedId ? 'bg-bg-2/50' : '')
                 }
               >

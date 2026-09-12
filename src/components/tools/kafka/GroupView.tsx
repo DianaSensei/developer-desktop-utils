@@ -96,9 +96,9 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
           <>
             {/* Members */}
             {data.members.length > 0 && (
-              <div className="border-b border-line/60">
+              <div className="border-b border-line">
                 <SectionLabel count={data.members.length} className="bg-bg-2/15 px-4 py-1.5">Members</SectionLabel>
-                <div className="divide-y divide-line/30">
+                <div className="divide-y divide-line-soft">
                   {data.members.map((m) => (
                     <div key={m.memberId} className="px-4 py-1.5 flex items-center gap-3 text-xs min-w-0">
                       <span className="font-mono truncate flex-1" title={m.memberId}>{m.clientId || m.memberId}</span>
@@ -119,7 +119,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                 const totalLag = parts.reduce((s, a) => s + (a.lag > 0 ? a.lag : 0), 0);
                 const hasLag = parts.some((a) => a.lag > 0);
                 return (
-                  <div key={topic} className="border-b border-line/40">
+                  <div key={topic} className="border-b border-line-soft">
                     {/* Topic header — toggles partition detail; topic name browses the topic */}
                     <div
                       className="flex items-center gap-2 px-4 py-2 hover:bg-bg-2/15 cursor-pointer select-none"
@@ -167,7 +167,7 @@ export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTo
                           return (
                             <div
                               key={a.partition}
-                              className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-line/20 text-sm"
+                              className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-line-soft text-sm"
                             >
                               <span className="text-right text-xs text-fg-mute tabular-nums">{a.partition}</span>
                               <span className="min-w-0 truncate text-xs" title={a.memberId ?? undefined}>
