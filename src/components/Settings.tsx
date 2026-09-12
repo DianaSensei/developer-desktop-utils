@@ -505,6 +505,26 @@ export function Settings() {
               </SelectContent>
             </Select>
           }
+          // Không thêm preview cho hàng "Font" phía trên: đổi --sans áp NGAY
+          // lên toàn app (sidebar, tiêu đề, mọi chữ khác đang hiện), nên bản
+          // thân màn Settings đã LÀ bản xem trước — thêm dải nữa là lặp.
+          //
+          // "Code font" thì khác: hai lựa chọn chỉ khác nhau ở LIGATURE
+          // (=>, !=, >=…), thứ không đọc ra được từ mỗi cái tên "IBM Plex
+          // Mono" / "Fira Code" — phải NHÌN. Không có dải này, người dùng
+          // phải rời Settings đi mở JSON Formatter hay ô nào đó có
+          // font-mono để so sánh. Học từ trang Editor của DBX: đổi Font
+          // Family thì một khối code mẫu render lại ngay bên dưới.
+          preview={
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-fg-mute">
+                {t('settings.monoFont.previewLabel')}
+              </span>
+              <code className="min-w-0 truncate font-mono text-[13px] text-fg">
+                {'const ok = (a !== b) && (a >= b) ? a => a * 2 : null;'}
+              </code>
+            </div>
+          }
         />
       </SettingGroup>
 
