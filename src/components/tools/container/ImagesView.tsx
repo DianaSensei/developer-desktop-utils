@@ -26,7 +26,7 @@ import { ImageDetailsDialog } from './ImageDetailsDialog';
 // intermediate images, not `null`/`undefined` — so `img.RepoTags ?? fallback`
 // never triggers and these rows rendered blank instead of falling back.
 // Check `.length` instead of relying on nullish coalescing.
-function repoTagLabel(tags: string[] | undefined, fallback: string[]): string {
+export function repoTagLabel(tags: string[] | undefined, fallback: string[]): string {
   return (tags && tags.length > 0 ? tags : fallback).join(', ');
 }
 
