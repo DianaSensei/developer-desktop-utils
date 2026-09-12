@@ -22,6 +22,14 @@ import { RowCheckbox, SelectionBar } from './SelectionBar';
 import { formatBytes } from './format';
 import { ImageDetailsDialog } from './ImageDetailsDialog';
 
+// `RepoTags` from the Docker API is `[]` (an empty array) for untagged/
+// intermediate images, not `null`/`undefined` — so `img.RepoTags ?? fallback`
+// never triggers and these rows rendered blank instead of falling back.
+// Check `.length` instead of relying on nullish coalescing.
+function repoTagLabel(tags: string[] | undefined, fallback: string[]): string {
+  return (tags && tags.length > 0 ? tags : fallback).join(', ');
+}
+
 export function ImagesView({ connection, refreshKey, onRefresh }: {
   connection: ContainerConnection;
   refreshKey: number;
@@ -57,7 +65,7 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
     [images, f],
   );
   const { sorted: rows, toggleSort, directionFor } = useSort(filtered, {
-    repo: (img) => (img.RepoTags ?? ['<none>:<none>']).join(', '),
+    repo: (img) => repoTagLabel(img.RepoTags, ['<none>:<none>']),
     id: (img) => img.Id,
     size: (img) => img.Size ?? 0,
     used: (img) => usage.byImage.get(img.Id)?.length ?? 0,
@@ -167,7 +175,7 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
                           title="Select image"
                         />
                       </Td>
-                      <Td mono>{(img.RepoTags ?? ['<none>:<none>']).join(', ')}</Td>
+                      <Td mono>{repoTagLabel(img.RepoTags, ['<none>:<none>'])}</Td>
                       <Td mono>{img.Id.replace('sha256:', '').slice(0, 12)}</Td>
                       <Td><UsageBadge users={usage.byImage.get(img.Id)} dangling={isDangling(img)} /></Td>
                       <Td numeric>{formatBytes(img.Size)}</Td>
@@ -213,7 +221,7 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
         open={!!removeTarget}
         onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}
         title="Remove image?"
-        description={removeTarget ? `Remove "${(removeTarget.RepoTags ?? [removeTarget.Id]).join(', ')}".` : ''}
+        description={removeTarget ? `Remove "${repoTagLabel(removeTarget.RepoTags, [removeTarget.Id])}".` : ''}
         confirmLabel="Remove"
         onConfirm={async () => {
           if (!removeTarget) return;
