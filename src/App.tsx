@@ -257,7 +257,7 @@ function NavScrollArea({
                     to={path}
                     onClick={onClose}
                     className={cn(
-                      'group relative flex w-full items-center rounded-sm px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
+                      'group relative flex w-full items-center rounded-sm px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                       isCollapsed ? 'justify-center' : 'gap-2.5',
                       isActive
                         ? 'bg-acc-tint text-acc-ink font-medium'
@@ -364,7 +364,7 @@ function NavScrollArea({
                   <button
                     type="button"
                     onClick={() => onEnableTool(tool)}
-                    className="group relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-fg-mute/70 transition-[color,background-color] duration-base ease-out-soft hover:text-fg hover:bg-fg/[0.05]"
+                    className="group relative flex w-full items-center gap-2.5 rounded-sm px-2.5 py-1.5 text-left text-fg-mute/70 transition-[color,background-color] duration-base ease-out-soft hover:text-fg hover:bg-fg/[0.05]"
                   >
                     <Icon className="h-4 w-4 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
                     <span className="flex-1 truncate text-sm">{tool.label}</span>
@@ -624,7 +624,7 @@ function Sidebar({
               onClick={onToggleCollapse}
               title={isCollapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
               className={cn(
-                'group relative hidden lg:flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
+                'group relative hidden lg:flex w-full items-center rounded-sm px-2.5 py-1.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
@@ -647,7 +647,7 @@ function Sidebar({
               onClick={() => onThemeChange(NEXT_THEME[themePreference])}
               title={t('shell.sidebar.themeCycle', { theme: t(activeThemeOption.labelKey) })}
               className={cn(
-                'group relative flex w-full items-center rounded-lg px-2.5 py-2.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
+                'group relative flex w-full items-center rounded-sm px-2.5 py-1.5 transition-colors text-fg-mute hover:text-fg hover:bg-bg-2/60',
                 isCollapsed ? 'justify-center' : 'gap-2.5'
               )}
             >
@@ -670,7 +670,7 @@ function Sidebar({
               onClick={onClose}
               title={t('shell.sidebar.settings')}
               className={cn(
-                'group relative flex items-center rounded-lg px-2.5 py-2.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
+                'group relative flex items-center rounded-sm px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                 isCollapsed ? 'justify-center' : 'gap-2.5',
                 isSettingsActive
                   ? 'bg-acc/10 text-acc font-medium'
@@ -1067,9 +1067,23 @@ function AppContent() {
                   bên cạnh (nó là badge cố định, không phải một tab bấm được),
                   và tab đang chọn trong tablist đã tự có chấm live của nó —
                   hiện hai chấm cho cùng một tool là thừa. */}
+              {/* ── Vì sao danh tính tool nằm SAU `OpenToolsStrip` ──────────
+                  Trước đây đỉnh cửa sổ có HAI dải chồng nhau nói gần như cùng
+                  một chuyện: hàng header mang icon + tên tool đang mở, và ngay
+                  dưới nó là dải tab liệt kê các tool đang mở — trong đó tab
+                  đang chọn CŨNG là tool đó, cũng có icon, cũng có tên. Hai dải,
+                  114px chiều cao, một thông tin.
+
+                  Giờ strip dựng THẲNG trong hàng này (`inline`), và khối danh
+                  tính bên dưới chỉ là `fallback` — nó hiện đúng khi có ít hơn
+                  hai tab, tức lúc strip không có gì để nói. Một dải, 50px. */}
+              <OpenToolsStrip
+                inline
+                fallback={
+                  <div className="flex min-w-0 items-center gap-2.5">
               <div
                 key={activeTool.path}
-                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-lg border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
+                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-sm border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
               >
                 <ActiveIcon className="h-4 w-4 text-acc" />
               </div>
@@ -1126,22 +1140,31 @@ function AppContent() {
                     })}
                 </div>
               ) : (
-                <div
+                /* Tên tool KHÔNG còn là viên thuốc accent đặc.
+                   `--acc` nghĩa là "cái này tương tác được" hoặc "cái này đang
+                   được chọn" (design/RULES.md). Tên của tool đang mở không phải
+                   một lựa chọn trong nhóm — không có gì để chọn khác, nó chỉ là
+                   nhãn. Tô nó bằng accent làm thứ ồn nhất màn hình lại là thứ
+                   bấm vào không có gì xảy ra, và tạo ra hình dạng "đang chọn"
+                   thứ ba trong vòng 200px chiều dọc (viên thuốc ở đây, tab bo
+                   `rounded-sm` bên dưới, toggle trong tool). Giờ nó là chữ. */
+                <h2
                   key={`${activeTool.path}-label`}
-                  className="inline-flex h-ctl shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
+                  className="inline-flex min-w-0 shrink items-center gap-1.5 truncate text-sm font-semibold leading-none motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
                 >
-                  <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap rounded-sm bg-acc px-3.5 text-sm font-semibold leading-none text-acc-fg shadow-soft sm:text-base">
-                    {activeTool.label}
-                    {activeTool.experimental && (
-                      <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
-                        <FlaskConical className="h-3.5 w-3.5 opacity-80" />
-                      </span>
-                    )}
-                  </h2>
-                </div>
+                  <span className="truncate">{activeTool.label}</span>
+                  {activeTool.experimental && (
+                    <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
+                      <FlaskConical className="h-3.5 w-3.5 text-fg-mute" />
+                    </span>
+                  )}
+                </h2>
               )}
+                  </div>
+                }
+              />
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex min-w-0 items-center gap-1">
               {/* Slot for tool-specific header actions (filled via ToolHeaderActions portal) */}
               <div id="tool-header-actions" className="flex items-center gap-1" />
               <Button
@@ -1173,7 +1196,6 @@ function AppContent() {
           </div>
         </div>
         )}
-        <OpenToolsStrip />
         {isFullHeight ? (
           <div className="flex-1 min-h-0 overflow-hidden">
             {/* key on pathname re-triggers the entrance animation on each tool switch */}

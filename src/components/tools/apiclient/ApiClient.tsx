@@ -424,7 +424,9 @@ export function ApiClient() {
           <span className="absolute -inset-x-1 inset-y-0" />
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Mặt làm việc — sáng nhất màn hình, đối lại cột điều hướng `--chrome`
+            bên trái. Đây là thứ nói cho mắt biết chỗ nào để làm việc. */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-card">
           <RequestTabs
             store={store}
             runs={runs}

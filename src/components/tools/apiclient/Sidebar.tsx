@@ -233,7 +233,12 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   const visible = store.collections.filter((c) => !q || collectionMatches(c, q));
 
   return (
-    <div className="flex h-full w-full flex-col">
+    // Cột điều hướng là CHROME, không phải mặt làm việc: nó chứa cây thư mục và
+    // ô tìm — thứ người dùng bấm để đi tới chỗ khác, không phải thứ người dùng
+    // đọc hoặc gõ. Trước đây nó trắng y hệt vùng request bên phải, nên hai cột
+    // dính vào nhau thành một mảng trắng và đường chia duy nhất là 1px mờ.
+    // Xem thang tông trong design/RULES.md.
+    <div className="flex h-full w-full flex-col bg-chrome">
       {/* header */}
       {/* size="xs" (24px), not the 34px control height: these sit beside an 11px
           eyebrow, and at h-ctl they alone set the header's height — 50px of
