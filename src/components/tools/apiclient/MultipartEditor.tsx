@@ -160,7 +160,7 @@ function MultipartRow({
                 'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
                 row.enabled
                   ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
-                  : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
+                  : 'border-line bg-bg group-hover/toggle:border-fg-mute',
               )}
             >
               {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}

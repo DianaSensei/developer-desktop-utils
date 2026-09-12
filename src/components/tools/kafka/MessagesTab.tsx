@@ -303,7 +303,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
             title="Value"
             aside={
               <div className="flex items-center gap-1.5">
-                <div className="flex rounded border border-sunk text-xs overflow-hidden">
+                <div className="flex rounded border border-line text-xs overflow-hidden">
                   {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
                     <button
                       key={m}
@@ -629,7 +629,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-fg-mute">Start from</Label>
-          <div className="flex rounded-md border border-sunk overflow-hidden text-xs h-ctl">
+          <div className="flex rounded-md border border-line overflow-hidden text-xs h-ctl">
             {(['tail', 'from', 'range', 'time'] as FetchMode[]).map((m) => (
               <button
                 key={m}
@@ -718,7 +718,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-fg-mute">Default view</Label>
-          <div className="flex rounded-md border border-sunk overflow-hidden text-xs h-ctl">
+          <div className="flex rounded-md border border-line overflow-hidden text-xs h-ctl">
             {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
               <button
                 key={m}

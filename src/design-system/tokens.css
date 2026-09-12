@@ -234,11 +234,31 @@
   .text-caption { @apply text-xs leading-relaxed text-fg-mute; }
 
   /* ── App chrome ───────────────────────────────────────────────────── */
+  /* ── Vì sao chrome KHÔNG còn là kính mờ ───────────────────────────────
+     Cũ: `glass-chrome` = nền `--chrome` ở 86% độ đục + `backdrop-blur(26px)
+     saturate(185%)`, viền `--line/70`.
+
+     Ba vấn đề, và cái thứ nhất là gốc:
+
+     1. KHÔNG CÓ GÌ Ở PHÍA SAU ĐỂ NHÌN XUYÊN QUA. `.env-bg` (nền gradient) chỉ
+        dùng ở trang mẫu, không dùng trong app — sidebar và header nằm thẳng
+        trên `--bg` phẳng. Nên 26px blur mỗi khung hình chỉ để trộn `--chrome`
+        với `--bg` ra một tông lưng chừng. Trả giá đúng bằng một hiệu ứng mà
+        không ai nhìn thấy.
+     2. `saturate(185%)` kéo lệch sắc mọi thứ NẰM DƯỚI dải chrome khi cuộn qua.
+     3. Viền ở 70% độ đục trên `--line` (88%) ra ≈ 91.6% — gần như biến mất.
+        Đó chính là "cái khung mong manh": vùng nào ra vùng đó không còn ranh
+        giới nào nói lên.
+
+     Mới: bề mặt ĐẶC, viền đủ mạnh. Đây là mô hình của IDE (VS Code, DBX):
+     chrome tối hơn vùng làm việc một bậc, ngăn bằng một đường 1px thật.
+     Kính mờ vẫn giữ cho bề mặt BAY (dialog, menu, tooltip) — ở đó mới thật
+     sự có nội dung phía sau để nhìn xuyên qua. */
   .sidebar-chrome {
-    @apply glass-chrome glass-sheen border-r border-line/70;
+    @apply bg-chrome border-r border-line;
   }
   .header-chrome {
-    @apply glass-chrome border-b border-line/70;
+    @apply bg-chrome border-b border-line;
   }
   .content-wrapper {
     @apply mx-auto w-full max-w-7xl;

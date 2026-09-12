@@ -176,7 +176,7 @@ export function TimeStepperField({
   );
 
   return (
-    <div className={cn('flex h-ctl-lg items-stretch overflow-hidden rounded-md border border-sunk bg-bg', className)}>
+    <div className={cn('flex h-ctl-lg items-stretch overflow-hidden rounded-md border border-line bg-bg', className)}>
       <span className="flex items-center pl-2 text-fg-mute">
         <Clock className="h-3.5 w-3.5" />
       </span>
@@ -196,9 +196,9 @@ export function TimeStepperField({
         }}
         className="w-full min-w-0 bg-transparent px-1.5 text-center font-mono text-sm tabular-nums focus:outline-hidden"
       />
-      <div className="flex flex-col border-l border-sunk">
+      <div className="flex flex-col border-l border-line">
         {stepBtn(1, ChevronUp, 'Later')}
-        {stepBtn(-1, ChevronDown, 'Earlier', 'border-t border-sunk')}
+        {stepBtn(-1, ChevronDown, 'Earlier', 'border-t border-line')}
       </div>
     </div>
   );

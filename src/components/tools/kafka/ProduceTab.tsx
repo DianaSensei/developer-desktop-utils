@@ -198,7 +198,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
         <div className="flex items-center gap-3">
           <div>
             <Label className="text-xs">Partition</Label>
-            <div className="flex rounded-md border border-sunk overflow-hidden text-xs h-ctl mt-1">
+            <div className="flex rounded-md border border-line overflow-hidden text-xs h-ctl mt-1">
               <button
                 className={`px-3 py-1 transition-colors ${partitionMode === 'auto' ? 'bg-acc/15 text-acc font-medium' : 'hover:bg-bg-2'}`}
                 onClick={() => setPartitionMode('auto')}

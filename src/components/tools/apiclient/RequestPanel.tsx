@@ -302,7 +302,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
                 onClick={() => !isGhost && editRow(a.id, { enabled: !a.enabled })}
                 className={cn(
                   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
-                  isGhost ? 'invisible' : a.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-sunk',
+                  isGhost ? 'invisible' : a.enabled ? 'border-acc bg-acc text-acc-fg' : 'border-line',
                 )}
                 title={a.enabled ? 'Enabled' : 'Disabled'}
               >
@@ -481,7 +481,7 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
                       'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
                       enabled
                         ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
-                        : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
+                        : 'border-line bg-bg group-hover/toggle:border-fg-mute',
                     )}
                   >
                     {enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}

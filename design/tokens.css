@@ -55,11 +55,28 @@
   /* ── Nền: xám NGẢ SẮC accent, không xám trung tính ────────────────────
      Xám trung tính là thứ làm giao diện trông rẻ. Mọi bề mặt ở đây đều mang
      một chút sắc của accent, nên khi đổi tone cả trang đổi theo, kể cả nền. */
-  --bg-c:     var(--a-h) 22% 96%;
-  --bg-2-c:   var(--a-h) 18% 92%;
+  /* ── Thang tông: bốn bậc, ĐỌC ĐƯỢC ─────────────────────────────────
+     Bậc cũ: bg 96 · sunk 97 · chrome 98.5 · card 100. Bốn bậc nằm trong 4%
+     độ sáng, mà ba bậc trên cùng cách nhau 1–1.5% — dưới ngưỡng mắt phân
+     biệt được trên màn thường. Hệ quả: cả cửa sổ đọc ra MỘT mảng trắng xám
+     duy nhất, không biết vùng làm việc bắt đầu ở đâu.
+
+     Thang mới giãn ra 5%, và thứ tự mang nghĩa cố định — đây là mô hình IDE,
+     giống `--dbx-content` / `--dbx-chrome` / `--dbx-gutter` của DBX:
+
+       card   100%  ← MẶT LÀM VIỆC. Luôn sáng nhất màn hình.
+       chrome  97%  ← thanh điều khiển: toolbar, đầu pane, sidebar
+       bg      95%  ← nền app, rãnh giữa các panel
+       bg-2    91%  ← chỗ LÕM: máng segmented, ô nhập chìm, vùng disabled
+
+     Luật đi kèm: cái gì người dùng ĐỌC hoặc GÕ thì nằm trên `--card`; cái gì
+     người dùng BẤM ĐỂ ĐIỀU KHIỂN thì nằm trên `--chrome`. Sai thứ tự này là
+     lý do trước đây vùng nội dung xám còn thanh công cụ trắng. */
+  --bg-c:     var(--a-h) 20% 95%;
+  --bg-2-c:   var(--a-h) 18% 91%;
   --card-c:   0 0% 100%;
-  --sunk-c:   var(--a-h) 24% 97%;
-  --chrome-c: var(--a-h) 26% 98.5%;
+  --sunk-c:   var(--a-h) 22% 96.5%;
+  --chrome-c: var(--a-h) 24% 97%;
 
   --bg:     hsl(var(--bg-c));
   --bg-2:   hsl(var(--bg-2-c));
@@ -113,11 +130,42 @@
   --cat-4: hsl(var(--cat-4-c));
   --cat-5: hsl(var(--cat-5-c));
 
+  /* ── ĐỘ ĐẶC: viền khoẻ và mép sáng ────────────────────────────────────
+     Ba token dưới đây là câu trả lời cho một lời phàn nàn cụ thể: app đọc ra
+     "mong manh, phẳng lì, không có cảm giác". Chẩn đoán (xem
+     `reference/ANALYSIS-DBX.md` mục 9) là app thiếu đúng hai thứ mà DBX có:
+     **viền đủ đậm để vùng nào ra vùng đó**, và **mép sáng trên bề mặt đặc**.
+
+     `--line-strong` — khung panel, đường chia vùng chính. `--line` (88%) đúng
+     cho đường kẻ giữa các hàng trong một danh sách, nhưng dùng nó để đóng
+     khung cả một panel thì panel đó không đứng vững: mắt không thấy vùng làm
+     việc bắt đầu từ đâu.
+
+     `--edge-lite` / `--edge-dark` — KHÔNG phải gradient (luật cấm gradient
+     trên nút vẫn nguyên). Đây là hai đường 1px NẰM TRONG mép nút: sáng ở
+     trên, tối ở dưới — đúng chỗ ánh sáng rơi vào và chỗ khuất của một vật
+     thật. Một mặt phẳng đặc không có hai đường đó đọc ra là hình dán, không
+     phải nút bấm được. Đây là khác biệt giữa "flat" và "phẳng mà có khối".
+
+     `--sh-btn-press` — lúc nhấn, mép sáng biến mất và bóng đảo vào TRONG. Đó
+     là thứ tạo ra "cảm giác" khi bấm, mạnh hơn hẳn `active:scale` đơn độc. */
+  --line-strong-c: var(--a-h) 20% 79%;
+  --line-strong:   hsl(var(--line-strong-c));
+
+  --edge-lite: inset 0 1px 0 hsl(0 0% 100% / .16);
+  --edge-dark: inset 0 -1px 0 hsl(var(--a-h) 34% 14% / .14);
+
   /* ── Bóng: ngả sắc accent, không phải đen thuần ───────────────────────
      Chỉ ba bậc. Một tầng nổi dùng --sh; lồng sâu hơn dùng viền, không bóng. */
   --sh-sm: 0 1px 2px hsl(var(--a-h) 30% 20% / .06);
   --sh:    0 1px 2px hsl(var(--a-h) 30% 20% / .06), 0 8px 20px -12px hsl(var(--a-h) 30% 20% / .22);
   --sh-lg: 0 2px 4px hsl(var(--a-h) 30% 20% / .07), 0 18px 36px -18px hsl(var(--a-h) 30% 20% / .30);
+
+  /* Bóng của NÚT ĐẶC: mép sáng + mép tối + bóng nhỏ, gộp thành một token để
+     không ai ghép tay ba mảnh rồi lệch nhau giữa các nút. Vẫn đi qua thang
+     `--sh-*`, nên không vi phạm luật "chỉ một hệ shadow". */
+  --sh-btn:       var(--edge-lite), var(--edge-dark), var(--sh-sm);
+  --sh-btn-press: inset 0 1px 2px hsl(var(--a-h) 34% 14% / .20);
 
   /* ── Bo góc: thang RỜI NHAU ───────────────────────────────────────────
      Thang cũ (--radius: 1rem → sm/md/lg = 12/14/16px) có ba bậc mà mắt không
@@ -243,9 +291,17 @@
   --cat-4-c: 178 55% 55%;
   --cat-5-c: 320 60% 68%;
 
+  --line-strong-c: var(--a-h) 14% 32%;
+
+  /* Nền tối: mép sáng phải NHẸ hơn nhiều, nếu không nút viền trắng như bị
+     quét sơn. Mép tối thì ngược lại, đậm hơn — nền càng tối càng cần. */
+  --edge-lite: inset 0 1px 0 hsl(0 0% 100% / .07);
+  --edge-dark: inset 0 -1px 0 rgb(0 0 0 / .28);
+
   --sh-sm: 0 1px 2px rgb(0 0 0 / .45);
   --sh:    0 1px 2px rgb(0 0 0 / .45), 0 10px 24px -14px rgb(0 0 0 / .8);
   --sh-lg: 0 2px 6px rgb(0 0 0 / .5),  0 20px 40px -20px rgb(0 0 0 / .9);
+  --sh-btn-press: inset 0 1px 2px rgb(0 0 0 / .40);
 
   color-scheme: dark;
 }

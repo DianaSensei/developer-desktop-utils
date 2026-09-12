@@ -66,7 +66,7 @@ module.exports = {
 
         /* ── Chữ & đường kẻ ──────────────────────────────────────────────── */
         fg: { DEFAULT: ch('fg'), mute: ch('fg-mute'), faint: ch('fg-faint') },
-        line: { DEFAULT: ch('line'), soft: ch('line-soft') },
+        line: { DEFAULT: ch('line'), soft: ch('line-soft'), strong: ch('line-strong') },
 
         /* ── Trạng thái: nghĩa CỐ ĐỊNH, không đổi khi swap tone ──────────── */
         ok:   { DEFAULT: ch('ok'),   tint: ch('ok-tint'),   edge: ch('ok-edge') },
@@ -89,11 +89,16 @@ module.exports = {
         full: 'var(--r-full)',
       },
 
-      /* Chỉ ba bậc bóng. Lồng sâu hơn dùng viền, không bóng. */
+      /* Chỉ ba bậc bóng. Lồng sâu hơn dùng viền, không bóng.
+         `btn` / `btn-press` KHÔNG phải bậc thứ tư: chúng là `--sh-sm` cộng hai
+         mép 1px (xem --sh-btn trong tokens.css), dành riêng cho bề mặt ĐẶC
+         bấm được. Đừng dùng cho thẻ hay panel. */
       boxShadow: {
         soft: 'var(--sh-sm)',
         DEFAULT: 'var(--sh)',
         lift: 'var(--sh-lg)',
+        btn: 'var(--sh-btn)',
+        'btn-press': 'var(--sh-btn-press)',
         none: 'none',
       },
 

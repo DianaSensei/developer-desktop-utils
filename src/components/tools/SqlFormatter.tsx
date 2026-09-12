@@ -362,7 +362,7 @@ function ToggleChip({ active, onClick, children }: {
         'rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors select-none',
         active
           ? 'border-acc/50 bg-acc/10 text-acc'
-          : 'border-sunk bg-transparent text-fg-mute hover:bg-bg-2 hover:text-fg'
+          : 'border-line bg-transparent text-fg-mute hover:bg-bg-2 hover:text-fg'
       )}
     >
       {children}

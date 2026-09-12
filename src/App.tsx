@@ -581,7 +581,7 @@ function Sidebar({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('shell.search.placeholder')}
-                className="h-ctl pl-7 pr-7 text-xs rounded-md bg-bg-2/40 border-bg-2"
+                className="h-ctl pl-7 pr-7 text-xs rounded-md bg-bg-2/40 border-line"
               />
               {query && (
                 <button

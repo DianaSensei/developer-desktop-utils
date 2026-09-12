@@ -33,7 +33,9 @@ trước. Chúng nằm ở đây để không ai cấm lại lần nữa.
 | **Màu Tailwind thô** (`text-green-500`, `bg-red-50`…) | Không theo được theme, không đổi được tone. Dùng token. **Ngưỡng hiện tại: 0** — thêm một cái là guard đỏ. |
 | **Chữ dưới 11px** | Không đọc được ở HiDPI. **Ngưỡng hiện tại: 0.** |
 | **Thẻ cảnh báo rời cho trạng thái thường trực** | Layout nhảy khi chuyển hợp lệ ↔ lỗi. Dùng chip + dải nhuộm trong panel. |
-| **Hai hệ shadow song song** | Chỉ `--sh-sm` / `--sh` / `--sh-lg`. |
+| **Hai hệ shadow song song** | Chỉ `--sh-sm` / `--sh` / `--sh-lg` (và `--sh-btn`, vốn dựng TỪ `--sh-sm`). |
+| **Kính mờ khi không có gì phía sau** | `backdrop-filter` chỉ dùng cho bề mặt BAY (dialog, menu, tooltip). Dải chrome nằm trên nền phẳng thì trong suốt chỉ làm mất độ đặc — xem `reference/ANALYSIS-DBX.md` đợt 2. |
+| **Tông NỀN dùng làm màu VIỀN** | `border-sunk` / `border-bg-2` — ô nhập không còn mép nào. Viền lấy từ `--line` / `--line-strong`. |
 | **Nhiều hơn hai chiều cao control** | Chỉ `--h` (34px) và `--h-lg` (40px). |
 | **Bo góc viết cứng** (`rounded-[12px]`) | Đứng ngoài preset `[data-corner]`: đổi kiểu bo góc thì chỗ đó ở lại, lệch với hàng xóm. **Ngưỡng hiện tại: 0.** |
 | **`--cat-N` mang nghĩa cố định** | Đó là bảng XOAY VÒNG. Gán nghĩa cho nó thì đổi màu một chỗ sẽ kéo theo chỗ khác — xem "Màu phân loại" bên dưới. |
@@ -108,6 +110,49 @@ Tailwind là giá trị cứng cho tới khi được khai báo tường minh.**
 
 ---
 
+## Thang tông — cái gì nằm trên bề mặt nào
+
+Bốn bậc, thứ tự mang nghĩa **cố định**. Đây là mô hình IDE: mặt làm việc luôn sáng nhất
+màn hình, mọi thứ điều khiển bao quanh tối hơn.
+
+| Bậc | Sáng | Dùng cho |
+|---|---|---|
+| `--card` | 100% | **Mặt làm việc**: thân pane, thẻ, ô nhập, bảng dữ liệu |
+| `--chrome` | 97% | **Thanh điều khiển**: toolbar, đầu pane, sidebar, tab bar |
+| `--bg` | 95% | Nền app, rãnh giữa các panel |
+| `--bg-2` | 91% | Chỗ **lõm**: máng segmented, vùng disabled |
+
+Phép thử: cái gì người dùng **đọc hoặc gõ** thì nằm trên `--card`; cái gì người dùng
+**bấm để điều khiển** thì nằm trên `--chrome`. Nội dung xám còn thanh công cụ trắng là
+ngược — và đó là lý do app từng đọc ra "không biết bắt đầu ở đâu".
+
+Hai bậc viền đi kèm: `--line` (88%) kẻ giữa các hàng trong một danh sách; `--line-strong`
+(79%) đóng khung panel và chia vùng chính. Dùng `--line` để đóng khung cả một panel thì
+panel đó không đứng vững.
+
+---
+
+## Độ sâu trên nút — hai mép, không phải gradient
+
+Một mặt phẳng đặc không có mép đọc ra là **hình dán**, không phải nút bấm được.
+
+```
+--sh-btn = --sh-sm            ← bóng ngoài: "vật này nổi"
+         + --edge-lite        ← 1px sáng ở mép TRONG trên
+         + --edge-dark        ← 1px tối ở mép TRONG dưới
+```
+
+Hai mép đó không phải gradient (luật cấm gradient trên nút vẫn nguyên) — chúng là chỗ
+ánh sáng rơi vào và chỗ khuất của một vật có bề dày.
+
+Lúc nhấn: mép sáng **tắt**, bóng đảo vào trong (`--sh-btn-press`). `active:scale` một
+mình không tạo được cảm giác bấm, vì thu nhỏ không đổi cách ánh sáng rơi.
+
+Chỉ áp cho bề mặt **đặc** (`default`, `secondary`, `destructive`). Nút viền mặt là
+`--card` trắng — mép sáng trên nền trắng chỉ làm dày đường viền một cách bẩn.
+
+---
+
 ## Ba bậc trạng thái — chọn đúng bậc
 
 | Bậc | Dùng khi | Component |
@@ -159,3 +204,6 @@ Dấu tiếng Việt chồng hai tầng (`ế`, `ộ`, `ữ`) cần chiều cao 
 - [ ] Không có bán kính viết cứng — `rg 'rounded-\[' src/`
 - [ ] Đổi `data-corner` sang `sharp` → không khối nào ở lại hình cũ
 - [ ] Màu mang nghĩa cố định thì có token tên nghĩa, không dùng thẳng `--cat-N`
+- [ ] Ô nhập / vùng đọc nằm trên `--card`; thanh điều khiển nằm trên `--chrome`
+- [ ] Không có tông nền nào bị dùng làm màu viền — `rg 'border-(sunk|bg-2|chrome)'`
+- [ ] Nút đặc mới dùng `shadow-btn` + `active:shadow-btn-press`, không phải `shadow-soft`

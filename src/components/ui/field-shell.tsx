@@ -54,7 +54,7 @@ export function FieldShell({
         className={cn(
           'flex items-stretch overflow-hidden rounded-sm border bg-bg',
           'transition-colors focus-within:border-acc/60 focus-within:ring-[3px] focus-within:ring-focus',
-          tone ? TONE_EDGE[tone] : 'border-sunk',
+          tone ? TONE_EDGE[tone] : 'border-line',
         )}
       >
         {gutter && (
