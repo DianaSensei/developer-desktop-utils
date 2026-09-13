@@ -29,9 +29,20 @@ export interface TabsProps {
   /** Active-tab underline + text color. Default 'border-acc text-fg'
    *  — override when a tool has an established alternate accent. */
   activeClassName?: string;
+  /**
+   * 'underline' (default): the original sliding-underline strip every
+   * existing consumer (Kafka, RabbitMQ, API Client's Params/Body/… tabs)
+   * already uses — unchanged.
+   * 'pill': active tab renders as a filled rounded pill instead, à la the
+   * Postman-style reference the API Client request tabs already adopted —
+   * no sliding underline bar. Opt-in per consumer rather than a global
+   * redesign, since this component is shared foundation across tools whose
+   * own tab bars weren't part of that request.
+   */
+  variant?: 'underline' | 'pill';
 }
 
-export function Tabs({ tabs, active, onSelect, right, className, activeClassName }: TabsProps) {
+export function Tabs({ tabs, active, onSelect, right, className, activeClassName, variant = 'underline' }: TabsProps) {
   const headerRef = useRef<HTMLDivElement>(null);
   const headerWRef = useRef(0);
   const [headerW, setHeaderW] = useState(0);
@@ -149,6 +160,7 @@ export function Tabs({ tabs, active, onSelect, right, className, activeClassName
         tabs={inlineTabs}
         active={active}
         activeClassName={activeClassName}
+        variant={variant}
         onSelect={onSelect}
       />
       {overflowTabs.length > 0 && <TabOverflow tabs={overflowTabs} onSelect={onSelect} />}
@@ -176,15 +188,17 @@ export function Tabs({ tabs, active, onSelect, right, className, activeClassName
  * Hover vẫn cho gạch mờ riêng ở từng nút: đó là "cái này bấm được", một nghĩa
  * khác với "cái này đang mở", nên nó không dùng chung con trượt.
  */
-function TabRow({ tabs, active, activeClassName, onSelect }: {
-  tabs: TabDef[]; active: string; activeClassName?: string; onSelect: (id: string) => void;
+function TabRow({ tabs, active, activeClassName, variant, onSelect }: {
+  tabs: TabDef[]; active: string; activeClassName?: string; variant: 'underline' | 'pill'; onSelect: (id: string) => void;
 }) {
   const rowRef = useRef<HTMLDivElement | null>(null);
   const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [bar, setBar] = useState<{ x: number; w: number } | null>(null);
   const ready = useRef(false);
+  const underline = variant === 'underline';
 
   useLayoutEffect(() => {
+    if (!underline) return;
     const row = rowRef.current;
     const el = btnRefs.current[active];
     // Tab đang mở có thể đang nằm trong menu tràn — lúc đó không có gạch chân
@@ -196,7 +210,7 @@ function TabRow({ tabs, active, activeClassName, onSelect }: {
     ro.observe(row);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [active, tabs]);
+  }, [active, tabs, underline]);
 
   useEffect(() => {
     if (!bar) return;
@@ -205,7 +219,7 @@ function TabRow({ tabs, active, activeClassName, onSelect }: {
   }, [bar]);
 
   return (
-    <div ref={rowRef} className="relative flex min-w-0 items-center gap-4 overflow-hidden">
+    <div ref={rowRef} className={cn('relative flex min-w-0 items-center overflow-hidden', underline ? 'gap-4' : 'gap-1 py-1')}>
       {tabs.map((t) => (
         <TabBtn
           key={t.id}
@@ -213,10 +227,11 @@ function TabRow({ tabs, active, activeClassName, onSelect }: {
           def={t}
           active={t.id === active}
           activeClassName={activeClassName}
+          variant={variant}
           onClick={() => onSelect(t.id)}
         />
       ))}
-      {bar && (
+      {underline && bar && (
         <span
           aria-hidden="true"
           className={cn(
@@ -235,21 +250,28 @@ function TabRow({ tabs, active, activeClassName, onSelect }: {
 }
 
 const TabBtn = forwardRef<HTMLButtonElement, {
-  def: TabDef; active: boolean; activeClassName?: string; onClick: () => void;
-}>(({ def, active, activeClassName, onClick }, ref) => (
+  def: TabDef; active: boolean; activeClassName?: string; variant: 'underline' | 'pill'; onClick: () => void;
+}>(({ def, active, activeClassName, variant, onClick }, ref) => (
   <button
     ref={ref}
     onClick={onClick}
     aria-selected={active}
     className={cn(
-      // Gạch chân của tab ĐANG MỞ do `TabRow` vẽ; `border-b-2` ở đây chỉ còn
-      // phục vụ trạng thái hover (và giữ nguyên chiều cao hàng để đổi tab
-      // không làm layout nhích lên một pixel).
-      'relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent py-2.5 text-xs font-medium',
-      'transition-colors duration-fast ease-out-soft',
-      active
-        ? (activeClassName ?? 'text-fg')
-        : 'text-fg-mute hover:text-fg hover:border-line',
+      'relative flex shrink-0 items-center gap-1.5 text-xs font-medium transition-colors duration-fast ease-out-soft',
+      variant === 'underline'
+        ? cn(
+            // Gạch chân của tab ĐANG MỞ do `TabRow` vẽ; `border-b-2` ở đây chỉ
+            // còn phục vụ trạng thái hover (và giữ nguyên chiều cao hàng để
+            // đổi tab không làm layout nhích lên một pixel).
+            '-mb-px border-b-2 border-transparent py-2.5',
+            active ? (activeClassName ?? 'text-fg') : 'text-fg-mute hover:text-fg hover:border-line',
+          )
+        : cn(
+            // Pill: nền đặc thay cho gạch chân, giống dãy tab request bên
+            // ngoài (RequestTabs.tsx) — không viền, không gạch chân trượt.
+            'rounded-md px-2.5 py-1.5',
+            active ? (activeClassName ?? 'bg-card text-fg shadow-sm') : 'text-fg-mute hover:bg-bg-2/50 hover:text-fg',
+          ),
     )}
   >
     {def.label}{def.badge}

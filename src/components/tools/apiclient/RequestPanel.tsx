@@ -2,7 +2,7 @@
 // URL + Send bar lives above the split (see AddressBar). Edits are written
 // straight back to the store so the request is always saved (Postman autosave).
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Braces, Check, ChevronDown, Code2, Database, File, FileQuestion, FileText,
   FormInput, Hexagon, type LucideIcon, Sparkles, Tag, Trash2, Wand2, X,
@@ -51,7 +51,19 @@ interface Props {
   onTabChange: (tab: Tab) => void;
 }
 
-const count = (n: number) => (n ? ` (${n})` : '');
+// A count (muted number) and/or a "has content" dot (green, à la the
+// Postman-style reference) — replaces the old plain-text " (n)"/" •" suffixes
+// baked into the label string itself, which read as part of the tab's name
+// rather than as a status indicator.
+function tabBadge(count: number | undefined, hasContent: boolean | undefined): ReactNode {
+  if (!count && !hasContent) return undefined;
+  return (
+    <>
+      {!!count && <span className="text-fg-mute/70">{count}</span>}
+      {hasContent && <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok" />}
+    </>
+  );
+}
 
 export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Props) {
   const enabledParams = request.params.filter((p) => p.enabled && p.key).length;
@@ -60,26 +72,32 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
   const hasScript = !!(request.script.req.trim() || request.script.res.trim());
   const enabledAsserts = request.assertions.filter((a) => a.enabled && a.expr).length;
 
-  const tabs: { id: Tab; label: string }[] = [
-    // Số đếm chỉ tính Query — Path chưa từng tính vào đây (số path param đã lộ
-    // rõ ngay trên URL), và giờ Headers cũng theo cùng lý đó: đếm riêng ngay
-    // tại nhãn "Headers" bên trong, không gộp vào một con số duy nhất mơ hồ.
-    { id: 'params', label: `Params${count(enabledParams)}` },
-    { id: 'body', label: `Body${request.body.mode !== 'none' ? ' •' : ''}` },
-    { id: 'auth', label: `Auth${request.auth.type !== 'none' ? ' •' : ''}` },
-    { id: 'script', label: `Script${hasScript ? ' •' : ''}` },
-    { id: 'tests', label: `Tests${count(enabledAsserts)}${request.tests.trim() ? ' •' : ''}` },
-    { id: 'settings', label: `Settings${request.settings.verifyTls === false ? ' •' : ''}` },
+  // Số đếm chỉ tính Query — Path chưa từng tính vào đây (số path param đã lộ
+  // rõ ngay trên URL), và giờ Headers cũng theo cùng lý đó: đếm riêng ngay
+  // tại nhãn "Headers" bên trong, không gộp vào một con số duy nhất mơ hồ.
+  const tabs: { id: Tab; label: string; badge?: ReactNode }[] = [
+    { id: 'params', label: 'Params', badge: tabBadge(enabledParams, false) },
+    { id: 'body', label: 'Body', badge: tabBadge(undefined, request.body.mode !== 'none') },
+    { id: 'auth', label: 'Auth', badge: tabBadge(undefined, request.auth.type !== 'none') },
+    { id: 'script', label: 'Script', badge: tabBadge(undefined, hasScript) },
+    { id: 'tests', label: 'Tests', badge: tabBadge(enabledAsserts, !!request.tests.trim()) },
+    { id: 'settings', label: 'Settings', badge: tabBadge(undefined, request.settings.verifyTls === false) },
   ];
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      {/* tab bar — collapses into » when narrow */}
+      {/* tab bar — collapses into » when narrow. bg-bg-2/10: pill mode's
+          active tab is `bg-card`, same as the bright workbench surface this
+          bar itself sits on (see ApiClient.tsx's own comment on that) — with
+          no dim band behind the strip the pill had nothing to contrast
+          against and read as plain text. Matches RequestTabs.tsx's outer
+          strip, which uses the same tint for the same reason. */}
       <Tabs
         tabs={tabs}
         active={tab}
         onSelect={(id) => onTabChange(id as Tab)}
-        activeClassName="text-fg"
+        variant="pill"
+        className="bg-bg-2/10"
         right={tab === 'body' ? (
           <div className="flex items-center gap-2">
             {request.body.mode === 'json' && (
