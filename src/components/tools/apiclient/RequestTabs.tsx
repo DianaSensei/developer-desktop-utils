@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { IconButton } from '@/components/ui/icon-button';
 import { StatusDot } from '@/components/ui/status-dot';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 import { methodColor, methodShort } from './method-color';
 import { EnvQuickView } from './EnvQuickView';
 import type { ApiStore } from './store';
@@ -132,7 +133,14 @@ export function RequestTabs({
   };
 
   return (
-    <div className="flex items-stretch border-b border-line bg-bg-2/10">
+    // ToolToolbar (`header-chrome` = bg-chrome + border-b border-line), not a
+    // hand-rolled `bg-bg-2/10` — that was ~10% opacity of an already-pale
+    // tone, i.e. functionally transparent, so this bar never read as a real
+    // toolbar the way every other tool's ToolToolbar/Sidebar's chrome does.
+    // px-0 py-0: this row's own children (the tab strip, the +New/reveal
+    // icons, the right cluster) already carry their own padding/dividers —
+    // ToolToolbar's default px-4 py-2.5 would double up.
+    <ToolToolbar className="flex items-stretch px-0 py-0">
       {/* tabs (scrollable) + new */}
       {/* Double-click on the empty part of the strip opens a new request —
           the browser-tab-bar gesture; the + button stays for discoverability. */}
@@ -359,6 +367,6 @@ export function RequestTabs({
         </IconButton>
       </div>
       {menu.state && <ContextMenu state={menu.state} onClose={menu.close} width={180} />}
-    </div>
+    </ToolToolbar>
   );
 }
