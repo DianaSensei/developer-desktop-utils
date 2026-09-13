@@ -1,5 +1,25 @@
 # Experience log
 
+## [2026-09-13] Settings page — khoảng trống 2 bên quá lớn khi cửa sổ mở rộng
+- Nguyên nhân: `Settings.tsx`'s content pane bọc mỗi mục trong
+  `mx-auto max-w-2xl` (672px) cố định — quyết định có chủ đích từ trước
+  (miêu tả theo kiểu DBX, ưu tiên độ rộng dễ đọc hơn là co giãn hết cỡ),
+  nhưng ở cửa sổ rộng để lại khoảng trống hai bên card lớn hơn chính bản
+  thân card.
+- Số lần thử: 1/1
+- Kết quả: Đã fix
+- Cách fix: nới `max-w-2xl` → `max-w-[60rem]` (960px, theo đúng con số
+  người dùng đề xuất) — vẫn là một giá trị CỐ ĐỊNH (không co giãn theo %
+  cửa sổ), giữ đúng tinh thần đọc-được ban đầu, chỉ đỡ trống hơn ở độ rộng
+  cửa sổ thường gặp.
+- Bài học chung: một max-width cố định cho mục đích đọc-được (readability
+  cap) vẫn có thể cần điều chỉnh SỐ, không phải cách tiếp cận, khi con số cụ
+  thể đã lỗi thời so với độ phân giải màn hình phổ biến hiện tại — không
+  phải mọi "khoảng trống ở cửa sổ rộng" đều là bug cần bỏ hẳn cap (xem thêm
+  case KeyValueEditor/RequestPanel cùng ngày, nơi cap ở cấp SECTION mới là
+  vấn đề thật — ở đây cap tồn tại đúng chỗ, chỉ cần nới con số).
+
+
 ## [2026-09-13] api-client Environments dialog — không tận dụng chiều rộng cửa sổ + callout luôn hiện đầy đủ
 - Nguyên nhân: `EnvironmentEditor.tsx` dùng `DialogContent size="full"`, nhưng trong `Dialog`
   dùng chung, `full` là `max-w-5xl` (1024px) CỐ ĐỊNH — không theo % chiều rộng cửa sổ (chính

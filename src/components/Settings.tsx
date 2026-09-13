@@ -489,7 +489,11 @@ export function Settings() {
           ra (nav bên trái đã hiện, lặp lại là dư — khớp phần lớn trang của
           DBX; chỉ Appearance giữ tiêu đề nhìn thấy, xem SettingGroup dưới). */}
       <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-2xl space-y-4 px-6 py-6">
+        {/* max-w-2xl (672px) từng để lại quá nhiều khoảng trống 2 bên trên
+            cửa sổ rộng — nới lên 60rem (960px), vẫn cố định (không co giãn
+            theo %, giữ dòng chữ mô tả không quá dài để đọc, đúng tinh thần
+            DBX ban đầu) nhưng đỡ trống hơn ở độ rộng thường gặp. */}
+        <div className="mx-auto max-w-[60rem] space-y-4 px-6 py-6">
           <h2 className="sr-only">{t(SETTINGS_SECTIONS.find((s) => s.id === activeSection)!.label)}</h2>
 
           {activeSection === 'appearance' && (
