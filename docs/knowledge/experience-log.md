@@ -1,5 +1,28 @@
 # Experience log
 
+## [2026-09-13] api-client Sidebar — kéo thả request/folder để sắp xếp: không thể thả TRƯỚC/SAU một folder
+- Nguyên nhân: `onDragOver` của mỗi `Row` (`Sidebar.tsx`) ép cứng `where = 'inside'` bất cứ khi
+  nào hover lên một row `container` (folder hoặc collection), không có logic chia vùng theo vị
+  trí con trỏ như với request (`before`/`after` theo nửa trên/nửa dưới). Hệ quả: một
+  request/folder không bao giờ có thể đứng làm SIBLING ngay trước/sau một folder — nó luôn bị
+  nhét VÀO TRONG folder đó, dù `store.moveItem`/`copyItem` đã hỗ trợ sẵn `'before'`/`'after'`
+  với target là folder từ trước (bug thuần UI, không phải store).
+- Số lần thử: 1/1
+- Kết quả: Đã fix
+- Cách fix: chia row của folder (không áp dụng cho collection — xem lý do dưới) thành 3 vùng
+  dọc theo vị trí con trỏ, giống VS Code Explorer: 25% trên = `before`, 25% dưới = `after`, 50%
+  giữa = `inside`. Row của collection (depth 0) vẫn giữ `where = 'inside'` cố định, vì
+  `moveItem`/`copyItem` LUÔN append thẳng vào collection bất kể `where` (một collection không
+  bao giờ là phần tử trong `items[]` của ai để mà sắp xếp trước/sau) — cho collection một chỉ
+  báo before/after sẽ là nói dối về việc thả thực sự làm gì.
+- Bài học chung: khi một UI kéo-thả phân biệt theo LOẠI target (ở đây: container vs. leaf) chỉ
+  bằng một nhánh if/else ép cứng một giá trị, kiểm tra xem nhánh đó có đang bỏ sót cả một chế độ
+  tương tác hợp lệ (ở đây: sắp xếp sibling quanh một container) hay không — logic tầng dưới
+  (store) có thể đã hỗ trợ sẵn, và phần UI mới là chỗ chặn. jsdom không có `DragEvent`/không hỗ
+  trợ `scrollIntoView`; test kéo-thả cần tự dựng event qua `createEvent` của
+  `@testing-library/dom` rồi gán tay `clientY`/`altKey` (constructor `Event` bỏ qua các field
+  này), và polyfill `scrollIntoView` trước khi render.
+
 ## [2026-09-07] api-client Runner — chạy CSV 100k dòng: state React giữ lịch sử biến run O(n) thành O(n²)
 - Nguyên nhân: `RunnerDialog.tsx` giữ toàn bộ lịch sử thực thi trong React state
   (`setRecords(prev => [...prev, record])` sau MỖI request) và tính lại thống kê bằng

@@ -593,8 +593,26 @@ function Row({
         const copy = e.altKey;
         e.dataTransfer.dropEffect = copy ? 'copy' : 'move';
         let where: DropTarget['where'] = 'after';
-        if (container) where = 'inside';
-        else { const r = e.currentTarget.getBoundingClientRect(); where = e.clientY < r.top + r.height / 2 ? 'before' : 'after'; }
+        const r = e.currentTarget.getBoundingClientRect();
+        if (container && depth > 0) {
+          // A folder also accepts before/after (to reorder as a sibling), not
+          // just inside (to nest into it) — split the row into three vertical
+          // bands like VS Code Explorer: top/bottom quarters reorder around
+          // the row, the middle half nests inside it. Without this, a
+          // request/folder could never land next to a folder as a sibling —
+          // it always got nested into it instead, which is the
+          // reorder-doesn't-work bug this fixes. Collections (depth 0) are
+          // excluded: moveItem/copyItem always append into a collection
+          // regardless of `where` (a collection is never a member of any
+          // items[] array to reorder within), so showing a before/after
+          // indicator on one would be a lie about what the drop actually does.
+          const offset = (e.clientY - r.top) / r.height;
+          where = offset < 0.25 ? 'before' : offset > 0.75 ? 'after' : 'inside';
+        } else if (container) {
+          where = 'inside';
+        } else {
+          where = e.clientY < r.top + r.height / 2 ? 'before' : 'after';
+        }
         if (ctx.dropTarget?.id !== id || ctx.dropTarget?.where !== where || ctx.dropTarget?.copy !== copy) ctx.setDropTarget({ id, where, copy });
       }}
       onDrop={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onDrop(); }}
