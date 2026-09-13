@@ -114,13 +114,53 @@ interface NodeCtx {
   dropTarget: DropTarget | null;
   setDragId: (id: string | null) => void;
   setDropTarget: (t: DropTarget | null) => void;
-  onDrop: () => void;
+  // Stable forever (see the empty-deps useCallback at its definition) — safe
+  // for a Row's pointer-event listeners to close over once at pointerdown
+  // and call much later, at pointerup, unlike a callback whose identity
+  // would change mid-drag.
+  commitDrop: () => void;
 }
 
 // `copy` mirrors the copy-modifier (Alt/Option) held during the drag — Bruno/
 // Postman-style reorder-or-move by default, drag-to-copy (including across
-// collections) when held. See Row's onDragOver below.
+// collections) when held. See Row's onPointerDown below.
 type DropTarget = { id: string; where: 'before' | 'after' | 'inside'; copy: boolean };
+
+// Hit-tests the pointer position during a drag against whichever row's DOM
+// node is actually under it — the pointer-drag replacement for what a
+// native `dragover` target used to give for free. Reads plain data
+// attributes off the DOM rather than closing over React props, since this
+// runs from a `window` pointermove listener that can outlive any particular
+// render.
+function findDropTarget(clientX: number, clientY: number, sourceId: string, copy: boolean): DropTarget | null {
+  const el = document.elementFromPoint(clientX, clientY);
+  const row = el?.closest<HTMLElement>('[data-tree-row]');
+  const targetId = row?.dataset.rowId;
+  if (!row || !targetId || targetId === sourceId) return null;
+  const isContainer = row.dataset.container === 'true';
+  const depth = Number(row.dataset.depth);
+  const r = row.getBoundingClientRect();
+  let where: DropTarget['where'];
+  if (isContainer && depth > 0) {
+    // A folder also accepts before/after (to reorder as a sibling), not just
+    // inside (to nest into it) — split the row into three vertical bands
+    // like VS Code Explorer: top/bottom quarters reorder around the row, the
+    // middle half nests inside it. Without this, a request/folder could
+    // never land next to a folder as a sibling — it always got nested into
+    // it instead.
+    const offset = (clientY - r.top) / r.height;
+    where = offset < 0.25 ? 'before' : offset > 0.75 ? 'after' : 'inside';
+  } else if (isContainer) {
+    // Collections (depth 0): moveItem/copyItem always append into a
+    // collection regardless of `where` (a collection is never a member of
+    // any items[] array to reorder within), so showing a before/after
+    // indicator on one would be a lie about what the drop actually does.
+    where = 'inside';
+  } else {
+    where = clientY < r.top + r.height / 2 ? 'before' : 'after';
+  }
+  return { id: targetId, where, copy };
+}
 
 interface Props {
   store: ApiStore;
@@ -157,14 +197,29 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
   const storeRef = useRef(store);
   storeRef.current = store;
 
-  const onDrop = useCallback(() => {
-    if (dragId && dropTarget) {
-      if (dropTarget.copy) storeRef.current.copyItem(dragId, dropTarget.id, dropTarget.where);
-      else storeRef.current.moveItem(dragId, dropTarget.id, dropTarget.where);
+  // Read through refs (not `dragId`/`dropTarget` directly) so this callback's
+  // identity never has to change — see the pointer-drag note on `NodeCtx`
+  // below for why that matters: a Row's pointer listeners are plain
+  // `window.addEventListener` callbacks created once at pointerdown, not
+  // React callbacks re-created on every render, so whatever they capture
+  // must stay correct however long the drag runs. An empty-deps useCallback
+  // closing over `dragId`/`dropTarget` directly would freeze those at
+  // whatever they were at pointerdown (`null`/`null`, before the drag even
+  // started) and silently no-op every drop.
+  const dragIdRef = useRef(dragId);
+  dragIdRef.current = dragId;
+  const dropTargetRef = useRef(dropTarget);
+  dropTargetRef.current = dropTarget;
+  const commitDrop = useCallback(() => {
+    const id = dragIdRef.current;
+    const target = dropTargetRef.current;
+    if (id && target) {
+      if (target.copy) storeRef.current.copyItem(id, target.id, target.where);
+      else storeRef.current.moveItem(id, target.id, target.where);
     }
     setDragId(null);
     setDropTarget(null);
-  }, [dragId, dropTarget]);
+  }, []);
 
   // Expand whatever ancestor folders/collection are hiding the active request
   // whenever it *changes* — reopening a tab, jumping in from History, the
@@ -239,8 +294,8 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
 
   const nodeCtx: NodeCtx = useMemo(() => ({
     storeRef, activeRequestId: store.activeRequestId, revealTick: revealTick ?? 0, q, onError: setError, onSettings: setSettings,
-    openMenu: menu.open, confirmDelete, editingId, setEditingId, onRun, dragId, dropTarget, setDragId, setDropTarget, onDrop,
-  }), [store.activeRequestId, revealTick, q, menu.open, confirmDelete, editingId, onRun, dragId, dropTarget, onDrop]);
+    openMenu: menu.open, confirmDelete, editingId, setEditingId, onRun, dragId, dropTarget, setDragId, setDropTarget, commitDrop,
+  }), [store.activeRequestId, revealTick, q, menu.open, confirmDelete, editingId, onRun, dragId, dropTarget, commitDrop]);
   const visible = store.collections.filter((c) => !q || collectionMatches(c, q));
 
   return (
@@ -595,41 +650,69 @@ function Row({
       // there — picking one up and dropping it anywhere was a silent no-op that
       // looked broken rather than doing nothing on purpose. Folders/requests
       // (depth > 0) keep the real drag-to-reorder/move behavior.
-      draggable={!editing && depth > 0}
-      onDragStart={(e) => { e.stopPropagation(); ctx.setDragId(id); e.dataTransfer.effectAllowed = 'copyMove'; }}
-      onDragEnd={() => { ctx.setDragId(null); ctx.setDropTarget(null); }}
-      onDragOver={(e) => {
-        if (!ctx.dragId || ctx.dragId === id) return;
-        e.preventDefault();
-        // Hold Alt/Option while dragging to copy instead of move — mirrors the
-        // OS convention and lets a request/folder land in another collection
-        // without removing it from this one.
-        const copy = e.altKey;
-        e.dataTransfer.dropEffect = copy ? 'copy' : 'move';
-        let where: DropTarget['where'] = 'after';
-        const r = e.currentTarget.getBoundingClientRect();
-        if (container && depth > 0) {
-          // A folder also accepts before/after (to reorder as a sibling), not
-          // just inside (to nest into it) — split the row into three vertical
-          // bands like VS Code Explorer: top/bottom quarters reorder around
-          // the row, the middle half nests inside it. Without this, a
-          // request/folder could never land next to a folder as a sibling —
-          // it always got nested into it instead, which is the
-          // reorder-doesn't-work bug this fixes. Collections (depth 0) are
-          // excluded: moveItem/copyItem always append into a collection
-          // regardless of `where` (a collection is never a member of any
-          // items[] array to reorder within), so showing a before/after
-          // indicator on one would be a lie about what the drop actually does.
-          const offset = (e.clientY - r.top) / r.height;
-          where = offset < 0.25 ? 'before' : offset > 0.75 ? 'after' : 'inside';
-        } else if (container) {
-          where = 'inside';
-        } else {
-          where = e.clientY < r.top + r.height / 2 ? 'before' : 'after';
-        }
-        if (ctx.dropTarget?.id !== id || ctx.dropTarget?.where !== where || ctx.dropTarget?.copy !== copy) ctx.setDropTarget({ id, where, copy });
+      //
+      // Pointer events, not native HTML5 draggable/dragstart/dragover/drop:
+      // the desktop app runs inside a Tauri webview with `dragDropEnabled`
+      // (its default) for OS-level file drops (see useTauriFileDrop.ts, used
+      // by ChecksumTool/QRCodeTool/ImageBase64Tool) — Tauri intercepts every
+      // native drag gesture before the webview ever sees it, so the HTML5
+      // events this used to be built on NEVER fired in the real app, only in
+      // a plain browser tab. Reordering looked "fixed" against jsdom/browser
+      // tests but was still completely broken for every actual user. Data
+      // attributes below (`data-tree-row`/`data-row-id`/…) let
+      // `findDropTarget` hit-test via `document.elementFromPoint` during the
+      // drag instead of relying on a dragover target.
+      data-tree-row
+      data-row-id={id}
+      data-container={container ? 'true' : undefined}
+      data-depth={depth}
+      onPointerDown={(e) => {
+        if (editing || depth === 0 || e.button !== 0) return;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const THRESHOLD = 4;
+        let dragging = false;
+
+        const cleanup = () => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onCancel);
+          window.removeEventListener('keydown', onKeyDown);
+          document.body.style.removeProperty('user-select');
+          document.body.style.removeProperty('cursor');
+        };
+        const onMove = (ev: PointerEvent) => {
+          if (!dragging) {
+            if (Math.abs(ev.clientX - startX) < THRESHOLD && Math.abs(ev.clientY - startY) < THRESHOLD) return;
+            dragging = true;
+            ctx.setDragId(id);
+            // Prevents text-selection during the drag — native HTML5 DnD did
+            // this automatically; a plain pointer-driven drag has to ask for
+            // it explicitly, same as SplitPane's own resize drag.
+            document.body.style.setProperty('user-select', 'none');
+            document.body.style.setProperty('cursor', 'grabbing');
+          }
+          ctx.setDropTarget(findDropTarget(ev.clientX, ev.clientY, id, ev.altKey));
+        };
+        const onUp = () => {
+          cleanup();
+          if (dragging) ctx.commitDrop();
+          // A press that never crossed the threshold was a plain click —
+          // never touched drag state, so nothing to reset.
+        };
+        const onCancel = () => {
+          cleanup();
+          ctx.setDragId(null);
+          ctx.setDropTarget(null);
+        };
+        const onKeyDown = (ev: KeyboardEvent) => {
+          if (ev.key === 'Escape' && dragging) onCancel();
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onCancel);
+        window.addEventListener('keydown', onKeyDown);
       }}
-      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onDrop(); }}
       className={cn(
         // Plays once wherever the row is freshly mounted — a new request/folder,
         // a folder just expanded, a drag-copy landing — and never replays on a

@@ -1,13 +1,16 @@
-// Regression coverage for the drag/drop reorder bug: hovering a folder row
-// always forced `where: 'inside'` (see onDragOver in Sidebar.tsx), so a
-// request/folder could never land BEFORE or AFTER a folder as a sibling — it
-// always got nested into it instead. store.moveItem already supported
-// before/after with a folder target; the bug was purely in the UI's zone
-// computation, so this test drives the real onDragOver/onDrop handlers
-// through the DOM rather than calling the store directly.
+// Regression coverage for drag/drop reorder in the Sidebar tree.
+//
+// This used to be built on native HTML5 draggable/dragstart/dragover/drop.
+// That never actually fired in the real desktop app: Tauri's window has
+// `dragDropEnabled` on (its default, needed for OS-level file drops — see
+// useTauriFileDrop.ts, used by ChecksumTool/QRCodeTool/ImageBase64Tool) and
+// intercepts every native drag gesture before the webview sees it. It only
+// ever worked in a plain browser tab, which is why earlier tests here (and
+// manual verification in a browser) reported success while the real app
+// stayed broken. Sidebar.tsx now drives reordering off plain pointer events
+// instead — this file exercises that.
 
 import { act, renderHook, render, fireEvent } from '@testing-library/react';
-import { createEvent } from '@testing-library/dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from './Sidebar';
 
@@ -21,30 +24,54 @@ vi.mock('@/lib/persistentStore', () => ({
 
 beforeEach(() => {
   cache.clear();
+  vi.restoreAllMocks();
 });
 
 // jsdom doesn't implement scrollIntoView; RequestNode's Row calls it whenever
 // the active request mounts (see the `active` effect in Sidebar.tsx).
 Element.prototype.scrollIntoView = vi.fn();
 
-// jsdom leaves getBoundingClientRect at all-zeros; stub it per-row so the
-// onDragOver handler's `(clientY - top) / height` zone math is meaningful.
+// jsdom leaves getBoundingClientRect at all-zeros; stub it per-row so
+// findDropTarget's `(clientY - top) / height` zone math is meaningful.
 function stubRect(el: Element, top: number, height: number) {
   vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
     top, height, bottom: top + height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}),
   });
 }
 
-// jsdom has no DragEvent constructor, so @testing-library/dom's fireEvent
-// falls back to a plain Event for drag* event names — `clientY`/`altKey`
-// passed in the init dict are silently dropped (Event's constructor doesn't
-// recognize them). Build the event via createEvent (still gets the
-// dataTransfer shim) and assign the extra properties directly afterward,
-// which a plain Event object accepts fine.
-function fireDrag(name: 'dragStart' | 'dragOver' | 'drop', node: HTMLElement, clientY: number, altKey = false) {
-  const event = createEvent[name](node, { dataTransfer: { dropEffect: '', effectAllowed: '' } });
-  Object.assign(event, { clientY, altKey });
+// jsdom's `elementFromPoint` doesn't do real layout — it always returns
+// null. findDropTarget uses it to hit-test the pointer position during a
+// drag, so tests stand in for the browser's real hit-testing by stubbing it
+// to return whichever row the test is actually dragging over.
+function stubElementFromPoint(row: Element) {
+  // jsdom doesn't define `elementFromPoint` at all (not even as a stub
+  // returning null), so `vi.spyOn` has nothing to wrap — assign it directly.
+  document.elementFromPoint = vi.fn(() => row);
+}
+
+// jsdom's PointerEvent constructor doesn't carry clientX/clientY/altKey
+// through its init dict the way a real browser's does — assign them
+// directly on the constructed event, same workaround as the old DragEvent
+// tests needed.
+function firePointer(
+  name: 'pointerdown' | 'pointermove' | 'pointerup',
+  node: HTMLElement,
+  clientY: number,
+  opts: { altKey?: boolean; button?: number } = {},
+) {
+  const event = new Event(name, { bubbles: true, cancelable: true });
+  Object.assign(event, { clientX: 0, clientY, altKey: opts.altKey ?? false, button: opts.button ?? 0, pointerId: 1 });
   return fireEvent(node, event);
+}
+
+// A drag: pointerdown on `source`, then pointermove past the drag threshold
+// (jumping straight from clientY 0 to `overY`, stubbing `elementFromPoint`
+// to report `over` as whatever's under the cursor there), then pointerup.
+function drag(source: HTMLElement, over: HTMLElement, overY: number, altKey = false) {
+  stubElementFromPoint(over);
+  firePointer('pointerdown', source, 0);
+  firePointer('pointermove', source, overY, { altKey });
+  firePointer('pointerup', source, overY);
 }
 
 describe('Sidebar — drag/drop reorder around a folder', () => {
@@ -66,16 +93,14 @@ describe('Sidebar — drag/drop reorder around a folder', () => {
 
     const { getByText } = render(<Sidebar store={result.current} onRun={() => {}} />);
 
-    const gammaRow = getByText('Gamma').closest('[draggable]') as HTMLElement;
-    const betaRow = getByText('Beta').closest('[draggable]') as HTMLElement;
+    const gammaRow = getByText('Gamma').closest('[data-tree-row]') as HTMLElement;
+    const betaRow = getByText('Beta').closest('[data-tree-row]') as HTMLElement;
     expect(gammaRow).toBeTruthy();
     expect(betaRow).toBeTruthy();
 
     stubRect(betaRow, 100, 28); // top quarter: clientY < 100 + 7
 
-    fireDrag('dragStart', gammaRow, 0);
-    fireDrag('dragOver', betaRow, 103);
-    fireDrag('drop', betaRow, 103);
+    drag(gammaRow, betaRow, 103);
 
     const ids = result.current.collections.find((c) => c.id === collectionId)!.items.map((i) => i.id);
     expect(ids).toEqual([alphaId, gammaId, betaId]);
@@ -96,14 +121,12 @@ describe('Sidebar — drag/drop reorder around a folder', () => {
 
     const { getByText } = render(<Sidebar store={result.current} onRun={() => {}} />);
 
-    const gammaRow = getByText('Gamma').closest('[draggable]') as HTMLElement;
-    const alphaRow = getByText('Alpha').closest('[draggable]') as HTMLElement;
+    const gammaRow = getByText('Gamma').closest('[data-tree-row]') as HTMLElement;
+    const alphaRow = getByText('Alpha').closest('[data-tree-row]') as HTMLElement;
 
     stubRect(alphaRow, 100, 28); // bottom quarter: clientY > 100 + 21
 
-    fireDrag('dragStart', gammaRow, 0);
-    fireDrag('dragOver', alphaRow, 125);
-    fireDrag('drop', alphaRow, 125);
+    drag(gammaRow, alphaRow, 125);
 
     const ids = result.current.collections.find((c) => c.id === collectionId)!.items.map((i) => i.id);
     expect(ids).toEqual([alphaId, gammaId]);
@@ -124,14 +147,12 @@ describe('Sidebar — drag/drop reorder around a folder', () => {
 
     const { getByText } = render(<Sidebar store={result.current} onRun={() => {}} />);
 
-    const gammaRow = getByText('Gamma').closest('[draggable]') as HTMLElement;
-    const alphaRow = getByText('Alpha').closest('[draggable]') as HTMLElement;
+    const gammaRow = getByText('Gamma').closest('[data-tree-row]') as HTMLElement;
+    const alphaRow = getByText('Alpha').closest('[data-tree-row]') as HTMLElement;
 
     stubRect(alphaRow, 100, 28); // middle band: 100+7 <= clientY <= 100+21
 
-    fireDrag('dragStart', gammaRow, 0);
-    fireDrag('dragOver', alphaRow, 114);
-    fireDrag('drop', alphaRow, 114);
+    drag(gammaRow, alphaRow, 114);
 
     const collection = result.current.collections.find((c) => c.id === collectionId)!;
     expect(collection.items).toHaveLength(1);
@@ -139,6 +160,62 @@ describe('Sidebar — drag/drop reorder around a folder', () => {
     expect(alpha.id).toBe(alphaId);
     expect(alpha.type).toBe('folder');
     if (alpha.type === 'folder') expect(alpha.items.map((i) => i.id)).toEqual([gammaId]);
+  });
+
+  it('does not start a drag from a plain click that never moves past the threshold', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    let collectionId = '';
+    act(() => { collectionId = result.current.addCollection(); });
+    let alphaId = '';
+    let gammaId = '';
+    act(() => { alphaId = result.current.addItem(collectionId, 'folder'); });
+    act(() => { gammaId = result.current.addItem(collectionId, 'request'); });
+    act(() => { result.current.renameItem(alphaId, 'Alpha'); });
+    act(() => { result.current.renameItem(gammaId, 'Gamma'); });
+
+    const { getByText } = render(<Sidebar store={result.current} onRun={() => {}} />);
+    const gammaRow = getByText('Gamma').closest('[data-tree-row]') as HTMLElement;
+    const alphaRow = getByText('Alpha').closest('[data-tree-row]') as HTMLElement;
+    stubRect(alphaRow, 100, 28);
+    stubElementFromPoint(alphaRow);
+
+    firePointer('pointerdown', gammaRow, 0);
+    // Movement stays within the 4px threshold — never becomes a drag.
+    firePointer('pointermove', gammaRow, 2);
+    firePointer('pointerup', gammaRow, 2);
+
+    const collection = result.current.collections.find((c) => c.id === collectionId)!;
+    expect(collection.items.map((i) => i.id)).toEqual([alphaId, gammaId]);
+  });
+
+  it('copies instead of moves when Alt/Option is held', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    let sourceCollectionId = '';
+    let targetCollectionId = '';
+    act(() => { sourceCollectionId = result.current.addCollection(); });
+    act(() => { targetCollectionId = result.current.addCollection(); });
+    let gammaId = '';
+    act(() => { gammaId = result.current.addItem(sourceCollectionId, 'request'); });
+    act(() => { result.current.renameItem(gammaId, 'Gamma'); });
+    act(() => { result.current.renameCollection(targetCollectionId, 'Target'); });
+
+    const { getByText } = render(<Sidebar store={result.current} onRun={() => {}} />);
+    const gammaRow = getByText('Gamma').closest('[data-tree-row]') as HTMLElement;
+    const targetRow = getByText('Target').closest('[data-tree-row]') as HTMLElement;
+    stubRect(targetRow, 100, 28);
+
+    drag(gammaRow, targetRow, 114, true);
+
+    const source = result.current.collections.find((c) => c.id === sourceCollectionId)!;
+    const target = result.current.collections.find((c) => c.id === targetCollectionId)!;
+    // Alt held: the original stays in place, a copy lands in the target.
+    expect(source.items.map((i) => i.id)).toEqual([gammaId]);
+    expect(target.items).toHaveLength(1);
+    expect(target.items[0].id).not.toBe(gammaId);
   });
 });
 
@@ -153,7 +230,7 @@ describe('Sidebar — revealTick (tab bar\'s "reveal in sidebar" button)', () =>
     act(() => { result.current.addItem(collectionId, 'request'); });
 
     const { rerender, getByText } = render(<Sidebar store={result.current} onRun={() => {}} revealTick={0} />);
-    const activeRow = getByText('New Request').closest('[draggable]') as HTMLElement;
+    const activeRow = getByText('New Request').closest('[data-tree-row]') as HTMLElement;
     expect(activeRow).toBeTruthy();
 
     const scrollSpy = vi.mocked(activeRow.scrollIntoView);

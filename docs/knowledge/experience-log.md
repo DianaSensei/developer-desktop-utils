@@ -1,5 +1,38 @@
 # Experience log
 
+## [2026-09-13] api-client Sidebar — kéo thả request/folder KHÔNG BAO GIỜ hoạt động trong app desktop thật, dù đã "fix" đúng logic trước đó
+- Nguyên nhân: fix trước đó cùng ngày (df02f84) sửa đúng logic phân vùng before/after/inside
+  khi hover folder, và được xác nhận qua test (jsdom, sự kiện giả lập) LẪN qua một tab Chrome
+  thường (chuột thật) — cả hai đều "chứng minh" đúng. Nhưng đó không phải môi trường thật: app
+  desktop chạy trong Tauri webview với `dragDropEnabled` bật (mặc định, cần cho tính năng kéo
+  file từ Finder vào ChecksumTool/QRCodeTool/ImageBase64Tool — xem `useTauriFileDrop.ts`, code cũ
+  đã tự ghi rõ "Tauri intercepts native file drops before the webview, so the browser's HTML5
+  `ondrop` never receives them"). Khi bật, TOÀN BỘ sự kiện kéo-thả HTML5 chuẩn
+  (dragstart/dragover/drop) trong TRANG không bao giờ tới được webview — không phải riêng file
+  từ Finder, mà MỌI drag session HTML5, kể cả kéo-thả nội bộ trong Sidebar. Đây là xung đột kết
+  cấu giữa hai tính năng dùng cùng một cơ chế OS-level, không phải lỗi logic.
+- Số lần thử: 1/1 (viết lại toàn bộ cơ chế, không phải sửa logic)
+- Kết quả: Đã fix (xác nhận qua chuột thật trên browser + test; xác nhận trực quan trên app
+  desktop thật CHƯA thực hiện được vì màn hình khoá — xem ghi chú)
+- Cách fix: viết lại Sidebar.tsx từ HTML5 draggable/dragstart/dragover/drop sang pointer events
+  thuần (pointerdown/pointermove/pointerup/pointercancel), gắn listener ở `window` khi vượt
+  ngưỡng 4px di chuyển (tránh nhầm click thường thành kéo), dùng `document.elementFromPoint` +
+  data attribute (`data-tree-row`/`data-row-id`/`data-container`/`data-depth`) để hit-test hàng
+  đang hover thay cho target của dragover. Giữ nguyên toàn bộ logic phân vùng before/after/inside
+  đã đúng từ trước, chỉ đổi CÁCH KÍCH HOẠT nó. Thêm bẫy: `commitDrop` đọc qua ref (không phải
+  đóng trực tiếp state `dragId`/`dropTarget`) vì listener của pointer event là closure thuần tạo
+  một lần lúc pointerdown, không phải React callback tái tạo mỗi lần state đổi — nếu đóng trực
+  tiếp sẽ luôn thấy `dragId=null` (giá trị lúc BẮT ĐẦU kéo, trước khi kéo thật sự bắt đầu).
+- Bài học chung (rất quan trọng cho Tauri app): **verify một tính năng UI bằng browser tab
+  thường (hay cả jsdom) KHÔNG chứng minh nó hoạt động trong app desktop thật** khi tính năng đó
+  dùng một cơ chế OS-level (native HTML5 drag-and-drop, geolocation, clipboard, notification...)
+  mà framework desktop (ở đây: Tauri) có thể can thiệp/độc quyền cho mục đích riêng của nó. Khi
+  một tính năng "kéo thả" trong app Tauri có vẻ đúng logic nhưng người dùng báo "vẫn không hoạt
+  động", luôn nghi ngờ ĐẦU TIÊN vào xung đột `dragDropEnabled` (hay tương đương) trước khi đi sâu
+  vào logic — tìm bằng `grep onDragDropEvent`/`useTauriFileDrop` xem app có tính năng OS
+  drag-drop nào khác đang dùng chung window hay không.
+
+
 ## [2026-09-13] Settings page — khoảng trống 2 bên quá lớn khi cửa sổ mở rộng
 - Nguyên nhân: `Settings.tsx`'s content pane bọc mỗi mục trong
   `mx-auto max-w-2xl` (672px) cố định — quyết định có chủ đích từ trước
