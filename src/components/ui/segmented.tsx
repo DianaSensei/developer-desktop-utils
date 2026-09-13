@@ -128,7 +128,10 @@ export function Segmented<T extends string>({
         <span
           aria-hidden="true"
           className={cn(
-            'pointer-events-none absolute inset-y-0.5 left-0 rounded-xs bg-acc shadow-soft',
+            // rounded-md: the app's one semantic shape for "this is
+            // selected" (design/RULES.md's "Bo góc cho 'đang chọn'" rule) —
+            // matches Tabs' active pill, App-shell's selected nav row, etc.
+            'pointer-events-none absolute inset-y-0.5 left-0 rounded-md bg-acc shadow-soft',
             ready.current && 'motion-safe:transition-transform motion-safe:duration-base motion-safe:ease-spring',
           )}
           style={{ width: thumb.w, transform: `translateX(${thumb.x}px)` }}
@@ -150,7 +153,8 @@ export function Segmented<T extends string>({
             onKeyDown={onKeyDown}
             className={cn(
               // `relative` + `z-10`: chữ nằm TRÊN con trượt, không bị nó phủ.
-              'relative z-10 inline-flex h-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xs px-3',
+              // rounded-md to match the thumb sliding beneath it.
+              'relative z-10 inline-flex h-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3',
               'transition-colors duration-fast ease-out-soft',
               // Vòng focus vẽ VÀO TRONG (offset âm) để không bị máng cắt mất —
               // trước đây component không có focus-visible nào, người dùng bàn

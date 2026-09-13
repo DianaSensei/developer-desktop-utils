@@ -108,6 +108,22 @@ Cạm bẫy đã vấp một lần: `borderRadius` khai trong `theme.extend` **k
 không ai thấy. Giờ `DEFAULT` trỏ vào `--r-default`. Nguyên tắc rút ra: **utility trần của
 Tailwind là giá trị cứng cho tới khi được khai báo tường minh.**
 
+### Bo góc cho "đang chọn" — `rounded-md`, không tầng nào khác
+
+Trạng thái "mục này đang được chọn/mở" (tab đang mở, hàng nav đang active, lựa chọn
+trong một nhóm chuyển-đổi) dùng **đúng một tầng: `rounded-md`**, bất kể nó xuất hiện ở
+đâu — sidebar điều hướng chính, tab titlebar, tab của một tool (API Client, Redis
+Admin...), hay nhóm chuyển-đổi kiểu `Segmented`. Trước đây ba nơi này lệch nhau
+(`rounded-sm` ở chrome cấp app, `rounded-xs` ở `Segmented`, và một biến thể gạch-chân-
+trượt không bo góc gì cả ở tab dùng `variant="underline"` cũ) — mắt nhìn ba hình dạng
+khác nhau cho cùng MỘT khái niệm ("cái này đang mở") trong một cửa sổ. `rounded-md` được
+chọn vì đó là tầng component `Tabs` (dùng chung, nhiều tool nhất) đã áp dụng trước, không
+phải một tầng mới bịa ra.
+
+Không áp dụng luật này cho bo góc của THẺ/HỘP THOẠI/NÚT nói chung — những chỗ đó vẫn theo
+kích thước riêng của chúng (thẻ lớn 14–24px, nút theo `--r-*` component tự chọn). Luật
+này CHỈ ràng buộc phần tử biểu thị "đang được chọn trong một nhóm".
+
 ---
 
 ## Thang tông — cái gì nằm trên bề mặt nào

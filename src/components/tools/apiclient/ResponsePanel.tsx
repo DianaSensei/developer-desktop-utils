@@ -368,12 +368,16 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* header: tabs left, format/status/actions pinned right */}
+      {/* header: tabs left, format/status/actions pinned right. bg-bg-2/10:
+          the active tab is a `bg-card` pill, same as the bright response
+          surface this bar itself sits on — without a dim band behind the
+          strip the pill has nothing to contrast against (same reasoning as
+          RequestPanel.tsx's own tab bar). */}
       <Tabs
         tabs={tabDefs}
         active={activeTab}
         onSelect={(id) => setTab(id as Tab)}
-        activeClassName="text-fg"
+        className="bg-bg-2/10"
         right={headerRight}
       />
 

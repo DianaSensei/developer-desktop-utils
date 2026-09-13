@@ -243,14 +243,33 @@ nổi"*, không nói *"vật này bấm được"*. Mặt trên vẫn là mảng
 
 ### Chưa sửa — việc của đợt sau
 
-- **Bốn dải chrome chồng nhau ở đỉnh cửa sổ**, mỗi dải một chiều cao và một tông gần
-  giống nhau (titlebar 68px · tab strip 46px · tab chế độ 54px · hàng tuỳ chọn 56px).
-  Gộp còn hai là việc chạm `App.tsx` + từng tool, nên tách riêng.
-- **Ba hình dạng cho cùng một trạng thái "đang chọn"** trong 200px chiều dọc: viên thuốc
-  bo tròn hoàn toàn ở titlebar, `rounded-md` ở tab, `rounded-sm` ở toggle.
-- **API Client tự dựng layout riêng**, không đi qua `ToolPane` — nên chưa hưởng phần
-  đóng khung ở trên.
-- **Hai mật độ trong cùng một cửa sổ**: sidebar 58px/hàng cạnh nội dung dày đặc.
+- ~~Bốn dải chrome chồng nhau ở đỉnh cửa sổ~~ — **đã đóng (2026-09-14)**, không phải vì
+  sửa mà vì số liệu này đã CŨ: một phiên làm việc trước đó đã tự gộp titlebar + tab strip
+  + tab chế độ thành đúng MỘT dải 38px (`App.tsx`, xem comment "Trước đây đỉnh cửa sổ có
+  HAI dải chồng nhau... Giờ strip dựng THẲNG trong hàng này... Một dải, 50px"). Xác nhận
+  lại bằng cách đọc trực tiếp `App.tsx` trước khi đóng, không chỉ tin vào tài liệu này.
+- ~~Ba hình dạng cho cùng một trạng thái "đang chọn"~~ — **đã sửa (2026-09-14)**. Đối
+  chiếu lại với code thật thì số liệu cũng đã cũ và THỰC RA đã thành 4 kiểu (sidebar/
+  titlebar `rounded-sm`, `Tabs` variant `pill` `rounded-md`, `Segmented` `rounded-xs`,
+  `Tabs` variant `underline` không bo góc gì — sliding underline). Thống nhất về MỘT tầng
+  `rounded-md` cho mọi nơi (xóa hẳn `variant="underline"` khỏi `Tabs`, chỉ còn pill); ghi
+  quy ước này thành luật trong `design/RULES.md` ("Bo góc cho 'đang chọn'"). Nhân tiện phát
+  hiện: nhãn tool đơn lẻ ở titlebar (không thuộc nhóm) vẫn còn là viên thuốc accent ở MỘT
+  trong hai nhánh code render nó (`titlebarNav`, đường dùng thật cho app desktop) trong khi
+  nhánh còn lại (`OpenToolsStrip`'s fallback, chỉ dùng khi không có titlebar tự vẽ) đã được
+  sửa thành chữ thường từ trước — một quyết định thiết kế đã có nhưng chưa áp dụng nhất
+  quán; đã đồng bộ cả hai theo hướng chữ thường.
+- ~~API Client tự dựng layout riêng, không đi qua `ToolPane`~~ — **đã sửa (2026-09-13)**:
+  `RequestTabs.tsx` chuyển sang `ToolToolbar` dùng chung. Xem
+  `docs/changelog/api-client-toolpane-adoption.md`.
+- ~~Hai mật độ trong cùng một cửa sổ~~ — **đã đóng (2026-09-14)**, cũng vì số liệu cũ:
+  không còn hàng sidebar 58px nào trong code hiện tại (sidebar chính ~32px, cây collection
+  của API Client đã 28px từ một đợt trước). Xác nhận lại bằng grep trực tiếp trước khi đóng.
+
+**Bài học rút ra khi đóng lại đợt này**: tài liệu phân tích (kể cả tài liệu này) đông cứng
+tại thời điểm viết — code tiếp tục đổi sau đó. Trước khi bắt tay sửa một mục "chưa sửa" đã
+ghi từ một phiên trước, luôn đối chiếu lại với code THẬT trước, đừng coi số liệu cũ là sự
+thật hiện tại.
 
 ---
 

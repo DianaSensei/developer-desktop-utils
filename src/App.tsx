@@ -257,7 +257,10 @@ function NavScrollArea({
                     to={path}
                     onClick={onClose}
                     className={cn(
-                      'group relative flex w-full items-center rounded-sm px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
+                      // rounded-md: the app's one semantic shape for "this is
+                      // selected" (design/RULES.md's "Bo góc cho 'đang chọn'"
+                      // rule) — this row IS that state (isActive below).
+                      'group relative flex w-full items-center rounded-md px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                       isCollapsed ? 'justify-center' : 'gap-2.5',
                       isActive
                         ? 'bg-acc-tint text-acc-ink font-medium'
@@ -670,7 +673,8 @@ function Sidebar({
               onClick={onClose}
               title={t('shell.sidebar.settings')}
               className={cn(
-                'group relative flex items-center rounded-sm px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
+                // rounded-md: same "đang chọn" shape as the tool nav rows above.
+                'group relative flex items-center rounded-md px-2.5 py-1.5 transition-[color,background-color,box-shadow] duration-base ease-out-soft',
                 isCollapsed ? 'justify-center' : 'gap-2.5',
                 isSettingsActive
                   ? 'bg-acc/10 text-acc font-medium'
@@ -871,7 +875,8 @@ function AppContent() {
                   role="tab"
                   aria-selected={on}
                   className={cn(
-                    'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-2 text-xs leading-none transition-colors',
+                    // rounded-md: same "đang chọn" shape used everywhere else.
+                    'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs leading-none transition-colors',
                     'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                     on
                       ? 'bg-acc font-semibold text-acc-fg shadow-soft'
@@ -906,7 +911,15 @@ function AppContent() {
           key={`${activeTool.path}-label`}
           className="inline-flex h-6 shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
         >
-          <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap rounded-sm bg-acc px-2 text-xs font-semibold leading-none text-acc-fg shadow-soft">
+          {/* Chữ thường, không phải viên thuốc accent: `--acc` nghĩa là "cái
+              này tương tác được" hoặc "cái này đang được chọn" (RULES.md).
+              Tên tool đang mở không phải một lựa chọn trong nhóm — không có
+              gì để chọn khác, nó chỉ là nhãn. Tô accent vào đây vừa là ồn
+              nhất màn hình cho một thứ bấm-vào-không-làm-gì, vừa tạo thêm
+              một hình dạng "đang chọn" thứ tư (đã có: sidebar nav, tab
+              titlebar, Tabs pill, Segmented) — xem khối tương đương trong
+              OpenToolsStrip's fallback, nơi đã sửa đúng hướng này trước. */}
+          <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap px-2 text-xs font-semibold leading-none text-fg">
             {activeTool.label}
             {activeTool.experimental && (
               <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
@@ -1083,7 +1096,7 @@ function AppContent() {
                   <div className="flex min-w-0 items-center gap-2.5">
               <div
                 key={activeTool.path}
-                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-sm border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
+                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
               >
                 <ActiveIcon className="h-4 w-4 text-acc" />
               </div>
@@ -1103,7 +1116,7 @@ function AppContent() {
                   key={`${activeTool.path}-tabs`}
                   role="tablist"
                   aria-label={activeGroup!.label}
-                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-sm bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
+                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
                 >
                   {activeGroupTabs.map((def) => {
                       const p = toolPath(def.id);
@@ -1116,7 +1129,7 @@ function AppContent() {
                           role="tab"
                           aria-selected={on}
                           className={cn(
-                            'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-sm px-3.5 text-sm leading-none transition-colors',
+                            'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-3.5 text-sm leading-none transition-colors',
                             'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                             on
                               ? 'bg-acc font-semibold text-acc-fg shadow-soft'
@@ -1147,7 +1160,7 @@ function AppContent() {
                    nhãn. Tô nó bằng accent làm thứ ồn nhất màn hình lại là thứ
                    bấm vào không có gì xảy ra, và tạo ra hình dạng "đang chọn"
                    thứ ba trong vòng 200px chiều dọc (viên thuốc ở đây, tab bo
-                   `rounded-sm` bên dưới, toggle trong tool). Giờ nó là chữ. */
+                   `rounded-md` bên dưới, toggle trong tool). Giờ nó là chữ. */
                 <h2
                   key={`${activeTool.path}-label`}
                   className="inline-flex min-w-0 shrink items-center gap-1.5 truncate text-sm font-semibold leading-none motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"

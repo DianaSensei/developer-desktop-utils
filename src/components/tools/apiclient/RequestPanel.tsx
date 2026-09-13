@@ -86,17 +86,16 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      {/* tab bar — collapses into » when narrow. bg-bg-2/10: pill mode's
-          active tab is `bg-card`, same as the bright workbench surface this
-          bar itself sits on (see ApiClient.tsx's own comment on that) — with
-          no dim band behind the strip the pill had nothing to contrast
-          against and read as plain text. Matches RequestTabs.tsx's outer
-          strip, which uses the same tint for the same reason. */}
+      {/* tab bar — collapses into » when narrow. bg-bg-2/10: the active tab
+          pill is `bg-card`, same as the bright workbench surface this bar
+          itself sits on (see ApiClient.tsx's own comment on that) — with no
+          dim band behind the strip the pill had nothing to contrast against
+          and read as plain text. Matches RequestTabs.tsx's outer strip,
+          which uses the same tint for the same reason. */}
       <Tabs
         tabs={tabs}
         active={tab}
         onSelect={(id) => onTabChange(id as Tab)}
-        variant="pill"
         className="bg-bg-2/10"
         right={tab === 'body' ? (
           <div className="flex items-center gap-2">

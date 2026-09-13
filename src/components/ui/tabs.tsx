@@ -8,6 +8,13 @@
 // views, RabbitMQ queue/exchange views) gets the same collapse-to-overflow
 // behavior instead of a plain non-responsive tab row that clips at narrow
 // widths.
+//
+// Active tab is a rounded-md filled pill — the app's one semantic shape for
+// "this is selected" (see design/RULES.md's "Bo góc cho trạng thái đang chọn"
+// rule). This used to be an opt-in `variant` (a sliding-underline strip was
+// the default, kept for compatibility with the tools that hadn't been moved
+// over yet); every consumer has since moved to the pill, so the underline
+// path and the `variant` prop are gone — one shape, not two to keep in sync.
 
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronsRight } from 'lucide-react';
@@ -26,23 +33,12 @@ export interface TabsProps {
   onSelect: (id: string) => void;
   right?: ReactNode;
   className?: string;
-  /** Active-tab underline + text color. Default 'border-acc text-fg'
+  /** Active-pill background + text color. Default 'bg-card text-fg shadow-sm'
    *  — override when a tool has an established alternate accent. */
   activeClassName?: string;
-  /**
-   * 'underline' (default): the original sliding-underline strip every
-   * existing consumer (Kafka, RabbitMQ, API Client's Params/Body/… tabs)
-   * already uses — unchanged.
-   * 'pill': active tab renders as a filled rounded pill instead, à la the
-   * Postman-style reference the API Client request tabs already adopted —
-   * no sliding underline bar. Opt-in per consumer rather than a global
-   * redesign, since this component is shared foundation across tools whose
-   * own tab bars weren't part of that request.
-   */
-  variant?: 'underline' | 'pill';
 }
 
-export function Tabs({ tabs, active, onSelect, right, className, activeClassName, variant = 'underline' }: TabsProps) {
+export function Tabs({ tabs, active, onSelect, right, className, activeClassName }: TabsProps) {
   const headerRef = useRef<HTMLDivElement>(null);
   const headerWRef = useRef(0);
   const [headerW, setHeaderW] = useState(0);
@@ -160,7 +156,6 @@ export function Tabs({ tabs, active, onSelect, right, className, activeClassName
         tabs={inlineTabs}
         active={active}
         activeClassName={activeClassName}
-        variant={variant}
         onSelect={onSelect}
       />
       {overflowTabs.length > 0 && <TabOverflow tabs={overflowTabs} onSelect={onSelect} />}
@@ -173,105 +168,34 @@ export function Tabs({ tabs, active, onSelect, right, className, activeClassName
   );
 }
 
-/**
- * Hàng tab + MỘT gạch chân dùng chung, trượt giữa các tab.
- *
- * Bản trước cho mỗi nút một `border-b-2` riêng, và đổi tab chỉ là tắt viền ở
- * nút cũ rồi bật viền ở nút mới. Hai chuyện xảy ra cùng lúc ở hai chỗ cách xa
- * nhau nên mắt không nối được chúng lại: người dùng thấy "gạch chân biến mất
- * rồi có gạch chân khác", chứ không thấy "gạch chân đi từ tab này sang tab
- * kia". Đó là thông tin duy nhất mà chuyển động ở thanh tab cần truyền, và
- * cũng là lý do một thanh tab chỉ đổi màu luôn đọc ra là làm cho có.
- *
- * Gạch chân dịch bằng `transform` (không `left`) nên không reflow, và lần đặt
- * đầu tiên không có transition — xem ghi chú cùng nội dung ở `Segmented`.
- * Hover vẫn cho gạch mờ riêng ở từng nút: đó là "cái này bấm được", một nghĩa
- * khác với "cái này đang mở", nên nó không dùng chung con trượt.
- */
-function TabRow({ tabs, active, activeClassName, variant, onSelect }: {
-  tabs: TabDef[]; active: string; activeClassName?: string; variant: 'underline' | 'pill'; onSelect: (id: string) => void;
+function TabRow({ tabs, active, activeClassName, onSelect }: {
+  tabs: TabDef[]; active: string; activeClassName?: string; onSelect: (id: string) => void;
 }) {
-  const rowRef = useRef<HTMLDivElement | null>(null);
-  const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const [bar, setBar] = useState<{ x: number; w: number } | null>(null);
-  const ready = useRef(false);
-  const underline = variant === 'underline';
-
-  useLayoutEffect(() => {
-    if (!underline) return;
-    const row = rowRef.current;
-    const el = btnRefs.current[active];
-    // Tab đang mở có thể đang nằm trong menu tràn — lúc đó không có gạch chân
-    // nào để vẽ, và ẩn nó đi đúng hơn là neo bừa vào tab đầu tiên.
-    if (!row || !el) { setBar(null); return; }
-    const measure = () => setBar({ x: el.offsetLeft, w: el.offsetWidth });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(row);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [active, tabs, underline]);
-
-  useEffect(() => {
-    if (!bar) return;
-    const id = requestAnimationFrame(() => { ready.current = true; });
-    return () => cancelAnimationFrame(id);
-  }, [bar]);
-
   return (
-    <div ref={rowRef} className={cn('relative flex min-w-0 items-center overflow-hidden', underline ? 'gap-4' : 'gap-1 py-1')}>
+    <div className="relative flex min-w-0 items-center gap-1 overflow-hidden py-1">
       {tabs.map((t) => (
         <TabBtn
           key={t.id}
-          ref={(el) => { btnRefs.current[t.id] = el; }}
           def={t}
           active={t.id === active}
           activeClassName={activeClassName}
-          variant={variant}
           onClick={() => onSelect(t.id)}
         />
       ))}
-      {underline && bar && (
-        <span
-          aria-hidden="true"
-          className={cn(
-            // `bottom-0`, KHÔNG phải `-bottom-px`: hàng này có `overflow-hidden`
-            // để cắt các tab tràn ra, nên bất cứ thứ gì đặt ngoài mép dưới đều
-            // bị cắt mất — kể cả chính gạch chân. Các nút có `-mb-px` nên mép
-            // dưới của hàng nằm đúng trên đường viền của thanh tab.
-            'pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-acc',
-            ready.current && 'motion-safe:transition-transform motion-safe:duration-base motion-safe:ease-out-soft',
-          )}
-          style={{ width: bar.w, transform: `translateX(${bar.x}px)` }}
-        />
-      )}
     </div>
   );
 }
 
 const TabBtn = forwardRef<HTMLButtonElement, {
-  def: TabDef; active: boolean; activeClassName?: string; variant: 'underline' | 'pill'; onClick: () => void;
-}>(({ def, active, activeClassName, variant, onClick }, ref) => (
+  def: TabDef; active: boolean; activeClassName?: string; onClick: () => void;
+}>(({ def, active, activeClassName, onClick }, ref) => (
   <button
     ref={ref}
     onClick={onClick}
     aria-selected={active}
     className={cn(
-      'relative flex shrink-0 items-center gap-1.5 text-xs font-medium transition-colors duration-fast ease-out-soft',
-      variant === 'underline'
-        ? cn(
-            // Gạch chân của tab ĐANG MỞ do `TabRow` vẽ; `border-b-2` ở đây chỉ
-            // còn phục vụ trạng thái hover (và giữ nguyên chiều cao hàng để
-            // đổi tab không làm layout nhích lên một pixel).
-            '-mb-px border-b-2 border-transparent py-2.5',
-            active ? (activeClassName ?? 'text-fg') : 'text-fg-mute hover:text-fg hover:border-line',
-          )
-        : cn(
-            // Pill: nền đặc thay cho gạch chân, giống dãy tab request bên
-            // ngoài (RequestTabs.tsx) — không viền, không gạch chân trượt.
-            'rounded-md px-2.5 py-1.5',
-            active ? (activeClassName ?? 'bg-card text-fg shadow-sm') : 'text-fg-mute hover:bg-bg-2/50 hover:text-fg',
-          ),
+      'relative flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors duration-fast ease-out-soft',
+      active ? (activeClassName ?? 'bg-card text-fg shadow-sm') : 'text-fg-mute hover:bg-bg-2/50 hover:text-fg',
     )}
   >
     {def.label}{def.badge}
@@ -286,7 +210,7 @@ function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string
   const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   return (
     <div ref={ref} className="relative ml-3 shrink-0">
-      <button onClick={() => setOpen((o) => !o)} title="More tabs" className="-mb-px border-b-2 border-transparent py-2 text-fg-mute hover:text-fg">
+      <button onClick={() => setOpen((o) => !o)} title="More tabs" className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-bg-2/50 hover:text-fg">
         <ChevronsRight className="h-4 w-4" />
       </button>
       {open && (
