@@ -1,5 +1,28 @@
 # Experience log
 
+## [2026-09-13] api-client Environments dialog — không tận dụng chiều rộng cửa sổ + callout luôn hiện đầy đủ
+- Nguyên nhân: `EnvironmentEditor.tsx` dùng `DialogContent size="full"`, nhưng trong `Dialog`
+  dùng chung, `full` là `max-w-5xl` (1024px) CỐ ĐỊNH — không theo % chiều rộng cửa sổ (chính
+  comment có sẵn trong `dialog.tsx` đã ghi rõ: "On a 1920px window `full` left nearly half the
+  screen unused"). Component đã có sẵn tier `size="viewport"` (`max-w-[94vw]`) nhưng
+  EnvironmentEditor chưa dùng tới. Song song: callout giải thích thứ tự ưu tiên
+  Collection/Global/Collection Variables (~480 ký tự) luôn hiện đầy đủ, không thể thu gọn —
+  ở popup hẹp 1024px nó xuống 3 dòng, đẩy nội dung thật (danh sách environment/bảng biến)
+  xuống dưới mỗi lần mở dialog, kể cả với người dùng đã đọc rồi.
+- Số lần thử: 1/1
+- Kết quả: Đã fix
+- Cách fix: đổi `size="full"` → `size="viewport"`. Thu callout thành 1 dòng tóm tắt thứ tự ưu
+  tiên (`Collection env → Global env → Collection Variables`) kèm nút "Learn more"/"Show less"
+  để mở/đóng đoạn giải thích đầy đủ theo yêu cầu (state cục bộ `explainerOpen`, mặc định đóng,
+  không persist — mỗi lần mở dialog lại thu gọn, vì đây là lời giải thích một-lần-đọc, không
+  phải trạng thái người dùng cần nhớ qua các phiên).
+- Bài học chung: khi một dialog/popup "không tối ưu không gian" trong app đã có sẵn hệ thống
+  size tier cho dialog dùng chung, luôn kiểm tra xem tier hiện tại có thật sự phản ứng theo cửa
+  sổ hay là một giá trị rem/px cố định bị đặt tên gây hiểu lầm ("full" nghe như "chiếm hết",
+  nhưng thực chất là một cap cố định) — component `dialog.tsx` đã tự ghi chú rõ điều này trước
+  đó, chỉ cần đọc đúng chỗ thay vì đoán.
+
+
 ## [2026-09-13] api-client RequestPanel — bảng Query/Headers/Assertions không dùng hết chiều rộng panel khi xếp chồng (stacked)
 - Nguyên nhân: `RequestPanel.tsx` bọc tab Params trong `max-w-5xl` và tab Tests
   trong `max-w-3xl` — cố ý từ trước để chặn cột VALUE của `KeyValueEditor`
