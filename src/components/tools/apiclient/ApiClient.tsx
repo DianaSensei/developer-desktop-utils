@@ -88,6 +88,13 @@ export function ApiClient() {
   );
   const [resizing, setResizing] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Bumped by RequestTabs' "reveal in sidebar" button. The sidebar already
+  // auto-scrolls the active row into view the moment a tab becomes active
+  // (see Sidebar.tsx/Row's own effect) — this exists for the case where the
+  // user then scrolled the sidebar away on their own and wants to jump back
+  // without switching tabs (which wouldn't re-trigger that effect, since
+  // `activeRequestId` wouldn't actually change).
+  const [revealTick, setRevealTick] = useState(0);
   const urlFieldRef = useRef<InlineCodeFieldHandle>(null);
 
   // Drag the divider between the collections sidebar and the workbench.
@@ -411,7 +418,7 @@ export function ApiClient() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="shrink-0 overflow-hidden" style={{ width: sidebarWidth }}>
-          <Sidebar store={store} searchInputRef={searchInputRef} onRun={handleRun} />
+          <Sidebar store={store} searchInputRef={searchInputRef} onRun={handleRun} revealTick={revealTick} />
         </div>
         <div
           onPointerDown={startSidebarResize}
@@ -440,6 +447,7 @@ export function ApiClient() {
             onSelectRequest={openRequest}
             onOpenHistory={() => setShowHistory(true)}
             onCloseHistory={() => setShowHistory(false)}
+            onRevealActive={() => setRevealTick((t) => t + 1)}
           />
           {showHistory ? (
             <HistoryView store={store} onExit={() => setShowHistory(false)} />

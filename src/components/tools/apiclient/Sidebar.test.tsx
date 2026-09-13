@@ -141,3 +141,27 @@ describe('Sidebar — drag/drop reorder around a folder', () => {
     if (alpha.type === 'folder') expect(alpha.items.map((i) => i.id)).toEqual([gammaId]);
   });
 });
+
+describe('Sidebar — revealTick (tab bar\'s "reveal in sidebar" button)', () => {
+  it('re-scrolls the active row into view when revealTick changes, even though activeRequestId does not', async () => {
+    const { useApiStore } = await import('./store');
+    const { result } = renderHook(() => useApiStore());
+
+    let collectionId = '';
+    act(() => { collectionId = result.current.addCollection(); });
+    // addItem(..., 'request') selects it — this becomes store.activeRequestId.
+    act(() => { result.current.addItem(collectionId, 'request'); });
+
+    const { rerender, getByText } = render(<Sidebar store={result.current} onRun={() => {}} revealTick={0} />);
+    const activeRow = getByText('New Request').closest('[draggable]') as HTMLElement;
+    expect(activeRow).toBeTruthy();
+
+    const scrollSpy = vi.mocked(activeRow.scrollIntoView);
+    scrollSpy.mockClear();
+
+    // Same store, same activeRequestId — only revealTick moves.
+    rerender(<Sidebar store={result.current} onRun={() => {}} revealTick={1} />);
+
+    expect(scrollSpy).toHaveBeenCalled();
+  });
+});

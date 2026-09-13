@@ -97,6 +97,11 @@ interface PendingDelete {
 interface NodeCtx {
   storeRef: React.MutableRefObject<ApiStore>;
   activeRequestId: string | null;
+  // Forces RequestNode's Row to re-run its scrollIntoView effect on demand
+  // (see Sidebar's own revealTick prop) even when `active` itself hasn't
+  // changed — that effect is keyed on `active` alone, so switching away and
+  // back to the same tab wouldn't otherwise re-trigger it.
+  revealTick: number;
   q: string;
   onError: (m: string | null) => void;
   onSettings: (t: NodeSettingsTarget) => void;
@@ -121,9 +126,13 @@ interface Props {
   store: ApiStore;
   searchInputRef?: React.Ref<HTMLInputElement>;
   onRun: (title: string, requests: ApiRequest[], collectionId: string) => void;
+  // Bumped by RequestTabs' "reveal in sidebar" button to force the active
+  // row back into view even when `activeRequestId` itself hasn't changed
+  // (switching tabs already does this on its own — see the effect below).
+  revealTick?: number;
 }
 
-export function Sidebar({ store, searchInputRef, onRun }: Props) {
+export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
   const [error, setError] = useState<string | null>(null);
   // Non-fatal notes from the last import (parts of a spec with no equivalent
   // here). Shown until dismissed so an import is never quietly lossy.
@@ -160,13 +169,15 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   // Expand whatever ancestor folders/collection are hiding the active request
   // whenever it *changes* — reopening a tab, jumping in from History, the
   // Runner — so it's never left invisible behind a collapsed ancestor with no
-  // clue where it lives. Deliberately keyed on activeRequestId alone: this
-  // fires once per selection, not on every render, so it never fights a
-  // collapse the user makes afterwards while still working in that request.
+  // clue where it lives. Deliberately keyed on activeRequestId alone (plus
+  // revealTick, for the "reveal in sidebar" tab-bar button re-running this on
+  // demand even when the id hasn't changed): this fires once per selection,
+  // not on every render, so it never fights a collapse the user makes
+  // afterwards while still working in that request.
   useEffect(() => {
     if (store.activeRequestId) store.revealRequest(store.activeRequestId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.activeRequestId]);
+  }, [store.activeRequestId, revealTick]);
 
   // Importing a collection that carries scripts is a decision to run someone
   // else's code on the next Send, so it goes through a review step instead of
@@ -227,9 +238,9 @@ export function Sidebar({ store, searchInputRef, onRun }: Props) {
   );
 
   const nodeCtx: NodeCtx = useMemo(() => ({
-    storeRef, activeRequestId: store.activeRequestId, q, onError: setError, onSettings: setSettings,
+    storeRef, activeRequestId: store.activeRequestId, revealTick: revealTick ?? 0, q, onError: setError, onSettings: setSettings,
     openMenu: menu.open, confirmDelete, editingId, setEditingId, onRun, dragId, dropTarget, setDragId, setDropTarget, onDrop,
-  }), [store.activeRequestId, q, menu.open, confirmDelete, editingId, onRun, dragId, dropTarget, onDrop]);
+  }), [store.activeRequestId, revealTick, q, menu.open, confirmDelete, editingId, onRun, dragId, dropTarget, onDrop]);
   const visible = store.collections.filter((c) => !q || collectionMatches(c, q));
 
   return (
@@ -566,11 +577,14 @@ function Row({
   // a tab, reopening from History, the Runner) — expanding its ancestors
   // (see store.revealRequest) is wasted if the row itself is still scrolled
   // off-screen. `active` is only ever true on a RequestNode's Row, so this is
-  // a no-op for every folder/collection row.
+  // a no-op for every folder/collection row. Also re-fires on `revealTick`
+  // alone (the tab bar's "reveal in sidebar" button) so scrolling back to an
+  // already-active request that the user scrolled away from still works —
+  // `active` itself doesn't change in that case.
   const rowRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (active) rowRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [active]);
+  }, [active, ctx.revealTick]);
 
   return (
     <div

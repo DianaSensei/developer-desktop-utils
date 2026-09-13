@@ -42,6 +42,11 @@ interface Props {
   onSelectRequest: (id: string) => void;
   onOpenHistory: () => void;
   onCloseHistory: () => void;
+  // "Reveal in sidebar" button, far right of the strip (Postman-style) — the
+  // sidebar already auto-scrolls the active row into view the moment a tab
+  // *becomes* active, so this is for jumping back after scrolling the
+  // sidebar away on its own, without switching tabs.
+  onRevealActive: () => void;
 }
 
 // A tab "needs attention" once it has settled on a transport/script error or a
@@ -68,7 +73,7 @@ function activeCollection(store: ApiStore): Collection | null {
 
 export function RequestTabs({
   store, runs, direction, onToggleDirection, onNewRequest, onManageEnvironments, onManageVault, resolvedVars,
-  historyActive, onSelectRequest, onOpenHistory, onCloseHistory,
+  historyActive, onSelectRequest, onOpenHistory, onCloseHistory, onRevealActive,
 }: Props) {
   const { openRequests, activeRequestId } = store;
   const collection = activeCollection(store);
@@ -135,7 +140,7 @@ export function RequestTabs({
       <div
         ref={stripRef}
         onScroll={measureEdges}
-        className="flex min-w-0 flex-1 items-stretch overflow-x-auto no-scrollbar"
+        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto no-scrollbar px-1.5 py-1"
         onDoubleClick={(e) => { if (e.target === e.currentTarget) onNewRequest(); }}
       >
         {openRequests.map((req) => {
@@ -159,14 +164,15 @@ export function RequestTabs({
                 // scale-in plays once, on the fresh mount a newly-opened tab gets
                 // (an already-open tab just being reordered/re-rendered keeps its
                 // DOM node by `key`, so it never replays).
-                'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 border-r border-line px-2.5 py-1.5 text-xs transition-colors motion-safe:animate-scale-in',
-                active ? 'bg-bg text-fg' : 'text-fg-mute hover:bg-bg/50 hover:text-fg',
+                // Rounded pill, not a full-height rectangle with a top accent
+                // bar — the active tab's own filled background is what marks
+                // it now, à la Postman/the reference screenshot, and the bar
+                // reads as flatter/borderless without a `border-r` between
+                // every tab.
+                'group relative flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors motion-safe:animate-scale-in',
+                active ? 'bg-card text-fg shadow-sm' : 'text-fg-mute hover:bg-bg/50 hover:text-fg',
               )}
             >
-              {/* Always mounted, opacity-crossfaded rather than conditionally
-                  rendered — switching the active tab used to snap this bar on/off
-                  instantly. */}
-              <span className={cn('absolute inset-x-0 top-0 h-0.5 bg-acc transition-opacity duration-base ease-out-soft', active ? 'opacity-100' : 'opacity-0')} />
               <span className={cn('shrink-0 text-[11px] font-bold uppercase', methodColor(req.method))}>
                 {methodShort(req.method)}
               </span>
@@ -193,8 +199,7 @@ export function RequestTabs({
           );
         })}
         {historyActive && (
-          <div className="group relative flex shrink-0 items-center gap-1.5 border-r border-line bg-bg px-2.5 py-1.5 text-xs text-fg motion-safe:animate-scale-in">
-            <span className="absolute inset-x-0 top-0 h-0.5 bg-acc" />
+          <div className="group relative flex shrink-0 items-center gap-1.5 rounded-md bg-card px-2.5 py-1.5 text-xs text-fg shadow-sm motion-safe:animate-scale-in">
             <Clock className="h-3.5 w-3.5 shrink-0 text-acc-ink" />
             <span>History</span>
             <button
@@ -222,6 +227,22 @@ export function RequestTabs({
           must never end up scrolled out of reach. */}
       <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg">
         <Plus className="h-4 w-4" />
+      </IconButton>
+
+      {/* Reveal the active request in the sidebar tree. The sidebar already
+          auto-scrolls to it the moment a tab *becomes* active — this is for
+          jumping back after scrolling the sidebar away on its own, without
+          switching tabs (which wouldn't re-trigger that on its own, since
+          activeRequestId doesn't actually change). Disabled with nothing
+          open/History showing rather than hidden, so its position in the
+          cluster never shifts. */}
+      <IconButton
+        onClick={onRevealActive}
+        disabled={historyActive || !activeRequestId}
+        title="Reveal in sidebar"
+        className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg"
+      >
+        <Folder className="h-4 w-4" />
       </IconButton>
 
       {/* right cluster: environment · history · layout */}
