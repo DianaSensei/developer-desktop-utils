@@ -1,5 +1,44 @@
 # Experience log
 
+## [2026-09-13] api-client RequestPanel — bảng Query/Headers/Assertions không dùng hết chiều rộng panel khi xếp chồng (stacked)
+- Nguyên nhân: `RequestPanel.tsx` bọc tab Params trong `max-w-5xl` và tab Tests
+  trong `max-w-3xl` — cố ý từ trước để chặn cột VALUE của `KeyValueEditor`
+  (vốn `minmax(0,1fr)`, giãn hết khoảng trống) biến một giá trị ngắn như
+  `profile` thành ô input rộng 600px khi layout xếp chồng (tab Request chiếm
+  trọn chiều rộng cửa sổ). Nhưng cách chặn ở cấp SECTION khiến cả khối (bảng +
+  phần trống bên cạnh) bị giới hạn theo, để lại một khối trống lớn vô nghĩa
+  bên cạnh bảng thay vì bảng được dùng nốt phần rộng đó.
+- Số lần thử: 1/1 — nhưng đã ĐI SAI HƯỚNG một lần trong lúc làm: bước đầu định
+  đổi `minmax(0,1fr)` thành `minmax(0,16rem)`/`minmax(0,40rem)` (bỏ hẳn `1fr`)
+  cho cột Name/Value, rồi dựng Playwright đo pixel thật mới phát hiện: khi
+  KHÔNG còn track nào là `1fr` (track linh hoạt duy nhất hấp thụ khoảng trống
+  thừa), bảng không còn tự giãn ra để dùng hết bề rộng có sẵn nữa — nó chỉ
+  co giãn CÙNG NHAU dựa trên thuật toán "Maximize Tracks" của CSS Grid (chia
+  đều khoảng trống cho tới khi một track chạm mức trần), tức nếu tổng khoảng
+  trống > tổng hai mức trần thì phần dư vẫn bị bỏ hoang — y hệt vấn đề ban
+  đầu chỉ nhỏ hơn. Đo bằng `getBoundingClientRect()` thật qua Playwright
+  (dựng file HTML cô lập rồi cả app thật, cả chế độ side-by-side lẫn xếp
+  chồng) xác nhận: bỏ `max-w-5xl`/`max-w-3xl` ở cấp section VẪN GIỮ
+  `minmax(0,16rem)`/`minmax(0,40rem)` ở cấp cột — tổ hợp này đúng ý muốn, vì
+  thuật toán CSS Grid tự phân bổ khoảng trống thừa cho các track CHƯA chạm
+  trần trước, mỗi cột chỉ dừng lại khi chạm đúng mức trần của NÓ.
+- Kết quả: Đã fix
+- Cách fix: bỏ `max-w-5xl`/`max-w-3xl` ở `RequestPanel.tsx` (để section dùng
+  hết chiều rộng panel); đổi cột Name/Value/Resolved của `KeyValueEditor` và
+  cột Expression/Value của bảng Assertions từ `minmax(0,1fr)` (không giới hạn)
+  sang `minmax(0,16rem)`/`minmax(0,40rem)`/`minmax(0,20rem)`/`minmax(0,28rem)`
+  (giới hạn TỪNG CỘT, sàn vẫn là 0 nên hẹp lại bình thường ở pane hẹp).
+- Bài học chung: khi một bug về CSS Grid "không dùng hết không gian" hay
+  "một ô giãn quá cỡ" có vẻ hiển nhiên trên giấy, đừng suy luận suông về
+  thuật toán "Maximize Tracks"/`fr` vs track cố định — hai cách viết
+  `minmax(0,1fr)` (linh hoạt, hấp thụ khoảng trống thừa) và
+  `minmax(0,<độ dài cố định>)` (chỉ là TRẦN, không tự hấp thụ khoảng trống nếu
+  không còn track `fr` nào khác) trông giống nhau nhưng cho kết quả bố cục
+  hoàn toàn khác khi container rộng hơn tổng các mức trần. Đo bằng
+  `getBoundingClientRect()` qua Playwright (kể cả dựng một trang HTML cô lập
+  tối giản để cô lập biến số) rẻ hơn nhiều so với đoán sai rồi phải sửa lại.
+
+
 ## [2026-09-13] api-client Sidebar — kéo thả request/folder để sắp xếp: không thể thả TRƯỚC/SAU một folder
 - Nguyên nhân: `onDragOver` của mỗi `Row` (`Sidebar.tsx`) ép cứng `where = 'inside'` bất cứ khi
   nào hover lên một row `container` (folder hoặc collection), không có logic chia vùng theo vị

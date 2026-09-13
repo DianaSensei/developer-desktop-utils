@@ -105,17 +105,17 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {/* Headers từng là tab riêng — di chuyển vào đây làm phần thứ ba, cùng
             hình dạng với Query/Path (nhãn nhỏ + bảng), thay vì buộc người dùng
             nhảy tab để thấy trọn bộ những gì gắn liền với request này. */}
-        {/* max-w-3xl on the table panes: in the stacked layout the request
-            pane spans the whole window, and a `1fr 1fr` key/value grid there
-            gave a 7-character value like `profile` a 600px column. The cap
-            binds only above ~800px, so a side-by-side split (pane ~600px) is
-            untouched and only the stacked layout and very wide windows are
-            reined in. It does cost a long header value (a bearer token, say)
-            some visible width, but those cells scroll horizontally and the
-            trade reads better than half a screen of empty table. Matches the
-            Auth and Settings panes, which already cap at max-w-lg/xl. */}
+        {/* No section-level max-w here (there used to be one, `max-w-5xl`):
+            in the stacked layout the request pane spans the whole window, and
+            capping the whole section left a dead block of empty space beside
+            a table that could otherwise have used that width — worse than the
+            problem it was solving. The actual fix is on the table's own
+            columns (see KeyValueEditor's `gridCols`, capped at the Name/Value
+            level), so the table still fills whatever width the pane has, it
+            just doesn't hand a 7-character value like `profile` a 600px-wide
+            input. */}
         {tab === 'params' && (
-          <div className="min-h-0 max-w-5xl flex-1 space-y-4 overflow-y-auto p-3">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
               <SectionLabel>Query</SectionLabel>
               {/* Editing params rewrites the URL's query string (kept in sync). */}
@@ -137,7 +137,7 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
         {tab === 'script' && <ScriptEditor request={request} onChange={onChange} />}
         {tab === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto p-3"><SettingsEditor request={request} onChange={onChange} /></div>}
         {tab === 'tests' && (
-          <div className="flex min-h-0 max-w-3xl flex-1 flex-col gap-3 overflow-y-auto p-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
             <div className="shrink-0 space-y-1.5">
               <Label className="text-xs">Assertions</Label>
               <AssertEditor request={request} onChange={onChange} />
@@ -273,18 +273,21 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
   const removeRow = (id: string) => onChange({ assertions: realRows.filter((a) => a.id !== id) });
 
   return (
-    // The Operator column is a fixed 12rem Select, so in a narrow request pane
-    // the two `1fr` text columns are what give way — at a ~300px pane they
-    // collapse to ~30px, too small to read an expression in. Below the min
-    // width the table scrolls sideways instead (the pattern docs/ai/CLAUDE.md
-    // prescribes for horizontal data tables) so every cell stays usable.
+    // The Operator column is a fixed 12rem Select; Expression/Value are each
+    // capped at 28rem (not a bare `1fr`) so a wide/stacked request pane can't
+    // stretch a short expression like `res.status` into a 600px-wide input —
+    // they still shrink together in a narrow pane (floor of 0), collapsing to
+    // ~30px at a ~300px pane, too small to read an expression in. Below the
+    // min width the table scrolls sideways instead (the pattern
+    // docs/ai/CLAUDE.md prescribes for horizontal data tables) so every cell
+    // stays usable.
     <div className="overflow-x-auto overflow-y-hidden rounded-md border text-xs">
       <div className="min-w-[24rem]">
       {/* header */}
       {/* Same header treatment as KeyValueEditor's tables, so the three
           tables a request shows (Query, Headers, Assertions) read as one
           family instead of two styles. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
+      <div className="grid grid-cols-[minmax(0,28rem)_9.5rem_minmax(0,28rem)_2rem] border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
         <div className="border-r px-3 py-1.5">Expression</div>
         <div className="border-r px-3 py-1.5">Operator</div>
         <div className="border-r px-3 py-1.5">Value</div>
@@ -295,7 +298,7 @@ function AssertEditor({ request, onChange }: { request: ApiRequest; onChange: (p
         const isGhost = a.id === ghost.id;
         const unary = UNARY_ASSERT_OPERATORS.includes(a.operator);
         return (
-          <div key={a.id} className="group grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors">
+          <div key={a.id} className="group grid grid-cols-[minmax(0,28rem)_9.5rem_minmax(0,28rem)_2rem] border-b last:border-b-0 hover:bg-bg-2/20 focus-within:bg-bg-2/20 focus-within:ring-[3px] focus-within:ring-inset focus-within:ring-focus transition-colors">
             {/* expr cell with enable checkbox */}
             <div className="flex min-w-0 items-center gap-1.5 border-r px-2">
               <button

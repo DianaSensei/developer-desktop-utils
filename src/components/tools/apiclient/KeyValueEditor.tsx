@@ -251,22 +251,32 @@ export function KeyValueEditor({
     );
   }
 
-  // `minmax(0,1fr)`, never a bare `1fr`. Every row here is its OWN grid
-  // container, so track sizes are computed per row — and `1fr` is shorthand for
-  // `minmax(auto, 1fr)`, whose `auto` floor is the cell's min-content width. One
-  // row holding something that can't shrink (a JWT in the CodeMirror value cell)
-  // therefore resized that row alone: its Name column collapsed to 21px while
-  // Value ballooned to 1149px in a 438px table, so the columns stopped lining up
-  // with every other row. Pinning the floor to 0 makes all rows agree whatever
-  // they contain.
+  // Never a bare `1fr` — every row here is its OWN grid container, so track
+  // sizes are computed per row, and `1fr` is shorthand for `minmax(auto, 1fr)`,
+  // whose `auto` floor is the cell's min-content width. A row holding
+  // something that can't shrink (a JWT in the CodeMirror value cell) would
+  // otherwise resize that row alone: its Name column collapsed to 21px while
+  // Value ballooned to 1149px in a 438px table, so the columns stopped lining
+  // up with every other row. Pinning the floor to 0 on every column below
+  // makes all rows agree whatever they contain.
+  //
+  // The max side is bounded too (16rem for Name, 40rem for Value/Resolved),
+  // not left as `1fr`: this table is used inside panes that can span the
+  // whole window width (the stacked/no-split layout has no per-section
+  // max-width any more — see RequestPanel.tsx), and an unbounded `1fr` there
+  // used to hand a 7-character value like `profile` a 600px-wide input. The
+  // floor of 0 means both columns still shrink together at a narrow pane
+  // exactly as before; only a genuinely wide pane sees the caps kick in,
+  // leaving a small unused strip beside the table instead of one covering
+  // the whole thing.
   // The leading column is 2rem, not 1rem: the whole cell is the enable/disable
   // target (see the row below), so this width is the target's width. The dot
   // inside stays 8px — the affordance grew, the visual didn't.
   const gridCols = [
-    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem]',
-    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]',
-    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem]',
-    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]',
+    'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_2rem]',
+    'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_2rem_2rem]',
+    'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_minmax(0,20rem)_2rem]',
+    'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_minmax(0,20rem)_2rem_2rem]',
   ][(secretToggle ? 1 : 0) + (showResolved ? 2 : 0)];
 
   return (
