@@ -3,6 +3,7 @@ import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
 import { createPluginService, type PluginService } from './service';
 import { hostAllowed } from './manifest';
+import type { Channel } from '@tauri-apps/api/core';
 import { isTauri } from '@/lib/platform';
 import * as audit from './audit';
 import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
@@ -86,7 +87,21 @@ export interface PluginSdk {
   };
   /** `fetch` tương thích chuẩn, đi qua tauri-plugin-http khi chạy trong app. */
   http: { fetch(input: string, init?: RequestInit): Promise<Response> };
-  native: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> };
+  native: {
+    invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
+    /**
+     * Kênh streaming của Tauri, để truyền vào một lệnh nhận `Channel` (log
+     * container, consumer Kafka/RabbitMQ, pub/sub Redis).
+     *
+     * SDK cần hàm này vì nếu không, mọi tool có luồng dữ liệu buộc phải import
+     * thẳng `@tauri-apps/api/core` và nằm ngoài điểm thắt — tức bốn tool nặng
+     * nhất của app vĩnh viễn không đi qua được lớp quyền/audit.
+     *
+     * `label` chỉ dùng cho nhật ký: một kênh không mang tên lệnh nào, nên nó là
+     * cách duy nhất để đọc log biết luồng này của thứ gì.
+     */
+    channel<T>(onMessage: (message: T) => void, label?: string): Promise<Channel<T>>;
+  };
   /** Tier B: gọi sidecar của plugin. Xem `service.ts`. */
   service: PluginService;
   log(message: string, detail?: string): void;
@@ -219,6 +234,17 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
         if (!allowed) throw new PluginCommandError(id, command);
         const { invoke } = await import('@tauri-apps/api/core');
         return invoke<T>(command, args);
+      },
+
+      async channel<T>(onMessage: (message: T) => void, label?: string): Promise<Channel<T>> {
+        // Không có tên lệnh để đối chiếu allowlist ở đây — allowlist bám vào
+        // lời gọi `invoke` sẽ dùng kênh này. Nên chỗ này chỉ kiểm quyền, và ghi
+        // lại việc mở luồng để nhật ký không bỏ sót một kênh dữ liệu dài hạn.
+        ensure(manifest, 'native', 'native', `channel:${label ?? 'unnamed'}`);
+        const { Channel: TauriChannel } = await import('@tauri-apps/api/core');
+        const channel = new TauriChannel<T>();
+        channel.onmessage = onMessage;
+        return channel;
       },
     },
 

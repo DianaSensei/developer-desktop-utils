@@ -156,6 +156,20 @@ describe('native.invoke', () => {
     expect(entry.allowed).toBe(true);
   });
 
+  it('channel cũng cần quyền "native", và mở luồng được ghi lại kèm nhãn', async () => {
+    await expect(createPluginSdk(plugin([])).native.channel(() => {})).rejects.toThrow(
+      PluginPermissionError,
+    );
+
+    const sdk = createPluginSdk(plugin(['native'], ['redis_']));
+    // jsdom không có `__TAURI_INTERNALS__` nên dựng Channel sẽ hỏng; điều cần
+    // khẳng định là nó KHÔNG hỏng ở tầng quyền.
+    await sdk.native.channel(() => {}, 'redis-pubsub').catch(() => {});
+
+    const entry = audit.recent().find((e) => e.action === 'channel:redis-pubsub')!;
+    expect(entry.allowed).toBe(true);
+  });
+
   it('mỗi lời gọi chỉ sinh đúng một dòng audit', async () => {
     const sdk = createPluginSdk(plugin(['native'], ['redis_']));
     await expect(sdk.native.invoke('container_remove')).rejects.toThrow();

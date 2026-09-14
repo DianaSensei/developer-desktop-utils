@@ -270,6 +270,25 @@ lực thật chứ không phải khai cho đẹp. Mô tả của `http:default` 
 `appPermissions.ts` cũng được sửa lại cho đúng sự thật: nó nói rõ danh sách có
 wildcard nên đây là quyền cấp-app, còn giới hạn theo tool ở chỗ khác.
 
+### Trả nợ ratchet — làm theo tool, không làm một lượt
+
+Hai chỉ số nợ trong `src/platform/baseline.json` (12 chỗ gọi thẳng
+`@tauri-apps`, 47 chỗ dùng thẳng store chung) nằm gọn trong bốn tool có luồng dữ
+liệu: Redis, Kafka, RabbitMQ, Containers. Cả bốn đều gói lệnh Tauri vào một
+object kiểu `redisApi` ở `types.ts`, và object đó được import trực tiếp ở **57
+file**.
+
+Chuyển chúng sang SDK vì vậy không phải sửa 12 dòng import mà là đổi cách 57
+file lấy API — một refactor cơ học lớn, trong bốn tool nặng nhất của app. Quyết
+định: **làm theo từng tool, khi có lý do khác để động vào tool đó**, chứ không
+làm một lượt. Ratchet tồn tại đúng cho nhịp đó: nó chặn chỗ mới, không ép dọn
+hết ngay.
+
+Thứ đã làm trước để đường đó thông: `sdk.native.channel()`. Thiếu nó thì mọi
+tool có luồng dữ liệu **buộc** phải import thẳng `@tauri-apps/api/core` dù có
+muốn chuyển hay không — tức bốn tool nặng nhất vĩnh viễn nằm ngoài lớp
+quyền/audit, và ratchet không bao giờ về 0 được dù có cố.
+
 ## Không làm (và vì sao)
 
 - **Nạp plugin lúc chạy từ repo khác.** Cần thêm: định dạng gói đã ký (tái dụng
