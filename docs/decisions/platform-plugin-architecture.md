@@ -138,11 +138,37 @@ Ba quyết định đi kèm:
 - **Audit của kênh này chỉ ghi TÊN khoá, không bao giờ ghi giá trị.** Một nhật
   ký làm rò seed TOTP thì tệ hơn hẳn việc không có nhật ký. Có test khoá lại.
 
-**Chưa mã hoá khi nằm trên đĩa.** Khoá mã hoá phải sống ở đâu đó, và chỗ duy nhất
-đáng tin là keychain của OS — cần một module Rust riêng (`keyring` + `aes-gcm`),
-kèm chính sách dự phòng cho Linux không có Secret Service. Đó là lát cắt riêng,
-có quyết định phụ thuộc riêng; việc tách mặt phẳng khoá ở đây độc lập với nó và
-phải đi trước.
+### Mã hoá khi nằm trên đĩa
+
+`src-tauri/src/secrets_vault.rs`: nội dung nằm trong `<app_data>/secrets.enc`,
+AES-256-GCM, khoá 32 byte **không nằm cạnh dữ liệu** mà ở keychain của OS
+(Keychain / Credential Manager / Secret Service). Mã hoá mà cất khoá ngay cạnh
+file là nghi thức, không phải bảo vệ — nên đây mới là phần cốt lõi.
+
+Ba bất biến được khoá bằng test Rust: bản mã không chứa **cả giá trị lẫn tên
+khoá** (tên khoá tiết lộ người dùng có bí mật của plugin nào); **mỗi lần ghi một
+nonce mới** (dùng lại nonce với cùng khoá trong GCM là hỏng hoàn toàn về mật mã,
+không chỉ yếu đi); và sửa một byte bản mã thì lần giải mã bị từ chối chứ không
+trả ra bản rõ méo mó.
+
+**Đường dự phòng fail-open, và nói thẳng vì sao.** Không phải máy Linux nào cũng
+có Secret Service (máy không màn hình, phiên không gnome-keyring). Khi đó khoá
+rơi về `<app_data>/secrets.key` quyền 0600. Ở chế độ này ai đọc được thư mục app
+data thì đọc được cả khoá lẫn dữ liệu — nó chỉ chặn việc chép `secrets.enc` đi
+nơi khác. Lựa chọn còn lại là fail-closed, tức 2FA và JWT ngừng chạy hẳn trên
+những máy đó; với một công cụ dev chạy cục bộ, im lặng làm hỏng tính năng là cái
+giá cao hơn. Đổi lại chế độ đang dùng **không được giấu**: `secret_vault_status`
+trả ra và Settings → Plugin hiện đúng một dòng nói máy này đang ở chế độ nào.
+
+**Không tự xoá khi không giải mã được.** Mất mục keychain thì blob thành không
+đọc được; các lệnh báo lỗi rõ ràng chứ tuyệt đối không tự khởi tạo lại kho — âm
+thầm vứt dữ liệu người dùng để "trở lại hoạt động" hỏng tệ hơn nhiều so với một
+thông báo lỗi. `secret_vault_reset` tồn tại cho trường hợp người dùng chủ động
+chọn bỏ.
+
+Bản trung gian (tách mặt phẳng khoá, chưa mã hoá) để lại `secrets.json` trần;
+`migrateSecretsFromPlainStore()` chuyển nó sang kho mã hoá rồi **dọn sạch** store
+cũ — để lại bản trần cạnh bản mã hoá thì việc mã hoá chẳng còn ý nghĩa.
 
 Đã chuyển sang kho: `devtool:2fa:accounts` (seed TOTP/HOTP) và `devtool:jwt:token`
 (một JWT dán vào debugger thường là bearer token thật, không phải chuỗi ví dụ).
@@ -205,9 +231,9 @@ thật, đóng gói thật, chỉ xuất hiện cùng plugin dịch vụ đầu 
 
 ## Việc còn lại
 
-1. ~~Tách credential ra khỏi store dùng chung.~~ **Đã làm** — xem "Kho bí mật"
-   bên dưới. Còn hai lát cắt: mã hoá khi nằm trên đĩa (cần keychain OS → module
-   Rust), và chuyển `devtool:apiclient:environments` sang kho.
+1. ~~Tách credential ra khỏi store dùng chung.~~ ~~Mã hoá khi nằm trên đĩa.~~
+   **Đã làm cả hai** — xem "Kho bí mật" bên dưới. Còn lại: chuyển
+   `devtool:apiclient:environments` sang kho.
 2. Thu hẹp `http://**` + `https://**` trong `capabilities/default.json` theo
    allowlist gắn với quyền `http` của từng plugin.
 3. ~~Guard test ranh giới Platform.~~ **Đã làm** — `src/platform/guard.test.ts`

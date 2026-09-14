@@ -14,41 +14,36 @@ import { storageGet, storageRemove } from '@/lib/persistentStore';
  *
  * Hai đường lưu, cố ý khác nhau:
  *
- * - **Trong Tauri**: một file store RIÊNG (`secrets.json`), không bao giờ được
- *   đọc vào cache chung, chỉ truy cập qua các hàm bất đồng bộ ở đây.
+ * - **Trong Tauri**: kho MÃ HOÁ phía Rust (`src-tauri/src/secrets_vault.rs`) —
+ *   AES-256-GCM, khoá nằm trong keychain của OS chứ không cạnh dữ liệu. Webview
+ *   không bao giờ chạm tới khoá.
  * - **Trên web (`npm run dev`)**: `sessionStorage`, KHÔNG phải `localStorage` —
  *   vì `initPersistentStore()` ở bản web hút nguyên `localStorage` vào cache
  *   chung, nên lưu bí mật ở đó sẽ đưa chúng trở lại đúng mặt phẳng khoá ta vừa
  *   dọn. Đổi lại, bản web chỉ giữ bí mật trong một phiên; đó là bản dành cho
  *   dev, sản phẩm thật luôn là Tauri.
  *
- * Chưa mã hoá khi nằm trên đĩa: khoá mã hoá phải sống ở đâu đó, và chỗ duy nhất
- * đáng tin là keychain của OS — cần một module Rust riêng. Đó là lát cắt kế
- * tiếp; việc tách mặt phẳng khoá ở đây độc lập với nó và phải đi trước.
+ * Trên máy Linux không có Secret Service, khoá rơi về file 0600 cạnh dữ liệu —
+ * yếu hơn hẳn, nên chế độ đang dùng được trả ra qua `vaultStatus()` để Settings
+ * hiển thị thay vì giấu đi. Xem phần đầu `secrets_vault.rs` cho đánh đổi đầy đủ.
  */
 
-const SECRET_STORE_FILE = 'secrets.json';
+const LEGACY_STORE_FILE = 'secrets.json';
 const WEB_PREFIX = 'devtool-secret:';
 
-type StoreLike = {
-  get(key: string): Promise<string | null | undefined>;
-  set(key: string, value: string): Promise<void>;
-  delete(key: string): Promise<boolean>;
-  keys(): Promise<string[]>;
-  clear(): Promise<void>;
-  save(): Promise<void>;
-};
+/** Khoá đến từ đâu — xem `KeyMode` ở secrets_vault.rs. */
+export type VaultKeyMode = 'keychain' | 'file';
 
-let storePromise: Promise<StoreLike> | null = null;
+export interface VaultStatus {
+  encrypted: boolean;
+  keyMode: VaultKeyMode;
+  /** `false` khi có dữ liệu trên đĩa nhưng khoá hiện tại không mở được nó. */
+  readable: boolean;
+}
 
-async function vault(): Promise<StoreLike | null> {
-  if (!isTauri) return null;
-  if (!storePromise) {
-    storePromise = import('@tauri-apps/plugin-store').then(
-      ({ load }) => load(SECRET_STORE_FILE, { defaults: {}, autoSave: 100 }) as unknown as Promise<StoreLike>,
-    );
-  }
-  return storePromise;
+async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(command, args);
 }
 
 /** Khoá trong kho: `<pluginId>/<key>`. Không dùng chung tiền tố `devtool:` của
@@ -59,66 +54,67 @@ export function vaultKey(pluginId: string, key: string): string {
 
 export async function secretGet(pluginId: string, key: string): Promise<string | null> {
   const k = vaultKey(pluginId, key);
-  const store = await vault();
-  if (!store) return sessionStorage.getItem(WEB_PREFIX + k);
-  return (await store.get(k)) ?? null;
+  if (!isTauri) return sessionStorage.getItem(WEB_PREFIX + k);
+  return (await call<string | null>('secret_vault_get', { key: k })) ?? null;
 }
 
 export async function secretSet(pluginId: string, key: string, value: string): Promise<void> {
   const k = vaultKey(pluginId, key);
-  const store = await vault();
-  if (!store) {
+  if (!isTauri) {
     sessionStorage.setItem(WEB_PREFIX + k, value);
     return;
   }
-  await store.set(k, value);
+  await call<void>('secret_vault_set', { key: k, value });
 }
 
 export async function secretDelete(pluginId: string, key: string): Promise<void> {
   const k = vaultKey(pluginId, key);
-  const store = await vault();
-  if (!store) {
+  if (!isTauri) {
     sessionStorage.removeItem(WEB_PREFIX + k);
     return;
   }
-  await store.delete(k);
+  await call<void>('secret_vault_delete', { key: k });
 }
 
 /** Tên khoá (đã bỏ tiền tố plugin) mà plugin này đang giữ trong kho. */
 export async function secretKeys(pluginId: string): Promise<string[]> {
   const prefix = `${pluginId}/`;
-  const store = await vault();
-  if (!store) {
-    const out: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const k = sessionStorage.key(i);
-      if (k?.startsWith(WEB_PREFIX + prefix)) out.push(k.slice((WEB_PREFIX + prefix).length));
-    }
-    return out.sort();
-  }
-  return (await store.keys())
+  const all = isTauri
+    ? await call<string[]>('secret_vault_keys')
+    : Object.keys(sessionStorage)
+        .filter((k) => k.startsWith(WEB_PREFIX))
+        .map((k) => k.slice(WEB_PREFIX.length));
+  return all
     .filter((k) => k.startsWith(prefix))
     .map((k) => k.slice(prefix.length))
     .sort();
 }
 
-export async function flushSecrets(): Promise<void> {
-  await (await vault())?.save();
+/** Chế độ khoá hiện tại, để Settings nói đúng mức bảo vệ đang áp dụng. */
+export async function vaultStatus(): Promise<VaultStatus | null> {
+  if (!isTauri) return null;
+  const raw = await call<{ encrypted: boolean; key_mode: VaultKeyMode; readable: boolean }>(
+    'secret_vault_status',
+  );
+  return { encrypted: raw.encrypted, keyMode: raw.key_mode, readable: raw.readable };
 }
+
+/** Kho phía Rust ghi thẳng xuống đĩa trong từng lệnh, không có gì để flush.
+ *  Giữ hàm này vì nó là điểm gọi đã có ở luồng di trú — và để nếu sau này kho
+ *  chuyển sang ghi trễ thì chỗ cần sửa đã nằm sẵn đúng một nơi. */
+export async function flushSecrets(): Promise<void> {}
 
 /** Xoá sạch kho. Dùng bởi nhánh DEV của main.tsx, song song với
  *  `clearPersistentStore()` — nếu không, `tauri:dev` sẽ dọn store chung nhưng
  *  để lại bí mật cũ, và "chạy từ trạng thái sạch" hoá ra không sạch. */
 export async function clearSecrets(): Promise<void> {
-  const store = await vault();
-  if (!store) {
+  if (!isTauri) {
     for (const k of Object.keys(sessionStorage)) {
       if (k.startsWith(WEB_PREFIX)) sessionStorage.removeItem(k);
     }
     return;
   }
-  await store.clear();
-  await store.save();
+  await call<void>('secret_vault_clear');
 }
 
 /**
@@ -159,7 +155,37 @@ export async function migrateSecretsFromSharedStore(): Promise<string[]> {
   return moved;
 }
 
-/** Chỉ dùng trong test — quên store đã mở để ca sau bắt đầu từ đầu. */
-export function __resetSecretsForTest(): void {
-  storePromise = null;
+/**
+ * Chuyển kho TRẦN của bản trước (`secrets.json`, do tauri-plugin-store ghi) sang
+ * kho mã hoá.
+ *
+ * Chỉ tồn tại vì đã có một bản trung gian tách mặt phẳng khoá nhưng chưa mã hoá.
+ * Người cài mới không có file này và hàm là no-op. Sau khi chép xong, store cũ
+ * được DỌN SẠCH — để lại bản trần bên cạnh bản mã hoá thì việc mã hoá chẳng còn
+ * ý nghĩa gì.
+ */
+export async function migrateSecretsFromPlainStore(): Promise<number> {
+  if (!isTauri) return 0;
+  let moved = 0;
+  try {
+    const { load } = await import('@tauri-apps/plugin-store');
+    const legacy = await load(LEGACY_STORE_FILE, { defaults: {}, autoSave: false });
+    const entries = await legacy.entries<string>();
+    for (const [key, value] of entries) {
+      if (typeof value !== 'string') continue;
+      await call<void>('secret_vault_set', { key, value });
+      moved += 1;
+    }
+    if (moved > 0) {
+      await legacy.clear();
+      await legacy.save();
+    }
+  } catch {
+    // Không có file cũ, hoặc plugin store không mở được: không có gì để chuyển.
+  }
+  return moved;
 }
+
+/** Chỉ dùng trong test — không còn state cục bộ nào để dọn, nhưng giữ điểm gọi
+ *  để test không phải biết chi tiết hiện thực. */
+export function __resetSecretsForTest(): void {}

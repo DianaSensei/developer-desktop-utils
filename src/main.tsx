@@ -48,7 +48,11 @@ import { clearPersistentStore, initPersistentStore } from './lib/persistentStore
 // Nhập thẳng từ module kho, KHÔNG qua barrel '@/platform': barrel kéo theo
 // registry và toàn bộ manifest plugin vào đồ thị module chạy trước bootstrap,
 // đúng thứ ghi chú ở trên đang cố tránh.
-import { clearSecrets, migrateSecretsFromSharedStore } from './platform/secrets';
+import {
+  clearSecrets,
+  migrateSecretsFromPlainStore,
+  migrateSecretsFromSharedStore,
+} from './platform/secrets';
 import { applyAccentToDocument, getAccentPreference } from './lib/accentPreference';
 import { applyCornerToDocument, getCornerPreference } from './lib/cornerPreference';
 import { applyFontToDocument, getFontPreference } from './lib/fontPreference';
@@ -79,6 +83,10 @@ async function bootstrap() {
   // `initPersistentStore()` (nguồn đọc từ cache của nó) và TRƯỚC khi nạp App —
   // nếu không, tool đọc bí mật có thể mount trước lúc dữ liệu kịp sang kho và
   // hiển thị trạng thái rỗng cho tới lần mở app sau.
+  // Hai bước, đúng thứ tự này: bản trung gian đã tách mặt phẳng khoá nhưng để
+  // kho ở dạng trần, nên dọn nó trước; rồi mới kéo phần còn sót trong store
+  // dùng chung của những máy nhảy thẳng từ bản cũ hơn.
+  await migrateSecretsFromPlainStore();
   await migrateSecretsFromSharedStore();
 
   // Áp dụng tone chủ đạo TRƯỚC lần vẽ đầu tiên — nếu không, người dùng đã chọn

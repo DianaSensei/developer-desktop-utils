@@ -21,13 +21,16 @@ export type { PluginSdk, PluginStorage, PluginSecrets } from './sdk';
 export {
   clearSecrets,
   flushSecrets,
+  migrateSecretsFromPlainStore,
   migrateSecretsFromSharedStore,
   secretDelete,
   secretGet,
   secretKeys,
   secretSet,
   vaultKey,
+  vaultStatus,
 } from './secrets';
+export type { VaultStatus, VaultKeyMode } from './secrets';
 export { useSecretState } from './useSecretState';
 export { SERVICE_PROTOCOL, createPluginService, PluginServiceError } from './service';
 export type {

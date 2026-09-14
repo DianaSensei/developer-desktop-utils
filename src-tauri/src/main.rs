@@ -12,6 +12,7 @@ mod ports;
 mod rabbit;
 mod redis_tool;
 mod container_tool;
+mod secrets_vault;
 mod service_host;
 
 use tauri::Manager;
@@ -85,6 +86,7 @@ fn main() {
         // Host cho plugin dịch vụ (tier B). Allowlist rỗng cho tới khi có
         // plugin đầu tiên dùng — xem service_host.rs.
         .manage(service_host::ServiceRegistry::default())
+        .manage(secrets_vault::VaultState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -119,6 +121,13 @@ fn main() {
             mcp_bridge::mcp_sidecar_path,
             service_host::service_call,
             service_host::service_stop,
+            secrets_vault::secret_vault_get,
+            secrets_vault::secret_vault_set,
+            secrets_vault::secret_vault_delete,
+            secrets_vault::secret_vault_keys,
+            secrets_vault::secret_vault_clear,
+            secrets_vault::secret_vault_reset,
+            secrets_vault::secret_vault_status,
             kafka::kafka_list_configs,
             kafka::kafka_save_config,
             kafka::kafka_delete_config,

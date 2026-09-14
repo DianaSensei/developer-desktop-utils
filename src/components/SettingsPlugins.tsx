@@ -3,7 +3,7 @@ import { ShieldCheck, Terminal } from 'lucide-react';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
-import { PLUGINS, SDK_VERSION, pluginAudit, type AuditEntry } from '@/platform';
+import { PLUGINS, SDK_VERSION, pluginAudit, vaultStatus, type AuditEntry, type VaultStatus } from '@/platform';
 
 /**
  * Settings → Plugin: cái nhìn duy nhất cho người dùng vào Platform.
@@ -26,12 +26,26 @@ export function SettingsPlugins() {
   const { t } = useLocale();
   const { isFeatureEnabled } = useFeatures();
   const [entries, setEntries] = useState<AuditEntry[]>(() => pluginAudit.recent(MAX_ROWS));
+  const [vault, setVault] = useState<VaultStatus | null>(null);
 
   useEffect(() => {
     // Nhật ký được ghi cả khi Settings đang đóng, nên đọc lại một lần lúc mount
     // rồi mới nghe tiếp — nếu chỉ nghe, panel sẽ mở ra trống trơn dù đã có lịch sử.
     setEntries(pluginAudit.recent(MAX_ROWS));
     return pluginAudit.subscribe(() => setEntries(pluginAudit.recent(MAX_ROWS)));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Mức bảo vệ của kho bí mật khác nhau giữa các máy (keychain hay file dự
+    // phòng). Người dùng có quyền biết máy mình đang ở chế độ nào thay vì phải
+    // suy đoán, nên nó hiện ngay ở đây chứ không nằm trong log.
+    void vaultStatus()
+      .then((s) => !cancelled && setVault(s))
+      .catch(() => !cancelled && setVault(null));
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const enabledCount = PLUGINS.filter((p) => isFeatureEnabled(p.id)).length;
@@ -46,6 +60,16 @@ export function SettingsPlugins() {
           sdk: SDK_VERSION,
         })}
       </p>
+
+      {vault && (
+        <p className={cn('text-[11px]', vault.readable ? 'text-fg-mute' : 'text-warn')}>
+          {!vault.readable
+            ? t('settings.plugins.vaultUnreadable')
+            : vault.keyMode === 'keychain'
+              ? t('settings.plugins.vaultKeychain')
+              : t('settings.plugins.vaultFile')}
+        </p>
+      )}
 
       <div className="rounded-lg border divide-y">
         {PLUGINS.map((p) => {

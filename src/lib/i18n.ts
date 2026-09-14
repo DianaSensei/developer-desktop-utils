@@ -210,6 +210,18 @@ export const DICTIONARY = {
   'settings.plugins.off': { vi: 'đã tắt', en: 'off' },
   'settings.plugins.noPermissions': { vi: 'Không dùng kênh nào của Platform', en: 'Uses no Platform channel' },
   'settings.plugins.commands': { vi: 'Lệnh native', en: 'Native commands' },
+  'settings.plugins.vaultKeychain': {
+    vi: 'Bí mật được mã hoá AES-256-GCM, khoá nằm trong keychain của hệ điều hành.',
+    en: 'Secrets are encrypted with AES-256-GCM; the key lives in the OS keychain.',
+  },
+  'settings.plugins.vaultFile': {
+    vi: 'Bí mật được mã hoá, nhưng máy này không có keychain khả dụng nên khoá nằm trong file chỉ chủ sở hữu đọc được, cạnh dữ liệu — yếu hơn: ai đọc được thư mục dữ liệu app thì đọc được cả hai.',
+    en: 'Secrets are encrypted, but no keychain is available on this machine, so the key sits in an owner-only file next to the data — weaker: anyone who can read the app data folder can read both.',
+  },
+  'settings.plugins.vaultUnreadable': {
+    vi: 'Không giải mã được kho bí mật bằng khoá hiện tại — nhiều khả năng mục trong keychain đã bị xoá hoặc thay.',
+    en: 'The secret store cannot be decrypted with the current key — the keychain entry was most likely removed or replaced.',
+  },
   'settings.plugins.audit': { vi: 'Nhật ký hoạt động', en: 'Activity log' },
   'settings.plugins.auditDescription': {
     vi: 'Mọi lời gọi plugin → Platform trong phiên này, kể cả lời gọi bị từ chối vì thiếu quyền. Chỉ lưu trong bộ nhớ, xoá khi đóng app.',
