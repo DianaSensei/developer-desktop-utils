@@ -5,12 +5,16 @@ import { CodeViewer } from '@/design-system';
 import { Callout } from '@/components/ui/callout';
 import { Shield } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdk, useSecretState } from '@/platform';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function JwtDebugger() {
-  const [token, setToken] = usePersistentState('devtool:jwt:token', '');
+  // Một JWT dán vào debugger thường là bearer token THẬT của người dùng, nên
+  // nó thuộc kho bí mật chứ không phải mặt phẳng khoá dùng chung mà mọi module
+  // trong webview đọc được.
+  const sdk = usePluginSdk();
+  const [token, setToken, tokenReady] = useSecretState(sdk, 'token', '');
 
   useQuickPaste(setToken);
   useInputHistory(token, setToken);
@@ -77,7 +81,9 @@ export function JwtDebugger() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center text-fg-mute gap-3 pt-12">
             <Shield className="h-12 w-12 text-fg-mute/25" />
-            <p className="text-sm font-medium">Paste a JWT token to decode it</p>
+            <p className="text-sm font-medium">
+              {tokenReady ? 'Paste a JWT token to decode it' : 'Loading…'}
+            </p>
             <p className="text-xs text-fg-mute/70">Supports HS256, RS256, ES256 and more</p>
           </div>
         )}

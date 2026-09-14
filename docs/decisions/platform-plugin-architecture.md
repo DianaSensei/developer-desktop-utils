@@ -144,6 +144,16 @@ kèm chính sách dự phòng cho Linux không có Secret Service. Đó là lát
 có quyết định phụ thuộc riêng; việc tách mặt phẳng khoá ở đây độc lập với nó và
 phải đi trước.
 
+Đã chuyển sang kho: `devtool:2fa:accounts` (seed TOTP/HOTP) và `devtool:jwt:token`
+(một JWT dán vào debugger thường là bearer token thật, không phải chuỗi ví dụ).
+Hai tool này cũng là hai plugin đầu tiên chạy trên SDK thật.
+
+Còn lại: `devtool:apiclient:environments` — token nằm lẫn với biến thường trong
+cùng một tài liệu, và `store.ts` của API Client đọc đồng bộ ở nhiều chỗ, nên
+chuyển nó là một lát cắt riêng chứ không phải đổi một dòng. Lưu ý tripwire
+`secretishKeyInSharedStore` **không** bắt được khoá này (tên khoá không lộ ra là
+credential) — nó bắt trường hợp hiển nhiên, không phải bằng chứng đã sạch.
+
 Mật khẩu broker (`kafka-brokers.json`, config Redis/RabbitMQ) đã nằm ở file
 riêng phía Rust từ trước, không đi qua store chung — nên không thuộc đợt này.
 
@@ -168,7 +178,8 @@ riêng phía Rust từ trước, không đi qua store chung — nên không thu�
    Rust), và chuyển `devtool:apiclient:environments` sang kho.
 2. Thu hẹp `http://**` + `https://**` trong `capabilities/default.json` theo
    allowlist gắn với quyền `http` của từng plugin.
-3. Guard test cấm `src/plugins/**` import trực tiếp `@tauri-apps/*` (theo mẫu
-   `design-system/guard.test.ts`), để `permissions` chuyển dần từ mô tả sang
-   thực thi.
+3. ~~Guard test ranh giới Platform.~~ **Đã làm** — `src/platform/guard.test.ts`
+   + `baseline.json`, cùng cơ chế ngưỡng lùi dần như `design-system/guard.test.ts`.
+   Mốc hiện tại: 12 chỗ gọi thẳng `@tauri-apps`, 47 chỗ dùng thẳng store chung.
+   Mỗi tool chuyển sang SDK thì hạ ngưỡng; về 0 là quyền tương ứng thành thực thi.
 4. Tier B: sidecar plugin host.

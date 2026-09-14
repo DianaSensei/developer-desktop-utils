@@ -133,6 +133,10 @@ const MIGRATIONS: ReadonlyArray<{ from: string; pluginId: string; key: string }>
   // Seed TOTP/HOTP — bí mật rõ ràng nhất trong app: đủ để sinh mã đăng nhập
   // của người dùng ở mọi dịch vụ họ đã thêm.
   { from: 'devtool:2fa:accounts', pluginId: '2fa', key: 'accounts' },
+  // JWT dán vào debugger: thường là bearer token thật của người dùng, không
+  // phải chuỗi ví dụ. Giữ nó ở store chung nghĩa là mọi module trong webview
+  // đọc được token phiên làm việc của họ.
+  { from: 'devtool:jwt:token', pluginId: 'jwt', key: 'token' },
 ];
 
 /**

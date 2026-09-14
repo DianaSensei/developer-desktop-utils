@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/jwt',
   order: 220,
   defaultEnabled: false,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write'],
+  permissions: ['secrets', 'clipboard:read', 'clipboard:write'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/JwtDebugger').then((m) => m.JwtDebugger),
 });
