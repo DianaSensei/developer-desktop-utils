@@ -363,6 +363,7 @@ same door, because a hook cannot be a property of a plain object:
 
 | Hook | What it gives you |
 |---|---|
+| `usePluginState(sdk, key, initial, opts?)` | the Platform's `usePersistentState`: same behaviour, namespaced key, `storage` permission checked. **Pass `opts.legacyKey`** when converting an existing tool — historical prefixes rarely match the plugin id (`devtool:redis:*` vs id `redis-client`), and skipping it silently throws away the user's saved state |
 | `usePluginConfig()` | the app's tunables (read-only — users own them, plugins don't) |
 | `useLiveConnection(sdk, connected)` | the sidebar's live dot. Id comes from the SDK, not a hand-typed string. Deliberately does **not** clear on unmount: the connection lives in Rust, so the dot must survive navigating away |
 | `usePluginMcpBridgeActive(sdk)` | whether this component should mount its own MCP bridge — folds in "is an MCP tool", "tool switch on", and "background bridge off" (mounting both double-registers) |

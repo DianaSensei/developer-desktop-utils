@@ -39,6 +39,7 @@ export {
 } from './secrets';
 export type { VaultStatus, VaultKeyMode } from './secrets';
 export { useSecretState } from './useSecretState';
+export { usePluginState } from './usePluginState';
 export { usePluginSdkFor } from './usePluginSdkFor';
 export { usePluginConfig, useLiveConnection, usePluginMcpBridgeActive } from './services';
 export { SERVICE_PROTOCOL, createPluginService, PluginServiceError } from './service';
@@ -50,5 +51,10 @@ export type {
   ServiceTransport,
 } from './service';
 export { PluginProvider, usePluginSdk, usePluginSdkOptional, withPluginSdk } from './context';
+// Kiểu `Channel` của Tauri đi qua cửa của Platform luôn: tool cần nó để khai
+// tham số của một lệnh nhận stream, và bắt chúng import type thẳng từ
+// '@tauri-apps/api/core' chỉ vì một cái tên kiểu là thứ duy nhất còn buộc chúng
+// chạm vào Tauri trực tiếp.
+export type { Channel } from '@tauri-apps/api/core';
 export * as pluginAudit from './audit';
 export type { AuditChannel, AuditEntry } from './audit';
