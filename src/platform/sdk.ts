@@ -2,6 +2,7 @@ import { copyToClipboard, readTextFromClipboard } from '@/lib/clipboard';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
 import { createPluginService, type PluginService } from './service';
+import { hostAllowed } from './manifest';
 import { isTauri } from '@/lib/platform';
 import * as audit from './audit';
 import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
@@ -30,6 +31,16 @@ export class PluginPermissionError extends Error {
         `Thêm "${permission}" vào permissions trong src/plugins/${pluginId}/plugin.ts.`,
     );
     this.name = 'PluginPermissionError';
+  }
+}
+
+export class PluginHostError extends Error {
+  constructor(readonly pluginId: string, readonly host: string) {
+    super(
+      `Plugin "${pluginId}" gọi tới "${host}" ngoài allowlist hosts của nó. ` +
+        `Thêm host vào hosts trong src/plugins/${pluginId}/plugin.ts (hoặc "*" nếu plugin thật sự gọi được mọi nơi).`,
+    );
+    this.name = 'PluginHostError';
   }
 }
 
@@ -168,6 +179,16 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
     http: {
       async fetch(input, init) {
         ensure(manifest, 'http', 'http', init?.method ?? 'GET', audit.describeUrl(input));
+        if (!hostAllowed(manifest.hosts ?? [], input)) {
+          audit.record({
+            pluginId: id,
+            channel: 'http',
+            action: init?.method ?? 'GET',
+            allowed: false,
+            detail: `${audit.describeUrl(input)} — ngoài allowlist hosts`,
+          });
+          throw new PluginHostError(id, audit.describeUrl(input));
+        }
         // tauri-plugin-http bỏ qua sandbox của webview (CORS, cookie của
         // trang) — đó là lý do nó tồn tại — nhưng chỉ có trong app thật, nên
         // bản web/test rơi về `fetch` của trình duyệt.

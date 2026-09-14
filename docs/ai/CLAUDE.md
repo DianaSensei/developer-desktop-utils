@@ -330,6 +330,13 @@ plugin runs in the app's own realm. Two rules are enforced at load time:
   every `redis_*` command). Native without an allowlist is unlimited access to all
   ~130 registered Tauri commands.
 - `commands` without `native` is rejected too.
+- `http` and `hosts` must come together. Patterns are `example.com`,
+  `*.example.com` (itself + subdomains) or `*`. Half-wildcards (`*abc.com`,
+  `a.*.com`) are rejected — they match wider than people expect. `*` is legal but
+  must be written out: a tool that really can call anywhere deserves a visible line
+  in its manifest, not a silent default. Note the Tauri capability layer cannot
+  express this — capabilities are per-webview and every plugin shares one, so the
+  app-wide grant stays broad and the per-plugin limit lives in the SDK.
 - `service` and the `service` descriptor must come together, and `service.methods`
   must be non-empty — an unbounded sidecar is unbounded access. `service.bin` is the
   bare binary name (no extension, no target triple); the binary is only ever spawned
@@ -342,7 +349,7 @@ plugin runs in the app's own realm. Two rules are enforced at load time:
 | `storage` | `sdk.storage.*` — namespaced `devtool:<id>:`, synchronous |
 | `secrets` | `sdk.secrets.*` — the **separate** secret vault, async. Use for anything credential-shaped (tokens, seeds, passwords), never `storage` |
 | `clipboard:read` / `clipboard:write` | `sdk.clipboard.*` (separate on purpose) |
-| `http` | `sdk.http.fetch` — outbound network |
+| `http` | `sdk.http.fetch` — outbound network, restricted to `hosts` |
 | `native` | `sdk.native.invoke` — Tauri commands within `commands` |
 | `service` | `sdk.service.call` — the plugin's own sidecar process (tier B), methods within `service.methods` |
 

@@ -73,6 +73,16 @@ export interface PluginManifest {
    */
   commands?: string[];
   /**
+   * Host plugin được phép gọi tới, chỉ có nghĩa khi đã khai quyền 'http'.
+   * Dạng: `'dns.google'` (khớp đúng), `'*.example.com'` (chính nó và mọi
+   * subdomain), hoặc `'*'` cho plugin thật sự không giới hạn được.
+   *
+   * `'*'` phải khai TƯỜNG MINH: một HTTP workbench đúng là gọi được mọi nơi
+   * theo thiết kế, nhưng điều đó xứng đáng là một dòng nhìn thấy được trong
+   * manifest chứ không phải mặc định ngầm của mọi plugin có quyền http.
+   */
+  hosts?: string[];
+  /**
    * Tier B: sidecar plugin này cần. Khai `service` thì phải khai cả quyền
    * 'service' — xem `service.ts` cho hợp đồng và lý do chọn tiến trình riêng.
    */

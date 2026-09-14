@@ -239,6 +239,37 @@ sẵn có của hệ điều hành (`cat` làm sidecar dội lại, `sh` làm si
 sidecar chết) thay vì ship một binary giả chỉ để kiểm thử; nhưng một sidecar
 thật, đóng gói thật, chỉ xuất hiện cùng plugin dịch vụ đầu tiên.
 
+### Allowlist host — và vì sao nó KHÔNG nằm ở tầng capability
+
+Ý định ban đầu là thu hẹp `http://**` + `https://**` trong
+`capabilities/default.json`. Việc đó **không làm được**, vì lý do đã nói ở phần
+quyền: capability của Tauri gắn theo **webview**, mà mọi plugin dùng chung một
+webview. API Client là một HTTP workbench — nó tồn tại để gọi tới URL người dùng
+gõ vào — nên capability buộc phải đủ rộng cho nó, và vì thế không nói được gì về
+riêng một tool nào khác.
+
+Giới hạn thật vì vậy nằm ở tầng Platform, cùng khuôn với `native` + `commands`:
+manifest khai `hosts`, `sdk.http.fetch` kiểm host rồi mới gửi, audit ghi lại cả
+lời gọi bị chặn.
+
+| Plugin | hosts |
+|---|---|
+| `network` | 7 host cố định (4 DoH resolver + 3 dịch vụ tra IP) |
+| `api-client` | `['*']` |
+| `rabbit-client` | `['*']` — host management do người dùng cấu hình lúc chạy |
+
+`'*'` **phải khai tường minh**: một workbench gọi được mọi nơi là đúng thiết kế,
+nhưng điều đó xứng đáng là một dòng nhìn thấy được trong manifest và trong
+Settings → Plugin, chứ không phải mặc định ngầm của mọi plugin có quyền `http`.
+Mẫu nửa vời (`*abc.com`, `a.*.com`) bị từ chối vì chúng khớp rộng hơn người viết
+tưởng; `*.example.com` phủ chính nó và subdomain, không phủ `evilexample.com`.
+
+Network tool là consumer thật đầu tiên: `lib/network.ts` nhận một `FetchLike`
+tiêm vào, và tool truyền `sdk.http.fetch` — nên allowlist 7 host ở trên có hiệu
+lực thật chứ không phải khai cho đẹp. Mô tả của `http:default` trong
+`appPermissions.ts` cũng được sửa lại cho đúng sự thật: nó nói rõ danh sách có
+wildcard nên đây là quyền cấp-app, còn giới hạn theo tool ở chỗ khác.
+
 ## Không làm (và vì sao)
 
 - **Nạp plugin lúc chạy từ repo khác.** Cần thêm: định dạng gói đã ký (tái dụng
@@ -257,8 +288,8 @@ thật, đóng gói thật, chỉ xuất hiện cùng plugin dịch vụ đầu 
 
 1. ~~Tách credential ra khỏi store dùng chung, mã hoá khi nằm trên đĩa, và
    chuyển environments của API Client.~~ **Đã làm cả ba** — xem "Kho bí mật".
-2. Thu hẹp `http://**` + `https://**` trong `capabilities/default.json` theo
-   allowlist gắn với quyền `http` của từng plugin.
+2. ~~Thu hẹp allowlist mạng.~~ **Đã làm, nhưng không ở chỗ ban đầu tưởng** — xem
+   "Allowlist host" bên dưới.
 3. ~~Guard test ranh giới Platform.~~ **Đã làm** — `src/platform/guard.test.ts`
    + `baseline.json`, cùng cơ chế ngưỡng lùi dần như `design-system/guard.test.ts`.
    Mốc hiện tại: 12 chỗ gọi thẳng `@tauri-apps`, 47 chỗ dùng thẳng store chung.

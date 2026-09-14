@@ -13,6 +13,11 @@ export default definePlugin({
   defaultEnabled: false,
   permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native', 'http'],
   commands: ['list_listening_ports', 'local_network_info'],
+  hosts: [
+    // DoH resolvers + dịch vụ tra IP, đúng danh sách tool này gọi tới.
+    'cloudflare-dns.com', 'dns.google', 'dns.quad9.net', 'dns.adguard-dns.com',
+    'ipapi.co', 'ipwho.is', 'freeipapi.com',
+  ],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/NetworkTools').then((m) => m.NetworkTools),
 });

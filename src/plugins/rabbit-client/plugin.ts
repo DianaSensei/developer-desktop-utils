@@ -13,6 +13,8 @@ export default definePlugin({
   defaultEnabled: false,
   permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native', 'http'],
   commands: ['mcp_respond', 'rabbit_'],
+  // Host management API do người dùng cấu hình lúc chạy, không biết trước.
+  hosts: ['*'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/rabbit/RabbitClient').then((m) => m.RabbitClient),
 });

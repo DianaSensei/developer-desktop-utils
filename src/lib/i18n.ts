@@ -210,6 +210,7 @@ export const DICTIONARY = {
   'settings.plugins.off': { vi: 'đã tắt', en: 'off' },
   'settings.plugins.noPermissions': { vi: 'Không dùng kênh nào của Platform', en: 'Uses no Platform channel' },
   'settings.plugins.commands': { vi: 'Lệnh native', en: 'Native commands' },
+  'settings.plugins.hosts': { vi: 'Host được phép gọi', en: 'Allowed hosts' },
   'settings.plugins.vaultKeychain': {
     vi: 'Bí mật được mã hoá AES-256-GCM, khoá nằm trong keychain của hệ điều hành.',
     en: 'Secrets are encrypted with AES-256-GCM; the key lives in the OS keychain.',

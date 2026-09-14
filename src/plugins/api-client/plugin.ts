@@ -13,6 +13,10 @@ export default definePlugin({
   defaultEnabled: true,
   permissions: ['storage', 'secrets', 'clipboard:read', 'clipboard:write', 'native', 'http'],
   commands: ['mcp_'],
+  // '*' là đúng bản chất ở đây chứ không phải sự lười: một HTTP workbench tồn
+  // tại để gọi tới URL người dùng gõ vào. Khai tường minh để nó là một dòng
+  // nhìn thấy được, không phải mặc định ngầm.
+  hosts: ['*'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/apiclient/ApiClient').then((m) => m.ApiClient),
 });

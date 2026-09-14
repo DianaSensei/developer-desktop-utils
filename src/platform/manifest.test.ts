@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FileJson } from 'lucide-react';
-import { definePlugin, satisfiesSdk, validateManifest } from '@/platform/manifest';
+import { definePlugin, hostAllowed, satisfiesSdk, validateManifest } from '@/platform/manifest';
 import { SDK_VERSION, type PluginManifest } from '@/platform/types';
 
 const base: PluginManifest = definePlugin({
@@ -87,9 +87,51 @@ describe('validateManifest', () => {
     expect(validateManifest({ ...base, permissions: ['native'], commands: ['redis_'] })).toEqual([]);
   });
 
+  it('"http" và hosts phải đi cùng nhau — quyền mạng không allowlist là quyền gọi mọi nơi', () => {
+    expect(validateManifest({ ...base, permissions: ['http'] }).join()).toMatch(/không khai hosts/);
+    expect(validateManifest({ ...base, hosts: ['dns.google'] }).join()).toMatch(/thiếu quyền "http"/);
+    expect(validateManifest({ ...base, permissions: ['http'], hosts: ['dns.google'] })).toEqual([]);
+    // "*" hợp lệ, nhưng phải được VIẾT RA — đó là điểm của luật này.
+    expect(validateManifest({ ...base, permissions: ['http'], hosts: ['*'] })).toEqual([]);
+  });
+
+  it('từ chối mẫu host nửa vời, vì chúng khớp rộng hơn người viết tưởng', () => {
+    for (const h of ['*abc.com', 'a.*.com', 'https://dns.google', 'dns.google/path', '']) {
+      expect(
+        validateManifest({ ...base, permissions: ['http'], hosts: [h] }).join(),
+        h,
+      ).toMatch(/không hợp lệ/);
+    }
+  });
+
   it('không ném với dữ liệu rác — registry cần loại plugin hỏng, không làm sập app', () => {
     expect(validateManifest(null).length).toBeGreaterThan(0);
     expect(validateManifest('nope').length).toBeGreaterThan(0);
     expect(validateManifest({}).length).toBeGreaterThan(0);
+  });
+});
+
+describe('hostAllowed', () => {
+  it('khớp đúng host, không khớp host chỉ trùng hậu tố', () => {
+    expect(hostAllowed(['dns.google'], 'https://dns.google/resolve')).toBe(true);
+    expect(hostAllowed(['dns.google'], 'https://dns.google.evil.com/x')).toBe(false);
+    expect(hostAllowed(['example.com'], 'https://notexample.com/x')).toBe(false);
+  });
+
+  it('"*.domain" phủ chính nó và subdomain, không phủ tên chỉ kết thúc giống nhau', () => {
+    expect(hostAllowed(['*.example.com'], 'https://example.com/x')).toBe(true);
+    expect(hostAllowed(['*.example.com'], 'https://api.example.com/x')).toBe(true);
+    expect(hostAllowed(['*.example.com'], 'https://a.b.example.com/x')).toBe(true);
+    expect(hostAllowed(['*.example.com'], 'https://evilexample.com/x')).toBe(false);
+  });
+
+  it('"*" phủ mọi thứ; danh sách rỗng thì không phủ gì', () => {
+    expect(hostAllowed(['*'], 'https://bat-ky-dau.com')).toBe(true);
+    expect(hostAllowed([], 'https://dns.google')).toBe(false);
+  });
+
+  it('không phân biệt hoa thường, và URL rác bị từ chối thay vì ném', () => {
+    expect(hostAllowed(['DNS.Google'], 'https://dns.google/x')).toBe(true);
+    expect(hostAllowed(['*'], 'khong-phai-url')).toBe(false);
   });
 });

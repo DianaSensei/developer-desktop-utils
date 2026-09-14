@@ -5,7 +5,7 @@
  * từ repo riêng, hay chạy trong webview tách biệt) mà không phải sửa từng plugin:
  * chúng chỉ thấy hợp đồng ở đây, không thấy cách registry hiện thực nó.
  */
-export { definePlugin, satisfiesSdk, validateManifest } from './manifest';
+export { definePlugin, hostAllowed, satisfiesSdk, validateManifest } from './manifest';
 export { SDK_VERSION } from './types';
 export type { PluginManifest, PluginPermission, PluginRecord, PluginLoadError } from './types';
 export {
@@ -16,7 +16,7 @@ export {
   DEFAULT_PLUGIN_FEATURES,
   getPlugin,
 } from './registry';
-export { createPluginSdk, storageKey, PluginPermissionError, PluginCommandError } from './sdk';
+export { createPluginSdk, storageKey, PluginPermissionError, PluginCommandError, PluginHostError } from './sdk';
 export type { PluginSdk, PluginStorage, PluginSecrets } from './sdk';
 export {
   clearSecrets,

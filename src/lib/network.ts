@@ -54,11 +54,20 @@ export interface DohProvider {
 const q = (s: string) => encodeURIComponent(s.trim());
 
 
+/** Hàm fetch mà các hàm dưới đây dùng. Network tool truyền `sdk.http.fetch` vào
+ *  để lời gọi đi qua điểm thắt của Platform: kiểm allowlist host khai trong
+ *  manifest, rồi ghi audit. */
+export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
 // Fetch wrapper: in the Tauri desktop app, route through the HTTP plugin so the
 // request is made from Rust (no browser `Origin` header, no CORS). Some public
 // services (e.g. ipwho.is) reject the WebView's Origin with HTTP 403 — this
 // bypasses that. On the web build, fall back to the standard `fetch`.
-async function netFetch(input: string, init?: RequestInit): Promise<Response> {
+//
+// `impl` có thì dùng luôn: đó là đường đã qua kiểm quyền. Đường mặc định bên
+// dưới giữ nguyên cho test và cho những chỗ gọi chưa chuyển.
+async function netFetch(input: string, init?: RequestInit, impl?: FetchLike): Promise<Response> {
+  if (impl) return impl(input, init);
   if (isTauri) {
     const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
     return tauriFetch(input, init);
@@ -132,11 +141,12 @@ export async function queryDns(
   provider: DohProvider = DOH_PROVIDERS[0],
   dnssec = false,
   signal?: AbortSignal,
+  fetchImpl?: FetchLike,
 ): Promise<DnsResult> {
   const res = await netFetch(provider.build(name, type, dnssec), {
     headers: { Accept: 'application/dns-json' },
     signal,
-  });
+  }, fetchImpl);
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${provider.label}`);
   const json = (await res.json()) as {
     Status: number;
@@ -158,9 +168,10 @@ export async function queryAllRecords(
   name: string,
   provider: DohProvider = DOH_PROVIDERS[0],
   signal?: AbortSignal,
+  fetchImpl?: FetchLike,
 ): Promise<DnsResult> {
   const results = await Promise.allSettled(
-    ALL_RECORD_TYPES.map((t) => queryDns(name, t, provider, false, signal)),
+    ALL_RECORD_TYPES.map((t) => queryDns(name, t, provider, false, signal, fetchImpl)),
   );
   const answers: DnsAnswer[] = [];
   let status = 0;
@@ -192,9 +203,10 @@ export async function checkPropagation(
   name: string,
   type: string,
   signal?: AbortSignal,
+  fetchImpl?: FetchLike,
 ): Promise<PropagationRow[]> {
   const results = await Promise.allSettled(
-    DOH_PROVIDERS.map((p) => queryDns(name, type, p, false, signal)),
+    DOH_PROVIDERS.map((p) => queryDns(name, type, p, false, signal, fetchImpl)),
   );
   return results.map((r, i) => {
     const provider = DOH_PROVIDERS[i];
@@ -227,11 +239,12 @@ export async function checkDnssec(
   name: string,
   provider: DohProvider = DOH_PROVIDERS[0],
   signal?: AbortSignal,
+  fetchImpl?: FetchLike,
 ): Promise<DnssecResult> {
   const [ds, dnskey, a] = await Promise.all([
-    queryDns(name, 'DS', provider, true, signal),
-    queryDns(name, 'DNSKEY', provider, true, signal),
-    queryDns(name, 'A', provider, true, signal),
+    queryDns(name, 'DS', provider, true, signal, fetchImpl),
+    queryDns(name, 'DNSKEY', provider, true, signal, fetchImpl),
+    queryDns(name, 'A', provider, true, signal, fetchImpl),
   ]);
   const rrsig = [...ds.answers, ...dnskey.answers].filter((r) => r.typeName === 'RRSIG');
   return {
@@ -398,12 +411,12 @@ export async function localNetworkInfo(): Promise<LocalNetworkInfo | null> {
 // `ip` empty → returns the caller's own public IP and geo. Falls back across
 // providers so a single service being down or rate-limiting (e.g. HTTP 403/429)
 // doesn't break the tool.
-export async function lookupIp(ip = '', signal?: AbortSignal): Promise<IpInfo> {
+export async function lookupIp(ip = '', signal?: AbortSignal, fetchImpl?: FetchLike): Promise<IpInfo> {
   const target = ip.trim();
   let lastError: Error | null = null;
   for (const p of IP_PROVIDERS) {
     try {
-      const res = await netFetch(p.url(target), { signal });
+      const res = await netFetch(p.url(target), { signal }, fetchImpl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const info = p.parse((await res.json()) as Record<string, any>);
       if (!info.ip) throw new Error('Empty response');

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck, Terminal } from 'lucide-react';
+import { Globe, ShieldCheck, Terminal } from 'lucide-react';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
@@ -102,6 +102,16 @@ export function SettingsPlugins() {
                       </span>
                     ))}
                   </div>
+                )}
+
+                {p.hosts && p.hosts.length > 0 && (
+                  <p className="flex items-baseline gap-1.5 text-[11px] text-fg-mute">
+                    <Globe className="h-3 w-3 shrink-0 translate-y-0.5 text-fg-mute/60" />
+                    <span>
+                      {t('settings.plugins.hosts')}:{' '}
+                      <code className="font-mono text-fg-mute/80">{p.hosts.join(' · ')}</code>
+                    </span>
+                  </p>
                 )}
 
                 {p.commands.length > 0 && (

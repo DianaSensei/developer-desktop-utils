@@ -59,7 +59,14 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   'updater:allow-download-and-install': 'Download and install app updates',
   'store:default': 'Save app settings and preferences to local storage',
   'window-state:default': 'Remember window size and position between launches',
-  'http:default': 'Send HTTP requests to the domains listed below',
+  // Danh sách dưới đây có cả `http://**` và `https://**`, tức trên thực tế là
+  // "mọi nơi". Không thu hẹp được ở tầng này: capability của Tauri gắn theo
+  // WEBVIEW, mà mọi tool dùng chung một webview, nên nó buộc phải đủ rộng cho
+  // API Client — một HTTP workbench tồn tại để gọi tới URL người dùng gõ vào.
+  // Giới hạn theo từng tool nằm ở tầng Platform: mỗi plugin khai `hosts` trong
+  // manifest và `sdk.http` chặn ngoài danh sách đó (xem Settings → Plugin).
+  'http:default':
+    'Send HTTP requests. The patterns below include wildcards, so this grant is app-wide; per-tool limits are declared in each plugin manifest and shown under Plugins',
   'core:default': 'Baseline Tauri IPC access (window, app, path, events) the app needs to run',
 };
 

@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileJson } from 'lucide-react';
 import { definePlugin } from '@/platform/manifest';
-import { PluginCommandError, PluginPermissionError, createPluginSdk, storageKey } from '@/platform/sdk';
+import {
+  PluginCommandError,
+  PluginHostError,
+  PluginPermissionError,
+  createPluginSdk,
+  storageKey,
+} from '@/platform/sdk';
 import * as audit from '@/platform/audit';
 import { storageGet, storageRemove } from '@/lib/persistentStore';
 import { clearSecrets, secretGet } from '@/platform/secrets';
@@ -12,7 +18,11 @@ vi.mock('@/lib/clipboard', () => ({
   readTextFromClipboard: vi.fn(async () => 'từ clipboard'),
 }));
 
-function plugin(permissions: PluginPermission[], commands: string[] = []): PluginManifest {
+function plugin(
+  permissions: PluginPermission[],
+  commands: string[] = [],
+  hosts: string[] = ['*'],
+): PluginManifest {
   return definePlugin({
     id: 'demo',
     label: 'Demo',
@@ -23,6 +33,7 @@ function plugin(permissions: PluginPermission[], commands: string[] = []): Plugi
     defaultEnabled: true,
     permissions,
     commands,
+    hosts,
     sdk: '^1.0.0',
     load: async () => () => null,
   });
@@ -96,6 +107,18 @@ describe('clipboard / http', () => {
     const sdk = createPluginSdk(plugin([]));
     await expect(sdk.http.fetch('https://example.com')).rejects.toThrow(PluginPermissionError);
     expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('host ngoài allowlist bị chặn dù đã có quyền http — quyền mạng không phải quyền gọi mọi nơi', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok'));
+    const sdk = createPluginSdk(plugin(['http'], [], ['dns.google']));
+
+    await expect(sdk.http.fetch('https://evil.example.com/x')).rejects.toThrow(PluginHostError);
+    expect(spy).not.toHaveBeenCalled();
+
+    await expect(sdk.http.fetch('https://dns.google/resolve')).resolves.toBeDefined();
+    expect(spy).toHaveBeenCalledOnce();
     spy.mockRestore();
   });
 

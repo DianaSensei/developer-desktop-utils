@@ -11,6 +11,33 @@ export function definePlugin(manifest: PluginManifest): PluginManifest {
 }
 
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const HOST_PATTERN = /^(?:\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i;
+
+/** `*`, `example.com`, `*.example.com`. Cố tình KHÔNG nhận `*abc.com` hay
+ *  `a.*.com`: wildcard nửa vời rất dễ khớp rộng hơn người viết tưởng. */
+function isHostPattern(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  return value === '*' || HOST_PATTERN.test(value);
+}
+
+/** Host của `url` có nằm trong allowlist không. Dùng bởi SDK lúc chạy. */
+export function hostAllowed(hosts: readonly string[], url: string): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return hosts.some((pattern) => {
+    if (pattern === '*') return true;
+    const p = pattern.toLowerCase();
+    if (p.startsWith('*.')) {
+      const suffix = p.slice(2);
+      return hostname === suffix || hostname.endsWith(`.${suffix}`);
+    }
+    return hostname === p;
+  });
+}
 const VALID_PERMISSIONS: PluginPermission[] = [
   'storage',
   'secrets',
@@ -80,6 +107,20 @@ export function validateManifest(input: unknown): string[] {
   }
   if ((m.permissions ?? []).includes('native') && (m.commands?.length ?? 0) === 0) {
     errors.push('có quyền "native" nhưng không khai commands — quyền native luôn phải kèm allowlist');
+  }
+
+  // Cùng luật với 'native': quyền mạng không kèm allowlist host là quyền gọi
+  // đi bất cứ đâu, và đó chính là thứ cần nhìn thấy được.
+  const hasHttp = (m.permissions ?? []).includes('http');
+  if (hasHttp !== ((m.hosts?.length ?? 0) > 0)) {
+    errors.push(
+      hasHttp
+        ? 'có quyền "http" nhưng không khai hosts — dùng ["*"] nếu plugin thật sự gọi được mọi nơi'
+        : 'khai hosts nhưng thiếu quyền "http"',
+    );
+  }
+  for (const h of m.hosts ?? []) {
+    if (!isHostPattern(h)) errors.push(`host "${h}" không hợp lệ — dùng "example.com", "*.example.com" hoặc "*"`);
   }
 
   // Cùng một luật "quyền phải đi kèm allowlist" như 'native', vì lý do giống
