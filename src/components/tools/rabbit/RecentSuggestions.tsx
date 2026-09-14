@@ -19,7 +19,7 @@ export function RecentSuggestions({ items, connId, field, value, onPick, emptyAs
 }) {
   if (items.length === 0) return null;
   return (
-    <div className="border-b border-line/40 py-1">
+    <div className="border-b border-line-soft py-1">
       <div className="px-2.5 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-fg-mute/60">Recent</div>
       {items.map((v) => (
         <div

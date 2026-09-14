@@ -219,8 +219,8 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
         )}
 
         {projects.map((p) => (
-          <div key={p.name} className="rounded-lg border border-line/50 overflow-hidden">
-            <div className="px-3.5 py-2.5 bg-bg-2/20 border-b border-line/50 flex items-center justify-between gap-3">
+          <div key={p.name} className="rounded-lg border border-line-soft overflow-hidden">
+            <div className="px-3.5 py-2.5 bg-bg-2/20 border-b border-line-soft flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{p.name}</p>
                 {p.workingDir && <p className="text-[11px] text-fg-mute font-mono truncate">{p.workingDir}</p>}

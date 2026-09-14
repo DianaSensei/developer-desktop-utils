@@ -52,22 +52,40 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // ── Vì sao nút đặc có `shadow-btn` chứ không phải `shadow-soft` ──────
+        // `shadow-soft` là một bóng NGOÀI, đặt dưới nút. Nó nói "vật này nổi",
+        // không nói "vật này bấm được". Mặt trên vẫn là một mảng màu phẳng
+        // tuyệt đối — nên nút đọc ra như hình dán, và đó đúng là lời phàn nàn
+        // "flat, không có chiều sâu, không có cảm giác".
+        //
+        // `shadow-btn` = `shadow-soft` + hai đường 1px NẰM TRONG mép: sáng ở
+        // trên, tối ở dưới (xem `--sh-btn` trong design/tokens.css). Không
+        // phải gradient — luật cấm gradient trên nút vẫn nguyên — mà là hai
+        // mép, đúng chỗ ánh sáng rơi vào và chỗ khuất của một vật có bề dày.
+        //
+        // Và lúc bấm thì mép sáng TẮT, bóng đảo vào trong (`shadow-btn-press`):
+        // nút lún xuống thật chứ không chỉ nhỏ lại. `active:scale` một mình
+        // không tạo được cảm giác đó vì nó không đổi cách ánh sáng rơi.
         default:
-          'bg-acc text-acc-fg shadow-soft hover:bg-acc-hi active:bg-acc-hi',
+          'bg-acc text-acc-fg shadow-btn hover:bg-acc-hi active:bg-acc-hi active:shadow-btn-press',
         // `tint` — nền nhuộm nhạt, chữ đậm cùng tông. Đây là bậc còn THIẾU giữa
         // `default` (đặc, chói) và `outline`/`ghost` (gần như vô hình): không có
         // nó, mọi màn chỉ còn hai thái cực và giao diện đọc ra tẻ nhạt. Dùng cho
         // hành động phụ vẫn cần trọng lượng — "Định dạng lại", "Chạy thử".
         tint: 'bg-acc-tint text-acc-ink hover:bg-acc-tint-2 active:bg-acc-tint-2',
         destructive:
-          'bg-bad text-white shadow-soft hover:bg-bad/90',
+          'bg-bad text-white shadow-btn hover:bg-bad/90 active:shadow-btn-press',
         // Kit: `border-color:--line; background:--card; box-shadow:--sh-sm`, hover
         // đổi viền sang `--acc-edge` và nền sang `--chrome`. Bóng KHÔNG đổi khi
         // rê chuột — đổi bóng lúc hover chính là hover-lift trá hình.
+        // Nút viền không lấy `--edge-lite`: mặt nó là `--card` (trắng), một mép
+        // sáng trên nền trắng thì không nhìn ra gì, chỉ làm dày thêm đường
+        // viền một cách bẩn. Bóng trong (`btn-press`) thì vẫn có — lún xuống
+        // là phản hồi của mọi nút, không riêng nút đặc.
         outline:
-          'border border-line bg-card shadow-soft hover:border-acc-edge hover:bg-chrome active:bg-sunk',
+          'border border-line bg-card shadow-soft hover:border-acc-edge hover:bg-chrome active:bg-sunk active:shadow-btn-press',
         secondary:
-          'bg-bg-2 text-fg hover:bg-bg-2/80 active:bg-sunk',
+          'bg-bg-2 text-fg shadow-btn hover:bg-bg-2/80 active:bg-sunk active:shadow-btn-press',
         // Kit đặt `color:--fg-mute` cho ghost, nhưng ở app này ghost là nền của
         // `CopyButton` và hàng chục nút icon vốn tự đặt màu chữ theo ngữ cảnh —
         // ép màu ở đây sẽ đổi diện mạo của những chỗ không liên quan gì tới lỗi

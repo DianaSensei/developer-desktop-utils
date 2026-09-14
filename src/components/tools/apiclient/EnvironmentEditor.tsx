@@ -50,6 +50,12 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   const [selectedEnvId, setSelectedEnvId] = useState<string | null>(environments[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  // Collapsed by default — the full explainer is 3 lines at this dialog's
+  // old fixed width, permanently pushing the actual environment list/table
+  // down before a returning user (who's already read it once) sees anything
+  // else. The one-line precedence summary below is the fact people actually
+  // come back for; "Learn more" expands to the full paragraph on demand.
+  const [explainerOpen, setExplainerOpen] = useState(false);
   // Filters the *rows* of whichever environment/collection-vars is open on
   // the right — separate from `query` above, which filters the left list of
   // environments. Reset on every selection change so a filter left over from
@@ -127,10 +133,13 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      {/* full, not xl: the fixed 240px list eats a fifth of xl's 768px before
-          the variable table (name/value/secret-toggle/delete) even starts —
-          the same two-pane shape as Runner, which already uses full. */}
-      <DialogContent size="full" scrollable>
+      {/* viewport, not full: "full" is a fixed max-w-5xl (1024px) regardless
+          of the actual window — on a wide window that left roughly half the
+          screen unused beside the two-pane list/table. "viewport" scales
+          with the window instead (max-w-[94vw]), which also gives the
+          precedence explainer below far more width to lay out in before it
+          has to wrap. */}
+      <DialogContent size="viewport" scrollable>
         {/* h-14 + pr-12, not py-3 + mr-6: DialogContent pins its own close X at
             `right-4 top-4` as a 24px box, so its centre is a fixed 28px from
             the top and right. A 56px header centres this button on the same
@@ -148,17 +157,45 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
         {/* The one thing every confused-user report about this dialog comes
             back to: which of these three wins. Stated once, up front, instead
             of split across two tooltips and a footnote paragraph each editor
-            used to carry on its own. */}
-        <Callout tone="info" size="sm" className="mx-4 mt-3">
-          A <strong className="text-fg">Collection environment</strong> is scoped to one
-          collection and follows whichever one the active request belongs to. A{' '}
-          <strong className="text-fg">Global environment</strong> applies everywhere and
-          stays active across collections. Both can be &ldquo;Active&rdquo; at the same
-          time — the Collection one wins on a name collision.{' '}
-          <strong className="text-fg">Collection Variables</strong> are the always-on
-          fallback beneath either: <em>Collection env → Global env → Collection
-          Variables</em>. Use any of them with{' '}
-          <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code> in a request.
+            used to carry on its own. Collapsed to the precedence summary
+            alone by default — a returning user who's already read the full
+            explanation once shouldn't have it permanently push the actual
+            environment list/table down every time the dialog opens; "Learn
+            more" expands the full paragraph on demand. */}
+        <Callout
+          tone="info"
+          size="sm"
+          className="mx-4 mt-3"
+          actions={
+            <button
+              type="button"
+              onClick={() => setExplainerOpen((o) => !o)}
+              className="whitespace-nowrap text-[11px] font-medium text-fg-mute underline decoration-dotted underline-offset-2 transition-colors hover:text-fg"
+            >
+              {explainerOpen ? 'Show less' : 'Learn more'}
+            </button>
+          }
+        >
+          {explainerOpen ? (
+            <>
+              A <strong className="text-fg">Collection environment</strong> is scoped to one
+              collection and follows whichever one the active request belongs to. A{' '}
+              <strong className="text-fg">Global environment</strong> applies everywhere and
+              stays active across collections. Both can be &ldquo;Active&rdquo; at the same
+              time — the Collection one wins on a name collision.{' '}
+              <strong className="text-fg">Collection Variables</strong> are the always-on
+              fallback beneath either: <em>Collection env → Global env → Collection
+              Variables</em>. Use any of them with{' '}
+              <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code> in a request.
+            </>
+          ) : (
+            <>
+              Precedence: <strong className="text-fg">Collection env</strong> →{' '}
+              <strong className="text-fg">Global env</strong> →{' '}
+              <strong className="text-fg">Collection Variables</strong>. Use{' '}
+              <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code> in a request.
+            </>
+          )}
         </Callout>
 
         <Tabs tabs={tabDefs} active={tab} onSelect={(id) => setTab(id as Tab)} className="px-4" />
@@ -275,7 +312,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         title="Export environment"
-                        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-acc hover:text-fg"
+                        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg"
                       >
                         <Download className="h-4 w-4" />
                       </DropdownMenuTrigger>

@@ -66,7 +66,14 @@ module.exports = {
 
         /* ── Chữ & đường kẻ ──────────────────────────────────────────────── */
         fg: { DEFAULT: ch('fg'), mute: ch('fg-mute'), faint: ch('fg-faint') },
-        line: { DEFAULT: ch('line'), soft: ch('line-soft') },
+        line: { DEFAULT: ch('line'), soft: ch('line-soft'), strong: ch('line-strong') },
+
+        /* ── Kiểu DỮ LIỆU: nghĩa cố định, độc lập accent. Xem tokens.css. ── */
+        type: {
+          string: ch('type-string'), number: ch('type-number'), bool: ch('type-bool'),
+          date: ch('type-date'), null: ch('type-null'), binary: ch('type-binary'),
+          object: ch('type-object'),
+        },
 
         /* ── Trạng thái: nghĩa CỐ ĐỊNH, không đổi khi swap tone ──────────── */
         ok:   { DEFAULT: ch('ok'),   tint: ch('ok-tint'),   edge: ch('ok-edge') },
@@ -77,6 +84,10 @@ module.exports = {
 
       /* Thang rời nhau — mỗi bậc mang một nghĩa. Xem TOKENS.md. */
       borderRadius: {
+        /* `rounded` trần. Không khai báo thì Tailwind giữ 0.25rem cứng và 151
+           chỗ dùng nó đứng ngoài preset [data-corner] — xem --r-default trong
+           tokens.css. Token mặc định bằng đúng 0.25rem nên không đổi hình. */
+        DEFAULT: 'var(--r-default)',
         xs: 'var(--r-xs)',
         sm: 'var(--r-sm)',
         md: 'var(--r-md)',
@@ -85,11 +96,16 @@ module.exports = {
         full: 'var(--r-full)',
       },
 
-      /* Chỉ ba bậc bóng. Lồng sâu hơn dùng viền, không bóng. */
+      /* Chỉ ba bậc bóng. Lồng sâu hơn dùng viền, không bóng.
+         `btn` / `btn-press` KHÔNG phải bậc thứ tư: chúng là `--sh-sm` cộng hai
+         mép 1px (xem --sh-btn trong tokens.css), dành riêng cho bề mặt ĐẶC
+         bấm được. Đừng dùng cho thẻ hay panel. */
       boxShadow: {
         soft: 'var(--sh-sm)',
         DEFAULT: 'var(--sh)',
         lift: 'var(--sh-lg)',
+        btn: 'var(--sh-btn)',
+        'btn-press': 'var(--sh-btn-press)',
         none: 'none',
       },
 

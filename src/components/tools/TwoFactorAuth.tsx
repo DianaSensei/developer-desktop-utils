@@ -213,7 +213,7 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
       {/* ── Header ── */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <div
-          className="w-ctl h-ctl rounded-md flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none"
+          className="w-ctl h-ctl rounded-sm flex items-center justify-center text-white text-[11px] font-bold shrink-0 select-none"
           style={avatarStyle(account.name)}
         >
           {initials(account.name)}
@@ -751,7 +751,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) ingestFiles(e.dataTransfer.files); }}
           className={cn(
             'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-colors',
-            dragOver ? 'border-acc bg-acc/5' : 'border-sunk hover:border-fg-mute/40 hover:bg-bg-2/30',
+            dragOver ? 'border-acc bg-acc/5' : 'border-line hover:border-fg-mute/40 hover:bg-bg-2/30',
           )}
         >
           {busy ? (
@@ -815,7 +815,7 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
                   >
                     <span className={cn(
                       'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors',
-                      checked ? 'bg-acc border-acc' : 'border-sunk',
+                      checked ? 'bg-acc border-acc' : 'border-line',
                     )}>
                       {checked && <Check className="h-3 w-3 text-acc-fg" />}
                     </span>

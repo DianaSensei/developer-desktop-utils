@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Label } from '@/components/ui/label';
+import { SectionLabel } from '@/components/ui/section-label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateTimePanel } from '@/components/ui/date-time-panel';
@@ -739,7 +740,7 @@ export function DateTimeTool() {
               {([['From', diffA, setDiffA], ['To', diffB, setDiffB]] as const).map(([lbl, val, set]) => (
                 <div key={lbl} className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs text-fg-mute">{lbl}</Label>
+                    <SectionLabel>{lbl}</SectionLabel>
                     <button
                       onClick={() => set(formatInTz(new Date(), inputTz, "yyyy-MM-dd'T'HH:mm:ss"))}
                       className="text-[11px] text-fg-mute hover:text-fg transition-colors"

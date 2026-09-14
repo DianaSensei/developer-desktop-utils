@@ -79,7 +79,7 @@ export function RequestQuickOpen({ open, onOpenChange, collections, openIds, onP
           onOpenAutoFocus={(e) => { e.preventDefault(); inputRef.current?.focus(); }}
           className={cn(
             'fixed left-1/2 top-[14%] z-50 w-full max-w-xl -translate-x-1/2 overflow-hidden',
-            'rounded-lg border border-line/70 glass-strong glass-sheen shadow-lift duration-base ease-out-soft',
+            'rounded-lg border border-line glass-strong glass-sheen shadow-lift duration-base ease-out-soft',
             'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
             'data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           )}

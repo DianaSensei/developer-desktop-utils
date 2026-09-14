@@ -26,6 +26,16 @@ export interface SettingRowProps {
   /** Điều khiển bên phải — Switch, StatusChip, Button, Select… */
   control?: React.ReactNode;
   /**
+   * Dải xem trước SỐNG, nằm dưới dòng, full-width, ngăn bằng một đường mảnh.
+   *
+   * Học từ trang Settings của DBX: đổi cỡ chữ / font editor thì một ô code
+   * mẫu render lại NGAY bên dưới — không phải tưởng tượng qua tên font, hay
+   * phải rời Settings đi tìm một ô nhập nào đó để so sánh. Chỉ dùng khi lựa
+   * chọn khó hình dung từ tên (font có ligature hay không, cỡ chữ bao nhiêu
+   * là đủ) — một dropdown "Ngôn ngữ: VI/EN" thì không cần, tự đọc tên đã rõ.
+   */
+  preview?: React.ReactNode;
+  /**
    * Biến cả dòng thành nút mở màn khác và hiện chevron. Loại trừ với `control`:
    * một dòng bấm được mà bên trong lại có điều khiển bấm được nữa là bẫy chuột.
    */
@@ -39,6 +49,7 @@ export function SettingRow({
   title,
   description,
   control,
+  preview,
   onOpen,
   disabled,
   className,
@@ -72,31 +83,46 @@ export function SettingRow({
     </>
   );
 
-  const shared = cn(
+  // Hàng chính (icon · tiêu đề · control) tách khỏi khung ngoài, để dải
+  // preview có chỗ đứng DƯỚI hàng mà không phá layout flex-row của nó.
+  // Không có `preview`, cấu trúc render ra y hệt bản cũ — chỉ thêm một div
+  // bọc không mang style riêng.
+  const row = cn(
     'flex w-full items-center gap-3 px-3.5 py-3 text-left',
-    'border-b border-line-soft last:border-b-0',
     disabled && 'pointer-events-none opacity-50',
-    className,
+  );
+  const outer = cn('border-b border-line-soft last:border-b-0', className);
+  const previewStrip = preview && (
+    <div className="border-t border-line-soft px-3.5 py-2.5">{preview}</div>
   );
 
   if (interactive) {
     return (
-      <button
-        type="button"
-        onClick={onOpen}
-        className={cn(
-          shared,
-          // Rê chuột đổi NỀN, không đổi vị trí — design/RULES.md.
-          'transition-colors hover:bg-bg-2/40',
-          'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
-        )}
-      >
-        {body}
-      </button>
+      <div className={outer}>
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn(
+            row,
+            'w-full',
+            // Rê chuột đổi NỀN, không đổi vị trí — design/RULES.md.
+            'transition-colors hover:bg-bg-2/40',
+            'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
+          )}
+        >
+          {body}
+        </button>
+        {previewStrip}
+      </div>
     );
   }
 
-  return <div className={shared}>{body}</div>;
+  return (
+    <div className={outer}>
+      <div className={row}>{body}</div>
+      {previewStrip}
+    </div>
+  );
 }
 
 /**

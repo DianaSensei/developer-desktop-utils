@@ -171,7 +171,7 @@ function FilterControls({
           onClick={toggle}
           title={activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active` : 'Filter tasks'}
           className={cn(
-            'relative flex h-ctl w-ctl items-center justify-center rounded-md border transition-colors hover:bg-bg-2 hover:text-fg',
+            'relative flex h-ctl w-ctl items-center justify-center rounded-sm border transition-colors hover:bg-bg-2 hover:text-fg',
             activeCount > 0 ? 'border-acc/50 text-fg' : 'text-fg-mute'
           )}
         >
@@ -545,7 +545,7 @@ export function TimeTracker() {
               fixed width in both modes so switching never shifts the controls to
               the left. Timer shows the live clock; Manual shows the target day +
               duration and opens a date/time popover. */}
-          <div className="flex h-ctl-lg items-stretch overflow-hidden rounded-md border">
+          <div className="flex h-ctl-lg items-stretch overflow-hidden rounded-sm border">
             <div className="flex items-stretch p-0.5">
               {(['timer', 'manual'] as const).map((m) => (
                 <button
@@ -743,7 +743,7 @@ export function TimeTracker() {
               )}
             </div>
           ) : (
-            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-ctl w-ctl items-center justify-center rounded-md border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg">
+            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-ctl w-ctl items-center justify-center rounded-sm border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg">
               <Search className="h-3.5 w-3.5" />
             </button>
           )}
@@ -766,7 +766,7 @@ export function TimeTracker() {
               <button
                 onClick={() => hasExportable && toggle()}
                 disabled={!hasExportable}
-                className="flex h-ctl w-ctl items-center justify-center rounded-md border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-40"
+                className="flex h-ctl w-ctl items-center justify-center rounded-sm border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-40"
                 title={hasExportable ? 'Export visible entries' : 'Nothing to export'}
               >
                 <Download className="h-3.5 w-3.5" />

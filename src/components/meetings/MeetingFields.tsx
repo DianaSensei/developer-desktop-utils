@@ -112,7 +112,7 @@ export function MeetingFields({
           <TimePicker value={toHM(meeting.end)} onChange={setEndTime} className="h-ctl w-[94px]" />
         </MetaField>
         <MetaField label="Duration">
-          <div className="flex h-ctl items-center rounded-md bg-fg/5 px-3 text-sm font-semibold tabular-nums">{duration}</div>
+          <div className="flex h-ctl items-center rounded-sm bg-fg/5 px-3 text-sm font-semibold tabular-nums">{duration}</div>
         </MetaField>
         <div className="min-w-[200px] flex-1">
           <MetaField label="Participants" icon={Users}>

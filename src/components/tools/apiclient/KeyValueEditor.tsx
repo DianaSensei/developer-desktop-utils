@@ -251,22 +251,32 @@ export function KeyValueEditor({
     );
   }
 
-  // `minmax(0,1fr)`, never a bare `1fr`. Every row here is its OWN grid
-  // container, so track sizes are computed per row — and `1fr` is shorthand for
-  // `minmax(auto, 1fr)`, whose `auto` floor is the cell's min-content width. One
-  // row holding something that can't shrink (a JWT in the CodeMirror value cell)
-  // therefore resized that row alone: its Name column collapsed to 21px while
-  // Value ballooned to 1149px in a 438px table, so the columns stopped lining up
-  // with every other row. Pinning the floor to 0 makes all rows agree whatever
-  // they contain.
+  // Never a bare `1fr` — every row here is its OWN grid container, so track
+  // sizes are computed per row, and `1fr` is shorthand for `minmax(auto, 1fr)`,
+  // whose `auto` floor is the cell's min-content width. A row holding
+  // something that can't shrink (a JWT in the CodeMirror value cell) would
+  // otherwise resize that row alone: its Name column collapsed to 21px while
+  // Value ballooned to 1149px in a 438px table, so the columns stopped lining
+  // up with every other row. Pinning the floor to 0 on every column below
+  // makes all rows agree whatever they contain.
+  //
+  // The max side is bounded too (16rem for Name, 40rem for Value/Resolved),
+  // not left as `1fr`: this table is used inside panes that can span the
+  // whole window width (the stacked/no-split layout has no per-section
+  // max-width any more — see RequestPanel.tsx), and an unbounded `1fr` there
+  // used to hand a 7-character value like `profile` a 600px-wide input. The
+  // floor of 0 means both columns still shrink together at a narrow pane
+  // exactly as before; only a genuinely wide pane sees the caps kick in,
+  // leaving a small unused strip beside the table instead of one covering
+  // the whole thing.
   // The leading column is 2rem, not 1rem: the whole cell is the enable/disable
   // target (see the row below), so this width is the target's width. The dot
   // inside stays 8px — the affordance grew, the visual didn't.
   const gridCols = [
-    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem]',
-    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]',
-    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem]',
-    'grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_2rem_2rem]',
+    'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_2rem]',
+    'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_2rem_2rem]',
+    'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_minmax(0,20rem)_2rem]',
+    'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_minmax(0,20rem)_2rem_2rem]',
   ][(secretToggle ? 1 : 0) + (showResolved ? 2 : 0)];
 
   return (
@@ -286,9 +296,14 @@ export function KeyValueEditor({
           </span>
         </div>
       )}
-      <div className="overflow-hidden rounded-md border text-xs">
+      {/* Bảng này cố ý sao đúng hình học của `DataTable` (xem ghi chú ở hàng
+          bên dưới) — nên khi `DataTable` đổi thì chỗ này phải đổi theo, nếu
+          không hai bảng cạnh nhau trong cùng một app lại lệch nhau: `--r-sm`
+          thay `rounded-md`, viền đủ độ đục, hàng tiêu đề là `--chrome` đặc
+          thay vì 40% của một tông vốn đã nhạt. */}
+      <div className="overflow-hidden rounded-sm border border-line text-xs">
         {/* Header row */}
-        <div className={cn('grid border-b bg-bg-2/40 text-[11px] font-semibold uppercase tracking-wide text-fg-mute', gridCols)}>
+        <div className={cn('grid border-b border-line bg-chrome text-[11px] font-semibold uppercase tracking-wider text-fg-mute', gridCols)}>
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>
@@ -404,7 +419,7 @@ function KeyValueRow({
                 'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
                 row.enabled
                   ? 'border-acc bg-acc text-acc-fg group-hover/toggle:border-acc-hi group-hover/toggle:bg-acc-hi'
-                  : 'border-sunk bg-bg group-hover/toggle:border-fg-mute',
+                  : 'border-line bg-bg group-hover/toggle:border-fg-mute',
               )}
             >
               {row.enabled && <Check className="h-2.5 w-2.5" strokeWidth={3} />}

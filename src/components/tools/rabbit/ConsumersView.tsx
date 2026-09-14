@@ -95,7 +95,7 @@ export function ConsumersView({ conn, refreshKey, onRefresh, prefill, detailQueu
             {sessions.length === 0
               ? <p className="text-sm text-fg-mute">No consumers running. Start one above.</p>
               : (
-                <div className="rounded-lg border divide-y divide-line/40 overflow-hidden">
+                <div className="rounded-lg border divide-y divide-line-soft overflow-hidden">
                   {sessions.map((s) => <ConsumerListRow key={s.queue} session={s} onOpen={() => onOpenConsumer(s.queue)} />)}
                 </div>
               )}
@@ -381,7 +381,7 @@ function ConsumerDetail({ session: s, onBack }: { session: ConsumerSession; onBa
         {shown.length === 0
           ? <p className="px-5 py-4 text-sm text-fg-mute">{q ? 'No messages match your search.' : (s.starting ? 'Starting…' : 'Waiting for messages…')}</p>
           : (
-            <div className="divide-y divide-line/40">
+            <div className="divide-y divide-line-soft">
               {shown.map((m) => <MessageRow key={m.deliveryTag} m={m} format={format} />)}
               {matches.length > shown.length && (
                 <p className="px-5 py-2 text-[11px] text-fg-mute">
@@ -425,7 +425,7 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
       </div>
 
       {expanded && (
-        <div className="px-5 pb-3 pt-1 space-y-2.5 bg-bg-2/10 border-t border-line/30">
+        <div className="px-5 pb-3 pt-1 space-y-2.5 bg-bg-2/10 border-t border-line-soft">
           <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] font-mono text-fg-mute pt-1">
             <span>exchange <span className="text-fg">{m.exchange || '(default)'}</span></span>
             <span>routing key <span className="text-fg">{m.routingKey || '—'}</span></span>
@@ -438,7 +438,7 @@ function MessageRow({ m, format }: { m: import('./types').ConsumedMessage; forma
           {headerEntries.length > 0 && (
             <div>
               <div className="text-[11px] font-medium text-fg-mute mb-1">Headers</div>
-              <div className="rounded-md border divide-y divide-line/40 overflow-hidden">
+              <div className="rounded-md border divide-y divide-line-soft overflow-hidden">
                 {headerEntries.map(([k, v]) => (
                   <div key={k} className="flex gap-3 px-2.5 py-1 text-[11px] font-mono">
                     <span className="text-fg-mute shrink-0">{k}</span>

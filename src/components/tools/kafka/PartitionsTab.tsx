@@ -24,7 +24,7 @@ export function PartitionsTab({ partitions }: PartitionsTabProps) {
         return (
           <div
             key={p.id}
-            className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-6 px-4 py-2 border-b border-line/40 text-sm"
+            className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-6 px-4 py-2 border-b border-line-soft text-sm"
           >
             <span className="text-fg-mute tabular-nums font-mono text-xs">{p.id}</span>
             <span className="text-right tabular-nums font-mono text-xs">

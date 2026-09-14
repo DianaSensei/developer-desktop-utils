@@ -83,7 +83,10 @@ export const allTools = [
     experimental: def.experimental ?? false,
     ...TOOL_ROUTES[def.id],
   })),
-  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', keywords: ['preferences', 'options', 'config'], experimental: false, path: '/settings', component: Settings },
+  // fullHeight: Settings tự quản lý layout hai cột (nav trái · nội dung phải,
+  // xem Settings.tsx), mỗi cột cuộn riêng — cần chiếm trọn khung hình như
+  // API Client, không phải khối nội dung được bọc sẵn max-width + padding.
+  { featureId: 'settings', label: 'Settings', icon: SettingsIcon, description: '', keywords: ['preferences', 'options', 'config'], experimental: false, path: '/settings', component: Settings, fullHeight: true },
 ];
 
 /** id tool → đường dẫn route. Bao gồm cả 'settings', không có trong TOOL_DEFS. */

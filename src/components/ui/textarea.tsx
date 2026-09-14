@@ -15,7 +15,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         autoCorrect="off"
         autoCapitalize="off"
         className={cn(
-          'flex min-h-[80px] w-full rounded-sm border border-sunk bg-bg px-3 py-2 text-sm transition-[color,border-color,box-shadow] duration-fast ease-out-soft placeholder:text-fg-mute/75 hover:border-line/80 focus-visible:outline-hidden focus-visible:border-acc/60 focus-visible:ring-[3px] focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50',
+          // Cùng lý do với Input: viền `--line`, nền `--card`. Xem ui/input.tsx.
+          'flex min-h-[80px] w-full rounded-sm border border-line bg-card px-3 py-2 text-sm transition-[color,border-color,box-shadow] duration-fast ease-out-soft placeholder:text-fg-mute/75 hover:border-line-strong focus-visible:outline-hidden focus-visible:border-acc/60 focus-visible:ring-[3px] focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
         ref={ref}

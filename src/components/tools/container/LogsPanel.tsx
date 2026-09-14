@@ -607,7 +607,7 @@ function LogToggleButton({ active, onClick, title, children }: {
         'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus focus-visible:ring-offset-bg',
         active
           ? 'border-acc/40 bg-acc/10 text-acc'
-          : 'border-line/70 text-fg-mute hover:border-line hover:text-fg',
+          : 'border-line text-fg-mute hover:border-line hover:text-fg',
       )}
     >
       {children}

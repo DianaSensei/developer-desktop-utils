@@ -55,11 +55,28 @@
   /* ── Nền: xám NGẢ SẮC accent, không xám trung tính ────────────────────
      Xám trung tính là thứ làm giao diện trông rẻ. Mọi bề mặt ở đây đều mang
      một chút sắc của accent, nên khi đổi tone cả trang đổi theo, kể cả nền. */
-  --bg-c:     var(--a-h) 22% 96%;
-  --bg-2-c:   var(--a-h) 18% 92%;
+  /* ── Thang tông: bốn bậc, ĐỌC ĐƯỢC ─────────────────────────────────
+     Bậc cũ: bg 96 · sunk 97 · chrome 98.5 · card 100. Bốn bậc nằm trong 4%
+     độ sáng, mà ba bậc trên cùng cách nhau 1–1.5% — dưới ngưỡng mắt phân
+     biệt được trên màn thường. Hệ quả: cả cửa sổ đọc ra MỘT mảng trắng xám
+     duy nhất, không biết vùng làm việc bắt đầu ở đâu.
+
+     Thang mới giãn ra 5%, và thứ tự mang nghĩa cố định — đây là mô hình IDE,
+     giống `--dbx-content` / `--dbx-chrome` / `--dbx-gutter` của DBX:
+
+       card   100%  ← MẶT LÀM VIỆC. Luôn sáng nhất màn hình.
+       chrome  97%  ← thanh điều khiển: toolbar, đầu pane, sidebar
+       bg      95%  ← nền app, rãnh giữa các panel
+       bg-2    91%  ← chỗ LÕM: máng segmented, ô nhập chìm, vùng disabled
+
+     Luật đi kèm: cái gì người dùng ĐỌC hoặc GÕ thì nằm trên `--card`; cái gì
+     người dùng BẤM ĐỂ ĐIỀU KHIỂN thì nằm trên `--chrome`. Sai thứ tự này là
+     lý do trước đây vùng nội dung xám còn thanh công cụ trắng. */
+  --bg-c:     var(--a-h) 20% 95%;
+  --bg-2-c:   var(--a-h) 18% 91%;
   --card-c:   0 0% 100%;
-  --sunk-c:   var(--a-h) 24% 97%;
-  --chrome-c: var(--a-h) 26% 98.5%;
+  --sunk-c:   var(--a-h) 22% 96.5%;
+  --chrome-c: var(--a-h) 24% 97%;
 
   --bg:     hsl(var(--bg-c));
   --bg-2:   hsl(var(--bg-2-c));
@@ -113,27 +130,100 @@
   --cat-4: hsl(var(--cat-4-c));
   --cat-5: hsl(var(--cat-5-c));
 
+  /* ── ĐỘ ĐẶC: viền khoẻ và mép sáng ────────────────────────────────────
+     Ba token dưới đây là câu trả lời cho một lời phàn nàn cụ thể: app đọc ra
+     "mong manh, phẳng lì, không có cảm giác". Chẩn đoán (xem
+     `reference/ANALYSIS-DBX.md` mục 9) là app thiếu đúng hai thứ mà DBX có:
+     **viền đủ đậm để vùng nào ra vùng đó**, và **mép sáng trên bề mặt đặc**.
+
+     `--line-strong` — khung panel, đường chia vùng chính. `--line` (88%) đúng
+     cho đường kẻ giữa các hàng trong một danh sách, nhưng dùng nó để đóng
+     khung cả một panel thì panel đó không đứng vững: mắt không thấy vùng làm
+     việc bắt đầu từ đâu.
+
+     `--edge-lite` / `--edge-dark` — KHÔNG phải gradient (luật cấm gradient
+     trên nút vẫn nguyên). Đây là hai đường 1px NẰM TRONG mép nút: sáng ở
+     trên, tối ở dưới — đúng chỗ ánh sáng rơi vào và chỗ khuất của một vật
+     thật. Một mặt phẳng đặc không có hai đường đó đọc ra là hình dán, không
+     phải nút bấm được. Đây là khác biệt giữa "flat" và "phẳng mà có khối".
+
+     `--sh-btn-press` — lúc nhấn, mép sáng biến mất và bóng đảo vào TRONG. Đó
+     là thứ tạo ra "cảm giác" khi bấm, mạnh hơn hẳn `active:scale` đơn độc. */
+  --line-strong-c: var(--a-h) 20% 79%;
+  --line-strong:   hsl(var(--line-strong-c));
+
+  --edge-lite: inset 0 1px 0 hsl(0 0% 100% / .16);
+  --edge-dark: inset 0 -1px 0 hsl(var(--a-h) 34% 14% / .14);
+
+  /* ── KIỂU DỮ LIỆU: hệ thứ tư, mang NGHĨA cố định ──────────────────────
+     Ba hệ đã có nói về giao diện: accent = "tương tác được", trạng thái =
+     "tốt/xấu", phân loại = "cái này khác cái kia". Không hệ nào nói được về
+     chính DỮ LIỆU đang hiện trên màn.
+
+     Đó là khoảng trống làm app "hiển thị" dữ liệu thay vì "mô tả" dữ liệu:
+     một ô chứa `0`, một ô chứa `"0"`, một ô rỗng và một ô NULL hiện ra y hệt
+     nhau, và người dùng phải tự đoán. DBX tô màu theo kiểu (`--data-grid-type-*`)
+     nên liếc một cái là biết cột nào là số, cột nào là chuỗi, chỗ nào NULL.
+
+     Vì sao KHÔNG dùng `--cat-N`: đó là bảng XOAY VÒNG, ô thứ ba không có
+     nghĩa gì cố định (xem RULES.md). Kiểu dữ liệu thì nghĩa cố định vĩnh
+     viễn — `string` luôn là `string`. Phải là token mang tên nghĩa.
+
+     Vì sao KHÔNG dùng accent: đổi tone sang tím thì cột số đổi màu theo, dù
+     kiểu của nó chẳng liên quan gì tới gu màu của người dùng. Cùng lý do với
+     hệ trạng thái — độc lập accent, không đổi khi swap tone. */
+  --type-string-c:  152 45% 34%;   /* chuỗi   */
+  --type-number-c:  214 72% 45%;   /* số nguyên, số thực */
+  --type-bool-c:     26 78% 42%;   /* true / false */
+  --type-date-c:    275 52% 50%;   /* thời gian */
+  --type-null-c:    var(--a-h) 10% 55%;  /* NULL / không có giá trị — xám, nhạt hơn chữ thường */
+  --type-binary-c:    2 55% 47%;   /* blob, bytes */
+  --type-object-c:  322 50% 46%;   /* object, array, json */
+
+  --type-string: hsl(var(--type-string-c));
+  --type-number: hsl(var(--type-number-c));
+  --type-bool:   hsl(var(--type-bool-c));
+  --type-date:   hsl(var(--type-date-c));
+  --type-null:   hsl(var(--type-null-c));
+  --type-binary: hsl(var(--type-binary-c));
+  --type-object: hsl(var(--type-object-c));
+
   /* ── Bóng: ngả sắc accent, không phải đen thuần ───────────────────────
      Chỉ ba bậc. Một tầng nổi dùng --sh; lồng sâu hơn dùng viền, không bóng. */
   --sh-sm: 0 1px 2px hsl(var(--a-h) 30% 20% / .06);
   --sh:    0 1px 2px hsl(var(--a-h) 30% 20% / .06), 0 8px 20px -12px hsl(var(--a-h) 30% 20% / .22);
   --sh-lg: 0 2px 4px hsl(var(--a-h) 30% 20% / .07), 0 18px 36px -18px hsl(var(--a-h) 30% 20% / .30);
 
+  /* Bóng của NÚT ĐẶC: mép sáng + mép tối + bóng nhỏ, gộp thành một token để
+     không ai ghép tay ba mảnh rồi lệch nhau giữa các nút. Vẫn đi qua thang
+     `--sh-*`, nên không vi phạm luật "chỉ một hệ shadow". */
+  --sh-btn:       var(--edge-lite), var(--edge-dark), var(--sh-sm);
+  --sh-btn-press: inset 0 1px 2px hsl(var(--a-h) 34% 14% / .20);
+
   /* ── Bo góc: thang RỜI NHAU ───────────────────────────────────────────
      Thang cũ (--radius: 1rem → sm/md/lg = 12/14/16px) có ba bậc mà mắt không
      phân biệt được, nên vô dụng. Thang này cách nhau đủ xa để có ý nghĩa. */
-  --r-xs:   6px;   /* chip, keycap, nút nhỏ */
-  --r-sm:  10px;   /* input, nút, ô nhỏ trong thẻ */
-  --r-md:  14px;   /* thẻ thường, dải nhuộm */
-  --r-lg:  18px;   /* panel, khung tool */
-  --r-xl:  24px;   /* modal, sheet */
+  /* Bậc nhỏ nhất, đứng dưới --r-xs: ô tick 16px, keycap, viền trong của một
+     control nhỏ — chỗ mà 6px đã đọc ra là tròn.
+
+     Đây cũng là giá trị của `rounded` trần: 151 chỗ trong repo dùng nó, và nếu
+     không khai báo thì Tailwind trả 0.25rem CỨNG, nằm ngoài thang token, nên
+     preset bo góc bên dưới không với tới được. Trỏ `borderRadius.DEFAULT` vào
+     token này (xem tailwind-preset.cjs) là cách 151 chỗ đó đi theo preset mà
+     không phải sửa chỗ nào — 4px bằng đúng 0.25rem nên không gì đổi hình. */
+  --r-default: 4px;
+  --r-xs:   5px;   /* chip, keycap, nút nhỏ */
+  --r-sm:   6px;   /* input, nút, ô nhỏ trong thẻ */
+  --r-md:   8px;   /* thẻ thường, dải nhuộm */
+  --r-lg:  10px;   /* panel, khung tool */
+  --r-xl:  14px;   /* modal, sheet */
   --r-full: 999px;
 
   /* ── Chiều cao control: MỘT giá trị, không ba ─────────────────────────
      Repo hiện trộn h-7 (28px) / h-8 (32px) / h-9 (36px) → mọi hàng control
      đều lệch nhau vài pixel. Chỉ còn hai bậc. */
-  --h:    34px;
-  --h-lg: 40px;
+  --h:    32px;
+  --h-lg: 38px;
 
   /* ── Mặt chữ ──────────────────────────────────────────────────────────
      `mono` chưa từng được khai báo trong preset Tailwind của repo, dù
@@ -234,9 +324,27 @@
   --cat-4-c: 178 55% 55%;
   --cat-5-c: 320 60% 68%;
 
+  --line-strong-c: var(--a-h) 14% 32%;
+
+  /* Nền tối: mép sáng phải NHẸ hơn nhiều, nếu không nút viền trắng như bị
+     quét sơn. Mép tối thì ngược lại, đậm hơn — nền càng tối càng cần. */
+  --edge-lite: inset 0 1px 0 hsl(0 0% 100% / .07);
+  --edge-dark: inset 0 -1px 0 rgb(0 0 0 / .28);
+
+  /* Nền tối: sáng hơn và bớt bão hoà, như bảng phân loại — nếu giữ nguyên độ
+     sáng của bản sáng thì chữ chìm hẳn vào nền. */
+  --type-string-c:  150 45% 62%;
+  --type-number-c:  212 78% 70%;
+  --type-bool-c:     28 75% 65%;
+  --type-date-c:    274 58% 74%;
+  --type-null-c:    var(--a-h) 10% 48%;
+  --type-binary-c:    4 62% 68%;
+  --type-object-c:  322 55% 70%;
+
   --sh-sm: 0 1px 2px rgb(0 0 0 / .45);
   --sh:    0 1px 2px rgb(0 0 0 / .45), 0 10px 24px -14px rgb(0 0 0 / .8);
   --sh-lg: 0 2px 6px rgb(0 0 0 / .5),  0 20px 40px -20px rgb(0 0 0 / .9);
+  --sh-btn-press: inset 0 1px 2px rgb(0 0 0 / .40);
 
   color-scheme: dark;
 }
@@ -263,6 +371,30 @@
    (l44) chỉ đạt 3.31:1, không đạt cả ngưỡng phi văn bản 3:1 lẫn văn bản
    4.5:1. l35 đạt 4.94:1, còn dư biên so với 4.5. */
 [data-accent="amber"]   { --a-h:  34; --a-s: 78%; --a-l: 35%; }
+
+/* ============================================================================
+   PRESET BO GÓC — cùng cơ chế với accent: thang bán kính là SÁU CON SỐ, đổi
+   preset là đổi cả sáu, không sửa component nào. Đặt data-corner trên <html>.
+
+   Vì sao có: bo góc là thứ gu người dùng chia rẽ mạnh nhất trong app công cụ —
+   người quen IDE (VS Code, JetBrains) thấy thang 14–24px "mềm quá", người quen
+   app hiện đại thấy thang 2–4px "thô". Tham khảo DBX: nó cho chọn
+   `none / small / large` ngay trong Settings và đó là một trong số ít tuỳ chọn
+   giao diện người dùng thật sự đụng tới. Xem `design/reference/ANALYSIS-DBX.md`.
+
+   Điều kiện để làm được: MỌI bán kính trong app phải đọc từ `--r-*`. Một chỗ
+   viết cứng `rounded-[12px]` là một chỗ không đổi theo preset — nhìn ra ngay vì
+   nó lệch với hàng xóm. `guard.test.ts` canh việc này.
+
+   `--r-full` KHÔNG nằm trong preset: pill vẫn là pill ở cả ba lựa chọn. Bán
+   kính đầy không phải một bậc trên thang, nó là một HÌNH DẠNG khác.
+   ========================================================================== */
+[data-corner="default"] { --r-default: 4px; --r-xs:  6px; --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px; }
+/* Dáng IDE: đủ bo để không cắt vào mắt, không đủ để đọc ra là "app tiêu dùng". */
+[data-corner="sharp"]   { --r-default: 2px; --r-xs:  2px; --r-sm:  3px; --r-md:  4px; --r-lg:  6px; --r-xl:  8px; }
+/* Mềm hơn mặc định một bậc rưỡi. Kiểm lại luật "bán kính trong = ngoài − đệm":
+   thẻ --r-lg 26px với đệm 8px thì ô trong dùng --r-md 20px — vẫn khớp. */
+[data-corner="round"]   { --r-default: 6px; --r-xs:  8px; --r-sm: 14px; --r-md: 20px; --r-lg: 26px; --r-xl: 32px; }
 
 /* ============================================================================
    PRESET FONT — chỉ đổi lại `--sans` (mặt chữ UI chung); `--mono` không đổi

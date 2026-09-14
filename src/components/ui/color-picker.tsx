@@ -203,14 +203,14 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
 
           {/* Hex input */}
           <div className="mt-3 flex items-center gap-2">
-            <div className="h-ctl w-ctl shrink-0 rounded-md border" style={{ backgroundColor: value }} />
+            <div className="h-ctl w-ctl shrink-0 rounded-sm border" style={{ backgroundColor: value }} />
             <input
               value={hexDraft}
               onChange={(e) => setHexDraft(e.target.value)}
               onBlur={commitHex}
               onKeyDown={(e) => { if (e.key === 'Enter') { commitHex(); (e.target as HTMLInputElement).blur(); } }}
               spellCheck={false}
-              className="h-ctl w-full rounded-md border bg-card px-2 font-mono text-xs uppercase focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
+              className="h-ctl w-full rounded-sm border bg-card px-2 font-mono text-xs uppercase focus:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
             />
           </div>
         </div>

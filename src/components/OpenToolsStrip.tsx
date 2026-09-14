@@ -10,6 +10,7 @@
 // duplicated across the macOS-overlay / Windows-Linux-custom-chrome /
 // merged-titlebar-off header variants.
 
+import type * as React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,7 +20,23 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { useOpenTools } from '@/hooks/useOpenTools';
 
-export function OpenToolsStrip() {
+export interface OpenToolsStripProps {
+  /**
+   * Dựng KHÔNG có dải bao ngoài (không viền dưới, không nền, không đệm dọc) để
+   * đặt thẳng vào hàng header. Đây là cách bỏ được một dải chrome nguyên vẹn:
+   * trước đây strip là band riêng nằm dưới header, nên đỉnh cửa sổ có hai dải
+   * chồng nhau nói gần như cùng một chuyện ("tool nào đang mở").
+   */
+  inline?: boolean;
+  /**
+   * Hiện khi có ÍT HƠN hai tab (không có gì để chuyển qua lại). Ở chế độ
+   * `inline`, chỗ này là danh tính tool đang mở — nếu không thì hàng header
+   * trống trơn, không nói đang ở đâu.
+   */
+  fallback?: React.ReactNode;
+}
+
+export function OpenToolsStrip({ inline = false, fallback = null }: OpenToolsStripProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isFeatureEnabled } = useFeatures();
@@ -37,13 +54,16 @@ export function OpenToolsStrip() {
 
   // Nothing to switch back TO with zero or one tab open — stay out of the
   // way instead of showing a strip with just the tool already on screen.
-  if (tabs.length < 2) return null;
+  if (tabs.length < 2) return <>{fallback}</>;
 
   return (
     <div
       role="tablist"
       aria-label={t('shell.openTools.label')}
-      className="z-20 flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-bg-2/40 px-2 py-1"
+      className={cn(
+        'flex shrink-0 items-center gap-1 overflow-x-auto',
+        inline ? 'min-w-0' : 'z-20 border-b border-line bg-chrome px-2 py-1',
+      )}
     >
       {tabs.map((tool) => {
         const Icon = tool.icon;
@@ -60,9 +80,17 @@ export function OpenToolsStrip() {
               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(toolPath(tool.featureId)); }
             }}
             className={cn(
-              'group inline-flex h-6 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs leading-none transition-colors',
+              // Tab TÀI LIỆU, không phải nút chọn chế độ — nên tab đang mở lấy
+              // đúng màu của MẶT LÀM VIỆC (`--card`) chứ không phải màu accent.
+              // Nhờ vậy nó đọc ra là tờ giấy đang nằm trên cùng, nối liền với
+              // nội dung bên dưới, y như tab trong IDE. Accent để dành cho
+              // "đang chọn chế độ" (tab nhóm bên cạnh) — hai nghĩa khác nhau,
+              // hai cách thể hiện khác nhau, mỗi cách dùng nhất quán.
+              'group inline-flex h-ctl shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-sm border px-2.5 text-xs leading-none transition-colors',
               'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
-              on ? 'bg-sunk font-medium text-fg shadow-soft' : 'text-fg-mute hover:bg-sunk/60 hover:text-fg',
+              on
+                ? 'border-line bg-card font-medium text-fg'
+                : 'border-transparent text-fg-mute hover:bg-card/60 hover:text-fg',
             )}
           >
             {live && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" title={t('shell.titlebar.running')} />}

@@ -31,7 +31,7 @@ export function NumberStepper({
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const set = (v: number) => onChange(clamp(Number.isFinite(v) ? v : min));
   return (
-    <div className={cn('flex h-ctl items-stretch overflow-hidden rounded-lg border border-line bg-bg', className)}>
+    <div className={cn('flex h-ctl items-stretch overflow-hidden rounded-sm border border-line bg-bg', className)}>
       <button
         type="button"
         onClick={() => set(value - step)}
@@ -176,7 +176,7 @@ export function TimeStepperField({
   );
 
   return (
-    <div className={cn('flex h-ctl-lg items-stretch overflow-hidden rounded-md border border-sunk bg-bg', className)}>
+    <div className={cn('flex h-ctl-lg items-stretch overflow-hidden rounded-sm border border-line bg-bg', className)}>
       <span className="flex items-center pl-2 text-fg-mute">
         <Clock className="h-3.5 w-3.5" />
       </span>
@@ -196,9 +196,9 @@ export function TimeStepperField({
         }}
         className="w-full min-w-0 bg-transparent px-1.5 text-center font-mono text-sm tabular-nums focus:outline-hidden"
       />
-      <div className="flex flex-col border-l border-sunk">
+      <div className="flex flex-col border-l border-line">
         {stepBtn(1, ChevronUp, 'Later')}
-        {stepBtn(-1, ChevronDown, 'Earlier', 'border-t border-sunk')}
+        {stepBtn(-1, ChevronDown, 'Earlier', 'border-t border-line')}
       </div>
     </div>
   );
@@ -445,7 +445,7 @@ export function ProjectPicker({
         <button
           onClick={toggle}
           className={cn(
-            'flex items-center gap-1.5 rounded-lg border border-line px-2.5 text-sm transition-colors hover:bg-bg-2',
+            'flex items-center gap-1.5 rounded-sm border border-line px-2.5 text-sm transition-colors hover:bg-bg-2',
             compact ? 'h-ctl' : 'h-ctl-lg'
           )}
         >
@@ -571,7 +571,7 @@ export function TagPicker({ value, onChange, compact }: { value: string[]; onCha
       trigger={({ toggle: t }) => (
         <button
           onClick={t}
-          className={cn('flex items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors hover:bg-bg-2', compact ? 'h-ctl' : 'h-ctl-lg')}
+          className={cn('flex items-center gap-1.5 rounded-sm border px-2.5 text-sm transition-colors hover:bg-bg-2', compact ? 'h-ctl' : 'h-ctl-lg')}
         >
           <TagIcon className="h-3.5 w-3.5 opacity-60" />
           <span className={cn('truncate', !selected.length && 'text-fg-mute')}>

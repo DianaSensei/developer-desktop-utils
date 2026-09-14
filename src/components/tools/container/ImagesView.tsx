@@ -7,7 +7,7 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow, Spinner } from '@/components/ui/spinner';
-import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
@@ -21,6 +21,14 @@ import { useRowSelection } from './useRowSelection';
 import { RowCheckbox, SelectionBar } from './SelectionBar';
 import { formatBytes } from './format';
 import { ImageDetailsDialog } from './ImageDetailsDialog';
+
+// `RepoTags` from the Docker API is `[]` (an empty array) for untagged/
+// intermediate images, not `null`/`undefined` — so `img.RepoTags ?? fallback`
+// never triggers and these rows rendered blank instead of falling back.
+// Check `.length` instead of relying on nullish coalescing.
+export function repoTagLabel(tags: string[] | undefined, fallback: string[]): string {
+  return (tags && tags.length > 0 ? tags : fallback).join(', ');
+}
 
 export function ImagesView({ connection, refreshKey, onRefresh }: {
   connection: ContainerConnection;
@@ -57,7 +65,7 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
     [images, f],
   );
   const { sorted: rows, toggleSort, directionFor } = useSort(filtered, {
-    repo: (img) => (img.RepoTags ?? ['<none>:<none>']).join(', '),
+    repo: (img) => repoTagLabel(img.RepoTags, ['<none>:<none>']),
     id: (img) => img.Id,
     size: (img) => img.Size ?? 0,
     used: (img) => usage.byImage.get(img.Id)?.length ?? 0,
@@ -139,55 +147,60 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
           rows.length === 0
             ? <p className="text-sm text-fg-mute">{f ? 'No matching images.' : 'No images.'}</p>
             : (
-              <DataTable>
-                <Thead>
-                  <Tr>
-                    <Th className="w-8">
-                      <RowCheckbox
-                        checked={selection.allVisibleSelected}
-                        indeterminate={selection.someVisibleSelected}
-                        onToggle={selection.toggleAllVisible}
-                        title="Select all shown"
-                      />
-                    </Th>
-                    <Th sortDirection={directionFor('repo')} onSortClick={() => toggleSort('repo')}>Repository:Tag</Th>
-                    <Th sortDirection={directionFor('id')} onSortClick={() => toggleSort('id')}>Image ID</Th>
-                    <Th sortDirection={directionFor('used')} onSortClick={() => toggleSort('used')}>In use</Th>
-                    <Th align="right" sortDirection={directionFor('size')} onSortClick={() => toggleSort('size')}>Size</Th>
-                    <Th align="right"></Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {rows.map((img, index) => (
-                    <Tr key={img.Id} interactive selected={selection.isSelected(img.Id)} onClick={() => setDetailsTarget(img)}>
-                      <Td onClick={(e) => e.stopPropagation()}>
+              <div className="overflow-hidden rounded-sm border border-line">
+                <DataTable containerClassName="rounded-none border-0">
+                  <Thead>
+                    <Tr>
+                      <Th className="w-8">
                         <RowCheckbox
-                          checked={selection.isSelected(img.Id)}
-                          onToggle={(e) => selection.toggle(img.Id, index, e.shiftKey)}
-                          title="Select image"
+                          checked={selection.allVisibleSelected}
+                          indeterminate={selection.someVisibleSelected}
+                          onToggle={selection.toggleAllVisible}
+                          title="Select all shown"
                         />
-                      </Td>
-                      <Td mono>{(img.RepoTags ?? ['<none>:<none>']).join(', ')}</Td>
-                      <Td mono>{img.Id.replace('sha256:', '').slice(0, 12)}</Td>
-                      <Td><UsageBadge users={usage.byImage.get(img.Id)} dangling={isDangling(img)} /></Td>
-                      <Td numeric>{formatBytes(img.Size)}</Td>
-                      <Td align="right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(img)}>
-                            <Info className="h-3.5 w-3.5" />
-                          </IconButton>
-                          <IconButton size="sm" title="Add tag" onClick={() => setTagTarget(img)}>
-                            <Tag className="h-3.5 w-3.5" />
-                          </IconButton>
-                          <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(img)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </IconButton>
-                        </div>
-                      </Td>
+                      </Th>
+                      <Th sortDirection={directionFor('repo')} onSortClick={() => toggleSort('repo')}>Repository:Tag</Th>
+                      <Th sortDirection={directionFor('id')} onSortClick={() => toggleSort('id')} sub="sha256" subTone="binary">Image ID</Th>
+                      <Th sortDirection={directionFor('used')} onSortClick={() => toggleSort('used')}>In use</Th>
+                      <Th align="right" sortDirection={directionFor('size')} onSortClick={() => toggleSort('size')} sub="bytes" subTone="number">Size</Th>
+                      <Th align="right"></Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </DataTable>
+                  </Thead>
+                  <Tbody>
+                    {rows.map((img, index) => (
+                      <Tr key={img.Id} interactive selected={selection.isSelected(img.Id)} onClick={() => setDetailsTarget(img)}>
+                        <Td onClick={(e) => e.stopPropagation()}>
+                          <RowCheckbox
+                            checked={selection.isSelected(img.Id)}
+                            onToggle={(e) => selection.toggle(img.Id, index, e.shiftKey)}
+                            title="Select image"
+                          />
+                        </Td>
+                        <Td mono>{repoTagLabel(img.RepoTags, ['<none>:<none>'])}</Td>
+                        <Td mono tone="binary">{img.Id.replace('sha256:', '').slice(0, 12)}</Td>
+                        <Td><UsageBadge users={usage.byImage.get(img.Id)} dangling={isDangling(img)} /></Td>
+                        <Td numeric tone="number">{formatBytes(img.Size)}</Td>
+                        <Td align="right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <IconButton size="sm" title="Details" onClick={() => setDetailsTarget(img)}>
+                              <Info className="h-3.5 w-3.5" />
+                            </IconButton>
+                            <IconButton size="sm" title="Add tag" onClick={() => setTagTarget(img)}>
+                              <Tag className="h-3.5 w-3.5" />
+                            </IconButton>
+                            <IconButton size="sm" title="Remove" className="hover:text-bad" onClick={() => setRemoveTarget(img)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </IconButton>
+                          </div>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </DataTable>
+                {/* Tiêu đề trang ghi TỔNG số, còn bảng thì đang LỌC — hai con số khác
+                    nhau và trước đây không chỗ nào nói ra. Dòng này nói cả hai. */}
+                <DataTableStatus rows={images.length} shown={rows.length} note={f ? `filter: "${f}"` : undefined} />
+              </div>
             )
         )}
       </div>
@@ -213,7 +226,7 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
         open={!!removeTarget}
         onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}
         title="Remove image?"
-        description={removeTarget ? `Remove "${(removeTarget.RepoTags ?? [removeTarget.Id]).join(', ')}".` : ''}
+        description={removeTarget ? `Remove "${repoTagLabel(removeTarget.RepoTags, [removeTarget.Id])}".` : ''}
         confirmLabel="Remove"
         onConfirm={async () => {
           if (!removeTarget) return;

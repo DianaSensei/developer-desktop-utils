@@ -1,5 +1,143 @@
 # Experience log
 
+## [2026-09-13] api-client Sidebar — kéo thả request/folder KHÔNG BAO GIỜ hoạt động trong app desktop thật, dù đã "fix" đúng logic trước đó
+- Nguyên nhân: fix trước đó cùng ngày (df02f84) sửa đúng logic phân vùng before/after/inside
+  khi hover folder, và được xác nhận qua test (jsdom, sự kiện giả lập) LẪN qua một tab Chrome
+  thường (chuột thật) — cả hai đều "chứng minh" đúng. Nhưng đó không phải môi trường thật: app
+  desktop chạy trong Tauri webview với `dragDropEnabled` bật (mặc định, cần cho tính năng kéo
+  file từ Finder vào ChecksumTool/QRCodeTool/ImageBase64Tool — xem `useTauriFileDrop.ts`, code cũ
+  đã tự ghi rõ "Tauri intercepts native file drops before the webview, so the browser's HTML5
+  `ondrop` never receives them"). Khi bật, TOÀN BỘ sự kiện kéo-thả HTML5 chuẩn
+  (dragstart/dragover/drop) trong TRANG không bao giờ tới được webview — không phải riêng file
+  từ Finder, mà MỌI drag session HTML5, kể cả kéo-thả nội bộ trong Sidebar. Đây là xung đột kết
+  cấu giữa hai tính năng dùng cùng một cơ chế OS-level, không phải lỗi logic.
+- Số lần thử: 1/1 (viết lại toàn bộ cơ chế, không phải sửa logic)
+- Kết quả: Đã fix (xác nhận qua chuột thật trên browser + test; xác nhận trực quan trên app
+  desktop thật CHƯA thực hiện được vì màn hình khoá — xem ghi chú)
+- Cách fix: viết lại Sidebar.tsx từ HTML5 draggable/dragstart/dragover/drop sang pointer events
+  thuần (pointerdown/pointermove/pointerup/pointercancel), gắn listener ở `window` khi vượt
+  ngưỡng 4px di chuyển (tránh nhầm click thường thành kéo), dùng `document.elementFromPoint` +
+  data attribute (`data-tree-row`/`data-row-id`/`data-container`/`data-depth`) để hit-test hàng
+  đang hover thay cho target của dragover. Giữ nguyên toàn bộ logic phân vùng before/after/inside
+  đã đúng từ trước, chỉ đổi CÁCH KÍCH HOẠT nó. Thêm bẫy: `commitDrop` đọc qua ref (không phải
+  đóng trực tiếp state `dragId`/`dropTarget`) vì listener của pointer event là closure thuần tạo
+  một lần lúc pointerdown, không phải React callback tái tạo mỗi lần state đổi — nếu đóng trực
+  tiếp sẽ luôn thấy `dragId=null` (giá trị lúc BẮT ĐẦU kéo, trước khi kéo thật sự bắt đầu).
+- Bài học chung (rất quan trọng cho Tauri app): **verify một tính năng UI bằng browser tab
+  thường (hay cả jsdom) KHÔNG chứng minh nó hoạt động trong app desktop thật** khi tính năng đó
+  dùng một cơ chế OS-level (native HTML5 drag-and-drop, geolocation, clipboard, notification...)
+  mà framework desktop (ở đây: Tauri) có thể can thiệp/độc quyền cho mục đích riêng của nó. Khi
+  một tính năng "kéo thả" trong app Tauri có vẻ đúng logic nhưng người dùng báo "vẫn không hoạt
+  động", luôn nghi ngờ ĐẦU TIÊN vào xung đột `dragDropEnabled` (hay tương đương) trước khi đi sâu
+  vào logic — tìm bằng `grep onDragDropEvent`/`useTauriFileDrop` xem app có tính năng OS
+  drag-drop nào khác đang dùng chung window hay không.
+
+
+## [2026-09-13] Settings page — khoảng trống 2 bên quá lớn khi cửa sổ mở rộng
+- Nguyên nhân: `Settings.tsx`'s content pane bọc mỗi mục trong
+  `mx-auto max-w-2xl` (672px) cố định — quyết định có chủ đích từ trước
+  (miêu tả theo kiểu DBX, ưu tiên độ rộng dễ đọc hơn là co giãn hết cỡ),
+  nhưng ở cửa sổ rộng để lại khoảng trống hai bên card lớn hơn chính bản
+  thân card.
+- Số lần thử: 1/1
+- Kết quả: Đã fix
+- Cách fix: nới `max-w-2xl` → `max-w-[60rem]` (960px, theo đúng con số
+  người dùng đề xuất) — vẫn là một giá trị CỐ ĐỊNH (không co giãn theo %
+  cửa sổ), giữ đúng tinh thần đọc-được ban đầu, chỉ đỡ trống hơn ở độ rộng
+  cửa sổ thường gặp.
+- Bài học chung: một max-width cố định cho mục đích đọc-được (readability
+  cap) vẫn có thể cần điều chỉnh SỐ, không phải cách tiếp cận, khi con số cụ
+  thể đã lỗi thời so với độ phân giải màn hình phổ biến hiện tại — không
+  phải mọi "khoảng trống ở cửa sổ rộng" đều là bug cần bỏ hẳn cap (xem thêm
+  case KeyValueEditor/RequestPanel cùng ngày, nơi cap ở cấp SECTION mới là
+  vấn đề thật — ở đây cap tồn tại đúng chỗ, chỉ cần nới con số).
+
+
+## [2026-09-13] api-client Environments dialog — không tận dụng chiều rộng cửa sổ + callout luôn hiện đầy đủ
+- Nguyên nhân: `EnvironmentEditor.tsx` dùng `DialogContent size="full"`, nhưng trong `Dialog`
+  dùng chung, `full` là `max-w-5xl` (1024px) CỐ ĐỊNH — không theo % chiều rộng cửa sổ (chính
+  comment có sẵn trong `dialog.tsx` đã ghi rõ: "On a 1920px window `full` left nearly half the
+  screen unused"). Component đã có sẵn tier `size="viewport"` (`max-w-[94vw]`) nhưng
+  EnvironmentEditor chưa dùng tới. Song song: callout giải thích thứ tự ưu tiên
+  Collection/Global/Collection Variables (~480 ký tự) luôn hiện đầy đủ, không thể thu gọn —
+  ở popup hẹp 1024px nó xuống 3 dòng, đẩy nội dung thật (danh sách environment/bảng biến)
+  xuống dưới mỗi lần mở dialog, kể cả với người dùng đã đọc rồi.
+- Số lần thử: 1/1
+- Kết quả: Đã fix
+- Cách fix: đổi `size="full"` → `size="viewport"`. Thu callout thành 1 dòng tóm tắt thứ tự ưu
+  tiên (`Collection env → Global env → Collection Variables`) kèm nút "Learn more"/"Show less"
+  để mở/đóng đoạn giải thích đầy đủ theo yêu cầu (state cục bộ `explainerOpen`, mặc định đóng,
+  không persist — mỗi lần mở dialog lại thu gọn, vì đây là lời giải thích một-lần-đọc, không
+  phải trạng thái người dùng cần nhớ qua các phiên).
+- Bài học chung: khi một dialog/popup "không tối ưu không gian" trong app đã có sẵn hệ thống
+  size tier cho dialog dùng chung, luôn kiểm tra xem tier hiện tại có thật sự phản ứng theo cửa
+  sổ hay là một giá trị rem/px cố định bị đặt tên gây hiểu lầm ("full" nghe như "chiếm hết",
+  nhưng thực chất là một cap cố định) — component `dialog.tsx` đã tự ghi chú rõ điều này trước
+  đó, chỉ cần đọc đúng chỗ thay vì đoán.
+
+
+## [2026-09-13] api-client RequestPanel — bảng Query/Headers/Assertions không dùng hết chiều rộng panel khi xếp chồng (stacked)
+- Nguyên nhân: `RequestPanel.tsx` bọc tab Params trong `max-w-5xl` và tab Tests
+  trong `max-w-3xl` — cố ý từ trước để chặn cột VALUE của `KeyValueEditor`
+  (vốn `minmax(0,1fr)`, giãn hết khoảng trống) biến một giá trị ngắn như
+  `profile` thành ô input rộng 600px khi layout xếp chồng (tab Request chiếm
+  trọn chiều rộng cửa sổ). Nhưng cách chặn ở cấp SECTION khiến cả khối (bảng +
+  phần trống bên cạnh) bị giới hạn theo, để lại một khối trống lớn vô nghĩa
+  bên cạnh bảng thay vì bảng được dùng nốt phần rộng đó.
+- Số lần thử: 1/1 — nhưng đã ĐI SAI HƯỚNG một lần trong lúc làm: bước đầu định
+  đổi `minmax(0,1fr)` thành `minmax(0,16rem)`/`minmax(0,40rem)` (bỏ hẳn `1fr`)
+  cho cột Name/Value, rồi dựng Playwright đo pixel thật mới phát hiện: khi
+  KHÔNG còn track nào là `1fr` (track linh hoạt duy nhất hấp thụ khoảng trống
+  thừa), bảng không còn tự giãn ra để dùng hết bề rộng có sẵn nữa — nó chỉ
+  co giãn CÙNG NHAU dựa trên thuật toán "Maximize Tracks" của CSS Grid (chia
+  đều khoảng trống cho tới khi một track chạm mức trần), tức nếu tổng khoảng
+  trống > tổng hai mức trần thì phần dư vẫn bị bỏ hoang — y hệt vấn đề ban
+  đầu chỉ nhỏ hơn. Đo bằng `getBoundingClientRect()` thật qua Playwright
+  (dựng file HTML cô lập rồi cả app thật, cả chế độ side-by-side lẫn xếp
+  chồng) xác nhận: bỏ `max-w-5xl`/`max-w-3xl` ở cấp section VẪN GIỮ
+  `minmax(0,16rem)`/`minmax(0,40rem)` ở cấp cột — tổ hợp này đúng ý muốn, vì
+  thuật toán CSS Grid tự phân bổ khoảng trống thừa cho các track CHƯA chạm
+  trần trước, mỗi cột chỉ dừng lại khi chạm đúng mức trần của NÓ.
+- Kết quả: Đã fix
+- Cách fix: bỏ `max-w-5xl`/`max-w-3xl` ở `RequestPanel.tsx` (để section dùng
+  hết chiều rộng panel); đổi cột Name/Value/Resolved của `KeyValueEditor` và
+  cột Expression/Value của bảng Assertions từ `minmax(0,1fr)` (không giới hạn)
+  sang `minmax(0,16rem)`/`minmax(0,40rem)`/`minmax(0,20rem)`/`minmax(0,28rem)`
+  (giới hạn TỪNG CỘT, sàn vẫn là 0 nên hẹp lại bình thường ở pane hẹp).
+- Bài học chung: khi một bug về CSS Grid "không dùng hết không gian" hay
+  "một ô giãn quá cỡ" có vẻ hiển nhiên trên giấy, đừng suy luận suông về
+  thuật toán "Maximize Tracks"/`fr` vs track cố định — hai cách viết
+  `minmax(0,1fr)` (linh hoạt, hấp thụ khoảng trống thừa) và
+  `minmax(0,<độ dài cố định>)` (chỉ là TRẦN, không tự hấp thụ khoảng trống nếu
+  không còn track `fr` nào khác) trông giống nhau nhưng cho kết quả bố cục
+  hoàn toàn khác khi container rộng hơn tổng các mức trần. Đo bằng
+  `getBoundingClientRect()` qua Playwright (kể cả dựng một trang HTML cô lập
+  tối giản để cô lập biến số) rẻ hơn nhiều so với đoán sai rồi phải sửa lại.
+
+
+## [2026-09-13] api-client Sidebar — kéo thả request/folder để sắp xếp: không thể thả TRƯỚC/SAU một folder
+- Nguyên nhân: `onDragOver` của mỗi `Row` (`Sidebar.tsx`) ép cứng `where = 'inside'` bất cứ khi
+  nào hover lên một row `container` (folder hoặc collection), không có logic chia vùng theo vị
+  trí con trỏ như với request (`before`/`after` theo nửa trên/nửa dưới). Hệ quả: một
+  request/folder không bao giờ có thể đứng làm SIBLING ngay trước/sau một folder — nó luôn bị
+  nhét VÀO TRONG folder đó, dù `store.moveItem`/`copyItem` đã hỗ trợ sẵn `'before'`/`'after'`
+  với target là folder từ trước (bug thuần UI, không phải store).
+- Số lần thử: 1/1
+- Kết quả: Đã fix
+- Cách fix: chia row của folder (không áp dụng cho collection — xem lý do dưới) thành 3 vùng
+  dọc theo vị trí con trỏ, giống VS Code Explorer: 25% trên = `before`, 25% dưới = `after`, 50%
+  giữa = `inside`. Row của collection (depth 0) vẫn giữ `where = 'inside'` cố định, vì
+  `moveItem`/`copyItem` LUÔN append thẳng vào collection bất kể `where` (một collection không
+  bao giờ là phần tử trong `items[]` của ai để mà sắp xếp trước/sau) — cho collection một chỉ
+  báo before/after sẽ là nói dối về việc thả thực sự làm gì.
+- Bài học chung: khi một UI kéo-thả phân biệt theo LOẠI target (ở đây: container vs. leaf) chỉ
+  bằng một nhánh if/else ép cứng một giá trị, kiểm tra xem nhánh đó có đang bỏ sót cả một chế độ
+  tương tác hợp lệ (ở đây: sắp xếp sibling quanh một container) hay không — logic tầng dưới
+  (store) có thể đã hỗ trợ sẵn, và phần UI mới là chỗ chặn. jsdom không có `DragEvent`/không hỗ
+  trợ `scrollIntoView`; test kéo-thả cần tự dựng event qua `createEvent` của
+  `@testing-library/dom` rồi gán tay `clientY`/`altKey` (constructor `Event` bỏ qua các field
+  này), và polyfill `scrollIntoView` trước khi render.
+
 ## [2026-09-07] api-client Runner — chạy CSV 100k dòng: state React giữ lịch sử biến run O(n) thành O(n²)
 - Nguyên nhân: `RunnerDialog.tsx` giữ toàn bộ lịch sử thực thi trong React state
   (`setRecords(prev => [...prev, record])` sau MỖI request) và tính lại thống kê bằng

@@ -29,10 +29,10 @@ export function UuidGenerator() {
               max="100"
               value={count}
               onChange={(e) => setCount(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
-              className="h-ctl rounded-lg text-sm"
+              className="h-ctl rounded-sm text-sm"
             />
           </div>
-          <Button onClick={generateUuids} className="h-ctl rounded-lg gap-1.5 text-xs">
+          <Button onClick={generateUuids} className="h-ctl rounded-sm gap-1.5 text-xs">
             <RefreshCw className="h-3.5 w-3.5" />
             Generate
           </Button>

@@ -3,9 +3,9 @@ import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
 import {
   RotateCcw, GripVertical, X, Search, CheckCheck, Ban, Star,
-  RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle, ChevronDown,
+  RefreshCw, Download, CheckCircle2, AlertCircle, WifiOff, XCircle,
   Clipboard, FolderOpen, FolderClosed, Shield, Globe, Sparkles, Compass,
-  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard, Plug,
+  RotateCw, HardDrive, LayoutGrid, Cog, Languages, Palette, Type, Keyboard, SquareDashed,
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -16,6 +16,10 @@ import {
   ACCENT_TONES, getAccentPreference, setAccentPreference,
   applyAccentToDocument, type AccentTone,
 } from '@/lib/accentPreference';
+import {
+  CORNER_STYLES, getCornerPreference, setCornerPreference,
+  applyCornerToDocument, type CornerStyle,
+} from '@/lib/cornerPreference';
 import {
   FONT_PREFERENCES, getFontPreference, setFontPreference,
   applyFontToDocument, type FontPreference,
@@ -233,6 +237,12 @@ const FONT_LABEL_KEY: Record<FontPreference, TranslationKey> = {
   classic: 'settings.font.classic',
 };
 
+const CORNER_LABEL_KEY: Record<CornerStyle, TranslationKey> = {
+  sharp: 'settings.corner.sharp',
+  default: 'settings.corner.default',
+  round: 'settings.corner.round',
+};
+
 const MONO_FONT_LABEL_KEY: Record<MonoFontPreference, TranslationKey> = {
   'ibm-plex-mono': 'settings.monoFont.ibmPlexMono',
   'fira-code': 'settings.monoFont.firaCode',
@@ -263,6 +273,32 @@ const PERMISSION_NAMESPACE_ICONS: Record<string, typeof Clipboard> = {
 const APP_PERMISSION_GROUPS = getAppPermissionGroups();
 const SHORTCUT_GROUPS = getShortcutGroups();
 
+// ── Nav trái, giống trang Settings của DBX ────────────────────────────────
+// Trước đây tám mục này xếp CHỒNG trong một trang cuộn dài — bốn mục còn có
+// accordion riêng bên trong (Tools/Shortcuts/Permissions/Configuration), nên
+// một trang Settings đơn giản cũng cuộn qua hàng nghìn pixel để tới mục cuối.
+//
+// DBX xử lý đúng bài toán này: một danh sách mục cố định bên trái (chữ thuần,
+// KHÔNG icon — khác hẳn sidebar chính của app, để hai tầng điều hướng không
+// lẫn vào nhau), bên phải chỉ hiện ĐÚNG MỘT mục, cuộn riêng. Bấm vào mục TỰ
+// LÀ hành động "mở" — không cần thêm accordion bên trong nữa.
+//
+// `label` lấy lại đúng các khoá dịch đã có sẵn của từng mục (không phát sinh
+// khoá i18n mới) — tiêu đề trong SETTINGS_SECTIONS và tiêu đề nội dung mục đó
+// hiển thị PHẢI khớp nhau, đây là nguồn duy nhất cho cả hai.
+const SETTINGS_SECTIONS = [
+  { id: 'appearance', label: 'settings.section.appearance' },
+  { id: 'tools', label: 'settings.section.tools' },
+  { id: 'shortcuts', label: 'settings.section.shortcuts' },
+  { id: 'permissions', label: 'settings.permissions.title' },
+  { id: 'mcp', label: 'settings.mcp.title' },
+  { id: 'about', label: 'settings.about.title' },
+  { id: 'storage', label: 'settings.storage.title' },
+  { id: 'config', label: 'settings.config.title' },
+] as const satisfies ReadonlyArray<{ id: string; label: TranslationKey }>;
+
+type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]['id'];
+
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools, isFavorite, toggleFavorite } = useFeatures();
   const { open: openOnboarding } = useOnboarding();
@@ -271,10 +307,10 @@ export function Settings() {
   const { locale, setLocale, t } = useLocale();
   const { enabled: mcpBackgroundEnabled, setEnabled: setMcpBackgroundEnabled } = useMcpBackgroundBridge();
   const { isEnabled: isMcpToolEnabled, setToolEnabled: setMcpToolEnabled } = useMcpToolEnabledMap();
-  const [configOpen, setConfigOpen] = useState(false);
-  const [toolsOpen, setToolsOpen] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [permsOpen, setPermsOpen] = useState(false);
+  // Một mục đang mở, không phải bốn cờ accordion rời — điều hướng ở nav trái
+  // TỰ LÀ sự "mở/đóng" rồi, nên bỏ hẳn kiểu accordion lồng bên trong từng mục.
+  // Xem SETTINGS_SECTIONS + nav trái ở cuối file cho danh sách đầy đủ.
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>('appearance');
   const [currentVersion, setCurrentVersion] = useState('');
   const [dataDir, setDataDir] = useState('');
   // Khởi tạo từ storage — main.tsx đã áp tone này lên <html> trước khi React
@@ -284,6 +320,12 @@ export function Settings() {
     setAccent(tone);
     setAccentPreference(tone);
     applyAccentToDocument(tone);
+  };
+  const [corner, setCorner] = useState<CornerStyle>(() => getCornerPreference());
+  const changeCorner = (style: CornerStyle) => {
+    setCorner(style);
+    setCornerPreference(style);
+    applyCornerToDocument(style);
   };
   const [font, setFont] = useState<FontPreference>(() => getFontPreference());
   const changeFont = (pref: FontPreference) => {
@@ -414,10 +456,48 @@ export function Settings() {
   }, [displayTools, reorderTools]);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8 py-2">
+    <div className="flex h-full min-h-0">
+      {/* Nav trái — chữ thuần, KHÔNG icon (khác sidebar chính của app, để hai
+          tầng điều hướng không lẫn vào nhau). Học từ trang Settings của DBX:
+          một danh sách mục cố định bên trái, bên phải chỉ hiện ĐÚNG một mục,
+          cuộn riêng — bấm vào mục tự là hành động "mở", không cần accordion
+          lồng bên trong từng mục như bản cũ nữa. */}
+      <nav className="w-48 shrink-0 overflow-y-auto border-r border-line bg-chrome px-2 py-4">
+        <ul className="space-y-0.5">
+          {SETTINGS_SECTIONS.map((s) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => setActiveSection(s.id)}
+                aria-current={activeSection === s.id ? 'true' : undefined}
+                className={cn(
+                  'w-full rounded-sm border px-2.5 py-2 text-left text-sm transition-colors',
+                  activeSection === s.id
+                    ? 'border-line bg-card font-medium text-fg'
+                    : 'border-transparent text-fg-mute hover:bg-card/60 hover:text-fg',
+                )}
+              >
+                {t(s.label)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-      {/* Appearance — đầu tiên vì đây là section duy nhất cho hiệu ứng THẤY
-          NGAY khi bấm chọn, khác với Tools (cần rời trang mới thấy đổi). */}
+      {/* Nội dung mục đang chọn — cuộn riêng khỏi nav. sr-only heading để
+          trình đọc màn hình vẫn biết đang ở mục nào dù không có tiêu đề hiện
+          ra (nav bên trái đã hiện, lặp lại là dư — khớp phần lớn trang của
+          DBX; chỉ Appearance giữ tiêu đề nhìn thấy, xem SettingGroup dưới). */}
+      <div className="min-w-0 flex-1 overflow-y-auto">
+        {/* max-w-2xl (672px) từng để lại quá nhiều khoảng trống 2 bên trên
+            cửa sổ rộng — nới lên 60rem (960px), vẫn cố định (không co giãn
+            theo %, giữ dòng chữ mô tả không quá dài để đọc, đúng tinh thần
+            DBX ban đầu) nhưng đỡ trống hơn ở độ rộng thường gặp. */}
+        <div className="mx-auto max-w-[60rem] space-y-4 px-6 py-6">
+          <h2 className="sr-only">{t(SETTINGS_SECTIONS.find((s) => s.id === activeSection)!.label)}</h2>
+
+          {activeSection === 'appearance' && (
+            <>
       <SettingGroup title={t('settings.section.appearance')}>
         <SettingRow
           icon={Languages}
@@ -441,6 +521,20 @@ export function Settings() {
           title={t('settings.tone.label')}
           description={t('settings.tone.description')}
           control={<AccentSwatches value={accent} onChange={changeAccent} ariaLabel={t('settings.tone.label')} />}
+        />
+        <SettingRow
+          icon={SquareDashed}
+          title={t('settings.corner.label')}
+          description={t('settings.corner.description')}
+          control={
+            <Segmented
+              size="sm"
+              aria-label={t('settings.corner.label')}
+              value={corner}
+              onValueChange={(v) => changeCorner(v as CornerStyle)}
+              options={CORNER_STYLES.map((c) => ({ value: c, label: t(CORNER_LABEL_KEY[c]) }))}
+            />
+          }
         />
         <SettingRow
           icon={Type}
@@ -475,26 +569,37 @@ export function Settings() {
               </SelectContent>
             </Select>
           }
+          // Không thêm preview cho hàng "Font" phía trên: đổi --sans áp NGAY
+          // lên toàn app (sidebar, tiêu đề, mọi chữ khác đang hiện), nên bản
+          // thân màn Settings đã LÀ bản xem trước — thêm dải nữa là lặp.
+          //
+          // "Code font" thì khác: hai lựa chọn chỉ khác nhau ở LIGATURE
+          // (=>, !=, >=…), thứ không đọc ra được từ mỗi cái tên "IBM Plex
+          // Mono" / "Fira Code" — phải NHÌN. Không có dải này, người dùng
+          // phải rời Settings đi mở JSON Formatter hay ô nào đó có
+          // font-mono để so sánh. Học từ trang Editor của DBX: đổi Font
+          // Family thì một khối code mẫu render lại ngay bên dưới.
+          preview={
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-fg-mute">
+                {t('settings.monoFont.previewLabel')}
+              </span>
+              <code className="min-w-0 truncate font-mono text-[13px] text-fg">
+                {'const ok = (a !== b) && (a >= b) ? a => a * 2 : null;'}
+              </code>
+            </div>
+          }
         />
       </SettingGroup>
+            </>
+          )}
 
-      {/* Tools section */}
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0">
-            <button
-              onClick={() => setToolsOpen((o) => !o)}
-              className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-fg/80"
-              aria-expanded={toolsOpen}
-            >
-              <ChevronDown className={cn('h-4 w-4 shrink-0 text-fg-mute transition-transform', !toolsOpen && '-rotate-90')} />
-              {t('settings.section.tools')}
-            </button>
-            <p className="text-[11px] text-fg-mute mt-0.5 pl-[22px]">
-              {t('settings.tools.enabledCount', { enabled: enabledCount, total: TOOL_DEFS.length })}
-            </p>
-          </div>
-          {toolsOpen && (
+          {activeSection === 'tools' && (
+            <section className="space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                <p className="text-[11px] text-fg-mute">
+                  {t('settings.tools.enabledCount', { enabled: enabledCount, total: TOOL_DEFS.length })}
+                </p>
           <div className="flex flex-wrap items-center gap-2">
             {!allEnabled && (
               <button
@@ -522,11 +627,7 @@ export function Settings() {
               {t('common.reset')}
             </button>
           </div>
-          )}
-        </div>
-
-        {toolsOpen && (
-        <>
+              </div>
         {/* Search */}
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-mute/60" />
@@ -534,7 +635,7 @@ export function Settings() {
             value={toolQuery}
             onChange={(e) => setToolQuery(e.target.value)}
             placeholder={t('shell.search.placeholder')}
-            className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-bg-2"
+            className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-line"
           />
           {toolQuery && (
             <button
@@ -670,23 +771,12 @@ export function Settings() {
             return nodes;
           })()}
         </div>
-        </>
-        )}
-      </section>
 
-      {/* Keyboard shortcuts section */}
-      <section className="space-y-3">
-        <button
-          onClick={() => setShortcutsOpen((o) => !o)}
-          className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-fg/80"
-          aria-expanded={shortcutsOpen}
-        >
-          <ChevronDown className={cn('h-4 w-4 text-fg-mute transition-transform', !shortcutsOpen && '-rotate-90')} />
-          {t('settings.section.shortcuts')}
-          <Keyboard className="h-3.5 w-3.5 text-fg-mute" />
-        </button>
-        {shortcutsOpen && (
-        <>
+            </section>
+          )}
+
+          {activeSection === 'shortcuts' && (
+            <section className="space-y-3">
         <p className="text-[11px] text-fg-mute -mt-1">
           {t('settings.shortcuts.description')}
         </p>
@@ -720,23 +810,11 @@ export function Settings() {
             );
           })}
         </div>
-        </>
-        )}
-      </section>
+            </section>
+          )}
 
-      {/* Permissions section */}
-      <section className="space-y-3">
-        <button
-          onClick={() => setPermsOpen((o) => !o)}
-          className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-fg/80"
-          aria-expanded={permsOpen}
-        >
-          <ChevronDown className={cn('h-4 w-4 text-fg-mute transition-transform', !permsOpen && '-rotate-90')} />
-          {t('settings.permissions.title')}
-          <Shield className="h-3.5 w-3.5 text-fg-mute" />
-        </button>
-        {permsOpen && (
-        <>
+          {activeSection === 'permissions' && (
+            <section className="space-y-3">
         <p className="text-[11px] text-fg-mute -mt-1">
           {t('settings.permissions.description')}
         </p>
@@ -783,16 +861,11 @@ export function Settings() {
             );
           })}
         </div>
-        </>
-        )}
-      </section>
+            </section>
+          )}
 
-      {/* MCP section */}
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-          {t('settings.mcp.title')}
-          <Plug className="h-3.5 w-3.5 text-fg-mute" />
-        </h2>
+          {activeSection === 'mcp' && (
+            <section className="space-y-3">
         {!isTauri ? (
           <p className="text-[11px] text-warn">{t('settings.mcp.webWarning')}</p>
         ) : (
@@ -840,11 +913,11 @@ export function Settings() {
             </div>
           </>
         )}
-      </section>
+            </section>
+          )}
 
-      {/* About section */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold">{t('settings.about.title')}</h2>
+          {activeSection === 'about' && (
+            <section className="space-y-3">
         <div className="rounded-lg border divide-y text-xs">
           <div className="flex items-center gap-3 px-4 py-4">
             <AppLogo size={44} />
@@ -877,7 +950,7 @@ export function Settings() {
               <div className="flex items-center gap-2">
                 {autoCheckEnabled && (
                   <Select value={String(checkHour)} onValueChange={(v) => setCheckHour(Number(v))}>
-                    <SelectTrigger className="h-ctl w-28 text-xs rounded-lg">
+                    <SelectTrigger className="h-ctl w-28 text-xs rounded-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1005,11 +1078,11 @@ export function Settings() {
             </p>
           </div>
         </div>
-      </section>
+            </section>
+          )}
 
-      {/* Data & Storage section */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold">{t('settings.storage.title')}</h2>
+          {activeSection === 'storage' && (
+            <section className="space-y-3">
         <div className="rounded-lg border divide-y">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">
@@ -1035,34 +1108,23 @@ export function Settings() {
             )}
           </div>
         </div>
-      </section>
-
-      {/* Configuration section */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => setConfigOpen((o) => !o)}
-            className="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-fg/80"
-            aria-expanded={configOpen}
-          >
-            <ChevronDown className={cn('h-4 w-4 text-fg-mute transition-transform', !configOpen && '-rotate-90')} />
-            {t('settings.config.title')}
-          </button>
-          {configOpen && (
-            <button
-              onClick={resetConfig}
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
-            >
-              <RotateCcw className="h-3 w-3" />
-              {t('common.reset')}
-            </button>
+            </section>
           )}
-        </div>
-        {configOpen && (
-        <>
-        <p className="text-[11px] text-fg-mute -mt-1">
-          {t('settings.config.description')}
-        </p>
+
+          {activeSection === 'config' && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-end">
+                <button
+                  onClick={resetConfig}
+                  className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  {t('common.reset')}
+                </button>
+              </div>
+              <p className="text-[11px] text-fg-mute -mt-1">
+                {t('settings.config.description')}
+              </p>
         {(Object.keys(SECTION_LABELS) as ConfigSection[]).map((sec) => {
           const fields = CONFIG_FIELDS.filter((f) => f.section === sec);
           if (!fields.length) return null;
@@ -1088,7 +1150,7 @@ export function Settings() {
                         const v = e.target.value;
                         if (v !== '') setField(f, Number(v));
                       }}
-                      className="h-ctl w-24 text-center text-xs rounded-lg"
+                      className="h-ctl w-24 text-center text-xs rounded-sm"
                     />
                     {f.unit && <span className="w-5 text-[11px] text-fg-mute">{f.unit}</span>}
                   </div>
@@ -1097,10 +1159,10 @@ export function Settings() {
             </div>
           );
         })}
-        </>
-        )}
-      </section>
-
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

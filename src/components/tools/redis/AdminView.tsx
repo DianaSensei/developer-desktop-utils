@@ -83,7 +83,10 @@ function ClientsTab({ conn }: { conn: RedisConnection }) {
           <Tbody>
             {rows.map((r, i) => (
               <Tr key={i}>
-                {columns.map((c) => <Td key={c} mono className="whitespace-nowrap">{r[c] ?? '—'}</Td>)}
+                {/* `r[c]` là `undefined` khi trường đó không có trong bản ghi —
+                    để `Td` tự vẽ `NULL` thay vì một gạch ngang trông như dữ
+                    liệu thật. Chuỗi rỗng vẫn vẽ bình thường. */}
+                {columns.map((c) => <Td key={c} mono className="whitespace-nowrap">{r[c] ?? null}</Td>)}
               </Tr>
             ))}
           </Tbody>

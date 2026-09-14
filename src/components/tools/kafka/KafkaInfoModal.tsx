@@ -23,7 +23,7 @@ interface RowProps {
 
 function Row({ action, when, calls, badge, note }: RowProps) {
   return (
-    <div className="py-2.5 border-b border-line/30 last:border-0">
+    <div className="py-2.5 border-b border-line-soft last:border-0">
       <div className="flex items-start gap-2.5">
         <Badge tone={BADGE_TONE[badge.variant]} uppercase>{badge.label}</Badge>
         <div className="flex-1 min-w-0">
@@ -90,11 +90,11 @@ export function KafkaInfoModal({ onClose, onDismissPermanently }: KafkaInfoModal
       </Callout>
 
       {/* Operations table */}
-      <div className="rounded-lg border border-line/50 overflow-hidden mb-4">
-        <div className="px-3 py-2 bg-bg-2/20 border-b border-line/40">
+      <div className="rounded-lg border border-line-soft overflow-hidden mb-4">
+        <div className="px-3 py-2 bg-bg-2/20 border-b border-line-soft">
           <SectionLabel>Operations</SectionLabel>
         </div>
-        <div className="px-3 divide-y divide-line/20">
+        <div className="px-3 divide-y divide-line-soft">
           <Row
             action="Select broker / Test connection"
             when="on broker select or Refresh"

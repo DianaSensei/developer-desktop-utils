@@ -46,7 +46,7 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
     <DropdownMenu>
       <DropdownMenuTrigger
         title="Quick view variables (Collection env, Global env, Collection Variables, Vault)"
-        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md text-fg-mute transition-colors hover:bg-bg hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
+        className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-bg hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
       >
         <Eye className="h-4 w-4" />
       </DropdownMenuTrigger>
@@ -98,7 +98,7 @@ export function EnvQuickView({ collectionEnv, globalEnv, resolvedVars, onManageE
                 return (
                   <div key={source}>
                     <SectionLabel className="px-2 py-1" count={rows.length}>{GROUP_LABEL[source]}</SectionLabel>
-                    <div className="divide-y divide-line/60">
+                    <div className="divide-y divide-line">
                       {rows.map((r) => (
                         <div key={r.name} className="flex items-start gap-2 px-2 py-1.5 text-xs">
                           <span className="w-2/5 shrink-0 truncate font-medium" title={r.name}>{r.name}</span>

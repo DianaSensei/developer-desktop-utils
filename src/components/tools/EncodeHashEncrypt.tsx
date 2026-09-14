@@ -677,8 +677,18 @@ export function EncodeHashEncrypt() {
   return (
     <div className="tool-full-height">
 
-      {/* Top-level tab navigation */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      {/* ── MỘT vùng công cụ, hai dòng — không phải hai dải ──────────────────
+          Trước đây hàng tab và hàng tuỳ chọn của tab Encode là hai khối riêng,
+          mỗi khối một nền và một đường viền dưới. Cộng với titlebar và dải tab
+          tool ở khung app, đỉnh cửa sổ có BỐN dải xám chồng nhau, mỗi dải một
+          chiều cao — đó là thứ đọc ra "cẩu thả": mắt phải vượt qua bốn đường
+          kẻ ngang trước khi tới nội dung, và không đường nào nói lên điều gì.
+
+          Giờ cả hai nằm trong cùng một `header-chrome`: một nền, một đường
+          viền dưới, hai dòng bên trong. Hàng tuỳ chọn chỉ hiện ở tab nào có,
+          nên sáu tab còn lại vẫn là một dòng như cũ. */}
+      <div className="shrink-0 header-chrome px-4 py-1.5 flex flex-col gap-1.5">
+      <div className="flex items-center gap-3">
         <Segmented
           value={tab}
           onValueChange={setTab}
@@ -694,11 +704,8 @@ export function EncodeHashEncrypt() {
           aria-label="Tool tab"
         />
       </div>
-
-      {/* ── Encode tab ───────────────────────────────────────────────────────── */}
-      {tab === 'encode' && (
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="shrink-0 px-4 py-2 border-b border-line bg-bg-2/5 flex flex-wrap items-center gap-3">
+        {tab === 'encode' && (
+          <div className="flex flex-wrap items-center gap-3">
             <Select value={algorithm} onValueChange={setAlgorithm}>
               <SelectTrigger className="h-ctl w-44 text-xs rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -717,7 +724,12 @@ export function EncodeHashEncrypt() {
             />
             <span className="text-xs text-fg-mute truncate hidden sm:block">{codec.description}</span>
           </div>
+        )}
+      </div>
 
+      {/* ── Encode tab ───────────────────────────────────────────────────────── */}
+      {tab === 'encode' && (
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <ToolPanes>
             <ToolPane>
               <PaneHeader label="Input" hint={quickPasteHint} />
@@ -774,7 +786,7 @@ export function EncodeHashEncrypt() {
                 'text-[11px] font-mono px-2 py-0.5 rounded border transition-colors',
                 upperHex
                   ? 'border-acc/40 bg-acc/10 text-acc'
-                  : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg hover:border-line/80'
+                  : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg hover:border-line'
               )}
             >
               {upperHex ? 'ABC' : 'abc'}
@@ -810,7 +822,7 @@ export function EncodeHashEncrypt() {
                   </div>
                   <p className="text-[11px] text-fg-mute/60 px-3 pb-2">{desc}</p>
                   {isVerifying && (
-                    <div className="px-3 pb-3 border-t border-line/50 pt-2.5 space-y-2">
+                    <div className="px-3 pb-3 border-t border-line-soft pt-2.5 space-y-2">
                       <p className="text-[11px] text-fg-mute font-medium">Verify {label} hash</p>
                       <div className="flex items-center gap-2">
                         <Input

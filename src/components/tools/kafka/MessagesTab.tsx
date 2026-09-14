@@ -4,7 +4,6 @@ import { LoadingRow, Spinner } from '@/components/ui/spinner';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -108,7 +107,7 @@ function CopyBtn({ text, className }: { text: string; className?: string }) {
 
 function SectionHead({ title, aside }: { title: string; aside?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between px-3 py-1.5 bg-bg-2/15 border-b border-line/40">
+    <div className="flex items-center justify-between px-3 py-1.5 bg-bg-2/15 border-b border-line-soft">
       <span className="text-[11px] font-semibold text-fg-mute uppercase tracking-widest">
         {title}
       </span>
@@ -275,7 +274,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-line/40">
+      <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-line-soft">
 
         {/* ── Properties ── */}
         <div>
@@ -303,7 +302,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
             title="Value"
             aside={
               <div className="flex items-center gap-1.5">
-                <div className="flex rounded border border-sunk text-xs overflow-hidden">
+                <div className="flex rounded border border-line text-xs overflow-hidden">
                   {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
                     <button
                       key={m}
@@ -345,7 +344,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
           {headerEntries.length === 0 ? (
             <p className="px-3 py-2.5 text-xs italic text-fg-mute/40">No headers</p>
           ) : (
-            <div className="divide-y divide-line/30">
+            <div className="divide-y divide-line-soft">
               {headerEntries.map(([k, v]) => (
                 <div key={k} className="px-3 py-2 flex items-start gap-2 min-w-0">
                   <div className="flex-1 min-w-0 space-y-0.5">
@@ -612,7 +611,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
       {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-4 py-2.5 border-b border-line shrink-0 bg-bg-2/10">
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-fg-mute">Partition</Label>
+          <SectionLabel>Partition</SectionLabel>
           <Select value={String(partition)} onValueChange={(v) => setPartition(Number(v))}>
             <SelectTrigger className="h-ctl text-xs font-mono min-w-[9rem]">
               <SelectValue />
@@ -628,8 +627,8 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-fg-mute">Start from</Label>
-          <div className="flex rounded-md border border-sunk overflow-hidden text-xs h-ctl">
+          <SectionLabel>Start from</SectionLabel>
+          <div className="flex rounded-sm border border-line overflow-hidden text-xs h-ctl">
             {(['tail', 'from', 'range', 'time'] as FetchMode[]).map((m) => (
               <button
                 key={m}
@@ -647,7 +646,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         {mode === 'time' && (
           <div className="flex flex-col gap-1">
-            <Label className="text-xs text-fg-mute">Since</Label>
+            <SectionLabel>Since</SectionLabel>
             <Select value={String(sinceMs)} onValueChange={(v) => setSinceMs(Number(v))}>
               <SelectTrigger className="h-ctl text-xs w-36">
                 <SelectValue />
@@ -663,7 +662,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         {mode === 'from' && (
           <div className="flex flex-col gap-1">
-            <Label className="text-xs text-fg-mute">Start offset</Label>
+            <SectionLabel>Start offset</SectionLabel>
             <Input
               type="number"
               min="0"
@@ -679,7 +678,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         {mode === 'range' && (
           <div className="flex items-end gap-2">
             <div className="flex flex-col gap-1">
-              <Label className="text-xs text-fg-mute">From</Label>
+              <SectionLabel>From</SectionLabel>
               <Input
                 type="number" min="0"
                 value={fromOffset}
@@ -690,7 +689,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
             </div>
             <span className="text-sm text-fg-mute mb-1.5">–</span>
             <div className="flex flex-col gap-1">
-              <Label className="text-xs text-fg-mute">To</Label>
+              <SectionLabel>To</SectionLabel>
               <Input
                 type="number" min="0"
                 value={toOffset}
@@ -704,7 +703,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
         {mode !== 'range' && (
           <div className="flex flex-col gap-1">
-            <Label className="text-xs text-fg-mute">Limit</Label>
+            <SectionLabel>Limit</SectionLabel>
             <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
               <SelectTrigger className="h-ctl text-xs w-24">
                 <SelectValue />
@@ -717,8 +716,8 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
         )}
 
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-fg-mute">Default view</Label>
-          <div className="flex rounded-md border border-sunk overflow-hidden text-xs h-ctl">
+          <SectionLabel>Default view</SectionLabel>
+          <div className="flex rounded-sm border border-line overflow-hidden text-xs h-ctl">
             {(['text', 'json', 'hex'] as ValueMode[]).map((m) => (
               <button
                 key={m}
@@ -783,7 +782,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
           </button>
         )}
         {fetched && sorted.length > 0 && (
-          <div className="flex items-center gap-1 shrink-0 border-l border-line/50 pl-2 ml-1">
+          <div className="flex items-center gap-1 shrink-0 border-l border-line-soft pl-2 ml-1">
             <span className="text-[11px] text-fg-mute/70 hidden sm:inline">Export</span>
             <CopyButton value={() => messagesToJson(sorted)} label="JSON" variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" iconClassName="h-3 w-3" />
             <CopyButton value={() => messagesToCsv(sorted)} label="CSV" variant="ghost" size="sm" className="h-6 px-1.5 text-[11px]" iconClassName="h-3 w-3" />
@@ -849,7 +848,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
                     key={`${msg.partition}-${msg.offset}`}
                     title="Click to view full message"
                     className={cn(
-                      'group w-full grid cursor-pointer px-3 py-1.5 text-left border-b border-line/30 transition-colors border-l-2',
+                      'group w-full grid cursor-pointer px-3 py-1.5 text-left border-b border-line-soft transition-colors border-l-2',
                       isSelected
                         ? 'bg-acc/10 border-l-acc'
                         : 'border-l-transparent hover:bg-bg-2/40 hover:border-l-acc/40',
@@ -884,7 +883,7 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
               {/* Load more older messages */}
               {(hasMore || loadingMore) && (
-                <div className="flex items-center justify-center py-3 border-t border-line/20">
+                <div className="flex items-center justify-center py-3 border-t border-line-soft">
                   {loadingMore ? (
                     <LoadingRow size="sm" />
                   ) : (

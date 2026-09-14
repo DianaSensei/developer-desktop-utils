@@ -105,7 +105,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
         const totalLag = parts.reduce((s, p) => s + (p.lag > 0 ? p.lag : 0), 0);
         const hasLag = parts.some((p) => p.lag > 0);
         return (
-          <div key={groupId} className="border-b border-line/40">
+          <div key={groupId} className="border-b border-line-soft">
             {/* Group header — toggles partition detail; group name opens the group */}
             <div
               className="flex items-center gap-2 px-4 py-2 hover:bg-bg-2/15 cursor-pointer select-none"
@@ -150,7 +150,7 @@ export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabPro
                   return (
                     <div
                       key={p.partition}
-                      className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-line/20 text-sm"
+                      className="grid grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] gap-x-3 pl-9 pr-4 py-1.5 border-t border-line-soft text-sm"
                     >
                       <span className="text-right text-xs text-fg-mute tabular-nums">{p.partition}</span>
                       <span className="text-right font-mono text-xs tabular-nums">

@@ -78,9 +78,9 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
                 <DataTable>
                   <Thead>
                     <Tr>
-                      <Th>Name</Th>
-                      <Th>Type</Th>
-                      <Th>Durable</Th>
+                      <Th sub="exchange" subTone="string">Name</Th>
+                      <Th sub="direct/topic/…" subTone="object">Type</Th>
+                      <Th sub="bool" subTone="bool">Durable</Th>
                     </Tr>
                   </Thead>
                   <Tbody>

@@ -89,7 +89,7 @@ export interface SkeletonListProps {
 export function SkeletonList({ rows = 6, leading, className }: SkeletonListProps) {
   const WIDTHS = ['w-2/3', 'w-1/2', 'w-3/5', 'w-5/12', 'w-7/12', 'w-1/2'];
   return (
-    <div role="status" aria-label="Đang tải" className={cn('divide-y divide-line/60', className)}>
+    <div role="status" aria-label="Đang tải" className={cn('divide-y divide-line', className)}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-3 px-3 py-2.5">
           {leading && <Skeleton circle className="h-5 w-5 shrink-0" />}

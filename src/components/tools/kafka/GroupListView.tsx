@@ -6,7 +6,7 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { StatusDot, type StatusDotTone } from '@/components/ui/status-dot';
-import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
+import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
 import { kafkaApi, type GroupSummary } from './types';
 
 const STATE_TONE: Record<string, StatusDotTone> = {
@@ -62,29 +62,34 @@ export function GroupListView({ brokerId, refreshKey, onRefresh, onSelectGroup }
           rows.length === 0
             ? <p className="text-sm text-fg-mute">{f ? 'No matching groups.' : 'No consumer groups.'}</p>
             : (
-              <DataTable>
-                <Thead>
-                  <Tr>
-                    <Th>Group</Th>
-                    <Th>State</Th>
-                    <Th>Protocol</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {rows.map((g) => (
-                    <Tr key={g.groupId} interactive onClick={() => onSelectGroup(g.groupId)}>
-                      <Td mono>{g.groupId}</Td>
-                      <Td>
-                        <span className="inline-flex items-center gap-1.5">
-                          <StatusDot tone={STATE_TONE[g.state] ?? 'idle'} size="xs" />
-                          {g.state || '—'}
-                        </span>
-                      </Td>
-                      <Td className="text-fg-mute">{g.protocolType || '—'}</Td>
+              <div className="overflow-hidden rounded-sm border border-line">
+                <DataTable containerClassName="rounded-none border-0">
+                  <Thead>
+                    <Tr>
+                      <Th sub="group id" subTone="string">Group</Th>
+                      <Th>State</Th>
+                      <Th>Protocol</Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </DataTable>
+                  </Thead>
+                  <Tbody>
+                    {rows.map((g) => (
+                      <Tr key={g.groupId} interactive onClick={() => onSelectGroup(g.groupId)}>
+                        <Td mono>{g.groupId}</Td>
+                        <Td>
+                          <span className="inline-flex items-center gap-1.5">
+                            <StatusDot tone={STATE_TONE[g.state] ?? 'idle'} size="xs" />
+                            {g.state || '—'}
+                          </span>
+                        </Td>
+                        <Td className="text-fg-mute">{g.protocolType || '—'}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </DataTable>
+                {/* Tiêu đề trang ghi TỔNG số, còn bảng thì đang LỌC — hai con số khác
+                    nhau và trước đây không chỗ nào nói ra. Dòng này nói cả hai. */}
+                <DataTableStatus rows={groups.length} shown={rows.length} note={f ? `filter: "${f}"` : undefined} />
+              </div>
             )
         )}
       </div>

@@ -203,9 +203,11 @@ export function KeysListView({ conn, db, refreshKey, onRefresh, onSelectKey }: K
                   <Th className="w-8">
                     <RowCheckbox checked={allVisibleSelected} onClick={toggleSelectAllVisible} title="Select all shown" />
                   </Th>
-                  <Th>Key</Th>
-                  <Th>Type</Th>
-                  <Th align="right">TTL</Th>
+                  <Th sub="key" subTone="string">Key</Th>
+                  <Th sub="redis type" subTone="object">Type</Th>
+                  {/* TTL không có đơn vị thì `-1` với `300` đọc ra như nhau —
+                      một cái là "không hết hạn", một cái là "5 phút nữa". */}
+                  <Th align="right" sub="time left" subTone="date">TTL</Th>
                   <Th className="w-8" />
                 </Tr>
               </Thead>
@@ -215,9 +217,9 @@ export function KeysListView({ conn, db, refreshKey, onRefresh, onSelectKey }: K
                     <Td onClick={(e) => e.stopPropagation()}>
                       <RowCheckbox checked={selected.has(r.key)} onClick={() => toggleSelected(r.key)} title="Select key" />
                     </Td>
-                    <Td mono>{r.key}</Td>
+                    <Td mono tone="string">{r.key}</Td>
                     <Td><Badge tone={TYPE_TONE[r.type] ?? 'neutral'}>{r.type}</Badge></Td>
-                    <Td align="right" className="tabular-nums text-fg-mute">{ttlLabel(r.ttlMs)}</Td>
+                    <Td align="right" tone="date" className="tabular-nums">{ttlLabel(r.ttlMs)}</Td>
                     <Td align="right">
                       <button
                         className="text-fg-mute hover:text-bad opacity-0 group-hover:opacity-100 transition-opacity"

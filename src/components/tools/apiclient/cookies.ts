@@ -89,7 +89,14 @@ export function parseSetCookie(raw: string, url: string): Cookie | null {
     }
   }
   // Max-Age takes precedence over Expires (RFC 6265 §5.2.2).
-  if (maxAge !== null) cookie.expires = Date.now() + maxAge * 1000;
+  // Max-Age <= 0 nghĩa là XOÁ, và phải neo vào mốc 0 chứ không phải `Date.now()`.
+  // Bản cũ: `expires = Date.now() + 0`. Nhưng `applySetCookies` đọc `now` của nó
+  // TRƯỚC khi gọi hàm này, nên nếu đồng hồ nhích một mili-giây giữa hai lời gọi
+  // thì `expires > now` → cookie đọc ra là CHƯA hết hạn → lệnh xoá bị bỏ qua và
+  // cookie ở lại jar. Hiếm, nhưng có thật, và phụ thuộc tải máy — đúng kiểu lỗi
+  // chỉ hiện ra một lần rồi không dựng lại được. `cookies.test.ts` bắt được nó
+  // khi chạy song song cả bộ test.
+  if (maxAge !== null) cookie.expires = maxAge <= 0 ? 0 : Date.now() + maxAge * 1000;
   return cookie;
 }
 
