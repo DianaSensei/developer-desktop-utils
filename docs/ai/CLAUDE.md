@@ -70,7 +70,7 @@ devtool/
 │   │   ├── useDismissable.ts      # Click-outside / Escape dismissal for overlays
 │   │   └── useTauriFileDrop.ts    # OS-level file drag-drop (Tauri webview event)
 │   ├── lib/
-│   │   ├── toolDefs.ts      # TOOL_DEFS array + DEFAULT_TOOL_ORDER — single source of truth
+│   │   ├── toolDefs.ts      # VIEW dẫn xuất từ registry (nguồn sự thật: src/plugins/)
 │   │   ├── toolGuides.tsx   # Per-tool "how to use" guide content for ToolGuideModal
 │   │   ├── liveConnections.ts   # Global live-connection registry (rabbit/kafka live dot)
 │   │   ├── utils.ts         # cn() classname merger
@@ -80,6 +80,15 @@ devtool/
 │   │   ├── network.ts       # DNS / IP utilities for the Network tool
 │   │   ├── otpauth.ts       # TOTP/HOTP logic for the 2FA tool
 │   │   └── properties.ts    # .properties format parser/serializer for Data Converter
+│   ├── platform/            # Platform: hợp đồng Plugin + SDK + registry + audit
+│   │   ├── types.ts         # PluginManifest, PluginPermission, SDK_VERSION
+│   │   ├── manifest.ts      # definePlugin(), validateManifest(), satisfiesSdk()
+│   │   ├── registry.ts      # auto-discovery qua import.meta.glob → PLUGINS
+│   │   ├── sdk.ts           # SDK theo plugin: storage/clipboard/http/native
+│   │   ├── audit.ts         # nhật ký mọi lời gọi plugin → Platform
+│   │   ├── context.ts       # usePluginSdk() — SDK của chính plugin đang render
+│   │   └── index.ts         # bề mặt import duy nhất: '@/platform'
+│   ├── plugins/             # MỘT thư mục cho mỗi tool: <id>/plugin.ts (manifest)
 │   ├── workers/             # Web Workers for heavy computation
 │   │   ├── checksum.worker.ts
 │   │   ├── deduplicate.worker.ts
@@ -230,17 +239,20 @@ import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 
 ---
 
-## Adding a New Tool (Step-by-Step)
+## Adding a New Tool = Adding a Plugin
 
-Tool metadata, routing, and feature toggles are kept separate. All four need updating.
+Every tool is a **plugin**: one folder, one manifest. The Platform discovers it
+automatically — there is no registration table to update, and no route to wire in
+`App.tsx`. See [`docs/decisions/platform-plugin-architecture.md`](../decisions/platform-plugin-architecture.md)
+for why.
 
 ### Step 1: Create the tool component
 
-Create `src/components/tools/YourTool.tsx`. Use the **modern tool pattern**: real-time output (no "Process" button), persisted input, quick-paste, and undo/redo.
+Create `src/components/tools/YourTool.tsx` exactly as before (see the modern tool
+pattern below). Nothing about writing a tool component changed.
 
 ```tsx
 import { useMemo } from 'react';
-import { YourIcon } from 'lucide-react';
 import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import { Textarea } from '@/components/ui/textarea';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -257,21 +269,17 @@ export function YourTool() {
 
   return (
     <div className="flex flex-col h-full">
-      <ToolToolbar>
-        {/* mode selectors, options */}
-      </ToolToolbar>
+      <ToolToolbar>{/* mode selectors, options */}</ToolToolbar>
       <ToolPanes>
         <ToolPane>
           <PaneHeader label="Input" hint={quickPasteHint} />
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="flex-1 min-h-0 resize-none font-mono rounded-none border-0"
-          />
+          <Textarea value={input} onChange={(e) => setInput(e.target.value)}
+            className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" />
         </ToolPane>
         <ToolPane>
           <PaneHeader label="Output" action={<CopyButton value={output} iconClassName="h-3.5 w-3.5" />} />
-          <Textarea value={output} readOnly className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" />
+          <Textarea value={output} readOnly
+            className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" />
         </ToolPane>
       </ToolPanes>
     </div>
@@ -279,56 +287,79 @@ export function YourTool() {
 }
 ```
 
-### Step 2: Add to TOOL_DEFS — `src/lib/toolDefs.ts`
+### Step 2: Declare the plugin — `src/plugins/<id>/plugin.ts`
 
-`TOOL_DEFS` is the single source of truth for tool metadata (id, label, icon, description, keywords). Settings and the sidebar read from it automatically.
+**This is the only registration step.** The folder name MUST equal the `id`.
 
 ```ts
 import { YourIcon } from 'lucide-react';
+import { definePlugin } from '@/platform';
 
-export const TOOL_DEFS: ToolDef[] = [
-  // ... existing tools
-  {
-    id: 'your-tool',
-    label: 'Your Tool',
-    icon: YourIcon,
-    description: 'One-line description shown in sidebar tooltip and Settings.',
-    keywords: ['synonym1', 'synonym2'],   // optional; improves sidebar search
-  },
-];
+export default definePlugin({
+  id: 'your-tool',                       // kebab-case; also the storage namespace
+  label: 'Your Tool',
+  icon: YourIcon,
+  description: 'One-line description shown in sidebar tooltip and Settings.',
+  keywords: ['synonym1', 'synonym2'],    // optional; improves sidebar search
+  route: '/your-tool',                   // absolute, unique
+  order: 265,                            // sidebar position; unique, gaps of 10 by convention
+  defaultEnabled: true,                  // on/off for a fresh install
+  permissions: ['storage', 'clipboard:read', 'clipboard:write'],
+  sdk: '^1.0.0',
+  load: () => import('@/components/tools/YourTool').then((m) => m.YourTool),
+});
 ```
 
-Also add the tool id to `DEFAULT_TOOL_ORDER` (same file) in the desired position for fresh installs.
+**That's it.** Metadata, sidebar order, route, code-splitting and the default
+on/off state all come from this file. `TOOL_DEFS`, `TOOL_ROUTES` and
+`DEFAULT_FEATURES` are now derived views — do not edit them.
 
-### Step 3: Register route in App.tsx
+### Step 3 (optional): Add a tool guide — `src/lib/toolGuides.tsx`
+
+Tools listed in `toolGuides.tsx` get a hand-written help section shown by the `?`
+button in the app header. Any tool not listed falls back to a generic guide built
+from its description. Add a named export matching the tool id (camelCase the id).
+
+### Permissions
+
+Declare every Platform channel the tool touches. Today these are a **declaration**
+surfaced in Settings → Plugins and recorded in the audit log, not a sandbox — a
+plugin runs in the app's own realm. Two rules are enforced at load time:
+
+- `native` MUST come with a `commands` allowlist (prefix match: `'redis_'` covers
+  every `redis_*` command). Native without an allowlist is unlimited access to all
+  ~130 registered Tauri commands.
+- `commands` without `native` is rejected too.
+
+| Permission | Channel it unlocks |
+|---|---|
+| `storage` | `sdk.storage.*` — namespaced `devtool:<id>:` |
+| `clipboard:read` / `clipboard:write` | `sdk.clipboard.*` (separate on purpose) |
+| `http` | `sdk.http.fetch` — outbound network |
+| `native` | `sdk.native.invoke` — Tauri commands within `commands` |
+
+### Using the SDK from inside a plugin
 
 ```tsx
-// 1. Lazy-import at top of App.tsx (code-split)
-const YourTool = lazy(() => named(import('@/components/tools/YourTool'), 'YourTool'));
+import { usePluginSdk } from '@/platform';
 
-// 2. Add entry to TOOL_ROUTES
-const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
-  // ... existing routes
-  'your-tool': { path: '/your-tool', component: YourTool, fullHeight: true },
-};
+const sdk = usePluginSdk();          // the SDK of THIS plugin — id is implicit
+sdk.storage.set('draft', value);     // → devtool:<id>:draft
+await sdk.http.fetch(url);           // throws unless 'http' is declared
 ```
 
-All tools should use `fullHeight: true` — it removes the scrolling wrapper so the tool controls its own overflow.
+Existing tools still use `usePersistentState` / `@/lib/clipboard` directly and are
+not being rewritten; the SDK is for new code and for tools you already need to
+touch for another reason. `usePluginSdk()` only works inside a component the
+Platform mounted — shared components take the SDK as a prop.
 
-### Step 4: Enable by default — `src/contexts/FeatureContext.tsx`
+### Checks that will fail you
 
-```tsx
-const DEFAULT_FEATURES: FeatureSettings = {
-  // ... existing
-  'your-tool': true,
-};
-```
-
-### Step 5 (optional): Add a tool guide — `src/lib/toolGuides.tsx`
-
-Tools listed in `toolGuides.tsx` get a hand-written help section shown by the `?` button in the app header. Any tool not listed falls back to a generic guide built from its description. Add a named export matching the tool id (camelCase the id).
-
-**That's it.** No changes needed in `Settings.tsx` — it reads `TOOL_DEFS` automatically.
+- `src/platform/registry.test.ts` — locks the full plugin set, sidebar order,
+  routes and default on/off state. A bad manifest is dropped from the registry and
+  turns this test red rather than silently vanishing from the sidebar.
+- `src/platform/manifest.test.ts` — manifest validation and SDK range rules.
+- `src/platform/sdk.test.ts` — permission enforcement and audit records.
 
 ---
 

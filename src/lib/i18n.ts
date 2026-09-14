@@ -197,6 +197,30 @@ export const DICTIONARY = {
     en: 'Running in browser — permissions listed below apply to the desktop app only.',
   },
 
+  // ── Settings — Plugins ───────────────────────────────────────────────────
+  'settings.plugins.title': { vi: 'Plugin', en: 'Plugins' },
+  'settings.plugins.description': {
+    vi: 'Mỗi tool là một plugin tự khai báo trong src/plugins/<id>/plugin.ts. Bảng dưới đọc thẳng từ các manifest đó: kênh Platform mà plugin được phép dùng, và lệnh native nằm trong allowlist của nó.',
+    en: 'Every tool is a plugin that declares itself in src/plugins/<id>/plugin.ts. The table below is read straight from those manifests: which Platform channels the plugin may use, and which native commands are in its allowlist.',
+  },
+  'settings.plugins.count': {
+    vi: '{{enabled}}/{{total}} plugin đang bật · Platform SDK {{sdk}}',
+    en: '{{enabled}} of {{total}} plugins on · Platform SDK {{sdk}}',
+  },
+  'settings.plugins.off': { vi: 'đã tắt', en: 'off' },
+  'settings.plugins.noPermissions': { vi: 'Không dùng kênh nào của Platform', en: 'Uses no Platform channel' },
+  'settings.plugins.commands': { vi: 'Lệnh native', en: 'Native commands' },
+  'settings.plugins.audit': { vi: 'Nhật ký hoạt động', en: 'Activity log' },
+  'settings.plugins.auditDescription': {
+    vi: 'Mọi lời gọi plugin → Platform trong phiên này, kể cả lời gọi bị từ chối vì thiếu quyền. Chỉ lưu trong bộ nhớ, xoá khi đóng app.',
+    en: 'Every plugin → Platform call this session, including ones denied for a missing permission. Kept in memory only; cleared when the app closes.',
+  },
+  'settings.plugins.auditEmpty': {
+    vi: 'Chưa có lời gọi nào trong phiên này.',
+    en: 'No calls yet this session.',
+  },
+  'settings.plugins.auditDenied': { vi: 'bị từ chối', en: 'denied' },
+
   // ── Settings — MCP ────────────────────────────────────────────────────────
   'settings.mcp.title': { vi: 'Cầu nối MCP', en: 'MCP' },
   'settings.mcp.backgroundTitle': { vi: 'Bridge MCP chạy nền', en: 'Background MCP bridge' },
