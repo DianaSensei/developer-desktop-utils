@@ -1,6 +1,7 @@
 import { copyToClipboard, readTextFromClipboard } from '@/lib/clipboard';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
+import { createPluginService, type PluginService } from './service';
 import { isTauri } from '@/lib/platform';
 import * as audit from './audit';
 import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
@@ -75,6 +76,8 @@ export interface PluginSdk {
   /** `fetch` tương thích chuẩn, đi qua tauri-plugin-http khi chạy trong app. */
   http: { fetch(input: string, init?: RequestInit): Promise<Response> };
   native: { invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> };
+  /** Tier B: gọi sidecar của plugin. Xem `service.ts`. */
+  service: PluginService;
   log(message: string, detail?: string): void;
 }
 
@@ -197,6 +200,8 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
         return invoke<T>(command, args);
       },
     },
+
+    service: createPluginService(manifest),
 
     log(message, detail) {
       audit.record({ pluginId: id, channel: 'lifecycle', action: message, allowed: true, detail });

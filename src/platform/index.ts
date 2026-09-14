@@ -29,6 +29,14 @@ export {
   vaultKey,
 } from './secrets';
 export { useSecretState } from './useSecretState';
+export { SERVICE_PROTOCOL, createPluginService, PluginServiceError } from './service';
+export type {
+  PluginService,
+  ServiceDescriptor,
+  ServiceRequest,
+  ServiceResponse,
+  ServiceTransport,
+} from './service';
 export { PluginProvider, usePluginSdk, usePluginSdkOptional, withPluginSdk } from './context';
 export * as pluginAudit from './audit';
 export type { AuditChannel, AuditEntry } from './audit';

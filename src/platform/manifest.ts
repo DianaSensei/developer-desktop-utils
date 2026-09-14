@@ -18,6 +18,7 @@ const VALID_PERMISSIONS: PluginPermission[] = [
   'clipboard:write',
   'http',
   'native',
+  'service',
 ];
 
 /**
@@ -79,6 +80,25 @@ export function validateManifest(input: unknown): string[] {
   }
   if ((m.permissions ?? []).includes('native') && (m.commands?.length ?? 0) === 0) {
     errors.push('có quyền "native" nhưng không khai commands — quyền native luôn phải kèm allowlist');
+  }
+
+  // Cùng một luật "quyền phải đi kèm allowlist" như 'native', vì lý do giống
+  // hệt: một sidecar không giới hạn method là một quyền mở vô hạn.
+  const hasService = (m.permissions ?? []).includes('service');
+  if (hasService !== (m.service !== undefined)) {
+    errors.push(
+      hasService
+        ? 'có quyền "service" nhưng không khai service descriptor'
+        : 'khai service descriptor nhưng thiếu quyền "service"',
+    );
+  }
+  if (m.service) {
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(m.service.bin)) {
+      errors.push(`service.bin "${m.service.bin}" phải là tên binary kebab-case, không kèm đuôi hay target-triple`);
+    }
+    if (m.service.methods.length === 0) {
+      errors.push('service.methods rỗng — sidecar không giới hạn method là quyền mở vô hạn');
+    }
   }
 
   return errors;

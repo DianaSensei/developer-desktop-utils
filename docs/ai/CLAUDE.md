@@ -330,6 +330,12 @@ plugin runs in the app's own realm. Two rules are enforced at load time:
   every `redis_*` command). Native without an allowlist is unlimited access to all
   ~130 registered Tauri commands.
 - `commands` without `native` is rejected too.
+- `service` and the `service` descriptor must come together, and `service.methods`
+  must be non-empty — an unbounded sidecar is unbounded access. `service.bin` is the
+  bare binary name (no extension, no target triple); the binary is only ever spawned
+  if Rust's own `ALLOWED_SERVICES` list in `src-tauri/src/service_host.rs` contains it,
+  because the manifest is read by the webview and so cannot be the thing that decides
+  which process runs.
 
 | Permission | Channel it unlocks |
 |---|---|
@@ -338,6 +344,7 @@ plugin runs in the app's own realm. Two rules are enforced at load time:
 | `clipboard:read` / `clipboard:write` | `sdk.clipboard.*` (separate on purpose) |
 | `http` | `sdk.http.fetch` — outbound network |
 | `native` | `sdk.native.invoke` — Tauri commands within `commands` |
+| `service` | `sdk.service.call` — the plugin's own sidecar process (tier B), methods within `service.methods` |
 
 ### Using the SDK from inside a plugin
 

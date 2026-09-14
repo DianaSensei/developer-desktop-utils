@@ -100,7 +100,7 @@ duy nhất cho mọi loại plugin.**
 | Tier | Là gì | Cơ chế | Trạng thái |
 |---|---|---|---|
 | **A** | Mini tool JS/TS | Manifest + `import.meta.glob`, chung webview | ✅ đã làm |
-| **B** | Plugin cần native (socket, fs, SDK hệ sinh thái khác) | Sidecar binary, IPC theo mẫu `mcp_bridge.rs` | ⏳ chưa |
+| **B** | Plugin cần native (socket, fs, SDK hệ sinh thái khác) | Sidecar binary, JSONL qua stdin/stdout | ✅ khung đã có, chờ plugin đầu tiên |
 | **C** | Mini app nặng (game, automation) | Crate + binary + **cửa sổ riêng** | ⏳ ngoài phạm vi hiện tại |
 
 Tier C phải là tiến trình riêng, không phải vì hiệu năng đồ hoạ mà vì bốn ràng
@@ -157,6 +157,38 @@ credential) — nó bắt trường hợp hiển nhiên, không phải bằng ch
 Mật khẩu broker (`kafka-brokers.json`, config Redis/RabbitMQ) đã nằm ở file
 riêng phía Rust từ trước, không đi qua store chung — nên không thuộc đợt này.
 
+## Tier B — plugin dịch vụ (sidecar)
+
+`src-tauri/src/service_host.rs` (host) + `src/platform/service.ts` (client).
+Manifest khai thêm `service: { bin, methods }` và quyền `service`.
+
+**Giao thức**: JSON theo dòng (JSONL) qua stdin/stdout, mỗi sidecar phục vụ tuần
+tự sau một mutex. Hợp đồng một sidecar phải giữ: trả đúng một dòng cho mỗi dòng
+nhận được; **thoát khi stdin đóng (EOF)** — đó là cách tiến trình con được dọn
+khi app bị kill mà không kịp chạy hàm dọn nào; không ghi gì khác lên stdout.
+
+**Ranh giới tin cậy nằm ở Rust, không ở manifest.** Client nêu tên binary, nhưng
+chỉ tên trong `ALLOWED_SERVICES` của `service_host.rs` mới được chạy — manifest
+do webview đọc, nên nó không thể là thứ quyết định tiến trình nào được sinh ra.
+Danh sách hiện rỗng: chưa plugin nào dùng tier B, nên host **fail-closed** thay
+vì mở sẵn một đường chạy tiến trình cho thứ chưa tồn tại. Có test Rust khoá rằng
+mọi mục trong allowlist đều phải có mặt trong `bundle.externalBin` — lệch hai chỗ
+này là kiểu lỗi chỉ lộ ra sau khi phát hành.
+
+**Timeout thì giết tiến trình, không chỉ báo lỗi.** Với một ống dẫn tuần tự, một
+phản hồi đến muộn vẫn nằm trong ống và sẽ bị đọc nhầm thành phản hồi của lời gọi
+kế tiếp. Cùng lý do khi sidecar trả JSON không hợp lệ: dòng vừa đọc có thể là log
+lạc vào stdout. Cả hai đường đều dọn tiến trình để lần gọi sau bắt đầu sạch.
+
+Không thêm `tauri-plugin-shell`: sidecar được resolve như binary nằm cạnh file
+thực thi, đúng quy ước `mcp_bridge::mcp_sidecar_path` đã dùng — nên không phải mở
+thêm quyền chạy tiến trình nào ở tầng capability.
+
+**Chưa có đường end-to-end thật.** Test Rust lái đường I/O thật bằng tiến trình
+sẵn có của hệ điều hành (`cat` làm sidecar dội lại, `sh` làm sidecar treo và
+sidecar chết) thay vì ship một binary giả chỉ để kiểm thử; nhưng một sidecar
+thật, đóng gói thật, chỉ xuất hiện cùng plugin dịch vụ đầu tiên.
+
 ## Không làm (và vì sao)
 
 - **Nạp plugin lúc chạy từ repo khác.** Cần thêm: định dạng gói đã ký (tái dụng
@@ -182,4 +214,6 @@ riêng phía Rust từ trước, không đi qua store chung — nên không thu�
    + `baseline.json`, cùng cơ chế ngưỡng lùi dần như `design-system/guard.test.ts`.
    Mốc hiện tại: 12 chỗ gọi thẳng `@tauri-apps`, 47 chỗ dùng thẳng store chung.
    Mỗi tool chuyển sang SDK thì hạ ngưỡng; về 0 là quyền tương ứng thành thực thi.
-4. Tier B: sidecar plugin host.
+4. ~~Tier B: sidecar plugin host.~~ **Đã làm phần khung** — xem "Tier B" bên dưới.
+   Còn lại: plugin thật đầu tiên dùng nó (kèm binary trong `externalBin` +
+   `ALLOWED_SERVICES`), và đường end-to-end chỉ chạy thật khi có plugin đó.

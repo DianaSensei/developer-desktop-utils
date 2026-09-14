@@ -15,7 +15,14 @@ import type { PluginPermission } from './types';
  * gì ở phạm vi hiện tại.
  */
 
-export type AuditChannel = 'storage' | 'secrets' | 'clipboard' | 'http' | 'native' | 'lifecycle';
+export type AuditChannel =
+  | 'storage'
+  | 'secrets'
+  | 'clipboard'
+  | 'http'
+  | 'native'
+  | 'service'
+  | 'lifecycle';
 
 export interface AuditEntry {
   ts: number;

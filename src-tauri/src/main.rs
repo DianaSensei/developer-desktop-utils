@@ -12,6 +12,7 @@ mod ports;
 mod rabbit;
 mod redis_tool;
 mod container_tool;
+mod service_host;
 
 use tauri::Manager;
 
@@ -81,6 +82,9 @@ fn main() {
         .manage(kafka::KafkaConsumerRegistry::default())
         .manage(redis_tool::PubSubRegistry::default())
         .manage(container_tool::StreamRegistry::default())
+        // Host cho plugin dịch vụ (tier B). Allowlist rỗng cho tới khi có
+        // plugin đầu tiên dùng — xem service_host.rs.
+        .manage(service_host::ServiceRegistry::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -113,6 +117,8 @@ fn main() {
             files::read_file_data_url,
             mcp_bridge::mcp_respond,
             mcp_bridge::mcp_sidecar_path,
+            service_host::service_call,
+            service_host::service_stop,
             kafka::kafka_list_configs,
             kafka::kafka_save_config,
             kafka::kafka_delete_config,

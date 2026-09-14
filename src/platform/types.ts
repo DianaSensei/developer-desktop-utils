@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
+import type { ServiceDescriptor } from './service';
 
 /**
  * Hợp đồng giữa Platform và Plugin.
@@ -36,7 +37,8 @@ export type PluginPermission =
   | 'clipboard:read'
   | 'clipboard:write'
   | 'http'
-  | 'native';
+  | 'native'
+  | 'service';
 
 export interface PluginManifest {
   /** kebab-case, duy nhất toàn app. Đồng thời là khoá bật/tắt và namespace storage. */
@@ -70,6 +72,11 @@ export interface PluginManifest {
    * quyền 'native'. Khớp tiền tố: `'redis_'` cho phép mọi lệnh `redis_*`.
    */
   commands?: string[];
+  /**
+   * Tier B: sidecar plugin này cần. Khai `service` thì phải khai cả quyền
+   * 'service' — xem `service.ts` cho hợp đồng và lý do chọn tiến trình riêng.
+   */
+  service?: ServiceDescriptor;
   /** Dải version SDK plugin chạy được, dạng `^M.m.p`. */
   sdk: string;
   /** Nạp component chính. Được gọi lazy ở lần điều hướng đầu tiên → code-split. */
