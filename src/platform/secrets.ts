@@ -133,6 +133,10 @@ const MIGRATIONS: ReadonlyArray<{ from: string; pluginId: string; key: string }>
   // phải chuỗi ví dụ. Giữ nó ở store chung nghĩa là mọi module trong webview
   // đọc được token phiên làm việc của họ.
   { from: 'devtool:jwt:token', pluginId: 'jwt', key: 'token' },
+  // "Vault" của API Client: toàn bộ nội dung là bí mật theo đúng định nghĩa của
+  // nó — nó tồn tại chính vì người dùng không muốn những giá trị này nằm trong
+  // environments xuất/nhập được.
+  { from: 'devtool:apiclient:vault', pluginId: 'api-client', key: 'vault' },
 ];
 
 /**

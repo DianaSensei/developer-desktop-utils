@@ -369,7 +369,10 @@ row to `MIGRATIONS` there when moving an existing key into the vault.
 Existing tools still use `usePersistentState` / `@/lib/clipboard` directly and are
 not being rewritten; the SDK is for new code and for tools you already need to
 touch for another reason. `usePluginSdk()` only works inside a component the
-Platform mounted — shared components take the SDK as a prop.
+Platform mounted — shared components take the SDK as a prop. For plugin code that
+deliberately mounts outside its own route (e.g. `ApiClientRuntimeProvider`, mounted
+in `App.tsx` so the MCP bridge answers while another tool is on screen), use
+`usePluginSdkFor('<plugin-id>')`.
 
 ### Checks that will fail you
 

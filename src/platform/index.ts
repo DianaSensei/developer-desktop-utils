@@ -32,6 +32,7 @@ export {
 } from './secrets';
 export type { VaultStatus, VaultKeyMode } from './secrets';
 export { useSecretState } from './useSecretState';
+export { usePluginSdkFor } from './usePluginSdkFor';
 export { SERVICE_PROTOCOL, createPluginService, PluginServiceError } from './service';
 export type {
   PluginService,

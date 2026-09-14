@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/api-client',
   order: 20,
   defaultEnabled: true,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native', 'http'],
+  permissions: ['storage', 'secrets', 'clipboard:read', 'clipboard:write', 'native', 'http'],
   commands: ['mcp_'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/apiclient/ApiClient').then((m) => m.ApiClient),

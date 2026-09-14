@@ -174,11 +174,35 @@ cũ — để lại bản trần cạnh bản mã hoá thì việc mã hoá ch�
 (một JWT dán vào debugger thường là bearer token thật, không phải chuỗi ví dụ).
 Hai tool này cũng là hai plugin đầu tiên chạy trên SDK thật.
 
-Còn lại: `devtool:apiclient:environments` — token nằm lẫn với biến thường trong
-cùng một tài liệu, và `store.ts` của API Client đọc đồng bộ ở nhiều chỗ, nên
-chuyển nó là một lát cắt riêng chứ không phải đổi một dòng. Lưu ý tripwire
-`secretishKeyInSharedStore` **không** bắt được khoá này (tên khoá không lộ ra là
-credential) — nó bắt trường hợp hiển nhiên, không phải bằng chứng đã sạch.
+### API Client: tách theo BIẾN, không bê cả tài liệu
+
+`devtool:apiclient:environments` chứa token, nhưng không chỉ có token: base URL,
+tên môi trường, biến thường — thứ người dùng sửa liên tục và các phần khác của
+store đọc đồng bộ (`migrateLegacyActiveEnv`). Bê cả tài liệu sang một kho bất
+đồng bộ, mã hoá lại từ đầu sau mỗi lần gõ phím, là trả giá lớn cho một phần nhỏ
+dữ liệu — và biến một tài liệu đồng bộ thành bất đồng bộ giữa một tool 1000+
+dòng là rủi ro không cần thiết.
+
+Nên chỉ **giá trị của biến có `secret: true`** đi vào kho (`envSecrets.ts` +
+`useEnvSecrets.ts`); cấu trúc ở lại chỗ cũ. Mô hình dữ liệu vốn đã phân biệt sẵn
+— `KeyValue.secret` có từ trước, dùng để che giá trị trong editor và loại nó
+khỏi cURL/codegen/history — nên đây chỉ là dùng đúng cái phân biệt đó cho việc
+lưu trữ. Bảy chỗ gọi `setEnvironments` trong `store.ts` không đổi một dòng.
+
+Bản đồ bí mật ghi lại **đầy đủ** mỗi lần, không phải bản vá: nhờ vậy bỏ đánh dấu
+`secret` hay xoá môi trường sẽ dọn luôn mục cũ trong kho thay vì để nó nằm lại
+vĩnh viễn. Di trú cho người nâng cấp chỉ chạy **sau khi kho đọc xong**, và giá
+trị đã có trong kho thắng tàn dư inline — chạy sớm hơn, hoặc để bản cũ đè ngược,
+đều là mất token thật của người dùng.
+
+"Vault" của API Client (`devtool:apiclient:vault`) thì đi trọn vào kho: toàn bộ
+nội dung của nó là bí mật theo đúng định nghĩa, nó tồn tại chính vì người dùng
+không muốn những giá trị đó nằm trong environments xuất/nhập được.
+
+`usePluginSdkFor(pluginId)` sinh ra từ đây: `ApiClientRuntimeProvider` mount
+thẳng trong App.tsx (để cầu nối MCP trả lời được khi người dùng đang xem tool
+khác), tức code của plugin sống ngoài cây mà Platform dựng, nơi `usePluginSdk()`
+sẽ ném.
 
 Mật khẩu broker (`kafka-brokers.json`, config Redis/RabbitMQ) đã nằm ở file
 riêng phía Rust từ trước, không đi qua store chung — nên không thuộc đợt này.
@@ -231,9 +255,8 @@ thật, đóng gói thật, chỉ xuất hiện cùng plugin dịch vụ đầu 
 
 ## Việc còn lại
 
-1. ~~Tách credential ra khỏi store dùng chung.~~ ~~Mã hoá khi nằm trên đĩa.~~
-   **Đã làm cả hai** — xem "Kho bí mật" bên dưới. Còn lại: chuyển
-   `devtool:apiclient:environments` sang kho.
+1. ~~Tách credential ra khỏi store dùng chung, mã hoá khi nằm trên đĩa, và
+   chuyển environments của API Client.~~ **Đã làm cả ba** — xem "Kho bí mật".
 2. Thu hẹp `http://**` + `https://**` trong `capabilities/default.json` theo
    allowlist gắn với quyền `http` của từng plugin.
 3. ~~Guard test ranh giới Platform.~~ **Đã làm** — `src/platform/guard.test.ts`

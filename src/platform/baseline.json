@@ -3,7 +3,7 @@
     "directTauriInPluginCode": "Tool gọi thẳng @tauri-apps thay vì qua sdk.native/clipboard/http. Về 0 thì quyền 'native' chuyển từ mô tả sang thực thi.",
     "sharedStoreInPluginCode": "Tool dùng thẳng usePersistentState/persistentStore thay vì sdk.storage. Về 0 thì mọi dữ liệu tool đều có namespace và audit.",
     "manifestForeignImports": "BẤT BIẾN, không phải nợ: manifest chỉ được nhập lucide-react và @/platform. Nhập thứ khác phá code-split.",
-    "secretishKeyInSharedStore": "BẤT BIẾN, không phải nợ: không credential nào được quay lại store dùng chung. Đây là tripwire theo TÊN khoá — nó bắt các trường hợp hiển nhiên, KHÔNG phải bằng chứng đã sạch (vd 'devtool:apiclient:environments' chứa token nhưng tên khoá không lộ ra)."
+    "secretishKeyInSharedStore": "BẤT BIẾN, không phải nợ: không credential nào được quay lại store dùng chung. Đây là tripwire theo TÊN khoá — nó bắt các trường hợp hiển nhiên, KHÔNG phải bằng chứng đã sạch: 'devtool:apiclient:environments' từng chứa token mà tên khoá không hề lộ ra (đã xử lý riêng bằng envSecrets.ts). Thêm một khoá mới mang credential thì đừng trông chờ luật này bắt được."
   },
   "limits": {
     "directTauriInPluginCode": 12,

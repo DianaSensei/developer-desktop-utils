@@ -7,6 +7,8 @@
 
 import { useCallback, useMemo } from 'react';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, useSecretState } from '@/platform';
+import { useEnvSecrets } from './useEnvSecrets';
 import { storageGet } from '@/lib/persistentStore';
 import { type Cookie, applySetCookies } from './cookies';
 import { paramsFromUrl } from './request';
@@ -408,8 +410,15 @@ export function useApiStore() {
   const [collections, setCollections] = usePersistentState<Collection[]>(
     'devtool:apiclient:collections', seedCollections, { debounceMs: 400 },
   );
-  const [environments, setEnvironments] = usePersistentState<Environment[]>(
+  // Giá trị của biến `secret` sống trong kho bí mật đã mã hoá; cấu trúc
+  // environments vẫn ở store thường. Xem envSecrets.ts cho lý do không bê cả
+  // tài liệu sang kho.
+  const sdk = usePluginSdkFor('api-client');
+  const [strippedEnvironments, setStrippedEnvironments] = usePersistentState<Environment[]>(
     'devtool:apiclient:environments', [], { debounceMs: 300 },
+  );
+  const [environments, setEnvironments] = useEnvSecrets(
+    sdk, strippedEnvironments, setStrippedEnvironments,
   );
   // Per-collection remembered choice (collectionId -> envId) and the single,
   // collection-independent global choice — replaces the old single
@@ -441,9 +450,10 @@ export function useApiStore() {
   // Local-only secret store, kept separate from environments (Postman's
   // "Vault"). Never touched by import/export or collection scripts — only
   // resolved into the actual outgoing request at send time (see engine.ts).
-  const [vault, setVault] = usePersistentState<KeyValue[]>(
-    'devtool:apiclient:vault', [], { debounceMs: 300 },
-  );
+  //
+  // Toàn bộ nội dung là bí mật theo đúng định nghĩa của nó, nên nó nằm trọn
+  // trong kho đã mã hoá chứ không phải store thường.
+  const [vault, setVault] = useSecretState<KeyValue[]>(sdk, 'vault', []);
 
   // Vault secrets namespaced as `vault.<key>` for {{ }} substitution.
   const vaultVars = useMemo(() => {
