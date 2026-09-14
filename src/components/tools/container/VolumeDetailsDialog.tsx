@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
-import { containerApi, type ContainerConnection, type VolumeDetails } from './types';
+import { type ContainerConnection, type VolumeDetails } from './types';
+import { useContainerApi } from './api_sdk';
 import { DetailField, DetailGrid, KeyValueTable, labelEntries } from './DetailRows';
 import { formatBytes } from './format';
 
@@ -23,6 +24,7 @@ export function VolumeDetailsDialog({ open, onOpenChange, connection, name, user
   /** Names of the containers mounting this volume, from the usage index. */
   users?: string[];
 }) {
+  const containerApi = useContainerApi();
   const [details, setDetails] = useState<VolumeDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

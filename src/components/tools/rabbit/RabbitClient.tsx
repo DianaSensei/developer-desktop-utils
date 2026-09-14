@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
+import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor, usePluginState } from '@/platform';
 import { Rabbit, Info, Plug } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
 import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 import { Button } from '@/components/ui/button';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
-import { rabbitApi, type RabbitConnection } from './types';
+import { type RabbitConnection } from './types';
+import { useRabbitApi } from './api_sdk';
 import { rabbitMgmt } from './api';
 import { useRabbitRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
@@ -33,6 +33,7 @@ const LEFT_DEFAULT = 264;
 let cachedConnections: RabbitConnection[] | null = null;
 
 export function RabbitClient() {
+  const rabbitApi = useRabbitApi();
   const rabbitState = useRabbitRuntime();
   const {
     selectedConnId, setSelectedConnId, connectedConnId, setConnectedConnId,
@@ -104,9 +105,9 @@ export function RabbitClient() {
   // we never flash a management-only view before redirecting.
   const effectiveView = conn?.amqpOnly && (view === 'overview' || view === 'connections') ? 'queues' : view;
 
-  const [infoDismissed, setInfoDismissed] = usePersistentState('devtool:rabbit:info-dismissed', false);
+  const [infoDismissed, setInfoDismissed] = usePluginState(sdk, 'info-dismissed', false, { legacyKey: 'devtool:rabbit:info-dismissed' });
   const [showInfo, setShowInfo] = useState(!infoDismissed);
-  const [leftWidth, setLeftWidth] = usePersistentState('devtool:rabbit:leftPanelWidth', LEFT_DEFAULT);
+  const [leftWidth, setLeftWidth] = usePluginState(sdk, 'leftPanelWidth', LEFT_DEFAULT, { legacyKey: 'devtool:rabbit:leftPanelWidth' });
   const [isResizing, setIsResizing] = useState(false);
 
   const handleResizeStart = (e: React.MouseEvent) => {

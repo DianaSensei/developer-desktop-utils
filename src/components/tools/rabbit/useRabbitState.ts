@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 
 export type RabbitView = 'overview' | 'connections' | 'rpc' | 'consumers' | 'queues' | 'exchanges' | 'queue' | 'exchange';
 
@@ -47,12 +47,13 @@ export interface RabbitState {
 }
 
 export function useRabbitState(): RabbitState {
+  const sdk = usePluginSdkFor('rabbit-client');
   // Selection persists across restarts so you resume where you left off.
-  const [selectedConnId, setSelectedConnIdRaw] = usePersistentState('devtool:rabbit:selectedConnId', '');
-  const [connectedConnId, setConnectedConnId] = usePersistentState('devtool:rabbit:connectedConnId', '');
-  const [view, setView] = usePersistentState<RabbitView>('devtool:rabbit:view', 'overview');
-  const [selectedQueue, setSelectedQueue] = usePersistentState<string | null>('devtool:rabbit:selectedQueue', null);
-  const [selectedExchange, setSelectedExchange] = usePersistentState<string | null>('devtool:rabbit:selectedExchange', null);
+  const [selectedConnId, setSelectedConnIdRaw] = usePluginState(sdk, 'selectedConnId', '', { legacyKey: 'devtool:rabbit:selectedConnId' });
+  const [connectedConnId, setConnectedConnId] = usePluginState(sdk, 'connectedConnId', '', { legacyKey: 'devtool:rabbit:connectedConnId' });
+  const [view, setView] = usePluginState<RabbitView>(sdk, 'view', 'overview', { legacyKey: 'devtool:rabbit:view' });
+  const [selectedQueue, setSelectedQueue] = usePluginState<string | null>(sdk, 'selectedQueue', null, { legacyKey: 'devtool:rabbit:selectedQueue' });
+  const [selectedExchange, setSelectedExchange] = usePluginState<string | null>(sdk, 'selectedExchange', null, { legacyKey: 'devtool:rabbit:selectedExchange' });
   const [rpcPrefill, setRpcPrefill] = useState<RpcPrefill | null>(null);
   const [consumerPrefill, setConsumerPrefill] = useState<ConsumerPrefill | null>(null);
   const [consumeDetailQueue, setConsumeDetailQueue] = useState<string | null>(null);

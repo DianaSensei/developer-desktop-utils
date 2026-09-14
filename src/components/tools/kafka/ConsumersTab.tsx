@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { AlertCircle, RefreshCw, ChevronRight, ChevronDown } from 'lucide-react';
 import { LoadingRow } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
-import { kafkaApi, type GroupLag } from './types';
+import { type GroupLag } from './types';
+import { useKafkaApi } from './api_sdk';
 
 interface ConsumersTabProps {
   brokerId: string;
@@ -25,6 +26,7 @@ function groupByGroup(rows: GroupLag[]): [string, GroupLag[]][] {
 // lazily by TopicView), and only re-fetched when the user clicks Refresh —
 // never automatically, since the scan asks every group for its offsets.
 export function ConsumersTab({ brokerId, topic, onSelectGroup }: ConsumersTabProps) {
+  const kafkaApi = useKafkaApi();
   const [groups, setGroups] = useState<GroupLag[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

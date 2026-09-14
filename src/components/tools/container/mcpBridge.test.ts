@@ -41,11 +41,11 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
   Channel: FakeChannel,
 }));
-vi.mock('./types', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./types')>();
-  return {
-    ...actual,
-    containerApi: {
+// Lớp lệnh giờ đến từ `useContainerApi()` (dựng trên SDK của plugin), nên mock
+// đặt ở đó thay vì ở `./types` — test không phải biết lớp lệnh được dựng bằng
+// cách nào, chỉ cần biết bridge gọi những hàm nào.
+vi.mock('./api_sdk', () => ({
+  useContainerApi: () => ({
       listConfigs: (...a: unknown[]) => listConfigsMock(...a),
       saveConfig: (...a: unknown[]) => saveConfigMock(...a),
       deleteConfig: (...a: unknown[]) => deleteConfigMock(...a),
@@ -64,9 +64,8 @@ vi.mock('./types', async (importOriginal) => {
       imageList: (...a: unknown[]) => imageListMock(...a),
       imageDetails: (...a: unknown[]) => imageDetailsMock(...a),
       imageRemove: (...a: unknown[]) => imageRemoveMock(...a),
-    },
-  };
-});
+    }),
+}));
 
 type CallHandler = (event: { payload: { id: string; tool: string; args: Record<string, unknown> } }) => void;
 

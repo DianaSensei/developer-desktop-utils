@@ -1,4 +1,4 @@
-import { invoke, Channel } from '@tauri-apps/api/core';
+import type { Channel, PluginSdk } from '@/platform';
 
 export interface BrokerConfig {
   id: string;
@@ -109,65 +109,82 @@ export type ConsumeFrom = 'latest' | 'earliest';
 
 // ── Invoke wrappers ───────────────────────────────────────────────────────────
 
-export const kafkaApi = {
-  listConfigs: () =>
-    invoke<BrokerConfig[]>('kafka_list_configs'),
+/**
+ * Lớp lệnh của tool, dựng theo SDK của plugin thay vì gọi thẳng `invoke`.
+ *
+ * Nhờ vậy allowlist `commands: ['kafka_', 'mcp_respond']` trong manifest có hiệu lực thật —
+ * một lệnh gõ sai hay một lệnh ngoài danh sách bị chặn ngay và ghi vào nhật ký,
+ * thay vì lặng lẽ đi thẳng xuống Rust.
+ *
+ * Dùng qua `useKafkaApi()` (xem api.ts); factory để lộ ra đây chỉ cho test và
+ * cho code không phải React.
+ */
+export function createKafkaApi(sdk: PluginSdk) {
+  const invoke = <T,>(command: string, args?: Record<string, unknown>) =>
+    sdk.native.invoke<T>(command, args);
 
-  saveConfig: (config: BrokerConfig) =>
-    invoke<BrokerConfig>('kafka_save_config', { config }),
+  return {
+    listConfigs: () =>
+      invoke<BrokerConfig[]>('kafka_list_configs'),
 
-  deleteConfig: (configId: string) =>
-    invoke<void>('kafka_delete_config', { configId }),
+    saveConfig: (config: BrokerConfig) =>
+      invoke<BrokerConfig>('kafka_save_config', { config }),
 
-  testConnection: (configId: string) =>
-    invoke<void>('kafka_test_connection', { configId }),
+    deleteConfig: (configId: string) =>
+      invoke<void>('kafka_delete_config', { configId }),
 
-  listTopics: (configId: string) =>
-    invoke<TopicSummary[]>('kafka_list_topics', { configId }),
+    testConnection: (configId: string) =>
+      invoke<void>('kafka_test_connection', { configId }),
 
-  topicDetails: (configId: string, topic: string) =>
-    invoke<TopicDetails>('kafka_topic_details', { configId, topic }),
+    listTopics: (configId: string) =>
+      invoke<TopicSummary[]>('kafka_list_topics', { configId }),
 
-  // On-demand only (Consumers tab) — scans groups, so never call on topic open.
-  topicConsumerGroups: (configId: string, topic: string) =>
-    invoke<GroupLag[]>('kafka_topic_consumer_groups', { configId, topic }),
+    topicDetails: (configId: string, topic: string) =>
+      invoke<TopicDetails>('kafka_topic_details', { configId, topic }),
 
-  createTopic: (configId: string, name: string, numPartitions: number, replicationFactor: number) =>
-    invoke<void>('kafka_create_topic', { configId, name, numPartitions, replicationFactor }),
+    // On-demand only (Consumers tab) — scans groups, so never call on topic open.
+    topicConsumerGroups: (configId: string, topic: string) =>
+      invoke<GroupLag[]>('kafka_topic_consumer_groups', { configId, topic }),
 
-  listGroups: (configId: string) =>
-    invoke<GroupSummary[]>('kafka_list_groups', { configId }),
+    createTopic: (configId: string, name: string, numPartitions: number, replicationFactor: number) =>
+      invoke<void>('kafka_create_topic', { configId, name, numPartitions, replicationFactor }),
 
-  groupDetails: (configId: string, groupId: string) =>
-    invoke<GroupDetails>('kafka_group_details', { configId, groupId }),
+    listGroups: (configId: string) =>
+      invoke<GroupSummary[]>('kafka_list_groups', { configId }),
 
-  produce: (configId: string, topic: string, partition: number | null, key: string | null, value: string, headers: Record<string, string>) =>
-    invoke<ProduceResult>('kafka_produce', { configId, topic, partition, key, value, headers }),
+    groupDetails: (configId: string, groupId: string) =>
+      invoke<GroupDetails>('kafka_group_details', { configId, groupId }),
 
-  produceBatch: (configId: string, topic: string, partition: number | null, records: BatchRecord[]) =>
-    invoke<number[]>('kafka_produce_batch', { configId, topic, partition, records }),
+    produce: (configId: string, topic: string, partition: number | null, key: string | null, value: string, headers: Record<string, string>) =>
+      invoke<ProduceResult>('kafka_produce', { configId, topic, partition, key, value, headers }),
 
-  fetchMessages: (configId: string, topic: string, partition: number, offset: number, limit: number, startTimestamp?: number | null) =>
-    invoke<KafkaMessage[]>('kafka_fetch_messages', { configId, topic, partition, offset, limit, startTimestamp: startTimestamp ?? null }),
+    produceBatch: (configId: string, topic: string, partition: number | null, records: BatchRecord[]) =>
+      invoke<number[]>('kafka_produce_batch', { configId, topic, partition, records }),
 
-  deleteTopic: (configId: string, name: string) =>
-    invoke<void>('kafka_delete_topic', { configId, name }),
+    fetchMessages: (configId: string, topic: string, partition: number, offset: number, limit: number, startTimestamp?: number | null) =>
+      invoke<KafkaMessage[]>('kafka_fetch_messages', { configId, topic, partition, offset, limit, startTimestamp: startTimestamp ?? null }),
 
-  topicConfigs: (configId: string, topic: string) =>
-    invoke<TopicConfig[]>('kafka_topic_configs', { configId, topic }),
+    deleteTopic: (configId: string, name: string) =>
+      invoke<void>('kafka_delete_topic', { configId, name }),
 
-  /** Start a realtime anonymous consumer over all partitions; records stream to `onMessage`. */
-  consumeStart: (
-    args: { configId: string; topic: string; from: ConsumeFrom },
-    onMessage: Channel<KafkaConsumedMessage>,
-  ) =>
-    invoke<string>('kafka_consume_start', {
-      configId: args.configId,
-      topic: args.topic,
-      from: args.from,
-      onMessage,
-    }),
+    topicConfigs: (configId: string, topic: string) =>
+      invoke<TopicConfig[]>('kafka_topic_configs', { configId, topic }),
 
-  consumeStop: (consumerId: string) =>
-    invoke<void>('kafka_consume_stop', { consumerId }),
-};
+    /** Start a realtime anonymous consumer over all partitions; records stream to `onMessage`. */
+    consumeStart: (
+      args: { configId: string; topic: string; from: ConsumeFrom },
+      onMessage: Channel<KafkaConsumedMessage>,
+    ) =>
+      invoke<string>('kafka_consume_start', {
+        configId: args.configId,
+        topic: args.topic,
+        from: args.from,
+        onMessage,
+      }),
+
+    consumeStop: (consumerId: string) =>
+      invoke<void>('kafka_consume_stop', { consumerId }),
+  };
+}
+
+export type KafkaApi = ReturnType<typeof createKafkaApi>;

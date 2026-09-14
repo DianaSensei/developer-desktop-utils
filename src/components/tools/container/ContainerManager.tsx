@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
+import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor, usePluginState } from '@/platform';
 import { Container, Plug } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
-import { containerApi, type ContainerConnection } from './types';
+import { type ContainerConnection } from './types';
+import { useContainerApi } from './api_sdk';
 import { useContainerRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
 import { LeftPanel } from './LeftPanel';
@@ -27,6 +27,7 @@ const LEFT_DEFAULT = 220;
 let cachedConnections: ContainerConnection[] | null = null;
 
 export function ContainerManager() {
+  const containerApi = useContainerApi();
   const containerState = useContainerRuntime();
   const {
     selectedConnId, setSelectedConnId, connectedConnId, setConnectedConnId,
@@ -80,7 +81,7 @@ export function ContainerManager() {
     setConnectedConnId('');
   }, [setConnectedConnId]);
 
-  const [leftWidth, setLeftWidth] = usePersistentState('devtool:container:leftPanelWidth', LEFT_DEFAULT);
+  const [leftWidth, setLeftWidth] = usePluginState(sdk, 'leftPanelWidth', LEFT_DEFAULT, { legacyKey: 'devtool:container:leftPanelWidth' });
   const [isResizing, setIsResizing] = useState(false);
 
   const handleResizeStart = (e: React.MouseEvent) => {

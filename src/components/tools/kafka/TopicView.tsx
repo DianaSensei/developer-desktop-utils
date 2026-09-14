@@ -3,7 +3,8 @@ import { AlertCircle, RefreshCw, ChevronRight, Server, Radio, Send, ArrowLeft } 
 import { Button } from '@/components/ui/button';
 import { LoadingRow, Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { kafkaApi, type TopicDetails } from './types';
+import { type TopicDetails } from './types';
+import { useKafkaApi } from './api_sdk';
 import { PropertiesTab } from './PropertiesTab';
 import { MessagesTab } from './MessagesTab';
 import { ConfigTab } from './ConfigTab';
@@ -44,6 +45,7 @@ export function TopicView({
   onProduce,
   onBackToTopics,
 }: TopicViewProps) {
+  const kafkaApi = useKafkaApi();
   // Tolerate a stale persisted tab (e.g. the removed 'produce').
   const activeTab: KafkaTab = TABS.some((t) => t.id === selectedTab) ? selectedTab : 'data';
   const [data, setData] = useState<TopicDetails | null>(null);

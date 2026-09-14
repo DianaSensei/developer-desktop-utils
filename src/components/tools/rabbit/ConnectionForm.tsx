@@ -9,7 +9,8 @@ import { Info, CheckCircle2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Callout } from '@/components/ui/callout';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
-import { EMPTY_CONNECTION, rabbitApi, type RabbitConnection } from './types';
+import { EMPTY_CONNECTION, type RabbitConnection } from './types';
+import { useRabbitApi } from './api_sdk';
 import { rabbitMgmt } from './api';
 
 interface ConnectionFormProps {
@@ -51,6 +52,7 @@ function hostsToText(c: { host: string; amqpPort: number; extraHosts?: string[] 
 }
 
 export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProps) {
+  const rabbitApi = useRabbitApi();
   const [form, setForm] = useState<RabbitConnection>(initial ?? EMPTY_CONNECTION);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);

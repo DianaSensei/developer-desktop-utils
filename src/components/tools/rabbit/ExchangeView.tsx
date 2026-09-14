@@ -1,3 +1,4 @@
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { RefreshCw, Send, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
@@ -5,9 +6,8 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RabbitConnection, ExchangeInfo, BindingInfo, ExchangeAmqpInfo } from './types';
-import { rabbitApi } from './types';
+import { useRabbitApi } from './api_sdk';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { NewBindingForm } from './QueueView';
@@ -25,7 +25,8 @@ interface ExchangeViewProps {
 type Tab = 'overview' | 'bindings';
 
 export function ExchangeView({ conn, exchangeName, refreshKey, onRefresh, onBack, onPublish }: ExchangeViewProps) {
-  const [tab, setTab] = usePersistentState<Tab>('devtool:rabbit:exchangeTab', 'overview');
+  const sdk = usePluginSdkFor('rabbit-client');
+  const [tab, setTab] = usePluginState<Tab>(sdk, 'exchangeTab', 'overview', { legacyKey: 'devtool:rabbit:exchangeTab' });
   // Tolerate stale persisted values (e.g. a removed 'publish' tab).
   const activeTab: Tab = tab === 'overview' || tab === 'bindings' ? tab : 'overview';
   const isDefault = exchangeName === '';
@@ -95,6 +96,7 @@ function MgmtOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
 
 /** AMQP-only overview: a passive declare can only confirm existence. */
 function AmqpOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConnection; exchangeName: string; refreshKey: number }) {
+  const rabbitApi = useRabbitApi();
   const { data, loading, error } = useRabbitData<ExchangeAmqpInfo[]>(() => rabbitApi.amqpExchangesInfo(conn.id, [exchangeName]), [conn.id, exchangeName, refreshKey]);
   if (loading) return <LoadingRow />;
   if (error) return <Callout tone="error">{error}</Callout>;
@@ -119,6 +121,7 @@ function AmqpOverviewTab({ conn, exchangeName, refreshKey }: { conn: RabbitConne
 }
 
 function BindingsTab({ conn, exchangeName, refreshKey }: { conn: RabbitConnection; exchangeName: string; refreshKey: number }) {
+  const rabbitApi = useRabbitApi();
   const isDefault = exchangeName === '';
   if (conn.amqpOnly) {
     return (

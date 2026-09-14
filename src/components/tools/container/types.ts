@@ -1,4 +1,4 @@
-import { invoke, Channel } from '@tauri-apps/api/core';
+import type { Channel, PluginSdk } from '@/platform';
 
 // ── Connection profile ──────────────────────────────────────────────────────
 
@@ -322,91 +322,108 @@ export function groupByComposeProject(containers: ContainerSummary[]): ComposePr
 
 // ── Invoke wrappers ─────────────────────────────────────────────────────────
 
-export const containerApi = {
-  listConfigs: () => invoke<ContainerConnection[]>('container_list_configs'),
-  saveConfig: (config: ContainerConnection) => invoke<ContainerConnection>('container_save_config', { config }),
-  deleteConfig: (configId: string) => invoke<void>('container_delete_config', { configId }),
-  detectSockets: () => invoke<DetectedSocket[]>('container_detect_sockets'),
-  testConnection: (config: ContainerConnection) => invoke<void>('container_test_connection', { config }),
+/**
+ * Lớp lệnh của tool, dựng theo SDK của plugin thay vì gọi thẳng `invoke`.
+ *
+ * Nhờ vậy allowlist `commands: ['container_', 'image_', 'volume_', 'network_', 'mcp_respond']` trong manifest có hiệu lực thật —
+ * một lệnh gõ sai hay một lệnh ngoài danh sách bị chặn ngay và ghi vào nhật ký,
+ * thay vì lặng lẽ đi thẳng xuống Rust.
+ *
+ * Dùng qua `useContainerApi()` (xem api.ts); factory để lộ ra đây chỉ cho test và
+ * cho code không phải React.
+ */
+export function createContainerApi(sdk: PluginSdk) {
+  const invoke = <T,>(command: string, args?: Record<string, unknown>) =>
+    sdk.native.invoke<T>(command, args);
 
-  list: (config: ContainerConnection, all: boolean) =>
-    invoke<ContainerSummary[]>('container_list', { config, all }),
-  inspect: (config: ContainerConnection, containerId: string) =>
-    invoke<unknown>('container_inspect', { config, containerId }),
-  start: (config: ContainerConnection, containerId: string) =>
-    invoke<void>('container_start', { config, containerId }),
-  stop: (config: ContainerConnection, containerId: string) =>
-    invoke<void>('container_stop', { config, containerId }),
-  restart: (config: ContainerConnection, containerId: string) =>
-    invoke<void>('container_restart', { config, containerId }),
-  pause: (config: ContainerConnection, containerId: string) =>
-    invoke<void>('container_pause', { config, containerId }),
-  unpause: (config: ContainerConnection, containerId: string) =>
-    invoke<void>('container_unpause', { config, containerId }),
-  remove: (config: ContainerConnection, containerId: string, force: boolean) =>
-    invoke<void>('container_remove', { config, containerId, force }),
-  details: (config: ContainerConnection, containerId: string) =>
-    invoke<ContainerDetails>('container_details', { config, containerId }),
+  return {
+    listConfigs: () => invoke<ContainerConnection[]>('container_list_configs'),
+    saveConfig: (config: ContainerConnection) => invoke<ContainerConnection>('container_save_config', { config }),
+    deleteConfig: (configId: string) => invoke<void>('container_delete_config', { configId }),
+    detectSockets: () => invoke<DetectedSocket[]>('container_detect_sockets'),
+    testConnection: (config: ContainerConnection) => invoke<void>('container_test_connection', { config }),
 
-  /** `since`/`until` are Unix seconds; pass 0 for "no bound" on either.
-   *  `timestamps` asks the daemon to prefix each line — it can only be chosen
-   *  when the stream starts, so toggling it restarts the stream. */
-  logsStart: (
-    config: ContainerConnection, containerId: string, tail: string,
-    since: number, until: number, timestamps: boolean, onLog: Channel<LogLine>,
-  ) => invoke<string>('container_logs_start', { config, containerId, tail, since, until, timestamps, onLog }),
-  logsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
+    list: (config: ContainerConnection, all: boolean) =>
+      invoke<ContainerSummary[]>('container_list', { config, all }),
+    inspect: (config: ContainerConnection, containerId: string) =>
+      invoke<unknown>('container_inspect', { config, containerId }),
+    start: (config: ContainerConnection, containerId: string) =>
+      invoke<void>('container_start', { config, containerId }),
+    stop: (config: ContainerConnection, containerId: string) =>
+      invoke<void>('container_stop', { config, containerId }),
+    restart: (config: ContainerConnection, containerId: string) =>
+      invoke<void>('container_restart', { config, containerId }),
+    pause: (config: ContainerConnection, containerId: string) =>
+      invoke<void>('container_pause', { config, containerId }),
+    unpause: (config: ContainerConnection, containerId: string) =>
+      invoke<void>('container_unpause', { config, containerId }),
+    remove: (config: ContainerConnection, containerId: string, force: boolean) =>
+      invoke<void>('container_remove', { config, containerId, force }),
+    details: (config: ContainerConnection, containerId: string) =>
+      invoke<ContainerDetails>('container_details', { config, containerId }),
 
-  statsStart: (config: ContainerConnection, containerId: string, onStat: Channel<StatsFrame>) =>
-    invoke<string>('container_stats_start', { config, containerId, onStat }),
-  /** Streams share one registry on the Rust side, so the log-stream stopper
-   *  cancels a stats stream just the same. */
-  statsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
-  /** One sample per container for the table's live usage columns — cheaper
-   *  than one open stats stream per row. Containers that fail are omitted. */
-  statsSnapshot: (config: ContainerConnection, containerIds: string[]) =>
-    invoke<Record<string, StatsFrame>>('container_stats_snapshot', { config, containerIds }),
+    /** `since`/`until` are Unix seconds; pass 0 for "no bound" on either.
+     *  `timestamps` asks the daemon to prefix each line — it can only be chosen
+     *  when the stream starts, so toggling it restarts the stream. */
+    logsStart: (
+      config: ContainerConnection, containerId: string, tail: string,
+      since: number, until: number, timestamps: boolean, onLog: Channel<LogLine>,
+    ) => invoke<string>('container_logs_start', { config, containerId, tail, since, until, timestamps, onLog }),
+    logsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
 
-  resources: (config: ContainerConnection, containerId: string) =>
-    invoke<ContainerResources>('container_resources', { config, containerId }),
-  updateResources: (config: ContainerConnection, containerId: string, resources: ContainerResourceUpdate) =>
-    invoke<void>('container_update_resources', { config, containerId, resources }),
+    statsStart: (config: ContainerConnection, containerId: string, onStat: Channel<StatsFrame>) =>
+      invoke<string>('container_stats_start', { config, containerId, onStat }),
+    /** Streams share one registry on the Rust side, so the log-stream stopper
+     *  cancels a stats stream just the same. */
+    statsStop: (streamId: string) => invoke<void>('container_logs_stop', { streamId }),
+    /** One sample per container for the table's live usage columns — cheaper
+     *  than one open stats stream per row. Containers that fail are omitted. */
+    statsSnapshot: (config: ContainerConnection, containerIds: string[]) =>
+      invoke<Record<string, StatsFrame>>('container_stats_snapshot', { config, containerIds }),
 
-  prune: (config: ContainerConnection) => invoke<PruneResult>('container_prune', { config }),
+    resources: (config: ContainerConnection, containerId: string) =>
+      invoke<ContainerResources>('container_resources', { config, containerId }),
+    updateResources: (config: ContainerConnection, containerId: string, resources: ContainerResourceUpdate) =>
+      invoke<void>('container_update_resources', { config, containerId, resources }),
 
-  imageList: (config: ContainerConnection) => invoke<ImageSummary[]>('image_list', { config }),
-  imageInspect: (config: ContainerConnection, imageId: string) => invoke<unknown>('image_inspect', { config, imageId }),
-  imageDetails: (config: ContainerConnection, imageId: string) => invoke<ImageDetails>('image_details', { config, imageId }),
-  imageRemove: (config: ContainerConnection, imageId: string, force: boolean) =>
-    invoke<void>('image_remove', { config, imageId, force }),
-  imagePull: (config: ContainerConnection, image: string, tag: string, onProgress: Channel<PullProgress>) =>
-    invoke<void>('image_pull', { config, image, tag, onProgress }),
-  /** `danglingOnly` = `docker image prune`; `false` = `docker image prune -a`. */
-  imagePrune: (config: ContainerConnection, danglingOnly: boolean) =>
-    invoke<PruneResult>('image_prune', { config, danglingOnly }),
-  imageTag: (config: ContainerConnection, imageId: string, repo: string, tag: string) =>
-    invoke<void>('image_tag', { config, imageId, repo, tag }),
+    prune: (config: ContainerConnection) => invoke<PruneResult>('container_prune', { config }),
 
-  volumeList: (config: ContainerConnection) => invoke<VolumeInfo[]>('volume_list', { config }),
-  volumeRemove: (config: ContainerConnection, name: string, force: boolean) =>
-    invoke<void>('volume_remove', { config, name, force }),
-  volumeCreate: (config: ContainerConnection, name: string) =>
-    invoke<VolumeInfo>('volume_create', { config, name }),
-  /** Per-volume disk usage in bytes, keyed by name — `{}` on Windows (named
-   *  pipe transport isn't wired up for this raw request, see backend). */
-  volumeSizes: (config: ContainerConnection) => invoke<Record<string, number>>('volume_sizes', { config }),
-  volumePrune: (config: ContainerConnection) => invoke<PruneResult>('volume_prune', { config }),
-  volumeDetails: (config: ContainerConnection, name: string) =>
-    invoke<VolumeDetails>('volume_details', { config, name }),
+    imageList: (config: ContainerConnection) => invoke<ImageSummary[]>('image_list', { config }),
+    imageInspect: (config: ContainerConnection, imageId: string) => invoke<unknown>('image_inspect', { config, imageId }),
+    imageDetails: (config: ContainerConnection, imageId: string) => invoke<ImageDetails>('image_details', { config, imageId }),
+    imageRemove: (config: ContainerConnection, imageId: string, force: boolean) =>
+      invoke<void>('image_remove', { config, imageId, force }),
+    imagePull: (config: ContainerConnection, image: string, tag: string, onProgress: Channel<PullProgress>) =>
+      invoke<void>('image_pull', { config, image, tag, onProgress }),
+    /** `danglingOnly` = `docker image prune`; `false` = `docker image prune -a`. */
+    imagePrune: (config: ContainerConnection, danglingOnly: boolean) =>
+      invoke<PruneResult>('image_prune', { config, danglingOnly }),
+    imageTag: (config: ContainerConnection, imageId: string, repo: string, tag: string) =>
+      invoke<void>('image_tag', { config, imageId, repo, tag }),
 
-  networkList: (config: ContainerConnection) => invoke<NetworkInfo[]>('network_list', { config }),
-  networkRemove: (config: ContainerConnection, name: string) => invoke<void>('network_remove', { config, name }),
-  networkCreate: (config: ContainerConnection, name: string, driver: string) =>
-    invoke<void>('network_create', { config, name, driver }),
-  networkPrune: (config: ContainerConnection) => invoke<PruneResult>('network_prune', { config }),
-  networkDetails: (config: ContainerConnection, networkId: string) =>
-    invoke<NetworkDetails>('network_details', { config, networkId }),
+    volumeList: (config: ContainerConnection) => invoke<VolumeInfo[]>('volume_list', { config }),
+    volumeRemove: (config: ContainerConnection, name: string, force: boolean) =>
+      invoke<void>('volume_remove', { config, name, force }),
+    volumeCreate: (config: ContainerConnection, name: string) =>
+      invoke<VolumeInfo>('volume_create', { config, name }),
+    /** Per-volume disk usage in bytes, keyed by name — `{}` on Windows (named
+     *  pipe transport isn't wired up for this raw request, see backend). */
+    volumeSizes: (config: ContainerConnection) => invoke<Record<string, number>>('volume_sizes', { config }),
+    volumePrune: (config: ContainerConnection) => invoke<PruneResult>('volume_prune', { config }),
+    volumeDetails: (config: ContainerConnection, name: string) =>
+      invoke<VolumeDetails>('volume_details', { config, name }),
 
-  systemInfo: (config: ContainerConnection) => invoke<SystemInfo>('container_system_info', { config }),
-  systemDf: (config: ContainerConnection) => invoke<SystemDataUsageResponse>('container_system_df', { config }),
-};
+    networkList: (config: ContainerConnection) => invoke<NetworkInfo[]>('network_list', { config }),
+    networkRemove: (config: ContainerConnection, name: string) => invoke<void>('network_remove', { config, name }),
+    networkCreate: (config: ContainerConnection, name: string, driver: string) =>
+      invoke<void>('network_create', { config, name, driver }),
+    networkPrune: (config: ContainerConnection) => invoke<PruneResult>('network_prune', { config }),
+    networkDetails: (config: ContainerConnection, networkId: string) =>
+      invoke<NetworkDetails>('network_details', { config, networkId }),
+
+    systemInfo: (config: ContainerConnection) => invoke<SystemInfo>('container_system_info', { config }),
+    systemDf: (config: ContainerConnection) => invoke<SystemDataUsageResponse>('container_system_df', { config }),
+  };
+}
+
+export type ContainerApi = ReturnType<typeof createContainerApi>;

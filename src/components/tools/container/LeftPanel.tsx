@@ -9,7 +9,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 import type { ContainerConnection } from './types';
-import { containerApi } from './types';
+import { useContainerApi } from './api_sdk';
 import { ConnectionForm } from './ConnectionForm';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { ContainerView } from './useContainerState';
@@ -34,6 +34,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel(props: LeftPanelProps) {
+  const containerApi = useContainerApi();
   const {
     connections, connectionsLoading, selectedConnId, onSelectConn, onConnectionsChanged,
     connected, connecting, onConnect, onDisconnect,

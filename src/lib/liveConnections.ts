@@ -33,8 +33,8 @@ function seed(featureId: string, storageKey: string, legacyKey?: string) {
     if (JSON.parse(raw ?? '""')) live.add(featureId);
   } catch { /* ignore */ }
 }
-seed('rabbit-client', 'devtool:rabbit:connectedConnId');
-seed('kafka-explorer', 'devtool:kafka:connectedBrokerId');
+seed('rabbit-client', 'devtool:rabbit-client:connectedConnId', 'devtool:rabbit:connectedConnId');
+seed('kafka-explorer', 'devtool:kafka-explorer:connectedBrokerId', 'devtool:kafka:connectedBrokerId');
 seed('redis-client', 'devtool:redis-client:connectedConnId', 'devtool:redis:connectedConnId');
 snapshot = Array.from(live);
 

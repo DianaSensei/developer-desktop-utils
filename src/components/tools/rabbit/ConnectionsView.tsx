@@ -1,3 +1,4 @@
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { RefreshCw, Plug, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
@@ -5,7 +6,6 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RabbitConnection, ConnectionRow, ChannelRow } from './types';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
@@ -26,7 +26,8 @@ function StateBadge({ state }: { state?: string }) {
 }
 
 export function ConnectionsView({ conn, refreshKey, onRefresh }: ConnectionsViewProps) {
-  const [tab, setTab] = usePersistentState<Tab>('devtool:rabbit:connTab', 'connections');
+  const sdk = usePluginSdkFor('rabbit-client');
+  const [tab, setTab] = usePluginState<Tab>(sdk, 'connTab', 'connections', { legacyKey: 'devtool:rabbit:connTab' });
   const conns = useRabbitData<ConnectionRow[]>(() => rabbitMgmt.connections(conn), [conn.id, refreshKey]);
   const chans = useRabbitData<ChannelRow[]>(() => rabbitMgmt.channels(conn), [conn.id, refreshKey]);
 

@@ -10,7 +10,8 @@ import { IconButton } from '@/components/ui/icon-button';
 import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 import { BrokerForm } from './BrokerForm';
-import { kafkaApi, type BrokerConfig } from './types';
+import { type BrokerConfig } from './types';
+import { useKafkaApi } from './api_sdk';
 import { kafkaConsumerStore, useKafkaConsumers } from './kafkaConsumerStore';
 import type { KafkaView } from './useKafkaState';
 
@@ -33,6 +34,7 @@ export function LeftPanel({
   selectedBrokerId, onSelectBroker, connected, connecting, onConnect, onDisconnect,
   view, onShowTopics, onShowGroups, onShowConsumers, onOpenConsumer, onShowProduce,
 }: LeftPanelProps) {
+  const kafkaApi = useKafkaApi();
   const [configs, setConfigs] = useState<BrokerConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);

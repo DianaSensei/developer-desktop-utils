@@ -14,7 +14,8 @@ import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
 import { SectionLabel } from '@/components/ui/section-label';
 import { cn } from '@/lib/utils';
-import { kafkaApi, type ConsumeFrom, type KafkaConsumedMessage } from './types';
+import { type ConsumeFrom, type KafkaConsumedMessage } from './types';
+import { useKafkaApi } from './api_sdk';
 import { kafkaConsumerStore, useKafkaConsumers, type KafkaConsumerSession } from './kafkaConsumerStore';
 import { kafkaInputHistory, useKafkaRecentMatches } from './kafkaInputHistoryStore';
 import { RecentSuggestions } from './RecentSuggestions';
@@ -115,6 +116,7 @@ function ConsumerListRow({ session: s, onOpen }: { session: KafkaConsumerSession
 function StartConsumerForm({ brokerId, refreshKey, sessions, prefill, onStarted }: {
   brokerId: string; refreshKey: number; sessions: KafkaConsumerSession[]; prefill?: TopicPrefill | null; onStarted: (topic: string) => void;
 }) {
+  const kafkaApi = useKafkaApi();
   const [topic, setTopic] = useState('');
   const [from, setFrom] = useState<ConsumeFrom>('latest');
   const [error, setError] = useState<string | null>(null);

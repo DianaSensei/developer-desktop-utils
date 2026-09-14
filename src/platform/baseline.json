@@ -6,8 +6,8 @@
     "secretishKeyInSharedStore": "BẤT BIẾN, không phải nợ: không credential nào được quay lại store dùng chung. Đây là tripwire theo TÊN khoá — nó bắt các trường hợp hiển nhiên, KHÔNG phải bằng chứng đã sạch: 'devtool:apiclient:environments' từng chứa token mà tên khoá không hề lộ ra (đã xử lý riêng bằng envSecrets.ts). Thêm một khoá mới mang credential thì đừng trông chờ luật này bắt được."
   },
   "limits": {
-    "directTauriInPluginCode": 30,
-    "sharedStoreInPluginCode": 45,
+    "directTauriInPluginCode": 14,
+    "sharedStoreInPluginCode": 33,
     "manifestForeignImports": 0,
     "secretishKeyInSharedStore": 0
   }

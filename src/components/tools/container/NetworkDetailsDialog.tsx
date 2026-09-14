@@ -5,7 +5,8 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { Badge } from '@/components/ui/badge';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
-import { containerApi, type ContainerConnection, type NetworkDetails, type NetworkInfo } from './types';
+import { type ContainerConnection, type NetworkDetails, type NetworkInfo } from './types';
+import { useContainerApi } from './api_sdk';
 import { DetailField, DetailGrid, KeyValueTable, labelEntries } from './DetailRows';
 
 /**
@@ -22,6 +23,7 @@ export function NetworkDetailsDialog({ open, onOpenChange, connection, network, 
   network: NetworkInfo | null;
   users?: string[];
 }) {
+  const containerApi = useContainerApi();
   const [details, setDetails] = useState<NetworkDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

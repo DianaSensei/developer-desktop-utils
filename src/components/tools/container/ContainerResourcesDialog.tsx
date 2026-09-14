@@ -7,7 +7,8 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { RowCheckbox } from './SelectionBar';
-import { containerApi, type ContainerConnection, type ContainerResourceUpdate, type ContainerResources } from './types';
+import { type ContainerConnection, type ContainerResourceUpdate, type ContainerResources } from './types';
+import { useContainerApi } from './api_sdk';
 
 // Editor for the cgroup limits `docker update` can change on an existing
 // container — CPU, memory, block IO, pids and restart policy. Works on one
@@ -148,6 +149,7 @@ export function ContainerResourcesDialog({ open, onOpenChange, connection, targe
   targets: { id: string; name: string }[];
   onApplied: () => void;
 }) {
+  const containerApi = useContainerApi();
   const bulk = targets.length > 1;
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [initial, setInitial] = useState<FormState>(EMPTY_FORM);

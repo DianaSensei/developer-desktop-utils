@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 
 export type ContainerView = 'overview' | 'containers' | 'images' | 'volumes' | 'networks' | 'compose';
 
@@ -20,9 +20,10 @@ export interface ContainerToolState {
 }
 
 export function useContainerState(): ContainerToolState {
-  const [selectedConnId, setSelectedConnIdRaw] = usePersistentState('devtool:container:selectedConnId', '');
-  const [connectedConnId, setConnectedConnId] = usePersistentState('devtool:container:connectedConnId', '');
-  const [view, setView] = usePersistentState<ContainerView>('devtool:container:view', 'overview');
+  const sdk = usePluginSdkFor('container-manager');
+  const [selectedConnId, setSelectedConnIdRaw] = usePluginState(sdk, 'selectedConnId', '', { legacyKey: 'devtool:container:selectedConnId' });
+  const [connectedConnId, setConnectedConnId] = usePluginState(sdk, 'connectedConnId', '', { legacyKey: 'devtool:container:connectedConnId' });
+  const [view, setView] = usePluginState<ContainerView>(sdk, 'view', 'overview', { legacyKey: 'devtool:container:view' });
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = () => setRefreshKey((k) => k + 1);

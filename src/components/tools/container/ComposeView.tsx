@@ -9,10 +9,8 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { IconButton } from '@/components/ui/icon-button';
-import {
-  containerApi, groupByComposeProject, COMPOSE_LABELS,
-  type ContainerConnection, type ContainerSummary, type ComposeProjectGroup,
-} from './types';
+import { groupByComposeProject, COMPOSE_LABELS, type ContainerConnection, type ContainerSummary, type ComposeProjectGroup } from './types';
+import { useContainerApi } from './api_sdk';
 import { cn } from '@/lib/utils';
 import { ContainerLogsDialog } from './ContainerLogsDialog';
 import { ContainerDetailsDialog } from './ContainerDetailsDialog';
@@ -66,6 +64,7 @@ export function ComposeView({ connection, refreshKey, onRefresh }: {
   refreshKey: number;
   onRefresh: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [containers, setContainers] = useState<ContainerSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

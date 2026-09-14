@@ -6,7 +6,8 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { SectionLabel } from '@/components/ui/section-label';
 import { cn } from '@/lib/utils';
 import { ViewHeader } from '@/components/ui/view-header';
-import { kafkaApi, type GroupDetails, type Assignment } from './types';
+import { type GroupDetails, type Assignment } from './types';
+import { useKafkaApi } from './api_sdk';
 
 interface GroupViewProps {
   brokerId: string;
@@ -37,6 +38,7 @@ const STATE_DOT: Record<string, string> = {
 };
 
 export function GroupView({ brokerId, groupId, refreshKey, onRefresh, onSelectTopic, onBack }: GroupViewProps) {
+  const kafkaApi = useKafkaApi();
   const [data, setData] = useState<GroupDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

@@ -6,7 +6,8 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { kafkaApi, type TopicDetails } from './types';
+import { type TopicDetails } from './types';
+import { useKafkaApi } from './api_sdk';
 import { ProduceTab } from './ProduceTab';
 import { useKafkaRecentMatches } from './kafkaInputHistoryStore';
 import { RecentSuggestions } from './RecentSuggestions';
@@ -26,6 +27,7 @@ interface ProduceViewProps {
  * pre-filled via `prefill` — mirroring the RabbitMQ tool's Send/Request panel.
  */
 export function ProduceView({ brokerId, refreshKey, onRefresh, prefill }: ProduceViewProps) {
+  const kafkaApi = useKafkaApi();
   // Seed the topic from the in-memory draft so it survives tab/tool switches.
   const [topic, setTopic] = useState(() => produceDraft.topic);
   const [topics, setTopics] = useState<string[]>([]);

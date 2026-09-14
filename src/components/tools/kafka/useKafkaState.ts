@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 
 /** Which destination the right panel shows. Mirrors the RabbitMQ tool's nav model. */
 export type KafkaView = 'topics' | 'groups' | 'consume' | 'produce' | 'topic' | 'group';
@@ -42,13 +42,14 @@ export interface KafkaState {
 }
 
 export function useKafkaState(): KafkaState {
+  const sdk = usePluginSdkFor('kafka-explorer');
   // Selection persists across restarts so you resume where you left off.
-  const [selectedBrokerId, setSelectedBrokerIdRaw] = usePersistentState('devtool:kafka:selectedBrokerId', '');
-  const [connectedBrokerId, setConnectedBrokerId] = usePersistentState('devtool:kafka:connectedBrokerId', '');
-  const [view, setView] = usePersistentState<KafkaView>('devtool:kafka:view', 'topics');
-  const [selectedTopic, setSelectedTopic] = usePersistentState<string | null>('devtool:kafka:selectedTopic', null);
-  const [selectedGroup, setSelectedGroup] = usePersistentState<string | null>('devtool:kafka:selectedGroup', null);
-  const [selectedTab, setSelectedTab] = usePersistentState<KafkaTab>('devtool:kafka:selectedTab', 'data');
+  const [selectedBrokerId, setSelectedBrokerIdRaw] = usePluginState(sdk, 'selectedBrokerId', '', { legacyKey: 'devtool:kafka:selectedBrokerId' });
+  const [connectedBrokerId, setConnectedBrokerId] = usePluginState(sdk, 'connectedBrokerId', '', { legacyKey: 'devtool:kafka:connectedBrokerId' });
+  const [view, setView] = usePluginState<KafkaView>(sdk, 'view', 'topics', { legacyKey: 'devtool:kafka:view' });
+  const [selectedTopic, setSelectedTopic] = usePluginState<string | null>(sdk, 'selectedTopic', null, { legacyKey: 'devtool:kafka:selectedTopic' });
+  const [selectedGroup, setSelectedGroup] = usePluginState<string | null>(sdk, 'selectedGroup', null, { legacyKey: 'devtool:kafka:selectedGroup' });
+  const [selectedTab, setSelectedTab] = usePluginState<KafkaTab>(sdk, 'selectedTab', 'data', { legacyKey: 'devtool:kafka:selectedTab' });
   const [consumePrefill, setConsumePrefill] = useState<TopicPrefill | null>(null);
   const [producePrefill, setProducePrefill] = useState<TopicPrefill | null>(null);
   const [consumeDetailTopic, setConsumeDetailTopic] = useState<string | null>(null);

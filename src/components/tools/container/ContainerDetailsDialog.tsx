@@ -1,5 +1,5 @@
+import { usePluginSdkFor } from '@/platform';
 import { useEffect, useRef, useState } from 'react';
-import { Channel } from '@tauri-apps/api/core';
 import { Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,7 +8,8 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
-import { containerApi, type ContainerConnection, type ContainerDetails, type ContainerResources, type ContainerSummary, type StatsFrame } from './types';
+import { type ContainerConnection, type ContainerDetails, type ContainerResources, type ContainerSummary, type StatsFrame } from './types';
+import { useContainerApi } from './api_sdk';
 import { DetailField, DetailGrid, KeyValueTable, envEntries, labelEntries } from './DetailRows';
 import { formatBytes } from './format';
 
@@ -40,6 +41,7 @@ export function ContainerDetailsDialog({ open, onOpenChange, connection, contain
    *  the "Edit limits" button when the parent view can handle it. */
   onEditLimits?: (container: ContainerSummary) => void;
 }) {
+  const containerApi = useContainerApi();
   const [details, setDetails] = useState<ContainerDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -224,29 +226,37 @@ function describeLimits(r: ContainerResources): string {
  *  stats endpoint (one open stream for the one container on screen — the
  *  table's columns use the cheaper polled snapshot instead). */
 function LiveStats({ connection, containerId }: { connection: ContainerConnection; containerId: string }) {
+  const sdk = usePluginSdkFor('container-manager');
+  const containerApi = useContainerApi();
   const [frame, setFrame] = useState<StatsFrame | null>(null);
   const [error, setError] = useState<string | null>(null);
   const streamIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const channel = new Channel<StatsFrame>();
-    channel.onmessage = (f) => { if (!cancelled) setFrame(f); };
-    containerApi.statsStart(connection, containerId, channel)
-      .then((id) => {
-        // Unmounted while the stream was starting — stop it right away rather
-        // than leaving an orphaned task running against the daemon.
-        if (cancelled) { void containerApi.statsStop(id); return; }
-        streamIdRef.current = id;
-      })
-      .catch((e) => { if (!cancelled) setError(String(e instanceof Error ? e.message : e)); });
+    // Kênh dựng qua SDK nên phải chờ — effect vì thế bọc trong một IIFE async.
+    // `cancelled` vẫn là chốt duy nhất quyết định việc dọn dẹp, y như trước.
+    void (async () => {
+      const channel = await sdk.native.channel<StatsFrame>(
+        (f) => { if (!cancelled) setFrame(f); },
+        'container-stats',
+      );
+      containerApi.statsStart(connection, containerId, channel)
+        .then((id) => {
+          // Unmounted while the stream was starting — stop it right away rather
+          // than leaving an orphaned task running against the daemon.
+          if (cancelled) { void containerApi.statsStop(id); return; }
+          streamIdRef.current = id;
+        })
+        .catch((e) => { if (!cancelled) setError(String(e instanceof Error ? e.message : e)); });
+    })();
     return () => {
       cancelled = true;
       const id = streamIdRef.current;
       streamIdRef.current = null;
       if (id) void containerApi.statsStop(id);
     };
-  }, [connection, containerId]);
+  }, [connection, containerId, sdk, containerApi]);
 
   if (error) return <Callout tone="error" size="sm">{error}</Callout>;
   if (!frame) return <p className="text-xs text-fg-mute">Waiting for the first sample…</p>;

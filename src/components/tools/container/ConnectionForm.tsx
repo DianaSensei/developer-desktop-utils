@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { CheckCircle2, Search } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Callout } from '@/components/ui/callout';
-import { EMPTY_CONNECTION, containerApi, type ContainerConnection, type DetectedSocket } from './types';
+import { EMPTY_CONNECTION, type ContainerConnection, type DetectedSocket } from './types';
+import { useContainerApi } from './api_sdk';
 
 interface ConnectionFormProps {
   initial?: ContainerConnection | null;
@@ -15,6 +16,7 @@ interface ConnectionFormProps {
 }
 
 export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProps) {
+  const containerApi = useContainerApi();
   const [form, setForm] = useState<ContainerConnection>(initial ?? EMPTY_CONNECTION);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);

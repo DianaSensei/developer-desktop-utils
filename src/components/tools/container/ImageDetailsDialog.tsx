@@ -4,7 +4,8 @@ import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { Badge } from '@/components/ui/badge';
-import { containerApi, type ContainerConnection, type ImageDetails, type ImageSummary } from './types';
+import { type ContainerConnection, type ImageDetails, type ImageSummary } from './types';
+import { useContainerApi } from './api_sdk';
 import { DetailField, DetailGrid, KeyValueTable, envEntries, labelEntries } from './DetailRows';
 import { formatBytes } from './format';
 
@@ -14,6 +15,7 @@ export function ImageDetailsDialog({ open, onOpenChange, connection, image }: {
   connection: ContainerConnection;
   image: ImageSummary | null;
 }) {
+  const containerApi = useContainerApi();
   const [details, setDetails] = useState<ImageDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

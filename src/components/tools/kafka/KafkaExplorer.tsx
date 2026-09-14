@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
+import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor, usePluginState } from '@/platform';
 import { Server, Info, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
@@ -15,9 +15,8 @@ import { KafkaInfoModal } from './KafkaInfoModal';
 import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 import { useKafkaRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
-import { kafkaApi } from './types';
+import { useKafkaApi } from './api_sdk';
 import { kafkaConsumerStore } from './kafkaConsumerStore';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 
 const LEFT_MIN = 180;
@@ -25,6 +24,7 @@ const LEFT_MAX = 520;
 const LEFT_DEFAULT = 256;
 
 export function KafkaExplorer() {
+  const kafkaApi = useKafkaApi();
   const kafkaState = useKafkaRuntime();
   const {
     selectedBrokerId,
@@ -93,9 +93,9 @@ export function KafkaExplorer() {
   // store lives outside this component tree), but not after it unmounts.
   useEffect(() => () => { kafkaConsumerStore.stopAll(); }, []);
 
-  const [infoDismissed, setInfoDismissed] = usePersistentState('devtool:kafka:info-dismissed', false);
+  const [infoDismissed, setInfoDismissed] = usePluginState(sdk, 'info-dismissed', false, { legacyKey: 'devtool:kafka:info-dismissed' });
   const [showInfo, setShowInfo] = useState(!infoDismissed);
-  const [leftWidth, setLeftWidth] = usePersistentState('devtool:kafka:leftPanelWidth', LEFT_DEFAULT);
+  const [leftWidth, setLeftWidth] = usePluginState(sdk, 'leftPanelWidth', LEFT_DEFAULT, { legacyKey: 'devtool:kafka:leftPanelWidth' });
   const [isResizing, setIsResizing] = useState(false);
 
   const [brokerName, setBrokerName] = useState('');

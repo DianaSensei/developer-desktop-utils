@@ -16,7 +16,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import type { RabbitConnection, ExchangeInfo, ExchangeAmqpInfo } from './types';
-import { rabbitApi } from './types';
+import { useRabbitApi } from './api_sdk';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { knownNamesStore, useKnownNames } from './knownNamesStore';
@@ -114,6 +114,7 @@ function MgmtExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }:
 // ── AMQP-only: typed names + passive-declare existence ────────────────────────
 
 function AmqpExchangeListView({ conn, refreshKey, onRefresh, onSelectExchange }: ExchangeListViewProps) {
+  const rabbitApi = useRabbitApi();
   const [createOpen, setCreateOpen] = useState(false);
   const [adding, setAdding] = useState('');
   const names = useKnownNames(conn.id).exchanges;
@@ -223,6 +224,7 @@ const EXCHANGE_TYPES = ['direct', 'fanout', 'topic', 'headers'] as const;
 export function CreateExchangeDialog({ open, onOpenChange, conn, onCreated }: {
   open: boolean; onOpenChange: (o: boolean) => void; conn: RabbitConnection; onCreated: (name: string) => void;
 }) {
+  const rabbitApi = useRabbitApi();
   const [name, setName] = useState('');
   const [type, setType] = useState<string>('direct');
   const [durable, setDurable] = useState(true);

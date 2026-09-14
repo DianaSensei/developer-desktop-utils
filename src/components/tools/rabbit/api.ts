@@ -1,12 +1,13 @@
 // RabbitMQ Management HTTP API client.
 //
-// All calls go through the Tauri HTTP plugin (`@tauri-apps/plugin-http`) so the
-// request is made from Rust — no browser `Origin` header and no CORS, the same
-// pattern as `src/lib/network.ts`. The Management API uses HTTP Basic auth; we
+// All calls go through `sdk.http.fetch`, which routes to the Tauri HTTP plugin so
+// the request is made from Rust — no browser `Origin` header and no CORS, the same
+// pattern as `src/lib/network.ts` — and records the call in the Platform's audit
+// log. The Management API uses HTTP Basic auth; we
 // build the `Authorization` header from the stored connection profile. This is a
 // desktop-only tool (the web build has no Tauri host to proxy through).
 
-import { isTauri } from '@/lib/platform';
+import { getPluginSdk } from '@/platform';
 import type {
   RabbitConnection,
   Overview,
@@ -20,12 +21,15 @@ import type {
 } from './types';
 
 
-async function httpFetch(input: string, init?: RequestInit): Promise<Response> {
-  if (isTauri) {
-    const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-    return tauriFetch(input, init);
-  }
-  return fetch(input, init);
+// `rabbitMgmt` là object ở phạm vi module (20 chỗ gọi khắp tool), nên SDK lấy
+// qua `getPluginSdk` thay vì hook. `sdk.http.fetch` tự lo nhánh Tauri/web y như
+// bản cũ, đồng thời kiểm allowlist `hosts` và ghi audit — host của RabbitMQ do
+// người dùng cấu hình lúc chạy nên manifest khai `['*']`, nhưng lời gọi vẫn có
+// mặt trong nhật ký.
+const sdk = getPluginSdk('rabbit-client');
+
+function httpFetch(input: string, init?: RequestInit): Promise<Response> {
+  return sdk.http.fetch(input, init);
 }
 
 /** Base API URL, e.g. `http://localhost:15672/api`. */

@@ -9,7 +9,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection } from './types';
-import { rabbitApi } from './types';
+import { useRabbitApi } from './api_sdk';
 import { ConnectionForm } from './ConnectionForm';
 import { ConfirmDialog } from './ConfirmDialog';
 import { consumerStore, useConsumers } from './consumerStore';
@@ -36,6 +36,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel(props: LeftPanelProps) {
+  const rabbitApi = useRabbitApi();
   const {
     connections, connectionsLoading, selectedConnId, onSelectConn, onConnectionsChanged,
     connected, connecting, onConnect, onDisconnect,

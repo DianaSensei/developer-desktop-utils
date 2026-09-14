@@ -1,5 +1,5 @@
+import { usePluginSdkFor } from '@/platform';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Channel } from '@tauri-apps/api/core';
 import { Layers, RefreshCw, Trash2, Download, Info, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { containerApi, type ContainerConnection, type ImageSummary, type PullProgress } from './types';
+import { type ContainerConnection, type ImageSummary, type PullProgress } from './types';
+import { useContainerApi } from './api_sdk';
 import { PruneButton } from './PruneButton';
 import { useUsageIndex, describeUsers } from './usage';
 import { useSort } from './useSort';
@@ -35,6 +36,7 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
   refreshKey: number;
   onRefresh: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [filter, setFilter] = useState('');
   const [images, setImages] = useState<ImageSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -251,6 +253,8 @@ export function ImagesView({ connection, refreshKey, onRefresh }: {
 function PullDialog({ open, onOpenChange, connection, onDone }: {
   open: boolean; onOpenChange: (o: boolean) => void; connection: ContainerConnection; onDone: () => void;
 }) {
+  const containerApi = useContainerApi();
+  const sdk = usePluginSdkFor('container-manager');
   const [image, setImage] = useState('');
   const [tag, setTag] = useState('latest');
   const [pulling, setPulling] = useState(false);
@@ -262,8 +266,7 @@ function PullDialog({ open, onOpenChange, connection, onDone }: {
     setPulling(true);
     setError(null);
     setStatus('Starting…');
-    const channel = new Channel<PullProgress>();
-    channel.onmessage = (p) => setStatus(p.status);
+    const channel = await sdk.native.channel<PullProgress>((p) => setStatus(p.status), 'image-pull');
     try {
       await containerApi.imagePull(connection, image.trim(), tag.trim() || 'latest', channel);
       onDone();
@@ -334,6 +337,7 @@ function TagDialog({ open, onOpenChange, connection, image, onTagged }: {
   image: ImageSummary | null;
   onTagged: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [repo, setRepo] = useState('');
   const [tag, setTag] = useState('latest');
   const [busy, setBusy] = useState(false);

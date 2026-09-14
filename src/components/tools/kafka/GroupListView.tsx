@@ -7,7 +7,8 @@ import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { StatusDot, type StatusDotTone } from '@/components/ui/status-dot';
 import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
-import { kafkaApi, type GroupSummary } from './types';
+import { type GroupSummary } from './types';
+import { useKafkaApi } from './api_sdk';
 
 const STATE_TONE: Record<string, StatusDotTone> = {
   Stable: 'live',
@@ -25,6 +26,7 @@ interface GroupListViewProps {
 }
 
 export function GroupListView({ brokerId, refreshKey, onRefresh, onSelectGroup }: GroupListViewProps) {
+  const kafkaApi = useKafkaApi();
   const [filter, setFilter] = useState('');
   const [groups, setGroups] = useState<GroupSummary[] | null>(null);
   const [loading, setLoading] = useState(false);

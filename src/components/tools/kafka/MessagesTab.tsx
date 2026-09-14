@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { usePluginConfig } from '@/platform';
+import { usePluginConfig, usePluginSdkFor, usePluginState } from '@/platform';
 import { AlertCircle, Search, X, ArrowUp, ArrowDown, ArrowUpDown, Regex, ChevronRight } from 'lucide-react';
 import { LoadingRow, Spinner } from '@/components/ui/spinner';
 import { SectionLabel } from '@/components/ui/section-label';
@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
-import { kafkaApi, type KafkaMessage, type PartitionInfo } from './types';
+import { type KafkaMessage, type PartitionInfo } from './types';
+import { useKafkaApi } from './api_sdk';
 
 // Export helpers — bulk copy of the currently-shown messages.
 function messagesToJson(msgs: KafkaMessage[]): string {
@@ -366,11 +366,11 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
+  const sdk = usePluginSdkFor('kafka-explorer');
+  const kafkaApi = useKafkaApi();
   const config = usePluginConfig();
-  const [defaultValueMode, setDefaultValueMode] = usePersistentState<ValueMode>(
-    `devtool:kafka:${brokerId}:defaultValueMode`,
-    'text',
-  );
+  const [defaultValueMode, setDefaultValueMode] = usePluginState<ValueMode>(sdk, `${brokerId}:defaultValueMode`,
+    'text', { legacyKey: `devtool:kafka:${brokerId}:defaultValueMode` });
   const [partition, setPartition] = useState<number>(partitions[0]?.id ?? 0);
   const [mode, setMode] = useState<FetchMode>('tail');
   const [sinceMs, setSinceMs] = useState<number>(60 * 60_000);
@@ -389,12 +389,12 @@ export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
 
   // Column widths (px) — value column is always 1fr. Persisted so a tuned
   // layout survives refetch / tab switches / app restart.
-  const [colWidths, setColWidths] = usePersistentState<ColWidths>('devtool:kafka:colWidths', DEFAULT_WIDTHS);
+  const [colWidths, setColWidths] = usePluginState<ColWidths>(sdk, 'colWidths', DEFAULT_WIDTHS, { legacyKey: 'devtool:kafka:colWidths' });
   const colWidthsRef = useRef(colWidths);
   colWidthsRef.current = colWidths;
 
   // Detail panel width (px) — also persisted.
-  const [detailWidth, setDetailWidth] = usePersistentState('devtool:kafka:detailWidth', DETAIL_DEFAULT);
+  const [detailWidth, setDetailWidth] = usePluginState(sdk, 'detailWidth', DETAIL_DEFAULT, { legacyKey: 'devtool:kafka:detailWidth' });
   const detailWidthRef = useRef(detailWidth);
   detailWidthRef.current = detailWidth;
 

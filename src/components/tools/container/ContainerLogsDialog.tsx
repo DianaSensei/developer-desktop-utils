@@ -3,7 +3,8 @@ import { Play, Square, RotateCw, Pause, PlayCircle, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { containerApi, type ContainerConnection, type ContainerSummary } from './types';
+import { type ContainerConnection, type ContainerSummary } from './types';
+import { useContainerApi } from './api_sdk';
 import { LogsPanel } from './LogsPanel';
 
 function stateTone(state?: string): BadgeTone {
@@ -39,6 +40,7 @@ export function ContainerLogsDialog({ open, onOpenChange, connection, container,
   /** Opens the owning view's remove confirmation. Omit to hide the button. */
   onRemove?: (container: ContainerSummary) => void;
 }) {
+  const containerApi = useContainerApi();
   // Kept one render behind `container` so the Dialog can stay mounted and play
   // its exit animation instead of the subtree vanishing the instant the target
   // clears — the same trick the details dialog uses.

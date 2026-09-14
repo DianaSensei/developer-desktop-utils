@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { kafkaApi, type TopicConfig } from './types';
+import { type TopicConfig } from './types';
+import { useKafkaApi } from './api_sdk';
 
 interface ConfigTabProps {
   brokerId: string;
@@ -12,6 +13,7 @@ interface ConfigTabProps {
 }
 
 export function ConfigTab({ brokerId, topic }: ConfigTabProps) {
+  const kafkaApi = useKafkaApi();
   const [configs, setConfigs] = useState<TopicConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

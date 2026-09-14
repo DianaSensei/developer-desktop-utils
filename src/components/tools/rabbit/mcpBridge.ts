@@ -27,8 +27,10 @@
 // don't both listen at once and double-answer the same call.
 
 import { useEffect, useRef } from 'react';
+import { usePluginSdkFor } from '@/platform';
 import { isTauri } from '@/lib/platform';
-import { rabbitApi, type RabbitConnection } from './types';
+import { useRabbitApi } from './api_sdk';
+import type { RabbitApi, RabbitConnection } from './types';
 import { rabbitMgmt } from './api';
 import { consumerStore } from './consumerStore';
 import type { RabbitState } from './useRabbitState';
@@ -46,7 +48,7 @@ function requireString(v: unknown, name: string): string {
   return v;
 }
 
-async function requireConnection(id: string): Promise<RabbitConnection> {
+async function requireConnection(rabbitApi: RabbitApi, id: string): Promise<RabbitConnection> {
   const all = await rabbitApi.listConfigs();
   const conn = all.find((c) => c.id === id);
   if (!conn) throw new Error(`No RabbitMQ connection with id "${id}"`);
@@ -56,16 +58,16 @@ async function requireConnection(id: string): Promise<RabbitConnection> {
 // Same two-step check RabbitClient.tsx's handleConnect runs: AMQP is always
 // tested; the management API is only tested when the profile isn't
 // AMQP-only (an AMQP-only broker may not expose it at all).
-async function testConnection(conn: RabbitConnection): Promise<void> {
+async function testConnection(rabbitApi: RabbitApi, conn: RabbitConnection): Promise<void> {
   await rabbitApi.amqpTest(conn);
   if (!conn.amqpOnly) await rabbitMgmt.testConnection(conn);
 }
 
-function buildHandlers(state: RabbitState): Record<string, ToolHandler> {
+function buildHandlers(rabbitApi: RabbitApi, state: RabbitState): Record<string, ToolHandler> {
   return {
     rabbit_list_connections: async () => rabbitApi.listConfigs(),
 
-    rabbit_get_connection: async (args) => requireConnection(requireString(args.connectionId, 'connectionId')),
+    rabbit_get_connection: async (args) => requireConnection(rabbitApi, requireString(args.connectionId, 'connectionId')),
 
     rabbit_add_connection: async (args) => {
       const conn: RabbitConnection = {
@@ -88,14 +90,14 @@ function buildHandlers(state: RabbitState): Record<string, ToolHandler> {
     // (unlike update_request's script/auth/body — see apiclient/mcpBridge.ts).
     rabbit_update_connection: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      const current = await requireConnection(id);
+      const current = await requireConnection(rabbitApi, id);
       const patch = (args.patch ?? {}) as Partial<RabbitConnection>;
       return rabbitApi.saveConfig({ ...current, ...patch, id });
     },
 
     rabbit_delete_connection: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      await requireConnection(id);
+      await requireConnection(rabbitApi, id);
       await rabbitApi.deleteConfig(id);
       return { ok: true };
     },
@@ -103,8 +105,8 @@ function buildHandlers(state: RabbitState): Record<string, ToolHandler> {
     // Verifies reachability without changing the connected/selected state —
     // same as the UI's own "Connect" button before it marks the connection live.
     rabbit_test_connection: async (args) => {
-      const conn = await requireConnection(requireString(args.connectionId, 'connectionId'));
-      await testConnection(conn);
+      const conn = await requireConnection(rabbitApi, requireString(args.connectionId, 'connectionId'));
+      await testConnection(rabbitApi, conn);
       return { ok: true };
     },
 
@@ -114,8 +116,8 @@ function buildHandlers(state: RabbitState): Record<string, ToolHandler> {
     // connection is live at a time.
     rabbit_connect: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      const conn = await requireConnection(id);
-      await testConnection(conn);
+      const conn = await requireConnection(rabbitApi, id);
+      await testConnection(rabbitApi, conn);
       if (state.connectedConnId && state.connectedConnId !== id) {
         consumerStore.stopForConn(state.connectedConnId);
       }
@@ -143,8 +145,10 @@ function buildHandlers(state: RabbitState): Record<string, ToolHandler> {
 // docs/ai/CLAUDE.md's "Stable refs for long-lived event listeners") — same
 // pattern as the API Client's/Mock Server's/Redis's/Kafka's `useMcpBridge`.
 export function useMcpBridge(state: RabbitState, enabled = true): void {
+  const sdk = usePluginSdkFor('rabbit-client');
+  const rabbitApi = useRabbitApi();
   const handlersRef = useRef<Record<string, ToolHandler>>({});
-  handlersRef.current = buildHandlers(state);
+  handlersRef.current = buildHandlers(rabbitApi, state);
 
   useEffect(() => {
     if (!isTauri || !enabled) return;
@@ -152,10 +156,11 @@ export function useMcpBridge(state: RabbitState, enabled = true): void {
     let unlisten: (() => void) | null = null;
 
     (async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      const { invoke } = await import('@tauri-apps/api/core');
-      const fn = await listen<McpCallEvent>('mcp:call', async (event) => {
-        const { id, tool, args } = event.payload;
+      // Qua SDK: sự kiện `mcp:call` và lệnh `mcp_respond` đều nằm trong quyền
+      // 'native' + allowlist của plugin, nên cầu nối này cũng hiện trong nhật ký
+      // như mọi lời gọi khác thay vì là một đường đi vòng.
+      const fn = await sdk.native.listen<McpCallEvent>('mcp:call', async (payload) => {
+        const { id, tool, args } = payload;
         const handler = handlersRef.current[tool];
         // Not one of this bridge's tools — leave it alone rather than
         // answering "unknown tool", since several bridges may be listening
@@ -163,9 +168,9 @@ export function useMcpBridge(state: RabbitState, enabled = true): void {
         if (!handler) return;
         try {
           const result = await handler(args ?? {});
-          await invoke('mcp_respond', { id, result: result ?? null, error: null });
+          await sdk.native.invoke('mcp_respond', { id, result: result ?? null, error: null });
         } catch (e) {
-          await invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
+          await sdk.native.invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
         }
       });
       if (cancelled) fn();
@@ -176,5 +181,5 @@ export function useMcpBridge(state: RabbitState, enabled = true): void {
       cancelled = true;
       unlisten?.();
     };
-  }, [enabled]);
+  }, [enabled, sdk]);
 }

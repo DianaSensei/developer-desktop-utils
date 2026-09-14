@@ -11,7 +11,8 @@ import { SearchInput } from '@/components/ui/search-input';
 import { Callout } from '@/components/ui/callout';
 import { LoadingRow } from '@/components/ui/spinner';
 import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
-import { kafkaApi, type TopicSummary } from './types';
+import { type TopicSummary } from './types';
+import { useKafkaApi } from './api_sdk';
 
 interface TopicListViewProps {
   brokerId: string;
@@ -21,6 +22,7 @@ interface TopicListViewProps {
 }
 
 export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }: TopicListViewProps) {
+  const kafkaApi = useKafkaApi();
   const [filter, setFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [topics, setTopics] = useState<TopicSummary[] | null>(null);
@@ -105,6 +107,7 @@ export function TopicListView({ brokerId, refreshKey, onRefresh, onSelectTopic }
 function CreateTopicDialog({ open, onOpenChange, brokerId, onCreated }: {
   open: boolean; onOpenChange: (o: boolean) => void; brokerId: string; onCreated: (name: string) => void;
 }) {
+  const kafkaApi = useKafkaApi();
   const [name, setName] = useState('');
   const [partitions, setPartitions] = useState('1');
   const [rf, setRf] = useState('1');

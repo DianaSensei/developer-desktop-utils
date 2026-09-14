@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Repeat, AlertTriangle, RefreshCw, Send, CheckCircle2, Timer, Check, X } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
@@ -12,10 +13,9 @@ import { CopyButton } from '@/components/ui/copy-button';
 // Read-only viewer for the reply, editable JSON/plain surface for the request
 // payload — the design system's shared code editors.
 import { CodeViewer, JsonEditor, TextEditor } from '@/design-system';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection, RpcReply, PublishOutcome, MessageProperties, ExchangeInfo, QueueInfo, BindingInfo } from './types';
-import { rabbitApi } from './types';
+import { useRabbitApi } from './api_sdk';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { useKnownNames } from './knownNamesStore';
@@ -68,14 +68,16 @@ const rpcDraft = {
  * buttons) open this panel pre-filled via `prefill`.
  */
 export function RpcView({ conn, prefill }: RpcViewProps) {
-  const [mode, setMode] = usePersistentState<Mode>('devtool:rabbit:rpcMode', 'request');
+  const sdk = usePluginSdkFor('rabbit-client');
+  const rabbitApi = useRabbitApi();
+  const [mode, setMode] = usePluginState<Mode>(sdk, 'rpcMode', 'request', { legacyKey: 'devtool:rabbit:rpcMode' });
   // Most fields are seeded from the in-memory draft (see `rpcDraft`) so the form
   // survives tab/tool switches while the app is open.
   const [exchange, setExchange] = useState(() => rpcDraft.exchange);
   const [routingKey, setRoutingKey] = useState(() => rpcDraft.routingKey);
   const [payload, setPayload] = useState(() => rpcDraft.payload);
   // Payload editor: JSON highlighting (+ Format action) or plain text.
-  const [payloadFormat, setPayloadFormat] = usePersistentState<'json' | 'plain'>('devtool:rabbit:payloadFormat', 'json');
+  const [payloadFormat, setPayloadFormat] = usePluginState<'json' | 'plain'>(sdk, 'payloadFormat', 'json', { legacyKey: 'devtool:rabbit:payloadFormat' });
 
   // Message properties
   const [contentType, setContentType] = useState(() => rpcDraft.contentType);
@@ -100,7 +102,7 @@ export function RpcView({ conn, prefill }: RpcViewProps) {
   const [sending, setSending] = useState(false);
   const [reply, setReply] = useState<RpcReply | null>(() => rpcDraft.reply);
   // Reply rendering: pretty-printed + highlighted JSON, or plain text.
-  const [replyFormat, setReplyFormat] = usePersistentState<'json' | 'plain'>('devtool:rabbit:replyFormat', 'json');
+  const [replyFormat, setReplyFormat] = usePluginState<'json' | 'plain'>(sdk, 'replyFormat', 'json', { legacyKey: 'devtool:rabbit:replyFormat' });
   const [elapsed, setElapsed] = useState<number | null>(() => rpcDraft.elapsed);
   const [outcome, setOutcome] = useState<PublishOutcome | null>(() => rpcDraft.outcome);
   const [stopped, setStopped] = useState(() => rpcDraft.stopped);

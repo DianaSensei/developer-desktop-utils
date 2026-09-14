@@ -1,4 +1,4 @@
-import { invoke, Channel } from '@tauri-apps/api/core';
+import type { Channel, PluginSdk } from '@/platform';
 
 // ── Connection profile (persisted via Rust to the app-data dir) ───────────────
 
@@ -273,79 +273,96 @@ export interface RpcCallArgs {
 
 // ── Invoke wrappers ───────────────────────────────────────────────────────────
 
-export const rabbitApi = {
-  listConfigs: () => invoke<RabbitConnection[]>('rabbit_list_configs'),
-  saveConfig: (config: RabbitConnection) =>
-    invoke<RabbitConnection>('rabbit_save_config', { config }),
-  deleteConfig: (configId: string) =>
-    invoke<void>('rabbit_delete_config', { configId }),
+/**
+ * Lớp lệnh của tool, dựng theo SDK của plugin thay vì gọi thẳng `invoke`.
+ *
+ * Nhờ vậy allowlist `commands: ['rabbit_', 'mcp_respond']` trong manifest có hiệu lực thật —
+ * một lệnh gõ sai hay một lệnh ngoài danh sách bị chặn ngay và ghi vào nhật ký,
+ * thay vì lặng lẽ đi thẳng xuống Rust.
+ *
+ * Dùng qua `useRabbitApi()` (xem api.ts); factory để lộ ra đây chỉ cho test và
+ * cho code không phải React.
+ */
+export function createRabbitApi(sdk: PluginSdk) {
+  const invoke = <T,>(command: string, args?: Record<string, unknown>) =>
+    sdk.native.invoke<T>(command, args);
 
-  /** Publish over AMQP with full properties, optional mandatory flag and publisher confirms. */
-  publish: (args: PublishArgs) =>
-    invoke<PublishOutcome>('rabbit_publish', {
-      configId: args.configId,
-      exchange: args.exchange,
-      routingKey: args.routingKey,
-      payload: args.payload,
-      properties: args.properties,
-      mandatory: args.mandatory,
-      confirm: args.confirm,
-    }),
+  return {
+    listConfigs: () => invoke<RabbitConnection[]>('rabbit_list_configs'),
+    saveConfig: (config: RabbitConnection) =>
+      invoke<RabbitConnection>('rabbit_save_config', { config }),
+    deleteConfig: (configId: string) =>
+      invoke<void>('rabbit_delete_config', { configId }),
 
-  /** Request/response via AMQP direct reply-to. Resolves with the reply or rejects on timeout. */
-  rpcCall: (args: RpcCallArgs) =>
-    invoke<RpcReply>('rabbit_rpc_call', {
-      configId: args.configId,
-      exchange: args.exchange,
-      routingKey: args.routingKey,
-      payload: args.payload,
-      correlationId: args.correlationId ?? null,
-      contentType: args.contentType ?? null,
-      headers: args.headers ?? null,
-      timeoutMs: args.timeoutMs,
-    }),
+    /** Publish over AMQP with full properties, optional mandatory flag and publisher confirms. */
+    publish: (args: PublishArgs) =>
+      invoke<PublishOutcome>('rabbit_publish', {
+        configId: args.configId,
+        exchange: args.exchange,
+        routingKey: args.routingKey,
+        payload: args.payload,
+        properties: args.properties,
+        mandatory: args.mandatory,
+        confirm: args.confirm,
+      }),
 
-  /** Start a live consumer; deliveries stream to `onMessage`. Returns the consumer id. */
-  consumeStart: (
-    args: { configId: string; queue: string; ackMode: ConsumeAckMode; prefetch: number; reply?: ReplyOptions | null },
-    onMessage: Channel<ConsumedMessage>,
-  ) =>
-    invoke<string>('rabbit_consume_start', {
-      configId: args.configId,
-      queue: args.queue,
-      ackMode: args.ackMode,
-      prefetch: args.prefetch,
-      reply: args.reply ?? null,
-      onMessage,
-    }),
+    /** Request/response via AMQP direct reply-to. Resolves with the reply or rejects on timeout. */
+    rpcCall: (args: RpcCallArgs) =>
+      invoke<RpcReply>('rabbit_rpc_call', {
+        configId: args.configId,
+        exchange: args.exchange,
+        routingKey: args.routingKey,
+        payload: args.payload,
+        correlationId: args.correlationId ?? null,
+        contentType: args.contentType ?? null,
+        headers: args.headers ?? null,
+        timeoutMs: args.timeoutMs,
+      }),
 
-  consumeStop: (consumerId: string) =>
-    invoke<void>('rabbit_consume_stop', { consumerId }),
+    /** Start a live consumer; deliveries stream to `onMessage`. Returns the consumer id. */
+    consumeStart: (
+      args: { configId: string; queue: string; ackMode: ConsumeAckMode; prefetch: number; reply?: ReplyOptions | null },
+      onMessage: Channel<ConsumedMessage>,
+    ) =>
+      invoke<string>('rabbit_consume_start', {
+        configId: args.configId,
+        queue: args.queue,
+        ackMode: args.ackMode,
+        prefetch: args.prefetch,
+        reply: args.reply ?? null,
+        onMessage,
+      }),
 
-  // ── AMQP-only topology (brokers without the management HTTP API) ────────────
+    consumeStop: (consumerId: string) =>
+      invoke<void>('rabbit_consume_stop', { consumerId }),
 
-  /** Open + close an AMQP connection to verify a (possibly unsaved) profile. */
-  amqpTest: (config: RabbitConnection) => invoke<void>('rabbit_amqp_test', { config }),
+    // ── AMQP-only topology (brokers without the management HTTP API) ────────────
 
-  /** Passive-declare each named queue → existence + live message/consumer counts. */
-  amqpQueuesInfo: (configId: string, names: string[]) =>
-    invoke<QueueAmqpInfo[]>('rabbit_amqp_queues_info', { configId, names }),
+    /** Open + close an AMQP connection to verify a (possibly unsaved) profile. */
+    amqpTest: (config: RabbitConnection) => invoke<void>('rabbit_amqp_test', { config }),
 
-  /** Passive-declare each named exchange → existence. */
-  amqpExchangesInfo: (configId: string, names: string[]) =>
-    invoke<ExchangeAmqpInfo[]>('rabbit_amqp_exchanges_info', { configId, names }),
+    /** Passive-declare each named queue → existence + live message/consumer counts. */
+    amqpQueuesInfo: (configId: string, names: string[]) =>
+      invoke<QueueAmqpInfo[]>('rabbit_amqp_queues_info', { configId, names }),
 
-  /** Declare a queue over AMQP. */
-  amqpDeclareQueue: (configId: string, name: string, durable: boolean, autoDelete: boolean) =>
-    invoke<void>('rabbit_amqp_declare_queue', { configId, name, durable, autoDelete }),
+    /** Passive-declare each named exchange → existence. */
+    amqpExchangesInfo: (configId: string, names: string[]) =>
+      invoke<ExchangeAmqpInfo[]>('rabbit_amqp_exchanges_info', { configId, names }),
 
-  /** Declare an exchange over AMQP. */
-  amqpDeclareExchange: (
-    configId: string, name: string, kind: string, durable: boolean, autoDelete: boolean, internal: boolean,
-  ) =>
-    invoke<void>('rabbit_amqp_declare_exchange', { configId, name, kind, durable, autoDelete, internal }),
+    /** Declare a queue over AMQP. */
+    amqpDeclareQueue: (configId: string, name: string, durable: boolean, autoDelete: boolean) =>
+      invoke<void>('rabbit_amqp_declare_queue', { configId, name, durable, autoDelete }),
 
-  /** Bind a queue to an exchange over AMQP. */
-  amqpBindQueue: (configId: string, queue: string, exchange: string, routingKey: string) =>
-    invoke<void>('rabbit_amqp_bind_queue', { configId, queue, exchange, routingKey }),
-};
+    /** Declare an exchange over AMQP. */
+    amqpDeclareExchange: (
+      configId: string, name: string, kind: string, durable: boolean, autoDelete: boolean, internal: boolean,
+    ) =>
+      invoke<void>('rabbit_amqp_declare_exchange', { configId, name, kind, durable, autoDelete, internal }),
+
+    /** Bind a queue to an exchange over AMQP. */
+    amqpBindQueue: (configId: string, queue: string, exchange: string, routingKey: string) =>
+      invoke<void>('rabbit_amqp_bind_queue', { configId, queue, exchange, routingKey }),
+  };
+}
+
+export type RabbitApi = ReturnType<typeof createRabbitApi>;

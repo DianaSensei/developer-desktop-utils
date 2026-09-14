@@ -12,7 +12,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { containerApi, type ContainerConnection, type NetworkInfo } from './types';
+import { type ContainerConnection, type NetworkInfo } from './types';
+import { useContainerApi } from './api_sdk';
 import { PruneButton } from './PruneButton';
 import { NetworkDetailsDialog } from './NetworkDetailsDialog';
 import { useUsageIndex, describeUsers } from './usage';
@@ -27,6 +28,7 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
   refreshKey: number;
   onRefresh: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [filter, setFilter] = useState('');
   const [networks, setNetworks] = useState<NetworkInfo[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -232,6 +234,7 @@ export function NetworksView({ connection, refreshKey, onRefresh }: {
 function CreateNetworkDialog({ open, onOpenChange, connection, onCreated }: {
   open: boolean; onOpenChange: (o: boolean) => void; connection: ContainerConnection; onCreated: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [name, setName] = useState('');
   const [driver, setDriver] = useState('bridge');
   const [busy, setBusy] = useState(false);

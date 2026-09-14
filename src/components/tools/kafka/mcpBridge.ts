@@ -24,8 +24,10 @@
 // don't both listen at once and double-answer the same call.
 
 import { useEffect, useRef } from 'react';
+import { usePluginSdkFor } from '@/platform';
 import { isTauri } from '@/lib/platform';
-import { kafkaApi, type BrokerConfig } from './types';
+import { useKafkaApi } from './api_sdk';
+import type { KafkaApi, BrokerConfig } from './types';
 import { kafkaConsumerStore } from './kafkaConsumerStore';
 import type { KafkaState } from './useKafkaState';
 
@@ -42,18 +44,18 @@ function requireString(v: unknown, name: string): string {
   return v;
 }
 
-async function requireConnection(id: string): Promise<BrokerConfig> {
+async function requireConnection(kafkaApi: KafkaApi, id: string): Promise<BrokerConfig> {
   const all = await kafkaApi.listConfigs();
   const conn = all.find((c) => c.id === id);
   if (!conn) throw new Error(`No Kafka connection with id "${id}"`);
   return conn;
 }
 
-function buildHandlers(state: KafkaState): Record<string, ToolHandler> {
+function buildHandlers(kafkaApi: KafkaApi, state: KafkaState): Record<string, ToolHandler> {
   return {
     kafka_list_connections: async () => kafkaApi.listConfigs(),
 
-    kafka_get_connection: async (args) => requireConnection(requireString(args.connectionId, 'connectionId')),
+    kafka_get_connection: async (args) => requireConnection(kafkaApi, requireString(args.connectionId, 'connectionId')),
 
     kafka_add_connection: async (args) => {
       const conn: BrokerConfig = {
@@ -73,14 +75,14 @@ function buildHandlers(state: KafkaState): Record<string, ToolHandler> {
     // (unlike update_request's script/auth/body — see apiclient/mcpBridge.ts).
     kafka_update_connection: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      const current = await requireConnection(id);
+      const current = await requireConnection(kafkaApi, id);
       const patch = (args.patch ?? {}) as Partial<BrokerConfig>;
       return kafkaApi.saveConfig({ ...current, ...patch, id });
     },
 
     kafka_delete_connection: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      await requireConnection(id);
+      await requireConnection(kafkaApi, id);
       await kafkaApi.deleteConfig(id);
       return { ok: true };
     },
@@ -89,7 +91,7 @@ function buildHandlers(state: KafkaState): Record<string, ToolHandler> {
     // same as the UI's own "Connect" button before it marks the broker live.
     kafka_test_connection: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      await requireConnection(id);
+      await requireConnection(kafkaApi, id);
       await kafkaApi.testConnection(id);
       return { ok: true };
     },
@@ -100,7 +102,7 @@ function buildHandlers(state: KafkaState): Record<string, ToolHandler> {
     // broker is live at a time.
     kafka_connect: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      await requireConnection(id);
+      await requireConnection(kafkaApi, id);
       await kafkaApi.testConnection(id);
       if (state.connectedBrokerId && state.connectedBrokerId !== id) {
         kafkaConsumerStore.stopForBroker(state.connectedBrokerId);
@@ -129,8 +131,10 @@ function buildHandlers(state: KafkaState): Record<string, ToolHandler> {
 // docs/ai/CLAUDE.md's "Stable refs for long-lived event listeners") — same
 // pattern as the API Client's/Mock Server's/Redis's `useMcpBridge`.
 export function useMcpBridge(state: KafkaState, enabled = true): void {
+  const sdk = usePluginSdkFor('kafka-explorer');
+  const kafkaApi = useKafkaApi();
   const handlersRef = useRef<Record<string, ToolHandler>>({});
-  handlersRef.current = buildHandlers(state);
+  handlersRef.current = buildHandlers(kafkaApi, state);
 
   useEffect(() => {
     if (!isTauri || !enabled) return;
@@ -138,10 +142,11 @@ export function useMcpBridge(state: KafkaState, enabled = true): void {
     let unlisten: (() => void) | null = null;
 
     (async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      const { invoke } = await import('@tauri-apps/api/core');
-      const fn = await listen<McpCallEvent>('mcp:call', async (event) => {
-        const { id, tool, args } = event.payload;
+      // Qua SDK: sự kiện `mcp:call` và lệnh `mcp_respond` đều nằm trong quyền
+      // 'native' + allowlist của plugin, nên cầu nối này cũng hiện trong nhật ký
+      // như mọi lời gọi khác thay vì là một đường đi vòng.
+      const fn = await sdk.native.listen<McpCallEvent>('mcp:call', async (payload) => {
+        const { id, tool, args } = payload;
         const handler = handlersRef.current[tool];
         // Not one of this bridge's tools — leave it alone rather than
         // answering "unknown tool", since several bridges may be listening
@@ -149,9 +154,9 @@ export function useMcpBridge(state: KafkaState, enabled = true): void {
         if (!handler) return;
         try {
           const result = await handler(args ?? {});
-          await invoke('mcp_respond', { id, result: result ?? null, error: null });
+          await sdk.native.invoke('mcp_respond', { id, result: result ?? null, error: null });
         } catch (e) {
-          await invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
+          await sdk.native.invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
         }
       });
       if (cancelled) fn();
@@ -162,5 +167,5 @@ export function useMcpBridge(state: KafkaState, enabled = true): void {
       cancelled = true;
       unlisten?.();
     };
-  }, [enabled]);
+  }, [enabled, sdk]);
 }

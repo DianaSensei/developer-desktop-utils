@@ -12,7 +12,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { containerApi, type ContainerConnection, type VolumeInfo } from './types';
+import { type ContainerConnection, type VolumeInfo } from './types';
+import { useContainerApi } from './api_sdk';
 import { PruneButton } from './PruneButton';
 import { VolumeDetailsDialog } from './VolumeDetailsDialog';
 import { useUsageIndex, describeUsers } from './usage';
@@ -26,6 +27,7 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
   refreshKey: number;
   onRefresh: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [filter, setFilter] = useState('');
   const [volumes, setVolumes] = useState<VolumeInfo[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -247,6 +249,7 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
 function CreateVolumeDialog({ open, onOpenChange, connection, onCreated }: {
   open: boolean; onOpenChange: (o: boolean) => void; connection: ContainerConnection; onCreated: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

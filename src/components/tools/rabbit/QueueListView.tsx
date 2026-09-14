@@ -13,7 +13,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import type { RabbitConnection, QueueAmqpInfo } from './types';
-import { rabbitApi } from './types';
+import { useRabbitApi } from './api_sdk';
 import { rabbitMgmt, type PagedQueues } from './api';
 import { useRabbitData } from './useRabbitData';
 import { knownNamesStore, useKnownNames } from './knownNamesStore';
@@ -135,6 +135,7 @@ function MgmtQueueListView({ conn, refreshKey, onRefresh, onSelectQueue }: Queue
 // ── AMQP-only: typed names + passive-declare counts ───────────────────────────
 
 function AmqpQueueListView({ conn, refreshKey, onRefresh, onSelectQueue }: QueueListViewProps) {
+  const rabbitApi = useRabbitApi();
   const [createOpen, setCreateOpen] = useState(false);
   const [adding, setAdding] = useState('');
   const names = useKnownNames(conn.id).queues;
@@ -247,6 +248,7 @@ function AmqpQueueListView({ conn, refreshKey, onRefresh, onSelectQueue }: Queue
 export function CreateQueueDialog({ open, onOpenChange, conn, onCreated }: {
   open: boolean; onOpenChange: (o: boolean) => void; conn: RabbitConnection; onCreated: (name: string) => void;
 }) {
+  const rabbitApi = useRabbitApi();
   const [name, setName] = useState('');
   const [durable, setDurable] = useState(true);
   const [busy, setBusy] = useState(false);

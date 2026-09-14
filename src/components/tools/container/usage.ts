@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { containerApi, type ContainerConnection, type ContainerSummary } from './types';
+import { type ContainerConnection, type ContainerSummary } from './types';
+import { useContainerApi } from './api_sdk';
 
 /**
  * "Is this image / volume / network actually being used, and by what?"
@@ -67,6 +68,7 @@ export function useUsageIndex(connection: ContainerConnection, refreshKey: numbe
   usage: UsageIndex;
   reload: () => void;
 } {
+  const containerApi = useContainerApi();
   const [usage, setUsage] = useState<UsageIndex>(EMPTY_USAGE);
   const [tick, setTick] = useState(0);
 

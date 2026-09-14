@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Plus, X, CheckCircle, AlertCircle, History, RotateCcw } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
@@ -6,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { usePersistentState } from '@/hooks/usePersistentState';
-import { kafkaApi, type PartitionInfo, type BatchRecord } from './types';
+import { type PartitionInfo, type BatchRecord } from './types';
+import { useKafkaApi } from './api_sdk';
 import { JsonEditor, TextEditor } from '@/design-system';
 import { produceDraft, type ProduceHeader as Header } from './produceDraft';
 import { kafkaInputHistory } from './kafkaInputHistoryStore';
@@ -46,6 +47,8 @@ interface ProduceTabProps {
 }
 
 export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
+  const sdk = usePluginSdkFor('kafka-explorer');
+  const kafkaApi = useKafkaApi();
   // Seeded from the in-memory draft so the form survives tab/tool/topic switches.
   const [partitionMode, setPartitionMode] = useState<'auto' | 'manual'>(() => produceDraft.partitionMode);
   const [partition, setPartition] = useState(() => produceDraft.partition);
@@ -61,7 +64,7 @@ export function ProduceTab({ brokerId, topic, partitions }: ProduceTabProps) {
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Send-again history (per broker+topic), newest first, capped at 10.
-  const [recent, setRecent] = usePersistentState<RecentSend[]>(`devtool:kafka:${brokerId}:${topic}:recentSends`, []);
+  const [recent, setRecent] = usePluginState<RecentSend[]>(sdk, `${brokerId}:${topic}:recentSends`, [], { legacyKey: `devtool:kafka:${brokerId}:${topic}:recentSends` });
 
   // Preview which partition a keyed message routes to in auto mode.
   const previewPartition = (!batch && partitionMode === 'auto' && key.trim() && partitions.length > 0)

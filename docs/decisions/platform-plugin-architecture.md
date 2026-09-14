@@ -270,7 +270,7 @@ lực thật chứ không phải khai cho đẹp. Mô tả của `http:default` 
 `appPermissions.ts` cũng được sửa lại cho đúng sự thật: nó nói rõ danh sách có
 wildcard nên đây là quyền cấp-app, còn giới hạn theo tool ở chỗ khác.
 
-### Redis Client — tool đầu tiên chạy hẳn trên SDK
+### Bốn tool streaming đã chuyển sang SDK
 
 Khuôn mẫu cho ba tool streaming còn lại:
 
@@ -293,26 +293,22 @@ module** từ `devtool:redis:connectedConnId` — trước khi component nào k�
 và di trú. Nếu chỉ đổi khoá mà không cho seed đọc được cả hai, chấm live sẽ sai
 đúng một lần chạy sau khi nâng cấp: kiểu lỗi không ai báo nhưng ai cũng thấy.
 
-Kết quả: ratchet 34 → 30 và 47 → 45.
+Cùng khuôn đó áp cho Kafka, RabbitMQ và Containers. Hai tình huống cần cách
+khác, và cả hai đều lộ ra một giới hạn thật của mô hình hook:
 
-### Trả nợ ratchet — làm theo tool, không làm một lượt
+- **Store ở phạm vi module** (`kafkaConsumerStore`, `consumerStore` của Rabbit,
+  `rabbitMgmt`) tồn tại CHÍNH VÌ consumer phải chạy tiếp khi người dùng chuyển
+  sang tool khác — nên chúng không gọi hook được. `getPluginSdk(id)` là lối lấy
+  SDK ngoài React dành đúng cho trường hợp này; quyền và allowlist vẫn được kiểm
+  y hệt.
+- **Kênh dựng bất đồng bộ.** `sdk.native.channel()` phải `await` (dynamic import
+  giữ Tauri ngoài bundle khởi động), trong khi `new Channel()` là đồng bộ. Ba
+  effect phải bọc lại trong IIFE async, với `cancelled` vẫn là chốt duy nhất
+  quyết định dọn dẹp — đây là chỗ dễ làm rò stream nhất nếu cẩu thả.
 
-Hai chỉ số nợ trong `src/platform/baseline.json` (12 chỗ gọi thẳng
-`@tauri-apps`, 47 chỗ dùng thẳng store chung) nằm gọn trong bốn tool có luồng dữ
-liệu: Redis, Kafka, RabbitMQ, Containers. Cả bốn đều gói lệnh Tauri vào một
-object kiểu `redisApi` ở `types.ts`, và object đó được import trực tiếp ở **57
-file**.
-
-Chuyển chúng sang SDK vì vậy không phải sửa 12 dòng import mà là đổi cách 57
-file lấy API — một refactor cơ học lớn, trong bốn tool nặng nhất của app. Quyết
-định: **làm theo từng tool, khi có lý do khác để động vào tool đó**, chứ không
-làm một lượt. Ratchet tồn tại đúng cho nhịp đó: nó chặn chỗ mới, không ép dọn
-hết ngay.
-
-Thứ đã làm trước để đường đó thông: `sdk.native.channel()`. Thiếu nó thì mọi
-tool có luồng dữ liệu **buộc** phải import thẳng `@tauri-apps/api/core` dù có
-muốn chuyển hay không — tức bốn tool nặng nhất vĩnh viễn nằm ngoài lớp
-quyền/audit, và ratchet không bao giờ về 0 được dù có cố.
+Kết quả sau bốn tool: ratchet **34 → 14** và **47 → 33**. Phần còn lại nằm rải ở
+các tool nhỏ, chuyển dần khi có lý do khác để động vào chúng — ratchet chặn chỗ
+mới, không ép dọn hết ngay.
 
 ### SDK đầy đủ — bề mặt dựng theo nhu cầu thật, không theo suy đoán
 

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Channel } from '@tauri-apps/api/core';
 import {
   Search, Pause, Play, WrapText, X, Clock, Regex, CaseSensitive,
   ChevronUp, ChevronDown, ArrowDownToLine, Eraser, Download, AlertTriangle,
@@ -10,7 +9,7 @@ import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Spinner } from '@/components/ui/spinner';
 import { saveTextFile } from '@/lib/fileio';
-import { usePluginSdkFor } from '@/platform';
+import { usePluginSdkFor, type Channel } from '@/platform';
 import { MOD_KEY } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 import type { LogLine } from './types';
@@ -180,8 +179,9 @@ export function LogsPanel({ start, stop, name }: {
     let cancelled = false;
     let streamId: string | null = null;
 
-    const channel = new Channel<LogLine>();
-    channel.onmessage = (line) => {
+    // Kênh dựng qua SDK nên phải chờ; phần khởi động stream vì thế nằm trong
+    // một IIFE async, còn `cancelled` vẫn là chốt duy nhất cho việc dọn dẹp.
+    const onLine = (line: LogLine) => {
       // Tạm dừng: giữ socket mở và đệm dòng mới lại (cắt theo cùng trần
       // MAX_LINES để việc dừng lâu không phình bộ nhớ), thay vì loại bỏ.
       if (!followRef.current) {
@@ -203,15 +203,19 @@ export function LogsPanel({ start, stop, name }: {
       setLines((prev) => appendCapped(prev, batch));
     }, FLUSH_MS);
 
-    startRef.current(tail, since, until, timestamps, channel)
-      .then((id) => {
-        if (cancelled) { stopRef.current(id).catch(() => {}); return; }
-        streamId = id;
-        // A container that is simply quiet never sends a first line; stop
-        // showing "Connecting…" once the stream itself is established.
-        setConnecting(false);
-      })
-      .catch((e) => { setConnecting(false); setError(String(e instanceof Error ? e.message : e)); });
+    void (async () => {
+      const channel = await sdk.native.channel<LogLine>(onLine, 'container-logs');
+      if (cancelled) return;
+      startRef.current(tail, since, until, timestamps, channel)
+        .then((id) => {
+          if (cancelled) { stopRef.current(id).catch(() => {}); return; }
+          streamId = id;
+          // A container that is simply quiet never sends a first line; stop
+          // showing "Connecting…" once the stream itself is established.
+          setConnecting(false);
+        })
+        .catch((e) => { setConnecting(false); setError(String(e instanceof Error ? e.message : e)); });
+    })();
 
     return () => {
       cancelled = true;
@@ -223,7 +227,7 @@ export function LogsPanel({ start, stop, name }: {
       setPendingCount(0);
       if (streamId) stopRef.current(streamId).catch(() => {});
     };
-  }, [tail, since, until, timestamps, appendCapped]);
+  }, [tail, since, until, timestamps, appendCapped, sdk]);
 
   // Tiếp tục chạy → xả đệm vào view theo đúng thứ tự đã đến.
   useEffect(() => {

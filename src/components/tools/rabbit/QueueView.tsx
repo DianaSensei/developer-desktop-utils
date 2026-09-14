@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { RefreshCw, Send, Headphones, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +10,8 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { Stat } from '@/components/ui/stat';
 import { Field } from '@/components/ui/tool-section';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RabbitConnection, QueueInfo, BindingInfo, QueueAmqpInfo } from './types';
-import { rabbitApi } from './types';
+import { useRabbitApi } from './api_sdk';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { formatBytes, formatNumber, formatRate } from './format';
@@ -38,7 +38,8 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export function QueueView({ conn, queueName, refreshKey, onRefresh, onBack, onPublish, onConsume }: QueueViewProps) {
-  const [tab, setTab] = usePersistentState<Tab>('devtool:rabbit:queueTab', 'overview');
+  const sdk = usePluginSdkFor('rabbit-client');
+  const [tab, setTab] = usePluginState<Tab>(sdk, 'queueTab', 'overview', { legacyKey: 'devtool:rabbit:queueTab' });
   // Tolerate stale values ('publish', 'messages', 'consume') persisted before those tabs were removed.
   const activeTab: Tab = tab === 'overview' || tab === 'bindings' ? tab : 'overview';
 
@@ -125,6 +126,7 @@ function MgmtOverviewTab({ conn, queueName, refreshKey }: { conn: RabbitConnecti
 
 /** AMQP-only overview: a passive declare gives existence + ready/consumer counts only. */
 function AmqpOverviewTab({ conn, queueName, refreshKey }: { conn: RabbitConnection; queueName: string; refreshKey: number }) {
+  const rabbitApi = useRabbitApi();
   const { data, loading, error } = useRabbitData<QueueAmqpInfo[]>(() => rabbitApi.amqpQueuesInfo(conn.id, [queueName]), [conn.id, queueName, refreshKey]);
   if (loading) return <LoadingRow />;
   if (error) return <Callout tone="error">{error}</Callout>;
@@ -164,6 +166,7 @@ function BindingsTab({ conn, queueName, refreshKey }: { conn: RabbitConnection; 
 
 /** AMQP-only: bindings can't be listed; only created. */
 function AmqpBindingsTab({ conn, queueName }: { conn: RabbitConnection; queueName: string }) {
+  const rabbitApi = useRabbitApi();
   return (
     <div className="space-y-3">
       <NewBindingForm

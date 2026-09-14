@@ -8,8 +8,8 @@
 // window so a high-throughput topic can't trigger a re-render per message.
 
 import { useSyncExternalStore } from 'react';
-import { Channel } from '@tauri-apps/api/core';
-import { kafkaApi, type KafkaConsumedMessage, type ConsumeFrom } from './types';
+import { getPluginSdk } from '@/platform';
+import { createKafkaApi, type KafkaConsumedMessage, type ConsumeFrom } from './types';
 
 const MAX_MESSAGES = 2000;
 const FLUSH_MS = 120;
@@ -87,6 +87,15 @@ function subscribe(l: Listener) {
   return () => listeners.delete(l);
 }
 
+/**
+ * Store này sống ở phạm vi module CHÍNH VÌ consumer phải chạy tiếp khi người
+ * dùng chuyển sang tool khác — nên nó không gọi hook được. `getPluginSdk` là
+ * lối lấy SDK ngoài React dành đúng cho trường hợp này: quyền và allowlist vẫn
+ * được kiểm y như khi gọi từ trong component.
+ */
+const sdk = getPluginSdk('kafka-explorer');
+const kafkaApi = createKafkaApi(sdk);
+
 export const kafkaConsumerStore = {
   async start(brokerId: string, topic: string, from: ConsumeFrom): Promise<void> {
     const k = key(brokerId, topic);
@@ -98,8 +107,10 @@ export const kafkaConsumerStore = {
     sessions.set(k, session);
     emit();
 
-    const channel = new Channel<KafkaConsumedMessage>();
-    channel.onmessage = (msg) => { if (sessions.has(k)) enqueue(k, msg); };
+    const channel = await sdk.native.channel<KafkaConsumedMessage>(
+      (msg) => { if (sessions.has(k)) enqueue(k, msg); },
+      'kafka-consume',
+    );
 
     try {
       const id = await kafkaApi.consumeStart({ configId: brokerId, topic, from }, channel);

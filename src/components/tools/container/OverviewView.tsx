@@ -7,10 +7,8 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { Stat } from '@/components/ui/stat';
 import { SectionLabel } from '@/components/ui/section-label';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
-import {
-  containerApi,
-  type ContainerConnection, type DiskUsageSummary, type SystemDataUsageResponse, type SystemInfo,
-} from './types';
+import { type ContainerConnection, type DiskUsageSummary, type SystemDataUsageResponse, type SystemInfo } from './types';
+import { useContainerApi } from './api_sdk';
 import { PruneButton, type PruneVariant } from './PruneButton';
 import { formatBytes } from './format';
 
@@ -19,6 +17,7 @@ export function OverviewView({ connection, refreshKey, onRefresh }: {
   refreshKey: number;
   onRefresh: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [info, setInfo] = useState<SystemInfo | null>(null);
   // Disk usage is a separate, much slower call than system info (the daemon
   // walks every image layer and container to compute it), so it loads on its

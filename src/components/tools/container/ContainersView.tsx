@@ -12,7 +12,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
-import { containerApi, type ContainerConnection, type ContainerSummary, type StatsFrame } from './types';
+import { type ContainerConnection, type ContainerSummary, type StatsFrame } from './types';
+import { useContainerApi } from './api_sdk';
 import { ContainerLogsDialog } from './ContainerLogsDialog';
 import { useSort } from './useSort';
 import { useRowSelection } from './useRowSelection';
@@ -55,6 +56,7 @@ export function ContainersView({ connection, refreshKey, onRefresh }: {
   refreshKey: number;
   onRefresh: () => void;
 }) {
+  const containerApi = useContainerApi();
   const [filter, setFilter] = useState('');
   const [showAll, setShowAll] = useState(true);
   const [liveStats, setLiveStats] = useState(false);

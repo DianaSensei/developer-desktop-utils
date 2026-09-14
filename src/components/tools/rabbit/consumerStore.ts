@@ -7,8 +7,8 @@
 // stops everything on unmount (see RabbitClient) so nothing leaks when you leave.
 
 import { useSyncExternalStore } from 'react';
-import { Channel } from '@tauri-apps/api/core';
-import { rabbitApi, type ConsumedMessage, type ConsumeAckMode, type ReplyOptions } from './types';
+import { getPluginSdk } from '@/platform';
+import { createRabbitApi, type ConsumedMessage, type ConsumeAckMode, type ReplyOptions } from './types';
 
 // Bounded ring buffer of the most recent messages kept for inspection/search.
 const MAX_MESSAGES = 2000;
@@ -98,6 +98,15 @@ function subscribe(l: Listener) {
   return () => listeners.delete(l);
 }
 
+/**
+ * Store này sống ở phạm vi module CHÍNH VÌ consumer phải chạy tiếp khi người
+ * dùng chuyển sang tool khác — nên nó không gọi hook được. `getPluginSdk` là
+ * lối lấy SDK ngoài React dành đúng cho trường hợp này: quyền và allowlist vẫn
+ * được kiểm y như khi gọi từ trong component.
+ */
+const sdk = getPluginSdk('rabbit-client');
+const rabbitApi = createRabbitApi(sdk);
+
 export const consumerStore = {
   /** Start consuming a queue. Throws (and registers nothing) if the start fails. */
   async start(connId: string, queue: string, mode: ConsumeAckMode, prefetch: number, reply: ReplyOptions | null = null): Promise<void> {
@@ -110,10 +119,12 @@ export const consumerStore = {
     sessions.set(k, session);
     emit();
 
-    const channel = new Channel<ConsumedMessage>();
     // Batch deliveries (see enqueue/flush) so high-traffic queues don't trigger a
     // re-render per message.
-    channel.onmessage = (msg) => { if (sessions.has(k)) enqueue(k, msg); };
+    const channel = await sdk.native.channel<ConsumedMessage>(
+      (msg) => { if (sessions.has(k)) enqueue(k, msg); },
+      'rabbit-consume',
+    );
 
     try {
       const id = await rabbitApi.consumeStart({ configId: connId, queue, ackMode: mode, prefetch, reply }, channel);

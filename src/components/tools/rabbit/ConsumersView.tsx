@@ -17,7 +17,7 @@ import { SectionLabel } from '@/components/ui/section-label';
 import { TextEditor } from '@/design-system';
 import { cn } from '@/lib/utils';
 import type { RabbitConnection, QueueInfo, ConsumeAckMode } from './types';
-import { rabbitApi } from './types';
+import { useRabbitApi } from './api_sdk';
 import { rabbitMgmt } from './api';
 import { useRabbitData } from './useRabbitData';
 import { useKnownNames } from './knownNamesStore';
@@ -45,6 +45,7 @@ const MODE_LABEL: Record<ConsumeAckMode, string> = {
 };
 
 export function ConsumersView({ conn, refreshKey, onRefresh, prefill, detailQueue, onOpenConsumer, onCloseDetail }: ConsumersViewProps) {
+  const rabbitApi = useRabbitApi();
   const sessions = useConsumers().filter((s) => s.connId === conn.id);
   const detail = detailQueue ? sessions.find((s) => s.queue === detailQueue) : undefined;
 
