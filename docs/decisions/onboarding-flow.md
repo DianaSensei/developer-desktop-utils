@@ -70,7 +70,7 @@ và cover bởi unit test cho phần logic (`OnboardingContext`, `useToolGuideTr
 - **Chưa chạy thử tay trên app thật** (Tauri dev) — AI agent không tự chạy dev server theo
   quy định `CLAUDE.md`. User cần tự verify luồng UI trước khi coi là hoàn tất 100%.
 - Nhóm tool trong `ONBOARDING_TOOL_GROUPS` (`src/lib/onboardingToolGroups.ts`) là phân loại
-  thủ công, không tự đồng bộ khi có tool mới thêm vào `TOOL_DEFS` — cần cập nhật tay khi
+  thủ công, không tự đồng bộ khi có plugin mới trong `src/plugins/` — cần cập nhật tay khi
   thêm tool mới nếu muốn tool đó xuất hiện ở bước chọn nhóm.
 - `TOOL_GUIDE_VERSIONS` phụ thuộc hoàn toàn vào việc dev nhớ tăng version thủ công khi sửa
   guide — không có cảnh báo/lint nào nếu quên.

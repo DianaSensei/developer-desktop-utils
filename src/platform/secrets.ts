@@ -147,6 +147,15 @@ const MIGRATIONS: ReadonlyArray<{ from: string; pluginId: string; key: string }>
  * thử lại. Một cờ đặt sai thời điểm sẽ biến sự cố giữa chừng thành mất dữ liệu.
  */
 export async function migrateSecretsFromSharedStore(): Promise<string[]> {
+  // KHÔNG di trú ở bản web. Kho của bản web là `sessionStorage`, nên "chuyển"
+  // ở đây thực chất là bê dữ liệu từ nơi lưu được sang nơi mất khi đóng tab,
+  // rồi xoá bản gốc — tức là XOÁ dữ liệu người dùng chứ không phải di trú.
+  //
+  // Để nguyên thì bản web hiển thị rỗng (đọc kho session trống) nhưng dữ liệu
+  // vẫn còn nguyên chỗ cũ và sẽ được di trú đúng cách khi họ mở bản desktop.
+  // Hiển thị rỗng là phiền; xoá mất là không sửa được.
+  if (!isTauri) return [];
+
   const moved: string[] = [];
   for (const { from, pluginId, key } of MIGRATIONS) {
     const raw = storageGet(from);
@@ -169,6 +178,8 @@ export async function migrateSecretsFromSharedStore(): Promise<string[]> {
  * ý nghĩa gì.
  */
 export async function migrateSecretsFromPlainStore(): Promise<number> {
+  // Cùng lý do như `migrateSecretsFromSharedStore`: bản web không có kho bền
+  // để chuyển sang, và store trần này cũng chỉ tồn tại ở bản Tauri.
   if (!isTauri) return 0;
   let moved = 0;
   try {

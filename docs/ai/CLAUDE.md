@@ -61,7 +61,7 @@ devtool/
 │   │   ├── tailwind-preset.cjs  # Tailwind theme preset
 │   │   └── README.md
 │   ├── hooks/
-│   │   ├── usePersistentState.ts  # useState + localStorage
+│   │   ├── usePersistentState.ts  # nền của usePluginState — plugin KHÔNG dùng trực tiếp
 │   │   ├── useQuickPaste.ts       # ⌘V / Ctrl+V clipboard paste
 │   │   ├── useInputHistory.ts     # ⌘Z / ⌘⇧Z undo/redo
 │   │   ├── useImagePaste.ts       # ⌘V / paste event → PNG data URL
@@ -74,7 +74,8 @@ devtool/
 │   │   ├── toolGuides.tsx   # Per-tool "how to use" guide content for ToolGuideModal
 │   │   ├── liveConnections.ts   # Global live-connection registry (rabbit/kafka live dot)
 │   │   ├── utils.ts         # cn() classname merger
-│   │   ├── clipboard.ts     # copyToClipboard(), copyImageToClipboard(), readImageFromClipboard()
+│   │   ├── clipboard.ts     # nền của sdk.clipboard — plugin đi qua SDK
+│   │   ├── fileio.ts        # nhập/xuất file dùng chung (nhận sdk), 4 plugin dùng
 │   │   ├── faker.ts         # Faker.js helpers for the Generator tool
 │   │   ├── meetings.tsx     # MeetingsProvider + useMeetings() — time-tracker meeting notes
 │   │   ├── network.ts       # DNS / IP utilities for the Network tool
@@ -233,7 +234,10 @@ import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 ### Transparency — the user must always know what the app is doing
 
 - **No silent network calls**: any network feature must be user-initiated or preceded by an explicit opt-in (toggle in Settings).
-- **Document permissions**: when adding a Tauri capability, add it to the App Permissions list in `Settings.tsx` so users see what the app can access.
+- **Document permissions**: a plugin declares what it touches in its own manifest
+  (`permissions`, `commands`, `hosts`) — Settings → Plugins renders that list, and the
+  audit log records every call. App-wide Tauri capabilities live in
+  `src-tauri/capabilities/default.json` and surface automatically via `appPermissions.ts`.
 - **Visible progress**: file reads, downloads, and long async operations must show status (spinner, progress text, done/error state).
 - **Minimum-scope access**: use the narrowest Tauri capability that the feature needs (e.g. `fs:read-file` not `fs:allow-all`).
 
@@ -248,8 +252,8 @@ for why.
 
 ### Step 1: Create the tool component
 
-Create `src/components/tools/YourTool.tsx` exactly as before (see the modern tool
-pattern below). Nothing about writing a tool component changed.
+Create `src/components/tools/YourTool.tsx`. Layout, hooks and styling are unchanged;
+the one difference from pre-Platform code is that persisted state goes through the SDK.
 
 ```tsx
 import { useMemo } from 'react';
@@ -257,11 +261,12 @@ import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/to
 import { Textarea } from '@/components/ui/textarea';
 import { CopyButton } from '@/components/ui/copy-button';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function YourTool() {
-  const [input, setInput] = usePersistentState('devtool:yourTool:input', '');
+  const sdk = usePluginSdkFor('your-tool');
+  const [input, setInput] = usePluginState(sdk, 'input', '');
   const output = useMemo(() => input.toUpperCase(), [input]);
 
   useQuickPaste(setInput);
@@ -388,9 +393,9 @@ loaded whole into a synchronous in-memory cache at boot and any module can read 
 key from it. See `src/platform/secrets.ts` and the ADR for the full reasoning; add a
 row to `MIGRATIONS` there when moving an existing key into the vault.
 
-Existing tools still use `usePersistentState` / `@/lib/clipboard` directly and are
-not being rewritten; the SDK is for new code and for tools you already need to
-touch for another reason. `usePluginSdk()` only works inside a component the
+Every tool now runs on the SDK: no plugin code reaches `@tauri-apps/*` directly
+(`guard.test.ts` keeps that at zero), and only two shared-store reads remain — both
+one-time migrations of keys that predate the namespace. `usePluginSdk()` only works inside a component the
 Platform mounted — shared components take the SDK as a prop. For plugin code that
 deliberately mounts outside its own route (e.g. `ApiClientRuntimeProvider`, mounted
 in `App.tsx` so the MCP bridge answers while another tool is on screen), use
@@ -410,13 +415,19 @@ in `App.tsx` so the MCP bridge answers while another tool is on screen), use
 
 All text tools must use these hooks for consistent behavior.
 
-### `usePersistentState(key, initial)` — `src/hooks/usePersistentState.ts`
+### `usePluginState(sdk, key, initial, opts?)` — `@/platform`
 
-Drop-in for `useState` that persists to `localStorage`. Key convention: `devtool:<toolName>:<field>`.
+Drop-in for `useState` that persists. The key is namespaced to the plugin
+(`devtool:<pluginId>:<key>`) and the `storage` permission is checked.
 
 ```tsx
-const [input, setInput] = usePersistentState('devtool:json:input', '');
+const sdk = usePluginSdkFor('json');
+const [input, setInput] = usePluginState(sdk, 'input', '');
 ```
+
+`usePersistentState` (`src/hooks/usePersistentState.ts`) is what this is built on.
+Plugin code must not use it directly — `src/platform/guard.test.ts` counts every
+such import and fails CI when the count rises.
 
 ### `useQuickPaste(onPaste, enabled?)` — `src/hooks/useQuickPaste.ts`
 
@@ -455,7 +466,7 @@ const { dropRef, dragging } = useTauriFileDrop((paths) => loadFile(paths[0]));
 
 Registers click-outside + Escape key handlers to dismiss an overlay/popover. Returns a `ref` to attach to the container.
 
-> Convention: **real-time output** (`useMemo`), **persisted input** (`usePersistentState`), **quick paste** (`useQuickPaste`), **undo/redo** (`useInputHistory`). Tools with no transformable input (UUID/QR generator) may keep an action button.
+> Convention: **real-time output** (`useMemo`), **persisted input** (`usePluginState`), **quick paste** (`useQuickPaste`), **undo/redo** (`useInputHistory`). Tools with no transformable input (UUID/QR generator) may keep an action button.
 
 ---
 
@@ -608,21 +619,20 @@ Common: `space-y-4`, `flex gap-2`, `rounded-lg`, `border`, `p-4`, `text-xs`, `fo
 
 ### Tauri detection
 ```tsx
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+const sdk = usePluginSdkFor('your-tool');
+if (sdk.env.isTauri) { … }        // plugin code
 ```
+Shell code (outside `src/components/tools/`) uses `isTauri` from `@/lib/platform`.
 
-### Clipboard write (Tauri-aware)
+### Clipboard (text and images)
 ```tsx
-import { copyToClipboard } from '@/lib/clipboard';
-await copyToClipboard(text);
+await sdk.clipboard.writeText(text);     // needs 'clipboard:write'
+await sdk.clipboard.readText();          // needs 'clipboard:read'
+await sdk.clipboard.writeImage(blobOrDataUrl);
+const dataUrl = await sdk.clipboard.readImage();   // null when no image
 ```
-
-### Image clipboard (Tauri-aware)
-```tsx
-import { copyImageToClipboard, readImageFromClipboard } from '@/lib/clipboard';
-await copyImageToClipboard(blobOrDataUrl);            // copy an image out
-const dataUrl = await readImageFromClipboard();       // null when no image
-```
+The underlying helpers live in `@/lib/clipboard`; plugin code reaches them through
+the SDK so the permission is checked and the call is audited.
 For "copy image" buttons, reuse `CopyButton` with its `copyAction` prop so the animated Copy→Check affordance is identical to text copies:
 ```tsx
 <CopyButton copyAction={async () => { try { await copyImageToClipboard(src); return true; } catch { return false; } }} label="Copy image" />
@@ -647,9 +657,9 @@ import { CopyButton } from '@/components/ui/copy-button';
 
 ### AppConfig — reading tunable numbers
 ```tsx
-import { useAppConfig } from '@/contexts/AppConfigContext';
+import { usePluginConfig } from '@/platform';
 
-const { config } = useAppConfig();
+const config = usePluginConfig();
 const ms = config.editor.historyDebounceMs;   // default 400
 const feedbackMs = config.editor.copyFeedbackMs;  // default 1500
 ```
@@ -657,9 +667,12 @@ All tunable values are defined in `src/config/appConfig.ts`. Users edit them in 
 
 ### Persist a setting
 ```tsx
-localStorage.setItem('devtool-my-setting', value);
-const saved = localStorage.getItem('devtool-my-setting');
+sdk.storage.set('my-setting', value);          // → devtool:<pluginId>:my-setting
+const saved = sdk.storage.get('my-setting');
 ```
+Never `localStorage` directly: the app's own store (`@/lib/persistentStore`) is what
+survives in the desktop build, and the SDK is what namespaces and audits it. For
+anything credential-shaped use `sdk.secrets` / `useSecretState` instead.
 
 ### Lazy-load a heavy library
 ```tsx
@@ -679,10 +692,11 @@ See `src/workers/checksum.worker.ts` for a reference implementation.
 ## State Management
 
 ### AppConfigContext — `src/contexts/AppConfigContext.tsx`
-Centralized tunable numbers stored in `localStorage` (`devtool-app-config`). Sections: `updates`, `editor`, `generator`, `kafka`. Every value has min/max/step metadata in `CONFIG_FIELDS` and appears automatically in Settings → Configuration.
+Centralized tunable numbers. Sections: `updates`, `editor`, `generator`, `kafka`. Every value has min/max/step metadata in `CONFIG_FIELDS` and appears automatically in Settings → Configuration.
 
 ```tsx
-const { config, setField, resetConfig } = useAppConfig();
+const { config, setField, resetConfig } = useAppConfig();   // shell only
+const config = usePluginConfig();                           // plugin code (read-only)
 ```
 
 ### FeatureContext — `src/contexts/FeatureContext.tsx`
@@ -1468,13 +1482,21 @@ import { ViewHeader } from '@/components/ui/view-header';
 ```
 
 ### Most Used Utilities
+
+Plugin code — everything platform-ish comes from one door:
+```tsx
+import {
+  usePluginSdkFor,   // SDK of this plugin (getPluginSdk outside React)
+  usePluginState,    // persisted state, namespaced + permission-checked
+  useSecretState,    // same, but in the encrypted vault
+  usePluginConfig,   // app tunables, read-only
+  useLiveConnection, // the sidebar's live dot
+} from '@/platform';
+```
+
+Shared libraries and UX hooks (no trust boundary, import directly):
 ```tsx
 import { cn } from '@/lib/utils';
-import { copyToClipboard } from '@/lib/clipboard';
-import { useAppConfig } from '@/contexts/AppConfigContext';
-import { useFeatures } from '@/contexts/FeatureContext';
-import { useUpdate } from '@/contexts/UpdateContext';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
@@ -1512,7 +1534,7 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 - `jwt-decode` — JWT parsing
 - `uuid` — UUID v4/v7 generation
 
-> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, local network info, and a **Ports** view (listening sockets + owning process, with Processes/Sockets layouts, column sort, scope local/LAN/all, and persisted favourite ports). Uses an **in-memory session store** (not `usePersistentState`) so results survive tab switches but clear on app restart — the one exception is favourite ports, persisted in `localStorage`.
+> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, local network info, and a **Ports** view (listening sockets + owning process, with Processes/Sockets layouts, column sort, scope local/LAN/all, and persisted favourite ports). Uses an **in-memory session store** (not persisted state) so results survive tab switches but clear on app restart — the one exception is favourite ports, which are persisted. Outbound requests go through `sdk.http.fetch`, restricted to the 7 hosts declared in its manifest.
 
 ---
 

@@ -1,431 +1,297 @@
 # Platform / Plugin — kiến trúc và ranh giới
 
-**Trạng thái**: đã áp dụng (giai đoạn 1)
-**Phạm vi**: mọi tool trong `src/`, hạ tầng đăng ký và SDK.
+**Trạng thái**: đã áp dụng. Mọi tool trong app là plugin và chạy trên SDK.
 
 ## Bối cảnh
 
-DevTool đang đi từ "một app có nhiều tool" sang "một platform chở nhiều mini
-app". Mục tiêu là phát triển nhiều tool nhỏ, nhúng chúng độc lập như plugin, và
-có chỗ để quản lý cũng như kiểm toán chúng.
+DevTool đi từ "một app có nhiều tool" sang "một platform chở nhiều mini app".
+Trước thay đổi này, thêm một tool phải sửa **năm** chỗ rời rạc — metadata, thứ tự
+sidebar, route, bật/tắt mặc định, hướng dẫn — và bốn trong năm chỗ đó không có gì
+bắt phải khớp nhau. `allTools` ráp hai bảng bằng `...TOOL_ROUTES[def.id]`, mà
+spread một `undefined` là hợp lệ trong JS, nên một tool thiếu route chỉ **lặng lẽ**
+mất `path`/`component` lúc chạy thay vì báo lỗi lúc build.
 
-Trước thay đổi này, thêm một tool phải sửa **năm** chỗ rời rạc:
+## Mô hình
 
-| Chỗ | Khai cái gì |
-|---|---|
-| `src/lib/toolDefs.ts` | metadata (label, icon, mô tả, từ khoá) |
-| `DEFAULT_TOOL_ORDER` | thứ tự sidebar |
-| `src/lib/toolRegistry.ts` | route + lazy import |
-| `DEFAULT_FEATURES` trong `FeatureContext.tsx` | bật/tắt mặc định |
-| `src/lib/toolGuides.tsx` | hướng dẫn sử dụng (tuỳ chọn) |
+### Một plugin = một thư mục = một manifest
 
-Bốn chỗ đầu không có gì bắt buộc phải khớp nhau. `allTools` ráp hai bảng bằng
-`...TOOL_ROUTES[def.id]`, mà spread một `undefined` là hợp lệ trong JS — nên một
-tool thiếu route chỉ **lặng lẽ** mất `path`/`component` lúc chạy thay vì báo lỗi
-lúc build.
+`src/plugins/<id>/plugin.ts` export default một `PluginManifest`. Platform tự quét
+bằng `import.meta.glob` (`src/platform/registry.ts`). Không còn bảng đăng ký tay.
 
-## Quyết định
+`toolDefs.ts`, `toolRegistry.ts` và `DEFAULT_FEATURES` vẫn tồn tại nhưng chỉ là
+**view dẫn xuất** — giữ nguyên hình dạng cũ để hơn một tá module đang đọc chúng
+(Settings, CommandPalette, toolGroups, onboarding) không phải đổi.
 
-### 1. Một plugin = một thư mục = một manifest
+`eager: true` **không** kéo tool vào bundle khởi động: manifest chỉ chứa metadata
+và một closure `load` chưa được gọi, nên code thật của tool vẫn ở chunk riêng.
+Quét lười thì ngược lại sẽ biến mọi thứ đọc metadata — sidebar, ⌘K, Settings —
+thành async.
 
-`src/plugins/<id>/plugin.ts` export default một `PluginManifest`. Platform tự
-quét bằng `import.meta.glob` (`src/platform/registry.ts`). Không còn bảng đăng ký
-tay nào.
+**Thư mục là danh tính**: `src/plugins/json/plugin.ts` phải khai `id: 'json'`.
+Không có luật này thì đường dẫn file không tra ngược được về plugin.
 
-`toolDefs.ts`, `toolRegistry.ts` và `DEFAULT_FEATURES` vẫn tồn tại nhưng chỉ còn
-là **view dẫn xuất** từ registry — giữ nguyên hình dạng cũ để hơn một tá module
-đang đọc chúng (Settings, CommandPalette, toolGroups, onboarding…) không phải đổi
-trong cùng một diff.
-
-**`eager: true` không kéo tool vào bundle khởi động**: manifest chỉ chứa metadata
-và một closure `load` chưa được gọi, nên code thật của tool vẫn nằm ở chunk riêng
-(đã đo: chunk `App` 995 kB → 987 kB sau thay đổi). Quét lười thì ngược lại sẽ
-biến mọi thứ đọc metadata — sidebar, ⌘K, Settings — thành async.
-
-### 2. Platform SDK là bề mặt duy nhất, và là điểm thắt để kiểm toán
-
-`src/platform/sdk.ts` cấp SDK **theo từng plugin**: `storage` (namespace
-`devtool:<id>:`), `clipboard`, `http`, `native.invoke`. Mọi kênh đi qua cùng một
-trình tự: kiểm quyền đã khai trong manifest → ghi audit → mới thực thi.
-
-Namespace storage **cố ý giữ đúng tiền tố `devtool:<id>:`** mà các tool đang dùng
-với `usePersistentState`: đổi tiền tố là im lặng vứt đi collection, lịch sử và
-cấu hình người dùng đã lưu.
-
-### 3. Quyền trong manifest là khai báo, **chưa** phải hàng rào
-
-Cần nói thẳng để không ai nhầm: mọi plugin hiện chạy **chung realm** với app, nên
-về kỹ thuật nó vẫn gọi thẳng được `window.__TAURI_INTERNALS__` và bỏ qua SDK. Danh
-sách `permissions` phục vụ ba việc khác, đều có giá trị thật:
-
-1. khai báo tường minh để hiện cho người dùng (Settings → Plugin);
-2. bắt lỗi sớm khi plugin dùng kênh nó chưa khai;
-3. cho audit một nhãn để ghi.
-
-Hàng rào thật chỉ xuất hiện khi plugin chạy trong webview/tiến trình riêng — lúc
-đó chính danh sách này là thứ ánh xạ sang capability của Tauri.
-
-Hệ quả đi kèm: **quyền `native` luôn phải kèm allowlist lệnh**. Quyền native không
-allowlist là quyền vô hạn trên toàn bộ ~130 lệnh đã đăng ký trong `main.rs`.
-`validateManifest` từ chối cả hai chiều (native không commands, commands không
-native).
-
-### 4. Manifest hỏng thì bị loại, không làm sập app
+### Manifest hỏng thì bị loại, không làm sập app
 
 `PLUGIN_ERRORS` gom manifest bị loại kèm lý do; `registry.test.ts` khoá danh sách
 đó phải rỗng. Một manifest sai chính tả làm **CI đỏ**, chứ không làm trắng cửa sổ
 của người dùng.
 
-Thư mục là danh tính: `src/plugins/json/plugin.ts` phải khai `id: 'json'`. Không
-có luật này thì đường dẫn file không tra ngược được về plugin.
+## Platform SDK
 
-### 5. Settings → Plugin: hai bảng, cố ý không gộp
+Bề mặt được chốt bằng cách **đếm xem các tool thực sự với ra ngoài những gì**,
+không phải liệt kê thứ nghe hợp lý.
+
+| Kênh | Quyền | Dùng cho |
+|---|---|---|
+| `sdk.storage` / `usePluginState` | `storage` | State có ghi nhớ, khoá gắn namespace `devtool:<id>:` |
+| `sdk.secrets` / `useSecretState` | `secrets` | Credential — kho riêng, mã hoá |
+| `sdk.clipboard` | `clipboard:read` / `clipboard:write` | Text và ảnh |
+| `sdk.files` | `files:read` / `files:write` | Hộp thoại + đọc/ghi file, kéo-thả cấp cửa sổ |
+| `sdk.http.fetch` | `http` + `hosts` | Mạng ra ngoài |
+| `sdk.native` | `native` + `commands` | `invoke`, `channel` (stream), `listen` (sự kiện Rust) |
+| `sdk.service` | `service` + `service.methods` | Sidecar riêng của plugin (tier B) |
+| `sdk.openExternal` | `open-url` | Giao URL cho trình duyệt của người dùng |
+| `sdk.env` | — | `isTauri`, `isMac`, `modKey`; không tiết lộ gì hơn `navigator.userAgent` |
+
+Ba dịch vụ có hình dạng React nên không thể là thuộc tính của object `sdk`, nhưng
+vẫn xuất qua cùng cửa `@/platform`: `usePluginConfig()`, `useLiveConnection()`,
+`usePluginMcpBridgeActive()`.
+
+**Đọc và ghi luôn tách đôi quyền** — clipboard cũng như file — vì cùng một lý do:
+một tool chỉ cần *nhập* file (API Client import collection) không nên vì thế mà có
+luôn quyền *ghi đè* lên bất cứ file nào người dùng chọn.
+
+### SDK là điểm thắt, và giờ quyền được THỰC THI
+
+Mọi kênh đi qua cùng một trình tự: kiểm quyền khai trong manifest → ghi audit →
+mới thực thi. Từ khi chỉ số `directTauriInPluginCode` về 0 (xem "Rào chắn"),
+**không code plugin nào còn chạm thẳng Tauri** — nên `permissions` không còn là mô
+tả mà là hàng rào thật: một lệnh gõ sai hay nằm ngoài allowlist bị chặn và ghi
+nhật ký, thay vì lặng lẽ đi xuống Rust.
+
+Điều đó **không** biến plugin thành sandbox. Mọi plugin vẫn chạy chung realm với
+app; về kỹ thuật một plugin vẫn có thể import `@tauri-apps/*` trở lại. Cái đã có
+là: mọi lời gọi hiện tại đều đi qua điểm thắt, và rào chắn làm CI đỏ nếu có chỗ
+mới lách ra. Sandbox thật chỉ xuất hiện khi plugin chạy trong webview/tiến trình
+riêng — lúc đó chính danh sách `permissions` là thứ ánh xạ sang capability.
+
+Hệ quả đi kèm: **quyền `native` luôn phải kèm allowlist lệnh**, `http` luôn kèm
+`hosts`, `service` luôn kèm `service.methods`. Quyền không allowlist là quyền vô
+hạn; `validateManifest` từ chối cả hai chiều.
+
+### Settings → Plugin: hai bảng, cố ý không gộp
 
 Manifest nói plugin **được phép** làm gì (tĩnh); nhật ký nói nó **đã** làm gì
-(động, theo phiên). Chỉ có bảng thứ nhất thì quyền mãi là lời hứa; chỉ có bảng
-thứ hai thì không có gì để đối chiếu.
+(động, theo phiên). Chỉ có bảng thứ nhất thì quyền mãi là lời hứa; chỉ có bảng thứ
+hai thì không có gì để đối chiếu.
 
 Audit là bộ đệm vòng trong RAM (500 bản ghi), **ghi cả lời gọi bị từ chối** — đó
 là loại lỗi duy nhất không tự lộ ra ở chỗ khác: hàm ném, plugin bắt lại, người
-dùng chỉ thấy tính năng "không chạy".
+dùng chỉ thấy tính năng "không chạy". Nhật ký chỉ ghi **host** của URL và **tên**
+file, không ghi path/query hay đường dẫn đầy đủ: đó là nơi token và tên tài khoản
+người dùng nằm. `usePluginState` ghi đúng một dòng cho mỗi khoá lúc gắn, không
+theo từng lần gõ phím — một editor sẽ cuốn trôi bộ đệm 500 mục.
 
-Nhật ký chỉ ghi **host** của URL, không ghi path/query: đó là nơi token và khoá
-API hay nằm.
-
-## Ranh giới — ba tier, ba cơ chế khác nhau
-
-Đây là quyết định quan trọng nhất và dễ làm sai nhất: **không có một cơ chế nạp
-duy nhất cho mọi loại plugin.**
-
-| Tier | Là gì | Cơ chế | Trạng thái |
-|---|---|---|---|
-| **A** | Mini tool JS/TS | Manifest + `import.meta.glob`, chung webview | ✅ đã làm |
-| **B** | Plugin cần native (socket, fs, SDK hệ sinh thái khác) | Sidecar binary, JSONL qua stdin/stdout | ✅ khung đã có, chờ plugin đầu tiên |
-| **C** | Mini app nặng (game, automation) | Crate + binary + **cửa sổ riêng** | ⏳ ngoài phạm vi hiện tại |
-
-Tier C phải là tiến trình riêng, không phải vì hiệu năng đồ hoạ mà vì bốn ràng
-buộc cụ thể của repo: profile release của app là `opt-level = "z"` (tối ưu dung
-lượng — cấu hình tệ nhất cho hot loop), `panic = "abort"` (panic trong mini app sẽ
-giết cả app), thời gian build đã phải hạ xuống `lto = "thin"` vì cây phụ thuộc
-async, và crash driver GPU trong tiến trình sẽ kéo theo mọi consumer đang chạy.
-
-## Kho bí mật (`src/platform/secrets.ts`)
+## Kho bí mật
 
 `persistentStore` nạp **toàn bộ** `app-settings.json` vào một cache đồng bộ trong
 RAM lúc khởi động, và `storageGet(bấtKỳKhoáNào)` đọc được mọi thứ trong đó. Khi
 seed TOTP và token API cùng nằm trên mặt phẳng khoá ấy thì bất kỳ đoạn code nào
-trong webview — kể cả một dependency npm bị chiếm trong bundle của một plugin —
-cũng đọc được tất cả bằng đúng một lời gọi.
+trong webview — kể cả một dependency npm bị chiếm — cũng đọc được tất cả bằng đúng
+một lời gọi.
 
-Bí mật giờ nằm ở một kho riêng, truy cập qua `sdk.secrets` (quyền `secrets`),
-khoá dạng `<pluginId>/<key>`:
+Bí mật giờ nằm ở kho riêng, truy cập qua `sdk.secrets`, khoá dạng `<pluginId>/<key>`:
 
-| Môi trường | Nơi lưu | Vì sao |
-|---|---|---|
-| Tauri | file store riêng `secrets.json` | không bao giờ được đọc vào cache chung |
-| Web (`npm run dev`) | `sessionStorage` | `initPersistentStore()` ở bản web hút **nguyên `localStorage`** vào cache chung — lưu ở đó là đưa bí mật trở lại đúng mặt phẳng khoá vừa dọn. Đổi lại bản web chỉ giữ trong một phiên; sản phẩm thật luôn là Tauri |
+| Môi trường | Nơi lưu |
+|---|---|
+| Tauri | `<app_data>/secrets.enc`, AES-256-GCM, khoá ở keychain OS |
+| Web (`npm run dev`) | `sessionStorage` — **không** `localStorage`, vì bản web hút nguyên localStorage vào cache chung, tức đưa bí mật trở lại đúng mặt phẳng khoá vừa dọn |
 
-Ba quyết định đi kèm:
-
-- **Kho bất đồng bộ, khác hẳn `sdk.storage` đồng bộ.** Đó là cái giá của việc ra
-  khỏi cache trong RAM. `useSecretState` gói lại, và trả thêm cờ `ready`: thiếu
-  chốt đó, effect ghi của lần render đầu sẽ đẩy giá trị khởi tạo (mảng rỗng) đè
-  lên dữ liệu thật vừa đọc lên — người dùng mở app ra là mất sạch tài khoản.
-- **Di trú xoá nguồn, không dùng cờ "đã migrate".** Chép mà không xoá thì không
-  giải quyết được gì; còn một cờ đặt sai thời điểm sẽ biến sự cố giữa chừng
-  thành mất dữ liệu. Nguồn bị xoá nên chạy lại là no-op, chết giữa chừng thì lần
-  khởi động sau tự thử lại.
-- **Audit của kênh này chỉ ghi TÊN khoá, không bao giờ ghi giá trị.** Một nhật
-  ký làm rò seed TOTP thì tệ hơn hẳn việc không có nhật ký. Có test khoá lại.
-
-### Mã hoá khi nằm trên đĩa
-
-`src-tauri/src/secrets_vault.rs`: nội dung nằm trong `<app_data>/secrets.enc`,
-AES-256-GCM, khoá 32 byte **không nằm cạnh dữ liệu** mà ở keychain của OS
-(Keychain / Credential Manager / Secret Service). Mã hoá mà cất khoá ngay cạnh
-file là nghi thức, không phải bảo vệ — nên đây mới là phần cốt lõi.
-
-Ba bất biến được khoá bằng test Rust: bản mã không chứa **cả giá trị lẫn tên
+**Khoá mã hoá không nằm cạnh dữ liệu.** Mã hoá mà cất khoá ngay cạnh file là nghi
+thức, không phải bảo vệ — nên vị trí khoá mới là phần cốt lõi, không phải thuật
+toán. Ba bất biến khoá bằng test Rust: bản mã không chứa **cả giá trị lẫn tên
 khoá** (tên khoá tiết lộ người dùng có bí mật của plugin nào); **mỗi lần ghi một
-nonce mới** (dùng lại nonce với cùng khoá trong GCM là hỏng hoàn toàn về mật mã,
-không chỉ yếu đi); và sửa một byte bản mã thì lần giải mã bị từ chối chứ không
-trả ra bản rõ méo mó.
+nonce mới** (dùng lại nonce với cùng khoá trong GCM là hỏng hoàn toàn, không chỉ
+yếu đi); sửa một byte bản mã thì giải mã bị từ chối chứ không trả ra bản rõ méo mó.
 
-**Đường dự phòng fail-open, và nói thẳng vì sao.** Không phải máy Linux nào cũng
-có Secret Service (máy không màn hình, phiên không gnome-keyring). Khi đó khoá
-rơi về `<app_data>/secrets.key` quyền 0600. Ở chế độ này ai đọc được thư mục app
-data thì đọc được cả khoá lẫn dữ liệu — nó chỉ chặn việc chép `secrets.enc` đi
-nơi khác. Lựa chọn còn lại là fail-closed, tức 2FA và JWT ngừng chạy hẳn trên
-những máy đó; với một công cụ dev chạy cục bộ, im lặng làm hỏng tính năng là cái
-giá cao hơn. Đổi lại chế độ đang dùng **không được giấu**: `secret_vault_status`
-trả ra và Settings → Plugin hiện đúng một dòng nói máy này đang ở chế độ nào.
+**Đường dự phòng fail-open, có chủ ý.** Máy Linux không có Secret Service thì khoá
+rơi về `<app_data>/secrets.key` quyền 0600. Ở chế độ đó ai đọc được thư mục app
+data thì đọc được cả hai — nó chỉ chặn việc chép `secrets.enc` đi nơi khác. Lựa
+chọn còn lại là fail-closed, tức 2FA và JWT ngừng chạy hẳn trên những máy đó; với
+công cụ dev chạy cục bộ, im lặng làm hỏng tính năng là giá cao hơn. Bù lại chế độ
+đang dùng **không được giấu**: Settings → Plugin hiện đúng một dòng nói rõ.
 
-**Không tự xoá khi không giải mã được.** Mất mục keychain thì blob thành không
-đọc được; các lệnh báo lỗi rõ ràng chứ tuyệt đối không tự khởi tạo lại kho — âm
-thầm vứt dữ liệu người dùng để "trở lại hoạt động" hỏng tệ hơn nhiều so với một
-thông báo lỗi. `secret_vault_reset` tồn tại cho trường hợp người dùng chủ động
-chọn bỏ.
-
-Bản trung gian (tách mặt phẳng khoá, chưa mã hoá) để lại `secrets.json` trần;
-`migrateSecretsFromPlainStore()` chuyển nó sang kho mã hoá rồi **dọn sạch** store
-cũ — để lại bản trần cạnh bản mã hoá thì việc mã hoá chẳng còn ý nghĩa.
-
-Đã chuyển sang kho: `devtool:2fa:accounts` (seed TOTP/HOTP) và `devtool:jwt:token`
-(một JWT dán vào debugger thường là bearer token thật, không phải chuỗi ví dụ).
-Hai tool này cũng là hai plugin đầu tiên chạy trên SDK thật.
+**Không tự xoá khi không giải mã được.** Mất mục keychain thì các lệnh báo lỗi rõ
+ràng chứ tuyệt đối không tự khởi tạo lại kho — âm thầm vứt dữ liệu để "trở lại
+hoạt động" hỏng tệ hơn nhiều. `secret_vault_reset` cho trường hợp người dùng chủ
+động chọn bỏ.
 
 ### API Client: tách theo BIẾN, không bê cả tài liệu
 
-`devtool:apiclient:environments` chứa token, nhưng không chỉ có token: base URL,
-tên môi trường, biến thường — thứ người dùng sửa liên tục và các phần khác của
-store đọc đồng bộ (`migrateLegacyActiveEnv`). Bê cả tài liệu sang một kho bất
-đồng bộ, mã hoá lại từ đầu sau mỗi lần gõ phím, là trả giá lớn cho một phần nhỏ
-dữ liệu — và biến một tài liệu đồng bộ thành bất đồng bộ giữa một tool 1000+
-dòng là rủi ro không cần thiết.
+`environments` chứa token nhưng cũng chứa base URL, tên môi trường, biến thường —
+thứ người dùng sửa liên tục và các phần khác của store đọc đồng bộ. Bê cả tài liệu
+sang kho bất đồng bộ, mã hoá lại sau mỗi lần gõ phím, là trả giá lớn cho một phần
+nhỏ dữ liệu.
 
 Nên chỉ **giá trị của biến có `secret: true`** đi vào kho (`envSecrets.ts` +
-`useEnvSecrets.ts`); cấu trúc ở lại chỗ cũ. Mô hình dữ liệu vốn đã phân biệt sẵn
-— `KeyValue.secret` có từ trước, dùng để che giá trị trong editor và loại nó
-khỏi cURL/codegen/history — nên đây chỉ là dùng đúng cái phân biệt đó cho việc
-lưu trữ. Bảy chỗ gọi `setEnvironments` trong `store.ts` không đổi một dòng.
+`useEnvSecrets.ts`); cấu trúc ở lại chỗ cũ. Mô hình dữ liệu vốn đã phân biệt sẵn —
+`KeyValue.secret` có từ trước — nên đây chỉ là dùng đúng cái phân biệt đó cho việc
+lưu trữ. Bảy chỗ gọi `setEnvironments` không đổi một dòng.
 
-Bản đồ bí mật ghi lại **đầy đủ** mỗi lần, không phải bản vá: nhờ vậy bỏ đánh dấu
-`secret` hay xoá môi trường sẽ dọn luôn mục cũ trong kho thay vì để nó nằm lại
-vĩnh viễn. Di trú cho người nâng cấp chỉ chạy **sau khi kho đọc xong**, và giá
-trị đã có trong kho thắng tàn dư inline — chạy sớm hơn, hoặc để bản cũ đè ngược,
-đều là mất token thật của người dùng.
+Bản đồ bí mật ghi lại **đầy đủ** mỗi lần, không phải bản vá: bỏ đánh dấu `secret`
+hay xoá môi trường sẽ dọn luôn mục cũ thay vì để nằm lại vĩnh viễn.
 
-"Vault" của API Client (`devtool:apiclient:vault`) thì đi trọn vào kho: toàn bộ
-nội dung của nó là bí mật theo đúng định nghĩa, nó tồn tại chính vì người dùng
-không muốn những giá trị đó nằm trong environments xuất/nhập được.
+"Vault" của API Client đi trọn vào kho: toàn bộ nội dung là bí mật theo đúng định
+nghĩa của nó.
 
-`usePluginSdkFor(pluginId)` sinh ra từ đây: `ApiClientRuntimeProvider` mount
-thẳng trong App.tsx (để cầu nối MCP trả lời được khi người dùng đang xem tool
-khác), tức code của plugin sống ngoài cây mà Platform dựng, nơi `usePluginSdk()`
-sẽ ném.
+## Allowlist host — và vì sao nó KHÔNG nằm ở tầng capability
 
-Mật khẩu broker (`kafka-brokers.json`, config Redis/RabbitMQ) đã nằm ở file
-riêng phía Rust từ trước, không đi qua store chung — nên không thuộc đợt này.
+Ý định ban đầu là thu hẹp `http://**` + `https://**` trong `capabilities/default.json`.
+Việc đó **không làm được**: capability của Tauri gắn theo **webview**, mà mọi plugin
+dùng chung một webview. API Client là HTTP workbench — nó tồn tại để gọi tới URL
+người dùng gõ vào — nên capability buộc phải đủ rộng cho nó, và vì thế không nói
+được gì về riêng một tool nào khác.
 
-## Tier B — plugin dịch vụ (sidecar)
-
-`src-tauri/src/service_host.rs` (host) + `src/platform/service.ts` (client).
-Manifest khai thêm `service: { bin, methods }` và quyền `service`.
-
-**Giao thức**: JSON theo dòng (JSONL) qua stdin/stdout, mỗi sidecar phục vụ tuần
-tự sau một mutex. Hợp đồng một sidecar phải giữ: trả đúng một dòng cho mỗi dòng
-nhận được; **thoát khi stdin đóng (EOF)** — đó là cách tiến trình con được dọn
-khi app bị kill mà không kịp chạy hàm dọn nào; không ghi gì khác lên stdout.
-
-**Ranh giới tin cậy nằm ở Rust, không ở manifest.** Client nêu tên binary, nhưng
-chỉ tên trong `ALLOWED_SERVICES` của `service_host.rs` mới được chạy — manifest
-do webview đọc, nên nó không thể là thứ quyết định tiến trình nào được sinh ra.
-Danh sách hiện rỗng: chưa plugin nào dùng tier B, nên host **fail-closed** thay
-vì mở sẵn một đường chạy tiến trình cho thứ chưa tồn tại. Có test Rust khoá rằng
-mọi mục trong allowlist đều phải có mặt trong `bundle.externalBin` — lệch hai chỗ
-này là kiểu lỗi chỉ lộ ra sau khi phát hành.
-
-**Timeout thì giết tiến trình, không chỉ báo lỗi.** Với một ống dẫn tuần tự, một
-phản hồi đến muộn vẫn nằm trong ống và sẽ bị đọc nhầm thành phản hồi của lời gọi
-kế tiếp. Cùng lý do khi sidecar trả JSON không hợp lệ: dòng vừa đọc có thể là log
-lạc vào stdout. Cả hai đường đều dọn tiến trình để lần gọi sau bắt đầu sạch.
-
-Không thêm `tauri-plugin-shell`: sidecar được resolve như binary nằm cạnh file
-thực thi, đúng quy ước `mcp_bridge::mcp_sidecar_path` đã dùng — nên không phải mở
-thêm quyền chạy tiến trình nào ở tầng capability.
-
-**Chưa có đường end-to-end thật.** Test Rust lái đường I/O thật bằng tiến trình
-sẵn có của hệ điều hành (`cat` làm sidecar dội lại, `sh` làm sidecar treo và
-sidecar chết) thay vì ship một binary giả chỉ để kiểm thử; nhưng một sidecar
-thật, đóng gói thật, chỉ xuất hiện cùng plugin dịch vụ đầu tiên.
-
-### Allowlist host — và vì sao nó KHÔNG nằm ở tầng capability
-
-Ý định ban đầu là thu hẹp `http://**` + `https://**` trong
-`capabilities/default.json`. Việc đó **không làm được**, vì lý do đã nói ở phần
-quyền: capability của Tauri gắn theo **webview**, mà mọi plugin dùng chung một
-webview. API Client là một HTTP workbench — nó tồn tại để gọi tới URL người dùng
-gõ vào — nên capability buộc phải đủ rộng cho nó, và vì thế không nói được gì về
-riêng một tool nào khác.
-
-Giới hạn thật vì vậy nằm ở tầng Platform, cùng khuôn với `native` + `commands`:
-manifest khai `hosts`, `sdk.http.fetch` kiểm host rồi mới gửi, audit ghi lại cả
-lời gọi bị chặn.
-
-| Plugin | hosts |
-|---|---|
-| `network` | 7 host cố định (4 DoH resolver + 3 dịch vụ tra IP) |
-| `api-client` | `['*']` |
-| `rabbit-client` | `['*']` — host management do người dùng cấu hình lúc chạy |
+Giới hạn thật vì vậy ở tầng Platform: manifest khai `hosts`, `sdk.http.fetch` kiểm
+host rồi mới gửi. `network` khai 7 host cố định; `api-client` và `rabbit-client`
+khai `['*']`.
 
 `'*'` **phải khai tường minh**: một workbench gọi được mọi nơi là đúng thiết kế,
-nhưng điều đó xứng đáng là một dòng nhìn thấy được trong manifest và trong
-Settings → Plugin, chứ không phải mặc định ngầm của mọi plugin có quyền `http`.
-Mẫu nửa vời (`*abc.com`, `a.*.com`) bị từ chối vì chúng khớp rộng hơn người viết
-tưởng; `*.example.com` phủ chính nó và subdomain, không phủ `evilexample.com`.
+nhưng điều đó xứng đáng là một dòng nhìn thấy được, không phải mặc định ngầm. Mẫu
+nửa vời (`*abc.com`, `a.*.com`) bị từ chối vì khớp rộng hơn người viết tưởng;
+`*.example.com` phủ chính nó và subdomain, không phủ `evilexample.com`.
 
-Network tool là consumer thật đầu tiên: `lib/network.ts` nhận một `FetchLike`
-tiêm vào, và tool truyền `sdk.http.fetch` — nên allowlist 7 host ở trên có hiệu
-lực thật chứ không phải khai cho đẹp. Mô tả của `http:default` trong
-`appPermissions.ts` cũng được sửa lại cho đúng sự thật: nó nói rõ danh sách có
-wildcard nên đây là quyền cấp-app, còn giới hạn theo tool ở chỗ khác.
+Mô tả của `http:default` trong `appPermissions.ts` nói rõ danh sách có wildcard nên
+đây là quyền cấp-app, còn giới hạn theo tool ở chỗ khác.
 
-### Bốn tool streaming đã chuyển sang SDK
+## Ba tier — ba cơ chế khác nhau
 
-Khuôn mẫu cho ba tool streaming còn lại:
+Quyết định quan trọng nhất và dễ làm sai nhất: **không có một cơ chế nạp duy nhất
+cho mọi loại plugin.**
 
-1. `types.ts`: object `redisApi` → `createRedisApi(sdk)`, mọi lệnh đi qua
-   `sdk.native.invoke` — allowlist `commands: ['redis_', 'mcp_respond']` trong
-   manifest từ đó mới có hiệu lực thật.
-2. `api.ts`: `useRedisApi()` = `useMemo(() => createRedisApi(sdk))`. **Không dùng
-   context**: mọi chỗ gọi đều đã nằm trong component hoặc hook, nên một `useMemo`
-   tại chỗ rẻ hơn một provider và không bắt các test đang render component con
-   đứng lẻ phải dựng thêm provider.
-3. `mcpBridge.ts`: `listen`/`invoke` → `sdk.native.listen`/`invoke`; `redisApi`
-   được truyền vào `buildHandlers` thay vì lấy từ module scope.
-4. `PubSubView`: `new Channel()` → `sdk.native.channel(..., 'redis-pubsub')`.
-5. Storage: `usePersistentState` → `usePluginState(sdk, key, init, { legacyKey })`.
+| Tier | Là gì | Cơ chế | Trạng thái |
+|---|---|---|---|
+| **A** | Mini tool JS/TS | Manifest + `import.meta.glob`, chung webview | ✅ |
+| **B** | Plugin cần native (socket, fs, SDK hệ sinh thái khác) | Sidecar binary, JSONL qua stdin/stdout | Khung xong, chờ plugin thật đầu tiên |
+| **C** | Mini app nặng (game, automation) | Crate + binary + **cửa sổ riêng** | Ngoài phạm vi |
 
-**Cái bẫy đắt nhất nằm ở bước 5 và ở một chỗ không ai ngờ.** Khoá lịch sử là
-`devtool:redis:*` còn id plugin là `redis-client`, nên thiếu `legacyKey` là mất
-kết nối đang chọn của người dùng. Nhưng `liveConnections.ts` cũng **seed lúc nạp
-module** từ `devtool:redis:connectedConnId` — trước khi component nào kịp mount
-và di trú. Nếu chỉ đổi khoá mà không cho seed đọc được cả hai, chấm live sẽ sai
-đúng một lần chạy sau khi nâng cấp: kiểu lỗi không ai báo nhưng ai cũng thấy.
+Tier C phải là tiến trình riêng, không vì hiệu năng đồ hoạ mà vì bốn ràng buộc cụ
+thể: profile release của app là `opt-level = "z"` (tối ưu dung lượng — cấu hình tệ
+nhất cho hot loop), `panic = "abort"` (panic trong mini app giết cả app), thời gian
+build đã phải hạ xuống `lto = "thin"` vì cây phụ thuộc async, và crash driver GPU
+trong tiến trình sẽ kéo theo mọi consumer đang chạy.
 
-Cùng khuôn đó áp cho Kafka, RabbitMQ và Containers. Hai tình huống cần cách
-khác, và cả hai đều lộ ra một giới hạn thật của mô hình hook:
+### Tier B — plugin dịch vụ (sidecar)
 
-- **Store ở phạm vi module** (`kafkaConsumerStore`, `consumerStore` của Rabbit,
-  `rabbitMgmt`) tồn tại CHÍNH VÌ consumer phải chạy tiếp khi người dùng chuyển
-  sang tool khác — nên chúng không gọi hook được. `getPluginSdk(id)` là lối lấy
-  SDK ngoài React dành đúng cho trường hợp này; quyền và allowlist vẫn được kiểm
-  y hệt.
-- **Kênh dựng bất đồng bộ.** `sdk.native.channel()` phải `await` (dynamic import
-  giữ Tauri ngoài bundle khởi động), trong khi `new Channel()` là đồng bộ. Ba
-  effect phải bọc lại trong IIFE async, với `cancelled` vẫn là chốt duy nhất
-  quyết định dọn dẹp — đây là chỗ dễ làm rò stream nhất nếu cẩu thả.
+`src-tauri/src/service_host.rs` (host) + `src/platform/service.ts` (client).
+Manifest khai `service: { bin, methods }` + quyền `service`.
 
-### Trạng thái cuối: ratchet về 0 và 2
+**Giao thức**: JSON theo dòng (JSONL) qua stdin/stdout, mỗi sidecar phục vụ tuần tự
+sau một mutex. Hợp đồng sidecar phải giữ: trả đúng một dòng cho mỗi dòng nhận được;
+**thoát khi stdin đóng (EOF)** — đó là cách tiến trình con được dọn khi app bị kill;
+không ghi gì khác lên stdout.
 
-| Chỉ số | Đầu | Cuối |
+**Ranh giới tin cậy ở Rust, không ở manifest.** Client nêu tên binary, nhưng chỉ tên
+trong `ALLOWED_SERVICES` mới được chạy — manifest do webview đọc, nên nó không thể
+là thứ quyết định tiến trình nào được sinh. Danh sách hiện rỗng: host **fail-closed**
+thay vì mở sẵn một đường chạy tiến trình cho thứ chưa tồn tại. Test Rust khoá rằng
+mọi mục trong allowlist đều phải có trong `bundle.externalBin`.
+
+**Timeout thì giết tiến trình, không chỉ báo lỗi.** Với ống dẫn tuần tự, phản hồi
+đến muộn vẫn nằm trong ống và sẽ bị đọc nhầm thành phản hồi của lời gọi kế tiếp.
+Cùng lý do khi sidecar trả JSON không hợp lệ.
+
+Không thêm `tauri-plugin-shell`: sidecar resolve như binary cạnh file thực thi, đúng
+quy ước `mcp_bridge::mcp_sidecar_path` — không phải mở thêm quyền chạy tiến trình nào.
+
+**Chưa có đường end-to-end thật.** Test Rust lái đường I/O thật bằng tiến trình sẵn
+có của OS (`cat` làm sidecar dội lại, `sh` làm sidecar treo và chết) thay vì ship một
+binary giả; nhưng một sidecar thật chỉ xuất hiện cùng plugin dịch vụ đầu tiên.
+
+## Rào chắn ranh giới (`guard.test.ts` + `baseline.json`)
+
+Cùng cơ chế ngưỡng lùi dần như `design-system/guard.test.ts`: đỏ cả khi vượt ngưỡng
+lẫn khi thấp hơn ngưỡng — dọn xong mà quên hạ thì lần sau vi phạm lẻn về không ai biết.
+
+| Luật | Ngưỡng | Ý nghĩa |
 |---|---|---|
-| Code plugin gọi thẳng `@tauri-apps` | 53 | **0** |
-| Code plugin dùng thẳng store chung | 47 | **2** |
+| Code plugin gọi thẳng `@tauri-apps` | **0** | Quyền `native`/`files`/`clipboard`/`http` được thực thi |
+| Code plugin dùng thẳng store chung | **2** | Hai ngoại lệ đúng, xem dưới |
+| Manifest nhập thứ ngoài `lucide-react` + `@/platform` | 0 | Nhập thứ khác phá code-split |
+| Khoá dáng credential trong store chung | 0 | Tripwire theo tên khoá |
 
-**Chỉ số thứ nhất về 0 là một thay đổi về CHẤT, không chỉ về lượng**: từ đây quyền
-`native` + allowlist `commands` được **thực thi** chứ không còn là mô tả. Một lệnh
-gõ sai hay nằm ngoài allowlist bị chặn và ghi nhật ký, thay vì lặng lẽ đi thẳng
-xuống Rust.
+**Bản guard đầu từng đo thiếu.** Nó chỉ đếm `from '@tauri-apps/…'` và bỏ sót
+`await import('@tauri-apps/…')` — mà repo này cố tình dùng dynamic import để giữ
+bundle gọn, nên dạng động mới là dạng phổ biến. Con số 12 khi đó là sai; số thật là
+53. Một rào chắn đo thiếu còn tệ hơn không có rào chắn, vì con số của nó trông như
+đã sạch.
 
-Hai chỗ còn lại của chỉ số thứ hai là **ngoại lệ đúng, không phải nợ**: code di
-trú một lần đọc những khoá có TRƯỚC khi có namespace — `apiclient/store.ts` đọc
+Hai chỗ còn lại của luật thứ hai là **ngoại lệ đúng, không phải nợ**: code di trú
+một lần đọc những khoá có TRƯỚC khi có namespace — `apiclient/store.ts` đọc
 `devtool:apiclient:activeEnv` để suy ra mô hình mới, `clockify/store.tsx` đọc cờ
-migrated/purged và quét khoá cũ để dọn. Đưa chúng qua `sdk.storage` sẽ **sai**,
-vì khoá khi đó thành `devtool:<id>:devtool:…`. Chúng chỉ biến mất khi chính các
-migration đó được xoá.
+migrated/purged. Đưa chúng qua `sdk.storage` sẽ **sai**, vì khoá khi đó thành
+`devtool:<id>:devtool:…`. Chúng chỉ biến mất khi chính các migration đó được xoá.
 
-Ba khuôn xuất hiện trong đợt dọn, đáng ghi lại vì tool sau sẽ gặp lại:
+Tripwire "khoá dáng credential" bắt theo **tên khoá**, nên nó bắt trường hợp hiển
+nhiên chứ **không** phải bằng chứng đã sạch: `devtool:apiclient:environments` từng
+chứa token mà tên khoá không hề lộ ra.
+
+## Di trú dữ liệu người dùng
+
+Đây là phần rủi ro nhất của cả thay đổi: chuyển tool sang `usePluginState` đổi
+**chỗ lưu** của gần như mọi thứ người dùng đã lưu. Một cặp khoá khai sai là dữ liệu
+biến mất mà không có lỗi nào báo ra — họ chỉ thấy app "tự reset".
+
+Ba khuôn, dùng lại cho mọi tool về sau:
 
 1. **Component/hook** → `usePluginSdkFor(id)` + `usePluginState(sdk, key, init, { legacyKey })`.
-2. **Store ở phạm vi module** (lịch sử nhập, log request, client HTTP quản trị) →
-   `getPluginSdk(id)` + `migrateLegacyKey(sdk, key, legacyKey)` gọi một lần lúc
-   nạp module.
-3. **Khoá mới = phần sau `devtool:` của khoá cũ**, giữ nguyên cả tiền tố phụ
-   (`codec:input` → `devtool:base64:codec:input`). Nhờ vậy nhiều sub-tool trong
-   cùng một plugin không giẫm khoá lên nhau.
+2. **Store ở phạm vi module** (lịch sử nhập, log request, client HTTP quản trị) tồn
+   tại *chính vì* nó phải sống ngoài vòng đời component, nên không gọi hook được →
+   `getPluginSdk(id)` + `migrateLegacyKey(sdk, key, legacyKey)` gọi một lần lúc nạp module.
+3. **Khoá mới**: Redis bỏ hẳn tiền tố cũ (`devtool:redis:selectedConnId` → key
+   `selectedConnId`) vì nó chỉ có một không gian khoá; Encode·Hash·Encrypt **giữ**
+   tiền tố phụ (`devtool:codec:input` → key `codec:input`) vì bốn sub-tool trong cùng
+   một plugin sẽ giẫm khoá lên nhau nếu bỏ.
 
-### SDK đầy đủ — bề mặt dựng theo nhu cầu thật, không theo suy đoán
+`legacyKey` **bắt buộc** ở mọi lần chuyển: tiền tố lịch sử hiếm khi trùng id plugin
+(`devtool:redis:*` vs `redis-client`, `devtool:apiclient:*` vs `api-client`).
 
-Bề mặt SDK được chốt bằng cách **đếm xem các tool đang thực sự với ra ngoài
-những gì**, không phải liệt kê thứ nghe hợp lý:
+**Hai cái bẫy không nằm trong ba khuôn trên**, và cả hai đều suýt lọt:
 
-| Nhu cầu thật (số chỗ dùng) | Kênh SDK |
-|---|---|
-| `usePersistentState` (43) | `sdk.storage` |
-| clipboard text + ảnh (28) | `sdk.clipboard.readText/writeText/readImage/writeImage` |
-| `lib/platform` — isTauri/IS_MAC/MOD_KEY (18) | `sdk.env` |
-| `invoke` + `Channel` + `api/event` (17) | `sdk.native.invoke/channel/listen` |
-| dialog + fs (20) | `sdk.files.*` |
-| `plugin-http` (2) | `sdk.http.fetch` + allowlist `hosts` |
-| `plugin-opener` (1) | `sdk.openExternal` |
+- `liveConnections.ts` **seed lúc nạp module**, trước khi component nào kịp di trú
+  khoá. Đổi khoá mà không cho seed đọc được cả hai thì chấm live sai đúng một lần
+  chạy sau khi nâng cấp — lỗi không ai báo nhưng ai cũng thấy.
+- Di trú sang kho bí mật **không được chạy ở bản web**. Kho của bản web là
+  `sessionStorage`, nên "chuyển" ở đó thực chất là bê dữ liệu từ nơi lưu được sang
+  nơi mất khi đóng tab rồi xoá bản gốc — tức **xoá** dữ liệu người dùng. Để nguyên
+  thì bản web hiển thị rỗng nhưng dữ liệu còn nguyên và sẽ được di trú đúng cách khi
+  họ mở bản desktop.
 
-Đọc và ghi luôn tách đôi quyền — clipboard cũng như file — vì cùng một lý do:
-một tool chỉ cần **nhập** file (API Client import collection) không nên vì thế mà
-có luôn quyền **ghi đè** lên bất cứ file nào người dùng chọn.
-
-Nhật ký chỉ ghi **tên file**, không ghi đường dẫn: đường dẫn đầy đủ chứa tên thư
-mục home, tức tên tài khoản của người dùng — thứ không cần có trong log để trả
-lời câu hỏi "plugin này đọc/ghi file gì".
-
-### Dịch vụ platform có hình dạng React
-
-Ba thứ nữa là dịch vụ của Platform nhưng không thể nằm trong object `sdk`, vì
-hook không thể là thuộc tính của một object thường: `usePluginConfig()`,
-`useLiveConnection(sdk, connected)`, `usePluginMcpBridgeActive(sdk)`. Chúng nằm ở
-`platform/services.ts` và xuất qua cùng một cửa `@/platform` — plugin không phải
-nhớ cái nào ở `contexts/`, cái nào ở `hooks/`, cái nào ở `lib/`.
-
-Hai chi tiết đáng giữ lại vì chúng là nơi dễ sai:
-
-- `useLiveConnection` **cố ý không dọn cờ lúc unmount**. Kết nối sống ở phía
-  Rust, không ở component — người dùng chuyển sang tool khác thì kết nối vẫn còn,
-  nên chấm live phải còn. Thêm cleanup "cho sạch" sẽ là báo sai.
-- `usePluginMcpBridgeActive` gộp ba điều kiện mà sáu tool trước đây tự ghép lại,
-  trong đó vế `&& !mcpBackgroundEnabled` là vế dễ sai nhất: khi bridge nền bật,
-  `McpBackgroundBridge` đã gắn bridge ở cấp app rồi, tool gắn thêm là đăng ký
-  trùng.
-
-Id lấy từ SDK thay vì chuỗi viết tay cũng xoá một lớp lỗi thật: năm chỗ gọi
-`liveConnections.set('redis-client', …)` cũ mang một literal có thể lệch khỏi id
-trong manifest, và khi lệch thì chấm live đơn giản là không bao giờ sáng — không
-có lỗi nào báo ra.
-
-### Rào chắn từng đo thiếu — và con số thật
-
-Bản guard đầu chỉ đếm `from '@tauri-apps/…'`. Nó **bỏ sót
-`await import('@tauri-apps/…')`** — mà repo này cố tình dùng dynamic import để
-giữ bundle gọn, nên dạng động mới là dạng phổ biến. Con số 12 vì thế là sai; số
-thật là **53**.
-
-Một rào chắn đo thiếu còn tệ hơn không có rào chắn, vì con số của nó trông như
-đã sạch. Phép đo đã sửa, và cùng lúc đó đợt chuyển sang SDK (fileio, QR Code,
-Time Tracker export) hạ 53 → **34**. Ngưỡng trong `baseline.json` tăng từ 12 lên
-34 là do **phép đo đúng lên**, không phải do code xấu đi — ghi rõ trong `notes`
-của chính file đó để người đọc sau không hiểu nhầm.
-
-### `fileio` ra khỏi thư mục của một plugin
-
-`tools/apiclient/fileio.ts` được **bốn plugin khác nhau** dùng (API Client, Data
-Converter, Generator, Containers) — một quan hệ phụ thuộc chéo giữa các plugin mà
-nhìn cây thư mục không thấy. Nó chuyển sang `src/lib/fileio.ts`, và mọi hàm nhận
-`sdk` của plugin gọi nó thay vì tự lấy: quyền file phải quy về **đúng** plugin
-đang yêu cầu, và nhật ký cũng phải ghi tên plugin đó.
+`src/platform/migration.test.ts` đọc **thẳng mã nguồn** để lấy mọi cặp
+(key, legacyKey) đang khai rồi kiểm từng cặp: đúng hình dạng, không hai chỗ tranh
+nhau một khoá cũ, plugin có thật, và — quan trọng nhất — **thật sự chuyển được dữ
+liệu**. Đọc mã nguồn thay vì liệt kê tay là có chủ ý: một danh sách chép tay sẽ lạc
+hậu ngay lần chuyển đổi kế tiếp, mà đó đúng là lúc cần nó nhất. Nó cũng kiểm khoá
+trong `liveConnections` khớp khoá tool thật sự ghi, và mọi plugin trong bảng
+`MIGRATIONS` của kho bí mật đều khai quyền `secrets` (thiếu quyền là di trú vẫn chép
+nhưng tool đọc lại bị chặn và hiện ra rỗng — trông y như mất dữ liệu).
 
 ## Không làm (và vì sao)
 
-- **Nạp plugin lúc chạy từ repo khác.** Cần thêm: định dạng gói đã ký (tái dụng
-  khoá minisign của updater), `registry.json` đã ký, kiểm `sdkRange` lúc cài, CI
-  ma trận hai chiều giữa hai repo. Hợp đồng (`PluginManifest` + `sdk` range) đã
-  sẵn sàng cho việc đó; cơ chế phân phối thì chưa.
+- **Nạp plugin lúc chạy từ repo khác.** Cần: định dạng gói đã ký (tái dụng khoá
+  minisign của updater), `registry.json` đã ký, kiểm `sdkRange` lúc cài, CI ma trận
+  hai chiều. Hợp đồng (`PluginManifest` + `sdk` range) đã sẵn sàng; cơ chế phân phối
+  thì chưa.
 - **Sandbox plugin.** Mọi plugin đều do chính chúng ta phát hành, nên cách ly để
-  chống mã độc chưa mua được gì. Cách ly để chống **crash** thì có giá trị và
-  thuộc tier B/C.
-- **Bắt các tool hiện có chuyển sang SDK.** Manifest bọc quanh code đang có;
-  không tool nào bị viết lại. Chuyển dần từng tool khi có lý do khác để động vào
-  nó. Cho tới lúc đó, `permissions` trong manifest của các tool cũ là **mô tả**
-  (suy ra từ chính code của chúng), không phải thứ đang được thực thi.
+  chống mã độc chưa mua được gì. Cách ly để chống **crash** thì có giá trị và thuộc
+  tier B/C.
+- **Đưa `useQuickPaste` / `useInputHistory` / `useImagePaste` vào SDK.** Chúng là
+  thư viện UX dùng chung, không vượt ranh giới tin cậy nào — thêm một lớp gián tiếp
+  mà không mua được gì.
 
 ## Việc còn lại
 
-1. ~~Tách credential ra khỏi store dùng chung, mã hoá khi nằm trên đĩa, và
-   chuyển environments của API Client.~~ **Đã làm cả ba** — xem "Kho bí mật".
-2. ~~Thu hẹp allowlist mạng.~~ **Đã làm, nhưng không ở chỗ ban đầu tưởng** — xem
-   "Allowlist host" bên dưới.
-3. ~~Guard test ranh giới Platform.~~ **Đã làm** — `src/platform/guard.test.ts`
-   + `baseline.json`, cùng cơ chế ngưỡng lùi dần như `design-system/guard.test.ts`.
-   Mốc hiện tại: 12 chỗ gọi thẳng `@tauri-apps`, 47 chỗ dùng thẳng store chung.
-   Mỗi tool chuyển sang SDK thì hạ ngưỡng; về 0 là quyền tương ứng thành thực thi.
-4. ~~Tier B: sidecar plugin host.~~ **Đã làm phần khung** — xem "Tier B" bên dưới.
-   Còn lại: plugin thật đầu tiên dùng nó (kèm binary trong `externalBin` +
-   `ALLOWED_SERVICES`), và đường end-to-end chỉ chạy thật khi có plugin đó.
+1. **Plugin dịch vụ tier B đầu tiên** — kèm binary trong `externalBin` +
+   `ALLOWED_SERVICES`; đường end-to-end chỉ chạy thật khi có nó.
+2. **Phân phối plugin từ repo riêng** — xem "Không làm" ở trên.
+3. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.
