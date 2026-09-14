@@ -1,16 +1,17 @@
+import { usePluginSdkFor, usePluginState } from '@/platform';
 // Generator — unifies the two data generators behind one tool: "Random" for
 // quick UUIDs / numbers / text, and "Test Data" for schema-based fake datasets.
 
 import { Segmented } from '@/components/ui/segmented';
 import { Dices, FlaskConical } from 'lucide-react';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { RandomGenerator } from './RandomGenerator';
 import { FakeDataGenerator } from './FakeDataGenerator';
 
 type Mode = 'random' | 'fake';
 
 export function Generator() {
-  const [mode, setMode] = usePersistentState<Mode>('devtool:generator:tab', 'random');
+  const sdk = usePluginSdkFor('generator');
+  const [mode, setMode] = usePluginState<Mode>(sdk, 'generator:tab', 'random', { legacyKey: 'devtool:generator:tab' });
 
   return (
     <div className="flex flex-col h-full">

@@ -7,9 +7,15 @@
 // `useKnownNames` (useSyncExternalStore).
 
 import { useSyncExternalStore } from 'react';
-import { storageGet, storageSet } from '@/lib/persistentStore';
+import { getPluginSdk, migrateLegacyKey } from '@/platform';
 
-const STORAGE_KEY = 'devtool:rabbit:knownNames';
+// Store ở phạm vi module (lịch sử nhập dùng chung giữa các view của tool), nên
+// SDK lấy qua `getPluginSdk` chứ không hook. `migrateLegacyKey` chạy một lần lúc
+// nạp module: khoá cũ không mang namespace plugin, bỏ qua nó là mất lịch sử của
+// người dùng.
+const STORAGE_KEY = 'knownNames';
+const sdk = getPluginSdk('rabbit-client');
+migrateLegacyKey(sdk, STORAGE_KEY, 'devtool:rabbit:knownNames');
 
 interface ConnNames { queues: string[]; exchanges: string[] }
 type Store = Record<string, ConnNames>;
@@ -19,7 +25,7 @@ let store: Store = load();
 
 function load(): Store {
   try {
-    const raw = storageGet(STORAGE_KEY);
+    const raw = sdk.storage.get(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as Store) : {};
   } catch {
     return {};
@@ -27,7 +33,7 @@ function load(): Store {
 }
 
 function persist() {
-  try { storageSet(STORAGE_KEY, JSON.stringify(store)); } catch { /* ignore */ }
+  try { sdk.storage.set(STORAGE_KEY, JSON.stringify(store)); } catch { /* ignore */ }
 }
 
 function emit() {

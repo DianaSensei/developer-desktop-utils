@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/base64',
   order: 110,
   defaultEnabled: true,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native'],
+  permissions: ['storage', 'files:read', 'clipboard:read', 'clipboard:write', 'native'],
   commands: ['hash_file', 'read_file_data_url'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/EncodeHashEncrypt').then((m) => m.EncodeHashEncrypt),

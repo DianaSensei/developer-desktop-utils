@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
+import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor, usePluginState } from '@/platform';
 import {
   Play, Square, Plus, Copy as CopyIcon, Trash2, AlertTriangle, PanelRightClose, PanelRightOpen,
   ChevronUp, ChevronDown, Upload, FileJson, Ban, Plug,
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CopyButton } from '@/components/ui/copy-button';
 import { ToolToolbar } from '@/components/ui/tool-layout';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { SplitPane } from '@/components/ui/split-pane';
 import { StatusDot } from '@/components/ui/status-dot';
@@ -58,7 +57,7 @@ export function MockServer() {
   useLiveConnection(sdk, status.running);
 
   const [selectedId, setSelectedId] = useState<string | null>(config.stubs[0]?.id ?? null);
-  const [logVisible, setLogVisible] = usePersistentState('devtool:mockServer:logVisible', true);
+  const [logVisible, setLogVisible] = usePluginState(sdk, 'mockServer:logVisible', true, { legacyKey: 'devtool:mockServer:logVisible' });
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
@@ -67,7 +66,7 @@ export function MockServer() {
   // Stub list is a fixed-width sidebar (px, persisted) so it stays narrow and
   // stable regardless of whether the request log is shown — the editor and log
   // share all the remaining space.
-  const [sidebarW, setSidebarW] = usePersistentState('devtool:mockServer:sidebarW', 230);
+  const [sidebarW, setSidebarW] = usePluginState(sdk, 'mockServer:sidebarW', 230, { legacyKey: 'devtool:mockServer:sidebarW' });
   const [dragging, setDragging] = useState(false);
   const dragCleanup = useRef<(() => void) | null>(null);
   useEffect(() => () => dragCleanup.current?.(), []);

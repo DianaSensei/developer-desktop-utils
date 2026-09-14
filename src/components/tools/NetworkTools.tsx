@@ -18,8 +18,7 @@ import { Stat, StatGrid } from '@/components/ui/stat';
 import { cn } from '@/lib/utils';
 import { isTauri } from '@/lib/platform';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
-import { usePluginSdk } from '@/platform';
+import { usePluginSdk, usePluginSdkFor, usePluginState } from '@/platform';
 import {
   DNS_RECORD_TYPES, DOH_PROVIDERS, DOH_PROVIDER_MAP,
   queryDns, queryAllRecords, checkPropagation, checkDnssec, lookupIp, getLocalNetworkInfo, listListeningPorts,
@@ -929,6 +928,7 @@ function SocketTableHeader() {
 }
 
 function PortsView() {
+  const sdk = usePluginSdkFor('network');
   const [entries, setEntries] = useSessionState<PortEntry[] | null>(SESSION.ports, 'entries');
   const [error, setError] = useSessionState<string>(SESSION.ports, 'error');
   const [filter, setFilter] = useSessionState<string>(SESSION.ports, 'filter');
@@ -938,7 +938,7 @@ function PortsView() {
   const [sortDir, setSortDir] = useSessionState<SortDir>(SESSION.ports, 'sortDir');
   // Favourites are a user preference, so they persist across app restarts
   // (unlike scan results, which live in the in-memory session store).
-  const [favorites, setFavorites] = usePersistentState<number[]>('devtool:network:favoritePorts', []);
+  const [favorites, setFavorites] = usePluginState<number[]>(sdk, 'network:favoritePorts', [], { legacyKey: 'devtool:network:favoritePorts' });
   const [addValue, setAddValue] = useState('');
   const [loading, setLoading] = useState(false);
 

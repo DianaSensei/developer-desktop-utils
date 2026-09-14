@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Input } from '@/components/ui/input';
 import { PaneHeader } from '@/components/ui/tool-layout';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,7 +8,6 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Layers } from 'lucide-react';
 import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 
@@ -151,11 +151,12 @@ function parseGroupNames(pattern: string): (string | null)[] {
 }
 
 export function RegexTester() {
-  const [pattern, setPattern] = usePersistentState('devtool:regex:pattern', '');
-  const [flags, setFlags] = usePersistentState('devtool:regex:flags', 'g');
-  const [testString, setTestString] = usePersistentState('devtool:regex:testString', '');
-  const [replacement, setReplacement] = usePersistentState('devtool:regex:replacement', '');
-  const [resultView, setResultView] = usePersistentState<ResultView>('devtool:regex:view', 'matches');
+  const sdk = usePluginSdkFor('regex');
+  const [pattern, setPattern] = usePluginState(sdk, 'regex:pattern', '', { legacyKey: 'devtool:regex:pattern' });
+  const [flags, setFlags] = usePluginState(sdk, 'regex:flags', 'g', { legacyKey: 'devtool:regex:flags' });
+  const [testString, setTestString] = usePluginState(sdk, 'regex:testString', '', { legacyKey: 'devtool:regex:testString' });
+  const [replacement, setReplacement] = usePluginState(sdk, 'regex:replacement', '', { legacyKey: 'devtool:regex:replacement' });
+  const [resultView, setResultView] = usePluginState<ResultView>(sdk, 'regex:view', 'matches', { legacyKey: 'devtool:regex:view' });
 
   useQuickPaste(setTestString);
   useInputHistory(testString, setTestString);

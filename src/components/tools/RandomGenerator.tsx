@@ -1,10 +1,9 @@
 import { useState, useCallback } from 'react';
-import { usePluginConfig } from '@/platform';
+import { usePluginConfig, usePluginSdkFor, usePluginState } from '@/platform';
 import { Input } from '@/components/ui/input';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { RefreshCw } from 'lucide-react';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { randomInt, randomString, randomUnitFloat } from '@/lib/secureRandom';
@@ -63,10 +62,11 @@ function ResultList({ items }: { items: string[] }) {
 }
 
 export function RandomGenerator() {
+  const sdk = usePluginSdkFor('generator');
   const config = usePluginConfig();
   const { maxNumberCount, maxTextCount, maxTextLength } = config.generator;
-  const [mode, setMode] = usePersistentState<Mode>('devtool:gen:mode', 'uuid');
-  const [count, setCount] = usePersistentState('devtool:gen:count', 1);
+  const [mode, setMode] = usePluginState<Mode>(sdk, 'gen:mode', 'uuid', { legacyKey: 'devtool:gen:mode' });
+  const [count, setCount] = usePluginState(sdk, 'gen:count', 1, { legacyKey: 'devtool:gen:count' });
   const [results, setResults] = useState<string[]>([]);
 
   // UUID
@@ -75,9 +75,9 @@ export function RandomGenerator() {
   }, [count]);
 
   // Number
-  const [numMin, setNumMin] = usePersistentState('devtool:gen:numMin', 0);
-  const [numMax, setNumMax] = usePersistentState('devtool:gen:numMax', 100);
-  const [decimals, setDecimals] = usePersistentState('devtool:gen:decimals', 0);
+  const [numMin, setNumMin] = usePluginState(sdk, 'gen:numMin', 0, { legacyKey: 'devtool:gen:numMin' });
+  const [numMax, setNumMax] = usePluginState(sdk, 'gen:numMax', 100, { legacyKey: 'devtool:gen:numMax' });
+  const [decimals, setDecimals] = usePluginState(sdk, 'gen:decimals', 0, { legacyKey: 'devtool:gen:decimals' });
 
   const generateNumbers = useCallback(() => {
     const min = Math.min(numMin, numMax);
@@ -87,11 +87,11 @@ export function RandomGenerator() {
   }, [count, numMin, numMax, decimals, maxNumberCount]);
 
   // Text
-  const [textLen, setTextLen] = usePersistentState('devtool:gen:textLen', 16);
-  const [charsets, setCharsets] = usePersistentState<Record<CharsetKey, boolean>>('devtool:gen:charsets', {
+  const [textLen, setTextLen] = usePluginState(sdk, 'gen:textLen', 16, { legacyKey: 'devtool:gen:textLen' });
+  const [charsets, setCharsets] = usePluginState<Record<CharsetKey, boolean>>(sdk, 'gen:charsets', {
     lower: true, upper: true, digits: true, symbols: false,
-  });
-  const [customChars, setCustomChars] = usePersistentState('devtool:gen:customChars', '');
+  }, { legacyKey: 'devtool:gen:charsets' });
+  const [customChars, setCustomChars] = usePluginState(sdk, 'gen:customChars', '', { legacyKey: 'devtool:gen:customChars' });
 
   const toggleCharset = (key: CharsetKey) => setCharsets((prev) => ({ ...prev, [key]: !prev[key] }));
 

@@ -1,3 +1,4 @@
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import {
   createContext,
   useCallback,
@@ -8,7 +9,6 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { dayStart, splitRunningAcrossDays, uid } from './time';
 
@@ -160,12 +160,13 @@ const ClockifyContext = createContext<ClockifyContextValue | undefined>(undefine
 // ---------------------------------------------------------------------------
 
 export function ClockifyProvider({ children }: { children: ReactNode }) {
-  const [projects, setProjects] = usePersistentState<Project[]>('devtool:clockify:projects', []);
-  const [tasks, setTasks] = usePersistentState<Task[]>('devtool:tasks:items', []);
-  const [tags, setTags] = usePersistentState<Tag[]>('devtool:clockify:tags', []);
-  const [entries, setEntries] = usePersistentState<TimeEntry[]>('devtool:clockify:entries', []);
-  const [subtasks, setSubtasks] = usePersistentState<Subtask[]>('devtool:clockify:subtasks', []);
-  const [settingsRaw, setSettings] = usePersistentState<Settings>('devtool:tasks:settings', DEFAULT_SETTINGS);
+  const sdk = usePluginSdkFor('task-tracker');
+  const [projects, setProjects] = usePluginState<Project[]>(sdk, 'clockify:projects', [], { legacyKey: 'devtool:clockify:projects' });
+  const [tasks, setTasks] = usePluginState<Task[]>(sdk, 'tasks:items', [], { legacyKey: 'devtool:tasks:items' });
+  const [tags, setTags] = usePluginState<Tag[]>(sdk, 'clockify:tags', [], { legacyKey: 'devtool:clockify:tags' });
+  const [entries, setEntries] = usePluginState<TimeEntry[]>(sdk, 'clockify:entries', [], { legacyKey: 'devtool:clockify:entries' });
+  const [subtasks, setSubtasks] = usePluginState<Subtask[]>(sdk, 'clockify:subtasks', [], { legacyKey: 'devtool:clockify:subtasks' });
+  const [settingsRaw, setSettings] = usePluginState<Settings>(sdk, 'tasks:settings', DEFAULT_SETTINGS, { legacyKey: 'devtool:tasks:settings' });
   // Old installs persisted only the original Pomodoro fields; merge defaults on
   // every read so new fields (weekStartsMon, work-hours, …) are present
   // before the migration effect runs.

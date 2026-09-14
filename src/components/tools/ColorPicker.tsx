@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
 import { ColorPicker as ColorField } from '@/components/ui/color-picker';
@@ -8,7 +9,6 @@ import {
   Copy, Check, Pipette, Image as ImageIcon, Download, SlidersHorizontal, HelpCircle, ArrowLeftRight,
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { copyToClipboard } from '@/lib/clipboard';
 
@@ -151,7 +151,8 @@ function Help({ text }: { text: string }) {
 }
 
 export function ColorPicker() {
-  const [color, setColor] = usePersistentState('devtool:colorPicker:color', '#2596be');
+  const sdk = usePluginSdkFor('color-picker');
+  const [color, setColor] = usePluginState(sdk, 'colorPicker:color', '#2596be', { legacyKey: 'devtool:colorPicker:color' });
   const [imageSrc, setImageSrc] = useState<string>('');
   const [palette, setPalette] = useState<string[]>([]);
 

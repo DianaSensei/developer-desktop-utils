@@ -9,9 +9,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { CopyButton } from '@/components/ui/copy-button';
 import { CodeViewer } from '@/design-system';
 import { saveTextFile } from '@/lib/fileio';
-import { usePluginSdkFor } from '@/platform';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Plus, X, Download, RefreshCw } from 'lucide-react';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { generateRows, serializeRows, ROW_FORMATS, DATE_FORMATS, FAKER_TYPE_GROUPS, type FieldDef, type FakerType, type RowFormat, type DateFormat } from '@/lib/faker';
 
 const DEFAULT_FIELDS: FieldDef[] = [
@@ -25,12 +24,12 @@ const newId = () => `f${Date.now().toString(36)}${Math.floor(Math.random() * 1e4
 
 export function FakeDataGenerator() {
   const sdk = usePluginSdkFor('generator');
-  const [fields, setFields] = usePersistentState<FieldDef[]>('devtool:fakeData:fields', DEFAULT_FIELDS);
-  const [count, setCount] = usePersistentState('devtool:fakeData:count', 10);
-  const [seed, setSeed] = usePersistentState('devtool:fakeData:seed', 1);
-  const [format, setFormat] = usePersistentState<RowFormat>('devtool:fakeData:format', 'json');
-  const [table, setTable] = usePersistentState('devtool:fakeData:table', 'users');
-  const [prefix, setPrefix] = usePersistentState('devtool:fakeData:prefix', 'data');
+  const [fields, setFields] = usePluginState<FieldDef[]>(sdk, 'fakeData:fields', DEFAULT_FIELDS, { legacyKey: 'devtool:fakeData:fields' });
+  const [count, setCount] = usePluginState(sdk, 'fakeData:count', 10, { legacyKey: 'devtool:fakeData:count' });
+  const [seed, setSeed] = usePluginState(sdk, 'fakeData:seed', 1, { legacyKey: 'devtool:fakeData:seed' });
+  const [format, setFormat] = usePluginState<RowFormat>(sdk, 'fakeData:format', 'json', { legacyKey: 'devtool:fakeData:format' });
+  const [table, setTable] = usePluginState(sdk, 'fakeData:table', 'users', { legacyKey: 'devtool:fakeData:table' });
+  const [prefix, setPrefix] = usePluginState(sdk, 'fakeData:prefix', 'data', { legacyKey: 'devtool:fakeData:prefix' });
 
   const safeCount = Math.max(1, Math.min(count || 1, 10000));
 

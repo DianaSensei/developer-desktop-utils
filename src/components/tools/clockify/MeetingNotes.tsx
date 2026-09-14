@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import ReactMarkdown from 'react-markdown';
 import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { SearchInput } from '@/components/ui/search-input';
 import { Plus, Trash2, NotebookPen, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import {
   buildMeetingMarkdown,
   formatDuration,
@@ -29,10 +29,11 @@ function whenLabel(m: Meeting): string {
 }
 
 export function MeetingNotes() {
+  const sdk = usePluginSdkFor('task-tracker');
   const { meetings, addMeeting, updateMeeting, deleteMeeting, getMeeting } = useMeetings();
-  const [selectedId, setSelectedId] = usePersistentState<string | null>('devtool:meeting:selected', null);
+  const [selectedId, setSelectedId] = usePluginState<string | null>(sdk, 'meeting:selected', null, { legacyKey: 'devtool:meeting:selected' });
   const [query, setQuery] = useState('');
-  const [mode, setMode] = usePersistentState<ViewMode>('devtool:meeting:mode', 'edit');
+  const [mode, setMode] = usePluginState<ViewMode>(sdk, 'meeting:mode', 'edit', { legacyKey: 'devtool:meeting:mode' });
 
   const sorted = useMemo(
     () => [...meetings].sort((a, b) => b.start - a.start),

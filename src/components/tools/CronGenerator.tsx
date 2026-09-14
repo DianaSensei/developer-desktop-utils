@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
@@ -7,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { HelpCircle, Lightbulb, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { CopyButton } from '@/components/ui/copy-button';
 import { ExplainBand } from '@/components/ui/explain-band';
@@ -527,11 +527,12 @@ function explainExpression(mode: CronMode, fields: CronFields | null, errors: st
 }
 
 export function CronGenerator() {
-  const [mode, setMode] = usePersistentState<CronMode>('devtool:cron:mode', 'linux');
-  const [fields, setFields] = usePersistentState<CronFields>('devtool:cron:fields', DEFAULT_FIELDS);
-  const [expression, setExpression] = usePersistentState('devtool:cron:expression', () =>
+  const sdk = usePluginSdkFor('cron-generator');
+  const [mode, setMode] = usePluginState<CronMode>(sdk, 'cron:mode', 'linux', { legacyKey: 'devtool:cron:mode' });
+  const [fields, setFields] = usePluginState<CronFields>(sdk, 'cron:fields', DEFAULT_FIELDS, { legacyKey: 'devtool:cron:fields' });
+  const [expression, setExpression] = usePluginState(sdk, 'cron:expression', () =>
     expressionFromFields('linux', DEFAULT_FIELDS)
-  );
+  , { legacyKey: 'devtool:cron:expression' });
 
   const inferredMode = inferMode(expression, mode);
   const rules = getRules(mode);

@@ -36,6 +36,28 @@ interface Options {
  * cuốn trôi mọi thứ khác — nhật ký khi đó vừa vô dụng vừa che mất đúng những
  * lời gọi đáng chú ý.
  */
+/**
+ * Chuyển một khoá từ vị trí cũ sang khoá có namespace, đúng một lần.
+ *
+ * Tách ra khỏi hook vì các store ở phạm vi module cũng cần nó — chúng dùng
+ * `sdk.storage` trực tiếp, không qua `usePluginState`, nhưng vẫn phải mang dữ
+ * liệu cũ của người dùng theo.
+ *
+ * Chỉ chép khi khoá mới còn trống: giá trị ở khoá mới luôn là bản mới hơn.
+ */
+export function migrateLegacyKey(sdk: PluginSdk, key: string, legacyKey: string): void {
+  const full = sdk.storage.key(key);
+  if (legacyKey === full) return;
+  if (sdk.storage.get(key) !== null) return;
+
+  const old = storageGet(legacyKey);
+  if (old === null) return;
+  // Ghi thẳng qua store: giá trị ĐÃ ở đúng dạng chuỗi đã lưu, không cần đi qua
+  // một vòng parse/stringify chỉ để chuyển chỗ.
+  storageSet(full, old);
+  storageRemove(legacyKey);
+}
+
 export function usePluginState<T>(
   sdk: PluginSdk,
   key: string,
@@ -45,21 +67,9 @@ export function usePluginState<T>(
   const namespaced = useMemo(() => {
     // Lời gọi này vừa kiểm quyền (ném nếu manifest chưa khai `storage`) vừa để
     // lại một dòng audit cho khoá — giá trị đọc ra được dùng tiếp ngay bên dưới.
-    const current = sdk.storage.get(key);
-    const full = sdk.storage.key(key);
-
-    const legacy = options?.legacyKey;
-    if (current === null && legacy && legacy !== full) {
-      const old = storageGet(legacy);
-      if (old !== null) {
-        // Ghi thẳng qua store thay vì `sdk.storage.set`: giá trị ĐÃ ở đúng dạng
-        // chuỗi JSON của `usePersistentState`, không phải đi qua một vòng
-        // parse/stringify chỉ để chuyển chỗ.
-        storageSet(full, old);
-        storageRemove(legacy);
-      }
-    }
-    return full;
+    sdk.storage.get(key);
+    if (options?.legacyKey) migrateLegacyKey(sdk, key, options.legacyKey);
+    return sdk.storage.key(key);
     // `options.legacyKey` cố tình không nằm trong deps: di trú là việc một lần
     // lúc dựng, và khoá cũ không đổi giữa các lần render.
     // eslint-disable-next-line react-hooks/exhaustive-deps

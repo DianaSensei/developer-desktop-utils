@@ -1,14 +1,15 @@
 import { useDeferredValue, useMemo } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { PaneHeader } from '@/components/ui/tool-layout';
 import { Stat, StatGrid } from '@/components/ui/stat';
 import { Check, X } from 'lucide-react';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function TextCounter() {
-  const [text, setText] = usePersistentState('devtool:textCounter:text', '');
+  const sdk = usePluginSdkFor('text-counter');
+  const [text, setText] = usePluginState(sdk, 'textCounter:text', '', { legacyKey: 'devtool:textCounter:text' });
 
   // The stats below do several full-string scans (splits, TextEncoder, per-char
   // counts). Defer so the textarea stays responsive on large input.

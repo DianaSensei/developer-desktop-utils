@@ -1,13 +1,13 @@
 {
   "notes": {
-    "directTauriInPluginCode": "Tool gọi thẳng @tauri-apps thay vì qua sdk.native/files/clipboard/http. Về 0 thì các quyền tương ứng chuyển từ mô tả sang thực thi. LƯU Ý con số: bản guard đầu chỉ đếm `from '@tauri-apps/…'` và bỏ sót `await import('@tauri-apps/…')` — dạng phổ biến hơn hẳn ở repo này. Sau khi sửa phép đo, số thật là 53; đợt chuyển fileio/QR/clockify sang SDK hạ xuống 34. Ngưỡng tăng so với 12 là do phép đo đúng lên, không phải do code xấu đi.",
-    "sharedStoreInPluginCode": "Tool dùng thẳng usePersistentState/persistentStore thay vì usePluginState của Platform. Về 0 thì mọi dữ liệu tool đều có namespace và audit. Khi chuyển, LUÔN khai `legacyKey`: tiền tố lịch sử hiếm khi trùng id plugin (devtool:redis:* vs id redis-client), thiếu nó là im lặng vứt dữ liệu người dùng.",
+    "directTauriInPluginCode": "ĐÃ VỀ 0. Không code plugin nào còn gọi thẳng @tauri-apps — mọi lời gọi đi qua sdk.native/files/clipboard/http, nên quyền 'native' + allowlist `commands` giờ được THỰC THI chứ không còn là mô tả. Giữ ở 0: một chỗ mới xuất hiện là một tool lách ra khỏi lớp quyền/audit.",
+    "sharedStoreInPluginCode": "Còn đúng 2, và cả hai là NGOẠI LỆ ĐÚNG chứ không phải nợ: code di trú một lần đọc những khoá có TRƯỚC khi có namespace (apiclient/store.ts đọc 'devtool:apiclient:activeEnv' để suy ra mô hình mới; clockify/store.tsx đọc cờ migrated/purged và quét khoá cũ để dọn). Đưa chúng qua sdk.storage sẽ sai vì khoá sẽ thành 'devtool:<id>:devtool:...'. Chúng biến mất khi những migration đó được xoá, không sớm hơn. Mọi khoá MỚI phải dùng usePluginState kèm legacyKey.",
     "manifestForeignImports": "BẤT BIẾN, không phải nợ: manifest chỉ được nhập lucide-react và @/platform. Nhập thứ khác phá code-split.",
     "secretishKeyInSharedStore": "BẤT BIẾN, không phải nợ: không credential nào được quay lại store dùng chung. Đây là tripwire theo TÊN khoá — nó bắt các trường hợp hiển nhiên, KHÔNG phải bằng chứng đã sạch: 'devtool:apiclient:environments' từng chứa token mà tên khoá không hề lộ ra (đã xử lý riêng bằng envSecrets.ts). Thêm một khoá mới mang credential thì đừng trông chờ luật này bắt được."
   },
   "limits": {
-    "directTauriInPluginCode": 14,
-    "sharedStoreInPluginCode": 33,
+    "directTauriInPluginCode": 0,
+    "sharedStoreInPluginCode": 2,
     "manifestForeignImports": 0,
     "secretishKeyInSharedStore": 0
   }

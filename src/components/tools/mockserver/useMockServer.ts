@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { getPluginSdk, usePluginSdkFor, usePluginState } from '@/platform';
 import { defaultConfig, newStub, type MockConfig, type MockStatus, type ScriptResult, type Stub } from './types';
 import { clearRequestLog, getRequestLog, subscribeRequestLog } from './requestLogStore';
 import { isTauri } from '@/lib/platform';
 export { isTauri };
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<T>(cmd, args);
+  return getPluginSdk('mock-server').native.invoke<T>(cmd, args);
 }
 
 // The Rust side ignores unknown fields, so we send the whole config (including
 // UI-only stub `id`/`name` and the host/port) untouched on start / update.
 export function useMockServer() {
-  const [config, setConfig] = usePersistentState<MockConfig>('devtool:mockServer:config', defaultConfig());
+  const sdk = usePluginSdkFor('mock-server');
+  const [config, setConfig] = usePluginState<MockConfig>(sdk, 'mockServer:config', defaultConfig(), { legacyKey: 'devtool:mockServer:config' });
   const [status, setStatus] = useState<MockStatus>({ running: false, host: '', port: 0 });
   // Request log lives in an app-lifetime store so it captures requests fired
   // from other tools (API Client) or a browser while this tab isn't open.

@@ -9,8 +9,7 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, ExternalLink, ClipboardPaste } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import QRCode from 'qrcode';
-import { usePersistentState } from '@/hooks/usePersistentState';
-import { type PluginSdk, usePluginConfig, usePluginSdkFor } from '@/platform';
+import { type PluginSdk, usePluginConfig, usePluginSdkFor, usePluginState } from '@/platform';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
 import { useImagePaste } from '@/hooks/useImagePaste';
@@ -319,12 +318,12 @@ const LOGO_PRESETS: Array<{ value: LogoPreset; display: string }> = [
 function QrGenerator() {
   const sdk = usePluginSdkFor('qrcode');
   const config = usePluginConfig();
-  const [text,        setText]        = usePersistentState('devtool:qrcode:text',        '');
-  const [darkColor,   setDarkColor]   = usePersistentState('devtool:qrcode:dark',        '#000000');
-  const [lightColor,  setLightColor]  = usePersistentState('devtool:qrcode:light',       '#FFFFFF');
-  const [transparent, setTransparent] = usePersistentState('devtool:qrcode:transparent', false);
-  const [frame,       setFrame]       = usePersistentState<FrameStyle>('devtool:qrcode:frame', 'none');
-  const [logo,        setLogo]        = usePersistentState<LogoPreset>('devtool:qrcode:logo',  'none');
+  const [text,        setText]        = usePluginState(sdk, 'qrcode:text',        '', { legacyKey: 'devtool:qrcode:text' });
+  const [darkColor,   setDarkColor]   = usePluginState(sdk, 'qrcode:dark',        '#000000', { legacyKey: 'devtool:qrcode:dark' });
+  const [lightColor,  setLightColor]  = usePluginState(sdk, 'qrcode:light',       '#FFFFFF', { legacyKey: 'devtool:qrcode:light' });
+  const [transparent, setTransparent] = usePluginState(sdk, 'qrcode:transparent', false, { legacyKey: 'devtool:qrcode:transparent' });
+  const [frame,       setFrame]       = usePluginState<FrameStyle>(sdk, 'qrcode:frame', 'none', { legacyKey: 'devtool:qrcode:frame' });
+  const [logo,        setLogo]        = usePluginState<LogoPreset>(sdk, 'qrcode:logo',  'none', { legacyKey: 'devtool:qrcode:logo' });
 
   const [customImageUrl, setCustomImageUrl] = useState('');
   const customImageRef = useRef<HTMLImageElement | null>(null);
@@ -566,8 +565,7 @@ function QrReader() {
   // data URL via the backend, then decode it like any other image.
   const loadFromPath = async (path: string) => {
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const file = await invoke<{ mime: string; dataUrl: string }>('read_file_data_url', { path });
+      const file = await sdk.native.invoke<{ mime: string; dataUrl: string }>('read_file_data_url', { path });
       if (!file.mime.startsWith('image/')) { setError('That file is not an image.'); return; }
       loadFromDataUrl(file.dataUrl);
     } catch {
@@ -669,7 +667,8 @@ function QrReader() {
 type QrMode = 'generate' | 'read';
 
 export function QRCodeTool() {
-  const [mode, setMode] = usePersistentState<QrMode>('devtool:qrcode:mode', 'generate');
+  const sdk = usePluginSdkFor('qrcode');
+  const [mode, setMode] = usePluginState<QrMode>(sdk, 'qrcode:mode', 'generate', { legacyKey: 'devtool:qrcode:mode' });
 
   return (
     <div className="h-full overflow-y-auto">

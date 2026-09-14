@@ -1,3 +1,4 @@
+import { getPluginSdk } from '@/platform';
 // App-lifetime store for the mock server's request log.
 //
 // The mock server keeps running (and emitting `mock:request` events) in the Rust
@@ -25,18 +26,18 @@ function notify() {
 function ensureListening() {
   if (listening || !isTauri) return;
   listening = true;
-  import('@tauri-apps/api/event')
-    .then(({ listen }) =>
-      // The backend batches requests (~1 event/250ms) so the UI never faces a
-      // per-request event storm under load.
-      listen<RequestLogEntry[]>('mock:request-batch', (e) => {
-        const batch = e.payload;
-        if (!batch || batch.length === 0) return;
-        // Batch arrives oldest→newest; show newest first, capped.
-        entries = [...batch].reverse().concat(entries).slice(0, LOG_CAP);
-        notify();
-      }),
-    )
+  // Store ở phạm vi module: listener phải sống suốt đời app để bắt được request
+  // dù người dùng đang mở tool nào — nên SDK lấy qua `getPluginSdk`, không hook.
+  //
+  // The backend batches requests (~1 event/250ms) so the UI never faces a
+  // per-request event storm under load.
+  getPluginSdk('mock-server').native
+    .listen<RequestLogEntry[]>('mock:request-batch', (batch) => {
+      if (!batch || batch.length === 0) return;
+      // Batch arrives oldest→newest; show newest first, capped.
+      entries = [...batch].reverse().concat(entries).slice(0, LOG_CAP);
+      notify();
+    })
     .catch(() => {
       // Allow a retry on the next subscribe if wiring up the listener failed.
       listening = false;

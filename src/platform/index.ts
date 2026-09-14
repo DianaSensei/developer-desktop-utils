@@ -24,6 +24,8 @@ export type {
   PluginEnv,
   PluginFiles,
   PluginFileFilter,
+  PluginFetchInit,
+  FileDropEvent,
 } from './sdk';
 export {
   clearSecrets,
@@ -39,7 +41,7 @@ export {
 } from './secrets';
 export type { VaultStatus, VaultKeyMode } from './secrets';
 export { useSecretState } from './useSecretState';
-export { usePluginState } from './usePluginState';
+export { usePluginState, migrateLegacyKey } from './usePluginState';
 export { usePluginSdkFor, getPluginSdk } from './usePluginSdkFor';
 export { usePluginConfig, useLiveConnection, usePluginMcpBridgeActive } from './services';
 export { SERVICE_PROTOCOL, createPluginService, PluginServiceError } from './service';

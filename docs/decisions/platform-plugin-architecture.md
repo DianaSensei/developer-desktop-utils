@@ -306,9 +306,34 @@ khác, và cả hai đều lộ ra một giới hạn thật của mô hình hoo
   effect phải bọc lại trong IIFE async, với `cancelled` vẫn là chốt duy nhất
   quyết định dọn dẹp — đây là chỗ dễ làm rò stream nhất nếu cẩu thả.
 
-Kết quả sau bốn tool: ratchet **34 → 14** và **47 → 33**. Phần còn lại nằm rải ở
-các tool nhỏ, chuyển dần khi có lý do khác để động vào chúng — ratchet chặn chỗ
-mới, không ép dọn hết ngay.
+### Trạng thái cuối: ratchet về 0 và 2
+
+| Chỉ số | Đầu | Cuối |
+|---|---|---|
+| Code plugin gọi thẳng `@tauri-apps` | 53 | **0** |
+| Code plugin dùng thẳng store chung | 47 | **2** |
+
+**Chỉ số thứ nhất về 0 là một thay đổi về CHẤT, không chỉ về lượng**: từ đây quyền
+`native` + allowlist `commands` được **thực thi** chứ không còn là mô tả. Một lệnh
+gõ sai hay nằm ngoài allowlist bị chặn và ghi nhật ký, thay vì lặng lẽ đi thẳng
+xuống Rust.
+
+Hai chỗ còn lại của chỉ số thứ hai là **ngoại lệ đúng, không phải nợ**: code di
+trú một lần đọc những khoá có TRƯỚC khi có namespace — `apiclient/store.ts` đọc
+`devtool:apiclient:activeEnv` để suy ra mô hình mới, `clockify/store.tsx` đọc cờ
+migrated/purged và quét khoá cũ để dọn. Đưa chúng qua `sdk.storage` sẽ **sai**,
+vì khoá khi đó thành `devtool:<id>:devtool:…`. Chúng chỉ biến mất khi chính các
+migration đó được xoá.
+
+Ba khuôn xuất hiện trong đợt dọn, đáng ghi lại vì tool sau sẽ gặp lại:
+
+1. **Component/hook** → `usePluginSdkFor(id)` + `usePluginState(sdk, key, init, { legacyKey })`.
+2. **Store ở phạm vi module** (lịch sử nhập, log request, client HTTP quản trị) →
+   `getPluginSdk(id)` + `migrateLegacyKey(sdk, key, legacyKey)` gọi một lần lúc
+   nạp module.
+3. **Khoá mới = phần sau `devtool:` của khoá cũ**, giữ nguyên cả tiền tố phụ
+   (`codec:input` → `devtool:base64:codec:input`). Nhờ vậy nhiều sub-tool trong
+   cùng một plugin không giẫm khoá lên nhau.
 
 ### SDK đầy đủ — bề mặt dựng theo nhu cầu thật, không theo suy đoán
 

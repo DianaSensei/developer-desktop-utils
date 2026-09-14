@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { cn } from '@/lib/utils';
 
@@ -156,11 +156,12 @@ function toArray(text: string) {
 }
 
 export function TextTransformer() {
-  const [input, setInput] = usePersistentState('devtool:textTransform:input', '');
-  const [mode, setMode] = usePersistentState<TransformMode>('devtool:textTransform:mode', 'single-line');
-  const [removeLineWhitespace, setRemoveLineWhitespace] = usePersistentState('devtool:textTransform:removeLineWs', false);
-  const [removeChars, setRemoveChars] = usePersistentState('devtool:textTransform:removeChars', '');
-  const [delimiters, setDelimiters] = usePersistentState('devtool:textTransform:delimiters', ',;');
+  const sdk = usePluginSdkFor('text-transform');
+  const [input, setInput] = usePluginState(sdk, 'textTransform:input', '', { legacyKey: 'devtool:textTransform:input' });
+  const [mode, setMode] = usePluginState<TransformMode>(sdk, 'textTransform:mode', 'single-line', { legacyKey: 'devtool:textTransform:mode' });
+  const [removeLineWhitespace, setRemoveLineWhitespace] = usePluginState(sdk, 'textTransform:removeLineWs', false, { legacyKey: 'devtool:textTransform:removeLineWs' });
+  const [removeChars, setRemoveChars] = usePluginState(sdk, 'textTransform:removeChars', '', { legacyKey: 'devtool:textTransform:removeChars' });
+  const [delimiters, setDelimiters] = usePluginState(sdk, 'textTransform:delimiters', ',;', { legacyKey: 'devtool:textTransform:delimiters' });
 
   const output = useMemo(() => {
     if (!input) return '';

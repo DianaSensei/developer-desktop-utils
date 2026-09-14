@@ -9,6 +9,20 @@ import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
 import { createPluginService, type PluginService } from './service';
 import { hostAllowed } from './manifest';
 import type { Channel } from '@tauri-apps/api/core';
+import type { DangerousSettings } from '@tauri-apps/plugin-http';
+
+/**
+ * `RequestInit` cộng các tuỳ chọn chỉ có ở tầng HTTP của Tauri.
+ *
+ * Cần vì chúng là thứ một HTTP workbench không thể thiếu: `maxRedirections` để
+ * người dùng tự quyết có đi theo redirect hay không, `danger` để gọi được tới
+ * endpoint dùng chứng chỉ tự ký. `fetch` của trình duyệt không có cả hai, và ở
+ * bản web chúng đơn giản bị bỏ qua.
+ */
+export type PluginFetchInit = RequestInit & {
+  maxRedirections?: number;
+  danger?: DangerousSettings;
+};
 import { IS_MAC, MOD_KEY, isTauri } from '@/lib/platform';
 import * as audit from './audit';
 import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
@@ -90,6 +104,12 @@ export interface PluginEnv {
   readonly modKey: string;
 }
 
+/** Trạng thái kéo-thả ở cấp cửa sổ. `paths` chỉ có ở pha 'drop'. */
+export interface FileDropEvent {
+  type: 'enter' | 'over' | 'drop' | 'leave';
+  paths?: string[];
+}
+
 export interface PluginFileFilter {
   name: string;
   /** Đuôi file, KHÔNG kèm dấu chấm: ['json', 'yaml']. */
@@ -126,7 +146,7 @@ export interface PluginSdk {
     writeImage(source: Blob | string): Promise<void>;
   };
   /** `fetch` tương thích chuẩn, đi qua tauri-plugin-http khi chạy trong app. */
-  http: { fetch(input: string, init?: RequestInit): Promise<Response> };
+  http: { fetch(input: string, init?: PluginFetchInit): Promise<Response> };
   native: {
     invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
     /**
@@ -146,6 +166,17 @@ export interface PluginSdk {
      * gọi nó lúc unmount, đúng như mọi listener khác trong repo này.
      */
     listen<T>(event: string, handler: (payload: T) => void): Promise<() => void>;
+    /**
+     * Sự kiện kéo-thả file ở cấp CỬA SỔ (Tauri chặn chúng trước webview, nên
+     * `ondrop` của HTML không bao giờ nhận được).
+     *
+     * Gác sau quyền `files:read` chứ không phải 'native': thứ nó trao cho plugin
+     * là đường dẫn file của người dùng: nhận được chúng đã là bước đầu của việc
+     * đọc file, dù việc đọc thật có diễn ra qua lệnh nào đi nữa.
+     *
+     * Trả về hàm huỷ đăng ký — plugin PHẢI gọi nó lúc unmount.
+     */
+    onFileDrop(handler: (event: FileDropEvent) => void): Promise<() => void>;
   };
   /** Tier B: gọi sidecar của plugin. Xem `service.ts`. */
   service: PluginService;
@@ -346,6 +377,15 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
         ensure(manifest, 'native', 'native', `listen:${event}`);
         const { listen } = await import('@tauri-apps/api/event');
         return listen<T>(event, (e) => handler(e.payload));
+      },
+
+      async onFileDrop(handler: (event: FileDropEvent) => void): Promise<() => void> {
+        ensure(manifest, 'files:read', 'files', 'onFileDrop');
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        return getCurrentWindow().onDragDropEvent((event) => {
+          const payload = event.payload as { type: FileDropEvent['type']; paths?: string[] };
+          handler({ type: payload.type, paths: payload.paths });
+        });
       },
 
       async channel<T>(onMessage: (message: T) => void, label?: string): Promise<Channel<T>> {

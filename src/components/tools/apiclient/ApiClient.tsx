@@ -7,10 +7,9 @@
 // export as Postman v2.1. Requests only fire when the user clicks Send.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePluginConfig, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
+import { usePluginConfig, usePluginMcpBridgeActive, usePluginSdkFor, usePluginState } from '@/platform';
 import { Plus, Search, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { Button } from '@/components/ui/button';
 import type { InlineCodeFieldHandle } from '@/design-system';
 import { RequestQuickOpen } from './RequestQuickOpen';
@@ -74,16 +73,12 @@ export function ApiClient() {
   const [showHistory, setShowHistory] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [runTarget, setRunTarget] = useState<{ title: string; requests: ApiRequest[]; collectionId: string } | null>(null);
-  const [direction, setDirection] = usePersistentState<SplitDirection>(
-    'devtool:apiclient:layout:v2', 'horizontal',
-  );
+  const [direction, setDirection] = usePluginState<SplitDirection>(sdk, 'apiclient:layout:v2', 'horizontal', { legacyKey: 'devtool:apiclient:layout:v2' });
   // Split sizes are persisted per axis, so toggling the layout (or reopening the
   // tool) restores the proportions the user set rather than resetting to 50/50.
-  const [splitH, setSplitH] = usePersistentState('devtool:apiclient:split:horizontal', 50);
-  const [splitV, setSplitV] = usePersistentState('devtool:apiclient:split:vertical', 50);
-  const [sidebarWidth, setSidebarWidth] = usePersistentState(
-    'devtool:apiclient:sidebarWidth', 288,
-  );
+  const [splitH, setSplitH] = usePluginState(sdk, 'apiclient:split:horizontal', 50, { legacyKey: 'devtool:apiclient:split:horizontal' });
+  const [splitV, setSplitV] = usePluginState(sdk, 'apiclient:split:vertical', 50, { legacyKey: 'devtool:apiclient:split:vertical' });
+  const [sidebarWidth, setSidebarWidth] = usePluginState(sdk, 'apiclient:sidebarWidth', 288, { legacyKey: 'devtool:apiclient:sidebarWidth' });
   const [resizing, setResizing] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   // Bumped by RequestTabs' "reveal in sidebar" button. The sidebar already

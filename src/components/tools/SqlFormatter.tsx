@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { EditorView, basicSetup } from 'codemirror';
 import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
@@ -18,7 +19,6 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 
 // ─── SQL formatter ───────────────────────────────────────────────────────────
@@ -373,13 +373,14 @@ function ToggleChip({ active, onClick, children }: {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SqlFormatter() {
-  const [mode, setMode]               = usePersistentState<Mode>('devtool:sql:mode', 'sql');
-  const [sqlInput, setSqlInput]       = usePersistentState('devtool:sql:input', '');
-  const [mongoInput, setMongoInput]   = usePersistentState('devtool:mongo:input', '');
-  const [indentSize, setIndentSize]   = usePersistentState<'2' | '4'>('devtool:sql:indentSize', '2');
-  const [uppercaseKw, setUppercaseKw] = usePersistentState('devtool:sql:uppercaseKw', true);
-  const [collapseSpaces, setCollapseSpaces] = usePersistentState('devtool:sql:collapseSpaces', true);
-  const [lineBreaks, setLineBreaks]   = usePersistentState('devtool:sql:lineBreaks', true);
+  const sdk = usePluginSdkFor('sql-formatter');
+  const [mode, setMode]               = usePluginState<Mode>(sdk, 'sql:mode', 'sql', { legacyKey: 'devtool:sql:mode' });
+  const [sqlInput, setSqlInput]       = usePluginState(sdk, 'sql:input', '', { legacyKey: 'devtool:sql:input' });
+  const [mongoInput, setMongoInput]   = usePluginState(sdk, 'mongo:input', '', { legacyKey: 'devtool:mongo:input' });
+  const [indentSize, setIndentSize]   = usePluginState<'2' | '4'>(sdk, 'sql:indentSize', '2', { legacyKey: 'devtool:sql:indentSize' });
+  const [uppercaseKw, setUppercaseKw] = usePluginState(sdk, 'sql:uppercaseKw', true, { legacyKey: 'devtool:sql:uppercaseKw' });
+  const [collapseSpaces, setCollapseSpaces] = usePluginState(sdk, 'sql:collapseSpaces', true, { legacyKey: 'devtool:sql:collapseSpaces' });
+  const [lineBreaks, setLineBreaks]   = usePluginState(sdk, 'sql:lineBreaks', true, { legacyKey: 'devtool:sql:lineBreaks' });
 
   const containerRef      = useRef<HTMLDivElement>(null);
   const viewRef           = useRef<EditorView | null>(null);

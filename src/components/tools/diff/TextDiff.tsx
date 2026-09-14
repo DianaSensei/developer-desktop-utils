@@ -1,11 +1,11 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { ArrowLeftRight, FoldVertical } from 'lucide-react';
 import {
   Segmented, PaneHeader, Badge, CopyButton, IconButton, CollapsibleSection,
   type BadgeTone,
 } from '@/design-system';
 import { DiffMergeView, type DiffStats, type DiffSide } from './DiffMergeView';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 
 type Mode = 'text' | 'json';
@@ -90,9 +90,10 @@ function computeJsonDiff(a: string, b: string): JsonDiffResult {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function TextDiff() {
-  const [mode, setMode] = usePersistentState<Mode>('devtool:diff:mode', 'text');
-  const [text1, setText1] = usePersistentState('devtool:diff:text1', '');
-  const [text2, setText2] = usePersistentState('devtool:diff:text2', '');
+  const sdk = usePluginSdkFor('diff');
+  const [mode, setMode] = usePluginState<Mode>(sdk, 'diff:mode', 'text', { legacyKey: 'devtool:diff:mode' });
+  const [text1, setText1] = usePluginState(sdk, 'diff:text1', '', { legacyKey: 'devtool:diff:text1' });
+  const [text2, setText2] = usePluginState(sdk, 'diff:text2', '', { legacyKey: 'devtool:diff:text2' });
   const [collapseUnchanged, setCollapseUnchanged] = useState(false);
   const [stats, setStats] = useState<DiffStats | null>(null);
 
