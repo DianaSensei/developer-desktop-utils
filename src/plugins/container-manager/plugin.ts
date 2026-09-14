@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/container-manager',
   order: 190,
   defaultEnabled: false,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native'],
+  permissions: ['storage', 'files:write', 'clipboard:read', 'clipboard:write', 'native'],
   commands: ['container_', 'image_', 'mcp_respond', 'network_', 'volume_'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/container/ContainerManager').then((m) => m.ContainerManager),

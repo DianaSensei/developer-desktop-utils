@@ -40,7 +40,8 @@ import { type ScriptFinding, findScripts, stripScripts } from './collectionScrip
 import { ImportReviewDialog } from './ImportReviewDialog';
 import { importOpenApi, isOpenApiDocument, parseSpecText } from './openapi';
 import { importBru, isBrunoFile } from './bruno';
-import { pickCollectionFile, saveJsonFile } from './fileio';
+import { pickCollectionFile, saveJsonFile } from '@/lib/fileio';
+import { usePluginSdkFor } from '@/platform';
 import { methodColor, methodShort } from './method-color';
 import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialog';
 import { ImportCurlDialog } from './ImportCurlDialog';
@@ -173,6 +174,7 @@ interface Props {
 }
 
 export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
+  const sdk = usePluginSdkFor('api-client');
   const [error, setError] = useState<string | null>(null);
   // Non-fatal notes from the last import (parts of a spec with no equivalent
   // here). Shown until dismissed so an import is never quietly lossy.
@@ -241,7 +243,7 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
     setError(null);
     setNotices([]);
     try {
-      const file = await pickCollectionFile();
+      const file = await pickCollectionFile(sdk);
       if (!file) return;
       let collection: Collection;
       // Unlike Postman/OpenAPI (both JSON/YAML, disambiguated by content), a
@@ -410,6 +412,7 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
 // ─── collection node ────────────────────────────────────────────────────────
 
 const CollectionNode = memo(function CollectionNode({ collection, ctx }: { collection: Collection; ctx: NodeCtx }) {
+  const sdk = usePluginSdkFor('api-client');
   const store = ctx.storeRef.current;
   const collapsed = !!collection.collapsed && !ctx.q;
 
@@ -417,7 +420,7 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
     ctx.onError(null);
     try {
       const json = JSON.stringify(exportPostman(collection), null, 2);
-      await saveJsonFile(`${collection.name || 'collection'}.postman_collection.json`, json);
+      await saveJsonFile(sdk, `${collection.name || 'collection'}.postman_collection.json`, json);
     } catch (e) {
       ctx.onError((e as Error).message);
     }

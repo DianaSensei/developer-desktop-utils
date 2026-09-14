@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/qrcode',
   order: 200,
   defaultEnabled: true,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native'],
+  permissions: ['storage', 'files:read', 'files:write', 'clipboard:read', 'clipboard:write', 'open-url', 'native'],
   commands: ['read_file_data_url'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/QRCodeTool').then((m) => m.QRCodeTool),

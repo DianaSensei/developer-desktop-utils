@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CopyButton } from '@/components/ui/copy-button';
 import { CodeViewer } from '@/design-system';
-import { saveTextFile } from '@/components/tools/apiclient/fileio';
+import { saveTextFile } from '@/lib/fileio';
+import { usePluginSdkFor } from '@/platform';
 import { Plus, X, Download, RefreshCw } from 'lucide-react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { generateRows, serializeRows, ROW_FORMATS, DATE_FORMATS, FAKER_TYPE_GROUPS, type FieldDef, type FakerType, type RowFormat, type DateFormat } from '@/lib/faker';
@@ -23,6 +24,7 @@ const DEFAULT_FIELDS: FieldDef[] = [
 const newId = () => `f${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 
 export function FakeDataGenerator() {
+  const sdk = usePluginSdkFor('generator');
   const [fields, setFields] = usePersistentState<FieldDef[]>('devtool:fakeData:fields', DEFAULT_FIELDS);
   const [count, setCount] = usePersistentState('devtool:fakeData:count', 10);
   const [seed, setSeed] = usePersistentState('devtool:fakeData:seed', 1);
@@ -56,7 +58,7 @@ export function FakeDataGenerator() {
 
   const handleDownload = () => {
     const ext = ROW_FORMATS.find((f) => f.value === format)?.ext ?? 'txt';
-    if (output) void saveTextFile(`data.${ext}`, output);
+    if (output) void saveTextFile(sdk, `data.${ext}`, output);
   };
 
   return (

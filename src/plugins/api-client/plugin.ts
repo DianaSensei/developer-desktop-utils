@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/api-client',
   order: 20,
   defaultEnabled: true,
-  permissions: ['storage', 'secrets', 'clipboard:read', 'clipboard:write', 'native', 'http'],
+  permissions: ['storage', 'secrets', 'files:read', 'files:write', 'clipboard:read', 'clipboard:write', 'http', 'native'],
   commands: ['mcp_'],
   // '*' là đúng bản chất ở đây chứ không phải sự lười: một HTTP workbench tồn
   // tại để gọi tới URL người dùng gõ vào. Khai tường minh để nó là một dòng

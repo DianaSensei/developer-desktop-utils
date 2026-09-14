@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/task-tracker',
   order: 10,
   defaultEnabled: true,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write'],
+  permissions: ['storage', 'files:write', 'clipboard:read', 'clipboard:write'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/clockify/Suite').then((m) => m.ClockifySuite),
 });

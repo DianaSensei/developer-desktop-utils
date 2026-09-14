@@ -91,6 +91,53 @@ describe('secrets', () => {
   });
 });
 
+describe('env', () => {
+  it('phơi ra thông tin môi trường mà không cần quyền nào', () => {
+    const sdk = createPluginSdk(plugin([]));
+    expect(typeof sdk.env.isTauri).toBe('boolean');
+    expect(typeof sdk.env.isMac).toBe('boolean');
+    expect(['⌘', 'Ctrl']).toContain(sdk.env.modKey);
+  });
+});
+
+describe('files', () => {
+  it('đọc và ghi là HAI quyền riêng — nhập file không kéo theo quyền ghi đè', async () => {
+    const readOnly = createPluginSdk(plugin(['files:read']));
+    await expect(readOnly.files.pickSave()).rejects.toThrow(PluginPermissionError);
+    await expect(readOnly.files.writeText('/tmp/x', 'y')).rejects.toThrow(PluginPermissionError);
+
+    const writeOnly = createPluginSdk(plugin(['files:write']));
+    await expect(writeOnly.files.pickOpen()).rejects.toThrow(PluginPermissionError);
+    await expect(writeOnly.files.readText('/tmp/x')).rejects.toThrow(PluginPermissionError);
+  });
+
+  it('nhật ký chỉ ghi TÊN file, không ghi đường dẫn chứa tên tài khoản', async () => {
+    const sdk = createPluginSdk(plugin(['files:read']));
+    // jsdom không có plugin-fs thật; điều cần khẳng định là audit đã ghi TRƯỚC
+    // khi lời gọi thật diễn ra, và ghi đúng thứ.
+    await sdk.files.readText('/Users/nguoi-dung-that/Documents/bi-mat.json').catch(() => {});
+
+    const entry = audit.recent().find((e) => e.channel === 'files')!;
+    expect(entry.detail).toBe('bi-mat.json');
+    expect(JSON.stringify(entry)).not.toContain('nguoi-dung-that');
+  });
+});
+
+describe('openExternal', () => {
+  it('cần quyền "open-url" riêng, không dùng ké quyền http', async () => {
+    await expect(createPluginSdk(plugin(['http'])).openExternal('https://x.com')).rejects.toThrow(
+      PluginPermissionError,
+    );
+
+    const sdk = createPluginSdk(plugin(['open-url']));
+    await sdk.openExternal('https://example.com/duong-dan?token=abc').catch(() => {});
+    const entry = audit.recent().find((e) => e.channel === 'shell')!;
+    expect(entry.allowed).toBe(true);
+    expect(entry.detail).toBe('https://example.com');
+    expect(JSON.stringify(entry)).not.toContain('abc');
+  });
+});
+
 describe('clipboard / http', () => {
   it('đọc và ghi clipboard cần đúng quyền tương ứng, không phải một quyền chung', async () => {
     const readOnly = createPluginSdk(plugin(['clipboard:read']));

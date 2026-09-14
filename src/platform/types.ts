@@ -36,6 +36,9 @@ export type PluginPermission =
   | 'secrets'
   | 'clipboard:read'
   | 'clipboard:write'
+  | 'files:read'
+  | 'files:write'
+  | 'open-url'
   | 'http'
   | 'native'
   | 'service';

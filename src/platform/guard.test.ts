@@ -80,8 +80,12 @@ const RULES: Rule[] = [
   {
     key: 'directTauriInPluginCode',
     label: 'code plugin gọi thẳng @tauri-apps',
-    why: 'Đi qua sdk.native / sdk.clipboard / sdk.http để quyền trong manifest có hiệu lực và audit ghi được.',
-    count: () => countPattern(PLUGIN_FILES, /from '@tauri-apps\/[^']+'/g),
+    why: 'Đi qua sdk.native / sdk.files / sdk.clipboard / sdk.http để quyền trong manifest có hiệu lực và audit ghi được.',
+    // Đếm CẢ `import ... from '@tauri-apps/…'` lẫn `await import('@tauri-apps/…')`.
+    // Bản đầu chỉ bắt dạng tĩnh và vì thế bỏ sót phần lớn: repo này cố tình dùng
+    // dynamic import để giữ bundle gọn, nên dạng động mới là dạng phổ biến. Một
+    // rào chắn đo thiếu còn tệ hơn không có, vì con số của nó trông như đã sạch.
+    count: () => countPattern(PLUGIN_FILES, /(?:from|import\()\s*'@tauri-apps\/[^']+'/g),
   },
   {
     key: 'sharedStoreInPluginCode',

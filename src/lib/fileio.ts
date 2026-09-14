@@ -1,21 +1,26 @@
-// JSON file import/export that works in both the Tauri desktop app and the web
-// build. Desktop uses the dialog + fs plugins (native pickers); the web build
-// falls back to an <input type=file> read and a Blob download.
+// Nhập/xuất file, chạy được cả trong app Tauri lẫn bản web: desktop dùng hộp
+// thoại của hệ điều hành qua `sdk.files`, bản web rơi về `<input type=file>` và
+// tải Blob xuống.
+//
+// Sống ở `lib/` chứ không nằm trong thư mục của một tool: bốn plugin khác nhau
+// dùng nó (API Client, Data Converter, Generator, Containers), nên để nó trong
+// `tools/apiclient/` như trước là một quan hệ phụ thuộc chéo giữa các plugin mà
+// nhìn cây thư mục không thấy.
+//
+// Mọi hàm nhận `sdk` của plugin gọi nó, không tự lấy: quyền file phải được quy
+// về ĐÚNG plugin đang yêu cầu, và nhật ký cũng phải ghi tên plugin đó.
 
 import { isTauri } from '@/lib/platform';
+import type { PluginSdk } from '@/platform';
 
 
 // Open a picker and return the chosen file's text contents, or null if cancelled.
-export async function pickJsonFile(): Promise<string | null> {
+export async function pickJsonFile(sdk: PluginSdk): Promise<string | null> {
   if (isTauri) {
-    const { open } = await import('@tauri-apps/plugin-dialog');
-    const path = await open({
-      multiple: false,
-      filters: [{ name: 'JSON', extensions: ['json'] }],
-    });
-    if (!path || typeof path !== 'string') return null;
-    const { readTextFile } = await import('@tauri-apps/plugin-fs');
-    return readTextFile(path);
+    const picked = await sdk.files.pickOpen({ filters: [{ name: 'JSON', extensions: ['json'] }] });
+    const path = picked?.[0];
+    if (!path) return null;
+    return sdk.files.readText(path);
   }
 
   return new Promise((resolve) => {
@@ -38,16 +43,14 @@ export async function pickJsonFile(): Promise<string | null> {
 // Swagger spec (just as often YAML), or a single Bruno request (.bru). Returns
 // the file's text contents and its name (the extension is a hint the importer
 // uses), or null if cancelled.
-export async function pickCollectionFile(): Promise<{ name: string; text: string } | null> {
+export async function pickCollectionFile(sdk: PluginSdk): Promise<{ name: string; text: string } | null> {
   if (isTauri) {
-    const { open } = await import('@tauri-apps/plugin-dialog');
-    const path = await open({
-      multiple: false,
+    const picked = await sdk.files.pickOpen({
       filters: [{ name: 'Collection, OpenAPI spec, or Bruno request', extensions: ['json', 'yaml', 'yml', 'bru'] }],
     });
-    if (!path || typeof path !== 'string') return null;
-    const { readTextFile } = await import('@tauri-apps/plugin-fs');
-    return { name: path.split(/[\\/]/).pop() ?? path, text: await readTextFile(path) };
+    const path = picked?.[0];
+    if (!path) return null;
+    return { name: path.split(/[\\/]/).pop() ?? path, text: await sdk.files.readText(path) };
   }
 
   return new Promise((resolve) => {
@@ -92,16 +95,14 @@ export function pickDataFile(): Promise<{ name: string; text: string } | null> {
 }
 
 // Save `text` to a .json file chosen by the user.
-export async function saveJsonFile(suggestedName: string, text: string): Promise<void> {
+export async function saveJsonFile(sdk: PluginSdk, suggestedName: string, text: string): Promise<void> {
   if (isTauri) {
-    const { save } = await import('@tauri-apps/plugin-dialog');
-    const path = await save({
+    const path = await sdk.files.pickSave({
       defaultPath: suggestedName,
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
     if (!path) return;
-    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-    await writeTextFile(path, text);
+    await sdk.files.writeText(path, text);
     return;
   }
 
@@ -116,13 +117,11 @@ export async function saveJsonFile(suggestedName: string, text: string): Promise
 
 // Save arbitrary text to a file the user picks (no extension lock-in). Used to
 // export a raw response body.
-export async function saveTextFile(suggestedName: string, text: string): Promise<void> {
+export async function saveTextFile(sdk: PluginSdk, suggestedName: string, text: string): Promise<void> {
   if (isTauri) {
-    const { save } = await import('@tauri-apps/plugin-dialog');
-    const path = await save({ defaultPath: suggestedName });
+    const path = await sdk.files.pickSave({ defaultPath: suggestedName });
     if (!path) return;
-    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-    await writeTextFile(path, text);
+    await sdk.files.writeText(path, text);
     return;
   }
 
@@ -147,6 +146,7 @@ export async function saveTextFile(suggestedName: string, text: string): Promise
 const FLUSH_BYTES = 4 * 1024 * 1024;
 
 export async function saveStreamedTextFile(
+  sdk: PluginSdk,
   suggestedName: string,
   chunks: Iterable<string>,
   opts: { extensions?: string[]; filterName?: string; onProgress?: (bytes: number) => void } = {},
@@ -154,13 +154,11 @@ export async function saveStreamedTextFile(
   const { extensions, filterName = 'File', onProgress } = opts;
 
   if (isTauri) {
-    const { save } = await import('@tauri-apps/plugin-dialog');
-    const path = await save({
+    const path = await sdk.files.pickSave({
       defaultPath: suggestedName,
       filters: extensions ? [{ name: filterName, extensions }] : undefined,
     });
     if (!path) return false;
-    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
 
     let buffer: string[] = [];
     let buffered = 0;
@@ -174,7 +172,7 @@ export async function saveStreamedTextFile(
       const text = buffer.join('');
       buffer = [];
       buffered = 0;
-      await writeTextFile(path, text, started ? { append: true } : undefined);
+      await sdk.files.writeText(path, text, started ? { append: true } : undefined);
       started = true;
       written += text.length;
       onProgress?.(written);
@@ -187,7 +185,7 @@ export async function saveStreamedTextFile(
     }
     await flush();
     // An export with no chunks at all still has to create the file.
-    if (!started) await writeTextFile(path, '');
+    if (!started) await sdk.files.writeText(path, '');
     return true;
   }
 
@@ -218,17 +216,15 @@ export async function saveStreamedTextFile(
 
 // Save raw bytes (given as base64) to a file the user picks. Used for binary
 // responses — images, PDFs, archives — where the text path would corrupt them.
-export async function saveBinaryFile(suggestedName: string, base64: string): Promise<void> {
+export async function saveBinaryFile(sdk: PluginSdk, suggestedName: string, base64: string): Promise<void> {
   const bin = atob(base64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
 
   if (isTauri) {
-    const { save } = await import('@tauri-apps/plugin-dialog');
-    const path = await save({ defaultPath: suggestedName });
+    const path = await sdk.files.pickSave({ defaultPath: suggestedName });
     if (!path) return;
-    const { writeFile } = await import('@tauri-apps/plugin-fs');
-    await writeFile(path, bytes);
+    await sdk.files.writeBytes(path, bytes);
     return;
   }
 

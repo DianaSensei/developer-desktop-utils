@@ -25,7 +25,8 @@ import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult } from './types';
 import { formatBytes, prettyBody, statusColor } from './request';
-import { saveBinaryFile, saveTextFile } from './fileio';
+import { saveBinaryFile, saveTextFile } from '@/lib/fileio';
+import { usePluginSdkFor } from '@/platform';
 import { queryJson } from './jsonpath';
 import { CodeViewer, type CodeViewerHandle } from '@/design-system';
 import type { RequestPanelTab } from './RequestPanel';
@@ -149,6 +150,7 @@ export function looksLikeCorsRejection(response: ApiResponse): boolean {
 }
 
 export function ResponsePanel({ response, sending, error, tests, logs, onClear, onJumpToTab, onJumpToSettings, request }: Props) {
+  const sdk = usePluginSdkFor('api-client');
   const [tab, setTab] = useState<Tab>('body');
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -240,10 +242,10 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
     // Binary payloads are saved from the preserved bytes; writing the decoded
     // text would hand back a file full of replacement characters.
     if (response.binary && response.bodyBase64) {
-      await saveBinaryFile(suggestedFileName(response), response.bodyBase64);
+      await saveBinaryFile(sdk, suggestedFileName(response), response.bodyBase64);
       return;
     }
-    await saveTextFile(suggestedFileName(response), response.body);
+    await saveTextFile(sdk, suggestedFileName(response), response.body);
   }, [response]);
 
   // Nothing has happened yet on this tab — show the keyboard-shortcut splash.

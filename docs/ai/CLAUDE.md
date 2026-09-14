@@ -347,11 +347,16 @@ plugin runs in the app's own realm. Two rules are enforced at load time:
 | Permission | Channel it unlocks |
 |---|---|
 | `storage` | `sdk.storage.*` — namespaced `devtool:<id>:`, synchronous |
-| `secrets` | `sdk.secrets.*` — the **separate** secret vault, async. Use for anything credential-shaped (tokens, seeds, passwords), never `storage` |
-| `clipboard:read` / `clipboard:write` | `sdk.clipboard.*` (separate on purpose) |
+| `secrets` | `sdk.secrets.*` — the **separate** encrypted vault, async. Use for anything credential-shaped (tokens, seeds, passwords), never `storage` |
+| `clipboard:read` / `clipboard:write` | `sdk.clipboard.readText/readImage` · `writeText/writeImage` (split on purpose) |
+| `files:read` / `files:write` | `sdk.files.pickOpen/readText/readBytes` · `pickSave/writeText/writeBytes` (split for the same reason: importing a file must not imply overwriting one) |
+| `open-url` | `sdk.openExternal(url)` — hand a URL to the user's browser |
 | `http` | `sdk.http.fetch` — outbound network, restricted to `hosts` |
-| `native` | `sdk.native.invoke` — Tauri commands within `commands` |
+| `native` | `sdk.native.invoke` (within `commands`), `sdk.native.channel` (streaming), `sdk.native.listen` (Rust events) |
 | `service` | `sdk.service.call` — the plugin's own sidecar process (tier B), methods within `service.methods` |
+
+`sdk.env` (`isTauri`, `isMac`, `modKey`) needs no permission — it says nothing
+`navigator.userAgent` doesn't already.
 
 ### Using the SDK from inside a plugin
 

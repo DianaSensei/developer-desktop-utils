@@ -1,10 +1,15 @@
-import { copyToClipboard, readTextFromClipboard } from '@/lib/clipboard';
+import {
+  copyImageToClipboard,
+  copyToClipboard,
+  readImageFromClipboard,
+  readTextFromClipboard,
+} from '@/lib/clipboard';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
 import { createPluginService, type PluginService } from './service';
 import { hostAllowed } from './manifest';
 import type { Channel } from '@tauri-apps/api/core';
-import { isTauri } from '@/lib/platform';
+import { IS_MAC, MOD_KEY, isTauri } from '@/lib/platform';
 import * as audit from './audit';
 import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
 
@@ -75,15 +80,50 @@ export interface PluginSecrets {
   keys(): Promise<string[]>;
 }
 
+/** Thông tin môi trường mà tool nào cũng hỏi. Chỉ đọc, không có quyền nào gác:
+ *  nó không tiết lộ gì mà `navigator.userAgent` không nói sẵn. */
+export interface PluginEnv {
+  /** Đang chạy trong webview của Tauri, không phải trình duyệt thường. */
+  readonly isTauri: boolean;
+  readonly isMac: boolean;
+  /** Phím lệnh theo hệ điều hành, để hiển thị phím tắt: '⌘' hoặc 'Ctrl'. */
+  readonly modKey: string;
+}
+
+export interface PluginFileFilter {
+  name: string;
+  /** Đuôi file, KHÔNG kèm dấu chấm: ['json', 'yaml']. */
+  extensions: string[];
+}
+
+export interface PluginFiles {
+  /** Hộp thoại mở file của hệ điều hành. `null` khi người dùng huỷ. */
+  pickOpen(options?: { title?: string; multiple?: boolean; filters?: PluginFileFilter[] }): Promise<string[] | null>;
+  /** Hộp thoại lưu file. `null` khi người dùng huỷ. */
+  pickSave(options?: { title?: string; defaultPath?: string; filters?: PluginFileFilter[] }): Promise<string | null>;
+  readText(path: string): Promise<string>;
+  /** `append` để ghi nối, dùng cho export lớn ghi theo từng khối. */
+  writeText(path: string, contents: string, options?: { append?: boolean }): Promise<void>;
+  readBytes(path: string): Promise<Uint8Array>;
+  writeBytes(path: string, data: Uint8Array): Promise<void>;
+}
+
 export interface PluginSdk {
   readonly id: string;
   readonly sdkVersion: string;
   readonly permissions: readonly PluginPermission[];
+  readonly env: PluginEnv;
+  files: PluginFiles;
+  /** Mở URL bằng trình duyệt mặc định của người dùng. */
+  openExternal(url: string): Promise<void>;
   storage: PluginStorage;
   secrets: PluginSecrets;
   clipboard: {
     readText(): Promise<string | null>;
     writeText(text: string): Promise<void>;
+    /** Ảnh trong clipboard dưới dạng data URL PNG, `null` khi không có ảnh. */
+    readImage(): Promise<string | null>;
+    writeImage(source: Blob | string): Promise<void>;
   };
   /** `fetch` tương thích chuẩn, đi qua tauri-plugin-http khi chạy trong app. */
   http: { fetch(input: string, init?: RequestInit): Promise<Response> };
@@ -101,6 +141,11 @@ export interface PluginSdk {
      * cách duy nhất để đọc log biết luồng này của thứ gì.
      */
     channel<T>(onMessage: (message: T) => void, label?: string): Promise<Channel<T>>;
+    /**
+     * Nghe một sự kiện phát từ phía Rust. Trả về hàm huỷ đăng ký — plugin PHẢI
+     * gọi nó lúc unmount, đúng như mọi listener khác trong repo này.
+     */
+    listen<T>(event: string, handler: (payload: T) => void): Promise<() => void>;
   };
   /** Tier B: gọi sidecar của plugin. Xem `service.ts`. */
   service: PluginService;
@@ -142,6 +187,7 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
     id,
     sdkVersion: SDK_VERSION,
     permissions: manifest.permissions ?? [],
+    env: { isTauri, isMac: IS_MAC, modKey: MOD_KEY },
 
     storage: {
       key: (key) => storageKey(id, key),
@@ -189,6 +235,66 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
         ensure(manifest, 'clipboard:write', 'clipboard', 'writeText', `${text.length} ký tự`);
         return copyToClipboard(text);
       },
+      async readImage() {
+        ensure(manifest, 'clipboard:read', 'clipboard', 'readImage');
+        return readImageFromClipboard();
+      },
+      async writeImage(source) {
+        ensure(manifest, 'clipboard:write', 'clipboard', 'writeImage');
+        return copyImageToClipboard(source);
+      },
+    },
+
+    // Đọc và ghi file tách thành hai quyền, cùng lý do như clipboard: một tool
+    // chỉ cần nhập file (API Client import collection) không nên vì thế mà có
+    // luôn quyền ghi đè lên bất cứ file nào người dùng chọn.
+    files: {
+      async pickOpen(options) {
+        ensure(manifest, 'files:read', 'files', 'pickOpen', options?.title);
+        const { open } = await import('@tauri-apps/plugin-dialog');
+        const picked = await open({
+          title: options?.title,
+          multiple: options?.multiple ?? false,
+          filters: options?.filters,
+        });
+        if (picked === null) return null;
+        return Array.isArray(picked) ? picked : [picked];
+      },
+      async pickSave(options) {
+        ensure(manifest, 'files:write', 'files', 'pickSave', options?.title);
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        return (await save({
+          title: options?.title,
+          defaultPath: options?.defaultPath,
+          filters: options?.filters,
+        })) ?? null;
+      },
+      async readText(path) {
+        ensure(manifest, 'files:read', 'files', 'readText', audit.describePath(path));
+        const { readTextFile } = await import('@tauri-apps/plugin-fs');
+        return readTextFile(path);
+      },
+      async writeText(path, contents, options) {
+        ensure(manifest, 'files:write', 'files', 'writeText', audit.describePath(path));
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        return writeTextFile(path, contents, options?.append ? { append: true } : undefined);
+      },
+      async readBytes(path) {
+        ensure(manifest, 'files:read', 'files', 'readBytes', audit.describePath(path));
+        const { readFile } = await import('@tauri-apps/plugin-fs');
+        return readFile(path);
+      },
+      async writeBytes(path, data) {
+        ensure(manifest, 'files:write', 'files', 'writeBytes', audit.describePath(path));
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        return writeFile(path, data);
+      },
+    },
+
+    async openExternal(url) {
+      ensure(manifest, 'open-url', 'shell', 'openExternal', audit.describeUrl(url));
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+      return openUrl(url);
     },
 
     http: {
@@ -234,6 +340,12 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
         if (!allowed) throw new PluginCommandError(id, command);
         const { invoke } = await import('@tauri-apps/api/core');
         return invoke<T>(command, args);
+      },
+
+      async listen<T>(event: string, handler: (payload: T) => void): Promise<() => void> {
+        ensure(manifest, 'native', 'native', `listen:${event}`);
+        const { listen } = await import('@tauri-apps/api/event');
+        return listen<T>(event, (e) => handler(e.payload));
       },
 
       async channel<T>(onMessage: (message: T) => void, label?: string): Promise<Channel<T>> {

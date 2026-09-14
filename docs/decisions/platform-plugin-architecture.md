@@ -289,6 +289,50 @@ tool có luồng dữ liệu **buộc** phải import thẳng `@tauri-apps/api/c
 muốn chuyển hay không — tức bốn tool nặng nhất vĩnh viễn nằm ngoài lớp
 quyền/audit, và ratchet không bao giờ về 0 được dù có cố.
 
+### SDK đầy đủ — bề mặt dựng theo nhu cầu thật, không theo suy đoán
+
+Bề mặt SDK được chốt bằng cách **đếm xem các tool đang thực sự với ra ngoài
+những gì**, không phải liệt kê thứ nghe hợp lý:
+
+| Nhu cầu thật (số chỗ dùng) | Kênh SDK |
+|---|---|
+| `usePersistentState` (43) | `sdk.storage` |
+| clipboard text + ảnh (28) | `sdk.clipboard.readText/writeText/readImage/writeImage` |
+| `lib/platform` — isTauri/IS_MAC/MOD_KEY (18) | `sdk.env` |
+| `invoke` + `Channel` + `api/event` (17) | `sdk.native.invoke/channel/listen` |
+| dialog + fs (20) | `sdk.files.*` |
+| `plugin-http` (2) | `sdk.http.fetch` + allowlist `hosts` |
+| `plugin-opener` (1) | `sdk.openExternal` |
+
+Đọc và ghi luôn tách đôi quyền — clipboard cũng như file — vì cùng một lý do:
+một tool chỉ cần **nhập** file (API Client import collection) không nên vì thế mà
+có luôn quyền **ghi đè** lên bất cứ file nào người dùng chọn.
+
+Nhật ký chỉ ghi **tên file**, không ghi đường dẫn: đường dẫn đầy đủ chứa tên thư
+mục home, tức tên tài khoản của người dùng — thứ không cần có trong log để trả
+lời câu hỏi "plugin này đọc/ghi file gì".
+
+### Rào chắn từng đo thiếu — và con số thật
+
+Bản guard đầu chỉ đếm `from '@tauri-apps/…'`. Nó **bỏ sót
+`await import('@tauri-apps/…')`** — mà repo này cố tình dùng dynamic import để
+giữ bundle gọn, nên dạng động mới là dạng phổ biến. Con số 12 vì thế là sai; số
+thật là **53**.
+
+Một rào chắn đo thiếu còn tệ hơn không có rào chắn, vì con số của nó trông như
+đã sạch. Phép đo đã sửa, và cùng lúc đó đợt chuyển sang SDK (fileio, QR Code,
+Time Tracker export) hạ 53 → **34**. Ngưỡng trong `baseline.json` tăng từ 12 lên
+34 là do **phép đo đúng lên**, không phải do code xấu đi — ghi rõ trong `notes`
+của chính file đó để người đọc sau không hiểu nhầm.
+
+### `fileio` ra khỏi thư mục của một plugin
+
+`tools/apiclient/fileio.ts` được **bốn plugin khác nhau** dùng (API Client, Data
+Converter, Generator, Containers) — một quan hệ phụ thuộc chéo giữa các plugin mà
+nhìn cây thư mục không thấy. Nó chuyển sang `src/lib/fileio.ts`, và mọi hàm nhận
+`sdk` của plugin gọi nó thay vì tự lấy: quyền file phải quy về **đúng** plugin
+đang yêu cầu, và nhật ký cũng phải ghi tên plugin đó.
+
 ## Không làm (và vì sao)
 
 - **Nạp plugin lúc chạy từ repo khác.** Cần thêm: định dạng gói đã ký (tái dụng

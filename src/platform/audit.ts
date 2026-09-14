@@ -19,6 +19,8 @@ export type AuditChannel =
   | 'storage'
   | 'secrets'
   | 'clipboard'
+  | 'files'
+  | 'shell'
   | 'http'
   | 'native'
   | 'service'
@@ -84,6 +86,16 @@ export function clear(): void {
  * webview sẽ ghi vào nhật ký một host mà plugin chưa từng gọi tới — sai lệch
  * đúng ở nơi nhật ký cần chính xác nhất.
  */
+/**
+ * Chỉ lấy TÊN FILE cho nhật ký, bỏ toàn bộ đường dẫn. Đường dẫn đầy đủ chứa tên
+ * thư mục home, tức tên tài khoản của người dùng — thứ không cần có trong log để
+ * trả lời câu hỏi "plugin này đọc/ghi file gì".
+ */
+export function describePath(path: string): string {
+  const name = path.split(/[\\/]/).pop();
+  return name && name.length > 0 ? name : '<đường dẫn rỗng>';
+}
+
 export function describeUrl(url: string): string {
   try {
     const u = new URL(url);

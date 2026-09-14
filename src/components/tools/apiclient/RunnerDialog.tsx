@@ -41,7 +41,8 @@ import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table'
 import { methodColor } from './method-color';
 import { formatBytes, statusColor, substituteVars } from './request';
 import { ResponsePanel } from './ResponsePanel';
-import { pickDataFile, saveStreamedTextFile } from './fileio';
+import { pickDataFile, saveStreamedTextFile } from '@/lib/fileio';
+import { usePluginSdkFor } from '@/platform';
 import { DELIMITER_LABEL, type DataRow, type ParsedDataFile, parseDataFileAsync } from './datafile';
 import { type ColumnMapping, collectVarTokens, mapColumns, missingColumns } from './varUsage';
 import type { ExecResult } from './engine';
@@ -94,6 +95,7 @@ const ITER_ROW_H_DATA = 48;
 const EMPTY_RECORDS: RunRecord[] = [];
 
 export function RunnerDialog({ title, requests, runRequest, knownVars = [], environments, defaultEnvId, open, onClose }: Props) {
+  const sdk = usePluginSdkFor('api-client');
   const [phase, setPhase] = useState<'setup' | 'results'>('setup');
 
   // Run order (reorderable) and selection.
@@ -603,6 +605,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
     };
     const suffix = scope === 'failed' ? '.failures' : '';
     await saveStreamedTextFile(
+      sdk,
       `${fileBase()}.run-results${suffix}.json`,
       jsonReportChunks(head, records),
       { extensions: ['json'], filterName: 'JSON' },
@@ -621,6 +624,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
   const exportResultsCsv = async (scope: ExportScope) => {
     const suffix = scope === 'failed' ? '.failures' : '';
     return saveStreamedTextFile(
+      sdk,
       `${fileBase()}.run-results${suffix}.csv`,
       csvChunks(exportRecords(scope), dataFile?.parsed.columns ?? []),
       { extensions: ['csv'], filterName: 'CSV' },

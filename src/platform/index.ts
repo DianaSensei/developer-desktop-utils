@@ -17,7 +17,14 @@ export {
   getPlugin,
 } from './registry';
 export { createPluginSdk, storageKey, PluginPermissionError, PluginCommandError, PluginHostError } from './sdk';
-export type { PluginSdk, PluginStorage, PluginSecrets } from './sdk';
+export type {
+  PluginSdk,
+  PluginStorage,
+  PluginSecrets,
+  PluginEnv,
+  PluginFiles,
+  PluginFileFilter,
+} from './sdk';
 export {
   clearSecrets,
   flushSecrets,

@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Spinner } from '@/components/ui/spinner';
-import { saveTextFile } from '@/components/tools/apiclient/fileio';
+import { saveTextFile } from '@/lib/fileio';
+import { usePluginSdkFor } from '@/platform';
 import { MOD_KEY } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 import type { LogLine } from './types';
@@ -117,6 +118,7 @@ export function LogsPanel({ start, stop, name }: {
   /** Used for the exported file name — e.g. `api-1` → `api-1-logs.log`. */
   name?: string;
 }) {
+  const sdk = usePluginSdkFor('container-manager');
   const [tail, setTail] = useState<string>('500');
   // Mốc thời gian giữ ở epoch-ms | null (null = không giới hạn) thay cho chuỗi
   // "yyyy-MM-ddTHH:mm" của <input type="datetime-local"> đã bỏ — xem khối
@@ -442,7 +444,7 @@ export function LogsPanel({ start, stop, name }: {
           />
           <LogToggleButton
             active={false}
-            onClick={() => void saveTextFile(`${name ?? 'container'}-logs.log`, exportText())}
+            onClick={() => void saveTextFile(sdk, `${name ?? 'container'}-logs.log`, exportText())}
             title="Save the lines currently shown to a file"
           >
             <Download className="h-3.5 w-3.5" /> Save

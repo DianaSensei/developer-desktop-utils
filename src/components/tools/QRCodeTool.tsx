@@ -10,6 +10,7 @@ import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Exter
 import { Spinner } from '@/components/ui/spinner';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, type PluginSdk } from '@/platform';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
@@ -242,18 +243,19 @@ async function renderToCanvas(opts: RenderOpts): Promise<HTMLCanvasElement | nul
 
 // ── File & clipboard helpers ──────────────────────────────────────────────────
 
-async function downloadPng(canvas: HTMLCanvasElement) {
+async function downloadPng(sdk: PluginSdk, canvas: HTMLCanvasElement) {
   const dataUrl = canvas.toDataURL('image/png');
   if (isTauri) {
-    const { save }      = await import('@tauri-apps/plugin-dialog');
-    const { writeFile } = await import('@tauri-apps/plugin-fs');
-    const path = await save({ filters: [{ name: 'PNG Image', extensions: ['png'] }], defaultPath: 'qrcode.png' });
+    const path = await sdk.files.pickSave({
+      filters: [{ name: 'PNG Image', extensions: ['png'] }],
+      defaultPath: 'qrcode.png',
+    });
     if (!path) return;
     const base64 = dataUrl.split(',')[1];
     const binary = atob(base64);
     const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    await writeFile(path, bytes);
+    await sdk.files.writeBytes(path, bytes);
   } else {
     const a = document.createElement('a');
     a.href = dataUrl;
@@ -264,16 +266,17 @@ async function downloadPng(canvas: HTMLCanvasElement) {
   }
 }
 
-async function pickImageFile(): Promise<{ dataUrl: string; img: HTMLImageElement } | null> {
+async function pickImageFile(sdk: PluginSdk): Promise<{ dataUrl: string; img: HTMLImageElement } | null> {
   let dataUrl = '';
   if (isTauri) {
-    const { open }      = await import('@tauri-apps/plugin-dialog');
-    const { readFile }  = await import('@tauri-apps/plugin-fs');
-    const selected = await open({ filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
-    if (!selected || Array.isArray(selected)) return null;
-    const bytes  = await readFile(selected as string);
+    const picked = await sdk.files.pickOpen({
+      filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+    });
+    const selected = picked?.[0];
+    if (!selected) return null;
+    const bytes  = await sdk.files.readBytes(selected);
     const base64 = btoa(String.fromCharCode(...bytes));
-    const ext    = (selected as string).split('.').pop()?.toLowerCase() ?? 'png';
+    const ext    = selected.split('.').pop()?.toLowerCase() ?? 'png';
     dataUrl = `data:image/${ext};base64,${base64}`;
   } else {
     dataUrl = await new Promise((resolve) => {
@@ -315,6 +318,7 @@ const LOGO_PRESETS: Array<{ value: LogoPreset; display: string }> = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 function QrGenerator() {
+  const sdk = usePluginSdkFor('qrcode');
   const { config } = useAppConfig();
   const [text,        setText]        = usePersistentState('devtool:qrcode:text',        '');
   const [darkColor,   setDarkColor]   = usePersistentState('devtool:qrcode:dark',        '#000000');
@@ -352,7 +356,7 @@ function QrGenerator() {
 
   const handleUpload = async () => {
     try {
-      const result = await pickImageFile();
+      const result = await pickImageFile(sdk);
       if (!result) return;
       customImageRef.current = result.img;
       setCustomImageUrl(result.dataUrl);
@@ -487,7 +491,7 @@ function QrGenerator() {
                 {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
                 {copied ? 'Copied!' : 'Copy Image'}
               </Button>
-              <Button onClick={() => canvasRef.current && downloadPng(canvasRef.current)} variant="outline" className="flex-1">
+              <Button onClick={() => canvasRef.current && downloadPng(sdk, canvasRef.current)} variant="outline" className="flex-1">
                 <Download className="h-4 w-4 mr-2" />
                 Download PNG
               </Button>
@@ -515,6 +519,7 @@ async function decodeQrFromImage(img: HTMLImageElement): Promise<string | null> 
 }
 
 function QrReader() {
+  const sdk = usePluginSdkFor('qrcode');
   const [imageUrl, setImageUrl] = useState('');
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
@@ -541,7 +546,7 @@ function QrReader() {
 
   const handleUpload = async () => {
     try {
-      const r = await pickImageFile();
+      const r = await pickImageFile(sdk);
       if (!r) return;
       await run(r.img, r.dataUrl);
     } catch {
@@ -600,8 +605,7 @@ function QrReader() {
   const openLink = async () => {
     const url = result.trim();
     if (isTauri) {
-      const { openUrl } = await import('@tauri-apps/plugin-opener');
-      await openUrl(url);
+      await sdk.openExternal(url);
     } else {
       window.open(url, '_blank', 'noopener');
     }

@@ -11,7 +11,8 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { ExplainBand } from '@/components/ui/explain-band';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CodeViewer, JsonEditor, TextEditor } from '@/design-system';
-import { saveTextFile } from '@/components/tools/apiclient/fileio';
+import { saveTextFile } from '@/lib/fileio';
+import { usePluginSdkFor } from '@/platform';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
@@ -104,6 +105,7 @@ function errMessage(e: unknown): string {
 }
 
 export function DataConverter() {
+  const sdk = usePluginSdkFor('data-converter');
   const [from, setFrom] = usePersistentState<Format>('devtool:dataConverter:from', 'json');
   const [to, setTo] = usePersistentState<Format>('devtool:dataConverter:to', 'yaml');
   const [input, setInput] = usePersistentState('devtool:dataConverter:input', '');
@@ -157,7 +159,7 @@ export function DataConverter() {
   const handleDownload = () => {
     if (!output) return;
     const ext = FORMATS.find((f) => f.value === to)?.ext ?? 'txt';
-    void saveTextFile(`converted.${ext}`, output);
+    void saveTextFile(sdk, `converted.${ext}`, output);
   };
 
   const showXmlOpts = to === 'xml';
