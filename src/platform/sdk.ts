@@ -1,5 +1,6 @@
 import { copyToClipboard, readTextFromClipboard } from '@/lib/clipboard';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
+import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
 import { isTauri } from '@/lib/platform';
 import * as audit from './audit';
 import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
@@ -49,11 +50,24 @@ export interface PluginStorage {
   key(key: string): string;
 }
 
+/**
+ * Kho bí mật của plugin. Bất đồng bộ, khác hẳn `storage` đồng bộ ở trên — và đó
+ * là chủ ý: nó nằm ở một file riêng, ngoài cache trong RAM mà mọi module đọc
+ * được. Chấp nhận `await` chính là cái giá của việc tách mặt phẳng khoá.
+ */
+export interface PluginSecrets {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  delete(key: string): Promise<void>;
+  keys(): Promise<string[]>;
+}
+
 export interface PluginSdk {
   readonly id: string;
   readonly sdkVersion: string;
   readonly permissions: readonly PluginPermission[];
   storage: PluginStorage;
+  secrets: PluginSecrets;
   clipboard: {
     readText(): Promise<string | null>;
     writeText(text: string): Promise<void>;
@@ -113,6 +127,27 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
       remove(key) {
         ensure(manifest, 'storage', 'storage', 'remove', key);
         storageRemove(storageKey(id, key));
+      },
+    },
+
+    // Audit của kênh này chỉ ghi TÊN khoá, không bao giờ ghi giá trị — một
+    // nhật ký làm rò seed TOTP thì tệ hơn hẳn việc không có nhật ký.
+    secrets: {
+      async get(key) {
+        ensure(manifest, 'secrets', 'secrets', 'get', key);
+        return secretGet(id, key);
+      },
+      async set(key, value) {
+        ensure(manifest, 'secrets', 'secrets', 'set', key);
+        return secretSet(id, key, value);
+      },
+      async delete(key) {
+        ensure(manifest, 'secrets', 'secrets', 'delete', key);
+        return secretDelete(id, key);
+      },
+      async keys() {
+        ensure(manifest, 'secrets', 'secrets', 'keys');
+        return secretKeys(id);
       },
     },
 

@@ -4,6 +4,7 @@ import { definePlugin } from '@/platform/manifest';
 import { PluginCommandError, PluginPermissionError, createPluginSdk, storageKey } from '@/platform/sdk';
 import * as audit from '@/platform/audit';
 import { storageGet, storageRemove } from '@/lib/persistentStore';
+import { clearSecrets, secretGet } from '@/platform/secrets';
 import type { PluginManifest, PluginPermission } from '@/platform/types';
 
 vi.mock('@/lib/clipboard', () => ({
@@ -52,6 +53,30 @@ describe('storage', () => {
     const sdk = createPluginSdk(plugin([]));
     expect(() => sdk.storage.set('k', 'v')).toThrow(PluginPermissionError);
     expect(storageGet('devtool:demo:k')).toBeNull();
+  });
+});
+
+describe('secrets', () => {
+  it('không khai quyền thì ném, và không ghi gì vào kho', async () => {
+    const sdk = createPluginSdk(plugin([]));
+    await expect(sdk.secrets.set('k', 'v')).rejects.toThrow(PluginPermissionError);
+    await expect(sdk.secrets.get('k')).rejects.toThrow(PluginPermissionError);
+    expect(await secretGet('demo', 'k')).toBeNull();
+  });
+
+  it('có quyền thì ghi/đọc được, và giá trị KHÔNG lọt vào nhật ký', async () => {
+    const sdk = createPluginSdk(plugin(['secrets']));
+    await sdk.secrets.set('accounts', 'JBSWY3DPEHPK3PXP');
+    expect(await sdk.secrets.get('accounts')).toBe('JBSWY3DPEHPK3PXP');
+
+    // Nhật ký chỉ được nêu TÊN khoá. Một audit log làm rò seed TOTP còn tệ
+    // hơn là không có audit log.
+    const entries = audit.recent().filter((e) => e.channel === 'secrets');
+    expect(entries.length).toBeGreaterThan(0);
+    expect(JSON.stringify(entries)).not.toContain('JBSWY3DPEHPK3PXP');
+    expect(entries.some((e) => e.detail === 'accounts')).toBe(true);
+
+    await clearSecrets();
   });
 });
 

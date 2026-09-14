@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/2fa',
   order: 260,
   defaultEnabled: true,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write'],
+  permissions: ['secrets', 'clipboard:read', 'clipboard:write'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/TwoFactorAuth').then((m) => m.TwoFactorAuth),
 });

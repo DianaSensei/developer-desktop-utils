@@ -333,7 +333,8 @@ plugin runs in the app's own realm. Two rules are enforced at load time:
 
 | Permission | Channel it unlocks |
 |---|---|
-| `storage` | `sdk.storage.*` — namespaced `devtool:<id>:` |
+| `storage` | `sdk.storage.*` — namespaced `devtool:<id>:`, synchronous |
+| `secrets` | `sdk.secrets.*` — the **separate** secret vault, async. Use for anything credential-shaped (tokens, seeds, passwords), never `storage` |
 | `clipboard:read` / `clipboard:write` | `sdk.clipboard.*` (separate on purpose) |
 | `http` | `sdk.http.fetch` — outbound network |
 | `native` | `sdk.native.invoke` — Tauri commands within `commands` |
@@ -341,12 +342,22 @@ plugin runs in the app's own realm. Two rules are enforced at load time:
 ### Using the SDK from inside a plugin
 
 ```tsx
-import { usePluginSdk } from '@/platform';
+import { usePluginSdk, useSecretState } from '@/platform';
 
 const sdk = usePluginSdk();          // the SDK of THIS plugin — id is implicit
 sdk.storage.set('draft', value);     // → devtool:<id>:draft
 await sdk.http.fetch(url);           // throws unless 'http' is declared
+
+// Credentials go in the vault, never in storage. `ready` is not optional:
+// rendering an empty state before the async read lands looks like data loss,
+// and writing before it lands *is* data loss.
+const [accounts, setAccounts, ready] = useSecretState<Account[]>(sdk, 'accounts', []);
 ```
+
+**Never put a credential in `sdk.storage` / `usePersistentState`.** That keyspace is
+loaded whole into a synchronous in-memory cache at boot and any module can read any
+key from it. See `src/platform/secrets.ts` and the ADR for the full reasoning; add a
+row to `MIGRATIONS` there when moving an existing key into the vault.
 
 Existing tools still use `usePersistentState` / `@/lib/clipboard` directly and are
 not being rewritten; the SDK is for new code and for tools you already need to

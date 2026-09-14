@@ -13,6 +13,7 @@ export function definePlugin(manifest: PluginManifest): PluginManifest {
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VALID_PERMISSIONS: PluginPermission[] = [
   'storage',
+  'secrets',
   'clipboard:read',
   'clipboard:write',
   'http',

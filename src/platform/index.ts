@@ -17,7 +17,18 @@ export {
   getPlugin,
 } from './registry';
 export { createPluginSdk, storageKey, PluginPermissionError, PluginCommandError } from './sdk';
-export type { PluginSdk, PluginStorage } from './sdk';
+export type { PluginSdk, PluginStorage, PluginSecrets } from './sdk';
+export {
+  clearSecrets,
+  flushSecrets,
+  migrateSecretsFromSharedStore,
+  secretDelete,
+  secretGet,
+  secretKeys,
+  secretSet,
+  vaultKey,
+} from './secrets';
+export { useSecretState } from './useSecretState';
 export { PluginProvider, usePluginSdk, usePluginSdkOptional, withPluginSdk } from './context';
 export * as pluginAudit from './audit';
 export type { AuditChannel, AuditEntry } from './audit';

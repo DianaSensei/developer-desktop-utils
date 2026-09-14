@@ -109,6 +109,44 @@ lượng — cấu hình tệ nhất cho hot loop), `panic = "abort"` (panic tro
 giết cả app), thời gian build đã phải hạ xuống `lto = "thin"` vì cây phụ thuộc
 async, và crash driver GPU trong tiến trình sẽ kéo theo mọi consumer đang chạy.
 
+## Kho bí mật (`src/platform/secrets.ts`)
+
+`persistentStore` nạp **toàn bộ** `app-settings.json` vào một cache đồng bộ trong
+RAM lúc khởi động, và `storageGet(bấtKỳKhoáNào)` đọc được mọi thứ trong đó. Khi
+seed TOTP và token API cùng nằm trên mặt phẳng khoá ấy thì bất kỳ đoạn code nào
+trong webview — kể cả một dependency npm bị chiếm trong bundle của một plugin —
+cũng đọc được tất cả bằng đúng một lời gọi.
+
+Bí mật giờ nằm ở một kho riêng, truy cập qua `sdk.secrets` (quyền `secrets`),
+khoá dạng `<pluginId>/<key>`:
+
+| Môi trường | Nơi lưu | Vì sao |
+|---|---|---|
+| Tauri | file store riêng `secrets.json` | không bao giờ được đọc vào cache chung |
+| Web (`npm run dev`) | `sessionStorage` | `initPersistentStore()` ở bản web hút **nguyên `localStorage`** vào cache chung — lưu ở đó là đưa bí mật trở lại đúng mặt phẳng khoá vừa dọn. Đổi lại bản web chỉ giữ trong một phiên; sản phẩm thật luôn là Tauri |
+
+Ba quyết định đi kèm:
+
+- **Kho bất đồng bộ, khác hẳn `sdk.storage` đồng bộ.** Đó là cái giá của việc ra
+  khỏi cache trong RAM. `useSecretState` gói lại, và trả thêm cờ `ready`: thiếu
+  chốt đó, effect ghi của lần render đầu sẽ đẩy giá trị khởi tạo (mảng rỗng) đè
+  lên dữ liệu thật vừa đọc lên — người dùng mở app ra là mất sạch tài khoản.
+- **Di trú xoá nguồn, không dùng cờ "đã migrate".** Chép mà không xoá thì không
+  giải quyết được gì; còn một cờ đặt sai thời điểm sẽ biến sự cố giữa chừng
+  thành mất dữ liệu. Nguồn bị xoá nên chạy lại là no-op, chết giữa chừng thì lần
+  khởi động sau tự thử lại.
+- **Audit của kênh này chỉ ghi TÊN khoá, không bao giờ ghi giá trị.** Một nhật
+  ký làm rò seed TOTP thì tệ hơn hẳn việc không có nhật ký. Có test khoá lại.
+
+**Chưa mã hoá khi nằm trên đĩa.** Khoá mã hoá phải sống ở đâu đó, và chỗ duy nhất
+đáng tin là keychain của OS — cần một module Rust riêng (`keyring` + `aes-gcm`),
+kèm chính sách dự phòng cho Linux không có Secret Service. Đó là lát cắt riêng,
+có quyết định phụ thuộc riêng; việc tách mặt phẳng khoá ở đây độc lập với nó và
+phải đi trước.
+
+Mật khẩu broker (`kafka-brokers.json`, config Redis/RabbitMQ) đã nằm ở file
+riêng phía Rust từ trước, không đi qua store chung — nên không thuộc đợt này.
+
 ## Không làm (và vì sao)
 
 - **Nạp plugin lúc chạy từ repo khác.** Cần thêm: định dạng gói đã ký (tái dụng
@@ -125,10 +163,9 @@ async, và crash driver GPU trong tiến trình sẽ kéo theo mọi consumer đ
 
 ## Việc còn lại
 
-1. Tách credential ra khỏi store dùng chung. `devtool:2fa:accounts` (TOTP
-   secret), `devtool:apiclient:environments` (token), `kafka-brokers.json`
-   (`sasl_password`) đang nằm chung một mặt phẳng khoá mà mọi code trong webview
-   đọc được. Đây là điều kiện tiên quyết trước khi nạp bất cứ thứ gì lúc chạy.
+1. ~~Tách credential ra khỏi store dùng chung.~~ **Đã làm** — xem "Kho bí mật"
+   bên dưới. Còn hai lát cắt: mã hoá khi nằm trên đĩa (cần keychain OS → module
+   Rust), và chuyển `devtool:apiclient:environments` sang kho.
 2. Thu hẹp `http://**` + `https://**` trong `capabilities/default.json` theo
    allowlist gắn với quyền `http` của từng plugin.
 3. Guard test cấm `src/plugins/**` import trực tiếp `@tauri-apps/*` (theo mẫu

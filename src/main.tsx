@@ -45,6 +45,10 @@ import '@fontsource/fira-code/latin-600.css';
 import '@fontsource/fira-code/latin-700.css';
 import './styles/globals.css';
 import { clearPersistentStore, initPersistentStore } from './lib/persistentStore';
+// Nhập thẳng từ module kho, KHÔNG qua barrel '@/platform': barrel kéo theo
+// registry và toàn bộ manifest plugin vào đồ thị module chạy trước bootstrap,
+// đúng thứ ghi chú ở trên đang cố tránh.
+import { clearSecrets, migrateSecretsFromSharedStore } from './platform/secrets';
 import { applyAccentToDocument, getAccentPreference } from './lib/accentPreference';
 import { applyCornerToDocument, getCornerPreference } from './lib/cornerPreference';
 import { applyFontToDocument, getFontPreference } from './lib/fontPreference';
@@ -66,7 +70,16 @@ async function bootstrap() {
   // builds (import.meta.env.DEV is false), and skipped on the web dev server.
   if (import.meta.env.DEV && isTauri) {
     await clearPersistentStore();
+    // Kho bí mật là file riêng nên `clearPersistentStore()` không chạm tới:
+    // thiếu dòng này, "chạy dev từ trạng thái sạch" vẫn còn nguyên seed 2FA cũ.
+    await clearSecrets();
   }
+
+  // Dời bí mật ra khỏi mặt phẳng khoá dùng chung. Phải chạy SAU
+  // `initPersistentStore()` (nguồn đọc từ cache của nó) và TRƯỚC khi nạp App —
+  // nếu không, tool đọc bí mật có thể mount trước lúc dữ liệu kịp sang kho và
+  // hiển thị trạng thái rỗng cho tới lần mở app sau.
+  await migrateSecretsFromSharedStore();
 
   // Áp dụng tone chủ đạo TRƯỚC lần vẽ đầu tiên — nếu không, người dùng đã chọn
   // teal sẽ thấy đúng một khung hình azure mặc định trước khi kịp đổi.
