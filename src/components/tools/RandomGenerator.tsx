@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
+import { usePluginConfig } from '@/platform';
 import { Input } from '@/components/ui/input';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { RefreshCw } from 'lucide-react';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useAppConfig } from '@/contexts/AppConfigContext';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { randomInt, randomString, randomUnitFloat } from '@/lib/secureRandom';
@@ -63,7 +63,7 @@ function ResultList({ items }: { items: string[] }) {
 }
 
 export function RandomGenerator() {
-  const { config } = useAppConfig();
+  const config = usePluginConfig();
   const { maxNumberCount, maxTextCount, maxTextLength } = config.generator;
   const [mode, setMode] = usePersistentState<Mode>('devtool:gen:mode', 'uuid');
   const [count, setCount] = usePersistentState('devtool:gen:count', 1);

@@ -10,8 +10,7 @@ import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Exter
 import { Spinner } from '@/components/ui/spinner';
 import QRCode from 'qrcode';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { usePluginSdkFor, type PluginSdk } from '@/platform';
-import { useAppConfig } from '@/contexts/AppConfigContext';
+import { type PluginSdk, usePluginConfig, usePluginSdkFor } from '@/platform';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
 import { useImagePaste } from '@/hooks/useImagePaste';
@@ -319,7 +318,7 @@ const LOGO_PRESETS: Array<{ value: LogoPreset; display: string }> = [
 
 function QrGenerator() {
   const sdk = usePluginSdkFor('qrcode');
-  const { config } = useAppConfig();
+  const config = usePluginConfig();
   const [text,        setText]        = usePersistentState('devtool:qrcode:text',        '');
   const [darkColor,   setDarkColor]   = usePersistentState('devtool:qrcode:dark',        '#000000');
   const [lightColor,  setLightColor]  = usePersistentState('devtool:qrcode:light',       '#FFFFFF');

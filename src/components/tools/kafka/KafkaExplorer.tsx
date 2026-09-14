@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
 import { Server, Info, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
@@ -14,11 +15,8 @@ import { KafkaInfoModal } from './KafkaInfoModal';
 import { ToolHeaderActions } from '@/components/ToolHeaderActions';
 import { useKafkaRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
-import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
-import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { kafkaApi } from './types';
 import { kafkaConsumerStore } from './kafkaConsumerStore';
-import { liveConnections } from '@/lib/liveConnections';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 
@@ -52,13 +50,13 @@ export function KafkaExplorer() {
     refresh,
   } = kafkaState;
 
-  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
-  const { enabled: mcpToolEnabled } = useMcpToolEnabled('kafka-explorer');
+  const sdk = usePluginSdkFor('kafka-explorer');
+  const mcpBridgeActive = usePluginMcpBridgeActive(sdk);
   // Skipped while the background bridge (Settings → MCP) is on — that one
   // instance, mounted once at the app root, already answers for this exact
   // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
   // Also skipped outright when the per-tool MCP toggle is off for Kafka Explorer.
-  useMcpBridge(kafkaState, mcpToolEnabled && !mcpBackgroundEnabled);
+  useMcpBridge(kafkaState, mcpBridgeActive);
 
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -88,7 +86,7 @@ export function KafkaExplorer() {
   }, [selectedBrokerId, setConnectedBrokerId]);
 
   // Surface the live state to the app sidebar's connection indicator.
-  useEffect(() => { liveConnections.set('kafka-explorer', isConnected); }, [isConnected]);
+  useLiveConnection(sdk, isConnected);
 
   // Stop any realtime consumers when leaving the tool so nothing keeps running
   // in the background. They persist across view switches within the tool (the

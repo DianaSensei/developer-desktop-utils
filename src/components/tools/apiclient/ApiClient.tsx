@@ -7,6 +7,7 @@
 // export as Postman v2.1. Requests only fire when the user clicks Send.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePluginConfig, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
 import { Plus, Search, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -29,10 +30,7 @@ import { CookieManager } from './CookieManager';
 import { executeRequest, errToString } from './engine';
 import { useMcpBridge } from './mcpBridge';
 import { useApiClientRuntime } from './mcpRuntimeContext';
-import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
-import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
-import { useAppConfig } from '@/contexts/AppConfigContext';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 import { buildResolvedVars } from './vars';
 
@@ -52,9 +50,9 @@ const EMPTY_RUN: RunState = { response: null, error: null, sending: false, tests
 export function ApiClient() {
   const { store, runRequest, persistResult } = useApiClientRuntime();
   const { activeRequest } = store;
-  const { config } = useAppConfig();
-  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
-  const { enabled: mcpToolEnabled } = useMcpToolEnabled('api-client');
+  const config = usePluginConfig();
+  const sdk = usePluginSdkFor('api-client');
+  const mcpBridgeActive = usePluginMcpBridgeActive(sdk);
   // Read through a ref so the send/run callbacks don't churn when unrelated
   // config values change.
   const scriptTimeoutRef = useRef(config.apiClient.scriptTimeoutMs);
@@ -196,7 +194,7 @@ export function ApiClient() {
   // this store regardless of which tool is on screen — listening here too
   // would double-answer the same `mcp:call` event. Also skipped outright
   // when the per-tool MCP toggle (Settings → MCP) is off for API Client.
-  useMcpBridge(store, runRequest, mcpToolEnabled && !mcpBackgroundEnabled);
+  useMcpBridge(store, runRequest, mcpBridgeActive);
 
   const send = useCallback(async () => {
     if (!activeRequest) return;

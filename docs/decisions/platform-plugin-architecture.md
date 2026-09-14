@@ -312,6 +312,29 @@ Nhật ký chỉ ghi **tên file**, không ghi đường dẫn: đường dẫn 
 mục home, tức tên tài khoản của người dùng — thứ không cần có trong log để trả
 lời câu hỏi "plugin này đọc/ghi file gì".
 
+### Dịch vụ platform có hình dạng React
+
+Ba thứ nữa là dịch vụ của Platform nhưng không thể nằm trong object `sdk`, vì
+hook không thể là thuộc tính của một object thường: `usePluginConfig()`,
+`useLiveConnection(sdk, connected)`, `usePluginMcpBridgeActive(sdk)`. Chúng nằm ở
+`platform/services.ts` và xuất qua cùng một cửa `@/platform` — plugin không phải
+nhớ cái nào ở `contexts/`, cái nào ở `hooks/`, cái nào ở `lib/`.
+
+Hai chi tiết đáng giữ lại vì chúng là nơi dễ sai:
+
+- `useLiveConnection` **cố ý không dọn cờ lúc unmount**. Kết nối sống ở phía
+  Rust, không ở component — người dùng chuyển sang tool khác thì kết nối vẫn còn,
+  nên chấm live phải còn. Thêm cleanup "cho sạch" sẽ là báo sai.
+- `usePluginMcpBridgeActive` gộp ba điều kiện mà sáu tool trước đây tự ghép lại,
+  trong đó vế `&& !mcpBackgroundEnabled` là vế dễ sai nhất: khi bridge nền bật,
+  `McpBackgroundBridge` đã gắn bridge ở cấp app rồi, tool gắn thêm là đăng ký
+  trùng.
+
+Id lấy từ SDK thay vì chuỗi viết tay cũng xoá một lớp lỗi thật: năm chỗ gọi
+`liveConnections.set('redis-client', …)` cũ mang một literal có thể lệch khỏi id
+trong manifest, và khi lệch thì chấm live đơn giản là không bao giờ sáng — không
+có lỗi nào báo ra.
+
 ### Rào chắn từng đo thiếu — và con số thật
 
 Bản guard đầu chỉ đếm `from '@tauri-apps/…'`. Nó **bỏ sót

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
 import { Rabbit, Info, Plug } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
@@ -8,11 +9,8 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { rabbitApi, type RabbitConnection } from './types';
 import { rabbitMgmt } from './api';
-import { liveConnections } from '@/lib/liveConnections';
 import { useRabbitRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
-import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
-import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { LeftPanel } from './LeftPanel';
 import { OverviewView } from './OverviewView';
 import { ConnectionsView } from './ConnectionsView';
@@ -43,13 +41,13 @@ export function RabbitClient() {
     refreshKey, refresh,
   } = rabbitState;
 
-  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
-  const { enabled: mcpToolEnabled } = useMcpToolEnabled('rabbit-client');
+  const sdk = usePluginSdkFor('rabbit-client');
+  const mcpBridgeActive = usePluginMcpBridgeActive(sdk);
   // Skipped while the background bridge (Settings → MCP) is on — that one
   // instance, mounted once at the app root, already answers for this exact
   // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
   // Also skipped outright when the per-tool MCP toggle is off for RabbitMQ Client.
-  useMcpBridge(rabbitState, mcpToolEnabled && !mcpBackgroundEnabled);
+  useMcpBridge(rabbitState, mcpBridgeActive);
 
   const [connections, setConnections] = useState<RabbitConnection[]>(cachedConnections ?? []);
   const [connLoading, setConnLoading] = useState(cachedConnections === null);
@@ -74,7 +72,7 @@ export function RabbitClient() {
   const isConnected = !!conn && connectedConnId === conn.id;
 
   // Surface the live state to the app sidebar's connection indicator.
-  useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected]);
+  useLiveConnection(sdk, isConnected);
 
   // Connect = verify the broker is reachable (AMQP, plus the management API when
   // enabled), then mark this connection live. Only one connection is live at a

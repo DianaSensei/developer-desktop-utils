@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
 import { Container, Plug } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
@@ -6,11 +7,8 @@ import { Button } from '@/components/ui/button';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 import { containerApi, type ContainerConnection } from './types';
-import { liveConnections } from '@/lib/liveConnections';
 import { useContainerRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
-import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
-import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { LeftPanel } from './LeftPanel';
 import { OverviewView } from './OverviewView';
 import { ContainersView } from './ContainersView';
@@ -36,13 +34,13 @@ export function ContainerManager() {
     refreshKey, refresh,
   } = containerState;
 
-  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
-  const { enabled: mcpToolEnabled } = useMcpToolEnabled('container-manager');
+  const sdk = usePluginSdkFor('container-manager');
+  const mcpBridgeActive = usePluginMcpBridgeActive(sdk);
   // Skipped while the background bridge (Settings → MCP) is on — that one
   // instance, mounted once at the app root, already answers for this exact
   // state regardless of which tool is on screen (see mcpRuntimeContext.tsx).
   // Also skipped outright when the per-tool MCP toggle is off for Containers.
-  useMcpBridge(containerState, mcpToolEnabled && !mcpBackgroundEnabled);
+  useMcpBridge(containerState, mcpBridgeActive);
 
   const [connections, setConnections] = useState<ContainerConnection[]>(cachedConnections ?? []);
   const [connLoading, setConnLoading] = useState(cachedConnections === null);
@@ -61,7 +59,7 @@ export function ContainerManager() {
   const conn = connections.find((c) => c.id === selectedConnId) ?? null;
   const isConnected = !!conn && connectedConnId === conn.id;
 
-  useEffect(() => { liveConnections.set('container-manager', isConnected); }, [isConnected]);
+  useLiveConnection(sdk, isConnected);
 
   const handleConnect = useCallback(async () => {
     if (!conn) return;

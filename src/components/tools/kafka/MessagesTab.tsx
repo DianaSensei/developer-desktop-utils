@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { usePluginConfig } from '@/platform';
 import { AlertCircle, Search, X, ArrowUp, ArrowDown, ArrowUpDown, Regex, ChevronRight } from 'lucide-react';
 import { LoadingRow, Spinner } from '@/components/ui/spinner';
 import { SectionLabel } from '@/components/ui/section-label';
@@ -8,7 +9,6 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useAppConfig } from '@/contexts/AppConfigContext';
 import { kafkaApi, type KafkaMessage, type PartitionInfo } from './types';
 
 // Export helpers — bulk copy of the currently-shown messages.
@@ -366,7 +366,7 @@ function DetailPanel({ msg, defaultValueMode, onClose }: DetailPanelProps) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function MessagesTab({ brokerId, topic, partitions }: MessagesTabProps) {
-  const { config } = useAppConfig();
+  const config = usePluginConfig();
   const [defaultValueMode, setDefaultValueMode] = usePersistentState<ValueMode>(
     `devtool:kafka:${brokerId}:defaultValueMode`,
     'text',

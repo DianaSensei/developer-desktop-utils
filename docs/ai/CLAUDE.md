@@ -358,6 +358,15 @@ plugin runs in the app's own realm. Two rules are enforced at load time:
 `sdk.env` (`isTauri`, `isMac`, `modKey`) needs no permission — it says nothing
 `navigator.userAgent` doesn't already.
 
+**Platform services that are React-shaped** live next to the SDK and import from the
+same door, because a hook cannot be a property of a plain object:
+
+| Hook | What it gives you |
+|---|---|
+| `usePluginConfig()` | the app's tunables (read-only — users own them, plugins don't) |
+| `useLiveConnection(sdk, connected)` | the sidebar's live dot. Id comes from the SDK, not a hand-typed string. Deliberately does **not** clear on unmount: the connection lives in Rust, so the dot must survive navigating away |
+| `usePluginMcpBridgeActive(sdk)` | whether this component should mount its own MCP bridge — folds in "is an MCP tool", "tool switch on", and "background bridge off" (mounting both double-registers) |
+
 ### Using the SDK from inside a plugin
 
 ```tsx
