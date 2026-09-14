@@ -18,15 +18,24 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
-function seed(featureId: string, storageKey: string) {
+/**
+ * `legacyKey` tồn tại vì các tool đang chuyển dần sang khoá có namespace của
+ * Platform (`devtool:<pluginId>:*`). Hàm seed chạy lúc NẠP MODULE, trước khi
+ * component nào kịp mount và di trú khoá, nên nó phải đọc được cả hai: khoá mới
+ * cho lần khởi động sau khi đã di trú, khoá cũ cho lần đầu tiên sau khi nâng
+ * cấp. Chỉ đọc một khoá là chấm live sai đúng một lần chạy — kiểu lỗi không ai
+ * báo nhưng ai cũng thấy.
+ */
+function seed(featureId: string, storageKey: string, legacyKey?: string) {
   try {
     // usePersistentState stores JSON; a non-empty connected id means "connected".
-    if (JSON.parse(storageGet(storageKey) ?? '""')) live.add(featureId);
+    const raw = storageGet(storageKey) ?? (legacyKey ? storageGet(legacyKey) : null);
+    if (JSON.parse(raw ?? '""')) live.add(featureId);
   } catch { /* ignore */ }
 }
 seed('rabbit-client', 'devtool:rabbit:connectedConnId');
 seed('kafka-explorer', 'devtool:kafka:connectedBrokerId');
-seed('redis-client', 'devtool:redis:connectedConnId');
+seed('redis-client', 'devtool:redis-client:connectedConnId', 'devtool:redis:connectedConnId');
 snapshot = Array.from(live);
 
 export const liveConnections = {

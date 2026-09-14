@@ -1,13 +1,13 @@
 {
   "notes": {
     "directTauriInPluginCode": "Tool gọi thẳng @tauri-apps thay vì qua sdk.native/files/clipboard/http. Về 0 thì các quyền tương ứng chuyển từ mô tả sang thực thi. LƯU Ý con số: bản guard đầu chỉ đếm `from '@tauri-apps/…'` và bỏ sót `await import('@tauri-apps/…')` — dạng phổ biến hơn hẳn ở repo này. Sau khi sửa phép đo, số thật là 53; đợt chuyển fileio/QR/clockify sang SDK hạ xuống 34. Ngưỡng tăng so với 12 là do phép đo đúng lên, không phải do code xấu đi.",
-    "sharedStoreInPluginCode": "Tool dùng thẳng usePersistentState/persistentStore thay vì sdk.storage. Về 0 thì mọi dữ liệu tool đều có namespace và audit.",
+    "sharedStoreInPluginCode": "Tool dùng thẳng usePersistentState/persistentStore thay vì usePluginState của Platform. Về 0 thì mọi dữ liệu tool đều có namespace và audit. Khi chuyển, LUÔN khai `legacyKey`: tiền tố lịch sử hiếm khi trùng id plugin (devtool:redis:* vs id redis-client), thiếu nó là im lặng vứt dữ liệu người dùng.",
     "manifestForeignImports": "BẤT BIẾN, không phải nợ: manifest chỉ được nhập lucide-react và @/platform. Nhập thứ khác phá code-split.",
     "secretishKeyInSharedStore": "BẤT BIẾN, không phải nợ: không credential nào được quay lại store dùng chung. Đây là tripwire theo TÊN khoá — nó bắt các trường hợp hiển nhiên, KHÔNG phải bằng chứng đã sạch: 'devtool:apiclient:environments' từng chứa token mà tên khoá không hề lộ ra (đã xử lý riêng bằng envSecrets.ts). Thêm một khoá mới mang credential thì đừng trông chờ luật này bắt được."
   },
   "limits": {
-    "directTauriInPluginCode": 34,
-    "sharedStoreInPluginCode": 47,
+    "directTauriInPluginCode": 30,
+    "sharedStoreInPluginCode": 45,
     "manifestForeignImports": 0,
     "secretishKeyInSharedStore": 0
   }

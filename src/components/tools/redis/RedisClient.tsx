@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor } from '@/platform';
+import { useLiveConnection, usePluginMcpBridgeActive, usePluginSdkFor, usePluginState } from '@/platform';
 import { Database, Plug } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
-import { redisApi, type RedisConnection } from './types';
+import { type RedisConnection } from './types';
+import { useRedisApi } from './api';
 import { useRedisRuntime } from './mcpRuntimeContext';
 import { useMcpBridge } from './mcpBridge';
 import { LeftPanel } from './LeftPanel';
@@ -27,6 +27,7 @@ const LEFT_DEFAULT = 240;
 let cachedConnections: RedisConnection[] | null = null;
 
 export function RedisClient() {
+  const redisApi = useRedisApi();
   const redisState = useRedisRuntime();
   const {
     selectedConnId, setSelectedConnId, connectedConnId, setConnectedConnId,
@@ -81,7 +82,7 @@ export function RedisClient() {
     setConnectedConnId('');
   }, [setConnectedConnId]);
 
-  const [leftWidth, setLeftWidth] = usePersistentState('devtool:redis:leftPanelWidth', LEFT_DEFAULT);
+  const [leftWidth, setLeftWidth] = usePluginState(sdk, 'leftPanelWidth', LEFT_DEFAULT, { legacyKey: 'devtool:redis:leftPanelWidth' });
   const [isResizing, setIsResizing] = useState(false);
 
   const handleResizeStart = (e: React.MouseEvent) => {

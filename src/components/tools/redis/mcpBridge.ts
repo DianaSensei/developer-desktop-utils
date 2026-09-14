@@ -23,8 +23,10 @@
 // don't both listen at once and double-answer the same call.
 
 import { useEffect, useRef } from 'react';
+import { usePluginSdkFor } from '@/platform';
 import { isTauri } from '@/lib/platform';
-import { redisApi, type RedisConnection } from './types';
+import { useRedisApi } from './api';
+import type { RedisApi, RedisConnection } from './types';
 import type { RedisState } from './useRedisState';
 
 interface McpCallEvent {
@@ -40,18 +42,18 @@ function requireString(v: unknown, name: string): string {
   return v;
 }
 
-async function requireConnection(id: string): Promise<RedisConnection> {
+async function requireConnection(redisApi: RedisApi, id: string): Promise<RedisConnection> {
   const all = await redisApi.listConfigs();
   const conn = all.find((c) => c.id === id);
   if (!conn) throw new Error(`No Redis connection with id "${id}"`);
   return conn;
 }
 
-function buildHandlers(state: RedisState): Record<string, ToolHandler> {
+function buildHandlers(redisApi: RedisApi, state: RedisState): Record<string, ToolHandler> {
   return {
     redis_list_connections: async () => redisApi.listConfigs(),
 
-    redis_get_connection: async (args) => requireConnection(requireString(args.connectionId, 'connectionId')),
+    redis_get_connection: async (args) => requireConnection(redisApi, requireString(args.connectionId, 'connectionId')),
 
     redis_add_connection: async (args) => {
       const conn: RedisConnection = {
@@ -71,14 +73,14 @@ function buildHandlers(state: RedisState): Record<string, ToolHandler> {
     // (unlike update_request's script/auth/body — see apiclient/mcpBridge.ts).
     redis_update_connection: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      const current = await requireConnection(id);
+      const current = await requireConnection(redisApi, id);
       const patch = (args.patch ?? {}) as Partial<RedisConnection>;
       return redisApi.saveConfig({ ...current, ...patch, id });
     },
 
     redis_delete_connection: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      await requireConnection(id);
+      await requireConnection(redisApi, id);
       await redisApi.deleteConfig(id);
       return { ok: true };
     },
@@ -86,7 +88,7 @@ function buildHandlers(state: RedisState): Record<string, ToolHandler> {
     // Verifies reachability without changing the connected/selected state —
     // same as the UI's own "Connect" button before it marks the connection live.
     redis_test_connection: async (args) => {
-      const conn = await requireConnection(requireString(args.connectionId, 'connectionId'));
+      const conn = await requireConnection(redisApi, requireString(args.connectionId, 'connectionId'));
       await redisApi.testConnection(conn);
       return { ok: true };
     },
@@ -96,7 +98,7 @@ function buildHandlers(state: RedisState): Record<string, ToolHandler> {
     // logical db (0–15) in the same call.
     redis_connect: async (args) => {
       const id = requireString(args.connectionId, 'connectionId');
-      const conn = await requireConnection(id);
+      const conn = await requireConnection(redisApi, id);
       await redisApi.testConnection(conn);
       state.setConnectedConnId(id);
       state.setSelectedConnId(id);
@@ -123,8 +125,10 @@ function buildHandlers(state: RedisState): Record<string, ToolHandler> {
 // docs/ai/CLAUDE.md's "Stable refs for long-lived event listeners") — same
 // pattern as the API Client's/Mock Server's `useMcpBridge`.
 export function useMcpBridge(state: RedisState, enabled = true): void {
+  const sdk = usePluginSdkFor('redis-client');
+  const redisApi = useRedisApi();
   const handlersRef = useRef<Record<string, ToolHandler>>({});
-  handlersRef.current = buildHandlers(state);
+  handlersRef.current = buildHandlers(redisApi, state);
 
   useEffect(() => {
     if (!isTauri || !enabled) return;
@@ -132,10 +136,11 @@ export function useMcpBridge(state: RedisState, enabled = true): void {
     let unlisten: (() => void) | null = null;
 
     (async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      const { invoke } = await import('@tauri-apps/api/core');
-      const fn = await listen<McpCallEvent>('mcp:call', async (event) => {
-        const { id, tool, args } = event.payload;
+      // Qua SDK: sự kiện `mcp:call` và lệnh `mcp_respond` đều nằm trong quyền
+      // 'native' + allowlist của plugin, nên cầu nối này cũng hiện trong nhật ký
+      // như mọi lời gọi khác thay vì là một đường đi vòng.
+      const fn = await sdk.native.listen<McpCallEvent>('mcp:call', async (payload) => {
+        const { id, tool, args } = payload;
         const handler = handlersRef.current[tool];
         // Not one of this bridge's tools — leave it alone rather than
         // answering "unknown tool", since several bridges may be listening
@@ -143,9 +148,9 @@ export function useMcpBridge(state: RedisState, enabled = true): void {
         if (!handler) return;
         try {
           const result = await handler(args ?? {});
-          await invoke('mcp_respond', { id, result: result ?? null, error: null });
+          await sdk.native.invoke('mcp_respond', { id, result: result ?? null, error: null });
         } catch (e) {
-          await invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
+          await sdk.native.invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
         }
       });
       if (cancelled) fn();
@@ -156,5 +161,5 @@ export function useMcpBridge(state: RedisState, enabled = true): void {
       cancelled = true;
       unlisten?.();
     };
-  }, [enabled]);
+  }, [enabled, sdk]);
 }

@@ -1,4 +1,4 @@
-import { invoke, Channel } from '@tauri-apps/api/core';
+import type { Channel, PluginSdk } from '@/platform';
 
 // ── Connection profile (persisted via Rust to the app-data dir) ───────────────
 
@@ -92,66 +92,83 @@ export type RedisReply =
 
 // ── Invoke wrappers ───────────────────────────────────────────────────────────
 
-export const redisApi = {
-  listConfigs: () => invoke<RedisConnection[]>('redis_list_configs'),
-  saveConfig: (config: RedisConnection) => invoke<RedisConnection>('redis_save_config', { config }),
-  deleteConfig: (configId: string) => invoke<void>('redis_delete_config', { configId }),
-  testConnection: (config: RedisConnection) => invoke<void>('redis_test_connection', { config }),
+/**
+ * Lớp lệnh Redis, dựng theo SDK của plugin thay vì gọi thẳng `invoke`.
+ *
+ * Nhờ vậy allowlist `commands: ['redis_', 'mcp_respond']` trong manifest có hiệu
+ * lực thật — một lệnh gõ sai hay một lệnh ngoài danh sách bị chặn ngay và ghi
+ * vào nhật ký, thay vì lặng lẽ đi thẳng xuống Rust.
+ *
+ * Dùng qua `useRedisApi()` (xem api.ts); factory để lộ ra đây chỉ cho test và
+ * cho code không phải React.
+ */
+export function createRedisApi(sdk: PluginSdk) {
+  const invoke = <T,>(command: string, args?: Record<string, unknown>) =>
+    sdk.native.invoke<T>(command, args);
 
-  overview: (configId: string, db: number) =>
-    invoke<RedisOverview>('redis_overview', { configId, db }),
+  return {
+    listConfigs: () => invoke<RedisConnection[]>('redis_list_configs'),
+    saveConfig: (config: RedisConnection) => invoke<RedisConnection>('redis_save_config', { config }),
+    deleteConfig: (configId: string) => invoke<void>('redis_delete_config', { configId }),
+    testConnection: (config: RedisConnection) => invoke<void>('redis_test_connection', { config }),
 
-  scanKeys: (configId: string, db: number, cursor: number, pattern: string, count: number) =>
-    invoke<ScanPage>('redis_scan_keys', { configId, db, cursor, pattern, count }),
+    overview: (configId: string, db: number) =>
+      invoke<RedisOverview>('redis_overview', { configId, db }),
 
-  keySummary: (configId: string, db: number, keys: string[]) =>
-    invoke<KeySummary[]>('redis_key_summary', { configId, db, keys }),
+    scanKeys: (configId: string, db: number, cursor: number, pattern: string, count: number) =>
+      invoke<ScanPage>('redis_scan_keys', { configId, db, cursor, pattern, count }),
 
-  getKey: (configId: string, db: number, key: string) =>
-    invoke<KeyValue>('redis_get_key', { configId, db, key }),
+    keySummary: (configId: string, db: number, keys: string[]) =>
+      invoke<KeySummary[]>('redis_key_summary', { configId, db, keys }),
 
-  setString: (configId: string, db: number, key: string, value: string, ttlSeconds: number | null) =>
-    invoke<void>('redis_set_string', { configId, db, key, value, ttlSeconds }),
+    getKey: (configId: string, db: number, key: string) =>
+      invoke<KeyValue>('redis_get_key', { configId, db, key }),
 
-  setTtl: (configId: string, db: number, key: string, ttlSeconds: number | null) =>
-    invoke<void>('redis_set_ttl', { configId, db, key, ttlSeconds }),
+    setString: (configId: string, db: number, key: string, value: string, ttlSeconds: number | null) =>
+      invoke<void>('redis_set_string', { configId, db, key, value, ttlSeconds }),
 
-  deleteKeys: (configId: string, db: number, keys: string[]) =>
-    invoke<number>('redis_delete_keys', { configId, db, keys }),
+    setTtl: (configId: string, db: number, key: string, ttlSeconds: number | null) =>
+      invoke<void>('redis_set_ttl', { configId, db, key, ttlSeconds }),
 
-  renameKey: (configId: string, db: number, oldKey: string, newKey: string) =>
-    invoke<void>('redis_rename_key', { configId, db, oldKey, newKey }),
+    deleteKeys: (configId: string, db: number, keys: string[]) =>
+      invoke<number>('redis_delete_keys', { configId, db, keys }),
 
-  /** Run an arbitrary command. Backs the CLI console and the key editors' mutations. */
-  exec: (configId: string, db: number, args: string[]) =>
-    invoke<RedisReply>('redis_exec', { configId, db, args }),
+    renameKey: (configId: string, db: number, oldKey: string, newKey: string) =>
+      invoke<void>('redis_rename_key', { configId, db, oldKey, newKey }),
 
-  memoryUsage: (configId: string, db: number, key: string) =>
-    invoke<number | null>('redis_memory_usage', { configId, db, key }),
+    /** Run an arbitrary command. Backs the CLI console and the key editors' mutations. */
+    exec: (configId: string, db: number, args: string[]) =>
+      invoke<RedisReply>('redis_exec', { configId, db, args }),
 
-  // ── Pub/Sub ───────────────────────────────────────────────────────────────
+    memoryUsage: (configId: string, db: number, key: string) =>
+      invoke<number | null>('redis_memory_usage', { configId, db, key }),
 
-  /** Subscribe to channels/patterns; messages stream to `onMessage`. Returns the subscription id. */
-  pubsubSubscribe: (configId: string, channels: string[], patterns: string[], onMessage: Channel<PubSubMessage>) =>
-    invoke<string>('redis_pubsub_subscribe', { configId, channels, patterns, onMessage }),
+    // ── Pub/Sub ───────────────────────────────────────────────────────────────
 
-  pubsubUnsubscribe: (subscriptionId: string) =>
-    invoke<void>('redis_pubsub_unsubscribe', { subscriptionId }),
+    /** Subscribe to channels/patterns; messages stream to `onMessage`. Returns the subscription id. */
+    pubsubSubscribe: (configId: string, channels: string[], patterns: string[], onMessage: Channel<PubSubMessage>) =>
+      invoke<string>('redis_pubsub_subscribe', { configId, channels, patterns, onMessage }),
 
-  publish: (configId: string, channel: string, message: string) =>
-    invoke<number>('redis_publish', { configId, channel, message }),
+    pubsubUnsubscribe: (subscriptionId: string) =>
+      invoke<void>('redis_pubsub_unsubscribe', { subscriptionId }),
 
-  // ── Server admin ──────────────────────────────────────────────────────────
+    publish: (configId: string, channel: string, message: string) =>
+      invoke<number>('redis_publish', { configId, channel, message }),
 
-  clientList: (configId: string) =>
-    invoke<ClientInfo[]>('redis_client_list', { configId }),
+    // ── Server admin ──────────────────────────────────────────────────────────
 
-  slowlog: (configId: string, count: number) =>
-    invoke<SlowLogEntry[]>('redis_slowlog', { configId, count }),
+    clientList: (configId: string) =>
+      invoke<ClientInfo[]>('redis_client_list', { configId }),
 
-  configGet: (configId: string, pattern: string) =>
-    invoke<[string, string][]>('redis_config_get', { configId, pattern }),
+    slowlog: (configId: string, count: number) =>
+      invoke<SlowLogEntry[]>('redis_slowlog', { configId, count }),
 
-  configSet: (configId: string, param: string, value: string) =>
-    invoke<void>('redis_config_set', { configId, param, value }),
-};
+    configGet: (configId: string, pattern: string) =>
+      invoke<[string, string][]>('redis_config_get', { configId, pattern }),
+
+    configSet: (configId: string, param: string, value: string) =>
+      invoke<void>('redis_config_set', { configId, param, value }),
+  };
+}
+
+export type RedisApi = ReturnType<typeof createRedisApi>;

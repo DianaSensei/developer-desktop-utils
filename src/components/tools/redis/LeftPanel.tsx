@@ -9,7 +9,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { StatusDot } from '@/components/ui/status-dot';
 import { cn } from '@/lib/utils';
 import type { RedisConnection } from './types';
-import { redisApi } from './types';
+import { useRedisApi } from './api';
 import { ConnectionForm } from './ConnectionForm';
 import { ConfirmDialog } from './ConfirmDialog';
 import type { RedisView } from './useRedisState';
@@ -37,6 +37,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel(props: LeftPanelProps) {
+  const redisApi = useRedisApi();
   const {
     connections, connectionsLoading, selectedConnId, onSelectConn, onConnectionsChanged,
     connected, connecting, onConnect, onDisconnect,

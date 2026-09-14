@@ -270,6 +270,31 @@ lực thật chứ không phải khai cho đẹp. Mô tả của `http:default` 
 `appPermissions.ts` cũng được sửa lại cho đúng sự thật: nó nói rõ danh sách có
 wildcard nên đây là quyền cấp-app, còn giới hạn theo tool ở chỗ khác.
 
+### Redis Client — tool đầu tiên chạy hẳn trên SDK
+
+Khuôn mẫu cho ba tool streaming còn lại:
+
+1. `types.ts`: object `redisApi` → `createRedisApi(sdk)`, mọi lệnh đi qua
+   `sdk.native.invoke` — allowlist `commands: ['redis_', 'mcp_respond']` trong
+   manifest từ đó mới có hiệu lực thật.
+2. `api.ts`: `useRedisApi()` = `useMemo(() => createRedisApi(sdk))`. **Không dùng
+   context**: mọi chỗ gọi đều đã nằm trong component hoặc hook, nên một `useMemo`
+   tại chỗ rẻ hơn một provider và không bắt các test đang render component con
+   đứng lẻ phải dựng thêm provider.
+3. `mcpBridge.ts`: `listen`/`invoke` → `sdk.native.listen`/`invoke`; `redisApi`
+   được truyền vào `buildHandlers` thay vì lấy từ module scope.
+4. `PubSubView`: `new Channel()` → `sdk.native.channel(..., 'redis-pubsub')`.
+5. Storage: `usePersistentState` → `usePluginState(sdk, key, init, { legacyKey })`.
+
+**Cái bẫy đắt nhất nằm ở bước 5 và ở một chỗ không ai ngờ.** Khoá lịch sử là
+`devtool:redis:*` còn id plugin là `redis-client`, nên thiếu `legacyKey` là mất
+kết nối đang chọn của người dùng. Nhưng `liveConnections.ts` cũng **seed lúc nạp
+module** từ `devtool:redis:connectedConnId` — trước khi component nào kịp mount
+và di trú. Nếu chỉ đổi khoá mà không cho seed đọc được cả hai, chấm live sẽ sai
+đúng một lần chạy sau khi nâng cấp: kiểu lỗi không ai báo nhưng ai cũng thấy.
+
+Kết quả: ratchet 34 → 30 và 47 → 45.
+
 ### Trả nợ ratchet — làm theo tool, không làm một lượt
 
 Hai chỉ số nợ trong `src/platform/baseline.json` (12 chỗ gọi thẳng

@@ -18,7 +18,7 @@ import {
 import { ViewHeader } from '@/components/ui/view-header';
 import { SearchInput } from '@/components/ui/search-input';
 import type { RedisConnection, KeySummary } from './types';
-import { redisApi } from './types';
+import { useRedisApi } from './api';
 import { MathConfirmDialog } from './MathConfirmDialog';
 
 type NewKeyType = 'string' | 'hash' | 'list' | 'set' | 'zset' | 'stream';
@@ -71,6 +71,7 @@ function ttlLabel(ttlMs: number): string {
 }
 
 export function KeysListView({ conn, db, refreshKey, onRefresh, onSelectKey }: KeysListViewProps) {
+  const redisApi = useRedisApi();
   const [filter, setFilter] = useState('');
   const debouncedFilter = useDebounced(filter.trim(), 300);
   const pattern = toScanPattern(debouncedFilter);
@@ -329,6 +330,7 @@ function buildCreateCommand(type: Exclude<NewKeyType, 'string'>, key: string, co
 function CreateKeyDialog({ open, onOpenChange, conn, db, onCreated }: {
   open: boolean; onOpenChange: (o: boolean) => void; conn: RedisConnection; db: number; onCreated: (key: string) => void;
 }) {
+  const redisApi = useRedisApi();
   const [type, setType] = useState<NewKeyType>('string');
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');

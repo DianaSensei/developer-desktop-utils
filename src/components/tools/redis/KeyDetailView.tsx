@@ -13,7 +13,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import type { RedisConnection, KeyValue, StreamEntry } from './types';
-import { redisApi } from './types';
+import { useRedisApi } from './api';
 import { MathConfirmDialog } from './MathConfirmDialog';
 import { formatBytes } from './format';
 
@@ -31,6 +31,7 @@ function ttlToSeconds(ttlMs: number): number | null {
 }
 
 export function KeyDetailView({ conn, db, keyName, onBack, onDeleted, onRenamed }: KeyDetailViewProps) {
+  const redisApi = useRedisApi();
   const [value, setValue] = useState<KeyValue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

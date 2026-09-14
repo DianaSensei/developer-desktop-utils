@@ -20,18 +20,17 @@ const testConnectionMock = vi.fn();
 
 vi.mock('@tauri-apps/api/event', () => ({ listen: (...args: unknown[]) => listenMock(...args) }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => invokeMock(...args) }));
-vi.mock('./types', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./types')>();
-  return {
-    ...actual,
-    redisApi: {
-      listConfigs: (...a: unknown[]) => listConfigsMock(...a),
-      saveConfig: (...a: unknown[]) => saveConfigMock(...a),
-      deleteConfig: (...a: unknown[]) => deleteConfigMock(...a),
-      testConnection: (...a: unknown[]) => testConnectionMock(...a),
-    },
-  };
-});
+// Lớp lệnh giờ đến từ `useRedisApi()` (dựng trên SDK của plugin), nên mock đặt
+// ở đó thay vì ở `./types` — và nhờ vậy test không phải biết lớp lệnh được dựng
+// bằng cách nào, chỉ cần biết bridge gọi những hàm nào.
+vi.mock('./api', () => ({
+  useRedisApi: () => ({
+    listConfigs: (...a: unknown[]) => listConfigsMock(...a),
+    saveConfig: (...a: unknown[]) => saveConfigMock(...a),
+    deleteConfig: (...a: unknown[]) => deleteConfigMock(...a),
+    testConnection: (...a: unknown[]) => testConnectionMock(...a),
+  }),
+}));
 
 type CallHandler = (event: { payload: { id: string; tool: string; args: Record<string, unknown> } }) => void;
 

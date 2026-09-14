@@ -4,7 +4,7 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { Callout } from '@/components/ui/callout';
 import { cn } from '@/lib/utils';
 import type { RedisConnection, RedisReply } from './types';
-import { redisApi } from './types';
+import { useRedisApi } from './api';
 import { REDIS_COMMANDS, type RedisCommandDef } from './commands';
 
 interface CliConsoleProps {
@@ -52,6 +52,7 @@ function formatReply(r: RedisReply, indent = 0): string[] {
 let nextId = 1;
 
 export function CliConsole({ conn, db }: CliConsoleProps) {
+  const redisApi = useRedisApi();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);

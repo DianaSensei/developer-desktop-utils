@@ -9,7 +9,7 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { Tabs } from '@/components/ui/tabs';
 import { SearchInput } from '@/components/ui/search-input';
 import type { RedisConnection } from './types';
-import { redisApi } from './types';
+import { useRedisApi } from './api';
 import { useRedisData } from './useRedisData';
 import { MathConfirmDialog } from './MathConfirmDialog';
 
@@ -58,6 +58,7 @@ export function AdminView({ conn }: AdminViewProps) {
 const PREFERRED_CLIENT_FIELDS = ['id', 'addr', 'laddr', 'name', 'age', 'idle', 'db', 'cmd', 'resp'];
 
 function ClientsTab({ conn }: { conn: RedisConnection }) {
+  const redisApi = useRedisApi();
   const { data, loading, error, reload } = useRedisData(() => redisApi.clientList(conn.id), [conn.id]);
   const rows = data ?? [];
 
@@ -104,6 +105,7 @@ function formatMicros(us: number): string {
 }
 
 function SlowLogTab({ conn }: { conn: RedisConnection }) {
+  const redisApi = useRedisApi();
   const { data, loading, error, reload } = useRedisData(() => redisApi.slowlog(conn.id, 128), [conn.id]);
   const rows = data ?? [];
 
@@ -140,6 +142,7 @@ function SlowLogTab({ conn }: { conn: RedisConnection }) {
 // ── Config ───────────────────────────────────────────────────────────────────
 
 function ConfigTab({ conn }: { conn: RedisConnection }) {
+  const redisApi = useRedisApi();
   const [filter, setFilter] = useState('');
   const pattern = useDebounced(filter.trim(), 300) || '*';
   const { data, loading, error, reload } = useRedisData(() => redisApi.configGet(conn.id, pattern), [conn.id, pattern]);

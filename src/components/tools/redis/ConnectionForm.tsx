@@ -7,7 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { Info, CheckCircle2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Callout } from '@/components/ui/callout';
-import { EMPTY_CONNECTION, redisApi, type RedisConnection } from './types';
+import { EMPTY_CONNECTION, type RedisConnection } from './types';
+import { useRedisApi } from './api';
 
 interface ConnectionFormProps {
   initial?: RedisConnection | null;
@@ -16,6 +17,7 @@ interface ConnectionFormProps {
 }
 
 export function ConnectionForm({ initial, onSave, onCancel }: ConnectionFormProps) {
+  const redisApi = useRedisApi();
   const [form, setForm] = useState<RedisConnection>(initial ?? EMPTY_CONNECTION);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);

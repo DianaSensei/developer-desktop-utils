@@ -6,7 +6,8 @@ import { SectionLabel } from '@/components/ui/section-label';
 import { Stat, StatGrid } from '@/components/ui/stat';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import type { RedisConnection } from './types';
-import { redisApi, type RedisOverview } from './types';
+import { type RedisOverview } from './types';
+import { useRedisApi } from './api';
 import { useRedisData } from './useRedisData';
 import { parseInfo, formatUptime, formatNumber, hitRate } from './format';
 
@@ -18,6 +19,7 @@ interface OverviewViewProps {
 }
 
 export function OverviewView({ conn, db, refreshKey, onRefresh }: OverviewViewProps) {
+  const redisApi = useRedisApi();
   const ov = useRedisData<RedisOverview>(() => redisApi.overview(conn.id, db), [conn.id, db, refreshKey]);
   const sections = ov.data ? parseInfo(ov.data.info) : {};
   const server = sections.Server ?? {};

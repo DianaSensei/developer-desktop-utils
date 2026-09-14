@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 
 export type RedisView = 'overview' | 'keys' | 'key' | 'cli' | 'pubsub' | 'admin';
 
@@ -25,11 +25,15 @@ export interface RedisState {
 }
 
 export function useRedisState(): RedisState {
-  const [selectedConnId, setSelectedConnIdRaw] = usePersistentState('devtool:redis:selectedConnId', '');
-  const [connectedConnId, setConnectedConnId] = usePersistentState('devtool:redis:connectedConnId', '');
-  const [db, setDbRaw] = usePersistentState('devtool:redis:db', 0);
-  const [view, setView] = usePersistentState<RedisView>('devtool:redis:view', 'overview');
-  const [selectedKey, setSelectedKey] = usePersistentState<string | null>('devtool:redis:selectedKey', null);
+  // `legacyKey` ở mọi dòng dưới đây là bắt buộc, không phải trang trí: tool này
+  // lưu ở tiền tố `devtool:redis:` từ trước, còn id plugin là `redis-client` —
+  // thiếu nó là im lặng vứt đi kết nối đang chọn và db của người dùng.
+  const sdk = usePluginSdkFor('redis-client');
+  const [selectedConnId, setSelectedConnIdRaw] = usePluginState(sdk, 'selectedConnId', '', { legacyKey: 'devtool:redis:selectedConnId' });
+  const [connectedConnId, setConnectedConnId] = usePluginState(sdk, 'connectedConnId', '', { legacyKey: 'devtool:redis:connectedConnId' });
+  const [db, setDbRaw] = usePluginState(sdk, 'db', 0, { legacyKey: 'devtool:redis:db' });
+  const [view, setView] = usePluginState<RedisView>(sdk, 'view', 'overview', { legacyKey: 'devtool:redis:view' });
+  const [selectedKey, setSelectedKey] = usePluginState<string | null>(sdk, 'selectedKey', null, { legacyKey: 'devtool:redis:selectedKey' });
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = () => setRefreshKey((k) => k + 1);
