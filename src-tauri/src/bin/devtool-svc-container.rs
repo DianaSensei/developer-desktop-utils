@@ -20,17 +20,20 @@
 //     nhiều lời gọi có thể chồng lên nhau trên CÙNG một sidecar (host demux
 //     theo `id`, xem `service_host.rs`).
 //
-// Bước 1 (đây): config CRUD, detect-sockets, test-connection, list/inspect,
+// Bước 1 (xong): config CRUD, detect-sockets, test-connection, list/inspect,
 // lifecycle (start/stop/restart/pause/unpause/remove) — mọi method ở đây là
 // MỘT-LẦN (đi qua `handle()`), không có method stream nào trong bước này.
-// Bước 2 (sau): image/volume/network/prune/system-info. Bước 3 (sau):
-// log/stats streaming (sẽ cần giao thức STREAM giống `pubsub-subscribe` của
+// Bước 2 (đây): container details/resources, image/volume/network CRUD +
+// details, prune, system info/df — vẫn toàn method MỘT-LẦN, port nguyên vẹn
+// logic từ `container_tool.rs` (không đoán lại). Bước 3 (sau): log/stats
+// streaming (sẽ cần giao thức STREAM giống `pubsub-subscribe` của
 // devtool-svc-redis — lỗi giữa chừng của method stream phải tự mã hoá vào
 // giao thức ứng dụng của chính sidecar này, KHÔNG dùng `Response::err`, xem
 // comment `send_pubsub_error` ở devtool-svc-redis.rs để hiểu lý do).
 
 use bollard::Docker;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc;
@@ -267,6 +270,349 @@ fn opt_param<T: serde::de::DeserializeOwned>(params: &serde_json::Value, field: 
     params.get(field).cloned().and_then(|v| serde_json::from_value(v).ok())
 }
 
+// ── Container details (curated projection) — port nguyên vẹn từ
+//    container_tool.rs, xem đó cho giải thích lý do curate thay vì passthrough ─
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerMountInfo {
+    #[serde(rename = "type")]
+    pub typ: Option<String>,
+    pub name: Option<String>,
+    pub source: Option<String>,
+    pub destination: Option<String>,
+    pub mode: Option<String>,
+    pub rw: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerPortBinding {
+    pub container_port: String,
+    pub host_ip: Option<String>,
+    pub host_port: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerNetworkInfo {
+    pub name: String,
+    pub ip_address: Option<String>,
+    pub gateway: Option<String>,
+    pub mac_address: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerResources {
+    /// CPU quota in units of 1e-9 CPUs — `--cpus` as the daemon stores it.
+    pub nano_cpus: Option<i64>,
+    pub cpu_shares: Option<i64>,
+    pub cpu_period: Option<i64>,
+    pub cpu_quota: Option<i64>,
+    pub cpuset_cpus: Option<String>,
+    pub memory_bytes: Option<i64>,
+    pub memory_reservation_bytes: Option<i64>,
+    /// Total memory + swap. `-1` is docker's "unlimited swap" sentinel and is
+    /// passed through as-is rather than normalised away.
+    pub memory_swap_bytes: Option<i64>,
+    pub blkio_weight: Option<u16>,
+    pub pids_limit: Option<i64>,
+    pub restart_policy: Option<String>,
+    pub restart_max_retry: Option<i64>,
+}
+
+/// `0` is what the daemon reports for an unset limit; treat it as absent so
+/// the form renders an empty field instead of a literal zero limit.
+fn nonzero(v: Option<i64>) -> Option<i64> {
+    v.filter(|&n| n != 0)
+}
+
+fn resources_from_host_config(hc: &bollard::models::HostConfig) -> ContainerResources {
+    let restart_policy = hc.restart_policy.clone().unwrap_or_default();
+    ContainerResources {
+        nano_cpus: nonzero(hc.nano_cpus),
+        cpu_shares: nonzero(hc.cpu_shares),
+        cpu_period: nonzero(hc.cpu_period),
+        cpu_quota: nonzero(hc.cpu_quota),
+        cpuset_cpus: hc.cpuset_cpus.clone().filter(|s| !s.is_empty()),
+        memory_bytes: nonzero(hc.memory),
+        memory_reservation_bytes: nonzero(hc.memory_reservation),
+        memory_swap_bytes: nonzero(hc.memory_swap),
+        blkio_weight: hc.blkio_weight.filter(|&w| w != 0),
+        pids_limit: nonzero(hc.pids_limit),
+        restart_policy: restart_policy.name.map(|n| n.to_string()),
+        restart_max_retry: restart_policy.maximum_retry_count,
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerDetails {
+    pub id: String,
+    pub name: String,
+    pub image: String,
+    pub platform: Option<String>,
+    pub created: Option<String>,
+    pub status: Option<String>,
+    pub running: bool,
+    pub paused: bool,
+    pub restarting: bool,
+    pub exit_code: Option<i64>,
+    pub started_at: Option<String>,
+    pub finished_at: Option<String>,
+    pub health_status: Option<String>,
+    pub command: Option<String>,
+    pub entrypoint: Vec<String>,
+    pub restart_policy: Option<String>,
+    pub restart_max_retry: Option<i64>,
+    pub env: Vec<String>,
+    pub labels: HashMap<String, String>,
+    pub mounts: Vec<ContainerMountInfo>,
+    pub ports: Vec<ContainerPortBinding>,
+    pub networks: Vec<ContainerNetworkInfo>,
+    pub resources: ContainerResources,
+}
+
+async fn container_details(docker: &Docker, container_id: &str) -> Result<ContainerDetails, String> {
+    let insp = docker.inspect_container(container_id, None).await.map_err(|e| e.to_string())?;
+
+    let state = insp.state.unwrap_or_default();
+    let cfg = insp.config.unwrap_or_default();
+    let host_config = insp.host_config.unwrap_or_default();
+    let net = insp.network_settings.unwrap_or_default();
+    let resources = resources_from_host_config(&host_config);
+    let restart_policy = host_config.restart_policy.unwrap_or_default();
+
+    let mounts = insp
+        .mounts
+        .unwrap_or_default()
+        .into_iter()
+        .map(|m| ContainerMountInfo {
+            typ: m.typ,
+            name: m.name,
+            source: m.source,
+            destination: m.destination,
+            mode: m.mode,
+            rw: m.rw,
+        })
+        .collect();
+
+    let ports = net
+        .ports
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|(container_port, bindings)| {
+            bindings.unwrap_or_default().into_iter().map(move |b| ContainerPortBinding {
+                container_port: container_port.clone(),
+                host_ip: b.host_ip,
+                host_port: b.host_port,
+            })
+        })
+        .collect();
+
+    let mut networks: Vec<ContainerNetworkInfo> = net
+        .networks
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(name, ep)| ContainerNetworkInfo {
+            name,
+            ip_address: ep.ip_address,
+            gateway: ep.gateway,
+            mac_address: ep.mac_address,
+        })
+        .collect();
+    networks.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(ContainerDetails {
+        id: insp.id.unwrap_or_default(),
+        name: insp.name.unwrap_or_default().trim_start_matches('/').to_string(),
+        image: insp.image.unwrap_or_default(),
+        platform: insp.platform,
+        created: insp.created,
+        status: state.status.map(|s| s.to_string()),
+        running: state.running.unwrap_or(false),
+        paused: state.paused.unwrap_or(false),
+        restarting: state.restarting.unwrap_or(false),
+        exit_code: state.exit_code,
+        started_at: state.started_at,
+        finished_at: state.finished_at,
+        health_status: state.health.and_then(|h| h.status).map(|s| s.to_string()),
+        command: cfg.cmd.map(|c| c.join(" ")),
+        entrypoint: cfg.entrypoint.unwrap_or_default(),
+        restart_policy: restart_policy.name.map(|n| n.to_string()),
+        restart_max_retry: restart_policy.maximum_retry_count,
+        env: cfg.env.unwrap_or_default(),
+        labels: cfg.labels.unwrap_or_default(),
+        mounts,
+        ports,
+        networks,
+        resources,
+    })
+}
+
+// ── Resource management (docker update) — port nguyên vẹn từ container_tool.rs ─
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerResourceUpdate {
+    pub nano_cpus: Option<i64>,
+    pub cpu_shares: Option<i64>,
+    pub cpu_period: Option<i64>,
+    pub cpu_quota: Option<i64>,
+    pub cpuset_cpus: Option<String>,
+    pub memory_bytes: Option<i64>,
+    pub memory_reservation_bytes: Option<i64>,
+    pub memory_swap_bytes: Option<i64>,
+    pub blkio_weight: Option<u16>,
+    pub pids_limit: Option<i64>,
+    pub restart_policy: Option<String>,
+    pub restart_max_retry: Option<i64>,
+}
+
+fn restart_policy_from_name(name: &str, max_retry: Option<i64>) -> Result<bollard::models::RestartPolicy, String> {
+    use bollard::models::RestartPolicyNameEnum as E;
+    let variant = match name {
+        "" => E::EMPTY,
+        "no" => E::NO,
+        "always" => E::ALWAYS,
+        "unless-stopped" => E::UNLESS_STOPPED,
+        "on-failure" => E::ON_FAILURE,
+        other => return Err(format!("Unknown restart policy \"{other}\"")),
+    };
+    Ok(bollard::models::RestartPolicy {
+        name: Some(variant),
+        // Docker rejects a non-zero retry count on anything but on-failure.
+        maximum_retry_count: if matches!(variant, E::ON_FAILURE) { max_retry.or(Some(0)) } else { Some(0) },
+    })
+}
+
+// ── Images — port nguyên vẹn từ container_tool.rs ───────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullProgress {
+    pub status: String,
+    pub id: Option<String>,
+    pub progress_current: Option<i64>,
+    pub progress_total: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageDetails {
+    pub id: String,
+    pub repo_tags: Vec<String>,
+    pub repo_digests: Vec<String>,
+    pub created: Option<String>,
+    pub size: i64,
+    pub architecture: Option<String>,
+    pub os: Option<String>,
+    pub author: Option<String>,
+    pub cmd: Vec<String>,
+    pub entrypoint: Vec<String>,
+    pub env: Vec<String>,
+    pub working_dir: Option<String>,
+    pub exposed_ports: Vec<String>,
+    pub labels: HashMap<String, String>,
+    pub layer_count: usize,
+}
+
+// ── Network / volume details (curated projections) — port nguyên vẹn ───────
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkIpamConfig {
+    pub subnet: Option<String>,
+    pub ip_range: Option<String>,
+    pub gateway: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkDetails {
+    pub id: String,
+    pub name: String,
+    pub driver: Option<String>,
+    pub scope: Option<String>,
+    pub created: Option<String>,
+    pub internal: bool,
+    pub attachable: bool,
+    pub ingress: bool,
+    pub ipv6: bool,
+    pub ipam_driver: Option<String>,
+    pub ipam_config: Vec<NetworkIpamConfig>,
+    pub options: HashMap<String, String>,
+    pub labels: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeDetails {
+    pub name: String,
+    pub driver: String,
+    pub mountpoint: String,
+    pub created_at: Option<String>,
+    pub scope: Option<String>,
+    pub labels: HashMap<String, String>,
+    pub options: HashMap<String, String>,
+    /// From the daemon's UsageData, which most drivers leave unset — `-1` is
+    /// docker's own "not available" marker and is passed through as such.
+    pub size_bytes: Option<i64>,
+    pub ref_count: Option<i64>,
+}
+
+// ── Prune (reclaiming disk) — port nguyên vẹn. Một shape chung cho cả bốn
+//    endpoint, xem container_tool.rs cho lý do gộp. ─────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PruneResult {
+    pub deleted: usize,
+    pub space_reclaimed: i64,
+}
+
+/// Per-volume disk usage (bytes), keyed by volume name — port nguyên vẹn từ
+/// `container_tool::volume_sizes` (bản Unix). Raw request thủ công qua
+/// `hyperlocal`/`hyper-util` trên CÙNG Unix socket `connect()` dùng, vì
+/// bollard's typed `df()` response (`SystemDataUsageResponse`) chỉ mang
+/// counter tổng hợp, KHÔNG có mảng `Volumes[]` per-item mà `/system/df` JSON
+/// thô thực sự trả về — xem comment đầy đủ ở container_tool.rs.
+#[cfg(unix)]
+async fn volume_sizes(config: &ContainerConnection) -> Result<HashMap<String, i64>, String> {
+    use http_body_util::{BodyExt, Full};
+    use hyper_util::{client::legacy::Client, rt::TokioExecutor};
+
+    let path = expand_socket_path(&config.socket_path);
+    let client: Client<hyperlocal::UnixConnector, Full<bytes::Bytes>> =
+        Client::builder(TokioExecutor::new()).build(hyperlocal::UnixConnector);
+    let uri: hyper::Uri = hyperlocal::Uri::new(&path, "/system/df?type=volume").into();
+
+    let resp = client.get(uri).await.map_err(|e| e.to_string())?;
+    let body = resp.into_body().collect().await.map_err(|e| e.to_string())?.to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&body).map_err(|e| e.to_string())?;
+
+    let mut sizes = HashMap::new();
+    if let Some(volumes) = json.get("Volumes").and_then(|v| v.as_array()) {
+        for v in volumes {
+            let name = v.get("Name").and_then(|n| n.as_str());
+            let size = v.get("UsageData").and_then(|u| u.get("Size")).and_then(|s| s.as_i64());
+            if let (Some(name), Some(size)) = (name, size) {
+                sizes.insert(name.to_string(), size);
+            }
+        }
+    }
+    Ok(sizes)
+}
+
+/// Windows named-pipe transport isn't wired up for this raw request (only the
+/// Unix socket path is) — port nguyên vẹn từ container_tool.rs: the Size
+/// column just shows unknown there.
+#[cfg(windows)]
+async fn volume_sizes(_config: &ContainerConnection) -> Result<HashMap<String, i64>, String> {
+    Ok(HashMap::new())
+}
+
 // ── Method dispatch ───────────────────────────────────────────────────────────
 
 async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -378,6 +724,359 @@ async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::V
             let opts = bollard::query_parameters::RemoveContainerOptions { force, ..Default::default() };
             docker.remove_container(&container_id, Some(opts)).await.map_err(|e| e.to_string())?;
             Ok(serde_json::Value::Null)
+        }
+
+        "details" => {
+            let config_id: String = param(&params, "configId")?;
+            let container_id: String = param(&params, "containerId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let details = container_details(&docker, &container_id).await?;
+            Ok(serde_json::to_value(details).unwrap())
+        }
+
+        "resources" => {
+            let config_id: String = param(&params, "configId")?;
+            let container_id: String = param(&params, "containerId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let insp = docker.inspect_container(&container_id, None).await.map_err(|e| e.to_string())?;
+            let resources = resources_from_host_config(&insp.host_config.unwrap_or_default());
+            Ok(serde_json::to_value(resources).unwrap())
+        }
+
+        "update-resources" => {
+            let config_id: String = param(&params, "configId")?;
+            let container_id: String = param(&params, "containerId")?;
+            let resources: ContainerResourceUpdate = param(&params, "resources")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let restart_policy = match &resources.restart_policy {
+                Some(name) => Some(restart_policy_from_name(name, resources.restart_max_retry)?),
+                None => None,
+            };
+            let body = bollard::models::ContainerUpdateBody {
+                nano_cpus: resources.nano_cpus,
+                cpu_shares: resources.cpu_shares,
+                cpu_period: resources.cpu_period,
+                cpu_quota: resources.cpu_quota,
+                cpuset_cpus: resources.cpuset_cpus.clone(),
+                memory: resources.memory_bytes,
+                memory_reservation: resources.memory_reservation_bytes,
+                memory_swap: resources.memory_swap_bytes,
+                blkio_weight: resources.blkio_weight,
+                pids_limit: resources.pids_limit,
+                restart_policy,
+                ..Default::default()
+            };
+            docker.update_container(&container_id, body).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+
+        // ── Images ───────────────────────────────────────────────────────────
+
+        "image-list" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let opts = bollard::query_parameters::ListImagesOptions { all: false, ..Default::default() };
+            let images = docker.list_images(Some(opts)).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(images).unwrap())
+        }
+
+        "image-inspect" => {
+            let config_id: String = param(&params, "configId")?;
+            let image_id: String = param(&params, "imageId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let insp = docker.inspect_image(&image_id).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(insp).unwrap())
+        }
+
+        "image-remove" => {
+            let config_id: String = param(&params, "configId")?;
+            let image_id: String = param(&params, "imageId")?;
+            let force: bool = opt_param(&params, "force").unwrap_or(false);
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let opts = bollard::query_parameters::RemoveImageOptions { force, ..Default::default() };
+            docker.remove_image(&image_id, Some(opts), None).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+
+        // `image-pull` is a MỘT-LẦN method here (Bước 2): it awaits the whole
+        // pull and returns once done, without per-chunk progress events — the
+        // Channel-based `container_tool::image_pull` streams `PullProgress`
+        // per event but the STREAM protocol (Waiter::Stream/EventSink) for
+        // this sidecar is Bước 3's job (log/stats). Consuming the whole
+        // stream here and discarding intermediate frames keeps behaviour
+        // correct (the pull still fully completes or fails) while deferring
+        // live progress UI to Bước 3.
+        "image-pull" => {
+            let config_id: String = param(&params, "configId")?;
+            let image: String = param(&params, "image")?;
+            let tag: String = param(&params, "tag")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let opts = bollard::query_parameters::CreateImageOptions {
+                from_image: Some(image),
+                tag: Some(tag),
+                ..Default::default()
+            };
+            use futures_util::StreamExt;
+            let mut stream = docker.create_image(Some(opts), None, None);
+            while let Some(item) = stream.next().await {
+                item.map_err(|e| e.to_string())?;
+            }
+            Ok(serde_json::Value::Null)
+        }
+
+        "image-details" => {
+            let config_id: String = param(&params, "configId")?;
+            let image_id: String = param(&params, "imageId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let insp = docker.inspect_image(&image_id).await.map_err(|e| e.to_string())?;
+            let cfg = insp.config.unwrap_or_default();
+            let details = ImageDetails {
+                id: insp.id.unwrap_or_default(),
+                repo_tags: insp.repo_tags.unwrap_or_default(),
+                repo_digests: insp.repo_digests.unwrap_or_default(),
+                created: insp.created,
+                size: insp.size.unwrap_or(0),
+                architecture: insp.architecture,
+                os: insp.os,
+                author: insp.author,
+                cmd: cfg.cmd.unwrap_or_default(),
+                entrypoint: cfg.entrypoint.unwrap_or_default(),
+                env: cfg.env.unwrap_or_default(),
+                working_dir: cfg.working_dir,
+                exposed_ports: cfg.exposed_ports.unwrap_or_default(),
+                labels: cfg.labels.unwrap_or_default(),
+                layer_count: insp.root_fs.and_then(|r| r.layers).map(|l| l.len()).unwrap_or(0),
+            };
+            Ok(serde_json::to_value(details).unwrap())
+        }
+
+        "image-tag" => {
+            let config_id: String = param(&params, "configId")?;
+            let image_id: String = param(&params, "imageId")?;
+            let repo: String = param(&params, "repo")?;
+            let tag: String = param(&params, "tag")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let opts = bollard::query_parameters::TagImageOptions { repo: Some(repo), tag: Some(tag) };
+            docker.tag_image(&image_id, Some(opts)).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+
+        // ── Volumes ──────────────────────────────────────────────────────────
+
+        "volume-list" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let resp = docker
+                .list_volumes(None::<bollard::query_parameters::ListVolumesOptions>)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(resp.volumes.unwrap_or_default()).unwrap())
+        }
+
+        "volume-remove" => {
+            let config_id: String = param(&params, "configId")?;
+            let name: String = param(&params, "name")?;
+            let force: bool = opt_param(&params, "force").unwrap_or(false);
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let opts = bollard::query_parameters::RemoveVolumeOptions { force, ..Default::default() };
+            docker.remove_volume(&name, Some(opts)).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+
+        "volume-create" => {
+            let config_id: String = param(&params, "configId")?;
+            let name: String = param(&params, "name")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let req = bollard::models::VolumeCreateRequest { name: Some(name), ..Default::default() };
+            let vol = docker.create_volume(req).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(vol).unwrap())
+        }
+
+        "volume-sizes" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let sizes = volume_sizes(&config).await?;
+            Ok(serde_json::to_value(sizes).unwrap())
+        }
+
+        "volume-details" => {
+            let config_id: String = param(&params, "configId")?;
+            let name: String = param(&params, "name")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let vol = docker.inspect_volume(&name).await.map_err(|e| e.to_string())?;
+            let usage = vol.usage_data;
+            let details = VolumeDetails {
+                name: vol.name,
+                driver: vol.driver,
+                mountpoint: vol.mountpoint,
+                created_at: vol.created_at.map(|d| d.to_string()),
+                scope: vol.scope.map(|s| s.to_string()),
+                labels: vol.labels,
+                options: vol.options,
+                size_bytes: usage.as_ref().map(|u| u.size),
+                ref_count: usage.as_ref().map(|u| u.ref_count),
+            };
+            Ok(serde_json::to_value(details).unwrap())
+        }
+
+        // ── Networks ─────────────────────────────────────────────────────────
+
+        "network-list" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let networks = docker
+                .list_networks(None::<bollard::query_parameters::ListNetworksOptions>)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(networks).unwrap())
+        }
+
+        "network-remove" => {
+            let config_id: String = param(&params, "configId")?;
+            let name: String = param(&params, "name")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            docker.remove_network(&name).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+
+        "network-create" => {
+            let config_id: String = param(&params, "configId")?;
+            let name: String = param(&params, "name")?;
+            let driver: String = param(&params, "driver")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let req = bollard::models::NetworkCreateRequest { name, driver: Some(driver), ..Default::default() };
+            docker.create_network(req).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+
+        "network-details" => {
+            let config_id: String = param(&params, "configId")?;
+            let network_id: String = param(&params, "networkId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let net = docker
+                .inspect_network(&network_id, None::<bollard::query_parameters::InspectNetworkOptions>)
+                .await
+                .map_err(|e| e.to_string())?;
+            let ipam = net.ipam.unwrap_or_default();
+            let details = NetworkDetails {
+                id: net.id.unwrap_or_default(),
+                name: net.name.unwrap_or_default(),
+                driver: net.driver,
+                scope: net.scope,
+                created: net.created.map(|d| d.to_string()),
+                internal: net.internal.unwrap_or(false),
+                attachable: net.attachable.unwrap_or(false),
+                ingress: net.ingress.unwrap_or(false),
+                ipv6: net.enable_ipv6.unwrap_or(false),
+                ipam_driver: ipam.driver,
+                ipam_config: ipam
+                    .config
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| NetworkIpamConfig { subnet: c.subnet, ip_range: c.ip_range, gateway: c.gateway })
+                    .collect(),
+                options: net.options.unwrap_or_default(),
+                labels: net.labels.unwrap_or_default(),
+            };
+            Ok(serde_json::to_value(details).unwrap())
+        }
+
+        // ── Prune ────────────────────────────────────────────────────────────
+
+        "container-prune" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let resp = docker
+                .prune_containers(None::<bollard::query_parameters::PruneContainersOptions>)
+                .await
+                .map_err(|e| e.to_string())?;
+            let result = PruneResult {
+                deleted: resp.containers_deleted.map(|v| v.len()).unwrap_or(0),
+                space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+            };
+            Ok(serde_json::to_value(result).unwrap())
+        }
+
+        "image-prune" => {
+            let config_id: String = param(&params, "configId")?;
+            let dangling_only: bool = param(&params, "danglingOnly")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let mut filters: HashMap<String, Vec<String>> = HashMap::new();
+            filters.insert("dangling".to_string(), vec![if dangling_only { "true" } else { "false" }.to_string()]);
+            let opts = bollard::query_parameters::PruneImagesOptions { filters: Some(filters) };
+            let resp = docker.prune_images(Some(opts)).await.map_err(|e| e.to_string())?;
+            let result = PruneResult {
+                deleted: resp.images_deleted.map(|v| v.len()).unwrap_or(0),
+                space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+            };
+            Ok(serde_json::to_value(result).unwrap())
+        }
+
+        "volume-prune" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let resp = docker
+                .prune_volumes(None::<bollard::query_parameters::PruneVolumesOptions>)
+                .await
+                .map_err(|e| e.to_string())?;
+            let result = PruneResult {
+                deleted: resp.volumes_deleted.map(|v| v.len()).unwrap_or(0),
+                space_reclaimed: resp.space_reclaimed.unwrap_or(0),
+            };
+            Ok(serde_json::to_value(result).unwrap())
+        }
+
+        "network-prune" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let resp = docker
+                .prune_networks(None::<bollard::query_parameters::PruneNetworksOptions>)
+                .await
+                .map_err(|e| e.to_string())?;
+            let result = PruneResult {
+                deleted: resp.networks_deleted.map(|v| v.len()).unwrap_or(0),
+                space_reclaimed: 0,
+            };
+            Ok(serde_json::to_value(result).unwrap())
+        }
+
+        // ── System ───────────────────────────────────────────────────────────
+
+        "system-info" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let info = docker.info().await.map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(info).unwrap())
+        }
+
+        "system-df" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let df = docker.df(None).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(df).unwrap())
         }
 
         other => Err(format!("method không hỗ trợ: \"{other}\"")),
@@ -500,6 +1199,166 @@ mod tests {
     async fn start_thieu_container_id_tra_ve_loi_ro_rang() {
         let res = handle("start", serde_json::json!({ "configId": "x" })).await;
         assert!(res.unwrap_err().contains("containerId"));
+    }
+
+    // ── Bước 2: đường lỗi cho container details/resources, image/volume/
+    //    network CRUD+details, prune, system-info/df — mọi test ở đây chỉ cần
+    //    xác nhận thiếu tham số/config không tồn tại trả lỗi rõ ràng, KHÔNG
+    //    panic; xác nhận thật với daemon thật (image-list/volume-list/
+    //    network-list/system-info/system-df/details/resources) làm riêng qua
+    //    script JSONL tạm, không phải trong test suite này.
+
+    #[tokio::test]
+    async fn details_thieu_config_id_tra_ve_loi_ro_rang() {
+        let res = handle("details", serde_json::json!({ "containerId": "x" })).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn details_config_khong_ton_tai_tra_ve_loi_ro_rang() {
+        let res = handle("details", serde_json::json!({ "configId": "khong-ton-tai", "containerId": "x" })).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn resources_thieu_container_id_tra_ve_loi_ro_rang() {
+        let res = handle("resources", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("containerId"));
+    }
+
+    #[tokio::test]
+    async fn update_resources_thieu_resources_tra_ve_loi_ro_rang() {
+        let res =
+            handle("update-resources", serde_json::json!({ "configId": "x", "containerId": "y" })).await;
+        assert!(res.unwrap_err().contains("resources"));
+    }
+
+    #[tokio::test]
+    async fn image_list_thieu_config_id_tra_ve_loi_ro_rang() {
+        let res = handle("image-list", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn image_inspect_thieu_image_id_tra_ve_loi_ro_rang() {
+        let res = handle("image-inspect", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("imageId"));
+    }
+
+    #[tokio::test]
+    async fn image_remove_config_khong_ton_tai_tra_ve_loi_ro_rang() {
+        let res =
+            handle("image-remove", serde_json::json!({ "configId": "khong-ton-tai", "imageId": "x" })).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn image_pull_thieu_tag_tra_ve_loi_ro_rang() {
+        let res = handle("image-pull", serde_json::json!({ "configId": "x", "image": "y" })).await;
+        assert!(res.unwrap_err().contains("tag"));
+    }
+
+    #[tokio::test]
+    async fn image_details_thieu_image_id_tra_ve_loi_ro_rang() {
+        let res = handle("image-details", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("imageId"));
+    }
+
+    #[tokio::test]
+    async fn image_tag_thieu_repo_tra_ve_loi_ro_rang() {
+        let res = handle("image-tag", serde_json::json!({ "configId": "x", "imageId": "y", "tag": "z" })).await;
+        assert!(res.unwrap_err().contains("repo"));
+    }
+
+    #[tokio::test]
+    async fn volume_list_thieu_config_id_tra_ve_loi_ro_rang() {
+        let res = handle("volume-list", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn volume_remove_thieu_name_tra_ve_loi_ro_rang() {
+        let res = handle("volume-remove", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("name"));
+    }
+
+    #[tokio::test]
+    async fn volume_create_thieu_name_tra_ve_loi_ro_rang() {
+        let res = handle("volume-create", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("name"));
+    }
+
+    #[tokio::test]
+    async fn volume_sizes_thieu_config_id_tra_ve_loi_ro_rang() {
+        let res = handle("volume-sizes", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn volume_details_config_khong_ton_tai_tra_ve_loi_ro_rang() {
+        let res =
+            handle("volume-details", serde_json::json!({ "configId": "khong-ton-tai", "name": "x" })).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn network_list_thieu_config_id_tra_ve_loi_ro_rang() {
+        let res = handle("network-list", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn network_remove_thieu_name_tra_ve_loi_ro_rang() {
+        let res = handle("network-remove", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("name"));
+    }
+
+    #[tokio::test]
+    async fn network_create_thieu_driver_tra_ve_loi_ro_rang() {
+        let res = handle("network-create", serde_json::json!({ "configId": "x", "name": "y" })).await;
+        assert!(res.unwrap_err().contains("driver"));
+    }
+
+    #[tokio::test]
+    async fn network_details_thieu_network_id_tra_ve_loi_ro_rang() {
+        let res = handle("network-details", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("networkId"));
+    }
+
+    #[tokio::test]
+    async fn container_prune_thieu_config_id_tra_ve_loi_ro_rang() {
+        let res = handle("container-prune", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn image_prune_thieu_dangling_only_tra_ve_loi_ro_rang() {
+        let res = handle("image-prune", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("danglingOnly"));
+    }
+
+    #[tokio::test]
+    async fn volume_prune_config_khong_ton_tai_tra_ve_loi_ro_rang() {
+        let res = handle("volume-prune", serde_json::json!({ "configId": "khong-ton-tai" })).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn network_prune_config_khong_ton_tai_tra_ve_loi_ro_rang() {
+        let res = handle("network-prune", serde_json::json!({ "configId": "khong-ton-tai" })).await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn system_info_thieu_config_id_tra_ve_loi_ro_rang() {
+        let res = handle("system-info", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn system_df_config_khong_ton_tai_tra_ve_loi_ro_rang() {
+        let res = handle("system-df", serde_json::json!({ "configId": "khong-ton-tai" })).await;
+        assert!(res.is_err());
     }
 
     #[test]
