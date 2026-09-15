@@ -7,13 +7,27 @@
 // Client đang mở của người dùng. Tiến trình riêng thì chỉ dịch vụ đó chết, lần
 // gọi sau tự spawn lại.
 //
-// Giao thức: JSON theo dòng (JSONL) qua stdin/stdout. Một dòng vào là một
-// request, một dòng ra là một response. Mỗi sidecar được phục vụ tuần tự bởi
-// một mutex — đơn giản và đủ: khối lượng ở đây là lời gọi do người dùng bấm,
-// không phải luồng dữ liệu nóng.
+// Giao thức: JSON theo dòng (JSONL) qua stdin/stdout. Mỗi dòng ra mang một
+// `id` khớp với dòng vào đã sinh ra nó. Có HAI kiểu lời gọi:
+//   - MỘT-LẦN (`service_call`): sidecar trả đúng một dòng cho mỗi request.
+//   - STREAM (`service_stream_start`/`_stop`): sidecar trả NHIỀU dòng cho
+//     CÙNG một `id` (Pub/Sub, tail log…), cho tới khi tự gửi `done: true` hoặc
+//     bị `service_stream_stop` yêu cầu ngừng route (sidecar không nhất thiết
+//     biết việc dừng đó — dọn tài nguyên phía sidecar, nếu cần, là việc của
+//     phương thức riêng sidecar tự định nghĩa, host không áp đặt).
+//
+// Một READER TASK riêng cho mỗi sidecar đọc liên tục và DEMUX theo `id` — đây
+// là điểm khác biệt lớn nhất so với bản v1 (một mutex khoá trọn một vòng
+// request/response): nó cho phép nhiều lời gọi đồng thời tới CÙNG một sidecar
+// (một one-shot không phải đợi một stream đang chạy nhường chỗ), và biến lớp
+// "phản hồi đến muộn bị đọc nhầm thành phản hồi của lời gọi kế tiếp" — vốn là
+// rủi ro cố hữu của mô hình v1 — thành vô hại: một phản hồi tới khi waiter của
+// nó đã bị dọn (do timeout) chỉ đơn giản không khớp `id` nào và bị bỏ qua.
 //
 // HỢP ĐỒNG mà một sidecar phải giữ:
-//   1. đọc từng dòng stdin, trả đúng một dòng JSON cho mỗi dòng nhận được;
+//   1. đọc từng dòng stdin, trả về ít nhất một dòng JSON mang đúng `id` đó
+//      (một dòng cho lời gọi thường; nhiều dòng, kết bằng `done: true`, cho
+//      một lời gọi mà chính sidecar coi là stream);
 //   2. THOÁT khi stdin đóng (EOF) — đây là cách tiến trình con được dọn khi app
 //      tắt, kể cả lúc app bị kill và không kịp chạy hàm dọn nào;
 //   3. không bao giờ ghi gì khác lên stdout (log thì ghi stderr).
@@ -24,12 +38,14 @@
 
 use std::collections::HashMap;
 use std::process::Stdio;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tauri::ipc::Channel;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex as AsyncMutex};
 use tokio::time::timeout;
 
 /// Phiên bản khung tin nhắn. Phải khớp `SERVICE_PROTOCOL` ở
@@ -46,11 +62,11 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 /// song song vì Rust và Node không chia sẻ được hằng số qua ranh giới ngôn
 /// ngữ; `allowlist_khop_voi_external_bin` dưới đây khoá vế phía tauri.conf.json.
 ///
-/// `devtool-svc-echo` là plugin ví dụ tối giản (chỉ `ping`/`echo`, không có
-/// giá trị người dùng) — nó tồn tại thuần để chứng minh đường end-to-end thật
-/// của tier B trước khi có plugin thật cần tới cơ chế này, xem
-/// `tests/service_echo.rs`. Chưa có `plugin.ts` nào khai `service` để gọi
-/// tới nó, nên nó không xuất hiện ở bất cứ đâu trong UI.
+/// `devtool-svc-echo` là plugin ví dụ tối giản (`ping`/`echo`/`tick-stream`,
+/// không có giá trị người dùng) — nó tồn tại thuần để chứng minh đường
+/// end-to-end thật của tier B, cả một-lần lẫn stream, trước khi có plugin thật
+/// cần tới cơ chế này, xem `tests/service_echo.rs`. Chưa có `plugin.ts` nào
+/// khai `service` để gọi tới nó, nên nó không xuất hiện ở bất cứ đâu trong UI.
 const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo"];
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +80,10 @@ pub struct ServiceRequest {
     pub params: serde_json::Value,
 }
 
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
 // `Deserialize` cũng cần, không chỉ `Serialize`: host PHÂN TÍCH phản hồi của
 // sidecar thành đúng kiểu này trước khi chuyển tiếp cho webview — một sidecar
 // trả JSON lệch hình dạng phải bị chặn ở đây, không phải lọt lên frontend.
@@ -75,11 +95,28 @@ pub struct ServiceResponse {
     pub result: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Dòng này là MỘT TRONG NHIỀU sự kiện của một stream, không phải phản hồi
+    /// một-lần. Vắng mặt (hay `false`) tương thích ngược với mọi sidecar không
+    /// biết gì về trường này (chúng chỉ bao giờ trả một-lần).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub stream: bool,
+    /// Dòng CUỐI của một stream — sau dòng này sidecar sẽ không gửi thêm sự
+    /// kiện nào cho đúng `id` này nữa. Chỉ có nghĩa khi đi kèm một lời gọi
+    /// stream; host bỏ qua nó với lời gọi một-lần.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub done: bool,
 }
 
 impl ServiceResponse {
     fn err(id: &str, message: impl Into<String>) -> Self {
-        Self { protocol: SERVICE_PROTOCOL, id: id.to_string(), result: None, error: Some(message.into()) }
+        Self {
+            protocol: SERVICE_PROTOCOL,
+            id: id.to_string(),
+            result: None,
+            error: Some(message.into()),
+            stream: false,
+            done: false,
+        }
     }
 }
 
@@ -101,15 +138,42 @@ pub fn reject_reason(request: &ServiceRequest) -> Option<String> {
     None
 }
 
-struct Running {
-    child: Child,
-    stdin: ChildStdin,
-    stdout: Lines<BufReader<ChildStdout>>,
+/// Nơi một dòng phản hồi (khớp `id`) được chuyển tới. `Once` giải quyết đúng
+/// một lần rồi bị gỡ; `Stream` sống tới khi gặp `done: true`, gặp `error`,
+/// hoặc bị `service_stream_stop` gỡ tay.
+enum Waiter {
+    Once(oneshot::Sender<ServiceResponse>),
+    Stream(Box<dyn EventSink>),
 }
 
-#[derive(Default)]
+/// Trừu tượng hoá "gửi một sự kiện ra ngoài" — tách khỏi `tauri::ipc::Channel`
+/// cụ thể để TEST ĐƯỢC bằng một tiến trình thật (`sh`) và một sink thu thập
+/// vào bộ nhớ, không cần dựng một `Channel` thật (chỉ construct được thông qua
+/// một lời gọi Tauri command thật đang chạy trong app — xem lý do tương tự ở
+/// `plugin_installer.rs` về việc không dựng `AppHandle` giả trong test).
+trait EventSink: Send {
+    fn send(&self, value: serde_json::Value);
+}
+
+struct ChannelSink(Channel<serde_json::Value>);
+
+impl EventSink for ChannelSink {
+    fn send(&self, value: serde_json::Value) {
+        let _ = self.0.send(value);
+    }
+}
+
+type Waiters = Arc<StdMutex<HashMap<String, Waiter>>>;
+
+struct RunningSidecar {
+    child: AsyncMutex<Child>,
+    stdin: AsyncMutex<ChildStdin>,
+    waiters: Waiters,
+}
+
+#[derive(Default, Clone)]
 pub struct ServiceRegistry {
-    running: Mutex<HashMap<String, Running>>,
+    running: Arc<AsyncMutex<HashMap<String, Arc<RunningSidecar>>>>,
 }
 
 /// Sidecar nằm cạnh file thực thi của app — cùng quy ước với
@@ -130,15 +194,75 @@ fn sidecar_path(bin: &str) -> Result<std::path::PathBuf, String> {
     Ok(path)
 }
 
-async fn spawn(bin: &str) -> Result<Running, String> {
-    let mut command = Command::new(sidecar_path(bin)?);
-    running_from(&mut command).map_err(|e| format!("Không chạy được sidecar \"{bin}\": {e}"))
+/// Demux MỘT dòng đã phân tích vào đúng waiter của nó. Hàm THUẦN (không có gì
+/// async) — dễ kiểm bằng cách gọi trực tiếp, không cần spawn tiến trình nào.
+fn dispatch(waiters: &Waiters, response: ServiceResponse) {
+    let mut w = waiters.lock().unwrap();
+    // Gỡ trước rồi mới quyết định có chèn lại không — giữ cả borrow đọc lẫn
+    // ghi cùng lúc trên cùng một entry sẽ không qua được borrow checker.
+    let Some(waiter) = w.remove(&response.id) else {
+        // Không ai còn chờ id này — đã timeout, hoặc rác. Bỏ qua có chủ ý:
+        // đây chính là điều làm một phản hồi tới muộn trở nên VÔ HẠI, khác
+        // hẳn bản v1 (một mutex khoá cả sidecar, phản hồi muộn ghép nhầm vào
+        // lời gọi kế tiếp).
+        return;
+    };
+    match waiter {
+        Waiter::Once(tx) => {
+            let _ = tx.send(response);
+        }
+        Waiter::Stream(sink) => {
+            if response.error.is_some() || response.done {
+                // Lỗi giữa chừng cũng coi như kết thúc — không lặng lẽ tiếp
+                // tục route rác cho một stream đã báo hỏng.
+                return;
+            }
+            sink.send(response.result.unwrap_or(serde_json::Value::Null));
+            w.insert(response.id, Waiter::Stream(sink));
+        }
+    }
 }
 
-/// Dựng `Running` từ một lệnh bất kỳ. Tách khỏi `spawn` để test lái được đường
-/// I/O thật (round-trip, timeout, tiến trình chết) bằng tiến trình sẵn có của
-/// hệ điều hành, không phải ship thêm một binary giả chỉ để kiểm thử.
-fn running_from(command: &mut Command) -> Result<Running, String> {
+/// Vòng đọc của một sidecar — chạy suốt vòng đời tiến trình con, một task cho
+/// mỗi sidecar. Kết thúc khi stdout đóng (tiến trình chết) hoặc sidecar nói
+/// sai giao thức (từ đó ống dẫn không còn tin được nữa — không có cách nào
+/// biết ranh giới dòng kế tiếp thật sự bắt đầu ở đâu). `on_ended` chạy đúng
+/// một lần khi vòng đọc dừng, để lớp gọi tự quyết định dọn gì tiếp (production:
+/// gỡ khỏi registry để lần sau spawn lại).
+async fn reader_loop(
+    mut lines: Lines<BufReader<ChildStdout>>,
+    waiters: Waiters,
+    on_ended: impl FnOnce() + Send + 'static,
+) {
+    loop {
+        match lines.next_line().await {
+            Ok(Some(line)) => match serde_json::from_str::<ServiceResponse>(&line) {
+                Ok(response) => dispatch(&waiters, response),
+                Err(_) => break,
+            },
+            _ => break,
+        }
+    }
+    // Mọi one-shot còn treo phải được giải quyết — nếu không, lời gọi phía
+    // trên đợi timeout thay vì biết ngay sidecar đã thoát. Stream thì lặng lẽ
+    // kết thúc: channel/sink không còn ai gửi thêm là tín hiệu đủ rõ.
+    let mut w = waiters.lock().unwrap();
+    for (_, waiter) in w.drain() {
+        if let Waiter::Once(tx) = waiter {
+            let _ = tx.send(ServiceResponse::err("", "Sidecar đã thoát hoặc nói sai giao thức"));
+        }
+    }
+    drop(w);
+    on_ended();
+}
+
+/// Spawn một tiến trình VÀ vòng đọc của nó. Nhận thẳng `Command` (không phải
+/// tên bin) để test lái được bằng tiến trình sẵn có của OS (`cat`, `sh`) thay
+/// vì ship thêm một binary giả.
+fn spawn_process(
+    command: &mut Command,
+    on_ended: impl FnOnce() + Send + 'static,
+) -> Result<Arc<RunningSidecar>, String> {
     let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -153,25 +277,93 @@ fn running_from(command: &mut Command) -> Result<Running, String> {
 
     let stdin = child.stdin.take().ok_or("Sidecar không mở được stdin")?;
     let stdout = child.stdout.take().ok_or("Sidecar không mở được stdout")?;
-    Ok(Running { child, stdin, stdout: BufReader::new(stdout).lines() })
+    let waiters: Waiters = Arc::default();
+
+    tokio::spawn(reader_loop(BufReader::new(stdout).lines(), waiters.clone(), on_ended));
+
+    Ok(Arc::new(RunningSidecar {
+        child: AsyncMutex::new(child),
+        stdin: AsyncMutex::new(stdin),
+        waiters,
+    }))
 }
 
-/// Một vòng request/response trên tiến trình đang chạy. Trả `Err` khi ống dẫn
-/// hỏng — người gọi sẽ giết tiến trình và để lần sau spawn lại.
-async fn exchange(running: &mut Running, line: String, limit: Duration) -> Result<String, String> {
-    running
-        .stdin
+async fn get_or_spawn(registry: &ServiceRegistry, bin: &str) -> Result<Arc<RunningSidecar>, String> {
+    let mut map = registry.running.lock().await;
+    if let Some(running) = map.get(bin) {
+        return Ok(running.clone());
+    }
+
+    let mut command = Command::new(sidecar_path(bin)?);
+    let cleanup_registry = registry.clone();
+    let cleanup_bin = bin.to_string();
+    let running = spawn_process(&mut command, move || {
+        // Dọn KHÔNG ĐỒNG BỘ với việc vòng đọc kết thúc: `on_ended` phải là một
+        // closure THƯỜNG (reader_loop không muốn phụ thuộc kiểu future cụ thể
+        // nào), nên việc gỡ khỏi map — vốn cần `.await` để khoá — được giao
+        // cho một task riêng. Trong lúc đó, một lời gọi mới TỚI ĐÚNG sidecar
+        // này vẫn dùng được `Arc` cũ cho tới khi nó bị gỡ (ghi xuống stdin đã
+        // đóng sẽ tự báo lỗi cho người gọi đó — tự sửa, không cần đồng bộ chặt).
+        tokio::spawn(async move {
+            cleanup_registry.running.lock().await.remove(&cleanup_bin);
+        });
+    })
+    .map_err(|e| format!("Không chạy được sidecar \"{bin}\": {e}"))?;
+
+    map.insert(bin.to_string(), running.clone());
+    Ok(running)
+}
+
+async fn write_line(running: &RunningSidecar, line: &str) -> Result<(), String> {
+    let mut stdin = running.stdin.lock().await;
+    stdin
         .write_all(line.as_bytes())
         .await
         .map_err(|e| format!("Không ghi được xuống sidecar: {e}"))?;
-    running.stdin.write_all(b"\n").await.map_err(|e| e.to_string())?;
-    running.stdin.flush().await.map_err(|e| e.to_string())?;
+    stdin.write_all(b"\n").await.map_err(|e| e.to_string())?;
+    stdin.flush().await.map_err(|e| e.to_string())
+}
 
-    match timeout(limit, running.stdout.next_line()).await {
-        Err(_) => Err(format!("Sidecar không trả lời trong {}s", limit.as_secs())),
-        Ok(Err(e)) => Err(format!("Không đọc được từ sidecar: {e}")),
-        Ok(Ok(None)) => Err("Sidecar đã đóng stdout".to_string()),
-        Ok(Ok(Some(line))) => Ok(line),
+fn encode(request: &ServiceRequest) -> Result<String, String> {
+    serde_json::to_string(&serde_json::json!({
+        "protocol": request.protocol,
+        "id": request.id,
+        "plugin": request.plugin,
+        "method": request.method,
+        "params": request.params,
+    }))
+    .map_err(|e| e.to_string())
+}
+
+/// Một vòng request/response MỘT-LẦN thật sự (dùng bởi cả `service_call` và
+/// các test dưới): đăng ký waiter TRƯỚC khi ghi dòng ra — đăng ký sau khi ghi
+/// sẽ để lọt một khoảng hở lý thuyết nơi phản hồi tới trước khi có ai chờ nó.
+async fn call_once(running: &RunningSidecar, request: &ServiceRequest, limit: Duration) -> ServiceResponse {
+    let line = match encode(request) {
+        Ok(l) => l,
+        Err(e) => return ServiceResponse::err(&request.id, e),
+    };
+
+    let (tx, rx) = oneshot::channel();
+    running.waiters.lock().unwrap().insert(request.id.clone(), Waiter::Once(tx));
+
+    if let Err(e) = write_line(running, &line).await {
+        running.waiters.lock().unwrap().remove(&request.id);
+        return ServiceResponse::err(&request.id, e);
+    }
+
+    match timeout(limit, rx).await {
+        Ok(Ok(response)) => response,
+        Ok(Err(_)) => ServiceResponse::err(&request.id, "Sidecar đã thoát trước khi trả lời"),
+        Err(_) => {
+            // KHÔNG giết sidecar ở đây, khác bản v1: với việc route theo `id`,
+            // một phản hồi tới muộn cho ĐÚNG lời gọi này giờ vô hại — nó chỉ
+            // không tìm thấy waiter (đã gỡ ngay dưới) và bị bỏ qua. Lời gọi
+            // khác, đồng thời, tới cùng sidecar không phải trả giá cho một
+            // lời gọi chậm.
+            running.waiters.lock().unwrap().remove(&request.id);
+            ServiceResponse::err(&request.id, format!("Sidecar không trả lời trong {}s", limit.as_secs()))
+        }
     }
 }
 
@@ -183,62 +375,74 @@ pub async fn service_call(
     if let Some(reason) = reject_reason(&request) {
         return Ok(ServiceResponse::err(&request.id, reason));
     }
-
-    let line = match serde_json::to_string(&serde_json::json!({
-        "protocol": request.protocol,
-        "id": request.id,
-        "plugin": request.plugin,
-        "method": request.method,
-        "params": request.params,
-    })) {
-        Ok(l) => l,
-        Err(e) => return Ok(ServiceResponse::err(&request.id, e.to_string())),
+    let running = match get_or_spawn(&state, &request.bin).await {
+        Ok(r) => r,
+        Err(e) => return Ok(ServiceResponse::err(&request.id, e)),
     };
+    Ok(call_once(&running, &request, CALL_TIMEOUT).await)
+}
 
-    let mut running_map = state.running.lock().await;
-    if !running_map.contains_key(&request.bin) {
-        match spawn(&request.bin).await {
-            Ok(r) => {
-                running_map.insert(request.bin.clone(), r);
-            }
-            Err(e) => return Ok(ServiceResponse::err(&request.id, e)),
-        }
+/// Bắt đầu một stream: ghi request, đăng ký `channel` để nhận MỌI sự kiện
+/// mang đúng `request.id` cho tới khi sidecar gửi `done: true` hoặc
+/// `service_stream_stop` được gọi. KHÔNG đợi sự kiện đầu tiên — trả về ngay
+/// sau khi ghi xong, vì một stream có thể không bao giờ có sự kiện nào cho
+/// tới khi có dữ liệu thật (một kênh Pub/Sub im lặng chẳng hạn).
+#[tauri::command]
+pub async fn service_stream_start(
+    state: tauri::State<'_, ServiceRegistry>,
+    request: ServiceRequest,
+    channel: Channel<serde_json::Value>,
+) -> Result<(), String> {
+    if let Some(reason) = reject_reason(&request) {
+        return Err(reason);
     }
+    let running = get_or_spawn(&state, &request.bin).await?;
+    let line = encode(&request)?;
 
-    let running = running_map.get_mut(&request.bin).expect("vừa chèn ở trên");
-    match exchange(running, line, CALL_TIMEOUT).await {
-        Ok(reply) => match serde_json::from_str::<ServiceResponse>(&reply) {
-            Ok(response) => Ok(response),
-            Err(e) => {
-                // Sidecar nói sai giao thức: ống dẫn coi như không còn tin được
-                // (dòng vừa đọc có thể là log lạc vào stdout, và dòng kế tiếp
-                // sẽ bị ghép nhầm với lời gọi sau). Dọn để lần sau bắt đầu sạch.
-                kill(running_map.remove(&request.bin)).await;
-                Ok(ServiceResponse::err(&request.id, format!("Phản hồi sidecar không hợp lệ: {e}")))
-            }
-        },
-        Err(e) => {
-            // Bao gồm cả TIMEOUT, và đó là lý do phải giết chứ không chỉ báo
-            // lỗi: phản hồi muộn vẫn còn nằm trong ống và sẽ bị đọc nhầm thành
-            // phản hồi của lời gọi kế tiếp.
-            kill(running_map.remove(&request.bin)).await;
-            Ok(ServiceResponse::err(&request.id, e))
-        }
+    running
+        .waiters
+        .lock()
+        .unwrap()
+        .insert(request.id.clone(), Waiter::Stream(Box::new(ChannelSink(channel))));
+
+    if let Err(e) = write_line(&running, &line).await {
+        running.waiters.lock().unwrap().remove(&request.id);
+        return Err(e);
     }
+    Ok(())
+}
+
+/// Ngừng route sự kiện cho MỘT stream — không đảm bảo sidecar biết việc này
+/// (host không áp đặt một quy ước "unsubscribe" chung cho mọi sidecar). Một
+/// sidecar muốn dọn tài nguyên khi khách ngừng nghe nên tự định nghĩa một
+/// phương thức riêng (ví dụ `unsubscribe`) mà client gọi qua `service_call`
+/// TRƯỚC khi gọi hàm này.
+#[tauri::command]
+pub async fn service_stream_stop(
+    state: tauri::State<'_, ServiceRegistry>,
+    bin: String,
+    id: String,
+) -> Result<(), String> {
+    if let Some(running) = state.running.lock().await.get(&bin) {
+        running.waiters.lock().unwrap().remove(&id);
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn service_stop(state: tauri::State<'_, ServiceRegistry>, bin: String) -> Result<(), String> {
-    kill(state.running.lock().await.remove(&bin)).await;
+    if let Some(running) = state.running.lock().await.remove(&bin) {
+        kill(running).await;
+    }
     Ok(())
 }
 
-async fn kill(running: Option<Running>) {
-    if let Some(mut r) = running {
-        // Đóng stdin trước: sidecar đúng hợp đồng sẽ tự thoát, không cần SIGKILL.
-        drop(r.stdin);
-        let _ = r.child.kill().await;
-    }
+async fn kill(running: Arc<RunningSidecar>) {
+    // Đóng stdin trước: sidecar đúng hợp đồng sẽ tự thoát, không cần SIGKILL.
+    // `stdin`/`child` nằm sau `AsyncMutex` vì `RunningSidecar` được chia sẻ
+    // (Arc) — một stream/one-shot khác có thể đang giữ nó đúng lúc này.
+    drop(running.stdin.lock().await);
+    let _ = running.child.lock().await.kill().await;
 }
 
 #[cfg(test)]
@@ -296,52 +500,174 @@ mod tests {
     #[tokio::test]
     async fn round_trip_qua_ong_dan_that() {
         let mut cmd = Command::new("cat");
-        let mut running = running_from(&mut cmd).expect("spawn cat");
+        let running = spawn_process(&mut cmd, || {}).expect("spawn cat");
 
-        let line = r#"{"protocol":1,"id":"7","plugin":"demo","method":"ping","params":null}"#;
-        let reply = exchange(&mut running, line.to_string(), Duration::from_secs(5))
-            .await
-            .expect("phải nhận được phản hồi");
+        let req = request("cat", SERVICE_PROTOCOL);
+        let response = call_once(&running, &req, Duration::from_secs(5)).await;
 
-        let parsed: ServiceResponse = serde_json::from_str(&reply).expect("phản hồi hợp lệ");
-        assert_eq!(parsed.id, "7");
-        assert_eq!(parsed.protocol, SERVICE_PROTOCOL);
-        kill(Some(running)).await;
+        assert_eq!(response.id, "1");
+        assert_eq!(response.protocol, SERVICE_PROTOCOL);
+        assert!(response.error.is_none(), "{response:?}");
+        kill(running).await;
     }
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn sidecar_nuot_request_ma_khong_tra_loi_thi_bao_timeout() {
-        // Đọc hết stdin nhưng không bao giờ ghi ra — đúng kiểu sidecar treo.
+    async fn hai_loi_goi_dong_thoi_toi_cung_sidecar_khong_giam_len_nhau() {
+        // Trần cũ (một mutex khoá cả sidecar cho MỘT vòng round-trip) sẽ khiến
+        // lời gọi thứ hai đợi lời gọi thứ nhất xong xuôi. `cat` dội đúng dòng
+        // gửi vào, nên hai id khác nhau phải nhận đúng phản hồi của MÌNH dù
+        // gửi gần như cùng lúc.
+        let mut cmd = Command::new("cat");
+        let running = spawn_process(&mut cmd, || {}).expect("spawn cat");
+
+        let mut a = request("cat", SERVICE_PROTOCOL);
+        a.id = "a".into();
+        let mut b = request("cat", SERVICE_PROTOCOL);
+        b.id = "b".into();
+
+        let (ra, rb) = tokio::join!(
+            call_once(&running, &a, Duration::from_secs(5)),
+            call_once(&running, &b, Duration::from_secs(5)),
+        );
+        assert_eq!(ra.id, "a");
+        assert_eq!(rb.id, "b");
+        kill(running).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn timeout_khong_giet_sidecar_va_khong_anh_huong_loi_goi_khac() {
+        // sh: dòng đầu KHÔNG được trả lời (ngủ lâu hơn timeout của lời gọi đó),
+        // dòng thứ hai dội lại ngay — chứng minh một lời gọi timeout không đầu
+        // độc sidecar cho lời gọi tiếp theo, khác hẳn hành vi "giết cả tiến
+        // trình khi timeout" của bản v1.
         let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg("while IFS= read -r _; do :; done");
-        let mut running = running_from(&mut cmd).expect("spawn sh");
+        cmd.arg("-c").arg("read -r first; sleep 5 & read -r second; echo \"$second\"");
+        let running = spawn_process(&mut cmd, || {}).expect("spawn sh");
 
-        let err = exchange(&mut running, "{}".to_string(), Duration::from_millis(200))
-            .await
-            .expect_err("phải timeout");
-        assert!(err.contains("không trả lời"), "{err}");
-        kill(Some(running)).await;
+        let mut a = request("sh", SERVICE_PROTOCOL);
+        a.id = "cham".into();
+        let err = call_once(&running, &a, Duration::from_millis(200)).await;
+        assert!(err.error.unwrap().contains("không trả lời"));
+
+        let mut b = request("sh", SERVICE_PROTOCOL);
+        b.id = "nhanh".into();
+        let ok = call_once(&running, &b, Duration::from_secs(5)).await;
+        assert_eq!(ok.id, "nhanh");
+        assert!(ok.error.is_none());
+
+        kill(running).await;
     }
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn sidecar_chet_thi_bao_dong_stdout_chu_khong_treo() {
+    async fn sidecar_chet_thi_bao_loi_ro_rang_khong_treo() {
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg("exit 0");
-        let mut running = running_from(&mut cmd).expect("spawn sh");
+        let running = spawn_process(&mut cmd, || {}).expect("spawn sh");
 
-        let err = exchange(&mut running, "{}".to_string(), Duration::from_secs(5))
-            .await
-            .expect_err("tiến trình đã chết");
-        assert!(err.contains("stdout") || err.contains("ghi được"), "{err}");
-        kill(Some(running)).await;
+        let req = request("sh", SERVICE_PROTOCOL);
+        let response = call_once(&running, &req, Duration::from_secs(5)).await;
+        assert!(response.error.is_some());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn json_hong_lam_reader_dung_va_bao_loi_cho_waiter_dang_treo() {
+        // `printf` in ra một dòng KHÔNG phải JSON hợp lệ — vòng đọc phải coi
+        // ống dẫn không còn tin được và dừng, chứ không cố đọc tiếp.
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c").arg("read -r _; printf 'khong-phai-json\\n'");
+        let running = spawn_process(&mut cmd, || {}).expect("spawn sh");
+
+        let req = request("sh", SERVICE_PROTOCOL);
+        let response = call_once(&running, &req, Duration::from_secs(5)).await;
+        assert!(response.error.is_some());
+    }
+
+    /// Sink thu thập vào bộ nhớ — thay cho `tauri::ipc::Channel` thật (chỉ
+    /// dựng được thông qua một lời gọi Tauri command đang chạy trong app).
+    struct CollectSink(Arc<StdMutex<Vec<serde_json::Value>>>);
+    impl EventSink for CollectSink {
+        fn send(&self, value: serde_json::Value) {
+            self.0.lock().unwrap().push(value);
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn stream_nhan_du_moi_su_kien_toi_khi_done() {
+        // Sidecar giả: đọc một dòng, rồi tự phát 3 sự kiện mang ĐÚNG id của
+        // request đó, kết bằng `done: true`.
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c").arg(
+            r#"read -r _; \
+               printf '{"protocol":1,"id":"s","stream":true,"result":1}\n'; \
+               printf '{"protocol":1,"id":"s","stream":true,"result":2}\n'; \
+               printf '{"protocol":1,"id":"s","stream":true,"done":true}\n'"#,
+        );
+        let running = spawn_process(&mut cmd, || {}).expect("spawn sh");
+
+        let collected = Arc::new(StdMutex::new(Vec::new()));
+        let mut req = request("sh", SERVICE_PROTOCOL);
+        req.id = "s".into();
+        let line = encode(&req).unwrap();
+        running
+            .waiters
+            .lock()
+            .unwrap()
+            .insert(req.id.clone(), Waiter::Stream(Box::new(CollectSink(collected.clone()))));
+        write_line(&running, &line).await.unwrap();
+
+        // Đợi tới khi waiter tự gỡ (nghĩa là `done` đã tới) thay vì `sleep` cố
+        // định — tránh test chập chờn theo tốc độ máy chạy CI.
+        for _ in 0..100 {
+            if !running.waiters.lock().unwrap().contains_key("s") {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(!running.waiters.lock().unwrap().contains_key("s"), "waiter phải tự gỡ sau done");
+        assert_eq!(*collected.lock().unwrap(), vec![serde_json::json!(1), serde_json::json!(2)]);
+        kill(running).await;
+    }
+
+    #[test]
+    fn stream_dung_tay_qua_dispatch_ngung_route_ngay_du_chua_done() {
+        let waiters: Waiters = Arc::default();
+        let collected = Arc::new(StdMutex::new(Vec::new()));
+        waiters
+            .lock()
+            .unwrap()
+            .insert("s".into(), Waiter::Stream(Box::new(CollectSink(collected.clone()))));
+
+        // Mô phỏng `service_stream_stop`: gỡ tay, không cần sidecar biết.
+        waiters.lock().unwrap().remove("s");
+
+        dispatch(
+            &waiters,
+            ServiceResponse { protocol: SERVICE_PROTOCOL, id: "s".into(), result: Some(serde_json::json!(1)), error: None, stream: true, done: false },
+        );
+        assert!(collected.lock().unwrap().is_empty(), "đã dừng thì không còn nhận sự kiện nào nữa");
+    }
+
+    #[test]
+    fn phan_hoi_toi_muon_khong_khop_id_nao_thi_bi_bo_qua_khong_panic() {
+        // Đây chính là ca bản v1 sẽ ghép nhầm vào lời gọi kế tiếp — với demux
+        // theo id, nó chỉ đơn giản không khớp waiter nào.
+        let waiters: Waiters = Arc::default();
+        dispatch(&waiters, ServiceResponse::err("khong-ai-cho", "trễ"));
+        // Không panic, không còn gì trong waiters — đủ để coi là bỏ qua sạch.
+        assert!(waiters.lock().unwrap().is_empty());
     }
 
     #[test]
     fn response_bo_qua_truong_rong_khi_serialize() {
         let json = serde_json::to_string(&ServiceResponse::err("7", "hỏng")).unwrap();
         assert!(json.contains("\"error\":\"hỏng\""), "{json}");
-        assert!(!json.contains("result"), "{json}");
+        assert!(!json.contains("result"));
+        assert!(!json.contains("stream"));
+        assert!(!json.contains("done"));
     }
 }

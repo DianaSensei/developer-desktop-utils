@@ -186,10 +186,10 @@ trong tiến trình sẽ kéo theo mọi consumer đang chạy.
 `src-tauri/src/service_host.rs` (host) + `src/platform/service.ts` (client).
 Manifest khai `service: { bin, methods }` + quyền `service`.
 
-**Giao thức**: JSON theo dòng (JSONL) qua stdin/stdout, mỗi sidecar phục vụ tuần tự
-sau một mutex. Hợp đồng sidecar phải giữ: trả đúng một dòng cho mỗi dòng nhận được;
-**thoát khi stdin đóng (EOF)** — đó là cách tiến trình con được dọn khi app bị kill;
-không ghi gì khác lên stdout.
+**Giao thức**: JSON theo dòng (JSONL) qua stdin/stdout. Hợp đồng sidecar phải giữ:
+trả ÍT NHẤT một dòng mang đúng `id` cho mỗi dòng nhận được; **thoát khi stdin đóng
+(EOF)** — đó là cách tiến trình con được dọn khi app bị kill; không ghi gì khác lên
+stdout (log thì ghi stderr).
 
 **Ranh giới tin cậy ở Rust, không ở manifest.** Client nêu tên binary, nhưng chỉ tên
 trong `ALLOWED_SERVICES` mới được chạy — manifest do webview đọc, nên nó không thể
@@ -197,9 +197,79 @@ là thứ quyết định tiến trình nào được sinh. Danh sách hiện r�
 thay vì mở sẵn một đường chạy tiến trình cho thứ chưa tồn tại. Test Rust khoá rằng
 mọi mục trong allowlist đều phải có trong `bundle.externalBin`.
 
-**Timeout thì giết tiến trình, không chỉ báo lỗi.** Với ống dẫn tuần tự, phản hồi
-đến muộn vẫn nằm trong ống và sẽ bị đọc nhầm thành phản hồi của lời gọi kế tiếp.
-Cùng lý do khi sidecar trả JSON không hợp lệ.
+### Ghép dòng theo `id`, không theo thứ tự ống dẫn (mở rộng streaming)
+
+Bản đầu phục vụ tuần tự: một mutex quanh sidecar, gửi rồi đọc đúng một dòng kế
+tiếp làm phản hồi. Cách này có hai giới hạn thật: (1) không biểu diễn được một
+method phát NHIỀU sự kiện cho một lời gọi (Pub/Sub, tail log — thứ Phase 2 của
+Kafka/Redis/Container chắc chắn cần), và (2) một lỗi tiềm ẩn — phản hồi đến muộn
+(timeout) vẫn nằm trong ống và bị đọc nhầm thành phản hồi của lời gọi kế tiếp
+dùng chung sidecar.
+
+Sửa bằng cách thêm một **tác vụ đọc nền cho mỗi sidecar** (`reader_loop`), chạy
+độc lập ngay khi sidecar được spawn, đọc liên tục mọi dòng và ghép chúng vào
+đúng lời gọi bằng `id` — KHÔNG còn giả định "dòng kế tiếp trên ống thuộc về lời
+gọi vừa gửi":
+
+- `Waiter::Once(oneshot::Sender)` — một lời gọi một-lần (`call()`/`sdk.service.call`),
+  y hệt trước, chỉ khác là nó không còn giữ khoá độc quyền sidecar trong lúc chờ.
+- `Waiter::Stream(Box<dyn EventSink>)` — một đăng ký dài hạn, nhận NHIỀU dòng cho
+  cùng một `id`, đến khi dòng nào đó mang `done: true`. `EventSink` là một trait
+  (`send(&self, Value)`) chứ không phải trực tiếp `tauri::ipc::Channel`: `Channel`
+  chỉ dựng được từ một lệnh Tauri thật đang chạy (nó cài `CommandArg`), không
+  fabricate được trong unit test cô lập — trait này tách phần LOGIC ĐỊNH TUYẾN
+  (test được bằng một `EventSink` giả, `CollectSink`) khỏi phần TRUYỀN TẢI thật.
+- `dispatch(waiters, response)` là hàm định tuyến thuần: gỡ waiter theo `id` ra
+  khỏi map TRƯỚC (tránh vừa giữ borrow bất biến từ `.get()` vừa cần `&mut` để
+  `.remove()`), rồi match trên giá trị đã sở hữu — `Stream` chưa `done` thì gửi
+  sự kiện rồi chèn lại vào map, `Stream` đã `done` hoặc `Once` thì gửi rồi bỏ
+  hẳn. Một phản hồi không khớp `id` nào (đã timeout, hoặc sidecar tự ý gửi thừa)
+  bị **bỏ qua thầm lặng, không panic** — đây là hệ quả trực tiếp của việc chọn
+  gỡ theo `id` thay vì theo thứ tự.
+
+**Khung tin nhắn** thêm hai trường tuỳ chọn, bỏ qua khi serialize nếu ở giá trị
+mặc định (`#[serde(default, skip_serializing_if = "is_false")]`, cần một hàm
+`is_false` viết tay vì `Not::not` không khớp chữ ký `&T -> bool` mà serde cần):
+`stream: bool` (dòng này là một-trong-nhiều sự kiện của cùng một lời gọi) và
+`done: bool` (sự kiện cuối của stream đó). Sidecar cũ (không biết hai trường
+này) vẫn tương thích: chúng vắng mặt tương đương `false`, tức hành vi một-lần
+như trước.
+
+**Timeout KHÔNG còn giết sidecar.** Đây là một thay đổi hành vi có chủ ý so với
+bản v1: giờ mỗi lời gọi có `id` riêng và một tác vụ đọc nền riêng biệt với việc
+gửi, một phản hồi đến muộn không còn nguy cơ bị đọc nhầm thành của lời gọi khác
+— nó chỉ đơn giản bị `dispatch` bỏ qua vì lúc đó `id` đã bị gỡ khỏi `waiters` do
+timeout. Giết sidecar mỗi lần timeout giờ là phản ứng thừa, tốn kém (một sidecar
+đang phục vụ một stream khác cho plugin khác sẽ bị giết oan). Sidecar trả JSON
+không hợp lệ hoàn toàn thì vẫn được coi là sự cố nghiêm trọng của tiến trình đó
+— hành vi đó không đổi.
+
+**Hai lệnh Tauri mới**: `service_stream_start(request, channel: Channel<Value>)`
+đăng ký một `Waiter::Stream` rồi gửi request; `service_stream_stop(bin, id)` gỡ
+đăng ký phía HOST — không đảm bảo sidecar biết việc dừng này (nó không phải một
+tín hiệu gửi xuống tiến trình con), dọn tài nguyên phía sidecar nếu cần là việc
+của một method riêng (`unsubscribe`) mà plugin tự gọi qua `call()` trước khi gọi
+`stop()`. Phía client, `sdk.service.stream(method, onMessage, params)` dùng
+CHUNG cửa chặn quyền/audit với `call()` (một hàm `prepare()` nội bộ dựng sẵn
+`ServiceRequest` cho cả hai) — một method stream ngoài `service.methods` bị từ
+chối y hệt một method một-lần.
+
+**`devtool-svc-echo` có thêm `tick-stream`** (`{ count }` → N sự kiện
+`0..count` rồi một dòng `done: true`, mặc định `count = 3`) — method DUY NHẤT
+trong plugin ví dụ này cần một binary thật để kiểm (`sh`/`cat` dùng trong test
+của `service_host.rs` không mô phỏng được việc một tiến trình tự phát nhiều
+dòng cho một request). `src-tauri/tests/service_echo.rs` kiểm cả ba việc: đúng
+số sự kiện + `done` cuối, mặc định đúng khi không truyền `count`, và sidecar
+vẫn sống/trả lời đúng cho request kế tiếp sau khi phát hết một stream.
+
+Test: 12 test Rust ở `service_host.rs` (thêm ba test mới — gọi đồng thời hai
+lời gọi tới cùng sidecar không giẫm lên nhau, timeout không giết sidecar và
+không ảnh hưởng lời gọi khác, và ba ca cho `dispatch`/stream nêu trên), 9 test
+integration ở `service_echo.rs` (ba test mới cho `tick-stream`), và phía TS,
+`sdk.service.stream` có test riêng dùng transport giả (`fakeStreamingTransport`)
+kiểm: dùng chung cửa chặn với `call`, báo lỗi rõ ràng khi transport không cài
+`.stream`, sự kiện tới đúng `onMessage`, và `.stop()` gọi lại đúng request đã
+đăng ký.
 
 Không thêm `tauri-plugin-shell`: sidecar resolve như binary cạnh file thực thi, đúng
 quy ước `mcp_bridge::mcp_sidecar_path` — không phải mở thêm quyền chạy tiến trình nào.
@@ -425,9 +495,18 @@ là đã dùng được cho việc thật, không chỉ đã đúng về mặt c
    thật, cài được qua Phase 1.** Đây LÀ một dự án riêng, không phải phần mở rộng
    nhỏ của Phase 1: `kafka.rs`/`rabbit.rs`/`redis_tool.rs`/`container_tool.rs` cộng
    lại ~4700 dòng, mỗi lệnh `#[tauri::command]` phải viết lại thành một method
-   JSONL qua `service_host.rs`, và các luồng dữ liệu dài hạn (Kafka consume, Redis
-   Pub/Sub, log/stats container) cần khung tin nhắn stream mà `service.ts` hiện
-   CHƯA có (nó chỉ có request/response một-một, giống `devtool-svc-echo`) — phải
-   mở rộng giao thức trước khi bắt đầu viết lại bất kỳ tool nào. Bắt đầu từ Redis
-   (nhỏ nhất, 945 dòng, đã qua SDK từ trước) khi có quyết định tiếp tục.
+   JSONL qua `service_host.rs`. ~~Khung tin nhắn stream mà các luồng dữ liệu dài
+   hạn (Kafka consume, Redis Pub/Sub, log/stats container) cần~~ **đã có** — xem
+   "Ghép dòng theo `id`" ở mục Tier B trên (`sdk.service.stream`, `tick-stream`
+   trong `devtool-svc-echo` làm bằng chứng cơ chế). Việc còn lại của Phase 2 giờ
+   thuần là việc viết lại từng tool, không còn vướng hạ tầng giao thức. Còn hai
+   thứ khác cần giải quyết TRƯỚC khi một sidecar như vậy "cài được" đúng nghĩa
+   qua Phase 1: (a) `plugin_installer.rs` hiện chỉ tải/kiểm/nạp bundle JS qua
+   `blob:` — chưa có đường tương đương cho một BINARY native theo từng nền tảng
+   (tải, kiểm checksum, cấp quyền thực thi, đặt đúng chỗ sidecar resolve được);
+   (b) `ALLOWED_SERVICES` là hằng số biên dịch sẵn trong Rust theo đúng chủ đích
+   (ranh giới tin cậy không giao cho manifest) — một sidecar cài lúc chạy từ bên
+   ngoài sẽ không nằm trong allowlist đó trừ khi cơ chế allowlist cũng được nghĩ
+   lại. Bắt đầu từ Redis (nhỏ nhất, 945 dòng, đã qua SDK từ trước) khi có quyết
+   định tiếp tục.
 4. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.

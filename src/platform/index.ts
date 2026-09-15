@@ -60,6 +60,7 @@ export type {
   ServiceRequest,
   ServiceResponse,
   ServiceTransport,
+  ServiceSubscription,
 } from './service';
 export { PluginProvider, usePluginSdk, usePluginSdkOptional, withPluginSdk } from './context';
 // Kiểu `Channel` của Tauri đi qua cửa của Platform luôn: tool cần nó để khai

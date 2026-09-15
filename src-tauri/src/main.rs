@@ -121,6 +121,8 @@ fn main() {
             mcp_bridge::mcp_respond,
             mcp_bridge::mcp_sidecar_path,
             service_host::service_call,
+            service_host::service_stream_start,
+            service_host::service_stream_stop,
             service_host::service_stop,
             secrets_vault::secret_vault_get,
             secrets_vault::secret_vault_set,

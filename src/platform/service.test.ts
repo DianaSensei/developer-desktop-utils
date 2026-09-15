@@ -6,6 +6,7 @@ import {
   SERVICE_PROTOCOL,
   createPluginService,
   type ServiceRequest,
+  type ServiceSubscription,
   type ServiceTransport,
 } from '@/platform/service';
 import * as audit from '@/platform/audit';
@@ -132,5 +133,86 @@ describe('sdk.service.call', () => {
     const service = createPluginService(withService(), { send: spy.mockResolvedValue({ protocol: SERVICE_PROTOCOL, id: 'x', result: 1 }) });
     await service.call('ping');
     expect(spy).toHaveBeenCalledOnce();
+  });
+});
+
+describe('sdk.service.stream', () => {
+  function fakeStreamingTransport(
+    emit: (request: ServiceRequest, onMessage: (event: unknown) => void) => void,
+  ): ServiceTransport & { calls: ServiceRequest[]; stopped: ServiceRequest[] } {
+    const calls: ServiceRequest[] = [];
+    const stopped: ServiceRequest[] = [];
+    return {
+      calls,
+      stopped,
+      async send(request) {
+        calls.push(request);
+        return { protocol: SERVICE_PROTOCOL, id: request.id, result: null };
+      },
+      async stream(request, onMessage) {
+        calls.push(request);
+        emit(request, onMessage);
+        return {
+          async stop() {
+            stopped.push(request);
+          },
+        };
+      },
+    };
+  }
+
+  it('dùng chung cửa chặn với call: method ngoài danh sách bị từ chối, không chạm transport', async () => {
+    const transport = fakeStreamingTransport(() => {});
+    const service = createPluginService(withService(), transport);
+
+    await expect(service.stream('rm-rf', vi.fn())).rejects.toThrow(/ngoài danh sách methods/);
+    expect(transport.calls).toHaveLength(0);
+  });
+
+  it('không khai service thì chặn ngay, không chạm transport', async () => {
+    const transport = fakeStreamingTransport(() => {});
+    const service = createPluginService(plugin(), transport);
+
+    await expect(service.stream('ping', vi.fn())).rejects.toThrow(PluginServiceError);
+    expect(transport.calls).toHaveLength(0);
+  });
+
+  it('transport không cài .stream thì báo lỗi rõ ràng thay vì gọi nhầm sang send', async () => {
+    const transport: ServiceTransport = {
+      async send(request) {
+        return { protocol: SERVICE_PROTOCOL, id: request.id, result: 'không nên tới đây' };
+      },
+    };
+    const service = createPluginService(withService(), transport);
+
+    await expect(service.stream('ping', vi.fn())).rejects.toThrow(/không hỗ trợ stream/);
+  });
+
+  it('sự kiện tới đúng onMessage, và .stop() gọi lại đúng request đã đăng ký', async () => {
+    let capturedStop: (() => Promise<void>) | undefined;
+    const transport = fakeStreamingTransport((_request, onMessage) => {
+      onMessage(0);
+      onMessage(1);
+    });
+    const service = createPluginService(withService(), transport);
+
+    const events: unknown[] = [];
+    const subscription: ServiceSubscription = await service.stream('ping', (event) => events.push(event));
+    capturedStop = subscription.stop.bind(subscription);
+    expect(events).toEqual([0, 1]);
+
+    await capturedStop();
+    expect(transport.stopped).toHaveLength(1);
+    expect(transport.stopped[0]).toMatchObject({ plugin: 'demo', bin: 'devtool-svc-demo', method: 'ping' });
+  });
+
+  it('mỗi lời gọi stream đều ghi audit như call, kể cả khi bị chặn', async () => {
+    const transport = fakeStreamingTransport(() => {});
+    const service = createPluginService(withService(), transport);
+
+    await expect(service.stream('rm-rf', vi.fn())).rejects.toThrow();
+
+    const entries = audit.recent().filter((e) => e.channel === 'service');
+    expect(entries.map((e) => [e.action, e.allowed])).toEqual([['rm-rf', false]]);
   });
 });

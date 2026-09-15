@@ -151,6 +151,94 @@ fn dong_stdin_thi_sidecar_tu_thoat() {
     assert!(status.success());
 }
 
+/// `tick-stream` là method DUY NHẤT phát nhiều dòng cho cùng một request —
+/// hành vi mà `sh`/`cat` (dùng ở test của service_host.rs) không mô phỏng
+/// được đầy đủ theo đúng nghĩa "một binary thật, đóng gói thật".
+#[test]
+fn tick_stream_phat_dung_so_su_kien_roi_ket_bang_done() {
+    let mut child = spawn();
+    let mut stdin = child.stdin.take().unwrap();
+    writeln!(
+        stdin,
+        r#"{{"protocol":1,"id":"t","plugin":"demo","method":"tick-stream","params":{{"count":3}}}}"#
+    )
+    .unwrap();
+    child.stdin = Some(stdin);
+
+    let stdout = child.stdout.as_mut().unwrap();
+    let mut reader = BufReader::new(stdout);
+    let mut events = Vec::new();
+    let mut saw_done = false;
+
+    for _ in 0..4 {
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        let parsed: Value = serde_json::from_str(line.trim()).expect("mỗi dòng phải là JSON hợp lệ");
+        assert_eq!(parsed["id"], "t");
+        assert_eq!(parsed["stream"], true);
+        if parsed.get("done").and_then(Value::as_bool).unwrap_or(false) {
+            saw_done = true;
+            break;
+        }
+        events.push(parsed["result"].clone());
+    }
+
+    assert!(saw_done, "phải kết thúc bằng done:true, không phải im lặng dừng");
+    assert_eq!(events, vec![serde_json::json!(0), serde_json::json!(1), serde_json::json!(2)]);
+    let _ = child.kill();
+}
+
+#[test]
+fn tick_stream_khong_truyen_count_thi_dung_mac_dinh_ba_su_kien() {
+    let mut child = spawn();
+    let mut stdin = child.stdin.take().unwrap();
+    writeln!(stdin, r#"{{"protocol":1,"id":"t2","plugin":"demo","method":"tick-stream","params":null}}"#).unwrap();
+    child.stdin = Some(stdin);
+
+    let stdout = child.stdout.as_mut().unwrap();
+    let mut reader = BufReader::new(stdout);
+    let mut count = 0;
+    loop {
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        let parsed: Value = serde_json::from_str(line.trim()).unwrap();
+        if parsed.get("done").and_then(Value::as_bool).unwrap_or(false) {
+            break;
+        }
+        count += 1;
+    }
+    assert_eq!(count, 3);
+    let _ = child.kill();
+}
+
+/// Sau khi trả hết N sự kiện của MỘT request stream, sidecar vẫn phải sống và
+/// trả lời đúng cho request KẾ TIẾP — một method stream không được phép để
+/// lại trạng thái làm hỏng những lời gọi sau nó.
+#[test]
+fn sau_khi_stream_xong_sidecar_van_tra_loi_binh_thuong_cho_request_ke_tiep() {
+    let mut child = spawn();
+    let mut stdin = child.stdin.take().unwrap();
+    writeln!(stdin, r#"{{"protocol":1,"id":"t3","plugin":"demo","method":"tick-stream","params":{{"count":1}}}}"#).unwrap();
+    child.stdin = Some(stdin);
+
+    let stdout = child.stdout.as_mut().unwrap();
+    {
+        let mut reader = BufReader::new(&mut *stdout);
+        for _ in 0..2 {
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+        }
+    }
+
+    let res = round_trip(
+        &mut child,
+        &json!({ "protocol": SERVICE_PROTOCOL, "id": "4", "plugin": "demo", "method": "ping", "params": null }),
+    )
+    .expect("phải còn sống sau khi phát xong một stream");
+    assert_eq!(res["result"], "pong");
+    let _ = child.kill();
+}
+
 fn wait_with_timeout(
     child: &mut std::process::Child,
     timeout: Duration,
