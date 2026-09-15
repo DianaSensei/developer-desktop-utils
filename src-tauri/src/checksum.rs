@@ -114,7 +114,7 @@ fn stream<R: Read>(
     Ok(())
 }
 
-// `pub(crate)`: plugin_installer.rs dùng lại đúng hàm này để mã hex checksum
+// `pub(crate)`: artifact_installer.rs dùng lại đúng hàm này để mã hex checksum
 // của bundle tải về, thay vì viết một bản hex-encode thứ hai trong crate.
 pub(crate) fn to_hex(bytes: &[u8]) -> String {
     use std::fmt::Write;

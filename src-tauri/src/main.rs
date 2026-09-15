@@ -14,7 +14,7 @@ mod redis_tool;
 mod container_tool;
 mod secrets_vault;
 mod service_host;
-mod plugin_installer;
+mod artifact_installer;
 mod plugin_data;
 
 use tauri::Manager;
@@ -88,7 +88,7 @@ fn main() {
         // Host cho plugin dịch vụ (tier B) — xem service_host.rs.
         .manage(service_host::ServiceRegistry::default())
         .manage(secrets_vault::VaultState::default())
-        .manage(plugin_installer::InstalledIndex::default())
+        .manage(artifact_installer::InstalledIndex::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -132,11 +132,12 @@ fn main() {
             secrets_vault::secret_vault_clear,
             secrets_vault::secret_vault_reset,
             secrets_vault::secret_vault_status,
-            plugin_installer::plugin_installer_fetch_manifest,
-            plugin_installer::plugin_installer_install,
-            plugin_installer::plugin_installer_list,
-            plugin_installer::plugin_installer_uninstall,
-            plugin_installer::plugin_installer_read_bundle,
+            artifact_installer::artifact_installer_current_target_triple,
+            artifact_installer::artifact_installer_fetch_manifest,
+            artifact_installer::artifact_installer_install,
+            artifact_installer::artifact_installer_list,
+            artifact_installer::artifact_installer_uninstall,
+            artifact_installer::artifact_installer_read_bundle,
             kafka::kafka_list_configs,
             kafka::kafka_save_config,
             kafka::kafka_delete_config,

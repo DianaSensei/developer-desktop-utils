@@ -31,6 +31,53 @@ function remoteManifest(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+/** Hình dạng THÔ y hệt những gì `artifact_installer_fetch_manifest` phía
+ *  Rust thực sự trả về cho nhánh plugin — internally-tagged theo `kind`,
+ *  ghi phẳng. */
+function remotePluginManifestRaw(overrides: Partial<Record<string, unknown>> = {}) {
+  return { kind: 'plugin', ...remoteManifest(overrides) };
+}
+
+function remoteServiceManifestRaw(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    kind: 'service',
+    bin: 'devtool-svc-demo',
+    version: '1.0.0',
+    protocol: 1,
+    targets: {
+      'x86_64-apple-darwin': { url: 'https://example.com/svc/x64', sha256: 'a'.repeat(64) },
+    },
+    ...overrides,
+  };
+}
+
+function installedPluginRaw(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    kind: 'plugin' as const,
+    manifest: remoteManifest(),
+    source_url: 'https://example.com/plugin.json',
+    bundle_path: '/tmp/demo/1.0.0/bundle.mjs',
+    installed_at: 1_700_000_000_000,
+    ...overrides,
+  };
+}
+
+function installedServiceRaw(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    kind: 'service' as const,
+    manifest: {
+      bin: 'devtool-svc-demo',
+      version: '1.0.0',
+      protocol: 1,
+      targets: { 'x86_64-apple-darwin': { url: 'https://example.com/svc/x64', sha256: 'a'.repeat(64) } },
+    },
+    source_url: 'https://example.com/svc.json',
+    bin_path: '/tmp/services/devtool-svc-demo/1.0.0/devtool-svc-demo',
+    installed_at: 1_700_000_000_000,
+    ...overrides,
+  };
+}
+
 async function loadInTauri() {
   vi.resetModules();
   (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
@@ -44,24 +91,22 @@ afterEach(() => {
 });
 
 describe('fetchManifestPreview / installPlugin / listInstalledPlugins / uninstallPlugin', () => {
-  it('gọi đúng lệnh Rust với đúng tham số, và đổi record snake_case sang camelCase', async () => {
+  it('gọi đúng lệnh Rust (artifact_installer_*) với đúng tham số, và đổi record snake_case sang camelCase', async () => {
     const installer = await loadInTauri();
 
-    invokeMock.mockResolvedValueOnce(remoteManifest());
+    invokeMock.mockResolvedValueOnce(remotePluginManifestRaw());
     await expect(installer.fetchManifestPreview('https://example.com/plugin.json')).resolves.toMatchObject({
       id: 'demo',
     });
-    expect(invokeMock).toHaveBeenCalledWith('plugin_installer_fetch_manifest', {
+    expect(invokeMock).toHaveBeenCalledWith('artifact_installer_fetch_manifest', {
       url: 'https://example.com/plugin.json',
     });
 
-    invokeMock.mockResolvedValueOnce({
-      manifest: remoteManifest(),
-      source_url: 'https://example.com/plugin.json',
-      bundle_path: '/tmp/demo/1.0.0/bundle.mjs',
-      installed_at: 1_700_000_000_000,
-    });
+    invokeMock.mockResolvedValueOnce(installedPluginRaw());
     const installed = await installer.installPlugin('https://example.com/plugin.json');
+    expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
+      sourceUrl: 'https://example.com/plugin.json',
+    });
     expect(installed).toEqual({
       manifest: remoteManifest(),
       sourceUrl: 'https://example.com/plugin.json',
@@ -71,7 +116,7 @@ describe('fetchManifestPreview / installPlugin / listInstalledPlugins / uninstal
 
     invokeMock.mockResolvedValueOnce([]);
     await installer.uninstallPlugin('demo');
-    expect(invokeMock).toHaveBeenCalledWith('plugin_installer_uninstall', { id: 'demo' });
+    expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'demo' });
   });
 
   it('listInstalledPlugins trên bản web (không phải Tauri) trả về rỗng, không gọi invoke', async () => {
@@ -81,6 +126,100 @@ describe('fetchManifestPreview / installPlugin / listInstalledPlugins / uninstal
 
     await expect(installer.listInstalledPlugins()).resolves.toEqual([]);
     expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('listInstalledPlugins lọc bỏ bản ghi kind=service khỏi danh sách chung', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([installedPluginRaw(), installedServiceRaw()]);
+
+    const plugins = await installer.listInstalledPlugins();
+    expect(plugins).toHaveLength(1);
+    expect(plugins[0].manifest.id).toBe('demo');
+    expect((plugins[0] as unknown as Record<string, unknown>).kind).toBeUndefined();
+  });
+
+  it('fetchManifestPreview từ chối rõ ràng nếu URL khai kind=service', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce(remoteServiceManifestRaw());
+    await expect(installer.fetchManifestPreview('https://example.com/svc.json')).rejects.toThrow('service');
+  });
+
+  it('installPlugin từ chối rõ ràng nếu bản ghi cài về là kind=service', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce(installedServiceRaw());
+    await expect(installer.installPlugin('https://example.com/svc.json')).rejects.toThrow('service');
+  });
+});
+
+describe('installService / listInstalledServices / uninstallService', () => {
+  it('gọi đúng lệnh Rust (artifact_installer_*) với đúng tham số, và đổi record snake_case sang camelCase', async () => {
+    const installer = await loadInTauri();
+
+    invokeMock.mockResolvedValueOnce(installedServiceRaw());
+    const installed = await installer.installService('https://example.com/svc.json');
+    expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
+      sourceUrl: 'https://example.com/svc.json',
+    });
+    expect(installed).toEqual({
+      manifest: {
+        bin: 'devtool-svc-demo',
+        version: '1.0.0',
+        protocol: 1,
+        targets: { 'x86_64-apple-darwin': { url: 'https://example.com/svc/x64', sha256: 'a'.repeat(64) } },
+      },
+      sourceUrl: 'https://example.com/svc.json',
+      binPath: '/tmp/services/devtool-svc-demo/1.0.0/devtool-svc-demo',
+      installedAt: 1_700_000_000_000,
+    });
+
+    invokeMock.mockResolvedValueOnce([]);
+    await installer.uninstallService('devtool-svc-demo');
+    expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'devtool-svc-demo' });
+  });
+
+  it('listInstalledServices lọc bỏ bản ghi kind=plugin khỏi danh sách chung', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([installedPluginRaw(), installedServiceRaw()]);
+
+    const services = await installer.listInstalledServices();
+    expect(services).toHaveLength(1);
+    expect(services[0].manifest.bin).toBe('devtool-svc-demo');
+  });
+
+  it('installService từ chối rõ ràng nếu bản ghi cài về là kind=plugin', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce(installedPluginRaw());
+    await expect(installer.installService('https://example.com/plugin.json')).rejects.toThrow('plugin');
+  });
+});
+
+describe('fetchArtifactManifestPreview / installArtifact / listInstalledArtifacts / uninstallArtifact', () => {
+  it('trả nguyên union kind cho lớp gọi tự rẽ nhánh (dùng bởi SettingsExtensionInstaller)', async () => {
+    const installer = await loadInTauri();
+
+    invokeMock.mockResolvedValueOnce(remoteServiceManifestRaw());
+    const preview = await installer.fetchArtifactManifestPreview('https://example.com/svc.json');
+    expect(preview.kind).toBe('service');
+
+    invokeMock.mockResolvedValueOnce([installedPluginRaw(), installedServiceRaw()]);
+    const all = await installer.listInstalledArtifacts();
+    expect(all.map((r) => r.kind).sort()).toEqual(['plugin', 'service']);
+  });
+
+  it('uninstallArtifact gọi đúng tham số key, dùng chung cho cả hai kind', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce(undefined);
+    await installer.uninstallArtifact('devtool-svc-demo');
+    expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'devtool-svc-demo' });
+  });
+});
+
+describe('currentTargetTriple', () => {
+  it('gọi đúng lệnh Rust và trả nguyên chuỗi triple', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce('aarch64-apple-darwin');
+    await expect(installer.currentTargetTriple()).resolves.toBe('aarch64-apple-darwin');
+    expect(invokeMock).toHaveBeenCalledWith('artifact_installer_current_target_triple', undefined);
   });
 });
 
@@ -94,7 +233,7 @@ describe('checkForUpdate', () => {
       installedAt: 0,
     };
 
-    invokeMock.mockResolvedValueOnce(remoteManifest({ version: '1.10.0' }));
+    invokeMock.mockResolvedValueOnce(remotePluginManifestRaw({ version: '1.10.0' }));
     const result = await installer.checkForUpdate(installedRecord);
 
     expect(result.available).toBe(true);
@@ -110,7 +249,7 @@ describe('checkForUpdate', () => {
       installedAt: 0,
     };
 
-    invokeMock.mockResolvedValueOnce(remoteManifest({ version: '1.2.0' }));
+    invokeMock.mockResolvedValueOnce(remotePluginManifestRaw({ version: '1.2.0' }));
     await expect(installer.checkForUpdate(installedRecord)).resolves.toMatchObject({ available: false });
   });
 
@@ -123,8 +262,43 @@ describe('checkForUpdate', () => {
       installedAt: 0,
     };
 
-    invokeMock.mockResolvedValueOnce(remoteManifest({ version: '1.9.9' }));
+    invokeMock.mockResolvedValueOnce(remotePluginManifestRaw({ version: '1.9.9' }));
     await expect(installer.checkForUpdate(installedRecord)).resolves.toMatchObject({ available: false });
+  });
+});
+
+describe('checkForServiceUpdate', () => {
+  it('phát hiện bản mới cho service, cùng phép so sánh số như nhánh plugin', async () => {
+    const installer = await loadInTauri();
+    const installedRecord = {
+      manifest: {
+        bin: 'devtool-svc-demo',
+        version: '1.2.0',
+        protocol: 1,
+        targets: {},
+      },
+      sourceUrl: 'https://example.com/svc.json',
+      binPath: '/tmp/x',
+      installedAt: 0,
+    };
+
+    invokeMock.mockResolvedValueOnce(remoteServiceManifestRaw({ version: '1.10.0' }));
+    const result = await installer.checkForServiceUpdate(installedRecord);
+    expect(result.available).toBe(true);
+    expect(result.remote?.version).toBe('1.10.0');
+  });
+
+  it('từ chối rõ ràng nếu nguồn đã cài không còn khai kind=service', async () => {
+    const installer = await loadInTauri();
+    const installedRecord = {
+      manifest: { bin: 'devtool-svc-demo', version: '1.0.0', protocol: 1, targets: {} },
+      sourceUrl: 'https://example.com/svc.json',
+      binPath: '/tmp/x',
+      installedAt: 0,
+    };
+
+    invokeMock.mockResolvedValueOnce(remotePluginManifestRaw());
+    await expect(installer.checkForServiceUpdate(installedRecord)).rejects.toThrow('plugin');
   });
 });
 
@@ -141,8 +315,8 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
   it('tra icon theo tên; tên lạ rơi về Puzzle thay vì chặn cài đặt', async () => {
     const installer = await loadInTauri();
     invokeMock.mockResolvedValueOnce([
-      { manifest: remoteManifest({ id: 'a', icon: 'regex' }), source_url: 'u', bundle_path: 'p', installed_at: 0 },
-      { manifest: remoteManifest({ id: 'b', icon: 'ten-icon-khong-ton-tai' }), source_url: 'u', bundle_path: 'p', installed_at: 0 },
+      installedPluginRaw({ manifest: remoteManifest({ id: 'a', icon: 'regex' }) }),
+      installedPluginRaw({ manifest: remoteManifest({ id: 'b', icon: 'ten-icon-khong-ton-tai' }) }),
     ]);
 
     const [a, b] = await installer.installedPluginManifests();
@@ -153,8 +327,8 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
   it('gán order sau MỌI plugin compile-time, theo đúng thứ tự trả về từ Rust', async () => {
     const installer = await loadInTauri();
     invokeMock.mockResolvedValueOnce([
-      { manifest: remoteManifest({ id: 'a' }), source_url: 'u', bundle_path: 'p', installed_at: 0 },
-      { manifest: remoteManifest({ id: 'b' }), source_url: 'u', bundle_path: 'p', installed_at: 0 },
+      installedPluginRaw({ manifest: remoteManifest({ id: 'a' }) }),
+      installedPluginRaw({ manifest: remoteManifest({ id: 'b' }) }),
     ]);
 
     const [a, b] = await installer.installedPluginManifests();
@@ -165,7 +339,7 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
   it('mang đúng permissions/commands/hosts/sdk từ manifest gốc, không đánh rơi trường nào', async () => {
     const installer = await loadInTauri();
     invokeMock.mockResolvedValueOnce([
-      {
+      installedPluginRaw({
         manifest: remoteManifest({
           id: 'a',
           permissions: ['storage', 'http'],
@@ -173,16 +347,22 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
           hosts: ['api.example.com'],
           sdk: '^2.0.0',
         }),
-        source_url: 'u',
-        bundle_path: 'p',
-        installed_at: 0,
-      },
+      }),
     ]);
 
     const [a] = await installer.installedPluginManifests();
     expect(a.manifest.permissions).toEqual(['storage', 'http']);
     expect(a.manifest.hosts).toEqual(['api.example.com']);
     expect(a.manifest.sdk).toBe('^2.0.0');
+  });
+
+  it('installed_service lẫn trong danh sách chung không lọt vào registry plugin', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([installedPluginRaw({ manifest: remoteManifest({ id: 'a' }) }), installedServiceRaw()]);
+
+    const manifests = await installer.installedPluginManifests();
+    expect(manifests).toHaveLength(1);
+    expect(manifests[0].manifest.id).toBe('a');
   });
 
   it('index.json đọc lỗi thì coi như chưa cài gì, không chặn app khởi động', async () => {
@@ -192,7 +372,7 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
     await expect(installer.installedPluginManifests()).resolves.toEqual([]);
   });
 
-  // `load` của mỗi manifest đổi ra ở đây gọi `plugin_installer_read_bundle`
+  // `load` của mỗi manifest đổi ra ở đây gọi `artifact_installer_read_bundle`
   // rồi `import()` một URL `blob:` — jsdom không thực thi ES module qua
   // blob: URL thật (không có pipeline load/parse script như một trình duyệt
   // thật), nên phần NẠP THẬT của bundle KHÔNG được kiểm ở đây. Đây là khoảng

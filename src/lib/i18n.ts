@@ -234,26 +234,40 @@ export const DICTIONARY = {
   },
   'settings.plugins.auditDenied': { vi: 'bị từ chối', en: 'denied' },
 
-  // ── Settings — Cài plugin từ bên ngoài ───────────────────────────────────
-  'settings.plugins.install.title': { vi: 'Cài plugin từ bên ngoài', en: 'Install external plugin' },
+  // ── Settings — Cài tiện ích (plugin JS + sidecar service) từ bên ngoài ────
+  'settings.plugins.install.title': { vi: 'Cài tiện ích từ bên ngoài', en: 'Install external extension' },
   'settings.plugins.install.description': {
-    vi: 'Dán URL manifest của một plugin (do bạn phát hành) để cài. Checksum sha256 trong manifest được kiểm trước khi bất kỳ dòng code nào chạy — một URL không tự đủ để tin, kiểm tra vẫn diễn ra dù bạn đã tin nguồn.',
-    en: 'Paste a plugin manifest URL (published by you) to install it. The sha256 checksum in the manifest is checked before any of its code ever runs — a URL alone is never enough trust, the check still happens even when you trust the source.',
+    vi: 'Dán URL manifest của một plugin hoặc một sidecar (do bạn phát hành) để cài. Checksum sha256 trong manifest được kiểm trước khi bất kỳ dòng code/binary nào chạy — một URL không tự đủ để tin, kiểm tra vẫn diễn ra dù bạn đã tin nguồn.',
+    en: 'Paste a manifest URL for a plugin or a sidecar (published by you) to install it. The sha256 checksum in the manifest is checked before any of its code/binary ever runs — a URL alone is never enough trust, the check still happens even when you trust the source.',
   },
   'settings.plugins.install.webWarning': {
-    vi: 'Đang chạy trong trình duyệt — cài plugin chỉ hoạt động trên bản desktop.',
-    en: 'Running in browser — installing plugins only works in the desktop app.',
+    vi: 'Đang chạy trong trình duyệt — cài tiện ích chỉ hoạt động trên bản desktop.',
+    en: 'Running in browser — installing extensions only works in the desktop app.',
   },
   'settings.plugins.install.preview': { vi: 'Xem trước', en: 'Preview' },
   'settings.plugins.install.confirm': { vi: 'Cài đặt', en: 'Install' },
   'settings.plugins.install.previewing': { vi: 'Đang tải manifest…', en: 'Fetching manifest…' },
   'settings.plugins.install.installing': { vi: 'Đang cài…', en: 'Installing…' },
   'settings.plugins.install.installed': {
-    vi: 'Đã cài. Khởi động lại app để dùng plugin này.',
-    en: 'Installed. Restart the app to use this plugin.',
+    vi: 'Đã cài. Khởi động lại app để dùng tiện ích này.',
+    en: 'Installed. Restart the app to use this extension.',
+  },
+  'settings.plugins.install.kind.plugin': { vi: 'Trình cắm', en: 'Plugin' },
+  'settings.plugins.install.kind.service': { vi: 'Dịch vụ', en: 'Service' },
+  'settings.plugins.install.targetTriple': {
+    vi: 'Nền tảng máy này: {{triple}}',
+    en: 'This machine\'s target: {{triple}}',
+  },
+  'settings.plugins.install.targetSupported': {
+    vi: 'Manifest có bản cho nền tảng này.',
+    en: 'The manifest has a build for this platform.',
+  },
+  'settings.plugins.install.targetUnsupported': {
+    vi: 'Manifest KHÔNG có bản cho nền tảng này — cài sẽ bị từ chối.',
+    en: 'The manifest has NO build for this platform — install will be rejected.',
   },
   'settings.plugins.installed.title': { vi: 'Đã cài từ bên ngoài', en: 'Installed from outside' },
-  'settings.plugins.installed.empty': { vi: 'Chưa cài plugin nào.', en: 'No plugins installed yet.' },
+  'settings.plugins.installed.empty': { vi: 'Chưa cài tiện ích nào.', en: 'No extensions installed yet.' },
   'settings.plugins.installed.checkUpdate': { vi: 'Kiểm bản mới', en: 'Check for update' },
   'settings.plugins.installed.update': { vi: 'Cập nhật', en: 'Update' },
   'settings.plugins.installed.upToDate': { vi: 'Đã là bản mới nhất', en: 'Up to date' },
@@ -262,9 +276,15 @@ export const DICTIONARY = {
     en: 'Version {{version}} available',
   },
   'settings.plugins.installed.uninstall': { vi: 'Gỡ', en: 'Uninstall' },
+  'settings.plugins.installed.serviceWarning': {
+    vi: 'Cập nhật/gỡ sẽ DỪNG sidecar này nếu đang chạy — một kết nối hoặc stream đang mở sẽ bị ngắt ngay.',
+    en: 'Updating/uninstalling will STOP this sidecar if it is running — any open connection or stream will be cut immediately.',
+  },
+  'settings.plugins.installed.confirm': { vi: 'Xác nhận', en: 'Confirm' },
+  'settings.plugins.installed.cancel': { vi: 'Huỷ', en: 'Cancel' },
   'settings.plugins.restart.needed': {
-    vi: 'Đã thay đổi plugin cài từ bên ngoài — khởi động lại để áp dụng.',
-    en: 'External plugins changed — restart to apply.',
+    vi: 'Đã thay đổi tiện ích cài từ bên ngoài — khởi động lại để áp dụng.',
+    en: 'External extensions changed — restart to apply.',
   },
   'settings.plugins.restart.now': { vi: 'Khởi động lại ngay', en: 'Restart now' },
 

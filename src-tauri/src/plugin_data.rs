@@ -23,7 +23,7 @@ use tauri::{AppHandle, Manager};
 
 /// Phần GHÉP ĐƯỜNG DẪN thuần — tách khỏi phần chạm `AppHandle`/đĩa bên dưới để
 /// test được (không dựng được `AppHandle` thật trong unit test cô lập, cùng lý
-/// do đã ghi ở `service_host.rs`/`plugin_installer.rs`).
+/// do đã ghi ở `service_host.rs`/`artifact_installer.rs`).
 fn join(app_data_dir: &Path, plugin_id: &str) -> PathBuf {
     app_data_dir.join("plugin-data").join(plugin_id)
 }

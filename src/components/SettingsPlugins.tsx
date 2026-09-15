@@ -4,7 +4,7 @@ import { useFeatures } from '@/contexts/FeatureContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import { PLUGINS, SDK_VERSION, pluginAudit, vaultStatus, type AuditEntry, type VaultStatus } from '@/platform';
-import { SettingsPluginInstaller } from '@/components/SettingsPluginInstaller';
+import { SettingsExtensionInstaller } from '@/components/SettingsExtensionInstaller';
 
 /**
  * Settings → Plugin: cái nhìn duy nhất cho người dùng vào Platform.
@@ -72,7 +72,7 @@ export function SettingsPlugins() {
         </p>
       )}
 
-      <SettingsPluginInstaller />
+      <SettingsExtensionInstaller />
 
       <div className="rounded-lg border divide-y">
         {PLUGINS.map((p) => {

@@ -251,10 +251,13 @@ automatically — there is no registration table to update, and no route to wire
 for why.
 
 This section covers **compile-time** plugins (`src/plugins/`), always bundled into
-the app. A plugin can also be **installed at runtime from a URL** — see
-"Cài đặt plugin từ bên ngoài" in the same ADR for the manifest format, the
-integrity/CSP mechanics, and the vendor-globals contract a plugin author's build
-must follow (`src/platform/installer.ts`, `src-tauri/src/plugin_installer.rs`).
+the app. A plugin (JS bundle) or a native sidecar service (Tier B binary) can also be
+**installed at runtime from a URL** — see "Cài đặt plugin từ bên ngoài" and "Tier B" in
+the same ADR for the manifest format (`kind: "plugin" | "service"`), the integrity/CSP
+mechanics, the `services/<bin>/<version>/` on-disk layout, and the vendor-globals
+contract a plugin author's build must follow (`src/platform/installer.ts`,
+`src-tauri/src/artifact_installer.rs` — renamed from `plugin_installer.rs` when the
+service branch was added).
 
 ### Step 1: Create the tool component
 

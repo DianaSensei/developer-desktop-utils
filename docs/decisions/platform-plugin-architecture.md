@@ -197,6 +197,19 @@ là thứ quyết định tiến trình nào được sinh. Danh sách hiện r�
 thay vì mở sẵn một đường chạy tiến trình cho thứ chưa tồn tại. Test Rust khoá rằng
 mọi mục trong allowlist đều phải có trong `bundle.externalBin`.
 
+**`ALLOWED_SERVICES` vẫn là hằng số biên dịch sẵn — điểm dừng có chủ ý.** Cơ chế cài
+sidecar từ URL (mục "Cài đặt tiện ích từ bên ngoài" bên dưới) KHÔNG mở rộng allowlist
+này: cài một binary tên lạ qua URL không tự cấp cho nó quyền chạy — `service_call` vẫn
+từ chối y hệt hiện tại nếu tên đó không nằm trong `ALLOWED_SERVICES`. Việc thêm
+`devtool-svc-redis` (và sau đó bỏ nó khỏi `bundle.externalBin` mặc định) là một quyết
+định code riêng, chưa làm trong đợt thêm cơ chế cài đặt này.
+
+**`sidecar_path()` giờ nhận `AppHandle`, đọc phần `kind=service` của
+`extensions/index.json` TRƯỚC, cạnh-exe (bundle.externalBin) SAU** — bản tải-về LUÔN
+thắng nếu có cả hai. Xem "Cài đặt tiện ích từ bên ngoài" bên dưới cho toàn bộ cơ chế
+tải/kiểm/lưu; đây là hàm BIÊN GIỚI TIN CẬY nối cơ chế đó với `service_host.rs`, nên đổi
+chữ ký/thứ tự ưu tiên của nó cần review kỹ, không chỉ chạy test xanh.
+
 ### Ghép dòng theo `id`, không theo thứ tự ống dẫn (mở rộng streaming)
 
 Bản đầu phục vụ tuần tự: một mutex quanh sidecar, gửi rồi đọc đúng một dòng kế
@@ -419,11 +432,86 @@ trong `liveConnections` khớp khoá tool thật sự ghi, và mọi plugin tron
 `MIGRATIONS` của kho bí mật đều khai quyền `secrets` (thiếu quyền là di trú vẫn chép
 nhưng tool đọc lại bị chặn và hiện ra rỗng — trông y như mất dữ liệu).
 
-## Cài đặt plugin từ bên ngoài (Phase 1: cơ chế URL + cập nhật)
+## Cài đặt tiện ích từ bên ngoài (Phase 1: plugin JS; mở rộng: sidecar service native)
 
-Mọi plugin vẫn do chính người dùng (chủ repo) phát hành — không mở cho bên thứ
-ba — nhưng từ đây, một plugin không bắt buộc phải compile sẵn vào app lúc build
-nữa: nó có thể tải, kiểm, và nạp lúc app đang chạy, từ một URL.
+Mọi tiện ích (plugin JS hay sidecar service) vẫn do chính người dùng (chủ repo)
+phát hành — không mở cho bên thứ ba — nhưng từ đây, nó không bắt buộc phải
+compile sẵn vào app lúc build nữa: nó có thể tải, kiểm, và nạp/spawn lúc app
+đang chạy, từ một URL.
+
+### Gộp chung "external artifact installer" (kind: plugin | service)
+
+`plugin_installer.rs` (Phase 1, chỉ biết plugin JS) đã được đổi tên/refactor
+thành `artifact_installer.rs` TỔNG QUÁT — một `RemoteArtifactManifest { kind:
+"plugin" | "service", ... }`, một `extensions/index.json` DUY NHẤT cho cả hai
+loại, một `SettingsExtensionInstaller.tsx` (thay `SettingsPluginInstaller.tsx`)
+hiển thị badge phân loại và nhánh hành động khác nhau theo `kind`. Xem
+`docs/plans/native-sidecar-install.md` cho toàn bộ quá trình quyết định
+(gồm phương án bị bác: hai module song song riêng biệt).
+
+- **Schema `kind`**: `RemoteArtifactManifest` (tải từ URL) và
+  `InstalledArtifactRecord` (lưu trong `extensions/index.json`) đều
+  internally-tagged theo `kind` (`#[serde(tag = "kind", rename_all =
+  "snake_case")]`, ghi phẳng — JSON không lồng dưới khoá "Plugin"/"Service").
+  Nhánh `plugin` giữ NGUYÊN hình dạng Phase 1 (entry/route/icon/permissions/
+  commands/hosts). Nhánh `service` mang `{ bin, version, protocol, targets:
+  { <target-triple>: { url, sha256 } } }` — `bin` là tên trần, không đuôi mở
+  rộng; đuôi `.exe` cho Windows do HOST tự thêm khi đặt tên file cuối cùng
+  trên đĩa, không lấy tên file từ URL.
+- **Migration `index.json` cũ (không có trường `kind`) — bắt buộc tương thích
+  ngược.** `Deserialize` của `InstalledArtifactRecord` được viết TAY (không
+  dùng derive): peek `serde_json::Value`, thiếu trường `kind` thì mặc định
+  `"plugin"` — đúng thứ MỌI bản ghi Phase 1 luôn là. Có test bằng chính hình
+  dạng JSON `plugin_installer.rs` từng ghi ra (không phải dữ liệu tự bịa),
+  đảm bảo không mất một bản ghi plugin JS đã cài nào của người dùng thật khi
+  nâng cấp app.
+- **Dời thư mục index, giữ nguyên chỗ lưu artifact.** `extensions/index.json`
+  (mới) thay `plugins/index.json` (cũ) làm nguồn sự thật DUY NHẤT — CHỈ file
+  index dời; nội dung bundle plugin vẫn ở `plugins/<id>/<version>/bundle.mjs`,
+  binary service ở `services/<bin>/<version>/<bin>[.exe]` (hai layout khác
+  nhau, chia sẻ một index). Nếu `extensions/index.json` chưa tồn tại nhưng
+  `plugins/index.json` (đường cũ) có, host tự copy sang (ghi qua `.tmp` cùng
+  thư mục đích rồi `rename` — atomic, idempotent) lúc khởi động; file cũ
+  KHÔNG bị xoá sau khi copy (lưới an toàn miễn phí cho lần nâng cấp đầu).
+- **Nhánh `service` ghi ATOMIC** (tải vào `<bin>[.exe].tmp` CÙNG thư mục đích
+  rồi `fs::rename`, chỉ sau đó mới `chmod +x` trên Unix) — khác nhánh `plugin`
+  (ghi thẳng), vì file này sẽ được SPAWN như một tiến trình: một file dở dang
+  do crash giữa chừng nguy hiểm hơn hẳn một bundle JS dở dang (JS dở dang chỉ
+  hỏng lúc `import()`). `sidecar_path()` chỉ bao giờ tìm đúng TÊN FILE CUỐI
+  CÙNG đã rename — một `.tmp` mồ côi do crash giữa `write`/`rename` không bao
+  giờ bị chọn nhầm.
+- **`current_target_triple()` TÍNH Ở RUST** (`std::env::consts::OS`/`ARCH` →
+  dạng chuẩn Rust: `x86_64-apple-darwin`, `aarch64-apple-darwin`,
+  `x86_64-pc-windows-msvc`, `aarch64-pc-windows-msvc`,
+  `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`), không nhận từ
+  client/manifest — cùng nguyên tắc "quyết định luôn do host" của
+  `ALLOWED_SERVICES`. Có lệnh Tauri riêng
+  (`artifact_installer_current_target_triple`) chỉ để UI HIỂN THỊ nó cho
+  người dùng tự xác nhận trước khi cài — không phải để webview tự chọn
+  target.
+- **Thứ tự resolution của `sidecar_path()`** (xem chi tiết ở mục Tier B
+  trên): bản tải-về (`extensions/index.json`, `kind=service`, file còn tồn
+  tại trên đĩa) LUÔN được thử TRƯỚC; cạnh-exe (`bundle.externalBin`) chỉ là
+  fallback khi không có bản tải-về hoặc file bị mất/hỏng đĩa ngoài luồng cài
+  đặt.
+- **Cài đè/gỡ một sidecar ĐANG CHẠY**: `artifact_installer_install`/
+  `artifact_installer_uninstall` (nhánh service) tự gọi `service_stop(bin)`
+  ngay sau khi ghi/xoá xong — lần `service_call` kế tiếp tự spawn lại (hành
+  vi self-healing sẵn có của `get_or_spawn`). Một stream đang mở bị ngắt
+  ngay lập tức — `SettingsExtensionInstaller.tsx` bắt buộc một bước cảnh báo
+  trước khi xác nhận cập nhật/gỡ một dòng `kind=service` (không cần phát
+  hiện thật một kết nối/stream đang mở — một cảnh báo chung là đủ theo DoD).
+- **Gỡ KHÔNG đụng `service-data/<bin>/`** (dữ liệu runtime của sidecar) — chỉ
+  xoá binary đã tải về (`services/<bin>/`), theo đúng quyết định "không di
+  trú, không xoá dữ liệu người dùng" đã chốt ở mục "Cách ly dữ liệu" trên.
+- **Rollback khi bản mới lỗi**: XOÁ bản cũ y hệt Phase 1 (không giữ song
+  song hai version) — dữ liệu 4 tool nặng (Kafka/RabbitMQ/Redis/Container)
+  không cần bảo toàn qua một lần cài lỗi.
+- **Điểm dừng có chủ ý — KHÔNG đổi `ALLOWED_SERVICES`/`bundle.externalBin`/
+  `prepare-service-sidecars.mjs`** trong đợt thêm cơ chế này. Cài một binary
+  tên lạ qua URL không tự cấp quyền chạy nó; thêm `devtool-svc-redis` vào
+  allowlist rồi bỏ khỏi `externalBin` mặc định là quyết định code riêng, làm
+  SAU khi Redis Phase 2 xong (xem "Việc còn lại" dưới).
 
 ### Định dạng gói
 
@@ -451,9 +539,12 @@ không chặn cài đặt. Không có `order`/`defaultEnabled` trong manifest �
 tự gán: `order` bắt đầu từ `100_000 + thứ tự cài` (luôn xếp sau mọi plugin
 compile-time), `defaultEnabled` luôn `true` (cài rồi thì mặc định bật).
 
-### Đường đi: tải → kiểm → lưu → nạp
+### Đường đi: tải → kiểm → lưu → nạp (nhánh plugin)
 
-`src-tauri/src/plugin_installer.rs` (Rust) + `src/platform/installer.ts` (TS).
+`src-tauri/src/artifact_installer.rs` (Rust, đổi tên/refactor từ
+`plugin_installer.rs` — xem "Gộp chung" ở trên) + `src/platform/installer.ts`
+(TS, tên file giữ nguyên: đã đủ tổng quát, chỉ thêm hàm cho nhánh service bên
+cạnh hàm nhánh plugin sẵn có).
 
 - **Tải THẲNG BẰNG reqwest ở Rust**, không qua binding JS của
   `@tauri-apps/plugin-http`. Một gói có thể vài MB; đẩy nó qua `invoke` dưới
@@ -551,20 +642,27 @@ là đã dùng được cho việc thật, không chỉ đã đúng về mặt c
    hạn (Kafka consume, Redis Pub/Sub, log/stats container) cần~~ **đã có** — xem
    "Ghép dòng theo `id`" ở mục Tier B trên (`sdk.service.stream`, `tick-stream`
    trong `devtool-svc-echo` làm bằng chứng cơ chế). Việc còn lại của Phase 2 giờ
-   thuần là việc viết lại từng tool, không còn vướng hạ tầng giao thức. Còn hai
-   thứ khác cần giải quyết TRƯỚC khi một sidecar như vậy "cài được" đúng nghĩa
-   qua Phase 1: (a) `plugin_installer.rs` hiện chỉ tải/kiểm/nạp bundle JS qua
-   `blob:` — chưa có đường tương đương cho một BINARY native theo từng nền tảng
-   (tải, kiểm checksum, cấp quyền thực thi, đặt đúng chỗ sidecar resolve được);
-   (b) `ALLOWED_SERVICES` là hằng số biên dịch sẵn trong Rust theo đúng chủ đích
-   (ranh giới tin cậy không giao cho manifest) — một sidecar cài lúc chạy từ bên
-   ngoài sẽ không nằm trong allowlist đó trừ khi cơ chế allowlist cũng được nghĩ
-   lại. Bắt đầu từ Redis (nhỏ nhất, 945 dòng, đã qua SDK từ trước) — **Bước 1
-   đã xong** (`devtool-svc-redis`: CRUD cấu hình + connect/overview/duyệt key,
-   19 test, xác nhận thủ công bằng Redis thật qua Docker). Sidecar lưu cấu
-   hình ở thư mục riêng của NÓ (`service-data/devtool-svc-redis/`), khác chỗ
-   `redis_tool.rs` (Tier A) đang lưu (`plugin-data/redis-client/`) — có chủ ý
-   KHÔNG di trú lúc cắt hẳn sang sidecar ở Bước 4/5: cấu hình kết nối Kafka/
-   RabbitMQ/Redis/Container không cần bảo toàn, người dùng tự nhập lại được
-   (xem "Cách ly dữ liệu" ở mục Tier B).
+   thuần là việc viết lại từng tool, không còn vướng hạ tầng giao thức.
+   ~~Còn hai thứ khác cần giải quyết TRƯỚC khi một sidecar như vậy "cài được"
+   đúng nghĩa qua Phase 1: (a) `plugin_installer.rs` hiện chỉ tải/kiểm/nạp
+   bundle JS qua `blob:` — chưa có đường tương đương cho một BINARY native
+   theo từng nền tảng~~ **(a) đã xong** — xem "Cài đặt tiện ích từ bên ngoài"
+   ở trên (`artifact_installer.rs`, nhánh `service`: tải theo target-triple,
+   kiểm checksum, ghi atomic, chmod +x, `sidecar_path()` resolve đúng thứ
+   tự). **(b) vẫn cố ý CHƯA làm**: `ALLOWED_SERVICES` là hằng số biên dịch
+   sẵn trong Rust theo đúng chủ đích (ranh giới tin cậy không giao cho
+   manifest) — một sidecar cài lúc chạy từ bên ngoài sẽ KHÔNG nằm trong
+   allowlist đó trừ khi ai đó chủ động thêm tên bin vào `ALLOWED_SERVICES`
+   lúc build (quyết định code riêng, chưa làm). Bắt đầu từ Redis (nhỏ nhất,
+   945 dòng, đã qua SDK từ trước) — **Bước 1 đã xong** (`devtool-svc-redis`:
+   CRUD cấu hình + connect/overview/duyệt key, 19 test, xác nhận thủ công
+   bằng Redis thật qua Docker). Sidecar lưu cấu hình ở thư mục riêng của NÓ
+   (`service-data/devtool-svc-redis/`), khác chỗ `redis_tool.rs` (Tier A)
+   đang lưu (`plugin-data/redis-client/`) — có chủ ý KHÔNG di trú lúc cắt
+   hẳn sang sidecar ở Bước 4/5: cấu hình kết nối Kafka/RabbitMQ/Redis/
+   Container không cần bảo toàn, người dùng tự nhập lại được (xem "Cách ly
+   dữ liệu" ở mục Tier B). Bước kế tiếp (chưa làm): thêm
+   `devtool-svc-redis` vào `ALLOWED_SERVICES`/`bundle.externalBin` lúc build,
+   rồi publish nó qua cơ chế cài đặt URL, rồi mới bỏ khỏi `externalBin` mặc
+   định.
 4. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.

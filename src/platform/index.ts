@@ -23,8 +23,25 @@ export {
   listInstalledPlugins,
   uninstallPlugin,
   checkForUpdate,
+  installService,
+  listInstalledServices,
+  uninstallService,
+  checkForServiceUpdate,
+  fetchArtifactManifestPreview,
+  installArtifact,
+  listInstalledArtifacts,
+  uninstallArtifact,
+  currentTargetTriple,
 } from './installer';
-export type { RemotePluginManifest, InstalledPluginRecord } from './installer';
+export type {
+  RemotePluginManifest,
+  InstalledPluginRecord,
+  ServiceTarget,
+  RemoteServiceManifest,
+  InstalledServiceRecord,
+  RemoteArtifactManifest,
+  InstalledArtifactRecord,
+} from './installer';
 export { createPluginSdk, storageKey, PluginPermissionError, PluginCommandError, PluginHostError } from './sdk';
 export type {
   PluginSdk,

@@ -151,7 +151,7 @@ enum Waiter {
 /// cụ thể để TEST ĐƯỢC bằng một tiến trình thật (`sh`) và một sink thu thập
 /// vào bộ nhớ, không cần dựng một `Channel` thật (chỉ construct được thông qua
 /// một lời gọi Tauri command thật đang chạy trong app — xem lý do tương tự ở
-/// `plugin_installer.rs` về việc không dựng `AppHandle` giả trong test).
+/// `artifact_installer.rs` về việc không dựng `AppHandle` giả trong test).
 trait EventSink: Send {
     fn send(&self, value: serde_json::Value);
 }
@@ -177,22 +177,68 @@ pub struct ServiceRegistry {
     running: Arc<AsyncMutex<HashMap<String, Arc<RunningSidecar>>>>,
 }
 
-/// Sidecar nằm cạnh file thực thi của app — cùng quy ước với
-/// `mcp_bridge::mcp_sidecar_path`, nên không cần thêm tauri-plugin-shell (và
-/// không cần mở quyền chạy tiến trình ở tầng capability).
-fn sidecar_path(bin: &str) -> Result<std::path::PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let dir = exe.parent().ok_or("Không xác định được thư mục cài đặt của app")?;
+/// Phần "tìm cạnh file thực thi" của `sidecar_path` — hành vi gốc, giữ
+/// NGUYÊN, chỉ tách `dir` ra làm tham số để test được (`current_exe()` trong
+/// một `cargo test` binary trỏ tới chính binary test, không phải nơi ta muốn
+/// kiểm). Vẫn là fallback SAU CÙNG khi không có bản tải-về nào — xem
+/// `sidecar_path` bên dưới.
+fn resolve_beside_dir(dir: &std::path::Path, bin: &str) -> Result<std::path::PathBuf, String> {
     let name = if cfg!(windows) { format!("{bin}.exe") } else { bin.to_string() };
     let path = dir.join(name);
     if !path.exists() {
         return Err(format!(
-            "Không thấy sidecar \"{bin}\" cạnh app — nhiều khả năng đây là bản dev (`tauri dev`), \
-             vốn chỉ build bin mặc định (`devtool`) chứ không build các sidecar. \
-             Chạy `cargo build --bin {bin}` để nó nằm cạnh trong target/debug rồi thử lại."
+            "Không thấy sidecar \"{bin}\" cạnh app, và cũng chưa cài qua Settings → Extensions. \
+             Nhiều khả năng đây là bản dev (`tauri dev`), vốn chỉ build bin mặc định (`devtool`) \
+             chứ không build các sidecar. Chạy `cargo build --bin {bin}` để nó nằm cạnh trong \
+             target/debug rồi thử lại, hoặc cài sidecar này qua URL trong Settings."
         ));
     }
     Ok(path)
+}
+
+/// Hợp cả hai nguồn, THUẦN (không đụng `AppHandle`/`current_exe()`) — dùng bởi
+/// cả `sidecar_path` thật (dưới đây) lẫn test của module này, không cần dựng
+/// một AppHandle giả (không thể — xem `artifact_installer.rs` đầu file đó về
+/// lý do).
+///
+/// **Thứ tự CỐ Ý, không được đảo ngược** (xem "Quyết định quan trọng nhất" ở
+/// `docs/plans/native-sidecar-install.md`): tải-về qua `extensions/index.json`
+/// (nếu có bản ghi VÀ file còn tồn tại trên đĩa) LUÔN được ưu tiên trước bản
+/// đóng gói sẵn cạnh exe. Điều này phục vụ trực tiếp mục tiêu đã chốt: một khi
+/// `bundle.externalBin` không còn liệt kê một bin nào đó, fallback tự nhiên
+/// biến mất — không cần sửa hàm này lần nữa.
+fn resolve_sidecar_path(
+    index_dir: Option<&std::path::Path>,
+    beside_dir: &std::path::Path,
+    bin: &str,
+) -> Result<std::path::PathBuf, String> {
+    if let Some(dir) = index_dir {
+        if let Some(path) = crate::artifact_installer::installed_service_bin_path_at(dir, bin) {
+            return Ok(path);
+        }
+    }
+    resolve_beside_dir(beside_dir, bin)
+}
+
+/// **HÀM BIÊN GIỚI TIN CẬY** — quyết định binary NÀO thực sự bị spawn cho một
+/// tên `bin` đã qua `ALLOWED_SERVICES`. Đọc phần `kind=service` của
+/// `extensions/index.json` (nhánh service của `artifact_installer.rs`, xem
+/// module đó) TRƯỚC; chỉ khi không có bản ghi hợp lệ (không có bản ghi, hoặc
+/// có bản ghi nhưng file đã mất khỏi đĩa — đĩa hỏng/xoá thủ công) mới rơi
+/// xuống hành vi CŨ (tìm cạnh `current_exe()`, đúng quy ước với
+/// `mcp_bridge::mcp_sidecar_path`, nên không cần thêm tauri-plugin-shell hay
+/// mở quyền chạy tiến trình ở tầng capability).
+fn sidecar_path(app: &AppHandle, bin: &str) -> Result<std::path::PathBuf, String> {
+    // `extensions_dir` tự tạo thư mục nếu chưa có — lỗi ở đây (app_data
+    // không đọc được) không nên chặn hẳn fallback cạnh-exe, nên chỉ bỏ qua
+    // (`.ok()`) thay vì `?`.
+    let index_dir = crate::artifact_installer::extensions_dir(app).ok();
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let beside_dir = exe
+        .parent()
+        .ok_or("Không xác định được thư mục cài đặt của app")?
+        .to_path_buf();
+    resolve_sidecar_path(index_dir.as_deref(), &beside_dir, bin)
 }
 
 /// Demux MỘT dòng đã phân tích vào đúng waiter của nó. Hàm THUẦN (không có gì
@@ -316,7 +362,7 @@ async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) ->
         return Ok(running.clone());
     }
 
-    let mut command = Command::new(sidecar_path(bin)?);
+    let mut command = Command::new(sidecar_path(app, bin)?);
     // Sidecar không có `AppHandle` — nó không phải một plugin JS chạy trong
     // webview, nên không đi qua `sdk.storage`/`app.path()`. Một sidecar cần
     // lưu gì đó bền (cấu hình kết nối, ví dụ) đọc thư mục NÀY, chỉ của riêng
@@ -714,5 +760,125 @@ mod tests {
         assert!(!json.contains("result"));
         assert!(!json.contains("stream"));
         assert!(!json.contains("done"));
+    }
+
+    // -- Task 3: sidecar_path — thứ tự ưu tiên tải-về-trước, cạnh-exe sau -----
+
+    fn temp_dir(label: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("devtool-sidecar-path-test-{label}-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// Ghi thẳng một `extensions/index.json` giả với đúng hình dạng
+    /// `artifact_installer.rs` thật sự ghi ra — dùng type công khai của module
+    /// đó (`InstalledArtifactRecord::Service`), không bịa JSON tay.
+    fn write_fake_service_index(extensions_dir: &std::path::Path, bin: &str, bin_path: &std::path::Path) {
+        let mut targets = HashMap::new();
+        targets.insert(
+            crate::artifact_installer::current_target_triple(),
+            crate::artifact_installer::ServiceTarget { url: "https://x/bin".into(), sha256: "0".repeat(64) },
+        );
+        let record = crate::artifact_installer::InstalledArtifactRecord::Service(
+            crate::artifact_installer::InstalledServiceRecord {
+                manifest: crate::artifact_installer::RemoteServiceManifest {
+                    bin: bin.into(),
+                    version: "1.0.0".into(),
+                    protocol: SERVICE_PROTOCOL,
+                    targets,
+                },
+                source_url: "https://x/svc.json".into(),
+                bin_path: bin_path.to_string_lossy().into_owned(),
+                installed_at: 1,
+            },
+        );
+        std::fs::write(
+            extensions_dir.join("index.json"),
+            serde_json::to_string_pretty(&vec![record]).unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn dat_cung_ten_bin_o_ca_hai_vi_tri_thi_ban_tai_ve_luon_duoc_chon() {
+        let extensions_dir = temp_dir("extensions");
+        let beside_dir = temp_dir("beside-exe");
+        let installed_bin = temp_dir("installed-bin-dir").join("devtool-svc-demo");
+        std::fs::write(&installed_bin, b"noi dung ban tai ve").unwrap();
+        // Cùng tên bin cũng tồn tại cạnh "exe" — nội dung khác hẳn, để một
+        // assertion sai (chọn nhầm bản) lộ rõ nếu có ai lỡ đảo thứ tự.
+        std::fs::write(beside_dir.join("devtool-svc-demo"), b"noi dung ban canh exe").unwrap();
+        write_fake_service_index(&extensions_dir, "devtool-svc-demo", &installed_bin);
+
+        let resolved = resolve_sidecar_path(Some(&extensions_dir), &beside_dir, "devtool-svc-demo").unwrap();
+        assert_eq!(resolved, installed_bin);
+    }
+
+    #[test]
+    fn khong_co_ban_tai_ve_thi_roi_xuong_canh_exe_khong_doi_hanh_vi_cu() {
+        let extensions_dir = temp_dir("extensions-empty");
+        let beside_dir = temp_dir("beside-exe-only");
+        let beside_bin = beside_dir.join("devtool-svc-demo");
+        std::fs::write(&beside_bin, b"ban dong goi san").unwrap();
+
+        let resolved = resolve_sidecar_path(Some(&extensions_dir), &beside_dir, "devtool-svc-demo").unwrap();
+        assert_eq!(resolved, beside_bin);
+    }
+
+    #[test]
+    fn khong_co_gi_o_ca_hai_noi_thi_bao_loi_ro_rang_khong_panic() {
+        let extensions_dir = temp_dir("extensions-empty-2");
+        let beside_dir = temp_dir("beside-empty");
+        let err = resolve_sidecar_path(Some(&extensions_dir), &beside_dir, "devtool-svc-khong-ton-tai").unwrap_err();
+        assert!(err.contains("Không thấy sidecar"), "{err}");
+    }
+
+    #[test]
+    fn index_noi_da_cai_nhung_file_mat_tren_dia_thi_roi_xuong_canh_exe() {
+        // index.json nói đã cài nhưng file bị xoá/hỏng đĩa — edge case nêu
+        // trong plan: rơi xuống fallback cạnh-exe nếu có, không panic.
+        let extensions_dir = temp_dir("extensions-dangling");
+        let beside_dir = temp_dir("beside-fallback");
+        let beside_bin = beside_dir.join("devtool-svc-demo");
+        std::fs::write(&beside_bin, b"ban dong goi san").unwrap();
+        // Trỏ tới một file KHÔNG tồn tại — mô phỏng đĩa hỏng/bị xoá thủ công.
+        let missing = temp_dir("missing-parent").join("devtool-svc-demo");
+        write_fake_service_index(&extensions_dir, "devtool-svc-demo", &missing);
+
+        let resolved = resolve_sidecar_path(Some(&extensions_dir), &beside_dir, "devtool-svc-demo").unwrap();
+        assert_eq!(resolved, beside_bin);
+    }
+
+    /// Round-trip đầy đủ: "cài" một binary giả (một script `sh` dội lại dòng
+    /// vào, giống `cat` — cùng cách `plugin_installer.rs`/`artifact_installer.rs`'s
+    /// test cũ không cần ship thêm binary nào), resolve qua `resolve_sidecar_path`,
+    /// rồi thực sự spawn + gọi qua đúng đường request/response mà `service_call`
+    /// dùng (`spawn_process`/`call_once`) — chứng minh cả đường dây, không chỉ
+    /// phần chọn đường dẫn.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn round_trip_cai_gia_resolve_dung_va_goi_duoc_qua_no() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let extensions_dir = temp_dir("rt-extensions");
+        let beside_dir = temp_dir("rt-beside");
+        let bin_dir = temp_dir("rt-bin-dir");
+        let installed_bin = bin_dir.join("devtool-svc-demo");
+        std::fs::write(&installed_bin, "#!/bin/sh\ncat\n").unwrap();
+        let mut perms = std::fs::metadata(&installed_bin).unwrap().permissions();
+        perms.set_mode(perms.mode() | 0o111);
+        std::fs::set_permissions(&installed_bin, perms).unwrap();
+        write_fake_service_index(&extensions_dir, "devtool-svc-demo", &installed_bin);
+
+        let resolved = resolve_sidecar_path(Some(&extensions_dir), &beside_dir, "devtool-svc-demo").unwrap();
+        assert_eq!(resolved, installed_bin);
+
+        let mut cmd = Command::new(&resolved);
+        let running = spawn_process(&mut cmd, || {}).expect("spawn binary vừa cài");
+        let req = request("devtool-svc-demo", SERVICE_PROTOCOL);
+        let response = call_once(&running, &req, Duration::from_secs(5)).await;
+        assert_eq!(response.id, "1");
+        assert!(response.error.is_none(), "{response:?}");
+        kill(running).await;
     }
 }
