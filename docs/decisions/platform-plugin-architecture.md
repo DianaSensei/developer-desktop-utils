@@ -297,23 +297,137 @@ trong `liveConnections` khớp khoá tool thật sự ghi, và mọi plugin tron
 `MIGRATIONS` của kho bí mật đều khai quyền `secrets` (thiếu quyền là di trú vẫn chép
 nhưng tool đọc lại bị chặn và hiện ra rỗng — trông y như mất dữ liệu).
 
+## Cài đặt plugin từ bên ngoài (Phase 1: cơ chế URL + cập nhật)
+
+Mọi plugin vẫn do chính người dùng (chủ repo) phát hành — không mở cho bên thứ
+ba — nhưng từ đây, một plugin không bắt buộc phải compile sẵn vào app lúc build
+nữa: nó có thể tải, kiểm, và nạp lúc app đang chạy, từ một URL.
+
+### Định dạng gói
+
+Một "gói" là hai thứ ở hai URL: một **manifest JSON** (`RemotePluginManifest`)
+và **đúng một file bundle ESM** mà manifest trỏ tới qua `entry`. Không phải một
+thư mục nhiều file — bundle được nạp qua URL kiểu `blob:` (xem dưới), và một
+blob không có "thư mục chứa nó" để trình duyệt phân giải `import` tương đối.
+Tác giả build ra một file đã gộp hết (Vite/esbuild/Rollup ở chế độ bundle single
+file), không phải ESM nhiều file như dev server vẫn phục vụ.
+
+```json
+{
+  "id": "my-tool", "version": "1.0.0", "sdk": "^1.0.0",
+  "entry": "https://example.com/my-tool/1.0.0/bundle.mjs",
+  "integrity": "<sha256 hex của đúng nội dung file entry>",
+  "label": "My Tool", "description": "...", "icon": "puzzle",
+  "keywords": [], "route": "/my-tool",
+  "permissions": ["storage"], "commands": [], "hosts": []
+}
+```
+
+`icon` là TÊN, không phải component — JSON không mang được code. Tra trong bảng
+cố định `ICONS_BY_NAME` (`src/platform/installer.ts`); tên lạ rơi về `Puzzle`,
+không chặn cài đặt. Không có `order`/`defaultEnabled` trong manifest — Platform
+tự gán: `order` bắt đầu từ `100_000 + thứ tự cài` (luôn xếp sau mọi plugin
+compile-time), `defaultEnabled` luôn `true` (cài rồi thì mặc định bật).
+
+### Đường đi: tải → kiểm → lưu → nạp
+
+`src-tauri/src/plugin_installer.rs` (Rust) + `src/platform/installer.ts` (TS).
+
+- **Tải THẲNG BẰNG reqwest ở Rust**, không qua binding JS của
+  `@tauri-apps/plugin-http`. Một gói có thể vài MB; đẩy nó qua `invoke` dưới
+  dạng JSON/base64 tốn thêm ~33% và giữ cả payload trong bộ nhớ ở hai phía
+  không cần thiết — Rust tải thẳng xuống đĩa (`<app_data>/plugins/<id>/<version>/
+  bundle.mjs`), JS chỉ nhận lại bản ghi đã cài.
+- **`integrity` (sha256) là BẮT BUỘC, kiểm HAI LẦN**: lúc cài (từ chối và không
+  ghi gì xuống đĩa nếu sai), và lại một lần nữa mỗi khi ĐỌC bundle để chạy —
+  phòng trường hợp file trên đĩa bị sửa sau khi cài mà `index.json` không biết.
+  Một URL không tự đủ để tin: một MITM hay một server lưu trữ bị chiếm có thể
+  đổi nội dung bundle mà người dùng không hay, dù chính họ đã tin nguồn.
+- **Nạp qua URL `blob:`, không phải asset-protocol.** `sdk`-tương-đương ở host
+  đọc lại nội dung bundle (kiểm checksum lần hai), dựng `Blob` rồi
+  `URL.createObjectURL`, `import()` URL đó. Lý do chọn `blob:` thay vì scope
+  asset-protocol của Tauri: hành vi CSP của `blob:` cho `import()` động là quy
+  tắc trình duyệt chuẩn, kiểm chứng được mà không cần chạy GUI thật; asset-
+  protocol có chi tiết cấu hình/scope riêng của từng bản Tauri mà việc này
+  không xác nhận được nếu không tự tay chạy app. CSP (`tauri.conf.json`) có
+  thêm `script-src 'self' blob:` — hẹp nhất có thể để cho phép đúng trường hợp
+  này, không mở toang `script-src` cho mọi nguồn.
+- **Đăng ký qua ĐÚNG MỘT hàm** (`registerManifest` trong `registry.ts`) dùng
+  chung với 26 plugin compile-time — nên chịu chung một bộ luật: id/route/order
+  không đụng nhau, hợp lệ theo `validateManifest`. Một plugin cài từ bên ngoài
+  cố lấy `route: '/json'` (đã bị plugin compile-time chiếm) bị từ chối y hệt
+  như hai plugin compile-time đụng route nhau lúc build — chỉ khác là lỗi này
+  vào `PLUGIN_ERRORS` lúc chạy thay vì làm CI đỏ lúc build.
+- **KHÔNG áp dụng ngay lập tức.** `initInstalledPlugins()` chỉ chạy MỘT LẦN lúc
+  bootstrap (`main.tsx`, trước khi render `<App/>`) — cài/gỡ/cập nhật trong lúc
+  app đang chạy không cập nhật sidebar tại chỗ; Settings nhắc khởi động lại,
+  dùng lại đúng cơ chế `relaunch()` app đã có sẵn cho việc TỰ CẬP NHẬT
+  (`UpdateContext`). Làm cho `PLUGINS` phản ứng runtime (biến registry từ mảng
+  tĩnh thành store `useSyncExternalStore`-được) là việc có thể làm sau, không
+  phải điều kiện để cơ chế này có ích.
+
+### React dùng chung — hợp đồng cho tác giả plugin
+
+Một bundle mang theo bản React riêng sẽ vỡ hook (hai bản React trong cùng một
+cây component là lỗi "Invalid hook call" kinh điển). `main.tsx` gán
+`window.__DEVTOOL_VENDOR__ = { react, reactDom, reactDomFull, jsxRuntime }`
+ngay từ dòng đầu tiên của app. Bundle của plugin phải cấu hình build của nó để
+`react`/`react-dom`/`react/jsx-runtime` KHÔNG bị tự bundle mà đọc từ đó — ví dụ
+với Rollup/Vite, dùng một plugin `resolveId`/`load` ảo:
+
+```js
+// vite.config.plugin-authoring.js — ví dụ, chưa kiểm bằng một plugin thật
+const vendorShim = {
+  name: 'devtool-vendor-shim',
+  resolveId: (id) => (['react', 'react-dom', 'react/jsx-runtime'].includes(id) ? id : null),
+  load(id) {
+    if (id === 'react') return 'export default window.__DEVTOOL_VENDOR__.react;';
+    if (id === 'react-dom') return 'export default window.__DEVTOOL_VENDOR__.reactDomFull;';
+    if (id === 'react/jsx-runtime') return `
+      export const jsx = window.__DEVTOOL_VENDOR__.jsxRuntime.jsx;
+      export const jsxs = window.__DEVTOOL_VENDOR__.jsxRuntime.jsxs;
+      export const Fragment = window.__DEVTOOL_VENDOR__.jsxRuntime.Fragment;
+    `;
+  },
+};
+```
+
+**Chưa kiểm bằng một plugin thật.** Cơ chế RUNTIME (vendor globals, blob-url
+import, checksum kép) có test thật ở cả hai phía (13 test Rust qua server HTTP
+thật, 10 test TS mock đúng ranh giới `invoke`). Phần AUTHORING (một bundle thật,
+build bằng cấu hình như trên, cài qua UI, thấy nó chạy đúng trong app) thì
+chưa — đây là khoảng trống cần một lần xác nhận thủ công trước khi coi cơ chế
+là đã dùng được cho việc thật, không chỉ đã đúng về mặt cơ chế.
+
 ## Không làm (và vì sao)
 
-- **Nạp plugin lúc chạy từ repo khác.** Cần: định dạng gói đã ký (tái dụng khoá
-  minisign của updater), `registry.json` đã ký, kiểm `sdkRange` lúc cài, CI ma trận
-  hai chiều. Hợp đồng (`PluginManifest` + `sdk` range) đã sẵn sàng; cơ chế phân phối
-  thì chưa.
 - **Sandbox plugin.** Mọi plugin đều do chính chúng ta phát hành, nên cách ly để
   chống mã độc chưa mua được gì. Cách ly để chống **crash** thì có giá trị và thuộc
   tier B/C.
 - **Đưa `useQuickPaste` / `useInputHistory` / `useImagePaste` vào SDK.** Chúng là
   thư viện UX dùng chung, không vượt ranh giới tin cậy nào — thêm một lớp gián tiếp
   mà không mua được gì.
+- **`PLUGINS` phản ứng runtime.** Cài/gỡ/cập nhật cần khởi động lại — xem trên.
+- **Registry tổng hợp nhiều plugin ("chợ" plugin).** Mỗi URL người dùng dán vào
+  là MỘT plugin; chưa có khái niệm một `registry.json` liệt kê nhiều plugin để
+  duyệt/cài hàng loạt. Thêm khi thực sự có nhiều hơn một, hai plugin cần phân
+  phối kiểu này.
 
 ## Việc còn lại
 
 1. ~~Plugin dịch vụ tier B đầu tiên.~~ **Đã có** — `devtool-svc-echo`, xem "Tier B" ở
    trên. Còn lại: một plugin thật (không phải ví dụ) khai `service` và có UI thật sự
    gọi tới sidecar của nó.
-2. **Phân phối plugin từ repo riêng** — xem "Không làm" ở trên.
-3. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.
+2. ~~Cài đặt plugin từ bên ngoài.~~ **Đã có phần cơ chế (Phase 1)** — xem mục ngay
+   trên. Còn lại: xác nhận thủ công với một plugin thật (mục "Chưa kiểm bằng một
+   plugin thật" ở trên).
+3. **Phase 2 — bốn tool nặng (Kafka/RabbitMQ/Redis/Container) thành sidecar tier B
+   thật, cài được qua Phase 1.** Đây LÀ một dự án riêng, không phải phần mở rộng
+   nhỏ của Phase 1: `kafka.rs`/`rabbit.rs`/`redis_tool.rs`/`container_tool.rs` cộng
+   lại ~4700 dòng, mỗi lệnh `#[tauri::command]` phải viết lại thành một method
+   JSONL qua `service_host.rs`, và các luồng dữ liệu dài hạn (Kafka consume, Redis
+   Pub/Sub, log/stats container) cần khung tin nhắn stream mà `service.ts` hiện
+   CHƯA có (nó chỉ có request/response một-một, giống `devtool-svc-echo`) — phải
+   mở rộng giao thức trước khi bắt đầu viết lại bất kỳ tool nào. Bắt đầu từ Redis
+   (nhỏ nhất, 945 dòng, đã qua SDK từ trước) khi có quyết định tiếp tục.
+4. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.

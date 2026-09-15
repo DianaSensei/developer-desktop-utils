@@ -15,7 +15,16 @@ export {
   DEFAULT_PLUGIN_ORDER,
   DEFAULT_PLUGIN_FEATURES,
   getPlugin,
+  initInstalledPlugins,
 } from './registry';
+export {
+  fetchManifestPreview,
+  installPlugin,
+  listInstalledPlugins,
+  uninstallPlugin,
+  checkForUpdate,
+} from './installer';
+export type { RemotePluginManifest, InstalledPluginRecord } from './installer';
 export { createPluginSdk, storageKey, PluginPermissionError, PluginCommandError, PluginHostError } from './sdk';
 export type {
   PluginSdk,

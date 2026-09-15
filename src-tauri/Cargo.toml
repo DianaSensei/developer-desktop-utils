@@ -73,6 +73,14 @@ aes-gcm = "0.11"
 # ở đây chỉ cần đúng một việc là "cho tôi N byte ngẫu nhiên an toàn", và bề mặt
 # API của nó ổn định hơn hẳn các bản rand gần đây.
 getrandom = { version = "0.4", features = ["std"] }
+# Tải gói plugin cài từ bên ngoài (src/plugin_installer.rs). Pin đúng "0.12" vì
+# đó là bản `tauri-plugin-http` đã kéo vào transitively (workspace đã có sẵn
+# reqwest 0.12.28 đã build) — dùng chung để không compile thêm một bản reqwest
+# thứ hai. Tải THẲNG bằng reqwest, không qua `tauri-plugin-http`'s JS binding:
+# gói plugin có thể vài MB, và JSON/IPC không phải đường đúng cho payload lớn
+# (base64 hoá tốn thêm ~33%) — Rust tải trực tiếp xuống đĩa, JS chỉ nhận lại
+# kết quả (đường dẫn cục bộ, hash).
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [target.'cfg(unix)'.dependencies]
 # Direct handles onto crates bollard already pulls in transitively (its own

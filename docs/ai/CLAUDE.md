@@ -250,6 +250,12 @@ automatically — there is no registration table to update, and no route to wire
 `App.tsx`. See [`docs/decisions/platform-plugin-architecture.md`](../decisions/platform-plugin-architecture.md)
 for why.
 
+This section covers **compile-time** plugins (`src/plugins/`), always bundled into
+the app. A plugin can also be **installed at runtime from a URL** — see
+"Cài đặt plugin từ bên ngoài" in the same ADR for the manifest format, the
+integrity/CSP mechanics, and the vendor-globals contract a plugin author's build
+must follow (`src/platform/installer.ts`, `src-tauri/src/plugin_installer.rs`).
+
 ### Step 1: Create the tool component
 
 Create `src/components/tools/YourTool.tsx`. Layout, hooks and styling are unchanged;

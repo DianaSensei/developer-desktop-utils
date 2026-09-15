@@ -234,6 +234,40 @@ export const DICTIONARY = {
   },
   'settings.plugins.auditDenied': { vi: 'bị từ chối', en: 'denied' },
 
+  // ── Settings — Cài plugin từ bên ngoài ───────────────────────────────────
+  'settings.plugins.install.title': { vi: 'Cài plugin từ bên ngoài', en: 'Install external plugin' },
+  'settings.plugins.install.description': {
+    vi: 'Dán URL manifest của một plugin (do bạn phát hành) để cài. Checksum sha256 trong manifest được kiểm trước khi bất kỳ dòng code nào chạy — một URL không tự đủ để tin, kiểm tra vẫn diễn ra dù bạn đã tin nguồn.',
+    en: 'Paste a plugin manifest URL (published by you) to install it. The sha256 checksum in the manifest is checked before any of its code ever runs — a URL alone is never enough trust, the check still happens even when you trust the source.',
+  },
+  'settings.plugins.install.webWarning': {
+    vi: 'Đang chạy trong trình duyệt — cài plugin chỉ hoạt động trên bản desktop.',
+    en: 'Running in browser — installing plugins only works in the desktop app.',
+  },
+  'settings.plugins.install.preview': { vi: 'Xem trước', en: 'Preview' },
+  'settings.plugins.install.confirm': { vi: 'Cài đặt', en: 'Install' },
+  'settings.plugins.install.previewing': { vi: 'Đang tải manifest…', en: 'Fetching manifest…' },
+  'settings.plugins.install.installing': { vi: 'Đang cài…', en: 'Installing…' },
+  'settings.plugins.install.installed': {
+    vi: 'Đã cài. Khởi động lại app để dùng plugin này.',
+    en: 'Installed. Restart the app to use this plugin.',
+  },
+  'settings.plugins.installed.title': { vi: 'Đã cài từ bên ngoài', en: 'Installed from outside' },
+  'settings.plugins.installed.empty': { vi: 'Chưa cài plugin nào.', en: 'No plugins installed yet.' },
+  'settings.plugins.installed.checkUpdate': { vi: 'Kiểm bản mới', en: 'Check for update' },
+  'settings.plugins.installed.update': { vi: 'Cập nhật', en: 'Update' },
+  'settings.plugins.installed.upToDate': { vi: 'Đã là bản mới nhất', en: 'Up to date' },
+  'settings.plugins.installed.updateAvailable': {
+    vi: 'Có bản {{version}} mới hơn',
+    en: 'Version {{version}} available',
+  },
+  'settings.plugins.installed.uninstall': { vi: 'Gỡ', en: 'Uninstall' },
+  'settings.plugins.restart.needed': {
+    vi: 'Đã thay đổi plugin cài từ bên ngoài — khởi động lại để áp dụng.',
+    en: 'External plugins changed — restart to apply.',
+  },
+  'settings.plugins.restart.now': { vi: 'Khởi động lại ngay', en: 'Restart now' },
+
   // ── Settings — MCP ────────────────────────────────────────────────────────
   'settings.mcp.title': { vi: 'Cầu nối MCP', en: 'MCP' },
   'settings.mcp.backgroundTitle': { vi: 'Bridge MCP chạy nền', en: 'Background MCP bridge' },

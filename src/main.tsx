@@ -1,5 +1,36 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import * as ReactDOMFull from 'react-dom';
+import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+
+// Bản React/ReactDOM DÙNG CHUNG cho plugin cài từ bên ngoài (xem
+// `src/platform/installer.ts`, phần "REACT DÙNG CHUNG"). Một bundle plugin
+// mang theo bản React RIÊNG của nó sẽ vỡ hook: hai bản React trong cùng một
+// cây component là lỗi "Invalid hook call" kinh điển, vì hook đọc trạng thái
+// nội bộ gắn với ĐÚNG một instance của React. Gán TRƯỚC bất cứ import động
+// nào của một plugin có thể chạy — nghĩa là ngay ở đây, phần trên cùng của
+// file được evaluate sớm nhất trong toàn bộ app.
+//
+// Tác giả plugin cấu hình build của mình coi `react`/`react-dom`/
+// `react/jsx-runtime` là "external", trỏ ba module đó về đây thay vì tự
+// bundle — xem hướng dẫn tác giả plugin trong
+// docs/decisions/platform-plugin-architecture.md.
+declare global {
+  interface Window {
+    __DEVTOOL_VENDOR__: {
+      react: typeof React;
+      reactDom: typeof ReactDOM;
+      reactDomFull: typeof ReactDOMFull;
+      jsxRuntime: { jsx: typeof jsx; jsxs: typeof jsxs; Fragment: typeof Fragment };
+    };
+  }
+}
+window.__DEVTOOL_VENDOR__ = {
+  react: React,
+  reactDom: ReactDOM,
+  reactDomFull: ReactDOMFull,
+  jsxRuntime: { jsx, jsxs, Fragment },
+};
 // Self-hosted fonts — bundled by Vite, work offline, render identically on
 // macOS / Windows / Linux.
 //
@@ -98,6 +129,17 @@ async function bootstrap() {
   applyCornerToDocument(getCornerPreference());
   applyFontToDocument(getFontPreference());
   applyMonoFontToDocument(getMonoFontPreference());
+
+  // Nạp plugin đã cài từ bên ngoài TRƯỚC khi App đọc `PLUGINS` lần đầu — một
+  // plugin cài từ mạng chỉ đọc được lúc chạy (từ đĩa máy người dùng), không
+  // sớm hơn, khác hẳn 26 plugin compile-time đã có sẵn lúc build. Import động
+  // (không phải `import { initInstalledPlugins } from './platform/registry'`
+  // ở đầu file) vì cùng lý do App được nạp động bên dưới: registry.ts quét
+  // toàn bộ `src/plugins/*/plugin.ts` ngay khi module của nó được evaluate,
+  // và cái đó không nên nằm trên đường import đồng bộ, chặn-render-đầu-tiên
+  // của chính file bootstrap này.
+  const { initInstalledPlugins } = await import('./platform/registry');
+  await initInstalledPlugins();
 
   const { default: App } = await import('./App');
   ReactDOM.createRoot(document.getElementById('root')!).render(
