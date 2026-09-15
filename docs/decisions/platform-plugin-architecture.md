@@ -302,23 +302,29 @@ tất cả vì chúng khác hẳn nhau về THỨ đang bị cô lập khỏi c�
   khoá hai việc — đúng công thức ghép, và hai bin khác nhau luôn ra hai thư mục
   khác nhau.
 
-- **Tier A cũ, biên dịch sẵn (`kafka.rs`, `rabbit.rs`, `container_tool.rs`, và
-  `redis_tool.rs` trước khi có sidecar).** Đây là NỢ isolation CÓ THẬT, không
-  phải đã giải quyết: mỗi module tự đọc/ghi một file phẳng ngay dưới app_data
-  gốc (`kafka-brokers.json`, `rabbit-connections.json`,
-  `container-connections.json`, `redis-connections.json`) — không đi qua
-  `sdk.storage`/`sdk.secrets` (chúng dùng lệnh Rust riêng, không phải kho
-  chung), và không có gì ở tầng hệ thống ngăn một lỗi gõ nhầm tên đọc/ghi nhầm
-  file của tool khác; nó "cách ly" đúng bằng việc code hiện tại được viết cẩn
-  thận chứ không bằng cấu trúc. Cách sửa ĐÚNG là để nguyên — không làm một đợt
-  di trú riêng cho những file này — vì chúng đang trên đường bị xoá hẳn theo
-  đúng lịch của Phase 2: mỗi tool khi tới lượt port sang sidecar (`redis_tool.rs`
-  đã bắt đầu) tự động được thư mục riêng qua `service_data_dir`, không cần một
-  dự án cách ly độc lập chạy song song rồi lại phải di trú lần nữa khi tool đó
-  bị xoá. `mcp_bridge.rs`'s `mcp-bridge.json` là ngoại lệ ĐÚNG, không phải nợ:
-  nó không phải dữ liệu của MỘT plugin, mà là cấu hình của chính cầu nối MCP
-  (cổng loopback), dùng chung cho MỌI bridge của MỌI plugin — không có
-  `pluginId` nào để cách ly theo.
+- **Tier A biên dịch sẵn (`kafka.rs`, `rabbit.rs`, `container_tool.rs`,
+  `redis_tool.rs`).** Từng là NỢ isolation có thật — mỗi module tự đọc/ghi một
+  file PHẲNG ngay dưới app_data gốc (`kafka-brokers.json`,
+  `rabbit-connections.json`, `container-connections.json`,
+  `redis-connections.json`), không có gì ở tầng hệ thống ngăn một lỗi gõ nhầm
+  tên đọc/ghi nhầm file của tool khác. Đã sửa bằng `src-tauri/src/plugin_data.rs`
+  — `plugin_data_dir(app, plugin_id)` cấp cho mỗi plugin một thư mục RIÊNG,
+  `<app_data>/plugin-data/<plugin_id>/`, cùng nguyên tắc với
+  `service_data_dir` bên Tier B (khác một chỗ: Tier A có sẵn `AppHandle` nên
+  đọc thẳng `app.path()`, không cần đi qua biến môi trường). Cả bốn module đã
+  chuyển qua hàm này. **KHÔNG di trú dữ liệu cũ**: bốn tool này chỉ lưu cấu
+  hình kết nối (host/port/thông tin đăng nhập) — người dùng tự nhập lại được
+  trong vài giây, không phải dữ liệu cần bảo toàn — nên đổi vị trí thẳng, chấp
+  nhận danh sách kết nối trống một lần sau khi nâng cấp, thay vì mang gánh
+  nặng di trú không cần thiết cho một quyết định kiến trúc thuần tuý. Hệ quả
+  phụ: `redis_tool.rs` (Tier A) và `devtool-svc-redis` (Tier B, đang port dở)
+  giờ đọc HAI thư mục khác nhau (`plugin-data/redis-client/` và
+  `service-data/devtool-svc-redis/`) — đúng ý, vì đây là hai bản triển khai
+  song song cho tới khi Phase 2 cắt hẳn và xoá `redis_tool.rs`.
+  `mcp_bridge.rs`'s `mcp-bridge.json` là ngoại lệ ĐÚNG, không đổi: nó không
+  phải dữ liệu của MỘT plugin, mà là cấu hình của chính cầu nối MCP (cổng
+  loopback), dùng chung cho MỌI bridge của MỌI plugin — không có `pluginId`
+  nào để cách ly theo.
 
 **Đường end-to-end đã có bằng chứng thật, với `devtool-svc-echo`.** Đây là plugin
 dịch vụ tối giản (`ping`/`echo`, không có giá trị người dùng) — tồn tại thuần để
@@ -555,10 +561,10 @@ là đã dùng được cho việc thật, không chỉ đã đúng về mặt c
    ngoài sẽ không nằm trong allowlist đó trừ khi cơ chế allowlist cũng được nghĩ
    lại. Bắt đầu từ Redis (nhỏ nhất, 945 dòng, đã qua SDK từ trước) — **Bước 1
    đã xong** (`devtool-svc-redis`: CRUD cấu hình + connect/overview/duyệt key,
-   19 test, xác nhận thủ công bằng Redis thật qua Docker). Nhắc cho Bước 4/5:
-   sidecar lưu cấu hình ở thư mục RIÊNG (`service-data/devtool-svc-redis/`,
-   xem "Cách ly dữ liệu" ở mục Tier B), khác chỗ `redis_tool.rs` (Tier A) đang
-   lưu (`redis-connections.json` ở gốc app_data) — lúc cắt hẳn sang sidecar
-   cần một bước di trú copy nội dung file cũ vào file mới, không thì người
-   dùng đang có kết nối đã lưu sẽ thấy danh sách trống.
+   19 test, xác nhận thủ công bằng Redis thật qua Docker). Sidecar lưu cấu
+   hình ở thư mục riêng của NÓ (`service-data/devtool-svc-redis/`), khác chỗ
+   `redis_tool.rs` (Tier A) đang lưu (`plugin-data/redis-client/`) — có chủ ý
+   KHÔNG di trú lúc cắt hẳn sang sidecar ở Bước 4/5: cấu hình kết nối Kafka/
+   RabbitMQ/Redis/Container không cần bảo toàn, người dùng tự nhập lại được
+   (xem "Cách ly dữ liệu" ở mục Tier B).
 4. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.

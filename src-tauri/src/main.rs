@@ -15,6 +15,7 @@ mod container_tool;
 mod secrets_vault;
 mod service_host;
 mod plugin_installer;
+mod plugin_data;
 
 use tauri::Manager;
 

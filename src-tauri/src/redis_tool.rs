@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use uuid::Uuid;
 
 use futures_util::StreamExt;
@@ -44,11 +44,14 @@ pub struct RedisConnection {
 
 // ── Config persistence ──────────────────────────────────────────────────────
 
+// Nằm trong thư mục RIÊNG của plugin này (`plugin-data/redis-client/`), không
+// còn phẳng ở gốc app_data — xem plugin_data.rs. Đổi vị trí có chủ ý, không di
+// trú file cũ: đây chỉ là cấu hình kết nối, người dùng tự nhập lại được. LƯU
+// Ý: vị trí này KHÁC với `service-data/devtool-svc-redis/connections.json` mà
+// sidecar Tier B (devtool-svc-redis.rs) dùng — hai bản riêng biệt cho tới khi
+// Phase 2 cắt hẳn sang sidecar và module này bị xoá.
 fn configs_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join("redis-connections.json"))
-        .map_err(|e| format!("Could not resolve app data directory: {e}"))
+    Ok(crate::plugin_data::plugin_data_dir(app, "redis-client")?.join("connections.json"))
 }
 
 fn load_configs(app: &AppHandle) -> Vec<RedisConnection> {

@@ -1,7 +1,7 @@
 use rskafka::client::{ClientBuilder, partition::{Compression, OffsetAt, UnknownTopicHandling}};
 use rskafka::record::Record;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri::ipc::Channel;
 use chrono::Utc;
 use std::collections::HashMap;
@@ -152,11 +152,12 @@ pub struct KafkaConsumerRegistry {
 
 // ── Config persistence ────────────────────────────────────────────────────────
 
+// Nằm trong thư mục RIÊNG của plugin này (`plugin-data/kafka-explorer/`), không
+// còn phẳng ở gốc app_data — xem plugin_data.rs. Đổi vị trí có chủ ý, không di
+// trú file cũ: đây chỉ là cấu hình kết nối (broker host/port), người dùng tự
+// nhập lại được, không phải dữ liệu cần bảo toàn.
 fn configs_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join("kafka-brokers.json"))
-        .map_err(|e| format!("Could not resolve app data directory: {e}"))
+    Ok(crate::plugin_data::plugin_data_dir(app, "kafka-explorer")?.join("brokers.json"))
 }
 
 fn load_configs(app: &AppHandle) -> Vec<BrokerConfig> {

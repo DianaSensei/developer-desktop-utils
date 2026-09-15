@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tokio::sync::Notify;
 use uuid::Uuid;
 
@@ -141,11 +141,11 @@ pub struct ConsumerRegistry {
 
 // ── Config persistence ──────────────────────────────────────────────────────
 
+// Nằm trong thư mục RIÊNG của plugin này (`plugin-data/rabbit-client/`), không
+// còn phẳng ở gốc app_data — xem plugin_data.rs. Đổi vị trí có chủ ý, không di
+// trú file cũ: đây chỉ là cấu hình kết nối, người dùng tự nhập lại được.
 fn configs_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|dir| dir.join("rabbit-connections.json"))
-        .map_err(|e| format!("Could not resolve app data directory: {e}"))
+    Ok(crate::plugin_data::plugin_data_dir(app, "rabbit-client")?.join("connections.json"))
 }
 
 fn load_configs(app: &AppHandle) -> Vec<RabbitConnection> {
