@@ -1,0 +1,188 @@
+# Cài đặt từ bên ngoài — publish một plugin/sidecar qua URL
+
+DevTool hỗ trợ cài một plugin (Tier A, bundle JS) hoặc một sidecar (Tier B,
+binary native) **sau khi app đã cài đặt**, không cần compile vào bản build
+gốc — người dùng dán một URL manifest vào Settings → Extensions.
+
+**Bối cảnh tin cậy**: cơ chế này dành cho plugin do CHÍNH bạn (chủ repo)
+phát hành và tự host — không phải một kho plugin mở cho bên thứ ba. Rủi ro
+được phòng là MITM/server lưu trữ bị chiếm khi tải qua mạng, không phải một
+tác giả ác ý.
+
+## Hai kind, một manifest chung
+
+```jsonc
+// kind: "plugin" — bundle JS chạy trong webview
+{
+  "kind": "plugin",
+  "id": "hello-example",
+  "version": "1.0.0",
+  "sdk": "^1.0.0",
+  "entry": "https://example.com/hello/bundle.mjs",
+  "integrity": "<sha256 hex của đúng nội dung file bundle.mjs>",
+  "label": "Hello Example",
+  "description": "...",
+  "icon": "puzzle",
+  "keywords": [],
+  "route": "/hello-example",
+  "permissions": [],
+  "commands": [],
+  "hosts": []
+}
+```
+
+```jsonc
+// kind: "service" — binary native, sidecar Tier B
+{
+  "kind": "service",
+  "bin": "devtool-svc-mydb",
+  "version": "1.0.0",
+  "protocol": 1,
+  "targets": {
+    "aarch64-apple-darwin": {
+      "url": "https://example.com/mydb/devtool-svc-mydb-aarch64-apple-darwin",
+      "sha256": "<sha256 hex của đúng binary cho target này>"
+    },
+    "x86_64-pc-windows-msvc": {
+      "url": "https://example.com/mydb/devtool-svc-mydb-x86_64-pc-windows-msvc.exe",
+      "sha256": "<...>"
+    }
+  }
+}
+```
+
+`targets` là map **target-triple chuẩn Rust** → `{ url, sha256 }`. Máy tự
+tính target-triple của chính nó (`current_target_triple()`, ở Rust — KHÔNG
+nhận từ client/manifest) rồi tra thẳng vào map; thiếu target cho nền tảng
+người dùng bị từ chối rõ ràng, không đoán/thử biến thể khác.
+
+## Field bắt buộc và ý nghĩa
+
+| Field (cả hai kind) | Ý nghĩa |
+|---|---|
+| `kind` | `"plugin"` hoặc `"service"` — bắt buộc, không suy luận. |
+| `integrity`/`sha256` | SHA-256 hex, 64 ký tự, của ĐÚNG NỘI DUNG file sẽ tải. **Bắt buộc**, kiểm hai lần (lúc cài, và lại mỗi lần đọc lại trước khi chạy) — phòng trường hợp file trên đĩa bị sửa sau khi cài mà index nội bộ không biết. |
+| URL (`entry`/`targets[].url`) | Phải là `https://` — `http` không mã hoá thì kiểm checksum ở bước sau cũng vô nghĩa, kẻ đứng giữa đổi được cả hai. |
+
+Nhánh `plugin` giữ thêm mọi field của `PluginManifest` compile-time NGOẠI
+TRỪ hai chỗ khác biệt bắt buộc vì giới hạn JSON:
+- `icon` là TÊN icon (tra trong bảng cố định ở `installer.ts`'s
+  `ICONS_BY_NAME` — tên lạ rơi về `Puzzle`, không chặn cài đặt), không phải
+  component.
+- Không có `load` — thay bằng `entry`, URL trỏ tới ĐÚNG MỘT file bundle đã
+  build sẵn (không phải một thư mục nhiều file).
+
+Không có `order`/`defaultEnabled` trong manifest — Platform tự gán:
+`order` bắt đầu từ `100_000 + thứ tự cài` (luôn xếp sau mọi plugin
+compile-time), `defaultEnabled` luôn `true`.
+
+## Build một bundle plugin đúng chuẩn
+
+**Một file duy nhất, không phải nhiều module.** Bundle được nạp qua
+`blob:` URL + `import()` động — một URL blob không có "thư mục chứa nó" để
+trình duyệt phân giải `import './helper.js'` tương đối. Build công cụ của
+bạn (Vite `build.lib`, esbuild `--bundle`) phải gộp hết thành một file ESM.
+
+**Export default một React component**, ký hiệu `default export`:
+
+```js
+// bundle.mjs — hand-written hoặc build ra từ TSX
+export default function HelloPlugin() {
+  const React = window.__DEVTOOL_VENDOR__.react;
+  return React.createElement('div', null, 'Hello!');
+}
+```
+
+**Dùng React DÙNG CHUNG của app** — không tự bundle `react`/`react-dom`.
+Một bundle mang theo bản React riêng sẽ vỡ hook ("Invalid hook call" kinh
+điển, vì hook đọc trạng thái nội bộ gắn với ĐÚNG một instance React). App
+gán `window.__DEVTOOL_VENDOR__ = { react, reactDom, reactDomFull, jsxRuntime }`
+ngay dòng đầu của `main.tsx`, trước bất kỳ import động nào của plugin có
+thể chạy. Nếu build bằng TSX qua Vite/Rollup, cấu hình một plugin
+`resolveId`/`load` ảo:
+
+```js
+// vite.config.plugin-authoring.js — ví dụ
+const vendorShim = {
+  name: 'devtool-vendor-shim',
+  resolveId: (id) => (['react', 'react-dom', 'react/jsx-runtime'].includes(id) ? id : null),
+  load(id) {
+    if (id === 'react') return 'export default window.__DEVTOOL_VENDOR__.react;';
+    if (id === 'react-dom') return 'export default window.__DEVTOOL_VENDOR__.reactDomFull;';
+    if (id === 'react/jsx-runtime') return `
+      export const jsx = window.__DEVTOOL_VENDOR__.jsxRuntime.jsx;
+      export const jsxs = window.__DEVTOOL_VENDOR__.jsxRuntime.jsxs;
+      export const Fragment = window.__DEVTOOL_VENDOR__.jsxRuntime.Fragment;
+    `;
+  },
+};
+```
+
+**Tính SHA-256 của đúng file cuối cùng** (sau khi build, không phải file
+nguồn):
+
+```bash
+shasum -a 256 bundle.mjs
+# hoặc: python3 -c "import hashlib; print(hashlib.sha256(open('bundle.mjs','rb').read()).hexdigest())"
+```
+
+## Build một sidecar đúng chuẩn để publish
+
+Xem [04-tier-b-sidecars.md](./04-tier-b-sidecars.md) cho cách viết sidecar.
+Để publish nó:
+
+1. `cargo build --release --bin devtool-svc-<ten>` **cho từng target-triple**
+   muốn hỗ trợ (cross-compile hoặc build trên máy đúng nền tảng đó).
+2. Tính SHA-256 của MỖI binary đã build.
+3. Host mỗi binary ở một URL `https://` (GitHub Release asset là lựa chọn
+   đơn giản — public, ổn định, không cần hạ tầng riêng).
+4. Viết manifest `kind: "service"` liệt kê từng target-triple → `{url, sha256}`.
+5. Tên bin trong manifest (`bin`) phải khớp một tên đã có sẵn trong
+   `ALLOWED_SERVICES` của app đang cài — **cài qua URL KHÔNG tự cấp quyền
+   chạy cho một tên bin mới**; đây là ranh giới tin cậy cố ý (xem
+   01-architecture.md). Sidecar bạn tự viết cho DevTool của chính mình thì
+   bạn cũng là người thêm tên vào `ALLOWED_SERVICES` khi build app — cơ chế
+   URL chỉ thay đổi CHỖ LẤY BYTES, không thay đổi AI QUYẾT ĐỊNH tên nào
+   được phép chạy.
+
+## Nơi lưu và độ ưu tiên lúc chạy
+
+- Plugin: `<app_data>/plugins/<id>/<version>/bundle.mjs`.
+- Sidecar: `<app_data>/services/<bin>/<version>/<bin>[.exe]`, ghi ATOMIC
+  (tải vào file `.tmp` cùng thư mục, kiểm checksum khớp, rồi `rename`) —
+  vì binary này sẽ được THỰC THI, một file dở dang do crash giữa chừng
+  nguy hiểm hơn hẳn một bundle JS dở dang.
+- Cả hai kind lưu chung một `<app_data>/extensions/index.json`.
+
+**Bản tải-về LUÔN thắng bản đóng gói sẵn** nếu một sidecar cùng tên tồn
+tại ở cả hai nơi — `sidecar_path()` kiểm `extensions/index.json` TRƯỚC,
+cạnh-file-thực-thi (đóng gói sẵn lúc build) chỉ là fallback.
+
+## Cập nhật và gỡ
+
+`checkForUpdate`/`checkForServiceUpdate` so sánh SemVer giữa bản đã cài và
+bản tại URL gốc đã cài từ (`source_url` lưu lại lúc cài). Cài đè một sidecar
+đang chạy tự động dừng tiến trình cũ (`service_stop`) — lần gọi kế tiếp tự
+spawn lại đúng version mới. Gỡ (`uninstallService`) KHÔNG đụng thư mục dữ
+liệu runtime của sidecar (`service-data/<bin>/`) — dữ liệu ở lại, người
+dùng tự dọn nếu muốn.
+
+**Cài/gỡ/cập nhật không áp dụng ngay lập tức** — `initInstalledPlugins()`
+chỉ chạy MỘT LẦN lúc bootstrap app. Settings nhắc khởi động lại sau khi
+cài xong.
+
+## API TypeScript để tự dựng UI cài đặt
+
+`Settings → Extensions` (component có sẵn) đã dùng đúng các hàm này —
+đọc `src/components/SettingsExtensionInstaller.tsx` nếu muốn tự làm một
+UI khác:
+
+```ts
+import {
+  fetchArtifactManifestPreview, // (url) => Promise<RemoteArtifactManifest>
+  installArtifact,              // (url) => Promise<InstalledArtifactRecord>
+  listInstalledArtifacts,       // () => Promise<InstalledArtifactRecord[]>
+  uninstallArtifact,            // (idOrBin) => Promise<void>
+  currentTargetTriple,          // () => Promise<string>
+} from '@/platform';
+```
