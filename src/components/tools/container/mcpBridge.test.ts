@@ -32,14 +32,9 @@ const imageListMock = vi.fn();
 const imageDetailsMock = vi.fn();
 const imageRemoveMock = vi.fn();
 
-class FakeChannel<T> {
-  onmessage: ((payload: T) => void) | null = null;
-}
-
 vi.mock('@tauri-apps/api/event', () => ({ listen: (...args: unknown[]) => listenMock(...args) }));
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
-  Channel: FakeChannel,
 }));
 // Lớp lệnh giờ đến từ `useContainerApi()` (dựng trên SDK của plugin), nên mock
 // đặt ở đó thay vì ở `./types` — test không phải biết lớp lệnh được dựng bằng
@@ -59,7 +54,6 @@ vi.mock('./api_sdk', () => ({
       unpause: (...a: unknown[]) => unpauseMock(...a),
       remove: (...a: unknown[]) => removeMock(...a),
       logsStart: (...a: unknown[]) => logsStartMock(...a),
-      logsStop: (...a: unknown[]) => logsStopMock(...a),
       statsSnapshot: (...a: unknown[]) => statsSnapshotMock(...a),
       imageList: (...a: unknown[]) => imageListMock(...a),
       imageDetails: (...a: unknown[]) => imageDetailsMock(...a),
@@ -107,8 +101,8 @@ beforeEach(() => {
   pauseMock.mockReset().mockResolvedValue(undefined);
   unpauseMock.mockReset().mockResolvedValue(undefined);
   removeMock.mockReset().mockResolvedValue(undefined);
-  logsStartMock.mockReset().mockResolvedValue('stream-1');
   logsStopMock.mockReset().mockResolvedValue(undefined);
+  logsStartMock.mockReset().mockResolvedValue({ stop: logsStopMock });
   statsSnapshotMock.mockReset().mockResolvedValue({});
   imageListMock.mockReset().mockResolvedValue([]);
   imageDetailsMock.mockReset().mockResolvedValue({ id: 'img1' });
@@ -289,11 +283,11 @@ describe('useMcpBridge (Container) — Tauri desktop', () => {
     expect(bad.error).toMatch(/No stats available/);
   });
 
-  it('container_logs collects lines streamed through the Channel within the window, then stops the stream', async () => {
-    let capturedChannel: FakeChannel<LogLine> | undefined;
-    logsStartMock.mockImplementation((_config, _id, _tail, _since, _until, _ts, channel: FakeChannel<LogLine>) => {
-      capturedChannel = channel;
-      return Promise.resolve('stream-1');
+  it('container_logs collects lines streamed through onLine within the window, then stops the subscription', async () => {
+    let capturedOnLine: ((line: LogLine) => void) | undefined;
+    logsStartMock.mockImplementation((_config, _id, _tail, _since, _until, _ts, onLine: (line: LogLine) => void) => {
+      capturedOnLine = onLine;
+      return Promise.resolve({ stop: logsStopMock });
     });
 
     await renderBridge(makeState({ connectedConnId: 'c1' }));
@@ -302,12 +296,12 @@ describe('useMcpBridge (Container) — Tauri desktop', () => {
     invokeMock.mockClear();
     capturedCb!({ payload: { id, tool: 'container_logs', args: { containerId: 'ctr1' } } });
 
-    // Give logsStart's promise a tick to resolve and hand back the Channel
-    // before feeding it messages — the real 1.5s collection window then
-    // elapses for real (COLLECT_WINDOW_MS isn't exported to fake-time it).
+    // Give logsStart's promise a tick to resolve and hand back onLine before
+    // feeding it messages — the real 1.5s collection window then elapses for
+    // real (COLLECT_WINDOW_MS isn't exported to fake-time it).
     await new Promise((r) => setTimeout(r, 10));
-    capturedChannel?.onmessage?.({ stream: 'stdout', message: 'hello' });
-    capturedChannel?.onmessage?.({ stream: 'stdout', message: 'world' });
+    capturedOnLine?.({ stream: 'stdout', message: 'hello' });
+    capturedOnLine?.({ stream: 'stdout', message: 'world' });
 
     await waitFor(
       () => expect(invokeMock).toHaveBeenCalledWith('mcp_respond', expect.objectContaining({ id })),
@@ -316,7 +310,7 @@ describe('useMcpBridge (Container) — Tauri desktop', () => {
     const res = invokeMock.mock.calls.find((c) => c[0] === 'mcp_respond' && (c[1] as { id: string }).id === id)?.[1] as { result: unknown };
 
     expect(logsStartMock).toHaveBeenCalledWith(makeConn(), 'ctr1', '100', 0, 0, false, expect.anything());
-    expect(logsStopMock).toHaveBeenCalledWith('stream-1');
+    expect(logsStopMock).toHaveBeenCalled();
     expect(res.result).toEqual({ lines: [{ stream: 'stdout', message: 'hello' }, { stream: 'stdout', message: 'world' }] });
   }, 10000);
 

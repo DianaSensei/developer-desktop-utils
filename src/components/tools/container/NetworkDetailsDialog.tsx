@@ -14,7 +14,7 @@ import { DetailField, DetailGrid, KeyValueTable, labelEntries } from './DetailRo
  * for — "why can't these two containers reach each other" is answered here or
  * not at all. Attachments come from the caller's container-derived usage index
  * rather than from the inspect payload; see network_details in
- * container_tool.rs for why.
+ * devtool-svc-container.rs for why.
  */
 export function NetworkDetailsDialog({ open, onOpenChange, connection, network, users }: {
   open: boolean;

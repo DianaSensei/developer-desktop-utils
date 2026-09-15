@@ -26,7 +26,7 @@
 // Bước 2 (xong): container details/resources, image/volume/network CRUD +
 // details, prune, system info/df — vẫn toàn method MỘT-LẦN, port nguyên vẹn
 // logic từ `container_tool.rs` (không đoán lại).
-// Bước 3 (đây): log/stats streaming, port nguyên vẹn từ
+// Bước 3 (xong): log/stats streaming, port nguyên vẹn từ
 // `container_tool::container_logs_start`/`container_stats_start`/
 // `container_stats_snapshot` (xem đó, dòng ~627-833). `logs-start` và
 // `stats-start` là method STREAM (giao thức giống hệt `pubsub-subscribe` của
@@ -39,6 +39,15 @@
 // `HashMap<containerId, StatsFrame>`. Registry nội bộ DÙNG CHUNG cho cả logs
 // và stats (một `HashMap<subscriptionId, Notify>` duy nhất) — xem comment đầy
 // đủ ở mục "Logs/Stats streaming" bên dưới cho lý do không tách hai registry.
+//
+// Bước 4 (đây): `image-pull` đổi từ method MỘT-LẦN (Bước 2, nuốt hết
+// progress) sang method STREAM kiểu TỰ KẾT THÚC — mẫu `tick-stream` của
+// `devtool-svc-echo.rs`, KHÔNG PHẢI mẫu `pubsub-subscribe`/`logs-start`:
+// không cần registry, không ai cần dừng tay nó. Xem `handle_image_pull` cho
+// lý do đầy đủ (đặc biệt vì sao vẫn cần một sự kiện app-level `"done"` thay
+// vì trông cậy vào bit `done: true` ở tầng khung — `service_host.rs::
+// dispatch()` không forward payload của dòng mang `done: true` cho
+// `Waiter::Stream`).
 
 use bollard::Docker;
 use futures_util::StreamExt;
@@ -98,6 +107,13 @@ impl Response {
     /// giống hệt `Response::event` của devtool-svc-redis.rs.
     fn event(id: String, result: serde_json::Value) -> Self {
         Self { protocol: SERVICE_PROTOCOL, id, result: Some(result), error: None, stream: true, done: false }
+    }
+    /// Dòng CUỐI của một stream tự kết thúc (`image-pull`) — mirror
+    /// `Response::done` của `devtool-svc-echo.rs`. Bị host bỏ qua khi định
+    /// tuyến tới `EventSink` (xem `dispatch()`/comment ở `handle_image_pull`),
+    /// chỉ giữ đúng hình thức giao thức "một method stream kết bằng done:true".
+    fn done(id: String) -> Self {
+        Self { protocol: SERVICE_PROTOCOL, id, result: None, error: None, stream: true, done: true }
     }
 }
 
@@ -688,6 +704,77 @@ fn send_stream_error(tx: &mpsc::UnboundedSender<Response>, id: &str, message: im
     let _ = tx.send(Response::event(id.to_string(), serde_json::json!({ "type": "error", "message": message.into() })));
 }
 
+/// `image-pull` là method STREAM kiểu "tự kết thúc" (mẫu `tick-stream` của
+/// `devtool-svc-echo`, KHÔNG PHẢI mẫu `pubsub-subscribe`/`logs-start` — không
+/// cần registry, không ai cần "dừng tay" nó): phát mỗi `PullProgress` như một
+/// sự kiện `{"type":"progress",...}` khi `docker.create_image(...)`'s stream
+/// nhận được item, rồi khi stream đó tự hết (`None`) gửi một sự kiện
+/// `{"type":"done"}` (để `onMessage` phía client biết việc pull đã xong —
+/// KHÔNG thể dựa vào bit `done: true` ở tầng khung `Response`, vì
+/// `service_host.rs::dispatch()` gỡ waiter và trả về ngay khi thấy
+/// `response.done`, không bao giờ gọi `sink.send()` cho chính dòng đó — xem
+/// comment ở đó. Method này VẪN gửi thêm một `Response::done` cuối cùng sau
+/// sự kiện app-level `"done"`, đúng hợp đồng "một method sidecar coi là
+/// stream phải kết bằng `done: true`" — dòng đó bị host lặng lẽ bỏ, vô hại,
+/// chỉ để đúng hình thức giao thức, không phải nơi client học được việc đã
+/// xong). Lỗi giữa chừng (bao gồm lỗi tham số/config không tồn tại) đi qua
+/// đúng con đường `send_stream_error` đã dùng cho logs/stats — sự kiện
+/// `{"type":"error","message":...}`.
+async fn handle_image_pull(id: String, params: serde_json::Value, tx: mpsc::UnboundedSender<Response>) {
+    let config_id: String = match param(&params, "configId") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let image: String = match param(&params, "image") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let tag: String = match param(&params, "tag") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let config = match find_config(&config_id) {
+        Ok(c) => c,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let docker = match connect(&config) {
+        Ok(d) => d,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+
+    let opts = bollard::query_parameters::CreateImageOptions {
+        from_image: Some(image),
+        tag: Some(tag),
+        ..Default::default()
+    };
+
+    let mut stream = docker.create_image(Some(opts), None, None);
+    loop {
+        match stream.next().await {
+            Some(Ok(info)) => {
+                let progress = PullProgress {
+                    status: info.status.unwrap_or_default(),
+                    id: info.id,
+                    progress_current: info.progress_detail.as_ref().and_then(|d| d.current),
+                    progress_total: info.progress_detail.as_ref().and_then(|d| d.total),
+                };
+                let mut event = serde_json::to_value(&progress).unwrap();
+                event.as_object_mut().unwrap().insert("type".to_string(), serde_json::json!("progress"));
+                if tx.send(Response::event(id.clone(), event)).is_err() {
+                    return; // writer task đã thoát — không còn ai đọc
+                }
+            }
+            Some(Err(e)) => {
+                send_stream_error(&tx, &id, e.to_string());
+                return;
+            }
+            None => break,
+        }
+    }
+    let _ = tx.send(Response::event(id.clone(), serde_json::json!({ "type": "done" })));
+    let _ = tx.send(Response::done(id));
+}
+
 /// Port nguyên vẹn từ `container_tool::LogLine` — xem đó cho giải thích đầy
 /// đủ. `stream`/`message`/`timestamp` giữ nguyên tên field.
 #[derive(Debug, Clone, Serialize)]
@@ -1102,31 +1189,8 @@ async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::V
             Ok(serde_json::Value::Null)
         }
 
-        // `image-pull` is a MỘT-LẦN method here (Bước 2): it awaits the whole
-        // pull and returns once done, without per-chunk progress events — the
-        // Channel-based `container_tool::image_pull` streams `PullProgress`
-        // per event but the STREAM protocol (Waiter::Stream/EventSink) for
-        // this sidecar is Bước 3's job (log/stats). Consuming the whole
-        // stream here and discarding intermediate frames keeps behaviour
-        // correct (the pull still fully completes or fails) while deferring
-        // live progress UI to Bước 3.
-        "image-pull" => {
-            let config_id: String = param(&params, "configId")?;
-            let image: String = param(&params, "image")?;
-            let tag: String = param(&params, "tag")?;
-            let config = find_config(&config_id)?;
-            let docker = connect(&config)?;
-            let opts = bollard::query_parameters::CreateImageOptions {
-                from_image: Some(image),
-                tag: Some(tag),
-                ..Default::default()
-            };
-            let mut stream = docker.create_image(Some(opts), None, None);
-            while let Some(item) = stream.next().await {
-                item.map_err(|e| e.to_string())?;
-            }
-            Ok(serde_json::Value::Null)
-        }
+        // `image-pull` KHÔNG đi qua đây — nó là method STREAM (Bước 4), xem
+        // `handle_image_pull` và nhánh dispatch riêng trong `handle_line`.
 
         "image-details" => {
             let config_id: String = param(&params, "configId")?;
@@ -1484,6 +1548,10 @@ async fn handle_line(line: &str, tx: &mpsc::UnboundedSender<Response>) {
         handle_stats_start(req.id, req.params, tx.clone()).await;
         return;
     }
+    if req.method == "image-pull" {
+        handle_image_pull(req.id, req.params, tx.clone()).await;
+        return;
+    }
     let response = match handle(&req.method, req.params).await {
         Ok(value) if value.is_null() => Response::ok(req.id),
         Ok(value) => Response::once(req.id, value),
@@ -1607,10 +1675,35 @@ mod tests {
         assert!(res.is_err());
     }
 
+    // `image-pull` là method STREAM (Bước 4, không còn đi qua `handle()`) —
+    // test đường lỗi mirror `logs_start_*`/`stats_start_*`: lỗi phải đi qua
+    // như một SỰ KIỆN STREAM (`{"type":"error",...}`), không phải
+    // `response.error`.
+
     #[tokio::test]
-    async fn image_pull_thieu_tag_tra_ve_loi_ro_rang() {
-        let res = handle("image-pull", serde_json::json!({ "configId": "x", "image": "y" })).await;
-        assert!(res.unwrap_err().contains("tag"));
+    async fn image_pull_thieu_tag_bao_loi_qua_stream_event() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_image_pull("req-7".to_string(), serde_json::json!({ "configId": "x", "image": "y" }), tx).await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none(), "lỗi phải đi qua stream event, không phải response.error");
+        assert!(response.stream);
+        let event = response.result.expect("sự kiện lỗi phải mang result");
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("tag"));
+    }
+
+    #[tokio::test]
+    async fn image_pull_config_khong_ton_tai_bao_loi_ro_rang() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_image_pull(
+            "req-8".to_string(),
+            serde_json::json!({ "configId": "khong-ton-tai-chac-chan", "image": "alpine", "tag": "latest" }),
+            tx,
+        )
+        .await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        assert_eq!(response.result.unwrap()["type"], "error");
     }
 
     #[tokio::test]

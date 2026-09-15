@@ -41,7 +41,7 @@ export function VolumesView({ connection, refreshKey, onRefresh }: {
   const { usage, reload: reloadUsage } = useUsageIndex(connection, refreshKey);
   // Volume size isn't part of the plain volume-list endpoint — the daemon has
   // to walk every volume's mountpoint on disk to compute it, which is
-  // noticeably slower (`volume_sizes` — see container_tool.rs for why that
+  // noticeably slower (`volume_sizes` — see devtool-svc-container.rs for why that
   // isn't just `container_system_df`). Fetched separately so the volume list
   // itself still renders instantly; the Size column just shows a spinner
   // until this resolves. Empty on Windows (not wired up there).

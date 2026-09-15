@@ -1,4 +1,3 @@
-import { usePluginSdkFor } from '@/platform';
 import { useEffect, useRef, useState } from 'react';
 import { Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { LoadingRow } from '@/components/ui/spinner';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { DataTable, Thead, Tbody, Tr, Th, Td } from '@/components/ui/data-table';
-import { type ContainerConnection, type ContainerDetails, type ContainerResources, type ContainerSummary, type StatsFrame } from './types';
+import { type ContainerConnection, type ContainerDetails, type ContainerResources, type ContainerStreamSubscription, type ContainerSummary, type StatsFrame } from './types';
 import { useContainerApi } from './api_sdk';
 import { DetailField, DetailGrid, KeyValueTable, envEntries, labelEntries } from './DetailRows';
 import { formatBytes } from './format';
@@ -226,37 +225,33 @@ function describeLimits(r: ContainerResources): string {
  *  stats endpoint (one open stream for the one container on screen — the
  *  table's columns use the cheaper polled snapshot instead). */
 function LiveStats({ connection, containerId }: { connection: ContainerConnection; containerId: string }) {
-  const sdk = usePluginSdkFor('container-manager');
   const containerApi = useContainerApi();
   const [frame, setFrame] = useState<StatsFrame | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const streamIdRef = useRef<string | null>(null);
+  const subscriptionRef = useRef<ContainerStreamSubscription | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    // Kênh dựng qua SDK nên phải chờ — effect vì thế bọc trong một IIFE async.
+    // Đăng ký qua SDK nên phải chờ — effect vì thế bọc trong một IIFE async.
     // `cancelled` vẫn là chốt duy nhất quyết định việc dọn dẹp, y như trước.
     void (async () => {
-      const channel = await sdk.native.channel<StatsFrame>(
-        (f) => { if (!cancelled) setFrame(f); },
-        'container-stats',
-      );
-      containerApi.statsStart(connection, containerId, channel)
-        .then((id) => {
-          // Unmounted while the stream was starting — stop it right away rather
-          // than leaving an orphaned task running against the daemon.
-          if (cancelled) { void containerApi.statsStop(id); return; }
-          streamIdRef.current = id;
-        })
-        .catch((e) => { if (!cancelled) setError(String(e instanceof Error ? e.message : e)); });
+      try {
+        const sub = await containerApi.statsStart(connection, containerId, (f) => { if (!cancelled) setFrame(f); });
+        // Unmounted while the stream was starting — stop it right away rather
+        // than leaving an orphaned task running against the daemon.
+        if (cancelled) { void sub.stop(); return; }
+        subscriptionRef.current = sub;
+      } catch (e) {
+        if (!cancelled) setError(String(e instanceof Error ? e.message : e));
+      }
     })();
     return () => {
       cancelled = true;
-      const id = streamIdRef.current;
-      streamIdRef.current = null;
-      if (id) void containerApi.statsStop(id);
+      const sub = subscriptionRef.current;
+      subscriptionRef.current = null;
+      if (sub) void sub.stop();
     };
-  }, [connection, containerId, sdk, containerApi]);
+  }, [connection, containerId, containerApi]);
 
   if (error) return <Callout tone="error" size="sm">{error}</Callout>;
   if (!frame) return <p className="text-xs text-fg-mute">Waiting for the first sample…</p>;

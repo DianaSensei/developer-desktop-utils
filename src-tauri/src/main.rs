@@ -10,7 +10,6 @@ mod mcp_bridge;
 mod mockserver;
 mod ports;
 mod rabbit;
-mod container_tool;
 mod secrets_vault;
 mod service_host;
 mod artifact_installer;
@@ -82,7 +81,6 @@ fn main() {
         .manage(mockserver::MockState::default())
         .manage(rabbit::ConsumerRegistry::default())
         .manage(kafka::KafkaConsumerRegistry::default())
-        .manage(container_tool::StreamRegistry::default())
         // Host cho plugin dịch vụ (tier B) — xem service_host.rs.
         .manage(service_host::ServiceRegistry::default())
         .manage(secrets_vault::VaultState::default())
@@ -171,47 +169,6 @@ fn main() {
             rabbit::rabbit_amqp_declare_queue,
             rabbit::rabbit_amqp_declare_exchange,
             rabbit::rabbit_amqp_bind_queue,
-            container_tool::container_list_configs,
-            container_tool::container_save_config,
-            container_tool::container_delete_config,
-            container_tool::container_detect_sockets,
-            container_tool::container_test_connection,
-            container_tool::container_list,
-            container_tool::container_inspect,
-            container_tool::container_start,
-            container_tool::container_stop,
-            container_tool::container_restart,
-            container_tool::container_pause,
-            container_tool::container_unpause,
-            container_tool::container_remove,
-            container_tool::container_details,
-            container_tool::container_logs_start,
-            container_tool::container_logs_stop,
-            container_tool::container_stats_start,
-            container_tool::container_stats_snapshot,
-            container_tool::container_resources,
-            container_tool::container_update_resources,
-            container_tool::image_list,
-            container_tool::image_inspect,
-            container_tool::image_details,
-            container_tool::image_remove,
-            container_tool::image_pull,
-            container_tool::volume_list,
-            container_tool::volume_remove,
-            container_tool::volume_create,
-            container_tool::volume_sizes,
-            container_tool::network_list,
-            container_tool::network_remove,
-            container_tool::network_create,
-            container_tool::container_prune,
-            container_tool::image_prune,
-            container_tool::image_tag,
-            container_tool::volume_prune,
-            container_tool::volume_details,
-            container_tool::network_prune,
-            container_tool::network_details,
-            container_tool::container_system_info,
-            container_tool::container_system_df,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

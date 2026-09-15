@@ -13,7 +13,7 @@
 //
 // Connection CRUD (list/add/update/delete) needs no React state at all —
 // `containerApi` is a thin wrapper over Tauri commands that read/write a
-// JSON file in the app data dir (src-tauri/src/container_tool.rs), so it
+// JSON file in the app data dir (src-tauri/src/bin/devtool-svc-container.rs), so it
 // can be called directly regardless of whether ContainerManager.tsx is
 // mounted. Every lifecycle/image operation below needs an ACTIVE
 // connection (`state.connectedConnId`) — there is no per-call connection
@@ -28,7 +28,6 @@ import { usePluginSdkFor } from '@/platform';
 import { isTauri } from '@/lib/platform';
 import { useContainerApi } from './api_sdk';
 import type { ContainerApi, ContainerConnection, LogLine, StatsFrame } from './types';
-import type { PluginSdk } from '@/platform';
 import type { ContainerToolState } from './useContainerState';
 
 interface McpCallEvent {
@@ -58,35 +57,32 @@ async function requireActiveConnection(containerApi: ContainerApi, state: Contai
   return requireConnection(containerApi, state.connectedConnId);
 }
 
-// Log/stats streams are inherently long-lived (a Tauri Channel), which
-// doesn't fit MCP's one request/one response shape. Collect what arrives
-// within a short window instead of an open-ended live tail — long enough to
-// catch the requested tail on an idle container, short enough that a call
-// doesn't hang.
+// Log/stats streams are inherently long-lived (a sidecar STREAM
+// subscription), which doesn't fit MCP's one request/one response shape.
+// Collect what arrives within a short window instead of an open-ended live
+// tail — long enough to catch the requested tail on an idle container, short
+// enough that a call doesn't hang.
 const COLLECT_WINDOW_MS = 1500;
 
 function collectLogs(
-  sdk: PluginSdk, containerApi: ContainerApi,
+  containerApi: ContainerApi,
   config: ContainerConnection, containerId: string, tail: string,
   since: number, until: number, timestamps: boolean,
 ): Promise<LogLine[]> {
   return new Promise((resolve) => {
     const lines: LogLine[] = [];
-    let streamId: string | null = null;
-    void (async () => {
-      const channel = await sdk.native.channel<LogLine>((line) => lines.push(line), 'container-logs-mcp');
-      containerApi.logsStart(config, containerId, tail, since, until, timestamps, channel)
-        .then((id) => { streamId = id; })
-        .catch(() => { /* surfaced as an empty result — the container may not exist */ });
-    })();
+    let subscription: { stop(): Promise<void> } | null = null;
+    containerApi.logsStart(config, containerId, tail, since, until, timestamps, (line) => lines.push(line))
+      .then((sub) => { subscription = sub; })
+      .catch(() => { /* surfaced as an empty result — the container may not exist */ });
     setTimeout(() => {
-      if (streamId) void containerApi.logsStop(streamId);
+      if (subscription) void subscription.stop();
       resolve(lines);
     }, COLLECT_WINDOW_MS);
   });
 }
 
-function buildHandlers(sdk: PluginSdk, containerApi: ContainerApi, state: ContainerToolState): Record<string, ToolHandler> {
+function buildHandlers(containerApi: ContainerApi, state: ContainerToolState): Record<string, ToolHandler> {
   return {
     // ── Connections ──────────────────────────────────────────────────────
     container_list_connections: async () => containerApi.listConfigs(),
@@ -202,7 +198,7 @@ function buildHandlers(sdk: PluginSdk, containerApi: ContainerApi, state: Contai
       const since = typeof args.since === 'number' ? args.since : 0;
       const until = typeof args.until === 'number' ? args.until : 0;
       const timestamps = args.timestamps === true;
-      const lines = await collectLogs(sdk, containerApi, config, containerId, tail, since, until, timestamps);
+      const lines = await collectLogs(containerApi, config, containerId, tail, since, until, timestamps);
       return { lines };
     },
 
@@ -246,7 +242,7 @@ export function useMcpBridge(state: ContainerToolState, enabled = true): void {
   const sdk = usePluginSdkFor('container-manager');
   const containerApi = useContainerApi();
   const handlersRef = useRef<Record<string, ToolHandler>>({});
-  handlersRef.current = buildHandlers(sdk, containerApi, state);
+  handlersRef.current = buildHandlers(containerApi, state);
 
   useEffect(() => {
     if (!isTauri || !enabled) return;

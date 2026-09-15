@@ -41,7 +41,7 @@ function containerName(c: ContainerSummary): string {
  * the com.docker.compose.project label docker compose stamps on them (the
  * same technique tools like OrbStack use for their compose grouping), and
  * every action (start/stop/restart/remove/logs) reuses the plain per-
- * container bollard commands from container_tool.rs.
+ * container bollard commands from devtool-svc-container.rs.
  *
  * The project-level actions mirror the compose CLI verbs that need no YAML:
  * Start / Stop / Restart map onto every container in the group, and "Down"

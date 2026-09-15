@@ -98,9 +98,8 @@ export function ContainerLogsDialog({ open, onOpenChange, connection, container,
                 <LogsPanel
                   key={target.Id}
                   name={containerName(target)}
-                  start={(tail, since, until, timestamps, onLog) =>
-                    containerApi.logsStart(connection, target.Id, tail, since, until, timestamps, onLog)}
-                  stop={containerApi.logsStop}
+                  start={(tail, since, until, timestamps, onLine) =>
+                    containerApi.logsStart(connection, target.Id, tail, since, until, timestamps, onLine)}
                 />
               </div>
             </div>

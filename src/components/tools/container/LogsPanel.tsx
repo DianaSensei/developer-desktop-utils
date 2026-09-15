@@ -9,10 +9,10 @@ import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Spinner } from '@/components/ui/spinner';
 import { saveTextFile } from '@/lib/fileio';
-import { usePluginSdkFor, type Channel } from '@/platform';
+import { usePluginSdkFor } from '@/platform';
 import { MOD_KEY } from '@/lib/platform';
 import { cn } from '@/lib/utils';
-import type { LogLine } from './types';
+import type { ContainerStreamSubscription, LogLine } from './types';
 
 const MAX_LINES = 5000;
 const TAIL_OPTIONS = ['100', '500', '1000', '5000', 'all'] as const;
@@ -111,9 +111,10 @@ export function buildMatcher(query: string, regex: boolean, caseSensitive: boole
  * search, wrap — is client-side, so the socket keeps running and toggling
  * them back never loses history or re-fetches.
  */
-export function LogsPanel({ start, stop, name }: {
-  start: (tail: string, since: number, until: number, timestamps: boolean, onLog: Channel<LogLine>) => Promise<string>;
-  stop: (streamId: string) => Promise<void>;
+export function LogsPanel({ start, name }: {
+  start: (
+    tail: string, since: number, until: number, timestamps: boolean, onLine: (line: LogLine) => void,
+  ) => Promise<ContainerStreamSubscription>;
   /** Used for the exported file name — e.g. `api-1` → `api-1-logs.log`. */
   name?: string;
 }) {
@@ -154,10 +155,8 @@ export function LogsPanel({ start, stop, name }: {
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const startRef = useRef(start);
-  const stopRef = useRef(stop);
   const followRef = useRef(follow);
   startRef.current = start;
-  stopRef.current = stop;
   followRef.current = follow;
 
   const since = useMemo(() => toEpochSeconds(sinceMs), [sinceMs]);
@@ -177,9 +176,9 @@ export function LogsPanel({ start, stop, name }: {
     setTruncated(false);
     incomingRef.current = [];
     let cancelled = false;
-    let streamId: string | null = null;
+    let subscription: ContainerStreamSubscription | null = null;
 
-    // Kênh dựng qua SDK nên phải chờ; phần khởi động stream vì thế nằm trong
+    // Đăng ký qua SDK nên phải chờ; phần khởi động stream vì thế nằm trong
     // một IIFE async, còn `cancelled` vẫn là chốt duy nhất cho việc dọn dẹp.
     const onLine = (line: LogLine) => {
       // Tạm dừng: giữ socket mở và đệm dòng mới lại (cắt theo cùng trần
@@ -204,17 +203,17 @@ export function LogsPanel({ start, stop, name }: {
     }, FLUSH_MS);
 
     void (async () => {
-      const channel = await sdk.native.channel<LogLine>(onLine, 'container-logs');
-      if (cancelled) return;
-      startRef.current(tail, since, until, timestamps, channel)
-        .then((id) => {
-          if (cancelled) { stopRef.current(id).catch(() => {}); return; }
-          streamId = id;
-          // A container that is simply quiet never sends a first line; stop
-          // showing "Connecting…" once the stream itself is established.
-          setConnecting(false);
-        })
-        .catch((e) => { setConnecting(false); setError(String(e instanceof Error ? e.message : e)); });
+      try {
+        const sub = await startRef.current(tail, since, until, timestamps, onLine);
+        if (cancelled) { sub.stop().catch(() => {}); return; }
+        subscription = sub;
+        // A container that is simply quiet never sends a first line; stop
+        // showing "Connecting…" once the stream itself is established.
+        setConnecting(false);
+      } catch (e) {
+        setConnecting(false);
+        setError(String(e instanceof Error ? e.message : e));
+      }
     })();
 
     return () => {
@@ -225,9 +224,9 @@ export function LogsPanel({ start, stop, name }: {
       pendingRef.current = [];
       incomingRef.current = [];
       setPendingCount(0);
-      if (streamId) stopRef.current(streamId).catch(() => {});
+      if (subscription) subscription.stop().catch(() => {});
     };
-  }, [tail, since, until, timestamps, appendCapped, sdk]);
+  }, [tail, since, until, timestamps, appendCapped]);
 
   // Tiếp tục chạy → xả đệm vào view theo đúng thứ tự đã đến.
   useEffect(() => {
