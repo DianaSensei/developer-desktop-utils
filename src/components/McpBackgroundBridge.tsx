@@ -4,9 +4,17 @@
 // calls" rule). Mounted once at the app root (App.tsx), inside every
 // runtime provider so it shares the exact same store/state instances the
 // tool components read when they're open — see apiclient/mcpRuntimeContext.tsx,
-// mockserver/mcpRuntimeContext.tsx, redis/mcpRuntimeContext.tsx,
-// kafka/mcpRuntimeContext.tsx, rabbit/mcpRuntimeContext.tsx, and
-// container/mcpRuntimeContext.tsx for why that sharing matters.
+// mockserver/mcpRuntimeContext.tsx, and kafka/mcpRuntimeContext.tsx for why
+// that sharing matters.
+//
+// redis-client/rabbit-client/container-manager moved to
+// developer-desktop-util-plugin (see
+// docs/decisions/architecture/optional-broker-plugins.md) and no longer
+// have a background bridge here: an externally-installed plugin only mounts
+// when its own route is visited, so there's no compile-time runtime context
+// to share while it's off-screen. Their MCP tool definitions still exist in
+// devtool-mcp-server.rs; calls to them simply go unanswered unless the
+// plugin's own route is open.
 //
 // The stateless utility tools (Encode·Hash·Encrypt, JWT Debugger, JSON
 // Formatter) do NOT need this — see McpUtilityBridge.tsx, mounted
@@ -23,14 +31,8 @@ import { useMcpBridge as useApiClientMcpBridge } from './tools/apiclient/mcpBrid
 import { useApiClientRuntime } from './tools/apiclient/mcpRuntimeContext';
 import { useMcpBridge as useMockServerMcpBridge } from './tools/mockserver/mcpBridge';
 import { useMockServerRuntime } from './tools/mockserver/mcpRuntimeContext';
-import { useMcpBridge as useRedisMcpBridge } from './tools/redis/mcpBridge';
-import { useRedisRuntime } from './tools/redis/mcpRuntimeContext';
 import { useMcpBridge as useKafkaMcpBridge } from './tools/kafka/mcpBridge';
 import { useKafkaRuntime } from './tools/kafka/mcpRuntimeContext';
-import { useMcpBridge as useRabbitMcpBridge } from './tools/rabbit/mcpBridge';
-import { useRabbitRuntime } from './tools/rabbit/mcpRuntimeContext';
-import { useMcpBridge as useContainerMcpBridge } from './tools/container/mcpBridge';
-import { useContainerRuntime } from './tools/container/mcpRuntimeContext';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
 import { useMcpToolEnabledMap } from '@/hooks/useMcpToolEnabled';
 
@@ -39,17 +41,11 @@ export function McpBackgroundBridge() {
   const { isEnabled } = useMcpToolEnabledMap();
   const { store, runRequest } = useApiClientRuntime();
   const mockServer = useMockServerRuntime();
-  const redisState = useRedisRuntime();
   const kafkaState = useKafkaRuntime();
-  const rabbitState = useRabbitRuntime();
-  const containerState = useContainerRuntime();
 
   useApiClientMcpBridge(store, runRequest, enabled && isEnabled('api-client'));
   useMockServerMcpBridge(mockServer, enabled && isEnabled('mock-server'));
-  useRedisMcpBridge(redisState, enabled && isEnabled('redis-client'));
   useKafkaMcpBridge(kafkaState, enabled && isEnabled('kafka-explorer'));
-  useRabbitMcpBridge(rabbitState, enabled && isEnabled('rabbit-client'));
-  useContainerMcpBridge(containerState, enabled && isEnabled('container-manager'));
 
   return null;
 }

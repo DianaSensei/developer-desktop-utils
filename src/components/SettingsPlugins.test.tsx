@@ -44,12 +44,12 @@ describe('Settings — Plugins', () => {
 
   it('quyền hiển thị lấy thẳng từ manifest, không phải bảng chép tay', () => {
     const { container } = renderPanel();
-    const redis = PLUGINS.find((p) => p.id === 'redis-client')!;
+    const kafka = PLUGINS.find((p) => p.id === 'kafka-explorer')!;
     // Khoá theo `data-plugin` thay vì dò cây DOM: nhiều plugin cùng có quyền
     // 'storage', bắt nhầm hàng sẽ khiến test xanh trong khi hàng thật sai.
-    const row = container.querySelector<HTMLElement>('[data-plugin="redis-client"]')!;
+    const row = container.querySelector<HTMLElement>('[data-plugin="kafka-explorer"]')!;
     expect(row).toBeTruthy();
-    for (const perm of redis.permissions) {
+    for (const perm of kafka.permissions) {
       expect(within(row).getByText(perm), perm).toBeTruthy();
     }
     expect(within(row).getByText(/mcp_respond/)).toBeTruthy();

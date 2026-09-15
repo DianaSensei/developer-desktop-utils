@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as ReactDOMFull from 'react-dom';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import { usePluginSdk } from './platform/context';
+import { usePluginState, migrateLegacyKey } from './platform/usePluginState';
+import { usePluginConfig, useLiveConnection, usePluginMcpBridgeActive } from './platform/services';
+import { usePluginSdkFor, getPluginSdk } from './platform/usePluginSdkFor';
 
 // Bản React/ReactDOM DÙNG CHUNG cho plugin cài từ bên ngoài (xem
 // `src/platform/installer.ts`, phần "REACT DÙNG CHUNG"). Một bundle plugin
@@ -10,6 +14,16 @@ import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
 // nội bộ gắn với ĐÚNG một instance của React. Gán TRƯỚC bất cứ import động
 // nào của một plugin có thể chạy — nghĩa là ngay ở đây, phần trên cùng của
 // file được evaluate sớm nhất trong toàn bộ app.
+//
+// `platform.usePluginSdk`/`usePluginState`/`usePluginConfig` cùng lý do: một
+// plugin cài từ URL được `registry.ts` bọc bằng `withPluginSdk` (Provider) từ
+// CHÍNH module `context.ts` này, nhưng bundle của plugin không `import` được
+// module đó (module riêng, không nằm trong build của nó) — expose thẳng ba
+// hook qua vendor object là cách duy nhất để code trong bundle đọc được đúng
+// React Context instance mà `withPluginSdk` đã set giá trị vào. Không hàm nào
+// trong ba hàm này tự nới quyền: `usePluginSdk()` vẫn ném nếu gọi ngoài cây
+// plugin, và `sdk.*` bên trong vẫn kiểm đúng `permissions` plugin đã khai ở
+// manifest kind="plugin" của nó — xem docs/plugin-sdk/05-external-install.md.
 //
 // Tác giả plugin cấu hình build của mình coi `react`/`react-dom`/
 // `react/jsx-runtime` là "external", trỏ ba module đó về đây thay vì tự
@@ -22,6 +36,16 @@ declare global {
       reactDom: typeof ReactDOM;
       reactDomFull: typeof ReactDOMFull;
       jsxRuntime: { jsx: typeof jsx; jsxs: typeof jsxs; Fragment: typeof Fragment };
+      platform: {
+        usePluginSdk: typeof usePluginSdk;
+        usePluginSdkFor: typeof usePluginSdkFor;
+        getPluginSdk: typeof getPluginSdk;
+        usePluginState: typeof usePluginState;
+        migrateLegacyKey: typeof migrateLegacyKey;
+        usePluginConfig: typeof usePluginConfig;
+        useLiveConnection: typeof useLiveConnection;
+        usePluginMcpBridgeActive: typeof usePluginMcpBridgeActive;
+      };
     };
   }
 }
@@ -30,6 +54,16 @@ window.__DEVTOOL_VENDOR__ = {
   reactDom: ReactDOM,
   reactDomFull: ReactDOMFull,
   jsxRuntime: { jsx, jsxs, Fragment },
+  platform: {
+    usePluginSdk,
+    usePluginSdkFor,
+    getPluginSdk,
+    usePluginState,
+    migrateLegacyKey,
+    usePluginConfig,
+    useLiveConnection,
+    usePluginMcpBridgeActive,
+  },
 };
 // Self-hosted fonts — bundled by Vite, work offline, render identically on
 // macOS / Windows / Linux.

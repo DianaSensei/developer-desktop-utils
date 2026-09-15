@@ -56,19 +56,38 @@ pub const SERVICE_PROTOCOL: u32 = 1;
 
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Binary sidecar được phép chạy. Mỗi mục PHẢI có một dòng tương ứng trong
-/// `bundle.externalBin` của tauri.conf.json, nếu không nó sẽ không được đóng
-/// gói cùng app và mọi lời gọi sẽ báo "không tìm thấy". Cũng phải có mặt trong
-/// danh sách của `scripts/prepare-service-sidecars.mjs` — hai chỗ khai tay
-/// song song vì Rust và Node không chia sẻ được hằng số qua ranh giới ngôn
-/// ngữ; `allowlist_khop_voi_external_bin` dưới đây khoá vế phía tauri.conf.json.
+/// Binary sidecar được phép chạy — ranh giới tin cậy sống Ở ĐÂY, không phải
+/// ở manifest (webview đọc được manifest, không đọc được hằng số Rust này).
+/// KHÔNG phải mọi mục ở đây được ĐÓNG GÓI SẴN — xem `BUNDLED_SERVICES` dưới,
+/// tách riêng đúng vì lý do đó.
 ///
 /// `devtool-svc-echo` là plugin ví dụ tối giản (`ping`/`echo`/`tick-stream`,
 /// không có giá trị người dùng) — nó tồn tại thuần để chứng minh đường
 /// end-to-end thật của tier B, cả một-lần lẫn stream, trước khi có plugin thật
 /// cần tới cơ chế này, xem `tests/service_echo.rs`. Chưa có `plugin.ts` nào
 /// khai `service` để gọi tới nó, nên nó không xuất hiện ở bất cứ đâu trong UI.
+///
+/// `devtool-svc-redis`/`-container`/`-rabbit`: nguồn đã chuyển sang repo
+/// `developer-desktop-util-plugin` (không phải ai cũng cần Redis/Docker/
+/// RabbitMQ) — xem docs/decisions/architecture/optional-broker-plugins.md.
+/// Tên vẫn ở lại đây có chủ đích: `05-external-install.md` nói rõ "cài qua
+/// URL KHÔNG tự cấp quyền chạy cho một tên bin mới" — cây quyết định "bin nào
+/// được phép chạy" là của TÁC GIẢ lúc build app, không phải của người cài. Bỏ
+/// tên khỏi danh sách này thì việc cài sidecar tương ứng từ URL sẽ luôn bị
+/// allowlist từ chối, vĩnh viễn, không chỉ tới lúc cài xong.
 const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo", "devtool-svc-redis", "devtool-svc-container", "devtool-svc-rabbit"];
+
+/// Tập con của `ALLOWED_SERVICES` được đóng gói SẴN cùng app (có dòng tương
+/// ứng trong `bundle.externalBin` của tauri.conf.json và trong danh sách của
+/// `scripts/prepare-service-sidecars.mjs` — hai chỗ khai tay song song vì
+/// Rust và Node không chia sẻ được hằng số qua ranh giới ngôn ngữ).
+///
+/// Một mục nằm trong `ALLOWED_SERVICES` nhưng KHÔNG ở đây là sidecar chỉ cài
+/// được qua URL (Settings → Extensions, `kind: "service"`) — người dùng
+/// không cần nó thì không tải bytes của nó về máy. `allowlist_khop_voi_external_bin`
+/// dưới đây chỉ khoá phần TẬP CON này khớp `bundle.externalBin`, không khoá
+/// toàn bộ `ALLOWED_SERVICES` như trước.
+const BUNDLED_SERVICES: &[&str] = &["devtool-svc-echo"];
 
 #[derive(Debug, Deserialize)]
 pub struct ServiceRequest {
@@ -351,7 +370,7 @@ fn spawn_process(
 /// mình, không có gì ở tầng hệ thống ngăn một lỗi gõ nhầm tên đọc/ghi nhầm file
 /// của tool khác. Sidecar mới port sang (bắt đầu từ Redis) sửa đúng khoảng
 /// trống này; các Tier A còn lại tự động được sửa khi tới lượt chúng port sang
-/// Tier B ở các bước sau của Phase 2 (xem docs/decisions/architecture/platform-plugin-architecture.md).
+/// Tier B ở các bước sau của Phase 2 (xem docs/decisions/architecture/optional-broker-plugins.md).
 fn service_data_dir(app_data_dir: &std::path::Path, bin: &str) -> std::path::PathBuf {
     app_data_dir.join("service-data").join(bin)
 }
@@ -571,11 +590,14 @@ mod tests {
 
     #[test]
     fn allowlist_khop_voi_external_bin() {
-        // Một mục trong allowlist mà không được đóng gói thì mọi lời gọi tới nó
-        // báo "không tìm thấy" trên máy người dùng, còn ở máy dev thì chạy tốt
-        // — kiểu lệch chỉ lộ ra sau khi phát hành.
+        // Một mục trong BUNDLED_SERVICES mà không được đóng gói thì mọi lời gọi
+        // tới nó báo "không tìm thấy" trên máy người dùng, còn ở máy dev thì
+        // chạy tốt — kiểu lệch chỉ lộ ra sau khi phát hành. Chỉ kiểm tập con
+        // ĐÓNG GÓI SẴN — một mục trong ALLOWED_SERVICES nhưng ngoài
+        // BUNDLED_SERVICES CỐ Ý không có mặt trong bundle.externalBin (cài qua
+        // URL), xem comment của cả hai hằng số ở trên.
         let conf = include_str!("../tauri.conf.json");
-        for bin in ALLOWED_SERVICES {
+        for bin in BUNDLED_SERVICES {
             assert!(
                 conf.contains(&format!("binaries/{bin}")),
                 "\"{bin}\" nằm trong ALLOWED_SERVICES nhưng thiếu trong bundle.externalBin"

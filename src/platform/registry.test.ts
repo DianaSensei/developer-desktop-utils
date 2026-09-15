@@ -11,10 +11,14 @@ import { TOOL_ROUTES, allTools } from '@/lib/toolRegistry';
  *
  * Các bảng pin bên dưới được trích từ ba file đăng ký TAY ở commit ngay trước
  * khi có Platform (toolDefs.ts, toolRegistry.ts, FeatureContext.tsx). Chúng
- * chứng minh việc chuyển sang manifest KHÔNG đổi gì với người dùng: đúng 26
+ * chứng minh việc chuyển sang manifest KHÔNG đổi gì với người dùng: đúng số
  * tool, đúng thứ tự sidebar, đúng route, đúng mặc định bật/tắt. Khi thêm hoặc
  * bỏ plugin về sau thì cập nhật bảng ở đây một cách CÓ CHỦ Ý — đó chính là
  * điểm rà soát ta muốn có.
+ *
+ * redis-client/rabbit-client/container-manager rời khỏi bảng này (không còn
+ * compile-time) khi ba plugin đó chuyển sang developer-desktop-util-plugin —
+ * xem docs/decisions/architecture/optional-broker-plugins.md.
  */
 
 const PINNED_ORDER = [
@@ -34,9 +38,6 @@ const PINNED_ORDER = [
   "diff",
   "cron-generator",
   "kafka-explorer",
-  "rabbit-client",
-  "redis-client",
-  "container-manager",
   "qrcode",
   "color-picker",
   "jwt",
@@ -63,9 +64,6 @@ const PINNED_ROUTES: Record<string, string> = {
   "deduplicate": "/deduplicate",
   "generator": "/generator",
   "kafka-explorer": "/kafka-explorer",
-  "rabbit-client": "/rabbit-client",
-  "redis-client": "/redis-client",
-  "container-manager": "/container-manager",
   "sql-formatter": "/sql-formatter",
   "task-tracker": "/task-tracker",
   "network": "/network",
@@ -92,9 +90,6 @@ const PINNED_LABELS: Record<string, string> = {
   "deduplicate": "Deduplicate",
   "generator": "Generator",
   "kafka-explorer": "Kafka Explorer",
-  "rabbit-client": "RabbitMQ",
-  "redis-client": "Redis",
-  "container-manager": "Containers",
   "sql-formatter": "SQL Formatter",
   "task-tracker": "Time Tracker",
   "network": "Network Tools",
@@ -124,9 +119,6 @@ const PINNED_DEFAULT_ENABLED: Record<string, boolean> = {
   "deduplicate": false,
   "generator": true,
   "kafka-explorer": false,
-  "rabbit-client": false,
-  "redis-client": false,
-  "container-manager": false,
   "sql-formatter": false,
   "network": false,
   "lucky-wheel": false,

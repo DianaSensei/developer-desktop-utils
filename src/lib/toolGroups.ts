@@ -4,7 +4,6 @@ import {
   CaseSensitive,
   Clock,
   Dices,
-  Radio,
   FileCode2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -78,12 +77,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
     label: 'Generate',
     icon: Dices,
     toolIds: ['generator', 'qrcode', 'lucky-wheel'],
-  },
-  {
-    id: 'g-brokers',
-    label: 'Brokers',
-    icon: Radio,
-    toolIds: ['kafka-explorer', 'rabbit-client', 'redis-client'],
   },
 ];
 

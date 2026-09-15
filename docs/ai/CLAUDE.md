@@ -4,7 +4,15 @@
 
 ## Project Overview
 
-**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, Kafka explorer, RabbitMQ client, API client, mock server, etc.).
+**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, Kafka explorer, API client, mock server, etc.).
+
+> **Redis/RabbitMQ/Container Manager are no longer compiled into this repo.**
+> They moved to [`developer-desktop-util-plugin`](https://github.com/DianaSensei/developer-desktop-util-plugin)
+> as optional, install-from-URL plugins (Settings → Extensions) — see
+> `docs/decisions/architecture/platform-plugin-architecture.md`. Sections
+> below that still describe their internals (liveConnections examples,
+> `docs/human/TOOLS.md`, etc.) are describing code that now lives in that
+> repo; the pattern still applies verbatim there.
 
 **Key Technologies:**
 - **Frontend**: React 18, TypeScript, Vite 8 (Rolldown bundler)
@@ -108,7 +116,7 @@ devtool/
 │   ├── ai/                  # AI agent guides (this file)
 │   ├── human/               # Human contributor guides
 │   └── design/DESIGN-SYSTEM.md
-├── testing/rabbitmq/        # RabbitMQ integration test harness (Python + Docker)
+├── testing/kafka/           # Kafka integration test harness (Python + Docker)
 ├── public/                  # Static assets
 └── package.json
 ```

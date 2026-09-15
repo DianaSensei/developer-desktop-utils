@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
 import type { PluginManifest, PluginPermission } from './types';
+import type { ServiceDescriptor } from './service';
 
 // ---------------------------------------------------------------------------
 // Manifest thô tải từ URL — khớp `RemoteArtifactManifest` phía Rust
@@ -78,6 +79,18 @@ export interface RemotePluginManifest {
   permissions: PluginPermission[];
   commands: string[];
   hosts: string[];
+  /**
+   * Tier B — sidecar mà plugin này gọi tới, khi `permissions` khai `'service'`.
+   * Cùng hình dạng `ServiceDescriptor` compile-time; đây là bổ sung so với
+   * Phase 1 (khi nhánh plugin external-install chỉ hỗ trợ Tier A) — không có
+   * trường này, `validateManifest()` từ chối mọi plugin cài từ URL có khai
+   * `'service'` (mismatch `hasService`/`m.service`), tức bản trước KHÔNG cài
+   * được một plugin gọi sidecar qua URL dù chính sidecar đó (`kind: "service"`)
+   * cài được. `bin` ở đây vẫn phải nằm trong `ALLOWED_SERVICES` phía Rust —
+   * trường này chỉ mang theo allowlist METHOD của plugin, không tự cấp quyền
+   * chạy một bin mới (xem docs/plugin-sdk/05-external-install.md).
+   */
+  service?: ServiceDescriptor;
 }
 
 /** Một target khả dụng của một service — địa chỉ tải + checksum riêng cho
@@ -373,6 +386,7 @@ export async function installedPluginManifests(): Promise<
       permissions: record.manifest.permissions,
       commands: record.manifest.commands,
       hosts: record.manifest.hosts,
+      service: record.manifest.service,
       sdk: record.manifest.sdk,
       load: () => loadInstalled(record.manifest.id),
     },

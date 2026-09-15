@@ -23,7 +23,12 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildSidecar } from './sidecar.mjs';
 
-const SERVICE_SIDECARS = ['devtool-svc-echo', 'devtool-svc-redis', 'devtool-svc-container', 'devtool-svc-rabbit'];
+// devtool-svc-redis/container/rabbit moved to developer-desktop-util-plugin
+// (optional, install-from-URL sidecars) — see
+// docs/decisions/architecture/optional-broker-plugins.md. Their names
+// stay in `ALLOWED_SERVICES` (service_host.rs) so an install still works,
+// but this repo no longer builds or bundles the binaries.
+const SERVICE_SIDECARS = ['devtool-svc-echo'];
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 for (const bin of SERVICE_SIDECARS) buildSidecar(root, bin);

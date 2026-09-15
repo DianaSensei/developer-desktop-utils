@@ -93,6 +93,26 @@ export default function HelloPlugin() {
 }
 ```
 
+**Dùng SDK DÙNG CHUNG của app nếu cần `permissions`** — một plugin khai
+`permissions`/`service` trong manifest (vd để gọi một sidecar Tier B) đọc SDK
+của chính nó qua `window.__DEVTOOL_VENDOR__.platform.*`, KHÔNG `import` từ
+`@/platform` — bundle của bạn không có module đó. Bề mặt hiện expose:
+`usePluginSdk`, `usePluginSdkFor`, `getPluginSdk`, `usePluginState`,
+`migrateLegacyKey`, `usePluginConfig`, `useLiveConnection`,
+`usePluginMcpBridgeActive`. Đây là ĐÚNG cùng hàm mà app chính dùng nội bộ;
+`usePluginSdk()` vẫn kiểm đúng `permissions` đã khai và audit lại mọi lời gọi
+như plugin compile-time, chỉ khác chỗ lấy bytes của hàm, không khác chỗ áp
+luật:
+
+```js
+const { usePluginSdk } = window.__DEVTOOL_VENDOR__.platform;
+
+export default function MyPlugin() {
+  const sdk = usePluginSdk();
+  // sdk.storage / sdk.service / sdk.clipboard / … — giống hệt plugin compile-time
+}
+```
+
 **Dùng React DÙNG CHUNG của app** — không tự bundle `react`/`react-dom`.
 Một bundle mang theo bản React riêng sẽ vỡ hook ("Invalid hook call" kinh
 điển, vì hook đọc trạng thái nội bộ gắn với ĐÚNG một instance React). App

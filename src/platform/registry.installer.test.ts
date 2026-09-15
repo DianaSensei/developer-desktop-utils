@@ -4,8 +4,8 @@ import type { PluginManifest } from './types';
 
 /**
  * `initInstalledPlugins()` nối plugin cài từ bên ngoài vào ĐÚNG mảng
- * `records` mà 26 plugin compile-time đã nằm sẵn — tách file riêng khỏi
- * `registry.test.ts` (giữ bộ pin 26-tool ở đó không bị xáo trộn bởi việc mock
+ * `records` mà các plugin compile-time đã nằm sẵn — tách file riêng khỏi
+ * `registry.test.ts` (giữ bộ pin plugin ở đó không bị xáo trộn bởi việc mock
  * `./installer` ở đây) vì registry.ts là SINGLETON theo module: gọi
  * `initInstalledPlugins()` hai lần trong cùng một lần nạp module sẽ cộng dồn
  * plugin của lần trước — mỗi test vì vậy phải `vi.resetModules()` rồi
@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe('initInstalledPlugins', () => {
-  it('không cài gì thì PLUGINS đúng bằng 26 plugin compile-time, không hơn', async () => {
+  it('không cài gì thì PLUGINS đúng bằng số plugin compile-time, không hơn', async () => {
     const { installedPluginManifests } = await import('./installer');
     vi.mocked(installedPluginManifests).mockResolvedValue([]);
 
@@ -56,7 +56,7 @@ describe('initInstalledPlugins', () => {
     await registry.initInstalledPlugins();
 
     expect(registry.PLUGINS.length).toBe(before);
-    expect(before).toBe(26);
+    expect(before).toBe(23);
   });
 
   it('thêm đúng một plugin hợp lệ vào PLUGINS và PLUGIN_MAP', async () => {

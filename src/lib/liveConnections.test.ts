@@ -75,16 +75,6 @@ describe('liveConnections — seed lúc module nạp (chấm đúng ngay lần m
     expect(result.current).toEqual(['kafka-explorer']);
   });
 
-  it('cả ba tool (rabbit/kafka/redis) đều được seed độc lập từ đúng key của mình', async () => {
-    vi.resetModules();
-    const { storageSet } = await import('@/lib/persistentStore');
-    storageSet('devtool:rabbit:connectedConnId', JSON.stringify('conn-1'));
-    storageSet('devtool:redis:connectedConnId', JSON.stringify('conn-2'));
-    const { useLiveConnections } = await import('@/lib/liveConnections');
-    const { result } = renderHook(() => useLiveConnections());
-    expect(new Set(result.current)).toEqual(new Set(['rabbit-client', 'redis-client']));
-  });
-
   it('chuỗi rỗng đã lưu ("chưa từng kết nối") KHÔNG được seed thành live', async () => {
     vi.resetModules();
     const { storageSet } = await import('@/lib/persistentStore');

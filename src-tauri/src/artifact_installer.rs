@@ -79,6 +79,24 @@ pub struct RemotePluginManifest {
     pub commands: Vec<String>,
     #[serde(default)]
     pub hosts: Vec<String>,
+    /// Tier B — sidecar plugin này gọi tới, khi `permissions` khai `'service'`.
+    /// Bổ sung so với Phase 1 (nhánh plugin external-install từng chỉ hỗ trợ
+    /// Tier A) — thiếu trường này, phía TS (`validateManifest()`) từ chối mọi
+    /// plugin cài từ URL có khai `'service'` vì mismatch giữa `permissions` và
+    /// `service`. `bin` ở đây vẫn phải nằm trong `ALLOWED_SERVICES`
+    /// (service_host.rs) mới chạy được — trường này chỉ đi kèm allowlist
+    /// METHOD, không tự cấp quyền chạy một bin mới.
+    #[serde(default)]
+    pub service: Option<RemoteServiceDescriptor>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteServiceDescriptor {
+    pub bin: String,
+    pub methods: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_ms: Option<u64>,
 }
 
 /// Một target khả dụng của một service — một địa chỉ tải kèm checksum riêng

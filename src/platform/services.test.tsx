@@ -6,7 +6,7 @@ import { createPluginSdk, getPlugin } from '@/platform';
 import { useLiveConnection, usePluginConfig, usePluginMcpBridgeActive } from '@/platform/services';
 import { storageRemove } from '@/lib/persistentStore';
 
-const redis = createPluginSdk(getPlugin('redis-client')!);
+const kafka = createPluginSdk(getPlugin('kafka-explorer')!);
 // 'qrcode' cố tình nằm ngoài MCP_TOOL_IDS — 'json' thì CÓ trong đó.
 const qrcode = createPluginSdk(getPlugin('qrcode')!);
 
@@ -28,7 +28,7 @@ describe('usePluginConfig', () => {
 describe('useLiveConnection', () => {
   it('lấy id từ SDK, không phải từ chuỗi viết tay', () => {
     function Probe({ connected }: { connected: boolean }) {
-      useLiveConnection(redis, connected);
+      useLiveConnection(kafka, connected);
       return null;
     }
     function Readout() {
@@ -41,7 +41,7 @@ describe('useLiveConnection', () => {
         <Readout />
       </>,
     );
-    expect(getByTestId('live').textContent).toContain('redis-client');
+    expect(getByTestId('live').textContent).toContain('kafka-explorer');
 
     rerender(
       <>
@@ -49,24 +49,24 @@ describe('useLiveConnection', () => {
         <Readout />
       </>,
     );
-    expect(getByTestId('live').textContent).not.toContain('redis-client');
+    expect(getByTestId('live').textContent).not.toContain('kafka-explorer');
   });
 
   it('KHÔNG tắt cờ khi unmount — kết nối sống ở phía Rust, không ở component', () => {
     function Probe() {
-      useLiveConnection(redis, true);
+      useLiveConnection(kafka, true);
       return null;
     }
     const view = render(<Probe />);
     view.unmount();
 
     const { result } = renderHook(() => useLiveConnections());
-    expect(result.current).toContain('redis-client');
+    expect(result.current).toContain('kafka-explorer');
 
     // dọn lại cho ca sau
     render(<ProbeOff />);
     function ProbeOff() {
-      useLiveConnection(redis, false);
+      useLiveConnection(kafka, false);
       return null;
     }
   });
@@ -79,7 +79,7 @@ describe('usePluginMcpBridgeActive', () => {
   });
 
   it('tool có MCP thì mặc định bật, vì bridge nền mặc định tắt', () => {
-    const { result } = renderHook(() => usePluginMcpBridgeActive(redis));
+    const { result } = renderHook(() => usePluginMcpBridgeActive(kafka));
     expect(result.current).toBe(true);
   });
 });
