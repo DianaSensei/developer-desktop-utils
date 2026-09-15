@@ -22,6 +22,11 @@ import { isTauri } from '@/lib/platform';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
 import { useMcpToolEnabledMap, MCP_TOOL_IDS, type McpToolId } from '@/hooks/useMcpToolEnabled';
 import { useMockServerRuntime } from '@/components/tools/mockserver/mcpRuntimeContext';
+import { META_MCP_TOOLS } from './mcpMetaTools';
+
+// Registered under this synthetic id — this bridge isn't a plugin (no
+// manifest, no SDK), just the platform's own always-on management surface.
+const META_PLUGIN_ID = 'devtool-platform';
 
 interface McpCallEvent {
   id: string;
@@ -111,6 +116,10 @@ export function McpManageBridge(): null {
     (async () => {
       const { listen } = await import('@tauri-apps/api/event');
       const { invoke } = await import('@tauri-apps/api/core');
+      // Unconditional, never unregistered — this bridge IS the platform's own
+      // management surface, mounted for the app's whole lifetime (see the
+      // file-level comment on why it has no `enabled` prop).
+      await invoke('mcp_register_tools', { pluginId: META_PLUGIN_ID, tools: META_MCP_TOOLS });
       const fn = await listen<McpCallEvent>('mcp:call', async (event) => {
         const { id, tool, args } = event.payload;
         const handler = buildHandlers(depsRef.current)[tool];

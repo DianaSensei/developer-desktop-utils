@@ -87,6 +87,7 @@ const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo", "devtool-svc-redis", "de
 /// không cần nó thì không tải bytes của nó về máy. `allowlist_khop_voi_external_bin`
 /// dưới đây chỉ khoá phần TẬP CON này khớp `bundle.externalBin`, không khoá
 /// toàn bộ `ALLOWED_SERVICES` như trước.
+#[cfg(test)]
 const BUNDLED_SERVICES: &[&str] = &["devtool-svc-echo"];
 
 #[derive(Debug, Deserialize)]

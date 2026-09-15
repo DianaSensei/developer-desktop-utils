@@ -115,6 +115,8 @@ fn main() {
             files::read_file_data_url,
             mcp_bridge::mcp_respond,
             mcp_bridge::mcp_sidecar_path,
+            mcp_bridge::mcp_register_tools,
+            mcp_bridge::mcp_unregister_tools,
             service_host::service_call,
             service_host::service_stream_start,
             service_host::service_stream_stop,

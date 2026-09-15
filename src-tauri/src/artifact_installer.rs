@@ -774,6 +774,7 @@ mod tests {
             permissions: vec![],
             commands: vec![],
             hosts: vec![],
+            service: None,
         }
     }
 

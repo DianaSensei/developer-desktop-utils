@@ -24,6 +24,7 @@ import { usePluginSdkFor } from '@/platform';
 import { isTauri } from '@/lib/platform';
 import type { MockServerState } from './useMockServer';
 import type { MockConfig, RequestLogEntry, Stub } from './types';
+import { MOCK_SERVER_MCP_TOOLS } from './mcpTools';
 
 interface McpCallEvent {
   id: string;
@@ -181,6 +182,11 @@ export function useMcpBridge(state: MockServerState, enabled = true): void {
     let unlisten: (() => void) | null = null;
 
     (async () => {
+      // Bundled with THIS tool, not the platform — devtool-mcp-server.rs has
+      // no compiled-in tool list of its own (see that file), so registering
+      // here is what makes its tools show up in `list_tools` at all. Same
+      // 'native' + allowlist gate as `mcp_respond` below.
+      await sdk.native.invoke('mcp_register_tools', { pluginId: sdk.id, tools: MOCK_SERVER_MCP_TOOLS });
       // Qua SDK: sự kiện `mcp:call` và lệnh `mcp_respond` đều nằm trong quyền
       // 'native' + allowlist của plugin, nên cầu nối này cũng hiện trong nhật ký
       // như mọi lời gọi khác thay vì là một đường đi vòng.
@@ -205,6 +211,10 @@ export function useMcpBridge(state: MockServerState, enabled = true): void {
     return () => {
       cancelled = true;
       unlisten?.();
+      // Best-effort — this tool's tools stop answering the moment
+      // `mcp:call` is unlistened anyway; unregistering just keeps
+      // `list_tools` honest about what will actually answer right now.
+      sdk.native.invoke('mcp_unregister_tools', { pluginId: sdk.id }).catch(() => {});
     };
   }, [enabled, sdk]);
 }
