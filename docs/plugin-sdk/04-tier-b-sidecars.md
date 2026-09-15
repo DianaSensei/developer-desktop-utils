@@ -130,7 +130,7 @@ async fn main() {
         let tx = tx.clone();
         // Spawn MỘT TASK cho mỗi dòng vào — cho phép nhiều lời gọi chồng lấn
         // (host demux theo `id`, xem "Ghép dòng theo id" ở
-        // docs/decisions/platform-plugin-architecture.md).
+        // docs/decisions/architecture/platform-plugin-architecture.md).
         tokio::spawn(async move {
             let response = handle_line(&line).await;
             let _ = tx.send(response);

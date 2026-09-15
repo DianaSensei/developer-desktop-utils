@@ -1,6 +1,16 @@
 # Redis tool — Pub/Sub dùng registry thay vì kết nối tạm thời
 
-## Phương án đã chọn
+> **Cập nhật**: quyết định này được ghi lại khi Redis còn là Tier A
+> (`redis_tool.rs`, đã xoá). Redis giờ chạy hoàn toàn qua sidecar Tier B
+> (`devtool-svc-redis.rs`) — pattern registry mô tả dưới đây được MANG
+> NGUYÊN sang sidecar (cùng lý do, cùng thiết kế), chỉ khác cơ chế truyền
+> tải: sự kiện đi qua `sdk.service.stream()` (không phải `Channel<PubSubMessage>`
+> của Tauri trực tiếp), và có thêm một method `unsubscribe` MỘT-LẦN riêng vì
+> `service_stream_stop` phía host không báo được cho sidecar biết khi nào
+> dừng — xem [`docs/plugin-sdk/04-tier-b-sidecars.md`](../../plugin-sdk/04-tier-b-sidecars.md)
+> cho mẫu chung. Lý do chọn registry (mục "Lý do" dưới) không đổi.
+
+## Phương án đã chọn (nguyên trạng lúc quyết định — Tier A)
 
 `redis_tool.rs` vốn có invariant: mọi command mở một `MultiplexedConnection` mới, chạy xong là
 đóng — không có pool/registry sống lâu (khác với `rabbit.rs`/`kafka.rs` vốn có consumer sống

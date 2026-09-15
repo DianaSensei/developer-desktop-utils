@@ -86,12 +86,15 @@ Needs Node 20.19+ and Rust stable. `npm run tauri:build` produces installers in 
 
 ## Docs
 
+Full map of every doc, and which one to read for what: **[docs/README.md](docs/README.md)**.
+
 - **[SECURITY.md](SECURITY.md)** — threat model, supply-chain guarantees & how to verify a build
 - **[docs/human/SETUP.md](docs/human/SETUP.md)** — setup, build & troubleshooting
 - **[docs/human/CONTRIBUTING.md](docs/human/CONTRIBUTING.md)** — how to add a tool, step by step
 - **[docs/human/TOOLS.md](docs/human/TOOLS.md)** — per-tool system access, permissions & storage
 - **[docs/human/kafka-explorer.md](docs/human/kafka-explorer.md)** — Kafka Explorer operation reference
 - **[docs/design/DESIGN-SYSTEM.md](docs/design/DESIGN-SYSTEM.md)** — design system: tokens, utilities & components
+- **[docs/plugin-sdk/](docs/plugin-sdk/README.md)** — writing a new plugin (built-in or installed from a URL)
 - **[docs/ai/CLAUDE.md](docs/ai/CLAUDE.md)** — guide for AI coding agents
 
 ---

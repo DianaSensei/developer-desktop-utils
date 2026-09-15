@@ -351,7 +351,7 @@ fn spawn_process(
 /// mình, không có gì ở tầng hệ thống ngăn một lỗi gõ nhầm tên đọc/ghi nhầm file
 /// của tool khác. Sidecar mới port sang (bắt đầu từ Redis) sửa đúng khoảng
 /// trống này; các Tier A còn lại tự động được sửa khi tới lượt chúng port sang
-/// Tier B ở các bước sau của Phase 2 (xem docs/decisions/platform-plugin-architecture.md).
+/// Tier B ở các bước sau của Phase 2 (xem docs/decisions/architecture/platform-plugin-architecture.md).
 fn service_data_dir(app_data_dir: &std::path::Path, bin: &str) -> std::path::PathBuf {
     app_data_dir.join("service-data").join(bin)
 }

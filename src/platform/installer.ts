@@ -39,7 +39,7 @@
 // ngay sau khi import React — bundle phải cấu hình build của nó coi
 // `react`/`react-dom` là external, đọc từ đó thay vì tự bundle. Đây là HỢP
 // ĐỒNG TÁC GIẢ, không phải thứ nạp lúc chạy có thể tự kiểm tra được — ghi lại
-// ở docs/decisions/platform-plugin-architecture.md.
+// ở docs/decisions/architecture/platform-plugin-architecture.md.
 //
 // NHÁNH SERVICE KHÔNG CÓ BLOB/IMPORT(): một binary native không chạy trong
 // webview — nó được cài xuống đĩa rồi SPAWN như tiến trình con (xem

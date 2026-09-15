@@ -66,5 +66,5 @@ TS/React: `src/platform/installer.ts` (+test), `src/platform/index.ts`,
 `src/components/SettingsExtensionInstaller.tsx` (+test, thay
 `SettingsPluginInstaller.tsx`), `src/components/SettingsPlugins.tsx`,
 `src/lib/i18n.ts`.
-Docs: `docs/ai/CLAUDE.md`, `docs/decisions/platform-plugin-architecture.md`,
+Docs: `docs/ai/CLAUDE.md`, `docs/decisions/architecture/platform-plugin-architecture.md`,
 `docs/plans/native-sidecar-install.md`.

@@ -1,5 +1,5 @@
 // Plugin dịch vụ (tier B) cho Redis Client — Bước 1 của Phase 2 (xem
-// docs/decisions/platform-plugin-architecture.md, mục "Việc còn lại").
+// docs/decisions/architecture/platform-plugin-architecture.md, mục "Việc còn lại").
 //
 // Port từ src-tauri/src/redis_tool.rs, giữ nguyên HÌNH DẠNG dữ liệu (JSON
 // camelCase, ngữ nghĩa SCAN/VALUE_CAP) nhưng ĐỔI chỗ lưu cấu hình kết nối một
@@ -133,7 +133,7 @@ pub struct RedisConnection {
 // này không biết và không có cách nào đọc/ghi ra ngoài thư mục của chính nó.
 // Hệ quả: cấu hình lưu qua Tier A hiện tại và qua sidecar này (chưa có
 // `plugin.ts` nào gọi tới nó) là HAI bản riêng biệt cho tới khi Bước 4/5 của
-// Phase 2 (xem docs/decisions/platform-plugin-architecture.md) chuyển hẳn
+// Phase 2 (xem docs/decisions/architecture/platform-plugin-architecture.md) chuyển hẳn
 // frontend sang sidecar này — lúc đó cần một bước di trú (copy nội dung
 // `redis-connections.json` cũ vào `connections.json` trong thư mục mới) để
 // không mất cấu hình người dùng đã lưu qua Tier A.

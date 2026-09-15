@@ -5,7 +5,7 @@ import { createRedisApi } from './types';
 /**
  * `createRedisApi` is the ONE seam every Redis view/hook goes through to talk
  * to the sidecar (`devtool-svc-redis`) — see the "điểm thắt" note in
- * `docs/decisions/platform-plugin-architecture.md`. These tests mock
+ * `docs/decisions/architecture/platform-plugin-architecture.md`. These tests mock
  * `sdk.service.call`/`sdk.service.stream` directly (the platform's own
  * `service.test.ts` already covers permission-checking/audit inside those),
  * so they only need to assert this file maps each RedisApi method to the

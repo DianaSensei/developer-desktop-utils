@@ -105,7 +105,7 @@ nhất (component chỉ thấy "tính năng không chạy", không thấy vì sa
 ## Nơi lưu dữ liệu — cách ly theo plugin
 
 Ba tầng dữ liệu, ba cơ chế cách ly khác nhau (chi tiết đầy đủ ở
-`docs/decisions/platform-plugin-architecture.md`, mục "Cách ly dữ liệu"):
+`docs/decisions/architecture/platform-plugin-architecture.md`, mục "Cách ly dữ liệu"):
 
 | Tầng | Cách ly bằng |
 |---|---|

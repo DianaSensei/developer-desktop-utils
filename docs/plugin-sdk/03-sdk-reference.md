@@ -68,7 +68,7 @@ theo plugin và quyền `storage` được kiểm.
 chuyển sang SDK (ví dụ đang port từ code cũ), truyền khoá cũ vào đây — di
 trú chạy đúng một lần lúc dựng, chỉ khi khoá mới còn trống. **Bắt buộc**
 mỗi khi đổi vị trí lưu trữ để không âm thầm vứt dữ liệu người dùng — xem
-`docs/decisions/platform-plugin-architecture.md` mục "Di trú dữ liệu người
+`docs/decisions/architecture/platform-plugin-architecture.md` mục "Di trú dữ liệu người
 dùng" cho ba khuôn mẫu di trú đầy đủ.
 
 ## `sdk.secrets` — quyền `secrets`

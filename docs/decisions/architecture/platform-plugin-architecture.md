@@ -628,82 +628,54 @@ là đã dùng được cho việc thật, không chỉ đã đúng về mặt c
 
 ## Việc còn lại
 
-1. ~~Plugin dịch vụ tier B đầu tiên.~~ **Đã có** — `devtool-svc-echo`, xem "Tier B" ở
-   trên. Còn lại: một plugin thật (không phải ví dụ) khai `service` và có UI thật sự
-   gọi tới sidecar của nó.
-2. ~~Cài đặt plugin từ bên ngoài.~~ **Đã có phần cơ chế (Phase 1)** — xem mục ngay
-   trên. Còn lại: xác nhận thủ công với một plugin thật (mục "Chưa kiểm bằng một
-   plugin thật" ở trên).
-3. **Phase 2 — bốn tool nặng (Kafka/RabbitMQ/Redis/Container) thành sidecar tier B
-   thật, cài được qua Phase 1.** Đây LÀ một dự án riêng, không phải phần mở rộng
-   nhỏ của Phase 1: `kafka.rs`/`rabbit.rs`/`redis_tool.rs`/`container_tool.rs` cộng
-   lại ~4700 dòng, mỗi lệnh `#[tauri::command]` phải viết lại thành một method
-   JSONL qua `service_host.rs`. ~~Khung tin nhắn stream mà các luồng dữ liệu dài
-   hạn (Kafka consume, Redis Pub/Sub, log/stats container) cần~~ **đã có** — xem
-   "Ghép dòng theo `id`" ở mục Tier B trên (`sdk.service.stream`, `tick-stream`
-   trong `devtool-svc-echo` làm bằng chứng cơ chế). Việc còn lại của Phase 2 giờ
-   thuần là việc viết lại từng tool, không còn vướng hạ tầng giao thức.
-   ~~Còn hai thứ khác cần giải quyết TRƯỚC khi một sidecar như vậy "cài được"
-   đúng nghĩa qua Phase 1: (a) `plugin_installer.rs` hiện chỉ tải/kiểm/nạp
-   bundle JS qua `blob:` — chưa có đường tương đương cho một BINARY native
-   theo từng nền tảng~~ **(a) đã xong** — xem "Cài đặt tiện ích từ bên ngoài"
-   ở trên (`artifact_installer.rs`, nhánh `service`: tải theo target-triple,
-   kiểm checksum, ghi atomic, chmod +x, `sidecar_path()` resolve đúng thứ
-   tự). **(b) vẫn cố ý CHƯA làm**: `ALLOWED_SERVICES` là hằng số biên dịch
-   sẵn trong Rust theo đúng chủ đích (ranh giới tin cậy không giao cho
-   manifest) — một sidecar cài lúc chạy từ bên ngoài sẽ KHÔNG nằm trong
-   allowlist đó trừ khi ai đó chủ động thêm tên bin vào `ALLOWED_SERVICES`
-   lúc build (quyết định code riêng, chưa làm). Bắt đầu từ Redis (nhỏ nhất,
-   945 dòng, đã qua SDK từ trước) — **Bước 1-3 đã xong** (`devtool-svc-redis`:
-   CRUD cấu hình + connect/overview/duyệt key (Bước 1), CLI exec + admin
-   (Bước 2), Pub/Sub qua giao thức stream (Bước 3), 34 test, xác nhận thủ
-   công bằng Redis thật qua Docker). **Bước 4+5 đã xong**: `devtool-svc-redis`
-   thêm vào `ALLOWED_SERVICES`/`bundle.externalBin`/`prepare-service-sidecars.mjs`;
-   `redis-client/plugin.ts` đổi quyền `native` (giữ cho MCP bridge) +
-   `service` (`service.methods` liệt kê đủ 21 method JSONL), bỏ `commands:
-   ['redis_']`; `createRedisApi` (types.ts) — điểm thắt duy nhất mọi
-   view/hook Redis đi qua — đổi từ `sdk.native.invoke('redis_xxx', …)` sang
-   `sdk.service.call('xxx-kebab', …)`, `pubsubSubscribe` đổi chữ ký trả về
-   `Promise<{ stop(): Promise<void> }>` đóng gói cả `unsubscribe` (sidecar)
-   lẫn `service_stream_stop` (host); `redis_tool.rs` (Tier A, ~945 dòng) đã
-   XOÁ khỏi `main.rs`. Sidecar lưu cấu hình ở thư mục riêng của NÓ
-   (`service-data/devtool-svc-redis/`), khác chỗ `redis_tool.rs` từng lưu
-   (`plugin-data/redis-client/`) — CỐ Ý KHÔNG di trú: cấu hình kết nối
-   Kafka/RabbitMQ/Redis/Container không cần bảo toàn, người dùng tự nhập lại
-   được (xem "Cách ly dữ liệu" ở mục Tier B) — người dùng nâng cấp sẽ thấy
-   danh sách kết nối Redis trống một lần.
+*(Mục này ghi trạng thái HIỆN TẠI, không phải nhật ký từng lần sửa — lịch sử
+đầy đủ nằm ở `git log` của file này và `docs/changelog/`.)*
 
-   **Lỗ hổng hạ tầng phát hiện, và cách né đúng ở tầng ứng dụng (không sửa
-   platform).** `service_host.rs::dispatch()` lặng lẽ bỏ một response
-   `error` khi waiter là `Stream` (không có biến thể `EventSink` nào mang
-   được lỗi ra ngoài) — một lỗi NGAY LÚC subscribe (config sai, kết nối bị
-   từ chối/timeout) gửi bằng `Response::err` (đặt `ServiceResponse.error`)
-   sẽ KHÔNG BAO GIỜ tới được `onMessage` phía client, và promise của
-   `sdk.service.stream()` (vốn đã resolve ngay sau khi đăng ký phía host
-   xong, không đợi sự kiện đầu) sẽ không bao giờ biết việc subscribe thật sự
-   thất bại — UI treo ở "Đang lắng nghe…" vĩnh viễn, không một dòng lỗi nào.
-   **Sửa ĐÚNG chỗ, không phải ở `service_host.rs`**: `devtool-svc-redis` gửi
-   lỗi lúc subscribe như một SỰ KIỆN STREAM bình thường
-   (`{"type":"error","message":...}`, cùng tầng với `"subscribed"`/
-   `"message"` đã có, qua `send_pubsub_error()`) thay vì qua
-   `ServiceResponse.error` — lỗi vì vậy đi trót lọt qua `dispatch()` (nó chỉ
-   chặn `error: Some(...)` ở TẦNG KHUNG, không biết gì về hình dạng payload
-   ứng dụng bên trong `result`). Phía TS, `createRedisApi.pubsubSubscribe`
-   giờ ĐỢI ĐÚNG sự kiện `subscribed` hoặc `error` đầu tiên trước khi
-   resolve/reject — không còn resolve sớm che giấu lỗi kết nối. Bài học
-   chung cho MỌI sidecar Tier B sau này (không riêng Redis): một method
-   STREAM muốn báo lỗi giữa chừng phải tự mã hoá lỗi đó vào chính giao thức
-   ứng dụng của mình (một trường `type`/discriminator trong `result`), không
-   được trông cậy vào `ServiceResponse.error` — cửa đó chỉ mở cho lời gọi
-   MỘT-LẦN (`Waiter::Once`). Đây KHÔNG phải nợ cần platform sửa: từng
-   sidecar tự biết ngữ nghĩa lỗi giữa chừng của method mình (Redis Pub/Sub
-   khác Kafka consume khác container logs), một khung lỗi chung ở tầng
-   `service_host.rs` sẽ phải đủ tổng quát cho mọi trường hợp trong khi mỗi
-   trường hợp lại muốn thứ khác — để mỗi sidecar tự quyết, đúng tinh thần
-   "quyền quyết định nằm gần nơi hiểu rõ ngữ cảnh nhất" đã theo xuyên suốt
-   tài liệu này.
+1. **Tier B + cài đặt từ bên ngoài — cơ chế nền tảng: xong.** `devtool-svc-echo`
+   chứng minh giao thức JSONL (one-shot + stream). `artifact_installer.rs`
+   tải/kiểm/cài được cả plugin JS (`kind: "plugin"`) lẫn binary native
+   (`kind: "service"`, theo target-triple, ghi atomic, `sidecar_path()` ưu
+   tiên bản tải-về). Xem `docs/plugin-sdk/` cho tài liệu tham khảo đầy đủ.
+   Còn thiếu: xác nhận bằng một plugin JS thật do bên ngoài build (chỉ có
+   test cơ chế, chưa có bằng chứng authoring thật).
 
-   Còn lại của Phase 2: publish `devtool-svc-redis` qua cơ chế cài đặt URL
-   rồi bỏ khỏi `externalBin` mặc định; lặp lại toàn bộ cho Kafka/RabbitMQ/
-   Container.
-4. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.
+2. **Phase 2 — bốn tool nặng thành sidecar Tier B thật.**
+
+   | Tool | Trạng thái |
+   |---|---|
+   | Redis | ✅ Xong (Bước 1-5) — `devtool-svc-redis`, `redis_tool.rs` đã xoá |
+   | Container | ✅ Xong (Bước 1-5) — `devtool-svc-container`, `container_tool.rs` đã xoá |
+   | RabbitMQ | ✅ Xong (Bước 1-5) — `devtool-svc-rabbit`, `rabbit.rs` đã xoá |
+   | Kafka | Chưa bắt đầu — `kafka.rs` (~1466 dòng) vẫn Tier A |
+
+   Cả ba tool đã xong đều theo đúng 5 bước: (1) config CRUD + ops cơ bản,
+   (2) ops còn lại, (3) method STREAM cho luồng dữ liệu dài hạn, (4) cắt
+   frontend sang `sdk.service`, (5) xoá code Tier A + nối
+   `ALLOWED_SERVICES`/`bundle.externalBin`. Dữ liệu kết nối KHÔNG được bảo
+   toàn khi cắt (cố ý — xem "Cách ly dữ liệu" ở mục Tier B); mỗi sidecar
+   lưu ở thư mục riêng của nó (`service-data/<bin>/`), tách hẳn khỏi
+   `plugin-data/<id>/` mà bản Tier A cũ dùng.
+
+   **Bài học lặp lại ở cả ba tool, đáng nhớ cho Kafka**: `service_host.rs::dispatch()`
+   lặng lẽ bỏ payload của một response mang `error: Some(...)` HOẶC
+   `done: true` khi waiter là `Stream` — một method stream muốn báo lỗi
+   hoặc kèm dữ liệu lúc hoàn tất PHẢI tự mã hoá việc đó vào giao thức ứng
+   dụng của chính nó (`{"type":"error"|"done", ...}` như một sự kiện bình
+   thường), không được trông cậy vào `ServiceResponse.error`/`done` — cửa
+   đó chỉ mở cho lời gọi một-lần. Đây KHÔNG phải nợ platform cần sửa: mỗi
+   sidecar tự biết ngữ nghĩa lỗi/hoàn tất của method mình, một khung chung
+   ở `service_host.rs` sẽ phải đủ tổng quát cho mọi trường hợp trong khi
+   mỗi trường hợp lại muốn thứ khác. Chi tiết + code mẫu:
+   `docs/plugin-sdk/04-tier-b-sidecars.md`.
+
+   **Còn lại trước khi Phase 2 coi là xong hẳn**: (a) publish
+   `devtool-svc-redis`/`devtool-svc-container`/`devtool-svc-rabbit` qua cơ
+   chế cài URL rồi bỏ khỏi `bundle.externalBin` mặc định (mục tiêu gốc —
+   installer gọn, tool nặng chỉ tải khi cần) — CHƯA làm, cần thêm việc ở
+   (b); (b) `ALLOWED_SERVICES` vẫn cố ý là hằng số biên dịch sẵn — một
+   sidecar cài lúc chạy từ URL chỉ chạy được nếu tên bin của nó ĐÃ nằm
+   trong danh sách này từ lúc build (quyết định code, không giao cho
+   manifest); (c) Kafka — tool cuối cùng, dự kiến lớn nhất (~1466 dòng),
+   theo đúng 5 bước như ba tool trước.
+
+3. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.

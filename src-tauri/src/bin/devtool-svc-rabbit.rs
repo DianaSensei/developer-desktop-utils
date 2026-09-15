@@ -1,5 +1,5 @@
 // Plugin dịch vụ (tier B) cho RabbitMQ Client — Bước 1+2 gộp của Phase 2 (xem
-// docs/decisions/platform-plugin-architecture.md, mục "Ba tier" và "Cách ly
+// docs/decisions/architecture/platform-plugin-architecture.md, mục "Ba tier" và "Cách ly
 // dữ liệu"). Port từ src-tauri/src/rabbit.rs, giữ nguyên HÌNH DẠNG dữ liệu
 // (JSON camelCase, struct `RabbitConnection`/`PublishProps`/`PublishOutcome`/
 // ...) nhưng KHÔNG đụng file đó — nó vẫn chạy production (Tier A) song song

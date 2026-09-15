@@ -2,8 +2,8 @@
 
 Bộ tài liệu này dành cho người viết một plugin MỚI cho DevTool — không phải
 người bảo trì chính app (xem `docs/ai/CLAUDE.md` cho việc đó) hay người muốn
-hiểu lý do kiến trúc được chọn (xem `docs/decisions/platform-plugin-architecture.md`
-và `docs/decisions/canary-release-channel.md` cho các quyết định + đánh đổi
+hiểu lý do kiến trúc được chọn (xem `docs/decisions/architecture/platform-plugin-architecture.md`
+và `docs/decisions/architecture/canary-release-channel.md` cho các quyết định + đánh đổi
 đầy đủ). Ở đây là tài liệu THAM KHẢO thực dụng: bạn cần gì để viết, đóng gói
 và phát hành một plugin.
 

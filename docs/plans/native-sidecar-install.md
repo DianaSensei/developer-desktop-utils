@@ -144,7 +144,7 @@ cần sửa `sidecar_path` lần nữa.
 - `artifact_installer_install`/`artifact_installer_uninstall` (nhánh service) gọi `service_stop(bin)` khi bin đang chạy, có test cho cả hai.
 - `src/platform/artifactInstaller.ts` (hoặc mở rộng `installer.ts` hiện có) export đủ hàm cho cả hai kind.
 - `SettingsExtensionInstaller.tsx` thay `SettingsPluginInstaller.tsx`: xem trước, cài, danh sách với badge kind, nút cập nhật/gỡ có cảnh báo ngắt kết nối cho service.
-- `docs/ai/CLAUDE.md` + `docs/decisions/platform-plugin-architecture.md` cập nhật mô tả schema mới, đường migration, và layout `services/<bin>/<version>/` + thứ tự resolution.
+- `docs/ai/CLAUDE.md` + `docs/decisions/architecture/platform-plugin-architecture.md` cập nhật mô tả schema mới, đường migration, và layout `services/<bin>/<version>/` + thứ tự resolution.
 - Không thay đổi `ALLOWED_SERVICES`/`bundle.externalBin`/`prepare-service-sidecars.mjs` trong phạm vi này.
 
 ### Task breakdown

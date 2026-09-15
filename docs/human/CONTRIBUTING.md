@@ -89,7 +89,7 @@ Anything credential-shaped (tokens, seeds, passwords) belongs in `sdk.secrets` /
 plugin namespace, always pass `usePluginState(..., { legacyKey: 'devtool:old:key' })`
 or the user's saved data is silently lost.
 
-Full reference: [`docs/decisions/platform-plugin-architecture.md`](../decisions/platform-plugin-architecture.md).
+Full reference: [`docs/decisions/architecture/platform-plugin-architecture.md`](../decisions/architecture/platform-plugin-architecture.md).
 
 ---
 

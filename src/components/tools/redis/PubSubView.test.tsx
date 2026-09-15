@@ -5,7 +5,7 @@ import type { RedisConnection } from './types';
 
 /**
  * `PubSubView` no longer builds a `Channel<PubSubMessage>` itself (Phase 2,
- * Bước 4/5 — see docs/decisions/platform-plugin-architecture.md) — it hands
+ * Bước 4/5 — see docs/decisions/architecture/platform-plugin-architecture.md) — it hands
  * an `onMessage` callback straight to `redisApi.pubsubSubscribe`, and stores
  * the returned `{ stop() }` object in a ref instead of a raw subscription id
  * string. These tests mock `useRedisApi` (the one seam this view goes

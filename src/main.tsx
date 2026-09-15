@@ -14,7 +14,7 @@ import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
 // Tác giả plugin cấu hình build của mình coi `react`/`react-dom`/
 // `react/jsx-runtime` là "external", trỏ ba module đó về đây thay vì tự
 // bundle — xem hướng dẫn tác giả plugin trong
-// docs/decisions/platform-plugin-architecture.md.
+// docs/decisions/architecture/platform-plugin-architecture.md.
 declare global {
   interface Window {
     __DEVTOOL_VENDOR__: {

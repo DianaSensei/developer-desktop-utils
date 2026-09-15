@@ -1,5 +1,5 @@
 // Plugin dịch vụ (tier B) cho Container Manager — Bước 1 của Phase 2 (xem
-// docs/decisions/platform-plugin-architecture.md, mục "Ba tier" và "Cách ly
+// docs/decisions/architecture/platform-plugin-architecture.md, mục "Ba tier" và "Cách ly
 // dữ liệu"). Port từ src-tauri/src/container_tool.rs, giữ nguyên HÌNH DẠNG dữ
 // liệu (JSON camelCase, struct `ContainerConnection`) nhưng KHÔNG đụng file
 // đó — nó vẫn chạy production (Tier A) song song cho tới Bước 4/5 cắt hẳn,

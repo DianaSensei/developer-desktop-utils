@@ -5,7 +5,7 @@ import { createRabbitApi, type ConsumedMessage, type PublishArgs, type RpcCallAr
 /**
  * `createRabbitApi` is the ONE seam every RabbitMQ view/hook/store goes
  * through to talk to the sidecar (`devtool-svc-rabbit`) — see the "điểm
- * thắt" note in `docs/decisions/platform-plugin-architecture.md`. These
+ * thắt" note in `docs/decisions/architecture/platform-plugin-architecture.md`. These
  * tests mock `sdk.service.call`/`sdk.service.stream` directly (the
  * platform's own `service.test.ts` already covers permission-checking/audit
  * inside those), so they only need to assert this file maps each RabbitApi

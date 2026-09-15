@@ -278,7 +278,7 @@
   `@tauri-apps/plugin-http` xác nhận `danger: DangerousSettings` đã tồn tại sẵn (không cần đoán
   hay thêm Tauri command mới); `curl.ts`'s `tokenize()` đọc trực tiếp để xác nhận nó chỉ xử lý
   `\`/`'`/`"`, không có nhánh nào xử lý `^`.
-- Kết quả: Đã thêm (xem `docs/decisions/transport-error-hints.md` để biết đầy đủ lý do thiết kế):
+- Kết quả: Đã thêm (xem `docs/decisions/architecture/transport-error-hints.md` để biết đầy đủ lý do thiết kế):
   `RequestSettings.verifyTls` (setting mới, mặc định `true`, nối vào `danger` option có sẵn của
   plugin-http) + `looksLikeCertError`/`looksLikeRedirectLoop` (heuristic trong `ResponsePanel.tsx`,
   cùng khuôn với `looksLikeCorsRejection` đã có) + `looksLikeCmdFormat`/`hasSessionCredentials`

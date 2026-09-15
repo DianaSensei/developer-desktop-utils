@@ -247,17 +247,13 @@ import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 
 Every tool is a **plugin**: one folder, one manifest. The Platform discovers it
 automatically — there is no registration table to update, and no route to wire in
-`App.tsx`. See [`docs/decisions/platform-plugin-architecture.md`](../decisions/platform-plugin-architecture.md)
+`App.tsx`. See [`docs/decisions/architecture/platform-plugin-architecture.md`](../decisions/architecture/platform-plugin-architecture.md)
 for why.
 
 This section covers **compile-time** plugins (`src/plugins/`), always bundled into
-the app. A plugin (JS bundle) or a native sidecar service (Tier B binary) can also be
-**installed at runtime from a URL** — see "Cài đặt plugin từ bên ngoài" and "Tier B" in
-the same ADR for the manifest format (`kind: "plugin" | "service"`), the integrity/CSP
-mechanics, the `services/<bin>/<version>/` on-disk layout, and the vendor-globals
-contract a plugin author's build must follow (`src/platform/installer.ts`,
-`src-tauri/src/artifact_installer.rs` — renamed from `plugin_installer.rs` when the
-service branch was added).
+the app. For the full plugin-authoring reference (manifest fields, SDK, Tier B
+sidecars, and installing a plugin/sidecar at runtime from a URL instead of
+compiling it in), see **[`docs/plugin-sdk/`](../plugin-sdk/README.md)**.
 
 ### Step 1: Create the tool component
 
@@ -334,81 +330,29 @@ Tools listed in `toolGuides.tsx` get a hand-written help section shown by the `?
 button in the app header. Any tool not listed falls back to a generic guide built
 from its description. Add a named export matching the tool id (camelCase the id).
 
-### Permissions
+### Permissions and the SDK — full reference lives in `docs/plugin-sdk/`
 
-Declare every Platform channel the tool touches. Today these are a **declaration**
-surfaced in Settings → Plugins and recorded in the audit log, not a sandbox — a
-plugin runs in the app's own realm. Two rules are enforced at load time:
+The permission table, validation rules, and the entire `sdk.*` surface
+(`storage`, `secrets`, `clipboard`, `files`, `http`, `native`, `service`,
+`openExternal`, `env`) are documented once, kept in sync with the source, in
+**[`docs/plugin-sdk/02-manifest.md`](../plugin-sdk/02-manifest.md)** and
+**[`docs/plugin-sdk/03-sdk-reference.md`](../plugin-sdk/03-sdk-reference.md)**
+— read those instead of duplicating them here. That doc set is written for
+anyone authoring a plugin (compile-time or installed from a URL); this file
+only adds what's specific to a **compile-time** tool living in this repo:
 
-- `native` MUST come with a `commands` allowlist (prefix match: `'redis_'` covers
-  every `redis_*` command). Native without an allowlist is unlimited access to all
-  ~130 registered Tauri commands.
-- `commands` without `native` is rejected too.
-- `http` and `hosts` must come together. Patterns are `example.com`,
-  `*.example.com` (itself + subdomains) or `*`. Half-wildcards (`*abc.com`,
-  `a.*.com`) are rejected — they match wider than people expect. `*` is legal but
-  must be written out: a tool that really can call anywhere deserves a visible line
-  in its manifest, not a silent default. Note the Tauri capability layer cannot
-  express this — capabilities are per-webview and every plugin shares one, so the
-  app-wide grant stays broad and the per-plugin limit lives in the SDK.
-- `service` and the `service` descriptor must come together, and `service.methods`
-  must be non-empty — an unbounded sidecar is unbounded access. `service.bin` is the
-  bare binary name (no extension, no target triple); the binary is only ever spawned
-  if Rust's own `ALLOWED_SERVICES` list in `src-tauri/src/service_host.rs` contains it,
-  because the manifest is read by the webview and so cannot be the thing that decides
-  which process runs.
-
-| Permission | Channel it unlocks |
-|---|---|
-| `storage` | `sdk.storage.*` — namespaced `devtool:<id>:`, synchronous |
-| `secrets` | `sdk.secrets.*` — the **separate** encrypted vault, async. Use for anything credential-shaped (tokens, seeds, passwords), never `storage` |
-| `clipboard:read` / `clipboard:write` | `sdk.clipboard.readText/readImage` · `writeText/writeImage` (split on purpose) |
-| `files:read` / `files:write` | `sdk.files.pickOpen/readText/readBytes` · `pickSave/writeText/writeBytes` (split for the same reason: importing a file must not imply overwriting one) |
-| `open-url` | `sdk.openExternal(url)` — hand a URL to the user's browser |
-| `http` | `sdk.http.fetch` — outbound network, restricted to `hosts` |
-| `native` | `sdk.native.invoke` (within `commands`), `sdk.native.channel` (streaming), `sdk.native.listen` (Rust events) |
-| `service` | `sdk.service.call` — the plugin's own sidecar process (tier B), methods within `service.methods` |
-
-`sdk.env` (`isTauri`, `isMac`, `modKey`) needs no permission — it says nothing
-`navigator.userAgent` doesn't already.
-
-**Platform services that are React-shaped** live next to the SDK and import from the
-same door, because a hook cannot be a property of a plain object:
-
-| Hook | What it gives you |
-|---|---|
-| `usePluginState(sdk, key, initial, opts?)` | the Platform's `usePersistentState`: same behaviour, namespaced key, `storage` permission checked. **Pass `opts.legacyKey`** when converting an existing tool — historical prefixes rarely match the plugin id (`devtool:redis:*` vs id `redis-client`), and skipping it silently throws away the user's saved state |
-| `usePluginConfig()` | the app's tunables (read-only — users own them, plugins don't) |
-| `useLiveConnection(sdk, connected)` | the sidebar's live dot. Id comes from the SDK, not a hand-typed string. Deliberately does **not** clear on unmount: the connection lives in Rust, so the dot must survive navigating away |
-| `usePluginMcpBridgeActive(sdk)` | whether this component should mount its own MCP bridge — folds in "is an MCP tool", "tool switch on", and "background bridge off" (mounting both double-registers) |
-
-### Using the SDK from inside a plugin
-
-```tsx
-import { usePluginSdk, useSecretState } from '@/platform';
-
-const sdk = usePluginSdk();          // the SDK of THIS plugin — id is implicit
-sdk.storage.set('draft', value);     // → devtool:<id>:draft
-await sdk.http.fetch(url);           // throws unless 'http' is declared
-
-// Credentials go in the vault, never in storage. `ready` is not optional:
-// rendering an empty state before the async read lands looks like data loss,
-// and writing before it lands *is* data loss.
-const [accounts, setAccounts, ready] = useSecretState<Account[]>(sdk, 'accounts', []);
-```
-
-**Never put a credential in `sdk.storage` / `usePersistentState`.** That keyspace is
-loaded whole into a synchronous in-memory cache at boot and any module can read any
-key from it. See `src/platform/secrets.ts` and the ADR for the full reasoning; add a
-row to `MIGRATIONS` there when moving an existing key into the vault.
-
-Every tool now runs on the SDK: no plugin code reaches `@tauri-apps/*` directly
-(`guard.test.ts` keeps that at zero), and only two shared-store reads remain — both
-one-time migrations of keys that predate the namespace. `usePluginSdk()` only works inside a component the
-Platform mounted — shared components take the SDK as a prop. For plugin code that
-deliberately mounts outside its own route (e.g. `ApiClientRuntimeProvider`, mounted
-in `App.tsx` so the MCP bridge answers while another tool is on screen), use
-`usePluginSdkFor('<plugin-id>')`.
+- `usePluginSdk()` only works inside a component the Platform mounted —
+  shared components take the SDK as a prop. For plugin code that
+  deliberately mounts outside its own route (e.g. `ApiClientRuntimeProvider`,
+  mounted in `App.tsx` so the MCP bridge answers while another tool is on
+  screen), use `usePluginSdkFor('<plugin-id>')`.
+- Every tool in THIS repo already runs on the SDK: no plugin code reaches
+  `@tauri-apps/*` directly (`guard.test.ts` keeps that at zero), and only two
+  shared-store reads remain — both one-time migrations of keys that predate
+  the namespace.
+- **Never put a credential in `sdk.storage` / `usePersistentState`.** See
+  `src/platform/secrets.ts` for the full reasoning; add a row to
+  `MIGRATIONS` there when moving an existing key into the vault.
 
 ### Checks that will fail you
 
@@ -953,7 +897,7 @@ git push origin main --tags
 
 ### API Client — Runner (`RunnerDialog.tsx`, `runnerStats.ts`, `runnerFlow.ts`, `runnerExport.ts`, `datafile.ts`)
 
-Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per row. **Built to handle ~100k rows**, which constrains how the results may be stored — read [decisions/runner-large-data-runs.md](../decisions/runner-large-data-runs.md) before touching this dialog.
+Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per row. **Built to handle ~100k rows**, which constrains how the results may be stored — read [decisions/architecture/runner-large-data-runs.md](../decisions/architecture/runner-large-data-runs.md) before touching this dialog.
 
 - **Never put the run history in React state.** Records live in `recordsRef` (append-only, read once at export) plus `byIterRef: Map<iter, RunRecord[]>` for O(1) access to the iteration on screen. Stats are folded O(1) per record into `accRef` (`fold`/`toStats` in `runnerStats.ts`). A `tick` state bumped on a 120 ms throttle (`scheduleFlush`/`flushNow`) is the *only* thing that triggers re-render. Re-introducing `setRecords([...prev, r])` or `summarize(records)` in a `useMemo` makes a 100k-row run O(n²) — that was the original bug.
 - **Built-in HTTP 2xx assertion:** the `Require HTTP 2xx` option (default **on**) injects `httpOkTest(...)` at the front of every execution's `tests` — including into the `ExecResult` copy kept for the detail view — so a non-2xx fails like a scripted assertion without anyone writing one. `isOk` itself stays lenient (200–399) on purpose: "only 2xx counts" is the assertion's job, so turning the option off restores the older meaning. Separately, `stats.http2xx` counts HTTP success regardless of the option (the "HTTP 2xx" tile, the by-request column, CSV `httpOk`, JSON `http`).
@@ -965,7 +909,7 @@ Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per
 
 ### API Client — Name/Value tables (`KeyValueEditor.tsx`)
 
-Shared by query params, headers, url-encoded bodies and environment variables. Three things are easy to break here — see [decisions/keyvalue-resolved-column.md](../decisions/keyvalue-resolved-column.md):
+Shared by query params, headers, url-encoded bodies and environment variables. Three things are easy to break here — see [decisions/ui/keyvalue-resolved-column.md](../decisions/ui/keyvalue-resolved-column.md):
 
 - **Resolved column**: read-only preview of what a row's `{{tokens}}` are worth now (`previewVars` in `vars.ts`, pure + tested). The cell and the show/hide rule live in `ResolvedValue.tsx` and are shared by all three request-pane tables — `KeyValueEditor`, `MultipartEditor` (form-data, which is `{{var}}`-substituted on send and so takes `vars` too) and `RequestPanel`'s path-params table; don't re-implement it in a fourth. Shown only when a table has at least one token, decided over *all* its rows so filtering can't yank the column out mid-type. Unresolved tokens render red and named — they get sent literally. Secrets need no handling here: the `vars` map the UI receives already masks Vault/secret entries at the source (`varMap` in `ApiClient.tsx`).
 - **Zebra `bg-bg-2/20` + hover `bg-bg-2/40`** — DataTable's own pair. Don't set hover equal to the stripe (it was `/20` before the stripe existed); hovering a striped row would then show nothing.
@@ -1011,7 +955,7 @@ Key files:
 
 **Connect/Disconnect flow:** a connection must be explicitly connected (`handleConnect` in `RabbitClient.tsx`) — runs AMQP test + management test (if not AMQP-only), then sets `connectedConnId` in `localStorage` (`devtool:rabbit:connectedConnId`). Connecting elsewhere stops the previous connection's consumers (`consumerStore.stopForConn`). The right panel shows `DisconnectedPanel` until connected.
 
-**Connection profiles:** stored in `rabbit-connections.json` in the app data directory (Rust `fs::write`). Fields: `id`, `name`, `host`, `port` (management), `amqpPort`, `vhost`, `username`, `password`, `useTls`, `caPem`, `clientIdentityPkcs12` (base64), `clientIdentityPassword`, `heartbeat`, `connectionName`, `amqpOnly`, `extraHosts` (for HA failover). All fields with `#[serde(default)]` for backward compatibility. `null_as_default` custom deserializer handles legacy `null` values for `Vec<String>` fields.
+**Connection profiles:** stored in `connections.json` inside the sidecar's own data directory (`<app_data>/service-data/devtool-svc-rabbit/` — set via `DEVTOOL_SERVICE_DATA_DIR`, see [`docs/plugin-sdk/04-tier-b-sidecars.md`](../plugin-sdk/04-tier-b-sidecars.md)). Fields: `id`, `name`, `host`, `port` (management), `amqpPort`, `vhost`, `username`, `password`, `useTls`, `caPem`, `clientIdentityPkcs12` (base64), `clientIdentityPassword`, `heartbeat`, `connectionName`, `amqpOnly`, `extraHosts` (for HA failover). All fields with `#[serde(default)]` for backward compatibility. `null_as_default` custom deserializer handles legacy `null` values for `Vec<String>` fields.
 
 **Multiple hosts (HA failover):** `extraHosts: string[]` — additional `"host"` or `"host:port"` entries. `connect_amqp` iterates all endpoints (primary + extras) with a 15 s per-endpoint timeout, returning on first success. `ConnectionForm.tsx` exposes an **Addresses** field (comma-separated `host:port`).
 
@@ -1023,15 +967,15 @@ Key files:
 
 **RPC view:** `RpcView.tsx` — module-scope `rpcDraft` (in-memory) seeds and mirrors all fields. Payload uses `CodeEditor` (JSON/plain Segmented + Format button). Reply uses `ResponseViewer` (JSON/plain, auto-detect from contentType). Exchange/routing-key/queue comboboxes use `useRecentMatches` + `RecentSuggestions`.
 
-**Live consumers:** `consumerStore.ts` (module-scope `Map`) manages `rabbit_consume_start` / `rabbit_consume_stop` Rust AMQP consumers. `stopForConn(connId)` stops all consumers for a connection; `stopAll()` on unmount.
+**Live consumers:** `consumerStore.ts` (module-scope `Map`) manages consumers via `rabbitApi.consumeStart`/the returned subscription's `.stop()` (Tier B — `sdk.service.stream('consume-start', …)`/`'consume-stop'` under the hood, not a direct Tauri command). `stopForConn(connId)` stops all consumers for a connection; `stopAll()` on unmount.
 
-**Rust backend (`src-tauri/src/rabbit.rs`):**
-- `rabbit_amqp_test` — connect test (iterates all endpoints)
-- `rabbit_publish` — full AMQP publish with properties + mandatory + publisher confirms → `PublishOutcome`
-- `rabbit_consume_start` / `rabbit_consume_stop` — live consumer via `ConsumerRegistry` (Mutex<HashMap<String, Arc<Notify>>>); prefetch-bounded; peek (non-destructive) or consume (ack)
-- `rabbit_rpc_call` — one-shot request/response via `amq.rabbitmq.reply-to`
-- `rabbit_amqp_queues_info` / `rabbit_amqp_exchanges_info` — passive declare for AMQP-only mode
-- `rabbit_amqp_declare_queue` / `rabbit_amqp_declare_exchange` / `rabbit_amqp_bind_queue` — topology management over AMQP
+**Sidecar backend (`src-tauri/src/bin/devtool-svc-rabbit.rs`, Tier B):** RabbitMQ runs entirely as a sidecar process (`rabbit.rs`, the old compiled-in Tauri commands, is deleted) — see [`docs/plugin-sdk/04-tier-b-sidecars.md`](../plugin-sdk/04-tier-b-sidecars.md) for the general Tier B model. JSONL methods (called via `sdk.service.call`/`stream`, never `sdk.native.invoke`):
+- `amqp-test` — connect test (iterates all endpoints)
+- `publish` — full AMQP publish with properties + mandatory + publisher confirms → `PublishOutcome`
+- `consume-start` (stream) / `consume-stop` — live consumer via an internal `Notify`-keyed registry; prefetch-bounded; peek (non-destructive) or consume (ack). Mid-stream failures are sent as an app-level `{"type":"error"}` event, never a protocol-level error — see the ADR's Tier B section for why.
+- `rpc-call` — one-shot request/response via `amq.rabbitmq.reply-to`
+- `amqp-queues-info` / `amqp-exchanges-info` — passive declare for AMQP-only mode
+- `amqp-declare-queue` / `amqp-declare-exchange` / `amqp-bind-queue` — topology management over AMQP
 
 **Live indicator:** `useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected])` in `RabbitClient.tsx`.
 
@@ -1052,7 +996,7 @@ Key files:
 - `mcpRuntimeContext.tsx` / `mcpBridge.ts` — MCP connection-management tools
 - `ConnectionForm.tsx` — AMQP-first form: Addresses (comma-separated multi-host), optional management API toggle, Advanced (vhost), Paste URI collapsible
 - `api.ts` — `rabbitMgmt` HTTP client + `QUEUE_LIST_QUERY` / `EXCHANGE_LIST_QUERY` constants
-- `types.ts` — `RabbitConnection`, `rabbitApi` Tauri invoke wrappers
+- `types.ts` — `RabbitConnection`, `createRabbitApi(sdk)` — the one seam, all `sdk.service.call`/`stream`
 - `consumerStore.ts` — module-scope consumer registry + `stopForConn(id)`
 - `inputHistoryStore.ts` — per-connection exchange/routingKey/queue history
 - `knownNamesStore.ts` — AMQP-only typed queue/exchange names per connection
@@ -1070,13 +1014,13 @@ Key files:
 
 **Key detail view (`KeyDetailView.tsx`):** type-aware editors for string/hash/list/set/zset/stream, plus TTL and `MEMORY USAGE` rows. Mutations (`onSetField`, `onPush`, `onSet`, …) apply an **optimistic local update** to the already-fetched `KeyValue` instead of re-running `load()` (a full HSCAN/SSCAN/ZSCAN/XRANGE) after every single field edit — important for a large collection, where a full reload per keystroke-blur would be slow. Errors from a mutation are caught by a shared `runMutation` wrapper and shown inline rather than becoming an unhandled promise rejection. The zset editor's optimistic update deliberately does **not** re-sort by score: the initial fetch comes from `ZSCAN`, whose order isn't guaranteed sorted, so sorting only on edit would make the list visibly reorder itself in a way a plain Refresh wouldn't reproduce.
 
-**Pub/Sub (`PubSubView.tsx`):** subscribes to channels/patterns via `redis_pubsub_subscribe`, which streams `PubSubMessage`s back over a Tauri `Channel` (same `new Channel<T>()` + `onmessage` pattern as `consumerStore.ts`/Kafka's consumer). Unlike Kafka/RabbitMQ's live consumers, there's no module-scope store keeping the subscription alive across view switches — it's owned by the component and stopped on unmount (a `useRef`-held subscription id, cleaned up in a `useEffect` cleanup). This is a deliberate scope call: Pub/Sub here is an ad-hoc debug helper, not a persistent monitor.
+**Pub/Sub (`PubSubView.tsx`):** subscribes to channels/patterns via `redisApi.pubsubSubscribe` (Tier B — `sdk.service.stream('pubsub-subscribe', …)` under the hood; resolves only once the sidecar confirms `{"type":"subscribed"}` or rejects on `{"type":"error"}`, never resolves optimistically). Unlike Kafka/RabbitMQ's live consumers, there's no module-scope store keeping the subscription alive across view switches — it's owned by the component and stopped on unmount (`.stop()` on the returned subscription, held in a `useRef`, cleaned up in a `useEffect` cleanup). This is a deliberate scope call: Pub/Sub here is an ad-hoc debug helper, not a persistent monitor.
 
 **Admin (`AdminView.tsx`):** three `Tabs`-switched sub-views — Clients (`CLIENT LIST`, parsed into loose `key=value` rows so the table survives field-set differences across Redis versions), Slow Log (`SLOWLOG GET`), Config (`CONFIG GET` search + inline edit, `CONFIG SET` gated behind `MathConfirmDialog` since it changes live server behavior for every connected client, not just this one).
 
 **CLI Console (`CliConsole.tsx`):** autocomplete dropdown over `commands.ts` (~90 common commands) while typing the command name, a syntax hint once it's fully typed, and multi-line paste — pasting text containing `\n` runs each line as a sequential command instead of being silently dropped by the single-line `<input>`.
 
-**Rust backend (`src-tauri/src/redis_tool.rs`):** every command opens its own fresh `MultiplexedConnection` (SELECTs `db`, runs, drops) — **except Pub/Sub**, which is inherently long-lived and gets a registry-tracked background task (`PubSubRegistry`, `Mutex<HashMap<String, Arc<Notify>>>`, same shape as `rabbit.rs`'s `ConsumerRegistry`). `connect()` wraps connection establishment in a 6s `tokio::time::timeout` so an unreachable host fails fast instead of hanging the UI. Key browsing always goes through SCAN/HSCAN/SSCAN/ZSCAN/XRANGE (capped at `VALUE_CAP` = 2000), never KEYS/SMEMBERS/HGETALL unbounded. `redis_exec` runs an arbitrary command (args passed as separate RESP protocol arguments, never string-concatenated) and backs both the CLI Console and every type editor's mutate actions, so there's one generic command surface instead of one bespoke Tauri command per Redis command.
+**Sidecar backend (`src-tauri/src/bin/devtool-svc-redis.rs`, Tier B):** Redis runs entirely as a sidecar process (`redis_tool.rs`, the old compiled-in Tauri commands, is deleted) — see [`docs/plugin-sdk/04-tier-b-sidecars.md`](../plugin-sdk/04-tier-b-sidecars.md) for the general Tier B model. Every JSONL method opens its own fresh `MultiplexedConnection` (SELECTs `db`, runs, drops) — **except `pubsub-subscribe`**, which is inherently long-lived and gets a registry-tracked background task (an internal `Notify`-keyed map, same shape as the RabbitMQ sidecar's consumer registry), stopped by the separate `unsubscribe` method (the host's `service_stream_stop` only unregisters its own waiter — it does not signal the sidecar). `connect()` wraps connection establishment in a 6s `tokio::time::timeout` so an unreachable host fails fast instead of hanging the UI. Key browsing always goes through SCAN/HSCAN/SSCAN/ZSCAN/XRANGE (capped at `VALUE_CAP` = 2000), never KEYS/SMEMBERS/HGETALL unbounded. `exec` runs an arbitrary command (args passed as separate RESP protocol arguments, never string-concatenated) and backs both the CLI Console and every type editor's mutate actions, so there's one generic method surface instead of one bespoke method per Redis command.
 
 **Live indicator:** `useEffect(() => { liveConnections.set('redis-client', isConnected); }, [isConnected])` in `RedisClient.tsx`.
 
@@ -1094,7 +1038,7 @@ Key files:
 - `useRedisState.ts` — navigation state (`RedisView`) + persisted `connectedConnId`/`db`
 - `mcpRuntimeContext.tsx` / `mcpBridge.ts` — MCP connection-management tools
 - `ConnectionForm.tsx` — host/port/username/password/TLS form
-- `types.ts` — `RedisConnection`, `KeyValue`, `PubSubMessage`, `redisApi` Tauri invoke wrappers
+- `types.ts` — `RedisConnection`, `KeyValue`, `PubSubMessage`, `createRedisApi(sdk)` — the one seam, all `sdk.service.call`/`stream`
 - `useRedisData.ts` — stale-while-revalidate data cache (Overview, Admin tabs)
 - `format.ts` — `INFO` output parsing, byte/uptime/number formatting
 - `commands.ts` — CLI Console autocomplete reference list
