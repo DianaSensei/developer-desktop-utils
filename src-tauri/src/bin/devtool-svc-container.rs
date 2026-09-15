@@ -23,18 +23,29 @@
 // Bước 1 (xong): config CRUD, detect-sockets, test-connection, list/inspect,
 // lifecycle (start/stop/restart/pause/unpause/remove) — mọi method ở đây là
 // MỘT-LẦN (đi qua `handle()`), không có method stream nào trong bước này.
-// Bước 2 (đây): container details/resources, image/volume/network CRUD +
+// Bước 2 (xong): container details/resources, image/volume/network CRUD +
 // details, prune, system info/df — vẫn toàn method MỘT-LẦN, port nguyên vẹn
-// logic từ `container_tool.rs` (không đoán lại). Bước 3 (sau): log/stats
-// streaming (sẽ cần giao thức STREAM giống `pubsub-subscribe` của
-// devtool-svc-redis — lỗi giữa chừng của method stream phải tự mã hoá vào
-// giao thức ứng dụng của chính sidecar này, KHÔNG dùng `Response::err`, xem
-// comment `send_pubsub_error` ở devtool-svc-redis.rs để hiểu lý do).
+// logic từ `container_tool.rs` (không đoán lại).
+// Bước 3 (đây): log/stats streaming, port nguyên vẹn từ
+// `container_tool::container_logs_start`/`container_stats_start`/
+// `container_stats_snapshot` (xem đó, dòng ~627-833). `logs-start` và
+// `stats-start` là method STREAM (giao thức giống hệt `pubsub-subscribe` của
+// devtool-svc-redis.rs: sự kiện đầu `{"type":"subscribed","subscriptionId":…}`,
+// lỗi giữa chừng đi qua như một SỰ KIỆN STREAM bình thường KHÔNG BAO GIỜ dùng
+// `Response::err`, xem comment `send_pubsub_error` ở đó để hiểu đầy đủ lý do
+// — sidecar này port lại thành `send_stream_error`). `logs-unsubscribe`/
+// `stats-unsubscribe` là method một-lần mirror `unsubscribe` của Redis.
+// `stats-snapshot` là method một-lần (KHÔNG phải stream) trả một lần
+// `HashMap<containerId, StatsFrame>`. Registry nội bộ DÙNG CHUNG cho cả logs
+// và stats (một `HashMap<subscriptionId, Notify>` duy nhất) — xem comment đầy
+// đủ ở mục "Logs/Stats streaming" bên dưới cho lý do không tách hai registry.
 
 use bollard::Docker;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -80,6 +91,13 @@ impl Response {
     }
     fn err(id: String, message: impl Into<String>) -> Self {
         Self { protocol: SERVICE_PROTOCOL, id, result: None, error: Some(message.into()), stream: false, done: false }
+    }
+    /// Một-trong-nhiều sự kiện của cùng một lời gọi stream (`logs-start`/
+    /// `stats-start`) — không bao giờ đi kèm `done: true` ở hai method này
+    /// (một tail log/stats sống tới khi bị dừng tay bằng `*-unsubscribe`),
+    /// giống hệt `Response::event` của devtool-svc-redis.rs.
+    fn event(id: String, result: serde_json::Value) -> Self {
+        Self { protocol: SERVICE_PROTOCOL, id, result: Some(result), error: None, stream: true, done: false }
     }
 }
 
@@ -613,6 +631,286 @@ async fn volume_sizes(_config: &ContainerConnection) -> Result<HashMap<String, i
     Ok(HashMap::new())
 }
 
+// ── Logs/Stats streaming — Bước 3 ────────────────────────────────────────────
+//
+// QUYẾT ĐỊNH THIẾT KẾ: MỘT registry nội bộ dùng chung cho cả logs-start VÀ
+// stats-start (khác với việc có thể tách hai registry riêng). Lý do: registry
+// chỉ cần biết "notify để dừng task nền của subscriptionId này" — nó không
+// cần biết subscriptionId đó là một tail log hay một stats stream để làm việc
+// đó. subscriptionId do chính sidecar sinh (`Uuid::new_v4()`) nên không có
+// khả năng đụng độ giữa hai loại dù dùng chung một map. Tách hai registry chỉ
+// thêm một tham số "loại nào" phải xuyên suốt mọi lời gọi mà không mua thêm
+// tính đúng đắn nào — `unsubscribe`/`unregister` không bao giờ cần phân biệt.
+// `logs-unsubscribe` và `stats-unsubscribe` vẫn là HAI method riêng ở tầng
+// giao thức (mirror rõ ràng phía client — một tool có thể dừng đúng loại nó
+// đang giữ mà không cần biết registry dùng chung phía dưới), nhưng cả hai gọi
+// xuống CÙNG một hàm `unregister_stream`.
+
+#[derive(Default)]
+struct StreamRegistry {
+    inner: Mutex<HashMap<String, Arc<tokio::sync::Notify>>>,
+}
+
+static STREAM_REGISTRY: OnceLock<StreamRegistry> = OnceLock::new();
+
+fn stream_registry() -> &'static StreamRegistry {
+    STREAM_REGISTRY.get_or_init(StreamRegistry::default)
+}
+
+fn register_stream(id: &str) -> Arc<tokio::sync::Notify> {
+    let notify = Arc::new(tokio::sync::Notify::new());
+    stream_registry().inner.lock().unwrap().insert(id.to_string(), notify.clone());
+    notify
+}
+
+fn unregister_stream(id: &str) {
+    stream_registry().inner.lock().unwrap().remove(id);
+}
+
+/// Dừng một subscription đang chạy (logs hoặc stats, registry dùng chung) —
+/// gọi từ cả `logs-unsubscribe` và `stats-unsubscribe` trong `handle()`. No-op
+/// (vẫn `Ok`) nếu `subscriptionId` không tồn tại, giống `unsubscribe` của
+/// devtool-svc-redis.rs — không có gì để dừng không phải là lỗi.
+fn unsubscribe_stream(subscription_id: &str) {
+    if let Some(notify) = stream_registry().inner.lock().unwrap().remove(subscription_id) {
+        notify.notify_one();
+    }
+}
+
+/// Gửi lỗi giữa chừng của một method STREAM như một SỰ KIỆN STREAM bình
+/// thường (`Response::event`, `error: None` ở tầng khung), KHÔNG BAO GIỜ dùng
+/// `Response::err` — `service_host.rs::dispatch()` âm thầm bỏ qua một
+/// `ServiceResponse` mang `error: Some(...)` cho một `Waiter::Stream` (xem
+/// comment đầy đủ ở `send_pubsub_error`, devtool-svc-redis.rs). Payload
+/// `{"type":"error","message":...}` đi qua đúng con đường event mà phía client
+/// đang đợi (`"subscribed"` hoặc `"error"`).
+fn send_stream_error(tx: &mpsc::UnboundedSender<Response>, id: &str, message: impl Into<String>) {
+    let _ = tx.send(Response::event(id.to_string(), serde_json::json!({ "type": "error", "message": message.into() })));
+}
+
+/// Port nguyên vẹn từ `container_tool::LogLine` — xem đó cho giải thích đầy
+/// đủ. `stream`/`message`/`timestamp` giữ nguyên tên field.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogLine {
+    pub stream: String, // "stdout" | "stderr"
+    pub message: String,
+    pub timestamp: Option<String>,
+}
+
+/// Port nguyên vẹn từ `container_tool::split_timestamp` — xem đó cho chú
+/// thích đầy đủ.
+fn split_timestamp(line: &str) -> (Option<String>, &str) {
+    let Some((head, rest)) = line.split_once(' ') else { return (None, line) };
+    let looks_like_ts = head.len() >= 20
+        && head.as_bytes()[4] == b'-'
+        && head.contains('T')
+        && head[..4].chars().all(|c| c.is_ascii_digit());
+    if looks_like_ts {
+        (Some(head.to_string()), rest)
+    } else {
+        (None, line)
+    }
+}
+
+/// Port nguyên vẹn từ `container_tool::StatsFrame`/`calc_cpu_percent`/
+/// `stats_to_frame` — xem đó cho chú thích đầy đủ.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsFrame {
+    pub cpu_percent: f64,
+    pub mem_usage_bytes: u64,
+    pub mem_limit_bytes: u64,
+    pub net_rx_bytes: u64,
+    pub net_tx_bytes: u64,
+}
+
+fn calc_cpu_percent(stats: &bollard::models::ContainerStatsResponse) -> f64 {
+    let cpu = stats.cpu_stats.as_ref();
+    let precpu = stats.precpu_stats.as_ref();
+    let (Some(cpu), Some(precpu)) = (cpu, precpu) else { return 0.0 };
+    let cpu_total = cpu.cpu_usage.as_ref().and_then(|u| u.total_usage).unwrap_or(0) as f64;
+    let precpu_total = precpu.cpu_usage.as_ref().and_then(|u| u.total_usage).unwrap_or(0) as f64;
+    let system = cpu.system_cpu_usage.unwrap_or(0) as f64;
+    let presystem = precpu.system_cpu_usage.unwrap_or(0) as f64;
+    let cpu_delta = cpu_total - precpu_total;
+    let system_delta = system - presystem;
+    let online_cpus = cpu.online_cpus.filter(|&n| n > 0).unwrap_or(1) as f64;
+    if system_delta > 0.0 && cpu_delta > 0.0 {
+        (cpu_delta / system_delta) * online_cpus * 100.0
+    } else {
+        0.0
+    }
+}
+
+fn stats_to_frame(stats: &bollard::models::ContainerStatsResponse) -> StatsFrame {
+    let mem_usage = stats.memory_stats.as_ref().and_then(|m| m.usage).unwrap_or(0);
+    let mem_limit = stats.memory_stats.as_ref().and_then(|m| m.limit).unwrap_or(0);
+    let (rx, tx) = stats
+        .networks
+        .as_ref()
+        .map(|nets| {
+            nets.values().fold((0u64, 0u64), |(rx, tx), n| {
+                (rx + n.rx_bytes.unwrap_or(0), tx + n.tx_bytes.unwrap_or(0))
+            })
+        })
+        .unwrap_or((0, 0));
+    StatsFrame {
+        cpu_percent: calc_cpu_percent(stats),
+        mem_usage_bytes: mem_usage,
+        mem_limit_bytes: mem_limit,
+        net_rx_bytes: rx,
+        net_tx_bytes: tx,
+    }
+}
+
+const SNAPSHOT_TIMEOUT_SECS: u64 = 10;
+
+/// `logs-start` là method STREAM — mirror `handle_pubsub_subscribe` của
+/// devtool-svc-redis.rs: mở `docker.logs(..., follow: true)` thật, đăng ký
+/// vào registry nội bộ, gửi sự kiện đầu `{"type":"subscribed",
+/// "subscriptionId":...}` rồi spawn một task nền phát mỗi dòng log nhận được
+/// như `{"type":"line", stream, message, timestamp}` — task tự dừng khi
+/// `notify` báo (từ `logs-unsubscribe`) hoặc khi `tx.send` bắt đầu lỗi (writer
+/// task đã thoát vì host đóng ống).
+async fn handle_logs_start(id: String, params: serde_json::Value, tx: mpsc::UnboundedSender<Response>) {
+    let config_id: String = match param(&params, "configId") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let container_id: String = match param(&params, "containerId") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let tail: String = opt_param(&params, "tail").unwrap_or_else(|| "all".to_string());
+    let since: i32 = opt_param(&params, "since").unwrap_or(0);
+    let until: i32 = opt_param(&params, "until").unwrap_or(0);
+    let timestamps: bool = opt_param(&params, "timestamps").unwrap_or(false);
+
+    let config = match find_config(&config_id) {
+        Ok(c) => c,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let docker = match connect(&config) {
+        Ok(d) => d,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+
+    let opts = bollard::query_parameters::LogsOptions {
+        follow: true,
+        stdout: true,
+        stderr: true,
+        tail,
+        since,
+        until,
+        timestamps,
+    };
+
+    let subscription_id = Uuid::new_v4().to_string();
+    let notify = register_stream(&subscription_id);
+
+    if tx
+        .send(Response::event(id.clone(), serde_json::json!({ "type": "subscribed", "subscriptionId": subscription_id })))
+        .is_err()
+    {
+        unregister_stream(&subscription_id);
+        return;
+    }
+
+    tokio::spawn(async move {
+        let mut stream = docker.logs(&container_id, Some(opts));
+        loop {
+            tokio::select! {
+                _ = notify.notified() => break,
+                next = stream.next() => match next {
+                    Some(Ok(out)) => {
+                        let (stream_name, bytes) = match out {
+                            bollard::container::LogOutput::StdOut { message } => ("stdout", message),
+                            bollard::container::LogOutput::StdErr { message } => ("stderr", message),
+                            bollard::container::LogOutput::Console { message } => ("stdout", message),
+                            bollard::container::LogOutput::StdIn { message } => ("stdin", message),
+                        };
+                        let raw = String::from_utf8_lossy(&bytes).to_string();
+                        let raw = raw.strip_suffix('\n').unwrap_or(&raw);
+                        let (ts, message) = if timestamps { split_timestamp(raw) } else { (None, raw) };
+                        let line = LogLine { stream: stream_name.to_string(), message: message.to_string(), timestamp: ts };
+                        let mut event = serde_json::to_value(&line).unwrap();
+                        event.as_object_mut().unwrap().insert("type".to_string(), serde_json::json!("line"));
+                        if tx.send(Response::event(id.clone(), event)).is_err() {
+                            break; // writer task đã thoát — không còn ai đọc
+                        }
+                    }
+                    Some(Err(e)) => {
+                        send_stream_error(&tx, &id, e.to_string());
+                        break;
+                    }
+                    None => break,
+                }
+            }
+        }
+        unregister_stream(&subscription_id);
+    });
+}
+
+/// `stats-start` là method STREAM — cùng cấu trúc `handle_logs_start`, mở
+/// `docker.stats(..., stream: true)` và phát mỗi frame như `{"type":"frame",
+/// ...StatsFrame}`.
+async fn handle_stats_start(id: String, params: serde_json::Value, tx: mpsc::UnboundedSender<Response>) {
+    let config_id: String = match param(&params, "configId") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let container_id: String = match param(&params, "containerId") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let config = match find_config(&config_id) {
+        Ok(c) => c,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let docker = match connect(&config) {
+        Ok(d) => d,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+
+    let opts = bollard::query_parameters::StatsOptions { stream: true, ..Default::default() };
+
+    let subscription_id = Uuid::new_v4().to_string();
+    let notify = register_stream(&subscription_id);
+
+    if tx
+        .send(Response::event(id.clone(), serde_json::json!({ "type": "subscribed", "subscriptionId": subscription_id })))
+        .is_err()
+    {
+        unregister_stream(&subscription_id);
+        return;
+    }
+
+    tokio::spawn(async move {
+        let mut stream = docker.stats(&container_id, Some(opts));
+        loop {
+            tokio::select! {
+                _ = notify.notified() => break,
+                next = stream.next() => match next {
+                    Some(Ok(stats)) => {
+                        let mut event = serde_json::to_value(stats_to_frame(&stats)).unwrap();
+                        event.as_object_mut().unwrap().insert("type".to_string(), serde_json::json!("frame"));
+                        if tx.send(Response::event(id.clone(), event)).is_err() {
+                            break;
+                        }
+                    }
+                    Some(Err(e)) => {
+                        send_stream_error(&tx, &id, e.to_string());
+                        break;
+                    }
+                    None => break,
+                }
+            }
+        }
+        unregister_stream(&subscription_id);
+    });
+}
+
 // ── Method dispatch ───────────────────────────────────────────────────────────
 
 async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -823,7 +1121,6 @@ async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::V
                 tag: Some(tag),
                 ..Default::default()
             };
-            use futures_util::StreamExt;
             let mut stream = docker.create_image(Some(opts), None, None);
             while let Some(item) = stream.next().await {
                 item.map_err(|e| e.to_string())?;
@@ -1079,6 +1376,52 @@ async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::V
             Ok(serde_json::to_value(df).unwrap())
         }
 
+        // ── Bước 3: logs/stats — phần một-lần của method dispatch ────────────
+        // `logs-start`/`stats-start` (stream) KHÔNG đi qua đây — xem
+        // `handle_logs_start`/`handle_stats_start`.
+
+        "logs-unsubscribe" => {
+            let subscription_id: String = param(&params, "subscriptionId")?;
+            unsubscribe_stream(&subscription_id);
+            Ok(serde_json::Value::Null)
+        }
+
+        "stats-unsubscribe" => {
+            let subscription_id: String = param(&params, "subscriptionId")?;
+            unsubscribe_stream(&subscription_id);
+            Ok(serde_json::Value::Null)
+        }
+
+        // Port nguyên vẹn từ `container_tool::container_stats_snapshot` — MỘT
+        // lần lấy mẫu CPU/memory/network cho một danh sách container (bảng
+        // containers cần một giá trị mỗi vài giây, không phải một stream sống
+        // riêng cho mỗi hàng). Container lỗi/timeout đơn giản vắng mặt khỏi map.
+        "stats-snapshot" => {
+            let config_id: String = param(&params, "configId")?;
+            let container_ids: Vec<String> = param(&params, "containerIds")?;
+            let config = find_config(&config_id)?;
+            let docker = connect(&config)?;
+            let futures = container_ids.into_iter().map(|cid| {
+                let docker = docker.clone();
+                async move {
+                    let opts = bollard::query_parameters::StatsOptions { stream: false, one_shot: false };
+                    let frame = tokio::time::timeout(
+                        std::time::Duration::from_secs(SNAPSHOT_TIMEOUT_SECS),
+                        docker.stats(&cid, Some(opts)).next(),
+                    )
+                    .await
+                    .ok()
+                    .flatten()
+                    .and_then(|r| r.ok())
+                    .map(|stats| stats_to_frame(&stats));
+                    frame.map(|f| (cid, f))
+                }
+            });
+            let frames = futures_util::future::join_all(futures).await;
+            let map: HashMap<String, StatsFrame> = frames.into_iter().flatten().collect();
+            Ok(serde_json::to_value(map).unwrap())
+        }
+
         other => Err(format!("method không hỗ trợ: \"{other}\"")),
     }
 }
@@ -1127,6 +1470,18 @@ async fn handle_line(line: &str, tx: &mpsc::UnboundedSender<Response>) {
     };
     if req.protocol != SERVICE_PROTOCOL {
         let _ = tx.send(Response::err(req.id, format!("lệch protocol: client {}, sidecar {SERVICE_PROTOCOL}", req.protocol)));
+        return;
+    }
+    // `logs-start`/`stats-start` KHÔNG đi qua `handle()` (một-lần) — chúng cần
+    // giữ `tx` để phát nhiều sự kiện theo thời gian, xem
+    // `handle_logs_start`/`handle_stats_start`. Mọi method khác vẫn đi qua
+    // đường một-lần cũ, không đổi hành vi.
+    if req.method == "logs-start" {
+        handle_logs_start(req.id, req.params, tx.clone()).await;
+        return;
+    }
+    if req.method == "stats-start" {
+        handle_stats_start(req.id, req.params, tx.clone()).await;
         return;
     }
     let response = match handle(&req.method, req.params).await {
@@ -1408,5 +1763,177 @@ mod tests {
         let line = serde_json::json!({ "protocol": SERVICE_PROTOCOL, "id": "9", "method": "khong-ton-tai", "params": null }).to_string();
         let response = call_handle_line(&line).await;
         assert!(response.error.unwrap().contains("khong-ton-tai"));
+    }
+
+    // ── Bước 3: đường lỗi cho logs-start/stats-start (stream), *-unsubscribe,
+    //    stats-snapshot — mirror phong cách `pubsub_subscribe_*` của
+    //    devtool-svc-redis.rs. Xác nhận thật với daemon thật (nhận sự kiện
+    //    "subscribed"/"line"/"frame") làm riêng qua script JSONL tạm, không
+    //    phải trong test suite này.
+
+    #[tokio::test]
+    async fn logs_start_thieu_config_id_bao_loi_qua_stream_event_khong_phai_response_err() {
+        // Lỗi phải đi qua như một SỰ KIỆN STREAM (`response.error.is_none()`,
+        // `stream: true`, payload `{"type":"error",...}`) — KHÔNG phải
+        // `response.error: Some(...)` ở tầng khung tin nhắn, vì
+        // `service_host.rs::dispatch()` âm thầm bỏ qua lỗi tầng khung cho một
+        // `Waiter::Stream` (xem comment ở `send_stream_error`).
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_logs_start("req-1".to_string(), serde_json::json!({ "containerId": "x" }), tx).await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert_eq!(response.id, "req-1");
+        assert!(response.error.is_none(), "lỗi phải đi qua stream event, không phải response.error");
+        assert!(response.stream);
+        let event = response.result.expect("sự kiện lỗi phải mang result");
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn logs_start_thieu_container_id_bao_loi_ro_rang() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_logs_start("req-2".to_string(), serde_json::json!({ "configId": "x" }), tx).await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        let event = response.result.unwrap();
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("containerId"));
+    }
+
+    #[tokio::test]
+    async fn logs_start_config_khong_ton_tai_bao_loi_ro_rang() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_logs_start(
+            "req-3".to_string(),
+            serde_json::json!({ "configId": "khong-ton-tai-chac-chan", "containerId": "x" }),
+            tx,
+        )
+        .await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        assert_eq!(response.result.unwrap()["type"], "error");
+    }
+
+    #[tokio::test]
+    async fn stats_start_thieu_config_id_bao_loi_qua_stream_event() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_stats_start("req-4".to_string(), serde_json::json!({ "containerId": "x" }), tx).await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        assert!(response.stream);
+        let event = response.result.unwrap();
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn stats_start_thieu_container_id_bao_loi_ro_rang() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_stats_start("req-5".to_string(), serde_json::json!({ "configId": "x" }), tx).await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        assert!(response.result.unwrap()["message"].as_str().unwrap().contains("containerId"));
+    }
+
+    #[tokio::test]
+    async fn stats_start_config_khong_ton_tai_bao_loi_ro_rang() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_stats_start(
+            "req-6".to_string(),
+            serde_json::json!({ "configId": "khong-ton-tai-chac-chan", "containerId": "x" }),
+            tx,
+        )
+        .await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        assert_eq!(response.result.unwrap()["type"], "error");
+    }
+
+    #[tokio::test]
+    async fn logs_unsubscribe_id_khong_ton_tai_van_ok_khong_panic() {
+        let res = handle("logs-unsubscribe", serde_json::json!({ "subscriptionId": "khong-ton-tai" })).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn logs_unsubscribe_thao_dung_entry_khoi_registry_va_bao_notify() {
+        let id = "logs-sub-test-1".to_string();
+        let notify = register_stream(&id);
+        let notified = tokio::spawn({
+            let notify = notify.clone();
+            async move { notify.notified().await }
+        });
+        let res = handle("logs-unsubscribe", serde_json::json!({ "subscriptionId": id })).await;
+        assert!(res.is_ok());
+        tokio::time::timeout(std::time::Duration::from_secs(2), notified).await.expect("notify phải bắn").unwrap();
+        assert!(!stream_registry().inner.lock().unwrap().contains_key(&id));
+    }
+
+    #[tokio::test]
+    async fn stats_unsubscribe_id_khong_ton_tai_van_ok_khong_panic() {
+        let res = handle("stats-unsubscribe", serde_json::json!({ "subscriptionId": "khong-ton-tai" })).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn stats_unsubscribe_thao_dung_entry_khoi_registry_va_bao_notify() {
+        let id = "stats-sub-test-1".to_string();
+        let notify = register_stream(&id);
+        let notified = tokio::spawn({
+            let notify = notify.clone();
+            async move { notify.notified().await }
+        });
+        let res = handle("stats-unsubscribe", serde_json::json!({ "subscriptionId": id })).await;
+        assert!(res.is_ok());
+        tokio::time::timeout(std::time::Duration::from_secs(2), notified).await.expect("notify phải bắn").unwrap();
+        assert!(!stream_registry().inner.lock().unwrap().contains_key(&id));
+    }
+
+    #[tokio::test]
+    async fn logs_unsubscribe_thieu_subscription_id_tra_ve_loi_ro_rang() {
+        let res = handle("logs-unsubscribe", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("subscriptionId"));
+    }
+
+    #[tokio::test]
+    async fn stats_unsubscribe_thieu_subscription_id_tra_ve_loi_ro_rang() {
+        let res = handle("stats-unsubscribe", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("subscriptionId"));
+    }
+
+    #[tokio::test]
+    async fn stats_snapshot_thieu_config_id_tra_ve_loi_ro_rang() {
+        let res = handle("stats-snapshot", serde_json::json!({ "containerIds": [] })).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn stats_snapshot_thieu_container_ids_tra_ve_loi_ro_rang() {
+        let res = handle("stats-snapshot", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("containerIds"));
+    }
+
+    #[tokio::test]
+    async fn stats_snapshot_config_khong_ton_tai_tra_ve_loi_ro_rang() {
+        let res = handle(
+            "stats-snapshot",
+            serde_json::json!({ "configId": "khong-ton-tai-chac-chan", "containerIds": ["x"] }),
+        )
+        .await;
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn split_timestamp_tach_dung_dinh_dang_rfc3339() {
+        let (ts, rest) = split_timestamp("2026-08-26T09:41:02.123456789Z hello world");
+        assert_eq!(ts.as_deref(), Some("2026-08-26T09:41:02.123456789Z"));
+        assert_eq!(rest, "hello world");
+    }
+
+    #[test]
+    fn split_timestamp_khong_tach_dong_khong_bat_dau_bang_timestamp() {
+        let (ts, rest) = split_timestamp("hello world");
+        assert_eq!(ts, None);
+        assert_eq!(rest, "hello world");
     }
 }
