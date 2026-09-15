@@ -44,15 +44,15 @@ describe('Settings — Plugins', () => {
 
   it('quyền hiển thị lấy thẳng từ manifest, không phải bảng chép tay', () => {
     const { container } = renderPanel();
-    const kafka = PLUGINS.find((p) => p.id === 'kafka-explorer')!;
+    const apiClient = PLUGINS.find((p) => p.id === 'api-client')!;
     // Khoá theo `data-plugin` thay vì dò cây DOM: nhiều plugin cùng có quyền
     // 'storage', bắt nhầm hàng sẽ khiến test xanh trong khi hàng thật sai.
-    const row = container.querySelector<HTMLElement>('[data-plugin="kafka-explorer"]')!;
+    const row = container.querySelector<HTMLElement>('[data-plugin="api-client"]')!;
     expect(row).toBeTruthy();
-    for (const perm of kafka.permissions) {
+    for (const perm of apiClient.permissions) {
       expect(within(row).getByText(perm), perm).toBeTruthy();
     }
-    expect(within(row).getByText(/mcp_respond/)).toBeTruthy();
+    expect(within(row).getByText(/mcp_/)).toBeTruthy();
   });
 
   it('lời gọi bị từ chối hiện trong nhật ký, kèm quyền còn thiếu', () => {

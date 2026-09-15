@@ -16,9 +16,10 @@ import { TOOL_ROUTES, allTools } from '@/lib/toolRegistry';
  * bỏ plugin về sau thì cập nhật bảng ở đây một cách CÓ CHỦ Ý — đó chính là
  * điểm rà soát ta muốn có.
  *
- * redis-client/rabbit-client/container-manager rời khỏi bảng này (không còn
- * compile-time) khi ba plugin đó chuyển sang developer-desktop-util-plugin —
- * xem docs/decisions/architecture/optional-broker-plugins.md.
+ * redis-client/rabbit-client/container-manager/kafka-explorer rời khỏi bảng
+ * này (không còn compile-time) khi bốn plugin đó chuyển sang
+ * developer-desktop-util-plugin — xem
+ * docs/decisions/architecture/optional-broker-plugins.md.
  */
 
 const PINNED_ORDER = [
@@ -37,7 +38,6 @@ const PINNED_ORDER = [
   "regex",
   "diff",
   "cron-generator",
-  "kafka-explorer",
   "qrcode",
   "color-picker",
   "jwt",
@@ -63,7 +63,6 @@ const PINNED_ROUTES: Record<string, string> = {
   "markdown": "/markdown",
   "deduplicate": "/deduplicate",
   "generator": "/generator",
-  "kafka-explorer": "/kafka-explorer",
   "sql-formatter": "/sql-formatter",
   "task-tracker": "/task-tracker",
   "network": "/network",
@@ -89,7 +88,6 @@ const PINNED_LABELS: Record<string, string> = {
   "markdown": "Markdown",
   "deduplicate": "Deduplicate",
   "generator": "Generator",
-  "kafka-explorer": "Kafka Explorer",
   "sql-formatter": "SQL Formatter",
   "task-tracker": "Time Tracker",
   "network": "Network Tools",
@@ -118,7 +116,6 @@ const PINNED_DEFAULT_ENABLED: Record<string, boolean> = {
   "markdown": false,
   "deduplicate": false,
   "generator": true,
-  "kafka-explorer": false,
   "sql-formatter": false,
   "network": false,
   "lucky-wheel": false,

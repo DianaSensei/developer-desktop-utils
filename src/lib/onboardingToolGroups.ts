@@ -16,7 +16,7 @@ export const ONBOARDING_TOOL_GROUPS: OnboardingToolGroup[] = [
     id: 'api-messaging',
     label: 'API & Messaging',
     icon: Send,
-    toolIds: ['api-client', 'mock-server', 'kafka-explorer'],
+    toolIds: ['api-client', 'mock-server'],
   },
   {
     id: 'data-format',

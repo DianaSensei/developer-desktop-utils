@@ -37,7 +37,6 @@ import { McpManageBridge } from '@/components/McpManageBridge';
 import { McpUtilityBridge } from '@/components/McpUtilityBridge';
 import { ApiClientRuntimeProvider } from '@/components/tools/apiclient/mcpRuntimeContext';
 import { MockServerRuntimeProvider } from '@/components/tools/mockserver/mcpRuntimeContext';
-import { KafkaRuntimeProvider } from '@/components/tools/kafka/mcpRuntimeContext';
 import { ExperimentalGate } from '@/components/ExperimentalGate';
 import { ExperimentalDot, ExperimentalMark } from '@/components/ExperimentalBadge';
 import { Button } from '@/components/ui/button';
@@ -1248,17 +1247,15 @@ function App() {
               <MeetingsProvider>
                 <ApiClientRuntimeProvider>
                   <MockServerRuntimeProvider>
-                    <KafkaRuntimeProvider>
-                      <Router>
-                        <AppContent />
-                        <UpdateDialog />
-                        <OnboardingFlow />
-                        <CommandPalette />
-                        <McpBackgroundBridge />
-                        <McpManageBridge />
-                        <McpUtilityBridge />
-                      </Router>
-                    </KafkaRuntimeProvider>
+                    <Router>
+                      <AppContent />
+                      <UpdateDialog />
+                      <OnboardingFlow />
+                      <CommandPalette />
+                      <McpBackgroundBridge />
+                      <McpManageBridge />
+                      <McpUtilityBridge />
+                    </Router>
                   </MockServerRuntimeProvider>
                 </ApiClientRuntimeProvider>
               </MeetingsProvider>

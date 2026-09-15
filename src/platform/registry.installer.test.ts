@@ -56,7 +56,7 @@ describe('initInstalledPlugins', () => {
     await registry.initInstalledPlugins();
 
     expect(registry.PLUGINS.length).toBe(before);
-    expect(before).toBe(23);
+    expect(before).toBe(22);
   });
 
   it('thêm đúng một plugin hợp lệ vào PLUGINS và PLUGIN_MAP', async () => {

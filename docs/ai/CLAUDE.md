@@ -4,15 +4,20 @@
 
 ## Project Overview
 
-**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, Kafka explorer, API client, mock server, etc.).
+**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, API client, mock server, etc.).
 
-> **Redis/RabbitMQ/Container Manager are no longer compiled into this repo.**
+> **Redis/RabbitMQ/Container Manager/Kafka Explorer are no longer compiled into this repo.**
 > They moved to [`developer-desktop-util-plugin`](https://github.com/DianaSensei/developer-desktop-util-plugin)
 > as optional, install-from-URL plugins (Settings → Extensions) — see
-> `docs/decisions/architecture/platform-plugin-architecture.md`. Sections
+> `docs/decisions/architecture/platform-plugin-architecture.md` and
+> `docs/decisions/architecture/optional-broker-plugins.md`. Sections
 > below that still describe their internals (liveConnections examples,
 > `docs/human/TOOLS.md`, etc.) are describing code that now lives in that
-> repo; the pattern still applies verbatim there.
+> repo; the pattern still applies verbatim there. Each such tool bundles its
+> own MCP tool schema and self-registers with the platform MCP bridge at
+> runtime (see `mcp_bridge.rs`'s `mcp_register_tools`/`mcp_unregister_tools`
+> and `devtool-mcp-server.rs`'s `fetch_registered_tools()`) instead of
+> being hardcoded into `devtool-mcp-server.rs`.
 
 **Key Technologies:**
 - **Frontend**: React 18, TypeScript, Vite 8 (Rolldown bundler)

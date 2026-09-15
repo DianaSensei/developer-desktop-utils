@@ -1,7 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod kafka;
 mod checksum;
 mod dropped;
 mod netinfo;
@@ -78,7 +77,6 @@ fn main() {
             }
         })
         .manage(mockserver::MockState::default())
-        .manage(kafka::KafkaConsumerRegistry::default())
         // Host cho plugin dịch vụ (tier B) — xem service_host.rs.
         .manage(service_host::ServiceRegistry::default())
         .manage(secrets_vault::VaultState::default())
@@ -134,23 +132,6 @@ fn main() {
             artifact_installer::artifact_installer_list,
             artifact_installer::artifact_installer_uninstall,
             artifact_installer::artifact_installer_read_bundle,
-            kafka::kafka_list_configs,
-            kafka::kafka_save_config,
-            kafka::kafka_delete_config,
-            kafka::kafka_test_connection,
-            kafka::kafka_list_topics,
-            kafka::kafka_topic_details,
-            kafka::kafka_topic_consumer_groups,
-            kafka::kafka_create_topic,
-            kafka::kafka_list_groups,
-            kafka::kafka_group_details,
-            kafka::kafka_produce,
-            kafka::kafka_produce_batch,
-            kafka::kafka_fetch_messages,
-            kafka::kafka_delete_topic,
-            kafka::kafka_topic_configs,
-            kafka::kafka_consume_start,
-            kafka::kafka_consume_stop,
             mockserver::mock_start,
             mockserver::mock_stop,
             mockserver::mock_status,

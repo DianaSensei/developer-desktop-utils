@@ -1,6 +1,6 @@
 /**
  * Tailwind CSS safelist for plugins moved out to `developer-desktop-util-plugin`
- * (redis-client, rabbit-client, container-manager — see
+ * (redis-client, rabbit-client, container-manager, kafka-explorer — see
  * docs/decisions/architecture/platform-plugin-architecture.md for why they're
  * no longer compiled into this repo).
  *
@@ -72,4 +72,8 @@ export const EXTERNAL_PLUGIN_CLASSNAMES_SAFELIST = `
   w-24 w-28 w-3 w-3.5 w-32 w-4 w-5 w-8
   w-[110px] w-[3px] w-[5px] w-ctl w-full w-px web-1 whitespace-nowrap
   whitespace-pre-wrap wrapper: yyyy-MM-ddTHH:mm z-10 z-20
+  -mb-px bg-bg-2/15 gap-x-8 grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem] grid-cols-[3rem_minmax(0,1fr)_6.5rem_6.5rem_5.5rem]
+  grid-cols-[auto_1fr_1fr_1fr] group-hover/recent:opacity-100 group-hover:bg-acc/10 group-hover:bg-acc/70 group-hover:opacity-50
+  group/recent hover:bg-bg-2/15 hover:border-l-acc/40 kafka-explorer max-w-[9rem] min-w-[9rem]
+  mt-auto overflow-x-hidden pb-0.5 pl-3.5 pr-4 pt-px space-y-6 text-acc/80
 `;

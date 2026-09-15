@@ -29,7 +29,6 @@ sha2 = "0.11"
 sha1 = "0.11"
 md-5 = "0.11"
 digest = "0.11"
-rskafka = { version = "0.6", features = ["transport-tls"] }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
@@ -76,7 +75,7 @@ custom-protocol = ["tauri/custom-protocol"]
 # Thin LTO + parallel codegen units trade a little binary size/runtime perf
 # for much faster release builds (fat LTO + codegen-units=1 serializes all
 # codegen onto a single thread, which is very slow with heavy async deps
-# like tokio/rskafka/axum/lapin in the dependency tree).
+# like tokio/axum/rmcp in the dependency tree).
 [profile.release]
 opt-level = "z"
 lto = "thin"

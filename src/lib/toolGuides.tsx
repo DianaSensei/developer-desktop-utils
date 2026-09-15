@@ -393,19 +393,6 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     ],
   }),
 
-  'kafka-explorer': makeGuide({
-    use: [
-      'Add a broker (host:port), then pick a topic or consumer group from the tree.',
-      'For a topic: browse Partitions, Messages (with offset/partition filters), Config and Consumers.',
-      'For a group: view committed offsets, lag and member assignments. The ⓘ button lists every API call the tool makes.',
-    ],
-    know: ['Data loads on navigation (no background polling); message fetches cap at 10 MB and group scans at 500.'],
-    caveat: [
-      'Plaintext only — no TLS or SASL authentication.',
-      'Producing messages and resetting offsets affect a REAL cluster, so take care on production brokers.',
-    ],
-  }),
-
   'task-tracker': makeGuide({
     use: [
       <>Add a task (with a project), then Start/Stop the timer (<Key>{mod}</Key>+<Key>↵</Key> toggles); edit entry times inline.</>,

@@ -67,15 +67,15 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 /// cần tới cơ chế này, xem `tests/service_echo.rs`. Chưa có `plugin.ts` nào
 /// khai `service` để gọi tới nó, nên nó không xuất hiện ở bất cứ đâu trong UI.
 ///
-/// `devtool-svc-redis`/`-container`/`-rabbit`: nguồn đã chuyển sang repo
-/// `developer-desktop-util-plugin` (không phải ai cũng cần Redis/Docker/
-/// RabbitMQ) — xem docs/decisions/architecture/optional-broker-plugins.md.
+/// `devtool-svc-redis`/`-container`/`-rabbit`/`-kafka`: nguồn đã chuyển sang
+/// repo `developer-desktop-util-plugin` (không phải ai cũng cần Redis/Docker/
+/// RabbitMQ/Kafka) — xem docs/decisions/architecture/optional-broker-plugins.md.
 /// Tên vẫn ở lại đây có chủ đích: `05-external-install.md` nói rõ "cài qua
 /// URL KHÔNG tự cấp quyền chạy cho một tên bin mới" — cây quyết định "bin nào
 /// được phép chạy" là của TÁC GIẢ lúc build app, không phải của người cài. Bỏ
 /// tên khỏi danh sách này thì việc cài sidecar tương ứng từ URL sẽ luôn bị
 /// allowlist từ chối, vĩnh viễn, không chỉ tới lúc cài xong.
-const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo", "devtool-svc-redis", "devtool-svc-container", "devtool-svc-rabbit"];
+const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo", "devtool-svc-redis", "devtool-svc-container", "devtool-svc-rabbit", "devtool-svc-kafka"];
 
 /// Tập con của `ALLOWED_SERVICES` được đóng gói SẴN cùng app (có dòng tương
 /// ứng trong `bundle.externalBin` của tauri.conf.json và trong danh sách của

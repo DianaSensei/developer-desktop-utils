@@ -43,7 +43,7 @@ describe('bản đồ nhóm', () => {
 describe('buildNavEntries', () => {
   it('gộp mọi tool thành đúng số mục, không mất tool nào', () => {
     const entries = buildNavEntries({ enabledIds: ALL });
-    expect(entries).toHaveLength(15);
+    expect(entries).toHaveLength(14);
 
     const flat = entries.flatMap((e) => e.tools.map((t) => t.id));
     expect(new Set(flat).size).toBe(TOOL_DEFS.length);

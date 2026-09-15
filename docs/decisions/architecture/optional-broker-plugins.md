@@ -1,4 +1,4 @@
-# Redis/RabbitMQ/Container Manager moved to a separate plugin repo
+# Redis/RabbitMQ/Container Manager/Kafka Explorer moved to a separate plugin repo
 
 ## Bối cảnh
 
@@ -11,19 +11,22 @@ Docker/Podman — ba dependency đó (crate `redis`, `lapin`, `bollard` cùng c�
 phụ thuộc của chúng) kéo dài thời gian build và tăng kích thước app cho
 100% người dùng để phục vụ một nhóm nhỏ hơn.
 
+Kafka Explorer ban đầu KHÔNG chuyển theo đợt đầu: logic Kafka nằm thẳng
+trong `src-tauri/src/kafka.rs` như native command (không phải sidecar riêng
+như ba tool kia), nên tách nó đòi viết lại thành sidecar JSONL trước
+(`devtool-svc-kafka`) — cùng khuôn với `devtool-svc-redis` (đăng ký luồng
+qua `ConsumerRegistry`/`Notify` cho live-consume). Việc viết lại đó đã xong
+ở một phiên sau; Kafka Explorer giờ theo đúng khuôn ba tool kia.
+
 ## Quyết định
 
-Chuyển UI + sidecar của cả ba sang repo riêng,
+Chuyển UI + sidecar của cả bốn (`redis-client`, `rabbit-client`,
+`container-manager`, `kafka-explorer`) sang repo riêng,
 [`developer-desktop-util-plugin`](https://github.com/DianaSensei/developer-desktop-util-plugin),
 cài qua URL (Settings → Extensions) thay vì compile-time. Cơ chế cài-từ-URL
 đã tồn tại từ trước (`docs/plugin-sdk/05-external-install.md`) — quyết định
 này không thêm cơ chế mới, chỉ là lần đầu dùng nó cho một plugin ĐÃ CÓ giá trị
 người dùng thật (trước đó chỉ có `devtool-svc-echo`, một ví dụ tối giản).
-
-Kafka Explorer KHÔNG chuyển theo: logic Kafka nằm thẳng trong
-`src-tauri/src/kafka.rs` như native command (không phải sidecar riêng như ba
-tool kia), nên tách nó đòi một cuộc viết lại Rust lớn hơn hẳn (dựng sidecar
-mới nói JSONL). Để sau, theo dõi riêng nếu cần.
 
 ## Hai lỗ hổng phải vá để việc chuyển này hoạt động thật
 
@@ -67,11 +70,18 @@ Redis/Rabbit/Container cần `sdk.storage`, `sdk.service` (gọi sidecar),
 
 ## Hệ quả chấp nhận được
 
-- **MCP**: `McpBackgroundBridge.tsx` không còn giữ runtime nền cho ba tool
+- **MCP**: `McpBackgroundBridge.tsx` không còn giữ runtime nền cho bốn tool
   này (một plugin cài từ URL chỉ mount khi route của nó đang mở — không có
   compile-time runtime context nào để share lúc tool không ở trên màn hình).
-  `devtool-mcp-server.rs` vẫn khai đủ tool MCP cho cả ba — lời gọi chỉ không
-  được trả lời cho tới khi người dùng cài plugin và mở đúng route của nó.
+  `devtool-mcp-server.rs` không còn khai tool MCP tĩnh cho bất cứ plugin nào
+  (kể cả các tool compile-in như API Client/Mock Server) — mỗi plugin tự
+  mang schema MCP của nó (`mcpTools.ts` trong chính plugin) và tự đăng ký
+  qua `mcp_register_tools`/`mcp_unregister_tools` (`mcp_bridge.rs`) khi
+  bridge của nó mount, tự huỷ đăng ký khi unmount. `devtool-mcp-server.rs`
+  đọc danh sách tool đã đăng ký qua `GET /tools` trên MỖI lần `list_tools()`
+  (không cache lúc khởi động process) — nên với bốn tool này, lời gọi MCP
+  chỉ xuất hiện sau khi người dùng cài plugin VÀ mở đúng route của nó (lúc
+  đó bridge mới mount và đăng ký).
 - **Tailwind**: các class utility riêng của ba tool này được giữ lại trong
   CSS đã build qua `src/styles/externalPluginClassnamesSafelist.ts` (một
   file text thuần, không import ở đâu) — nếu không, Tailwind JIT sẽ âm thầm
