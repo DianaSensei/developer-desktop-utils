@@ -204,9 +204,30 @@ Cùng lý do khi sidecar trả JSON không hợp lệ.
 Không thêm `tauri-plugin-shell`: sidecar resolve như binary cạnh file thực thi, đúng
 quy ước `mcp_bridge::mcp_sidecar_path` — không phải mở thêm quyền chạy tiến trình nào.
 
-**Chưa có đường end-to-end thật.** Test Rust lái đường I/O thật bằng tiến trình sẵn
-có của OS (`cat` làm sidecar dội lại, `sh` làm sidecar treo và chết) thay vì ship một
-binary giả; nhưng một sidecar thật chỉ xuất hiện cùng plugin dịch vụ đầu tiên.
+**Đường end-to-end đã có bằng chứng thật, với `devtool-svc-echo`.** Đây là plugin
+dịch vụ tối giản (`ping`/`echo`, không có giá trị người dùng) — tồn tại thuần để
+chứng minh cơ chế: build ra binary thật, đóng gói qua `externalBin`, nằm trong
+`ALLOWED_SERVICES`, và một integration test thật (`src-tauri/tests/service_echo.rs`)
+spawn đúng binary đã build (qua `CARGO_BIN_EXE_devtool-svc-echo`, biến Cargo chỉ có ở
+integration test chứ không có ở unit test bên trong bin crate) rồi nói chuyện qua khung
+JSONL — không còn là mô phỏng bằng `cat`/`sh` như test host-side. Test host-side (đối
+xử với sidecar giả bằng `cat`/`sh`) vẫn giữ nguyên vì chúng nhắm đúng phần khác: logic
+điều phối phía host (allowlist, spawn-một-lần, timeout giết tiến trình).
+
+Việc dựng plugin này lộ ra một **bug bootstrap thật** trong script build: `tauri-build`
+kiểm mọi mục `externalBin` đã tồn tại trên đĩa mỗi khi `build.rs` chạy lại (tức mỗi khi
+`tauri.conf.json` đổi) — kể cả với `cargo build`/`cargo test` thường, không riêng
+`tauri build`. Lần đầu thêm một sidecar mới, biên dịch nó (bản thân là một `cargo build`
+của cùng package) thất bại trước khi kịp tạo ra binary mà chính bước đó đang cố tạo. Sửa
+trong `scripts/sidecar.mjs`: tạo một placeholder rỗng tại đúng đường dẫn nếu chưa có,
+trước khi build — kiểm tra tồn tại chỉ cần một file, không xác thực nó là binary thật,
+nên placeholder qua được; binary thật ghi đè lên ngay sau đó. Không có bước này thì
+`prepare-service-sidecars.mjs` không chạy nổi trên một checkout sạch — nó chỉ tình cờ
+chạy được trên máy phát triển ban đầu vì đã có sẵn một file placeholder cũ, gitignore,
+để lại từ một phiên trước.
+
+Chưa có: một `plugin.ts` thật khai `service` để gọi tới sidecar này qua UI — vẫn đúng như
+đã ghi, vì đây là plugin ví dụ chứ không phải tính năng.
 
 ## Rào chắn ranh giới (`guard.test.ts` + `baseline.json`)
 
@@ -291,7 +312,8 @@ nhưng tool đọc lại bị chặn và hiện ra rỗng — trông y như mấ
 
 ## Việc còn lại
 
-1. **Plugin dịch vụ tier B đầu tiên** — kèm binary trong `externalBin` +
-   `ALLOWED_SERVICES`; đường end-to-end chỉ chạy thật khi có nó.
+1. ~~Plugin dịch vụ tier B đầu tiên.~~ **Đã có** — `devtool-svc-echo`, xem "Tier B" ở
+   trên. Còn lại: một plugin thật (không phải ví dụ) khai `service` và có UI thật sự
+   gọi tới sidecar của nó.
 2. **Phân phối plugin từ repo riêng** — xem "Không làm" ở trên.
 3. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.

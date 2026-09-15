@@ -41,12 +41,17 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Binary sidecar được phép chạy. Mỗi mục PHẢI có một dòng tương ứng trong
 /// `bundle.externalBin` của tauri.conf.json, nếu không nó sẽ không được đóng
-/// gói cùng app và mọi lời gọi sẽ báo "không tìm thấy".
+/// gói cùng app và mọi lời gọi sẽ báo "không tìm thấy". Cũng phải có mặt trong
+/// danh sách của `scripts/prepare-service-sidecars.mjs` — hai chỗ khai tay
+/// song song vì Rust và Node không chia sẻ được hằng số qua ranh giới ngôn
+/// ngữ; `allowlist_khop_voi_external_bin` dưới đây khoá vế phía tauri.conf.json.
 ///
-/// Rỗng là đúng ở thời điểm này: chưa plugin nào dùng tier B. Host vì vậy
-/// fail-closed — mọi lời gọi đều bị từ chối — thay vì mở sẵn một đường chạy
-/// tiến trình cho thứ chưa tồn tại.
-const ALLOWED_SERVICES: &[&str] = &[];
+/// `devtool-svc-echo` là plugin ví dụ tối giản (chỉ `ping`/`echo`, không có
+/// giá trị người dùng) — nó tồn tại thuần để chứng minh đường end-to-end thật
+/// của tier B trước khi có plugin thật cần tới cơ chế này, xem
+/// `tests/service_echo.rs`. Chưa có `plugin.ts` nào khai `service` để gọi
+/// tới nó, nên nó không xuất hiện ở bất cứ đâu trong UI.
+const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo"];
 
 #[derive(Debug, Deserialize)]
 pub struct ServiceRequest {
@@ -117,8 +122,9 @@ fn sidecar_path(bin: &str) -> Result<std::path::PathBuf, String> {
     let path = dir.join(name);
     if !path.exists() {
         return Err(format!(
-            "Không thấy sidecar \"{bin}\" cạnh app — nhiều khả năng đây là bản dev (`tauri dev`). \
-             Khi phát triển, chạy `cargo run --bin {bin}` và trỏ host vào đó."
+            "Không thấy sidecar \"{bin}\" cạnh app — nhiều khả năng đây là bản dev (`tauri dev`), \
+             vốn chỉ build bin mặc định (`devtool`) chứ không build các sidecar. \
+             Chạy `cargo build --bin {bin}` để nó nằm cạnh trong target/debug rồi thử lại."
         ));
     }
     Ok(path)
