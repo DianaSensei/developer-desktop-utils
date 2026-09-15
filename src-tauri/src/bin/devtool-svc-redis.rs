@@ -16,13 +16,39 @@
 //     tất cả ghi ra CÙNG MỘT ống qua một mpsc channel (một task riêng sở hữu
 //     stdout, tránh hai response ghi xen kẽ làm hỏng ranh giới dòng).
 //
-// Bước 1 chỉ port: CRUD cấu hình kết nối, connect/test, overview (INFO+DBSIZE),
-// và duyệt key (scan/summary/get/set/ttl/delete/rename/memory-usage). CLI
-// exec, admin (client-list/slowlog/config get-set), và Pub/Sub streaming là
-// Bước 2/3 — vẫn nằm ở redis_tool.rs cho tới lúc đó.
+// Bước 1 (xong): CRUD cấu hình kết nối, connect/test, overview (INFO+DBSIZE),
+// và duyệt key (scan/summary/get/set/ttl/delete/rename/memory-usage).
+//
+// Bước 2 (đây): CLI exec (`exec`) + admin (`client-list`/`slowlog`/
+// `config-get`/`config-set`) — method một-lần, đi qua `handle()` như mọi
+// method Bước 1.
+//
+// Bước 3 (đây): Pub/Sub qua giao thức STREAM. Method `pubsub-subscribe` KHÔNG
+// đi qua `handle()` (một-lần) — nó mở một Pub/Sub connection thật rồi phát
+// NHIỀU sự kiện `Response::event(id, …)` cho CÙNG một `request.id`, không bao
+// giờ tự kết bằng `done: true` (một subscription sống tới khi bị dừng tay).
+// Sự kiện đầu tiên mang `{ "type": "subscribed", "subscriptionId": … }` — một
+// id NỘI BỘ do chính sidecar sinh ra, khác `request.id` của khung JSONL (một
+// `request.id` ứng với một lần gọi `pubsub-subscribe`; dừng phải đến từ một
+// request KHÁC, method `unsubscribe`, mang đúng `subscriptionId` đó). Registry
+// nội bộ (`REGISTRY`, `Arc<Mutex<HashMap<subscriptionId, Notify>>>`) theo dõi
+// mọi subscription đang chạy để `unsubscribe` có thể dừng đúng cái cần dừng —
+// nhiều subscription có thể chạy đồng thời trên cùng sidecar.
+//
+// `service_stream_stop` (host) gỡ waiter phía HOST, không truyền tín hiệu
+// xuống sidecar (xem service_host.rs) — nên task nền của một subscription chỉ
+// tự dừng khi chính nó phát hiện KHÔNG CÒN AI ĐỌC PHẢN HỒI: task nền gửi mọi
+// sự kiện qua kênh `tx` dùng chung với writer task sở hữu stdout; writer task
+// thoát vòng lặp ngay khi một lần ghi ra stdout thất bại (host đã đóng ống —
+// ví dụ bị kill) và khi đó DROP `rx`, nên `tx.send(...)` của task nền bắt đầu
+// trả lỗi — đó là tín hiệu THẬT duy nhất để tự dừng, không phải một "unsubscribe"
+// nào gọi tới. Gọi `unsubscribe` là cách CHỦ ĐỘNG dừng sạch trước khi đóng app.
 
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock};
 
+use futures_util::StreamExt;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use redis::Value;
 use serde::{Deserialize, Serialize};
@@ -71,6 +97,13 @@ impl Response {
     }
     fn err(id: String, message: impl Into<String>) -> Self {
         Self { protocol: SERVICE_PROTOCOL, id, result: None, error: Some(message.into()), stream: false, done: false }
+    }
+    /// Một-trong-nhiều sự kiện của cùng một lời gọi stream (Pub/Sub) — không
+    /// bao giờ đi kèm `done: true` ở sidecar này, khác `tick-stream` của
+    /// devtool-svc-echo (stream hữu hạn). Dừng là việc của registry + method
+    /// `unsubscribe`, không phải một dòng `done` tự nhiên.
+    fn event(id: String, result: serde_json::Value) -> Self {
+        Self { protocol: SERVICE_PROTOCOL, id, result: Some(result), error: None, stream: true, done: false }
     }
 }
 
@@ -215,14 +248,84 @@ fn value_to_i64(v: Value) -> Option<i64> {
     }
 }
 
-fn value_to_status_string(v: Value) -> String {
+// ── Generic command execution (CLI console + type-editor mutations) — Bước 2 ─
+
+/// Port nguyên vẹn từ `redis_tool.rs`'s `RedisReply`/`value_to_reply` — xem
+/// đó cho chú thích đầy đủ (binary payload decode lossy có chủ ý, `Value` là
+/// `#[non_exhaustive]` nên nhánh `_` bắt các biến thể RESP3 mới thay vì vỡ
+/// build khi crate `redis` nâng version).
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", content = "data")]
+enum RedisReply {
+    Nil,
+    Int(i64),
+    Bulk(String),
+    Status(String),
+    Array(Vec<RedisReply>),
+    Error(String),
+}
+
+fn value_to_reply(v: Value) -> RedisReply {
     match v {
-        Value::Nil => "none".to_string(),
-        Value::SimpleString(s) => s,
-        Value::Okay => "OK".to_string(),
-        Value::BulkString(b) => String::from_utf8_lossy(&b).into_owned(),
+        Value::Nil => RedisReply::Nil,
+        Value::Int(i) => RedisReply::Int(i),
+        Value::BulkString(b) => RedisReply::Bulk(String::from_utf8_lossy(&b).into_owned()),
+        Value::SimpleString(s) => RedisReply::Status(s),
+        Value::Okay => RedisReply::Status("OK".to_string()),
+        Value::Double(d) => RedisReply::Bulk(d.to_string()),
+        Value::Boolean(b) => RedisReply::Int(if b { 1 } else { 0 }),
+        Value::VerbatimString { text, .. } => RedisReply::Bulk(text),
+        Value::Array(items) | Value::Set(items) => RedisReply::Array(items.into_iter().map(value_to_reply).collect()),
+        Value::Map(pairs) => RedisReply::Array(
+            pairs.into_iter().flat_map(|(k, v)| [value_to_reply(k), value_to_reply(v)]).collect(),
+        ),
+        Value::Push { data, .. } => RedisReply::Array(data.into_iter().map(value_to_reply).collect()),
+        Value::BigNumber(n) => RedisReply::Bulk(format!("{n:?}")),
+        Value::Attribute { data, .. } => value_to_reply(*data),
+        Value::ServerError(e) => RedisReply::Error(e.to_string()),
+        _ => RedisReply::Bulk(String::new()),
+    }
+}
+
+fn value_to_status_string(v: Value) -> String {
+    match value_to_reply(v) {
+        RedisReply::Status(s) | RedisReply::Bulk(s) => s,
+        RedisReply::Nil => "none".to_string(),
         other => format!("{other:?}"),
     }
+}
+
+// ── Server admin — Bước 2 ────────────────────────────────────────────────────
+
+/// Port nguyên vẹn từ `redis_tool.rs` — một dòng `SLOWLOG GET` là một mảng
+/// lồng `[id, timestamp, duration_micros, [cmd_args…], client_addr, client_name]`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SlowLogEntry {
+    id: i64,
+    timestamp: i64,
+    duration_micros: i64,
+    command: Vec<String>,
+    client_addr: Option<String>,
+    client_name: Option<String>,
+}
+
+// ── Pub/Sub — Bước 3 ─────────────────────────────────────────────────────────
+//
+// Registry nội bộ theo dõi các subscription đang chạy, tách biệt khỏi
+// `Waiters` phía service_host.rs (đó là registry của HOST theo `request.id`
+// của MỘT LẦN GỌI; đây là registry của SIDECAR theo `subscriptionId` NỘI BỘ,
+// sống xuyên suốt nhiều lần gọi — một `unsubscribe` request khác hẳn request
+// đã gọi `pubsub-subscribe` mới dừng đúng subscription này).
+#[derive(Default)]
+struct PubSubRegistry {
+    inner: Mutex<HashMap<String, Arc<tokio::sync::Notify>>>,
+}
+
+static REGISTRY: OnceLock<PubSubRegistry> = OnceLock::new();
+
+fn registry() -> &'static PubSubRegistry {
+    REGISTRY.get_or_init(PubSubRegistry::default)
 }
 
 // ── Params helpers ───────────────────────────────────────────────────────────
@@ -509,8 +612,219 @@ async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::V
             }
         }
 
+        // ── Bước 2: CLI exec + admin ─────────────────────────────────────────
+
+        "exec" => {
+            let config_id: String = param(&params, "configId")?;
+            let db: u8 = param(&params, "db")?;
+            let args: Vec<String> = param(&params, "args")?;
+            if args.is_empty() {
+                return Err("Empty command".to_string());
+            }
+            let config = find_config(&config_id)?;
+            let mut con = connect(&config, db).await?;
+            let mut cmd = redis::cmd(&args[0]);
+            for a in &args[1..] {
+                cmd.arg(a);
+            }
+            let value: Value = cmd.query_async(&mut con).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::to_value(value_to_reply(value)).unwrap())
+        }
+
+        "client-list" => {
+            let config_id: String = param(&params, "configId")?;
+            let config = find_config(&config_id)?;
+            let mut con = connect(&config, 0).await?;
+            let raw: String = redis::cmd("CLIENT").arg("LIST").query_async(&mut con).await.map_err(|e| e.to_string())?;
+            let mut out = Vec::new();
+            for line in raw.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                let mut row = BTreeMap::new();
+                for kv in line.split_whitespace() {
+                    if let Some((k, v)) = kv.split_once('=') {
+                        row.insert(k.to_string(), v.to_string());
+                    }
+                }
+                out.push(row);
+            }
+            let out: Vec<BTreeMap<String, String>> = out;
+            Ok(serde_json::to_value(out).unwrap())
+        }
+
+        "slowlog" => {
+            let config_id: String = param(&params, "configId")?;
+            let count: i64 = param(&params, "count")?;
+            let config = find_config(&config_id)?;
+            let mut con = connect(&config, 0).await?;
+            let value: Value = redis::cmd("SLOWLOG").arg("GET").arg(count).query_async(&mut con).await.map_err(|e| e.to_string())?;
+            let Value::Array(entries) = value else { return Ok(serde_json::to_value(Vec::<SlowLogEntry>::new()).unwrap()) };
+            let mut out = Vec::with_capacity(entries.len());
+            for entry in entries {
+                let Value::Array(fields) = entry else { continue };
+                let id = fields.first().cloned().and_then(value_to_i64).unwrap_or(0);
+                let timestamp = fields.get(1).cloned().and_then(value_to_i64).unwrap_or(0);
+                let duration_micros = fields.get(2).cloned().and_then(value_to_i64).unwrap_or(0);
+                let command = match fields.get(3) {
+                    Some(Value::Array(args)) => args.iter().cloned().map(value_to_status_string).collect(),
+                    _ => Vec::new(),
+                };
+                let client_addr = fields.get(4).cloned().map(value_to_status_string).filter(|s| !s.is_empty());
+                let client_name = fields.get(5).cloned().map(value_to_status_string).filter(|s| !s.is_empty());
+                out.push(SlowLogEntry { id, timestamp, duration_micros, command, client_addr, client_name });
+            }
+            Ok(serde_json::to_value(out).unwrap())
+        }
+
+        "config-get" => {
+            let config_id: String = param(&params, "configId")?;
+            let pattern: String = param(&params, "pattern")?;
+            let config = find_config(&config_id)?;
+            let mut con = connect(&config, 0).await?;
+            let pattern = if pattern.trim().is_empty() { "*".to_string() } else { pattern };
+            let flat: Vec<String> = redis::cmd("CONFIG").arg("GET").arg(pattern).query_async(&mut con).await.map_err(|e| e.to_string())?;
+            let out: Vec<(String, String)> = flat.chunks(2).filter(|c| c.len() == 2).map(|c| (c[0].clone(), c[1].clone())).collect();
+            Ok(serde_json::to_value(out).unwrap())
+        }
+
+        "config-set" => {
+            let config_id: String = param(&params, "configId")?;
+            let param_name: String = param(&params, "param")?;
+            let value: String = param(&params, "value")?;
+            let config = find_config(&config_id)?;
+            let mut con = connect(&config, 0).await?;
+            redis::cmd("CONFIG").arg("SET").arg(&param_name).arg(&value).query_async::<()>(&mut con).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+
+        // ── Bước 3: Pub/Sub — one-shot phần của method dispatch ──────────────
+        // `pubsub-subscribe` (stream) KHÔNG đi qua đây — xem `handle_pubsub_subscribe`.
+
+        "unsubscribe" => {
+            let subscription_id: String = param(&params, "subscriptionId")?;
+            if let Some(notify) = registry().inner.lock().unwrap().remove(&subscription_id) {
+                notify.notify_one();
+            }
+            Ok(serde_json::Value::Null)
+        }
+
+        "publish" => {
+            let config_id: String = param(&params, "configId")?;
+            let channel: String = param(&params, "channel")?;
+            let message: String = param(&params, "message")?;
+            let config = find_config(&config_id)?;
+            let mut con = connect(&config, 0).await?;
+            let n: i64 = redis::cmd("PUBLISH").arg(&channel).arg(&message).query_async(&mut con).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::json!(n))
+        }
+
         other => Err(format!("method không hỗ trợ: \"{other}\"")),
     }
+}
+
+/// `pubsub-subscribe` là method STREAM — không trả một `Ok(Value)` đơn lẻ như
+/// `handle()`, vì nó phải phát nhiều sự kiện cho cùng một `request.id` theo
+/// thời gian. Mở kết nối Pub/Sub thật (`get_async_pubsub`, giống
+/// `redis_pubsub_subscribe` cũ ở `redis_tool.rs`), đăng ký subscription vào
+/// `REGISTRY`, gửi một sự kiện "subscribed" mang `subscriptionId` NỘI BỘ rồi
+/// spawn một task nền phát mỗi message Pub/Sub nhận được như một sự kiện
+/// riêng — task đó tự dừng khi `tx.send(...)` bắt đầu lỗi (writer task đã
+/// thoát vì ghi stdout lỗi), hoặc khi `unsubscribe` báo `notify`.
+async fn handle_pubsub_subscribe(id: String, params: serde_json::Value, tx: mpsc::UnboundedSender<Response>) {
+    let channels: Vec<String> = opt_param(&params, "channels").unwrap_or_default();
+    let patterns: Vec<String> = opt_param(&params, "patterns").unwrap_or_default();
+    if channels.is_empty() && patterns.is_empty() {
+        let _ = tx.send(Response::err(id, "Provide at least one channel or pattern".to_string()));
+        return;
+    }
+    let config_id: String = match param(&params, "configId") {
+        Ok(v) => v,
+        Err(e) => {
+            let _ = tx.send(Response::err(id, e));
+            return;
+        }
+    };
+    let config = match find_config(&config_id) {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = tx.send(Response::err(id, e));
+            return;
+        }
+    };
+    let client = match redis::Client::open(redis_url(&config)) {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = tx.send(Response::err(id, e.to_string()));
+            return;
+        }
+    };
+    let mut pubsub = match tokio::time::timeout(CONNECT_TIMEOUT, client.get_async_pubsub()).await {
+        Ok(Ok(p)) => p,
+        Ok(Err(e)) => {
+            let _ = tx.send(Response::err(id, e.to_string()));
+            return;
+        }
+        Err(_) => {
+            let _ = tx.send(Response::err(
+                id,
+                format!("Connection to {}:{} timed out after {}s", config.host, config.port, CONNECT_TIMEOUT.as_secs()),
+            ));
+            return;
+        }
+    };
+
+    for ch in &channels {
+        if let Err(e) = pubsub.subscribe(ch).await {
+            let _ = tx.send(Response::err(id, e.to_string()));
+            return;
+        }
+    }
+    for pat in &patterns {
+        if let Err(e) = pubsub.psubscribe(pat).await {
+            let _ = tx.send(Response::err(id, e.to_string()));
+            return;
+        }
+    }
+
+    let subscription_id = Uuid::new_v4().to_string();
+    let notify = Arc::new(tokio::sync::Notify::new());
+    registry().inner.lock().unwrap().insert(subscription_id.clone(), notify.clone());
+
+    if tx
+        .send(Response::event(id.clone(), serde_json::json!({ "type": "subscribed", "subscriptionId": subscription_id })))
+        .is_err()
+    {
+        registry().inner.lock().unwrap().remove(&subscription_id);
+        return;
+    }
+
+    tokio::spawn(async move {
+        let mut stream = pubsub.into_on_message();
+        loop {
+            tokio::select! {
+                _ = notify.notified() => break,
+                next = stream.next() => match next {
+                    Some(msg) => {
+                        let event = serde_json::json!({
+                            "type": "message",
+                            "channel": msg.get_channel_name(),
+                            "pattern": msg.get_pattern::<String>().ok(),
+                            "payload": msg.get_payload::<String>().unwrap_or_default(),
+                        });
+                        if tx.send(Response::event(id.clone(), event)).is_err() {
+                            // Writer task đã thoát (ghi stdout lỗi) — không còn
+                            // ai đọc phản hồi nữa, tự dừng thay vì trôi vô hạn.
+                            break;
+                        }
+                    }
+                    None => break,
+                }
+            }
+        }
+        registry().inner.lock().unwrap().remove(&subscription_id);
+    });
 }
 
 // ── main: đọc stdin, spawn một task async cho mỗi dòng, một task khác sở hữu
@@ -538,28 +852,44 @@ async fn main() {
         }
         let tx = tx.clone();
         tokio::spawn(async move {
-            let response = handle_line(&line).await;
-            let _ = tx.send(response);
+            handle_line(&line, &tx).await;
         });
     }
 
     drop(tx);
     let _ = writer.await;
+    // Lưu ý: nếu có subscription Pub/Sub đang chạy, task nền của nó vẫn giữ
+    // một bản sao `tx` nên `writer` (và do đó main()) sẽ KHÔNG tự thoát chỉ vì
+    // stdin đóng — `service_host.rs` spawn sidecar với `kill_on_drop(true)`
+    // (xem đó), nên tiến trình vẫn bị buộc dừng khi host kill/drop child
+    // handle bất kể trạng thái kênh nội bộ này.
 }
 
-async fn handle_line(line: &str) -> Response {
+/// `pubsub-subscribe` KHÔNG đi qua `handle()` (một-lần) — nó cần giữ `tx` để
+/// phát nhiều sự kiện theo thời gian, xem `handle_pubsub_subscribe`. Mọi
+/// method khác vẫn đi qua đường một-lần cũ, không đổi hành vi.
+async fn handle_line(line: &str, tx: &mpsc::UnboundedSender<Response>) {
     let req: Request = match serde_json::from_str(line) {
         Ok(r) => r,
-        Err(e) => return Response::err(String::new(), format!("JSON không hợp lệ: {e}")),
+        Err(e) => {
+            let _ = tx.send(Response::err(String::new(), format!("JSON không hợp lệ: {e}")));
+            return;
+        }
     };
     if req.protocol != SERVICE_PROTOCOL {
-        return Response::err(req.id, format!("lệch protocol: client {}, sidecar {SERVICE_PROTOCOL}", req.protocol));
+        let _ = tx.send(Response::err(req.id, format!("lệch protocol: client {}, sidecar {SERVICE_PROTOCOL}", req.protocol)));
+        return;
     }
-    match handle(&req.method, req.params).await {
+    if req.method == "pubsub-subscribe" {
+        handle_pubsub_subscribe(req.id, req.params, tx.clone()).await;
+        return;
+    }
+    let response = match handle(&req.method, req.params).await {
         Ok(value) if value.is_null() => Response::ok(req.id),
         Ok(value) => Response::once(req.id, value),
         Err(e) => Response::err(req.id, e),
-    }
+    };
+    let _ = tx.send(response);
 }
 
 #[cfg(test)]
@@ -685,6 +1015,16 @@ mod tests {
         assert_eq!(res.unwrap(), serde_json::json!([]));
     }
 
+    /// `handle_line` giờ trả về qua kênh `tx` thay vì trực tiếp (cần vậy để
+    /// `pubsub-subscribe` phát nhiều sự kiện) — test dựng một kênh riêng và
+    /// đọc lại đúng một `Response` cho các method một-lần.
+    async fn call_handle_line(line: &str) -> Response {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_line(line, &tx).await;
+        drop(tx);
+        rx.recv().await.expect("handle_line phải gửi đúng một response cho method một-lần")
+    }
+
     #[tokio::test]
     async fn handle_line_tra_null_cho_ket_qua_null_thanh_response_khong_result() {
         let line = serde_json::json!({
@@ -696,7 +1036,7 @@ mod tests {
         // nhưng vẫn cần DEVTOOL_SERVICE_DATA_DIR để ghi lại file, nên test này chỉ
         // xác nhận KHÔNG panic và trả về một Response hợp lệ (lỗi hay không tuỳ
         // môi trường chạy test có set biến hay không).
-        let response = handle_line(&line).await;
+        let response = call_handle_line(&line).await;
         assert_eq!(response.id, "1");
         assert_eq!(response.protocol, SERVICE_PROTOCOL);
     }
@@ -704,13 +1044,157 @@ mod tests {
     #[tokio::test]
     async fn lech_protocol_bi_tu_choi_truoc_khi_cham_toi_method() {
         let line = serde_json::json!({ "protocol": 99, "id": "1", "method": "list-configs", "params": null }).to_string();
-        let response = handle_line(&line).await;
+        let response = call_handle_line(&line).await;
         assert!(response.error.unwrap().contains("lệch protocol"));
     }
 
     #[tokio::test]
     async fn json_hong_khong_panic_tra_ve_loi() {
-        let response = handle_line("{khong-phai-json").await;
+        let response = call_handle_line("{khong-phai-json").await;
         assert!(response.error.unwrap().contains("JSON không hợp lệ"));
+    }
+
+    // ── Bước 2: value_to_reply / RedisReply — port test từ redis_tool.rs ──────
+
+    #[test]
+    fn value_to_reply_maps_scalars() {
+        assert!(matches!(value_to_reply(Value::Nil), RedisReply::Nil));
+        assert!(matches!(value_to_reply(Value::Int(42)), RedisReply::Int(42)));
+        assert!(matches!(value_to_reply(Value::Okay), RedisReply::Status(s) if s == "OK"));
+        match value_to_reply(Value::SimpleString("PONG".to_string())) {
+            RedisReply::Status(s) => assert_eq!(s, "PONG"),
+            other => panic!("unexpected {other:?}"),
+        }
+        match value_to_reply(Value::BulkString(b"hello".to_vec())) {
+            RedisReply::Bulk(s) => assert_eq!(s, "hello"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn value_to_reply_maps_boolean_to_int() {
+        assert!(matches!(value_to_reply(Value::Boolean(true)), RedisReply::Int(1)));
+        assert!(matches!(value_to_reply(Value::Boolean(false)), RedisReply::Int(0)));
+    }
+
+    #[test]
+    fn value_to_reply_maps_array_recursively() {
+        let v = Value::Array(vec![Value::Int(1), Value::BulkString(b"two".to_vec())]);
+        match value_to_reply(v) {
+            RedisReply::Array(items) => {
+                assert_eq!(items.len(), 2);
+                assert!(matches!(items[0], RedisReply::Int(1)));
+                match &items[1] {
+                    RedisReply::Bulk(s) => assert_eq!(s, "two"),
+                    other => panic!("unexpected {other:?}"),
+                }
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn value_to_reply_flattens_map_into_kv_pairs() {
+        let v = Value::Map(vec![(Value::BulkString(b"k".to_vec()), Value::Int(1))]);
+        match value_to_reply(v) {
+            RedisReply::Array(items) => assert_eq!(items.len(), 2),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn value_to_reply_unwraps_attribute() {
+        let v = Value::Attribute { data: Box::new(Value::Int(7)), attributes: vec![] };
+        assert!(matches!(value_to_reply(v), RedisReply::Int(7)));
+    }
+
+    #[test]
+    fn value_to_status_string_falls_back_to_debug_for_other_variants() {
+        let s = value_to_status_string(Value::Int(5));
+        assert_eq!(s, format!("{:?}", RedisReply::Int(5)));
+    }
+
+    #[tokio::test]
+    async fn exec_voi_args_rong_tra_ve_loi_khong_can_config() {
+        let res = handle("exec", serde_json::json!({ "configId": "x", "db": 0, "args": [] })).await;
+        assert_eq!(res.unwrap_err(), "Empty command");
+    }
+
+    #[tokio::test]
+    async fn exec_thieu_tham_so_tra_ve_loi_ro_rang() {
+        let res = handle("exec", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn slowlog_thieu_tham_so_tra_ve_loi_ro_rang() {
+        let res = handle("slowlog", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("count"));
+    }
+
+    #[tokio::test]
+    async fn config_get_thieu_tham_so_tra_ve_loi_ro_rang() {
+        let res = handle("config-get", serde_json::json!({ "configId": "x" })).await;
+        assert!(res.unwrap_err().contains("pattern"));
+    }
+
+    // ── Bước 3: registry + validation của pubsub-subscribe/unsubscribe ───────
+
+    #[tokio::test]
+    async fn unsubscribe_id_khong_ton_tai_van_ok_khong_panic() {
+        // Gỡ một subscriptionId chưa từng đăng ký là no-op (giống bản Tier A) —
+        // không có gì để dừng nhưng vẫn phải trả Ok, không lỗi/panic.
+        let res = handle("unsubscribe", serde_json::json!({ "subscriptionId": "khong-ton-tai" })).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_thao_dung_entry_khoi_registry_va_bao_notify() {
+        let id = "sub-test-1".to_string();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        registry().inner.lock().unwrap().insert(id.clone(), notify.clone());
+
+        let notified = tokio::spawn({
+            let notify = notify.clone();
+            async move { notify.notified().await }
+        });
+
+        let res = handle("unsubscribe", serde_json::json!({ "subscriptionId": id })).await;
+        assert!(res.is_ok());
+        // notify_one() đã được gọi bên trong handle("unsubscribe", …) — task
+        // đang chờ notified() phải hoàn tất, không treo.
+        tokio::time::timeout(std::time::Duration::from_secs(2), notified).await.expect("notify phải bắn").unwrap();
+        assert!(!registry().inner.lock().unwrap().contains_key(&id));
+    }
+
+    #[tokio::test]
+    async fn pubsub_subscribe_khong_channel_khong_pattern_bao_loi_ro_rang() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_pubsub_subscribe("req-1".to_string(), serde_json::json!({ "channels": [], "patterns": [] }), tx).await;
+        let response = rx.recv().await.expect("phải gửi đúng một response lỗi");
+        assert_eq!(response.id, "req-1");
+        assert!(response.error.unwrap().contains("channel or pattern"));
+        assert!(!response.stream);
+    }
+
+    #[tokio::test]
+    async fn pubsub_subscribe_thieu_config_id_bao_loi_ro_rang() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_pubsub_subscribe("req-2".to_string(), serde_json::json!({ "channels": ["ch"] }), tx).await;
+        let response = rx.recv().await.expect("phải gửi đúng một response lỗi");
+        assert!(response.error.unwrap().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn pubsub_subscribe_config_khong_ton_tai_bao_loi_ro_rang() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_pubsub_subscribe(
+            "req-3".to_string(),
+            serde_json::json!({ "channels": ["ch"], "configId": "khong-ton-tai-chac-chan" }),
+            tx,
+        )
+        .await;
+        let response = rx.recv().await.expect("phải gửi đúng một response lỗi");
+        assert!(response.error.is_some());
     }
 }
