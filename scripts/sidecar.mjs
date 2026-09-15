@@ -5,11 +5,33 @@
 // tắc đặt tên và vị trí.
 
 import { execFileSync } from 'node:child_process';
-import { closeSync, copyFileSync, chmodSync, existsSync, mkdirSync, openSync } from 'node:fs';
+import { closeSync, copyFileSync, chmodSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 function run(cmd, args, cwd) {
   return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'inherit', 'inherit'] });
+}
+
+/// `tauri-build`'s build.rs kiểm TOÀN BỘ `bundle.externalBin` tồn tại trên đĩa
+/// mỗi khi `cargo build`/`cargo test` chạy — không riêng bin đang build. Bản
+/// vá bootstrap trước đây (tạo placeholder cho ĐÚNG MỘT bin sắp build) bỏ sót
+/// đúng ca này: `prepare-mcp-sidecar.mjs` build `devtool-mcp-server` TRƯỚC,
+/// nhưng lúc đó `devtool-svc-echo` (một entry KHÁC trong externalBin, do
+/// `prepare-service-sidecars.mjs` phụ trách, chạy SAU trong beforeBuildCommand)
+/// còn chưa có placeholder nào — build.rs từ chối vì "resource path ... doesn't
+/// exist" trước khi kịp build cái đang cần build, dù đó không phải bin mình
+/// đang build. Chưa từng lộ ra vì đây là lần đầu tiên CI chạy từ một checkout
+/// THẬT SỰ SẠCH kể từ khi `devtool-svc-echo` được thêm vào externalBin — máy
+/// dev cục bộ luôn có sẵn binary cũ từ lần build trước đó nên không bao giờ
+/// thấy trạng thái "cả hai đều trống" này.
+///
+/// Đọc thẳng `tauri.conf.json`'s `bundle.externalBin` — nguồn sự thật DUY NHẤT
+/// mà `tauri-build` thực sự kiểm — thay vì hand-list riêng ở đây, để một
+/// sidecar mới thêm sau này (Phase 2) không lặp lại đúng lỗi này.
+function allExternalBinNames(root) {
+  const conf = JSON.parse(readFileSync(join(root, 'src-tauri', 'tauri.conf.json'), 'utf8'));
+  const entries = conf.bundle?.externalBin ?? [];
+  return entries.map((p) => p.replace(/^binaries\//, ''));
 }
 
 export function buildSidecar(root, binName) {
@@ -42,7 +64,13 @@ export function buildSidecar(root, binName) {
   // the file is a real executable — only `tauri build`'s actual bundling
   // step would care about the content), so create one when there's nothing
   // there yet. Once the real binary is compiled below, it overwrites this.
-  if (!existsSync(destPath)) closeSync(openSync(destPath, 'w'));
+  //
+  // Tạo placeholder cho MỌI entry trong externalBin (không riêng `binName`) —
+  // xem comment ở `allExternalBinNames` về lý do phải làm vậy.
+  for (const bin of allExternalBinNames(root)) {
+    const path = join(binariesDir, `${bin}-${targetTriple}${isWindows ? '.exe' : ''}`);
+    if (!existsSync(path)) closeSync(openSync(path, 'w'));
+  }
 
   console.log(`Building ${binName} (release)...`);
   run('cargo', ['build', '--release', '--bin', binName], srcTauri);
