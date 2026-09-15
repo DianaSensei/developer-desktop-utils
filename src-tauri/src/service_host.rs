@@ -43,6 +43,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
+use tauri::{AppHandle, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::{oneshot, Mutex as AsyncMutex};
@@ -288,13 +289,20 @@ fn spawn_process(
     }))
 }
 
-async fn get_or_spawn(registry: &ServiceRegistry, bin: &str) -> Result<Arc<RunningSidecar>, String> {
+async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<Arc<RunningSidecar>, String> {
     let mut map = registry.running.lock().await;
     if let Some(running) = map.get(bin) {
         return Ok(running.clone());
     }
 
     let mut command = Command::new(sidecar_path(bin)?);
+    // Sidecar không có `AppHandle` — nó không phải một plugin JS chạy trong
+    // webview, nên không đi qua `sdk.storage`/`app.path()`. Một sidecar cần
+    // lưu gì đó bền (cấu hình kết nối, ví dụ) đọc thư mục này qua biến môi
+    // trường thay vì tự đoán quy ước thư mục dữ liệu của app trên từng OS.
+    if let Ok(dir) = app.path().app_data_dir() {
+        command.env("DEVTOOL_APP_DATA_DIR", dir);
+    }
     let cleanup_registry = registry.clone();
     let cleanup_bin = bin.to_string();
     let running = spawn_process(&mut command, move || {
@@ -369,13 +377,14 @@ async fn call_once(running: &RunningSidecar, request: &ServiceRequest, limit: Du
 
 #[tauri::command]
 pub async fn service_call(
+    app: AppHandle,
     state: tauri::State<'_, ServiceRegistry>,
     request: ServiceRequest,
 ) -> Result<ServiceResponse, String> {
     if let Some(reason) = reject_reason(&request) {
         return Ok(ServiceResponse::err(&request.id, reason));
     }
-    let running = match get_or_spawn(&state, &request.bin).await {
+    let running = match get_or_spawn(&app, &state, &request.bin).await {
         Ok(r) => r,
         Err(e) => return Ok(ServiceResponse::err(&request.id, e)),
     };
@@ -389,6 +398,7 @@ pub async fn service_call(
 /// tới khi có dữ liệu thật (một kênh Pub/Sub im lặng chẳng hạn).
 #[tauri::command]
 pub async fn service_stream_start(
+    app: AppHandle,
     state: tauri::State<'_, ServiceRegistry>,
     request: ServiceRequest,
     channel: Channel<serde_json::Value>,
@@ -396,7 +406,7 @@ pub async fn service_stream_start(
     if let Some(reason) = reject_reason(&request) {
         return Err(reason);
     }
-    let running = get_or_spawn(&state, &request.bin).await?;
+    let running = get_or_spawn(&app, &state, &request.bin).await?;
     let line = encode(&request)?;
 
     running
