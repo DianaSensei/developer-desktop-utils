@@ -1,4 +1,4 @@
-import type { Channel, PluginSdk } from '@/platform';
+import type { PluginSdk } from '@/platform';
 
 // ── Connection profile (persisted via Rust to the app-data dir) ───────────────
 
@@ -271,32 +271,42 @@ export interface RpcCallArgs {
   timeoutMs: number;
 }
 
-// ── Invoke wrappers ───────────────────────────────────────────────────────────
+// ── Service (sidecar) wrappers ─────────────────────────────────────────────────
+
+/** Trả về từ `consumeStart` — `.stop()` gói cả hai bước bắt buộc: báo sidecar
+ *  dừng qua `consume-stop` (nếu đã nhận được `subscriptionId`) rồi mới gỡ
+ *  đăng ký phía host, đúng thứ tự `pubsubSubscribe` của Redis / `logsStart`/
+ *  `statsStart` của Container đã làm. */
+export interface RabbitConsumeSubscription {
+  stop(): Promise<void>;
+}
 
 /**
- * Lớp lệnh của tool, dựng theo SDK của plugin thay vì gọi thẳng `invoke`.
+ * Lớp lệnh RabbitMQ, dựng theo `sdk.service` (Tier B — sidecar
+ * `devtool-svc-rabbit`) thay vì gọi thẳng `invoke`. Nhờ vậy allowlist
+ * `service.methods` trong manifest có hiệu lực thật — một method gõ sai hay
+ * ngoài danh sách bị chặn ngay và ghi vào nhật ký, thay vì lặng lẽ đi thẳng
+ * xuống sidecar.
  *
- * Nhờ vậy allowlist `commands: ['rabbit_', 'mcp_respond']` trong manifest có hiệu lực thật —
- * một lệnh gõ sai hay một lệnh ngoài danh sách bị chặn ngay và ghi vào nhật ký,
- * thay vì lặng lẽ đi thẳng xuống Rust.
+ * Method quản lý HTTP (overview/queues/exchanges/connections/...) KHÔNG nằm
+ * ở đây — chúng đi qua `sdk.http.fetch` tới REST API quản trị của broker (xem
+ * `api.ts`), không phải qua sidecar.
  *
  * Dùng qua `useRabbitApi()` (xem api.ts); factory để lộ ra đây chỉ cho test và
  * cho code không phải React.
  */
 export function createRabbitApi(sdk: PluginSdk) {
-  const invoke = <T,>(command: string, args?: Record<string, unknown>) =>
-    sdk.native.invoke<T>(command, args);
+  const call = <T,>(method: string, params?: Record<string, unknown>) =>
+    sdk.service.call<T>(method, params);
 
   return {
-    listConfigs: () => invoke<RabbitConnection[]>('rabbit_list_configs'),
-    saveConfig: (config: RabbitConnection) =>
-      invoke<RabbitConnection>('rabbit_save_config', { config }),
-    deleteConfig: (configId: string) =>
-      invoke<void>('rabbit_delete_config', { configId }),
+    listConfigs: () => call<RabbitConnection[]>('list-configs'),
+    saveConfig: (config: RabbitConnection) => call<RabbitConnection>('save-config', { config }),
+    deleteConfig: (configId: string) => call<void>('delete-config', { configId }),
 
     /** Publish over AMQP with full properties, optional mandatory flag and publisher confirms. */
     publish: (args: PublishArgs) =>
-      invoke<PublishOutcome>('rabbit_publish', {
+      call<PublishOutcome>('publish', {
         configId: args.configId,
         exchange: args.exchange,
         routingKey: args.routingKey,
@@ -308,7 +318,7 @@ export function createRabbitApi(sdk: PluginSdk) {
 
     /** Request/response via AMQP direct reply-to. Resolves with the reply or rejects on timeout. */
     rpcCall: (args: RpcCallArgs) =>
-      invoke<RpcReply>('rabbit_rpc_call', {
+      call<RpcReply>('rpc-call', {
         configId: args.configId,
         exchange: args.exchange,
         routingKey: args.routingKey,
@@ -319,49 +329,120 @@ export function createRabbitApi(sdk: PluginSdk) {
         timeoutMs: args.timeoutMs,
       }),
 
-    /** Start a live consumer; deliveries stream to `onMessage`. Returns the consumer id. */
-    consumeStart: (
+    /**
+     * Start a live consumer via the sidecar's STREAM method `consume-start` —
+     * mirrors `createRedisApi.pubsubSubscribe`: the first event carries
+     * `{ type: 'subscribed', subscriptionId }` (the sidecar's internal
+     * consumer id, distinct from the JSONL request id), every following
+     * `{ type: 'message', ...ConsumedMessage }` event is forwarded to
+     * `onMessage`. A subscribe-time failure (bad config, connection refused,
+     * missing queue) arrives as a THIRD event shape, `{ type: 'error',
+     * message }` — deliberately not a protocol-level `ServiceResponse.error`
+     * (see `send_stream_error`'s doc comment in devtool-svc-rabbit.rs; a
+     * `Waiter::Stream` silently drops that). This promise properly WAITS for
+     * either `subscribed` or `error` before settling.
+     *
+     * `.stop()` does the two mandatory steps in order: (1) tell the sidecar
+     * to actually stop the consumer via the one-shot `consume-stop` method
+     * (only if a `subscriptionId` was received), THEN (2) stop the host-side
+     * stream registration — `service_stream_stop` only unregisters the host
+     * waiter, it does not signal the sidecar.
+     */
+    consumeStart: async (
       args: { configId: string; queue: string; ackMode: ConsumeAckMode; prefetch: number; reply?: ReplyOptions | null },
-      onMessage: Channel<ConsumedMessage>,
-    ) =>
-      invoke<string>('rabbit_consume_start', {
-        configId: args.configId,
-        queue: args.queue,
-        ackMode: args.ackMode,
-        prefetch: args.prefetch,
-        reply: args.reply ?? null,
-        onMessage,
-      }),
+      onMessage: (msg: ConsumedMessage) => void,
+    ): Promise<RabbitConsumeSubscription> => {
+      let subscriptionId: string | null = null;
+      let settleReady: (() => void) | null = null;
+      let settleFailed: ((e: Error) => void) | null = null;
+      const ready = new Promise<void>((resolve, reject) => {
+        settleReady = resolve;
+        settleFailed = reject;
+      });
 
-    consumeStop: (consumerId: string) =>
-      invoke<void>('rabbit_consume_stop', { consumerId }),
+      const subscription = await sdk.service.stream<
+        { type: string; subscriptionId?: string; message?: string } & Partial<ConsumedMessage>
+      >(
+        'consume-start',
+        (event) => {
+          if (event.type === 'subscribed') {
+            subscriptionId = event.subscriptionId ?? null;
+            settleReady?.();
+            return;
+          }
+          if (event.type === 'error') {
+            settleFailed?.(new Error(event.message ?? 'Consume failed'));
+            return;
+          }
+          if (event.type === 'message') {
+            onMessage({
+              payload: event.payload ?? '',
+              exchange: event.exchange ?? '',
+              routingKey: event.routingKey ?? '',
+              redelivered: event.redelivered ?? false,
+              deliveryTag: event.deliveryTag ?? 0,
+              correlationId: event.correlationId ?? null,
+              contentType: event.contentType ?? null,
+              messageId: event.messageId ?? null,
+              headers: event.headers ?? {},
+            });
+          }
+        },
+        {
+          configId: args.configId,
+          queue: args.queue,
+          ackMode: args.ackMode,
+          prefetch: args.prefetch,
+          reply: args.reply ?? null,
+        },
+      );
+
+      try {
+        await ready;
+      } catch (e) {
+        // Đăng ký phía host đã lỡ mở (sdk.service.stream ở trên thành công) —
+        // dọn nó đi trước khi báo lỗi lên, không để lại một stream mồ côi
+        // không ai còn đọc.
+        await subscription.stop().catch(() => {});
+        throw e;
+      }
+
+      return {
+        async stop() {
+          if (subscriptionId) {
+            await call<void>('consume-stop', { consumerId: subscriptionId }).catch(() => {});
+          }
+          await subscription.stop();
+        },
+      };
+    },
 
     // ── AMQP-only topology (brokers without the management HTTP API) ────────────
 
     /** Open + close an AMQP connection to verify a (possibly unsaved) profile. */
-    amqpTest: (config: RabbitConnection) => invoke<void>('rabbit_amqp_test', { config }),
+    amqpTest: (config: RabbitConnection) => call<void>('amqp-test', { config }),
 
     /** Passive-declare each named queue → existence + live message/consumer counts. */
     amqpQueuesInfo: (configId: string, names: string[]) =>
-      invoke<QueueAmqpInfo[]>('rabbit_amqp_queues_info', { configId, names }),
+      call<QueueAmqpInfo[]>('amqp-queues-info', { configId, names }),
 
     /** Passive-declare each named exchange → existence. */
     amqpExchangesInfo: (configId: string, names: string[]) =>
-      invoke<ExchangeAmqpInfo[]>('rabbit_amqp_exchanges_info', { configId, names }),
+      call<ExchangeAmqpInfo[]>('amqp-exchanges-info', { configId, names }),
 
     /** Declare a queue over AMQP. */
     amqpDeclareQueue: (configId: string, name: string, durable: boolean, autoDelete: boolean) =>
-      invoke<void>('rabbit_amqp_declare_queue', { configId, name, durable, autoDelete }),
+      call<void>('amqp-declare-queue', { configId, name, durable, autoDelete }),
 
     /** Declare an exchange over AMQP. */
     amqpDeclareExchange: (
       configId: string, name: string, kind: string, durable: boolean, autoDelete: boolean, internal: boolean,
     ) =>
-      invoke<void>('rabbit_amqp_declare_exchange', { configId, name, kind, durable, autoDelete, internal }),
+      call<void>('amqp-declare-exchange', { configId, name, kind, durable, autoDelete, internal }),
 
     /** Bind a queue to an exchange over AMQP. */
     amqpBindQueue: (configId: string, queue: string, exchange: string, routingKey: string) =>
-      invoke<void>('rabbit_amqp_bind_queue', { configId, queue, exchange, routingKey }),
+      call<void>('amqp-bind-queue', { configId, queue, exchange, routingKey }),
   };
 }
 

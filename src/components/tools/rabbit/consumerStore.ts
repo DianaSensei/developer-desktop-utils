@@ -8,7 +8,13 @@
 
 import { useSyncExternalStore } from 'react';
 import { getPluginSdk } from '@/platform';
-import { createRabbitApi, type ConsumedMessage, type ConsumeAckMode, type ReplyOptions } from './types';
+import {
+  createRabbitApi,
+  type ConsumedMessage,
+  type ConsumeAckMode,
+  type RabbitConsumeSubscription,
+  type ReplyOptions,
+} from './types';
 
 // Bounded ring buffer of the most recent messages kept for inspection/search.
 const MAX_MESSAGES = 2000;
@@ -19,8 +25,8 @@ const MAX_MESSAGES = 2000;
 const FLUSH_MS = 120;
 
 export interface ConsumerSession {
-  /** Backend consumer id ('' until consumeStart resolves). */
-  id: string;
+  /** Set once `consumeStart` resolves; `.stop()` tears the sidecar consumer + host stream down. */
+  subscription: RabbitConsumeSubscription | null;
   connId: string;
   queue: string;
   mode: ConsumeAckMode;
@@ -114,27 +120,25 @@ export const consumerStore = {
     if (sessions.has(k)) return; // already running
 
     const session: ConsumerSession = {
-      id: '', connId, queue, mode, prefetch, reply, messages: [], received: 0, paused: false, bufferedWhilePaused: 0, startedAt: Date.now(), starting: true,
+      subscription: null, connId, queue, mode, prefetch, reply, messages: [], received: 0, paused: false, bufferedWhilePaused: 0, startedAt: Date.now(), starting: true,
     };
     sessions.set(k, session);
     emit();
 
-    // Batch deliveries (see enqueue/flush) so high-traffic queues don't trigger a
-    // re-render per message.
-    const channel = await sdk.native.channel<ConsumedMessage>(
-      (msg) => { if (sessions.has(k)) enqueue(k, msg); },
-      'rabbit-consume',
-    );
-
     try {
-      const id = await rabbitApi.consumeStart({ configId: connId, queue, ackMode: mode, prefetch, reply }, channel);
+      // Batch deliveries (see enqueue/flush) so high-traffic queues don't trigger a
+      // re-render per message.
+      const subscription = await rabbitApi.consumeStart(
+        { configId: connId, queue, ackMode: mode, prefetch, reply },
+        (msg) => { if (sessions.has(k)) enqueue(k, msg); },
+      );
       const s = sessions.get(k);
       if (!s) {
         // Stopped before start resolved — tear the backend consumer down.
-        rabbitApi.consumeStop(id).catch(() => {});
+        subscription.stop().catch(() => {});
         return;
       }
-      s.id = id;
+      s.subscription = subscription;
       s.starting = false;
       emit();
     } catch (e) {
@@ -152,8 +156,8 @@ export const consumerStore = {
     sessions.delete(k);
     discardPending(k);
     emit();
-    if (s.id) {
-      try { await rabbitApi.consumeStop(s.id); } catch { /* ignore */ }
+    if (s.subscription) {
+      try { await s.subscription.stop(); } catch { /* ignore */ }
     }
   },
 
@@ -178,7 +182,7 @@ export const consumerStore = {
     const all = Array.from(sessions.values()).filter((s) => s.connId === connId);
     for (const s of all) { sessions.delete(key(s.connId, s.queue)); discardPending(key(s.connId, s.queue)); }
     emit();
-    await Promise.all(all.map((s) => (s.id ? rabbitApi.consumeStop(s.id).catch(() => {}) : Promise.resolve())));
+    await Promise.all(all.map((s) => (s.subscription ? s.subscription.stop().catch(() => {}) : Promise.resolve())));
   },
 
   async stopAll(): Promise<void> {
@@ -186,7 +190,7 @@ export const consumerStore = {
     sessions.clear();
     for (const s of all) discardPending(key(s.connId, s.queue));
     emit();
-    await Promise.all(all.map((s) => (s.id ? rabbitApi.consumeStop(s.id).catch(() => {}) : Promise.resolve())));
+    await Promise.all(all.map((s) => (s.subscription ? s.subscription.stop().catch(() => {}) : Promise.resolve())));
   },
 };
 

@@ -9,7 +9,6 @@ mod files;
 mod mcp_bridge;
 mod mockserver;
 mod ports;
-mod rabbit;
 mod secrets_vault;
 mod service_host;
 mod artifact_installer;
@@ -79,7 +78,6 @@ fn main() {
             }
         })
         .manage(mockserver::MockState::default())
-        .manage(rabbit::ConsumerRegistry::default())
         .manage(kafka::KafkaConsumerRegistry::default())
         // Host cho plugin dịch vụ (tier B) — xem service_host.rs.
         .manage(service_host::ServiceRegistry::default())
@@ -156,19 +154,6 @@ fn main() {
             mockserver::mock_status,
             mockserver::mock_update_rules,
             mockserver::mock_test_script,
-            rabbit::rabbit_list_configs,
-            rabbit::rabbit_save_config,
-            rabbit::rabbit_delete_config,
-            rabbit::rabbit_rpc_call,
-            rabbit::rabbit_publish,
-            rabbit::rabbit_consume_start,
-            rabbit::rabbit_consume_stop,
-            rabbit::rabbit_amqp_test,
-            rabbit::rabbit_amqp_queues_info,
-            rabbit::rabbit_amqp_exchanges_info,
-            rabbit::rabbit_amqp_declare_queue,
-            rabbit::rabbit_amqp_declare_exchange,
-            rabbit::rabbit_amqp_bind_queue,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

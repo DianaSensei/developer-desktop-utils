@@ -11,8 +11,28 @@ export default definePlugin({
   route: '/rabbit-client',
   order: 170,
   defaultEnabled: false,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native', 'http'],
-  commands: ['mcp_respond', 'rabbit_'],
+  permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native', 'http', 'service'],
+  // `native` chỉ còn cho `mcp_respond`/`mcp:call` (cầu nối MCP, xem mcpBridge.ts) —
+  // mọi lệnh RabbitMQ thật đi qua `service` (sidecar `devtool-svc-rabbit`).
+  commands: ['mcp_respond'],
+  service: {
+    bin: 'devtool-svc-rabbit',
+    methods: [
+      'list-configs',
+      'save-config',
+      'delete-config',
+      'amqp-test',
+      'rpc-call',
+      'publish',
+      'consume-start',
+      'consume-stop',
+      'amqp-queues-info',
+      'amqp-exchanges-info',
+      'amqp-declare-queue',
+      'amqp-declare-exchange',
+      'amqp-bind-queue',
+    ],
+  },
   // Host management API do người dùng cấu hình lúc chạy, không biết trước.
   hosts: ['*'],
   sdk: '^1.0.0',
