@@ -7,7 +7,6 @@ import { ViewHeader } from '@/components/ui/view-header';
 import { Field } from '@/components/ui/tool-section';
 import { Spinner } from '@/components/ui/spinner';
 import type { RedisConnection, PubSubMessage } from './types';
-import { usePluginSdkFor } from '@/platform';
 import { useRedisApi } from './api';
 
 interface PubSubViewProps {
@@ -31,10 +30,9 @@ let nextId = 1;
 
 export function PubSubView({ conn }: PubSubViewProps) {
   const redisApi = useRedisApi();
-  const sdk = usePluginSdkFor('redis-client');
   const [channelsInput, setChannelsInput] = useState('');
   const [patternsInput, setPatternsInput] = useState('');
-  const [subscription, setSubscription] = useState<{ id: string; channels: string[]; patterns: string[] } | null>(null);
+  const [subscription, setSubscription] = useState<{ channels: string[]; patterns: string[] } | null>(null);
   const [subscribing, setSubscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ReceivedMessage[]>([]);
@@ -47,9 +45,9 @@ export function PubSubView({ conn }: PubSubViewProps) {
   // The view unmounts on nav-away (switching to another Redis view, or
   // disconnecting) — this stops the backend subscription so it doesn't keep
   // running (and pushing messages nobody reads) after the user leaves.
-  const subscriptionIdRef = useRef<string | null>(null);
+  const subscriptionRef = useRef<{ stop(): Promise<void> } | null>(null);
   useEffect(() => () => {
-    if (subscriptionIdRef.current) redisApi.pubsubUnsubscribe(subscriptionIdRef.current).catch(() => {});
+    subscriptionRef.current?.stop().catch(() => {});
   }, []);
 
   const subscribe = async () => {
@@ -61,19 +59,16 @@ export function PubSubView({ conn }: PubSubViewProps) {
     }
     setSubscribing(true);
     setError(null);
-    // Kênh dựng qua SDK: quyền 'native' được kiểm và việc mở một luồng dữ liệu
-    // dài hạn có mặt trong nhật ký, thay vì là một `new Channel()` vô hình.
-    const ch = await sdk.native.channel<PubSubMessage>((msg) => {
-      setMessages((prev) => {
-        const next = [{ ...msg, id: nextId++, at: Date.now() }, ...prev];
-        if (next.length > MAX_MESSAGES) next.length = MAX_MESSAGES;
-        return next;
-      });
-    }, 'redis-pubsub');
     try {
-      const id = await redisApi.pubsubSubscribe(conn.id, channels, patterns, ch);
-      subscriptionIdRef.current = id;
-      setSubscription({ id, channels, patterns });
+      const sub = await redisApi.pubsubSubscribe(conn.id, channels, patterns, (msg) => {
+        setMessages((prev) => {
+          const next = [{ ...msg, id: nextId++, at: Date.now() }, ...prev];
+          if (next.length > MAX_MESSAGES) next.length = MAX_MESSAGES;
+          return next;
+        });
+      });
+      subscriptionRef.current = sub;
+      setSubscription({ channels, patterns });
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
     } finally {
@@ -82,10 +77,10 @@ export function PubSubView({ conn }: PubSubViewProps) {
   };
 
   const stop = async () => {
-    const id = subscriptionIdRef.current;
-    subscriptionIdRef.current = null;
+    const sub = subscriptionRef.current;
+    subscriptionRef.current = null;
     setSubscription(null);
-    if (id) { try { await redisApi.pubsubUnsubscribe(id); } catch { /* already gone */ } }
+    if (sub) { try { await sub.stop(); } catch { /* already gone */ } }
   };
 
   const publish = async () => {

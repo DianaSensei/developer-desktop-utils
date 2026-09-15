@@ -32,7 +32,7 @@
   "bundle": {
     "createUpdaterArtifacts": true,
     "active": true,
-    "externalBin": ["binaries/devtool-mcp-server", "binaries/devtool-svc-echo"],
+    "externalBin": ["binaries/devtool-mcp-server", "binaries/devtool-svc-echo", "binaries/devtool-svc-redis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

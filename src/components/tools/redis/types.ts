@@ -1,4 +1,4 @@
-import type { Channel, PluginSdk } from '@/platform';
+import type { PluginSdk } from '@/platform';
 
 // ── Connection profile (persisted via Rust to the app-data dir) ───────────────
 
@@ -93,81 +93,159 @@ export type RedisReply =
 // ── Invoke wrappers ───────────────────────────────────────────────────────────
 
 /**
- * Lớp lệnh Redis, dựng theo SDK của plugin thay vì gọi thẳng `invoke`.
- *
- * Nhờ vậy allowlist `commands: ['redis_', 'mcp_respond']` trong manifest có hiệu
- * lực thật — một lệnh gõ sai hay một lệnh ngoài danh sách bị chặn ngay và ghi
- * vào nhật ký, thay vì lặng lẽ đi thẳng xuống Rust.
+ * Lớp lệnh Redis, dựng theo `sdk.service` (Tier B — sidecar `devtool-svc-redis`)
+ * thay vì gọi thẳng `invoke`. Nhờ vậy allowlist `service.methods` trong manifest
+ * có hiệu lực thật — một method gõ sai hay ngoài danh sách bị chặn ngay và ghi
+ * vào nhật ký, thay vì lặng lẽ đi thẳng xuống sidecar.
  *
  * Dùng qua `useRedisApi()` (xem api.ts); factory để lộ ra đây chỉ cho test và
  * cho code không phải React.
  */
 export function createRedisApi(sdk: PluginSdk) {
-  const invoke = <T,>(command: string, args?: Record<string, unknown>) =>
-    sdk.native.invoke<T>(command, args);
+  const call = <T,>(method: string, params?: Record<string, unknown>) =>
+    sdk.service.call<T>(method, params);
 
   return {
-    listConfigs: () => invoke<RedisConnection[]>('redis_list_configs'),
-    saveConfig: (config: RedisConnection) => invoke<RedisConnection>('redis_save_config', { config }),
-    deleteConfig: (configId: string) => invoke<void>('redis_delete_config', { configId }),
-    testConnection: (config: RedisConnection) => invoke<void>('redis_test_connection', { config }),
+    listConfigs: () => call<RedisConnection[]>('list-configs'),
+    saveConfig: (config: RedisConnection) => call<RedisConnection>('save-config', { config }),
+    deleteConfig: (configId: string) => call<void>('delete-config', { configId }),
+    testConnection: (config: RedisConnection) => call<void>('test-connection', { config }),
 
     overview: (configId: string, db: number) =>
-      invoke<RedisOverview>('redis_overview', { configId, db }),
+      call<RedisOverview>('overview', { configId, db }),
 
     scanKeys: (configId: string, db: number, cursor: number, pattern: string, count: number) =>
-      invoke<ScanPage>('redis_scan_keys', { configId, db, cursor, pattern, count }),
+      call<ScanPage>('scan-keys', { configId, db, cursor, pattern, count }),
 
     keySummary: (configId: string, db: number, keys: string[]) =>
-      invoke<KeySummary[]>('redis_key_summary', { configId, db, keys }),
+      call<KeySummary[]>('key-summary', { configId, db, keys }),
 
     getKey: (configId: string, db: number, key: string) =>
-      invoke<KeyValue>('redis_get_key', { configId, db, key }),
+      call<KeyValue>('get-key', { configId, db, key }),
 
     setString: (configId: string, db: number, key: string, value: string, ttlSeconds: number | null) =>
-      invoke<void>('redis_set_string', { configId, db, key, value, ttlSeconds }),
+      call<void>('set-string', { configId, db, key, value, ttlSeconds }),
 
     setTtl: (configId: string, db: number, key: string, ttlSeconds: number | null) =>
-      invoke<void>('redis_set_ttl', { configId, db, key, ttlSeconds }),
+      call<void>('set-ttl', { configId, db, key, ttlSeconds }),
 
     deleteKeys: (configId: string, db: number, keys: string[]) =>
-      invoke<number>('redis_delete_keys', { configId, db, keys }),
+      call<number>('delete-keys', { configId, db, keys }),
 
     renameKey: (configId: string, db: number, oldKey: string, newKey: string) =>
-      invoke<void>('redis_rename_key', { configId, db, oldKey, newKey }),
+      call<void>('rename-key', { configId, db, oldKey, newKey }),
 
     /** Run an arbitrary command. Backs the CLI console and the key editors' mutations. */
     exec: (configId: string, db: number, args: string[]) =>
-      invoke<RedisReply>('redis_exec', { configId, db, args }),
+      call<RedisReply>('exec', { configId, db, args }),
 
     memoryUsage: (configId: string, db: number, key: string) =>
-      invoke<number | null>('redis_memory_usage', { configId, db, key }),
+      call<number | null>('memory-usage', { configId, db, key }),
 
     // ── Pub/Sub ───────────────────────────────────────────────────────────────
 
-    /** Subscribe to channels/patterns; messages stream to `onMessage`. Returns the subscription id. */
-    pubsubSubscribe: (configId: string, channels: string[], patterns: string[], onMessage: Channel<PubSubMessage>) =>
-      invoke<string>('redis_pubsub_subscribe', { configId, channels, patterns, onMessage }),
+    /**
+     * Subscribe to channels/patterns via the sidecar's STREAM method — the
+     * first event carries `{ type: 'subscribed', subscriptionId }` (an id the
+     * sidecar generates internally, distinct from the JSONL request id), every
+     * following event carries `{ type: 'message', ... }` and is forwarded to
+     * `onMessage`. Never resolves with `done: true` on its own — call
+     * `.stop()` to end it.
+     *
+     * A subscribe-time failure (bad config, connection refused/timeout) is
+     * sent by the sidecar as a THIRD event shape, `{ type: 'error', message }`
+     * — deliberately NOT as a protocol-level `ServiceResponse.error`, because
+     * `service_host.rs`'s `dispatch()` silently drops an `error` response
+     * routed to a Stream waiter (no `EventSink` variant carries an error out;
+     * see its doc comment). Wrapping the failure as a normal stream event lets
+     * it reach here, so this promise properly WAITS for either `subscribed`
+     * or `error` before settling — resolving early (before either arrives)
+     * would make every connection failure look like a silent no-op to the
+     * caller, exactly the bug this shape avoids.
+     *
+     * `.stop()` does the two mandatory steps in order: (1) tell the sidecar to
+     * actually stop publishing via the one-shot `unsubscribe` method (only if
+     * a `subscriptionId` was received), THEN (2) stop the host-side stream
+     * registration (`ServiceSubscription.stop()`) — `service_stream_stop`
+     * only unregisters the host waiter, it does not signal the sidecar (see
+     * platform-plugin-architecture.md's Tier B section).
+     */
+    pubsubSubscribe: async (
+      configId: string,
+      channels: string[],
+      patterns: string[],
+      onMessage: (msg: PubSubMessage) => void,
+    ): Promise<{ stop(): Promise<void> }> => {
+      let subscriptionId: string | null = null;
+      let settleReady: (() => void) | null = null;
+      let settleFailed: ((e: Error) => void) | null = null;
+      const ready = new Promise<void>((resolve, reject) => {
+        settleReady = resolve;
+        settleFailed = reject;
+      });
 
-    pubsubUnsubscribe: (subscriptionId: string) =>
-      invoke<void>('redis_pubsub_unsubscribe', { subscriptionId }),
+      const subscription = await sdk.service.stream<{
+        type: string;
+        subscriptionId?: string;
+        message?: string;
+        channel?: string;
+        pattern?: string | null;
+        payload?: string;
+      }>(
+        'pubsub-subscribe',
+        (event) => {
+          if (event.type === 'subscribed') {
+            subscriptionId = event.subscriptionId ?? null;
+            settleReady?.();
+            return;
+          }
+          if (event.type === 'error') {
+            settleFailed?.(new Error(event.message ?? 'Subscribe failed'));
+            return;
+          }
+          if (event.type === 'message') {
+            onMessage({ channel: event.channel ?? '', pattern: event.pattern ?? null, payload: event.payload ?? '' });
+          }
+        },
+        { configId, channels, patterns },
+      );
+
+      try {
+        await ready;
+      } catch (e) {
+        // Đăng ký phía host đã lỡ mở (sdk.service.stream ở trên thành công) —
+        // dọn nó đi trước khi báo lỗi lên, không để lại một stream mồ côi
+        // không ai còn đọc.
+        await subscription.stop().catch(() => {});
+        throw e;
+      }
+
+      return {
+        async stop() {
+          if (subscriptionId) {
+            await call<void>('unsubscribe', { subscriptionId }).catch(() => {});
+          }
+          await subscription.stop();
+        },
+      };
+    },
 
     publish: (configId: string, channel: string, message: string) =>
-      invoke<number>('redis_publish', { configId, channel, message }),
+      call<number>('publish', { configId, channel, message }),
 
     // ── Server admin ──────────────────────────────────────────────────────────
 
     clientList: (configId: string) =>
-      invoke<ClientInfo[]>('redis_client_list', { configId }),
+      call<ClientInfo[]>('client-list', { configId }),
 
     slowlog: (configId: string, count: number) =>
-      invoke<SlowLogEntry[]>('redis_slowlog', { configId, count }),
+      call<SlowLogEntry[]>('slowlog', { configId, count }),
 
     configGet: (configId: string, pattern: string) =>
-      invoke<[string, string][]>('redis_config_get', { configId, pattern }),
+      call<[string, string][]>('config-get', { configId, pattern }),
 
     configSet: (configId: string, param: string, value: string) =>
-      invoke<void>('redis_config_set', { configId, param, value }),
+      call<void>('config-set', { configId, param, value }),
   };
 }
 

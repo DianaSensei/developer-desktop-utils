@@ -654,15 +654,56 @@ là đã dùng được cho việc thật, không chỉ đã đúng về mặt c
    manifest) — một sidecar cài lúc chạy từ bên ngoài sẽ KHÔNG nằm trong
    allowlist đó trừ khi ai đó chủ động thêm tên bin vào `ALLOWED_SERVICES`
    lúc build (quyết định code riêng, chưa làm). Bắt đầu từ Redis (nhỏ nhất,
-   945 dòng, đã qua SDK từ trước) — **Bước 1 đã xong** (`devtool-svc-redis`:
-   CRUD cấu hình + connect/overview/duyệt key, 19 test, xác nhận thủ công
-   bằng Redis thật qua Docker). Sidecar lưu cấu hình ở thư mục riêng của NÓ
-   (`service-data/devtool-svc-redis/`), khác chỗ `redis_tool.rs` (Tier A)
-   đang lưu (`plugin-data/redis-client/`) — có chủ ý KHÔNG di trú lúc cắt
-   hẳn sang sidecar ở Bước 4/5: cấu hình kết nối Kafka/RabbitMQ/Redis/
-   Container không cần bảo toàn, người dùng tự nhập lại được (xem "Cách ly
-   dữ liệu" ở mục Tier B). Bước kế tiếp (chưa làm): thêm
-   `devtool-svc-redis` vào `ALLOWED_SERVICES`/`bundle.externalBin` lúc build,
-   rồi publish nó qua cơ chế cài đặt URL, rồi mới bỏ khỏi `externalBin` mặc
-   định.
+   945 dòng, đã qua SDK từ trước) — **Bước 1-3 đã xong** (`devtool-svc-redis`:
+   CRUD cấu hình + connect/overview/duyệt key (Bước 1), CLI exec + admin
+   (Bước 2), Pub/Sub qua giao thức stream (Bước 3), 34 test, xác nhận thủ
+   công bằng Redis thật qua Docker). **Bước 4+5 đã xong**: `devtool-svc-redis`
+   thêm vào `ALLOWED_SERVICES`/`bundle.externalBin`/`prepare-service-sidecars.mjs`;
+   `redis-client/plugin.ts` đổi quyền `native` (giữ cho MCP bridge) +
+   `service` (`service.methods` liệt kê đủ 21 method JSONL), bỏ `commands:
+   ['redis_']`; `createRedisApi` (types.ts) — điểm thắt duy nhất mọi
+   view/hook Redis đi qua — đổi từ `sdk.native.invoke('redis_xxx', …)` sang
+   `sdk.service.call('xxx-kebab', …)`, `pubsubSubscribe` đổi chữ ký trả về
+   `Promise<{ stop(): Promise<void> }>` đóng gói cả `unsubscribe` (sidecar)
+   lẫn `service_stream_stop` (host); `redis_tool.rs` (Tier A, ~945 dòng) đã
+   XOÁ khỏi `main.rs`. Sidecar lưu cấu hình ở thư mục riêng của NÓ
+   (`service-data/devtool-svc-redis/`), khác chỗ `redis_tool.rs` từng lưu
+   (`plugin-data/redis-client/`) — CỐ Ý KHÔNG di trú: cấu hình kết nối
+   Kafka/RabbitMQ/Redis/Container không cần bảo toàn, người dùng tự nhập lại
+   được (xem "Cách ly dữ liệu" ở mục Tier B) — người dùng nâng cấp sẽ thấy
+   danh sách kết nối Redis trống một lần.
+
+   **Lỗ hổng hạ tầng phát hiện, và cách né đúng ở tầng ứng dụng (không sửa
+   platform).** `service_host.rs::dispatch()` lặng lẽ bỏ một response
+   `error` khi waiter là `Stream` (không có biến thể `EventSink` nào mang
+   được lỗi ra ngoài) — một lỗi NGAY LÚC subscribe (config sai, kết nối bị
+   từ chối/timeout) gửi bằng `Response::err` (đặt `ServiceResponse.error`)
+   sẽ KHÔNG BAO GIỜ tới được `onMessage` phía client, và promise của
+   `sdk.service.stream()` (vốn đã resolve ngay sau khi đăng ký phía host
+   xong, không đợi sự kiện đầu) sẽ không bao giờ biết việc subscribe thật sự
+   thất bại — UI treo ở "Đang lắng nghe…" vĩnh viễn, không một dòng lỗi nào.
+   **Sửa ĐÚNG chỗ, không phải ở `service_host.rs`**: `devtool-svc-redis` gửi
+   lỗi lúc subscribe như một SỰ KIỆN STREAM bình thường
+   (`{"type":"error","message":...}`, cùng tầng với `"subscribed"`/
+   `"message"` đã có, qua `send_pubsub_error()`) thay vì qua
+   `ServiceResponse.error` — lỗi vì vậy đi trót lọt qua `dispatch()` (nó chỉ
+   chặn `error: Some(...)` ở TẦNG KHUNG, không biết gì về hình dạng payload
+   ứng dụng bên trong `result`). Phía TS, `createRedisApi.pubsubSubscribe`
+   giờ ĐỢI ĐÚNG sự kiện `subscribed` hoặc `error` đầu tiên trước khi
+   resolve/reject — không còn resolve sớm che giấu lỗi kết nối. Bài học
+   chung cho MỌI sidecar Tier B sau này (không riêng Redis): một method
+   STREAM muốn báo lỗi giữa chừng phải tự mã hoá lỗi đó vào chính giao thức
+   ứng dụng của mình (một trường `type`/discriminator trong `result`), không
+   được trông cậy vào `ServiceResponse.error` — cửa đó chỉ mở cho lời gọi
+   MỘT-LẦN (`Waiter::Once`). Đây KHÔNG phải nợ cần platform sửa: từng
+   sidecar tự biết ngữ nghĩa lỗi giữa chừng của method mình (Redis Pub/Sub
+   khác Kafka consume khác container logs), một khung lỗi chung ở tầng
+   `service_host.rs` sẽ phải đủ tổng quát cho mọi trường hợp trong khi mỗi
+   trường hợp lại muốn thứ khác — để mỗi sidecar tự quyết, đúng tinh thần
+   "quyền quyết định nằm gần nơi hiểu rõ ngữ cảnh nhất" đã theo xuyên suốt
+   tài liệu này.
+
+   Còn lại của Phase 2: publish `devtool-svc-redis` qua cơ chế cài đặt URL
+   rồi bỏ khỏi `externalBin` mặc định; lặp lại toàn bộ cho Kafka/RabbitMQ/
+   Container.
 4. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.

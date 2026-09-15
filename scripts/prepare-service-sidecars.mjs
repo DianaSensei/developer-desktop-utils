@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildSidecar } from './sidecar.mjs';
 
-const SERVICE_SIDECARS = ['devtool-svc-echo'];
+const SERVICE_SIDECARS = ['devtool-svc-echo', 'devtool-svc-redis'];
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 for (const bin of SERVICE_SIDECARS) buildSidecar(root, bin);

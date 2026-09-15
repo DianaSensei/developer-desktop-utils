@@ -52,7 +52,7 @@ describe('Settings — Plugins', () => {
     for (const perm of redis.permissions) {
       expect(within(row).getByText(perm), perm).toBeTruthy();
     }
-    expect(within(row).getByText(/redis_/)).toBeTruthy();
+    expect(within(row).getByText(/mcp_respond/)).toBeTruthy();
   });
 
   it('lời gọi bị từ chối hiện trong nhật ký, kèm quyền còn thiếu', () => {

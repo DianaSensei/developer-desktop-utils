@@ -732,58 +732,76 @@ async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::V
 /// spawn một task nền phát mỗi message Pub/Sub nhận được như một sự kiện
 /// riêng — task đó tự dừng khi `tx.send(...)` bắt đầu lỗi (writer task đã
 /// thoát vì ghi stdout lỗi), hoặc khi `unsubscribe` báo `notify`.
+/// Gửi lỗi như một SỰ KIỆN STREAM bình thường (`Response::event`, `error:
+/// None`), KHÔNG dùng `Response::err` (đặt `error: Some(...)` ở tầng khung
+/// tin nhắn). Lý do bắt buộc: `service_host.rs::dispatch()` coi một
+/// `ServiceResponse` mang `error: Some(...)` cho một `Waiter::Stream` là "kết
+/// thúc" và ÂM THẦM BỎ QUA — không có cách nào đưa nó tới `EventSink` (`sink`
+/// chỉ nhận `send(&self, Value)`, không có khái niệm lỗi). Nếu dùng
+/// `Response::err` ở đây, một lần subscribe thất bại (sai config, mất kết
+/// nối, timeout) sẽ KHÔNG BAO GIỜ tới được `onMessage` phía client — người
+/// dùng thấy "Đang lắng nghe…" mãi mãi mà không có gì xảy ra, không một dòng
+/// lỗi nào. Gói lỗi vào chính giao thức ứng dụng (`{"type":"error", ...}`,
+/// cùng tầng với `"subscribed"`/`"message"` đã có) để nó đi qua đúng con
+/// đường event bình thường, nơi phía TS (`createRedisApi.pubsubSubscribe`)
+/// đợi đúng "subscribed" hoặc "error" trước khi coi lời gọi là thành công.
+fn send_pubsub_error(tx: &mpsc::UnboundedSender<Response>, id: &str, message: impl Into<String>) {
+    let _ = tx.send(Response::event(id.to_string(), serde_json::json!({ "type": "error", "message": message.into() })));
+}
+
 async fn handle_pubsub_subscribe(id: String, params: serde_json::Value, tx: mpsc::UnboundedSender<Response>) {
     let channels: Vec<String> = opt_param(&params, "channels").unwrap_or_default();
     let patterns: Vec<String> = opt_param(&params, "patterns").unwrap_or_default();
     if channels.is_empty() && patterns.is_empty() {
-        let _ = tx.send(Response::err(id, "Provide at least one channel or pattern".to_string()));
+        send_pubsub_error(&tx, &id, "Provide at least one channel or pattern");
         return;
     }
     let config_id: String = match param(&params, "configId") {
         Ok(v) => v,
         Err(e) => {
-            let _ = tx.send(Response::err(id, e));
+            send_pubsub_error(&tx, &id, e);
             return;
         }
     };
     let config = match find_config(&config_id) {
         Ok(c) => c,
         Err(e) => {
-            let _ = tx.send(Response::err(id, e));
+            send_pubsub_error(&tx, &id, e);
             return;
         }
     };
     let client = match redis::Client::open(redis_url(&config)) {
         Ok(c) => c,
         Err(e) => {
-            let _ = tx.send(Response::err(id, e.to_string()));
+            send_pubsub_error(&tx, &id, e.to_string());
             return;
         }
     };
     let mut pubsub = match tokio::time::timeout(CONNECT_TIMEOUT, client.get_async_pubsub()).await {
         Ok(Ok(p)) => p,
         Ok(Err(e)) => {
-            let _ = tx.send(Response::err(id, e.to_string()));
+            send_pubsub_error(&tx, &id, e.to_string());
             return;
         }
         Err(_) => {
-            let _ = tx.send(Response::err(
-                id,
+            send_pubsub_error(
+                &tx,
+                &id,
                 format!("Connection to {}:{} timed out after {}s", config.host, config.port, CONNECT_TIMEOUT.as_secs()),
-            ));
+            );
             return;
         }
     };
 
     for ch in &channels {
         if let Err(e) = pubsub.subscribe(ch).await {
-            let _ = tx.send(Response::err(id, e.to_string()));
+            send_pubsub_error(&tx, &id, e.to_string());
             return;
         }
     }
     for pat in &patterns {
         if let Err(e) = pubsub.psubscribe(pat).await {
-            let _ = tx.send(Response::err(id, e.to_string()));
+            send_pubsub_error(&tx, &id, e.to_string());
             return;
         }
     }
@@ -1169,20 +1187,33 @@ mod tests {
 
     #[tokio::test]
     async fn pubsub_subscribe_khong_channel_khong_pattern_bao_loi_ro_rang() {
+        // Lỗi phải đi qua như một SỰ KIỆN STREAM (`response.error.is_none()`,
+        // `stream: true`, payload `{"type":"error",...}`) — KHÔNG phải
+        // `response.error: Some(...)` ở tầng khung tin nhắn, vì
+        // `service_host.rs::dispatch()` âm thầm bỏ qua lỗi tầng khung cho một
+        // `Waiter::Stream` (xem comment ở `send_pubsub_error`). Nếu test này
+        // đỏ vì `response.error` lại có giá trị, đó là dấu hiệu bug cũ
+        // (subscribe thất bại nhưng client không bao giờ biết) đã quay lại.
         let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
         handle_pubsub_subscribe("req-1".to_string(), serde_json::json!({ "channels": [], "patterns": [] }), tx).await;
-        let response = rx.recv().await.expect("phải gửi đúng một response lỗi");
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
         assert_eq!(response.id, "req-1");
-        assert!(response.error.unwrap().contains("channel or pattern"));
-        assert!(!response.stream);
+        assert!(response.error.is_none(), "lỗi phải đi qua stream event, không phải response.error");
+        assert!(response.stream);
+        let event = response.result.expect("sự kiện lỗi phải mang result");
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("channel or pattern"));
     }
 
     #[tokio::test]
     async fn pubsub_subscribe_thieu_config_id_bao_loi_ro_rang() {
         let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
         handle_pubsub_subscribe("req-2".to_string(), serde_json::json!({ "channels": ["ch"] }), tx).await;
-        let response = rx.recv().await.expect("phải gửi đúng một response lỗi");
-        assert!(response.error.unwrap().contains("configId"));
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        let event = response.result.unwrap();
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("configId"));
     }
 
     #[tokio::test]
@@ -1194,7 +1225,9 @@ mod tests {
             tx,
         )
         .await;
-        let response = rx.recv().await.expect("phải gửi đúng một response lỗi");
-        assert!(response.error.is_some());
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        assert_eq!(response.result.unwrap()["type"], "error");
     }
+
 }

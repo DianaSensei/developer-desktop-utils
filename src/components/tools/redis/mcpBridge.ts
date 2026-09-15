@@ -7,8 +7,9 @@
 // handler below, then reports back via `mcp_respond`.
 //
 // Connection CRUD (list/add/update/delete/test) needs no React state at
-// all — `redisApi` is a thin wrapper over Tauri commands that read/write a
-// JSON file in the app data dir (src-tauri/src/redis_tool.rs), so it can be
+// all — `redisApi` (createRedisApi in ./types.ts) is a thin wrapper over
+// `sdk.service.call` to the Tier B sidecar (src-tauri/src/bin/devtool-svc-redis.rs),
+// which reads/writes a JSON file in ITS OWN service-data dir, so it can be
 // called directly from here regardless of whether RedisClient.tsx is
 // mounted. Only connect/disconnect (which selects/connects a *saved*
 // connection) touches persisted UI state (`connectedConnId`/`db`), which is

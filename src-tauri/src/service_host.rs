@@ -68,7 +68,7 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 /// end-to-end thật của tier B, cả một-lần lẫn stream, trước khi có plugin thật
 /// cần tới cơ chế này, xem `tests/service_echo.rs`. Chưa có `plugin.ts` nào
 /// khai `service` để gọi tới nó, nên nó không xuất hiện ở bất cứ đâu trong UI.
-const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo"];
+const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo", "devtool-svc-redis"];
 
 #[derive(Debug, Deserialize)]
 pub struct ServiceRequest {
