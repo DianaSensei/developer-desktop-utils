@@ -289,6 +289,27 @@ fn spawn_process(
     }))
 }
 
+/// Thư mục dữ liệu bền của MỘT sidecar — `<app_data>/service-data/<bin>`. Hàm
+/// THUẦN (chỉ ghép đường dẫn, không chạm đĩa) để test được không cần
+/// `AppHandle`; `get_or_spawn` là nơi thật sự `create_dir_all` nó.
+///
+/// Cách ly bằng cấu trúc thư mục, không phải bằng quy ước đặt tên file: một
+/// sidecar chỉ NHÌN THẤY thư mục của chính nó qua biến môi trường
+/// `DEVTOOL_SERVICE_DATA_DIR` — nó không có cách nào biết (nói gì tới đọc/ghi)
+/// thư mục app_data gốc hay thư mục của sidecar khác, kể cả nếu code của nó có
+/// lỗi hay cố tình đoán đường dẫn. Khác hẳn quy ước cũ của các
+/// `#[tauri::command]` biên dịch sẵn (`kafka-brokers.json`,
+/// `rabbit-connections.json`, `container-connections.json`, `redis_tool.rs`'s
+/// `redis-connections.json`) — các file đó vẫn nằm phẳng ngay dưới app_data
+/// gốc, chỉ "cách ly" bằng việc mỗi module tự giác chỉ đụng đúng tên file của
+/// mình, không có gì ở tầng hệ thống ngăn một lỗi gõ nhầm tên đọc/ghi nhầm file
+/// của tool khác. Sidecar mới port sang (bắt đầu từ Redis) sửa đúng khoảng
+/// trống này; các Tier A còn lại tự động được sửa khi tới lượt chúng port sang
+/// Tier B ở các bước sau của Phase 2 (xem docs/decisions/platform-plugin-architecture.md).
+fn service_data_dir(app_data_dir: &std::path::Path, bin: &str) -> std::path::PathBuf {
+    app_data_dir.join("service-data").join(bin)
+}
+
 async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<Arc<RunningSidecar>, String> {
     let mut map = registry.running.lock().await;
     if let Some(running) = map.get(bin) {
@@ -298,10 +319,13 @@ async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) ->
     let mut command = Command::new(sidecar_path(bin)?);
     // Sidecar không có `AppHandle` — nó không phải một plugin JS chạy trong
     // webview, nên không đi qua `sdk.storage`/`app.path()`. Một sidecar cần
-    // lưu gì đó bền (cấu hình kết nối, ví dụ) đọc thư mục này qua biến môi
-    // trường thay vì tự đoán quy ước thư mục dữ liệu của app trên từng OS.
-    if let Ok(dir) = app.path().app_data_dir() {
-        command.env("DEVTOOL_APP_DATA_DIR", dir);
+    // lưu gì đó bền (cấu hình kết nối, ví dụ) đọc thư mục NÀY, chỉ của riêng
+    // nó, qua biến môi trường — không phải toàn bộ app_data_dir.
+    if let Ok(app_data) = app.path().app_data_dir() {
+        let dir = service_data_dir(&app_data, bin);
+        if std::fs::create_dir_all(&dir).is_ok() {
+            command.env("DEVTOOL_SERVICE_DATA_DIR", dir);
+        }
     }
     let cleanup_registry = registry.clone();
     let cleanup_bin = bin.to_string();
@@ -468,6 +492,17 @@ mod tests {
             method: "ping".into(),
             params: serde_json::Value::Null,
         }
+    }
+
+    #[test]
+    fn service_data_dir_cach_ly_theo_ten_bin_khong_phai_ten_file() {
+        let root = std::path::Path::new("/app-data");
+        assert_eq!(service_data_dir(root, "devtool-svc-redis"), root.join("service-data").join("devtool-svc-redis"));
+        // Hai sidecar khác nhau không bao giờ ra cùng một thư mục.
+        assert_ne!(
+            service_data_dir(root, "devtool-svc-redis"),
+            service_data_dir(root, "devtool-svc-kafka"),
+        );
     }
 
     #[test]

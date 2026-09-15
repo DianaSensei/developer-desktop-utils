@@ -1,12 +1,15 @@
 // Plugin dịch vụ (tier B) cho Redis Client — Bước 1 của Phase 2 (xem
 // docs/decisions/platform-plugin-architecture.md, mục "Việc còn lại").
 //
-// Port TRỰC TIẾP từ src-tauri/src/redis_tool.rs, giữ nguyên hành vi: cùng
-// đường dẫn file cấu hình, cùng hình dạng JSON trả về (camelCase), cùng ngữ
-// nghĩa SCAN/VALUE_CAP. Khác NHAU đúng hai chỗ, cả hai đều là hệ quả của việc
-// chạy như tiến trình riêng chứ không phải một `#[tauri::command]`:
-//   - Không có `AppHandle` → thư mục dữ liệu app đọc từ biến môi trường
-//     `DEVTOOL_APP_DATA_DIR` mà `service_host.rs::get_or_spawn` set khi spawn.
+// Port từ src-tauri/src/redis_tool.rs, giữ nguyên HÌNH DẠNG dữ liệu (JSON
+// camelCase, ngữ nghĩa SCAN/VALUE_CAP) nhưng ĐỔI chỗ lưu cấu hình kết nối một
+// cách có chủ ý — xem "Cách ly dữ liệu" dưới. Khác với bản Tier A đúng hai
+// chỗ, cả hai đều là hệ quả của việc chạy như tiến trình riêng:
+//   - Không có `AppHandle` → thư mục dữ liệu đọc từ biến môi trường
+//     `DEVTOOL_SERVICE_DATA_DIR` mà `service_host.rs::get_or_spawn` set khi
+//     spawn — thư mục này ĐÃ được cách ly riêng cho sidecar này
+//     (`<app_data>/service-data/devtool-svc-redis`), sidecar không có cách
+//     nào biết tới app_data gốc hay thư mục của sidecar khác.
 //   - Nhiều lời gọi có thể chồng lên nhau trên CÙNG một sidecar (host demux
 //     theo `id`, xem service_host.rs) — main() vì vậy KHÔNG đọc-xử lý-trả lời
 //     tuần tự như devtool-svc-echo, mà spawn một task async cho mỗi dòng vào,
@@ -88,17 +91,28 @@ pub struct RedisConnection {
     pub use_tls: bool,
 }
 
-// ── Config persistence — CÙNG file (`redis-connections.json`) mà redis_tool.rs
-//    dùng, để không mất cấu hình đã lưu khi chuyển sang sidecar này. ──────────
+// ── Config persistence ───────────────────────────────────────────────────────
+//
+// Lưu trong thư mục RIÊNG của sidecar này (`DEVTOOL_SERVICE_DATA_DIR` —
+// `<app_data>/service-data/devtool-svc-redis/`), KHÔNG phải cùng chỗ với file
+// `redis-connections.json` mà `redis_tool.rs` (Tier A, vẫn đang chạy song
+// song) đang dùng. Cách ly bằng thư mục, không phải bằng tên file: sidecar
+// này không biết và không có cách nào đọc/ghi ra ngoài thư mục của chính nó.
+// Hệ quả: cấu hình lưu qua Tier A hiện tại và qua sidecar này (chưa có
+// `plugin.ts` nào gọi tới nó) là HAI bản riêng biệt cho tới khi Bước 4/5 của
+// Phase 2 (xem docs/decisions/platform-plugin-architecture.md) chuyển hẳn
+// frontend sang sidecar này — lúc đó cần một bước di trú (copy nội dung
+// `redis-connections.json` cũ vào `connections.json` trong thư mục mới) để
+// không mất cấu hình người dùng đã lưu qua Tier A.
 
 fn app_data_dir() -> Result<PathBuf, String> {
-    std::env::var("DEVTOOL_APP_DATA_DIR")
+    std::env::var("DEVTOOL_SERVICE_DATA_DIR")
         .map(PathBuf::from)
-        .map_err(|_| "DEVTOOL_APP_DATA_DIR không được set — sidecar phải chạy qua service_host.rs".to_string())
+        .map_err(|_| "DEVTOOL_SERVICE_DATA_DIR không được set — sidecar phải chạy qua service_host.rs".to_string())
 }
 
 fn configs_path() -> Result<PathBuf, String> {
-    Ok(app_data_dir()?.join("redis-connections.json"))
+    Ok(app_data_dir()?.join("connections.json"))
 }
 
 fn load_configs() -> Vec<RedisConnection> {
@@ -632,8 +646,8 @@ mod tests {
         // Không set biến môi trường trong test này — nhưng test khác trong
         // cùng binary CÓ THỂ chạy song song và set nó (không có ở đây), nên chỉ
         // assert khi biến thực sự vắng mặt để tránh test chập chờn.
-        if std::env::var("DEVTOOL_APP_DATA_DIR").is_err() {
-            assert!(app_data_dir().unwrap_err().contains("DEVTOOL_APP_DATA_DIR"));
+        if std::env::var("DEVTOOL_SERVICE_DATA_DIR").is_err() {
+            assert!(app_data_dir().unwrap_err().contains("DEVTOOL_SERVICE_DATA_DIR"));
         }
     }
 
@@ -651,7 +665,7 @@ mod tests {
 
     #[tokio::test]
     async fn config_id_khong_ton_tai_tra_ve_loi_ro_rang() {
-        // configs_path() phụ thuộc DEVTOOL_APP_DATA_DIR; nếu thiếu, find_config
+        // configs_path() phụ thuộc DEVTOOL_SERVICE_DATA_DIR; nếu thiếu, find_config
         // vẫn phải trả lỗi rõ ràng (load_configs() rơi về rỗng), không panic.
         let res = handle("overview", serde_json::json!({ "configId": "khong-ton-tai", "db": 0 })).await;
         assert!(res.is_err());
@@ -679,7 +693,7 @@ mod tests {
         })
         .to_string();
         // delete-config không cần config tồn tại (retain là no-op nếu không có) —
-        // nhưng vẫn cần DEVTOOL_APP_DATA_DIR để ghi lại file, nên test này chỉ
+        // nhưng vẫn cần DEVTOOL_SERVICE_DATA_DIR để ghi lại file, nên test này chỉ
         // xác nhận KHÔNG panic và trả về một Response hợp lệ (lỗi hay không tuỳ
         // môi trường chạy test có set biến hay không).
         let response = handle_line(&line).await;

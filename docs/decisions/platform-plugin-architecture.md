@@ -274,6 +274,52 @@ kiểm: dùng chung cửa chặn với `call`, báo lỗi rõ ràng khi transpor
 Không thêm `tauri-plugin-shell`: sidecar resolve như binary cạnh file thực thi, đúng
 quy ước `mcp_bridge::mcp_sidecar_path` — không phải mở thêm quyền chạy tiến trình nào.
 
+### Cách ly dữ liệu giữa các plugin
+
+Ba tầng dữ liệu, ba cơ chế cách ly khác nhau — không có một cơ chế chung cho
+tất cả vì chúng khác hẳn nhau về THỨ đang bị cô lập khỏi cái gì:
+
+- **`sdk.storage`/`sdk.secrets` (Tier A, phía webview).** Cách ly ở TẦNG CODE,
+  không phải quy ước: `storageKey(pluginId, key)` / `vaultKey(pluginId, key)`
+  được đóng (closure) sẵn với `manifest.id` ngay lúc `createPluginSdk(manifest)`
+  dựng SDK cho plugin đó — bề mặt SDK plugin cầm trong tay **không có tham số
+  nào để tự nêu một `pluginId` khác**. Một plugin muốn đọc namespace của plugin
+  khác phải cố tình bỏ qua SDK và tự ráp chuỗi khoá bằng tay — hành vi đó bị
+  `guard.test.ts` khoá số lần "code plugin dùng thẳng store chung" ở ngưỡng 2
+  (hai ngoại lệ đã biết, xem "Rào chắn ranh giới"). Đây là cách ly đúng nghĩa
+  cho một hệ nhiều plugin **cùng do một chủ phát hành**, không phải sandbox
+  chống mã độc (xem "Không làm" — sandbox bị loại bỏ có chủ đích vì lý do khác).
+
+- **Sidecar Tier B (tiến trình riêng).** Cách ly ở TẦNG HỆ ĐIỀU HÀNH, không phải
+  quy ước đặt tên file: `service_host.rs::get_or_spawn` cấp cho mỗi sidecar một
+  thư mục RIÊNG, `<app_data>/service-data/<bin>/`, qua biến môi trường
+  `DEVTOOL_SERVICE_DATA_DIR` — sidecar chỉ nhận được đúng đường dẫn thư mục của
+  chính nó, không có cách nào (kể cả nếu code của nó có lỗi) biết tới hay đọc
+  ghi thư mục app_data gốc hay thư mục của sidecar khác. `devtool-svc-redis`
+  (Phase 2, Bước 1) là sidecar đầu tiên dùng cơ chế này, thay `redis-connections.json`
+  phẳng ở gốc app_data bằng `service-data/devtool-svc-redis/connections.json`.
+  Test: `service_data_dir` (hàm thuần, ghép đường dẫn không chạm đĩa) có test
+  khoá hai việc — đúng công thức ghép, và hai bin khác nhau luôn ra hai thư mục
+  khác nhau.
+
+- **Tier A cũ, biên dịch sẵn (`kafka.rs`, `rabbit.rs`, `container_tool.rs`, và
+  `redis_tool.rs` trước khi có sidecar).** Đây là NỢ isolation CÓ THẬT, không
+  phải đã giải quyết: mỗi module tự đọc/ghi một file phẳng ngay dưới app_data
+  gốc (`kafka-brokers.json`, `rabbit-connections.json`,
+  `container-connections.json`, `redis-connections.json`) — không đi qua
+  `sdk.storage`/`sdk.secrets` (chúng dùng lệnh Rust riêng, không phải kho
+  chung), và không có gì ở tầng hệ thống ngăn một lỗi gõ nhầm tên đọc/ghi nhầm
+  file của tool khác; nó "cách ly" đúng bằng việc code hiện tại được viết cẩn
+  thận chứ không bằng cấu trúc. Cách sửa ĐÚNG là để nguyên — không làm một đợt
+  di trú riêng cho những file này — vì chúng đang trên đường bị xoá hẳn theo
+  đúng lịch của Phase 2: mỗi tool khi tới lượt port sang sidecar (`redis_tool.rs`
+  đã bắt đầu) tự động được thư mục riêng qua `service_data_dir`, không cần một
+  dự án cách ly độc lập chạy song song rồi lại phải di trú lần nữa khi tool đó
+  bị xoá. `mcp_bridge.rs`'s `mcp-bridge.json` là ngoại lệ ĐÚNG, không phải nợ:
+  nó không phải dữ liệu của MỘT plugin, mà là cấu hình của chính cầu nối MCP
+  (cổng loopback), dùng chung cho MỌI bridge của MỌI plugin — không có
+  `pluginId` nào để cách ly theo.
+
 **Đường end-to-end đã có bằng chứng thật, với `devtool-svc-echo`.** Đây là plugin
 dịch vụ tối giản (`ping`/`echo`, không có giá trị người dùng) — tồn tại thuần để
 chứng minh cơ chế: build ra binary thật, đóng gói qua `externalBin`, nằm trong
@@ -507,6 +553,12 @@ là đã dùng được cho việc thật, không chỉ đã đúng về mặt c
    (b) `ALLOWED_SERVICES` là hằng số biên dịch sẵn trong Rust theo đúng chủ đích
    (ranh giới tin cậy không giao cho manifest) — một sidecar cài lúc chạy từ bên
    ngoài sẽ không nằm trong allowlist đó trừ khi cơ chế allowlist cũng được nghĩ
-   lại. Bắt đầu từ Redis (nhỏ nhất, 945 dòng, đã qua SDK từ trước) khi có quyết
-   định tiếp tục.
+   lại. Bắt đầu từ Redis (nhỏ nhất, 945 dòng, đã qua SDK từ trước) — **Bước 1
+   đã xong** (`devtool-svc-redis`: CRUD cấu hình + connect/overview/duyệt key,
+   19 test, xác nhận thủ công bằng Redis thật qua Docker). Nhắc cho Bước 4/5:
+   sidecar lưu cấu hình ở thư mục RIÊNG (`service-data/devtool-svc-redis/`,
+   xem "Cách ly dữ liệu" ở mục Tier B), khác chỗ `redis_tool.rs` (Tier A) đang
+   lưu (`redis-connections.json` ở gốc app_data) — lúc cắt hẳn sang sidecar
+   cần một bước di trú copy nội dung file cũ vào file mới, không thì người
+   dùng đang có kết nối đã lưu sẽ thấy danh sách trống.
 4. **Xoá hai ngoại lệ store chung** khi các migration một lần của chúng hết hạn dùng.
