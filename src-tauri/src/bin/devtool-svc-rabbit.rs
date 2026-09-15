@@ -30,26 +30,35 @@
 // Mọi method ở bước này là MỘT-LẦN (đi qua `handle()`), không có method
 // stream nào.
 //
-// KHÔNG làm trong bước này: `consume-start`/`consume-stop` (method STREAM,
-// cần `ConsumerRegistry` — Bước 3 riêng sau, tương tự cách Redis Pub/Sub và
-// Container logs/stats streaming đã tách bước — xem `handle_logs_start` của
-// `devtool-svc-container.rs` cho mẫu sẽ dùng: sự kiện đầu
-// `{"type":"subscribed","subscriptionId":...}`, lỗi giữa chừng qua
-// `send_stream_error` KHÔNG BAO GIỜ dùng `Response::err`).
+// Bước 3 (đây): `consume-start` (method STREAM) + `consume-stop` (một-lần).
+// Port từ `rabbit_consume_start`/`rabbit_consume_stop` của rabbit.rs (dòng
+// ~556-659) — giữ NGUYÊN logic ba `ack_mode` ("peek"/"consume"/"respond") và
+// việc giữ `_keep_conn`/`channel` sống trong task nền suốt vòng đời consumer.
+// Giao thức stream mirror `handle_logs_start` của `devtool-svc-container.rs`
+// (chính nó mirror `handle_pubsub_subscribe` của `devtool-svc-redis.rs`): sự
+// kiện đầu `{"type":"subscribed","subscriptionId":...}`, mỗi message nhận
+// được là `{"type":"message", ...ConsumedMessage}`, lỗi giữa chừng qua
+// `send_stream_error` (SỰ KIỆN STREAM bình thường) KHÔNG BAO GIỜ dùng
+// `Response::err` — `service_host.rs::dispatch()` âm thầm bỏ payload của một
+// response mang `error: Some` cho một `Waiter::Stream`. Đăng ký/gỡ đăng ký
+// dùng CÙNG một `StreamRegistry` kiểu `Arc<Mutex<HashMap<id, Notify>>>` như
+// hai sidecar kia — subscriptionId do chính sidecar sinh (`Uuid::new_v4()`)
+// nên một registry chung là đủ dù sau này có thêm method stream khác.
 
 use base64::Engine;
 use futures_util::StreamExt;
 use lapin::options::{
-    BasicConsumeOptions, BasicPublishOptions, ConfirmSelectOptions, ExchangeDeclareOptions, QueueBindOptions,
-    QueueDeclareOptions,
+    BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, BasicQosOptions, ConfirmSelectOptions,
+    ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions,
 };
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
 use lapin::types::{AMQPValue, FieldTable};
 use lapin::{BasicProperties, Connection, ConnectionProperties, ExchangeKind};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc;
@@ -97,6 +106,13 @@ impl Response {
     }
     fn err(id: String, message: impl Into<String>) -> Self {
         Self { protocol: SERVICE_PROTOCOL, id, result: None, error: Some(message.into()), stream: false, done: false }
+    }
+    /// Một-trong-nhiều sự kiện của cùng một lời gọi stream (`consume-start`) —
+    /// không bao giờ đi kèm `done: true`: một consumer sống tới khi bị dừng
+    /// tay bằng `consume-stop`, giống `logs-start`/`stats-start` của
+    /// `devtool-svc-container.rs`.
+    fn event(id: String, result: serde_json::Value) -> Self {
+        Self { protocol: SERVICE_PROTOCOL, id, result: Some(result), error: None, stream: true, done: false }
     }
 }
 
@@ -192,6 +208,33 @@ pub struct PublishOutcome {
     pub confirmed: bool,
     pub routed: bool,
     pub return_reason: Option<String>,
+}
+
+/// Port nguyên vẹn từ `rabbit.rs::ConsumedMessage` — một message nhận được từ
+/// `consume-start`, phát như sự kiện `{"type":"message", ...}`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsumedMessage {
+    pub payload: String,
+    pub exchange: String,
+    pub routing_key: String,
+    pub redelivered: bool,
+    pub delivery_tag: u64,
+    pub correlation_id: Option<String>,
+    pub content_type: Option<String>,
+    pub message_id: Option<String>,
+    pub headers: BTreeMap<String, String>,
+}
+
+/// Port nguyên vẹn từ `rabbit.rs::ReplyOptions` — cấu hình auto-reply cho
+/// `ackMode: "respond"` (tool đóng vai RPC server).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplyOptions {
+    /// Reply with the request's own body instead of `payload`.
+    pub echo: bool,
+    pub payload: String,
+    pub content_type: Option<String>,
 }
 
 // ── Config persistence ───────────────────────────────────────────────────────
@@ -357,6 +400,45 @@ fn to_field_table(headers: &BTreeMap<String, String>) -> FieldTable {
     ft
 }
 
+/// Port nguyên vẹn từ `rabbit.rs::amqp_value_to_string` — dùng để đọc header
+/// của một message đã nhận (chiều ngược `to_field_table`).
+fn amqp_value_to_string(v: &AMQPValue) -> String {
+    match v {
+        AMQPValue::LongString(s) => s.to_string(),
+        AMQPValue::Boolean(b) => b.to_string(),
+        AMQPValue::ShortShortInt(i) => i.to_string(),
+        AMQPValue::ShortShortUInt(i) => i.to_string(),
+        AMQPValue::ShortInt(i) => i.to_string(),
+        AMQPValue::ShortUInt(i) => i.to_string(),
+        AMQPValue::LongInt(i) => i.to_string(),
+        AMQPValue::LongUInt(i) => i.to_string(),
+        AMQPValue::LongLongInt(i) => i.to_string(),
+        other => format!("{other:?}"),
+    }
+}
+
+/// Port nguyên vẹn từ `rabbit.rs::message_from_delivery`.
+fn message_from_delivery(d: &lapin::message::Delivery) -> ConsumedMessage {
+    let p = &d.properties;
+    let mut headers = BTreeMap::new();
+    if let Some(h) = p.headers().as_ref() {
+        for (k, v) in h.inner() {
+            headers.insert(k.to_string(), amqp_value_to_string(v));
+        }
+    }
+    ConsumedMessage {
+        payload: String::from_utf8_lossy(&d.data).to_string(),
+        exchange: d.exchange.to_string(),
+        routing_key: d.routing_key.to_string(),
+        redelivered: d.redelivered,
+        delivery_tag: d.delivery_tag,
+        correlation_id: p.correlation_id().as_ref().map(|s| s.to_string()),
+        content_type: p.content_type().as_ref().map(|s| s.to_string()),
+        message_id: p.message_id().as_ref().map(|s| s.to_string()),
+        headers,
+    }
+}
+
 fn build_properties(p: &PublishProps) -> BasicProperties {
     let mut props = BasicProperties::default();
     if let Some(v) = nonempty(&p.content_type) {
@@ -430,6 +512,175 @@ pub struct ExchangeAmqpInfo {
 /// channel, so each probe runs on its own fresh channel.
 fn is_not_found(msg: &str) -> bool {
     msg.contains("NOT_FOUND") || msg.contains("404") || msg.contains("no queue") || msg.contains("no exchange")
+}
+
+// ── Consumer streaming — Bước 3 ─────────────────────────────────────────────
+//
+// Registry nội bộ theo dõi các consumer đang chạy, tách biệt khỏi `Waiters`
+// phía service_host.rs (đó là registry của HOST theo `request.id` của MỘT
+// LẦN GỌI `consume-start`; đây là registry của SIDECAR theo `consumerId` NỘI
+// BỘ, sống xuyên suốt nhiều lần gọi — một `consume-stop` request khác hẳn
+// request đã gọi `consume-start` mới dừng đúng consumer này). Cùng cấu trúc
+// `PubSubRegistry` của devtool-svc-redis.rs / `StreamRegistry` của
+// devtool-svc-container.rs — chỉ một method stream ở sidecar này nên một
+// registry riêng là đủ, không cần dùng chung với method khác.
+#[derive(Default)]
+struct ConsumerStreamRegistry {
+    inner: Mutex<HashMap<String, Arc<tokio::sync::Notify>>>,
+}
+
+static STREAM_REGISTRY: OnceLock<ConsumerStreamRegistry> = OnceLock::new();
+
+fn stream_registry() -> &'static ConsumerStreamRegistry {
+    STREAM_REGISTRY.get_or_init(ConsumerStreamRegistry::default)
+}
+
+/// Gửi lỗi giữa chừng của `consume-start` như một SỰ KIỆN STREAM bình thường
+/// (`Response::event`, `error: None` ở tầng khung), KHÔNG BAO GIỜ dùng
+/// `Response::err` — `service_host.rs::dispatch()` âm thầm bỏ qua một
+/// `ServiceResponse` mang `error: Some(...)` cho một `Waiter::Stream` (xem
+/// comment đầy đủ ở `send_pubsub_error`, devtool-svc-redis.rs). Payload
+/// `{"type":"error","message":...}` đi qua đúng con đường event mà phía
+/// client đang đợi (`"subscribed"` hoặc `"error"`).
+fn send_stream_error(tx: &mpsc::UnboundedSender<Response>, id: &str, message: impl Into<String>) {
+    let _ = tx.send(Response::event(id.to_string(), serde_json::json!({ "type": "error", "message": message.into() })));
+}
+
+/// `consume-start` là method STREAM — mirror `handle_logs_start` của
+/// devtool-svc-container.rs / `handle_pubsub_subscribe` của
+/// devtool-svc-redis.rs: mở connection+channel AMQP thật, `basic_qos`,
+/// `basic_consume`, đăng ký vào registry nội bộ, gửi sự kiện đầu
+/// `{"type":"subscribed","subscriptionId":...}` rồi spawn một task nền phát
+/// mỗi message nhận được như `{"type":"message", ...ConsumedMessage}`. Port
+/// ĐÚNG logic ack/reply theo `ackMode` từ `rabbit_consume_start`
+/// (rabbit.rs dòng ~556-648): "peek" không ack (để lại unacked, bounded bởi
+/// prefetch), "consume" ack không reply, "respond" ack + publish reply qua
+/// direct reply-to nếu `reply` có mặt (echo body gốc hay payload tuỳ chỉnh,
+/// set correlation_id/content_type từ request gốc). GIỮ `_keep_conn`/`channel`
+/// sống trong task nền suốt vòng đời consumer — drop sớm đóng kết nối AMQP
+/// ngay khi hàm return, lỗi dễ mắc nhất khi port ẩu.
+async fn handle_consume_start(id: String, params: serde_json::Value, tx: mpsc::UnboundedSender<Response>) {
+    let config_id: String = match param(&params, "configId") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let queue: String = match param(&params, "queue") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let ack_mode: String = match param(&params, "ackMode") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let prefetch: u16 = match param(&params, "prefetch") {
+        Ok(v) => v,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let reply: Option<ReplyOptions> = opt_param(&params, "reply");
+
+    let config = match find_config(&config_id) {
+        Ok(c) => c,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let conn = match connect_amqp(&config).await {
+        Ok(c) => c,
+        Err(e) => return send_stream_error(&tx, &id, e),
+    };
+    let channel = match conn.create_channel().await {
+        Ok(c) => c,
+        Err(e) => return send_stream_error(&tx, &id, e.to_string()),
+    };
+
+    let prefetch = prefetch.clamp(1, 500);
+    if let Err(e) = channel.basic_qos(prefetch, BasicQosOptions::default()).await {
+        return send_stream_error(&tx, &id, e.to_string());
+    }
+
+    let should_ack = ack_mode != "peek"; // consume + respond both ack
+    let should_reply = ack_mode == "respond" && reply.is_some();
+    let mut consumer = match channel
+        .basic_consume(
+            queue.clone().into(),
+            "devtool-consumer".into(),
+            BasicConsumeOptions::default(), // manual ack
+            FieldTable::default(),
+        )
+        .await
+    {
+        Ok(c) => c,
+        Err(e) => return send_stream_error(&tx, &id, format!("Consume failed: {e}")),
+    };
+
+    let consumer_id = Uuid::new_v4().to_string();
+    let notify = Arc::new(tokio::sync::Notify::new());
+    stream_registry().inner.lock().unwrap().insert(consumer_id.clone(), notify.clone());
+
+    if tx
+        .send(Response::event(id.clone(), serde_json::json!({ "type": "subscribed", "subscriptionId": consumer_id })))
+        .is_err()
+    {
+        stream_registry().inner.lock().unwrap().remove(&consumer_id);
+        return;
+    }
+
+    tokio::spawn(async move {
+        // Giữ connection (và channel) sống suốt vòng đời consumer; channel còn
+        // dùng để publish reply ở chế độ "respond". Drop sớm (không giữ biến
+        // này) đóng kết nối AMQP ngay khi task return.
+        let _keep_conn = conn;
+        let channel = channel;
+        loop {
+            tokio::select! {
+                _ = notify.notified() => break,
+                next = consumer.next() => match next {
+                    Some(Ok(delivery)) => {
+                        let message = message_from_delivery(&delivery);
+                        let event = {
+                            let mut v = serde_json::to_value(&message).unwrap();
+                            v.as_object_mut().unwrap().insert("type".to_string(), serde_json::json!("message"));
+                            v
+                        };
+                        if tx.send(Response::event(id.clone(), event)).is_err() {
+                            break; // writer task đã thoát — không còn ai đọc
+                        }
+                        if should_reply {
+                            if let (Some(rep), Some(reply_to)) =
+                                (reply.as_ref(), delivery.properties.reply_to().as_ref())
+                            {
+                                let body: Vec<u8> = if rep.echo {
+                                    delivery.data.clone()
+                                } else {
+                                    rep.payload.clone().into_bytes()
+                                };
+                                let mut rprops = BasicProperties::default();
+                                if let Some(cid) = delivery.properties.correlation_id().as_ref() {
+                                    rprops = rprops.with_correlation_id(cid.clone());
+                                }
+                                if let Some(ct) = rep.content_type.as_ref().filter(|s| !s.trim().is_empty()) {
+                                    rprops = rprops.with_content_type(ct.clone().into());
+                                }
+                                let _ = channel
+                                    .basic_publish(
+                                        "".into(),
+                                        reply_to.as_str().into(),
+                                        BasicPublishOptions::default(),
+                                        &body,
+                                        rprops,
+                                    )
+                                    .await;
+                            }
+                        }
+                        if should_ack {
+                            let _ = delivery.ack(BasicAckOptions::default()).await;
+                        }
+                        // peek mode: leave unacked (bounded by prefetch)
+                    }
+                    Some(Err(_)) | None => break,
+                }
+            }
+        }
+        stream_registry().inner.lock().unwrap().remove(&consumer_id);
+    });
 }
 
 // ── Method dispatch ───────────────────────────────────────────────────────────
@@ -748,6 +999,16 @@ async fn handle(method: &str, params: serde_json::Value) -> Result<serde_json::V
             Ok(serde_json::Value::Null)
         }
 
+        // "consume-start" (stream) KHÔNG đi qua đây — xem `handle_consume_start`.
+
+        "consume-stop" => {
+            let consumer_id: String = param(&params, "consumerId")?;
+            if let Some(notify) = stream_registry().inner.lock().unwrap().remove(&consumer_id) {
+                notify.notify_one();
+            }
+            Ok(serde_json::Value::Null)
+        }
+
         other => Err(format!("method không hỗ trợ: \"{other}\"")),
     }
 }
@@ -784,6 +1045,11 @@ async fn main() {
 
     drop(tx);
     let _ = writer.await;
+    // Lưu ý: nếu có consumer `consume-start` đang chạy, task nền của nó vẫn
+    // giữ một bản sao `tx` nên `writer` (và do đó main()) sẽ KHÔNG tự thoát
+    // chỉ vì stdin đóng — `service_host.rs` spawn sidecar với
+    // `kill_on_drop(true)`, nên tiến trình vẫn bị buộc dừng khi host
+    // kill/drop child handle bất kể trạng thái kênh nội bộ này.
 }
 
 async fn handle_line(line: &str, tx: &mpsc::UnboundedSender<Response>) {
@@ -798,9 +1064,13 @@ async fn handle_line(line: &str, tx: &mpsc::UnboundedSender<Response>) {
         let _ = tx.send(Response::err(req.id, format!("lệch protocol: client {}, sidecar {SERVICE_PROTOCOL}", req.protocol)));
         return;
     }
-    // Bước này KHÔNG có method stream nào — `consume-start`/`consume-stop` là
-    // Bước 3 riêng, sẽ thêm nhánh dispatch tương tự `logs-start` của
-    // devtool-svc-container.rs khi đó.
+    // `consume-start` KHÔNG đi qua `handle()` (một-lần) — nó cần giữ `tx` để
+    // phát nhiều sự kiện theo thời gian, xem `handle_consume_start`. Mọi
+    // method khác (bao gồm `consume-stop`) vẫn đi qua đường một-lần cũ.
+    if req.method == "consume-start" {
+        handle_consume_start(req.id, req.params, tx.clone()).await;
+        return;
+    }
     let response = match handle(&req.method, req.params).await {
         Ok(value) if value.is_null() => Response::ok(req.id),
         Ok(value) => Response::once(req.id, value),
@@ -1118,6 +1388,130 @@ mod tests {
         )
         .await;
         assert!(res.is_err());
+    }
+
+    // ── Bước 3: consume-start (stream) / consume-stop — đường lỗi + registry ─
+
+    #[tokio::test]
+    async fn consume_stop_id_khong_ton_tai_van_ok_khong_panic() {
+        // Gỡ một consumerId chưa từng đăng ký là no-op (giống bản Tier A) —
+        // không có gì để dừng nhưng vẫn phải trả Ok, không lỗi/panic.
+        let res = handle("consume-stop", serde_json::json!({ "consumerId": "khong-ton-tai" })).await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn consume_stop_thieu_consumer_id_tra_ve_loi_ro_rang() {
+        let res = handle("consume-stop", serde_json::json!({})).await;
+        assert!(res.unwrap_err().contains("consumerId"));
+    }
+
+    #[tokio::test]
+    async fn consume_stop_thao_dung_entry_khoi_registry_va_bao_notify() {
+        let id = "consumer-test-1".to_string();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        stream_registry().inner.lock().unwrap().insert(id.clone(), notify.clone());
+
+        let notified = tokio::spawn({
+            let notify = notify.clone();
+            async move { notify.notified().await }
+        });
+
+        let res = handle("consume-stop", serde_json::json!({ "consumerId": id })).await;
+        assert!(res.is_ok());
+        // notify_one() đã được gọi bên trong handle("consume-stop", …) — task
+        // đang chờ notified() phải hoàn tất, không treo.
+        tokio::time::timeout(std::time::Duration::from_secs(2), notified).await.expect("notify phải bắn").unwrap();
+        assert!(!stream_registry().inner.lock().unwrap().contains_key(&id));
+    }
+
+    #[tokio::test]
+    async fn consume_start_thieu_config_id_bao_loi_qua_stream_event() {
+        // Lỗi phải đi qua như một SỰ KIỆN STREAM (`response.error.is_none()`,
+        // `stream: true`, payload `{"type":"error",...}`) — KHÔNG phải
+        // `response.error: Some(...)` ở tầng khung tin nhắn, vì
+        // `service_host.rs::dispatch()` âm thầm bỏ qua lỗi tầng khung cho một
+        // `Waiter::Stream` (xem comment ở `send_stream_error`). Nếu test này
+        // đỏ vì `response.error` lại có giá trị, đó là dấu hiệu bug cũ (fail
+        // giữa chừng nhưng client không bao giờ biết) đã quay lại.
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_consume_start(
+            "req-1".to_string(),
+            serde_json::json!({ "queue": "q1", "ackMode": "consume", "prefetch": 10 }),
+            tx,
+        )
+        .await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert_eq!(response.id, "req-1");
+        assert!(response.error.is_none(), "lỗi phải đi qua stream event, không phải response.error");
+        assert!(response.stream);
+        let event = response.result.expect("sự kiện lỗi phải mang result");
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("configId"));
+    }
+
+    #[tokio::test]
+    async fn consume_start_thieu_queue_bao_loi_qua_stream_event() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_consume_start(
+            "req-2".to_string(),
+            serde_json::json!({ "configId": "x", "ackMode": "consume", "prefetch": 10 }),
+            tx,
+        )
+        .await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        let event = response.result.expect("sự kiện lỗi phải mang result");
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("queue"));
+    }
+
+    #[tokio::test]
+    async fn consume_start_thieu_ack_mode_bao_loi_qua_stream_event() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_consume_start(
+            "req-3".to_string(),
+            serde_json::json!({ "configId": "x", "queue": "q1", "prefetch": 10 }),
+            tx,
+        )
+        .await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        let event = response.result.expect("sự kiện lỗi phải mang result");
+        assert_eq!(event["type"], "error");
+        assert!(event["message"].as_str().unwrap().contains("ackMode"));
+    }
+
+    #[tokio::test]
+    async fn consume_start_config_khong_ton_tai_bao_loi_qua_stream_event() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<Response>();
+        handle_consume_start(
+            "req-4".to_string(),
+            serde_json::json!({
+                "configId": "khong-ton-tai-chac-chan", "queue": "q1", "ackMode": "consume", "prefetch": 10,
+            }),
+            tx,
+        )
+        .await;
+        let response = rx.recv().await.expect("phải gửi đúng một sự kiện lỗi");
+        assert!(response.error.is_none());
+        let event = response.result.expect("sự kiện lỗi phải mang result");
+        assert_eq!(event["type"], "error");
+    }
+
+    #[tokio::test]
+    async fn consume_start_di_qua_handle_line_khong_qua_handle_mot_lan() {
+        // `handle_line` phải phân nhánh `consume-start` sang
+        // `handle_consume_start` (đường stream event), không rơi vào đường
+        // `handle()` một-lần (đường đó sẽ trả `response.error: Some(...)`).
+        let line = serde_json::json!({
+            "protocol": SERVICE_PROTOCOL, "id": "req-5", "method": "consume-start",
+            "params": { "queue": "q1", "ackMode": "consume", "prefetch": 10 },
+        })
+        .to_string();
+        let response = call_handle_line(&line).await;
+        assert!(response.error.is_none(), "lỗi phải đi qua stream event, không phải response.error");
+        assert!(response.stream);
+        let event = response.result.expect("sự kiện lỗi phải mang result");
+        assert_eq!(event["type"], "error");
     }
 
     /// `handle_line` trả về qua kênh `tx` — test dựng một kênh riêng và đọc
