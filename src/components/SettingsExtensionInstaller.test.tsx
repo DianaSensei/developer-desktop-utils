@@ -97,10 +97,13 @@ async function renderInTauri() {
   // `useContext` bên trong component không thấy đúng Provider, ném "must be
   // used within a LocaleProvider" dù JSX nhìn đúng.
   const { LocaleProvider } = await import('@/contexts/LocaleContext');
+  const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
   const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
   return render(
     <LocaleProvider>
-      <SettingsExtensionInstaller />
+      <ExtensionUpdateProvider>
+        <SettingsExtensionInstaller />
+      </ExtensionUpdateProvider>
     </LocaleProvider>,
   );
 }
@@ -118,10 +121,13 @@ describe('SettingsExtensionInstaller — bản web (không phải Tauri)', () =>
     vi.resetModules();
     delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
     const { LocaleProvider } = await import('@/contexts/LocaleContext');
+    const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
     const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
     render(
       <LocaleProvider>
-        <SettingsExtensionInstaller />
+        <ExtensionUpdateProvider>
+          <SettingsExtensionInstaller />
+        </ExtensionUpdateProvider>
       </LocaleProvider>,
     );
 

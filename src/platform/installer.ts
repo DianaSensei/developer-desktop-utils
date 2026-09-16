@@ -326,6 +326,53 @@ export async function checkForServiceUpdate(
   return { available: compareVersions(remote.version, record.manifest.version) > 0, remote };
 }
 
+// ---------------------------------------------------------------------------
+// Kiểm TẤT CẢ artifact đã cài — dùng bởi ExtensionUpdateContext để tự kiểm
+// lúc app khởi động, không đợi người dùng bấm "Check for update" từng dòng.
+// ---------------------------------------------------------------------------
+
+export interface ArtifactUpdateAvailable {
+  /** id (plugin) hoặc bin (service) — cùng khoá `recordKey` dùng ở
+   *  SettingsExtensionInstaller.tsx. */
+  key: string;
+  record: InstalledArtifactRecord;
+  remoteVersion: string;
+}
+
+/** Kiểm từng artifact đã cài, TUẦN TỰ (không Promise.all) — best-effort, một
+ *  nguồn lỗi (mạng, URL đã đổi/chết) chỉ loại đúng mục đó khỏi kết quả, không
+ *  chặn việc kiểm các mục còn lại hay ném lỗi ra ngoài (lời gọi này chạy nền
+ *  lúc khởi động, không có UI nào chờ nó để hiện lỗi). Tuần tự thay vì song
+ *  song có chủ đích, không chỉ để đơn giản: kiểm N mục cùng lúc là N request
+ *  HTTP đồng thời lúc app vừa mở — không có gì cần gấp ở đây (kết quả chỉ
+ *  hiện thành badge, không chặn UI nào), nên tránh dồn tải mạng không cần
+ *  thiết. Đọc index thất bại (file hỏng, quyền đĩa…) cũng không được ném ra
+ *  ngoài — cùng nguyên tắc `installedPluginManifests()` ở registry.ts: coi
+ *  như "chưa cài gì" thay vì kéo cả app xuống. */
+export async function checkAllForUpdates(): Promise<ArtifactUpdateAvailable[]> {
+  let records: InstalledArtifactRecord[];
+  try {
+    records = await listInstalledArtifacts();
+  } catch {
+    return [];
+  }
+  const updates: ArtifactUpdateAvailable[] = [];
+  for (const record of records) {
+    try {
+      if (record.kind === 'plugin') {
+        const { available, remote } = await checkForUpdate(record);
+        if (available && remote) updates.push({ key: record.manifest.id, record, remoteVersion: remote.version });
+      } else {
+        const { available, remote } = await checkForServiceUpdate(record);
+        if (available && remote) updates.push({ key: record.manifest.bin, record, remoteVersion: remote.version });
+      }
+    } catch {
+      // Bỏ qua mục này, tiếp tục kiểm các mục còn lại.
+    }
+  }
+  return updates;
+}
+
 /**
  * Nạp mã nguồn bundle đã cài (Rust kiểm lại checksum trước khi trả về — xem
  * `artifact_installer_read_bundle`) và chạy nó như một ES module qua URL

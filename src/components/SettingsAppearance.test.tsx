@@ -6,6 +6,7 @@ import { LocaleProvider } from '@/contexts/LocaleContext';
 import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { UpdateProvider } from '@/contexts/UpdateContext';
+import { ExtensionUpdateProvider } from '@/contexts/ExtensionUpdateContext';
 import { ACCENT_TONES } from '@/lib/accentPreference';
 import { storageGet, storageRemove } from '@/lib/persistentStore';
 
@@ -23,7 +24,9 @@ function renderSettings() {
         <FeatureProvider>
           <OnboardingProvider>
             <UpdateProvider>
-              <Settings />
+              <ExtensionUpdateProvider>
+                <Settings />
+              </ExtensionUpdateProvider>
             </UpdateProvider>
           </OnboardingProvider>
         </FeatureProvider>

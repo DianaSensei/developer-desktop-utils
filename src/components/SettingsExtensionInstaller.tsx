@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Download, RefreshCw, Trash2 } from 'lucide-react';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useExtensionUpdates } from '@/contexts/ExtensionUpdateContext';
 import { isTauri } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,7 @@ type PendingServiceAction = 'update' | 'uninstall';
 
 export function SettingsExtensionInstaller() {
   const { t } = useLocale();
+  const { updates: autoUpdates } = useExtensionUpdates();
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState<RemoteArtifactManifest | null>(null);
   const [previewTriple, setPreviewTriple] = useState<string | null>(null);
@@ -81,6 +83,19 @@ export function SettingsExtensionInstaller() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // ExtensionUpdateContext đã tự kiểm mọi artifact lúc app khởi động — dùng
+  // kết quả đó để hiện sẵn nút "Update" ngay khi mở trang này, thay vì bắt
+  // người dùng bấm "Check for update" từng dòng trước (nút đó vẫn còn, cho
+  // trường hợp một artifact đổi version SAU lần kiểm lúc khởi động).
+  useEffect(() => {
+    if (autoUpdates.length === 0) return;
+    setRowUpdateVersion((prev) => {
+      const next = { ...prev };
+      for (const u of autoUpdates) next[u.key] = u.remoteVersion;
+      return next;
+    });
+  }, [autoUpdates]);
 
   if (!isTauri) {
     return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;

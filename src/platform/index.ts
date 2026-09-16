@@ -32,6 +32,7 @@ export {
   listInstalledArtifacts,
   uninstallArtifact,
   currentTargetTriple,
+  checkAllForUpdates,
 } from './installer';
 export type {
   RemotePluginManifest,
@@ -41,6 +42,7 @@ export type {
   InstalledServiceRecord,
   RemoteArtifactManifest,
   InstalledArtifactRecord,
+  ArtifactUpdateAvailable,
 } from './installer';
 export { createPluginSdk, storageKey, PluginPermissionError, PluginCommandError, PluginHostError } from './sdk';
 export type {

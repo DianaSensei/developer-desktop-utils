@@ -45,6 +45,7 @@ import { FeatureProvider, useFeatures } from '@/contexts/FeatureContext';
 import { LocaleProvider, useLocale } from '@/contexts/LocaleContext';
 import type { TranslationKey } from '@/lib/i18n';
 import { UpdateProvider, useUpdate } from '@/contexts/UpdateContext';
+import { ExtensionUpdateProvider, useExtensionUpdates } from '@/contexts/ExtensionUpdateContext';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { MeetingsProvider } from '@/lib/meetings';
 import { UpdateDialog } from '@/components/UpdateDialog';
@@ -451,6 +452,7 @@ function Sidebar({
   const location = useLocation();
   const { isFeatureEnabled, toggleFeature, toolOrder, favorites, toggleFavorite, isFavorite } = useFeatures();
   const { updateAvailable } = useUpdate();
+  const { updates: extensionUpdates } = useExtensionUpdates();
   const { t } = useLocale();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -679,7 +681,7 @@ function Sidebar({
             >
               <span className="relative shrink-0">
                 <SettingsIcon className="h-4 w-4 transition-transform duration-base ease-out-soft motion-safe:group-hover:scale-110" />
-                {updateAvailable && (
+                {(updateAvailable || extensionUpdates.length > 0) && (
                   <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-ok ring-1 ring-bg" />
                 )}
               </span>
@@ -1244,21 +1246,23 @@ function App() {
         <FeatureProvider>
           <OnboardingProvider>
             <UpdateProvider>
-              <MeetingsProvider>
-                <ApiClientRuntimeProvider>
-                  <MockServerRuntimeProvider>
-                    <Router>
-                      <AppContent />
-                      <UpdateDialog />
-                      <OnboardingFlow />
-                      <CommandPalette />
-                      <McpBackgroundBridge />
-                      <McpManageBridge />
-                      <McpUtilityBridge />
-                    </Router>
-                  </MockServerRuntimeProvider>
-                </ApiClientRuntimeProvider>
-              </MeetingsProvider>
+              <ExtensionUpdateProvider>
+                <MeetingsProvider>
+                  <ApiClientRuntimeProvider>
+                    <MockServerRuntimeProvider>
+                      <Router>
+                        <AppContent />
+                        <UpdateDialog />
+                        <OnboardingFlow />
+                        <CommandPalette />
+                        <McpBackgroundBridge />
+                        <McpManageBridge />
+                        <McpUtilityBridge />
+                      </Router>
+                    </MockServerRuntimeProvider>
+                  </ApiClientRuntimeProvider>
+                </MeetingsProvider>
+              </ExtensionUpdateProvider>
             </UpdateProvider>
           </OnboardingProvider>
         </FeatureProvider>
