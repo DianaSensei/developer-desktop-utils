@@ -397,6 +397,7 @@ fn stage_install_plugin(
     std::fs::write(&bundle_path, bytes).map_err(|e| e.to_string())?;
 
     let id = manifest.id.clone();
+    let new_version = manifest.version.clone();
     let record = InstalledArtifactRecord::Plugin(InstalledPluginRecord {
         manifest,
         source_url,
@@ -407,10 +408,28 @@ fn stage_install_plugin(
     // Cài đè lên chính plugin đó (cùng id) thì thay hẳn bản ghi cũ — không giữ
     // lại hai bản ghi cho cùng một id, kể cả khác version. Chỉ lọc trong các
     // bản ghi PLUGIN — không đụng bản ghi service nào dù trùng chuỗi khoá.
+    let mut old_version: Option<String> = None;
     let mut records = read_index(index_dir)?;
-    records.retain(|r| !matches!(r, InstalledArtifactRecord::Plugin(p) if p.manifest.id == id));
+    records.retain(|r| match r {
+        InstalledArtifactRecord::Plugin(p) if p.manifest.id == id => {
+            old_version = Some(p.manifest.version.clone());
+            false
+        }
+        _ => true,
+    });
     records.push(record.clone());
     write_index(index_dir, &records)?;
+
+    // Dọn thư mục version CŨ sau khi index đã ghi thành công — một update
+    // (khác version) để lại `plugins/<id>/<old-version>/` không còn bản ghi
+    // nào trỏ tới, mồ côi vĩnh viễn nếu không dọn (khác uninstall, vốn đã xoá
+    // cả `plugins/<id>/` — ở đây `<id>/<new-version>/` vừa ghi phải giữ lại).
+    // Lỗi xoá (Windows khoá file, quyền đĩa…) không chặn việc cài — best-effort.
+    if let Some(old_version) = old_version {
+        if old_version != new_version {
+            let _ = std::fs::remove_dir_all(plugins_dir.join(&id).join(&old_version));
+        }
+    }
 
     Ok(record)
 }
@@ -484,6 +503,7 @@ fn stage_install_service(
     }
 
     let bin = manifest.bin.clone();
+    let new_version = manifest.version.clone();
     let record = InstalledArtifactRecord::Service(InstalledServiceRecord {
         manifest,
         source_url,
@@ -493,10 +513,26 @@ fn stage_install_service(
 
     // Cài đè cùng bin thì thay hẳn bản ghi cũ — theo quyết định đã chốt trong
     // plan (không giữ song song hai version; rollback = xoá cài lại thủ công).
+    let mut old_version: Option<String> = None;
     let mut records = read_index(index_dir)?;
-    records.retain(|r| !matches!(r, InstalledArtifactRecord::Service(s) if s.manifest.bin == bin));
+    records.retain(|r| match r {
+        InstalledArtifactRecord::Service(s) if s.manifest.bin == bin => {
+            old_version = Some(s.manifest.version.clone());
+            false
+        }
+        _ => true,
+    });
     records.push(record.clone());
     write_index(index_dir, &records)?;
+
+    // Dọn thư mục version CŨ — cùng lý do nhánh plugin ở trên. Sidecar cũ đã bị
+    // `service_stop` ở lớp gọi (`artifact_installer_install`) trước khi hàm
+    // này chạy xong, nên tới đây binary cũ không còn tiến trình nào giữ file.
+    if let Some(old_version) = old_version {
+        if old_version != new_version {
+            let _ = std::fs::remove_dir_all(services_dir.join(&bin).join(&old_version));
+        }
+    }
 
     Ok(record)
 }
@@ -700,20 +736,21 @@ pub async fn artifact_installer_install(
             }
             let bytes = res.bytes().await.map_err(|e| e.to_string())?;
             let bin = manifest.bin.clone();
-            let record = stage_install_service(
+            // Dừng sidecar ĐANG CHẠY (nếu có) TRƯỚC khi ghi/dọn đĩa — hai lý
+            // do: (1) self-healing, lần `service_call` kế tiếp tự spawn lại
+            // đúng version mới; (2) trên Windows, xoá thư mục version cũ
+            // (bên trong `stage_install_service`) trong khi tiến trình cũ vẫn
+            // giữ file binary sẽ thất bại lặng lẽ (best-effort) — dừng trước
+            // đảm bảo cleanup thật sự dọn được, không chỉ udpate index.
+            let _ = crate::service_host::service_stop(services.clone(), bin).await;
+            stage_install_service(
                 &index_dir,
                 &services_dir(&app)?,
                 manifest,
                 source_url,
                 &triple,
                 &bytes,
-            )?;
-            // Cài đè một sidecar ĐANG CHẠY: dừng ngay để lần `service_call` kế
-            // tiếp tự spawn lại đúng version mới (hành vi self-healing sẵn có
-            // của `get_or_spawn`) — không làm việc này thì tiến trình cũ vẫn
-            // sống và phục vụ version cũ cho tới khi app restart.
-            let _ = crate::service_host::service_stop(services.clone(), bin).await;
-            record
+            )?
         }
     };
 
@@ -984,6 +1021,14 @@ mod tests {
             InstalledArtifactRecord::Plugin(p) => assert_eq!(p.manifest.version, "2.0.0"),
             other => panic!("{other:?}"),
         }
+        assert!(
+            !plugins_dir.join("demo").join("1.0.0").exists(),
+            "thư mục version CŨ phải bị dọn sau khi update, không mồ côi trên đĩa"
+        );
+        assert!(
+            plugins_dir.join("demo").join("2.0.0").join("bundle.mjs").exists(),
+            "thư mục version MỚI phải còn nguyên"
+        );
     }
 
     #[test]
@@ -1119,6 +1164,14 @@ mod tests {
             InstalledArtifactRecord::Service(s) => assert_eq!(s.manifest.version, "2.0.0"),
             other => panic!("{other:?}"),
         }
+        assert!(
+            !services_dir.join("devtool-svc-demo").join("1.0.0").exists(),
+            "thư mục version CŨ phải bị dọn sau khi update, không mồ côi trên đĩa"
+        );
+        assert!(
+            services_dir.join("devtool-svc-demo").join("2.0.0").exists(),
+            "thư mục version MỚI phải còn nguyên"
+        );
     }
 
     #[test]

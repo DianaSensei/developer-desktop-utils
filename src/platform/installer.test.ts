@@ -302,6 +302,51 @@ describe('checkForServiceUpdate', () => {
   });
 });
 
+describe('checkAllForUpdates', () => {
+  // Kiểm TUẦN TỰ theo đúng thứ tự mảng trả về từ `artifact_installer_list`
+  // (không Promise.all — xem lý do ở comment của hàm) — nên mock theo THỨ TỰ
+  // GỌI, cùng khuôn với mọi test khác trong file này, là đủ.
+  it('trả về mọi artifact có bản mới, cả plugin lẫn service, bỏ qua mục đã up-to-date', async () => {
+    const installer = await loadInTauri();
+    const pluginUpToDate = installedPluginRaw({ manifest: remoteManifest({ id: 'up-to-date' }) });
+    const pluginOutdated = installedPluginRaw({ manifest: remoteManifest({ id: 'outdated', version: '1.0.0' }) });
+    const serviceOutdated = installedServiceRaw();
+
+    invokeMock.mockResolvedValueOnce([pluginUpToDate, pluginOutdated, serviceOutdated]); // artifact_installer_list
+    invokeMock.mockResolvedValueOnce(remotePluginManifestRaw({ id: 'up-to-date', version: '1.0.0' })); // check up-to-date
+    invokeMock.mockResolvedValueOnce(remotePluginManifestRaw({ id: 'outdated', version: '2.0.0' })); // check outdated plugin
+    invokeMock.mockResolvedValueOnce(remoteServiceManifestRaw({ version: '2.0.0' })); // check outdated service
+
+    const updates = await installer.checkAllForUpdates();
+    expect(updates.map((u) => u.key).sort()).toEqual(['devtool-svc-demo', 'outdated']);
+    expect(updates.find((u) => u.key === 'outdated')?.remoteVersion).toBe('2.0.0');
+    expect(updates.find((u) => u.key === 'devtool-svc-demo')?.remoteVersion).toBe('2.0.0');
+  });
+
+  it('một nguồn lỗi (mạng, URL chết) chỉ loại đúng mục đó, không chặn kiểm các mục còn lại', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([installedPluginRaw({ manifest: remoteManifest({ id: 'broken' }) }), installedServiceRaw()]);
+    invokeMock.mockRejectedValueOnce(new Error('mạng lỗi')); // check broken plugin
+    invokeMock.mockResolvedValueOnce(remoteServiceManifestRaw({ version: '9.9.9' })); // check service, vẫn chạy tiếp
+
+    const updates = await installer.checkAllForUpdates();
+    expect(updates).toHaveLength(1);
+    expect(updates[0].key).toBe('devtool-svc-demo');
+  });
+
+  it('không cài gì thì trả về rỗng, không ném lỗi', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([]);
+    await expect(installer.checkAllForUpdates()).resolves.toEqual([]);
+  });
+
+  it('index.json đọc lỗi thì coi như chưa cài gì, không ném lỗi ra ngoài', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockRejectedValueOnce(new Error('index.json hỏng'));
+    await expect(installer.checkAllForUpdates()).resolves.toEqual([]);
+  });
+});
+
 describe('installedPluginManifests — đổi RemotePluginManifest thành PluginManifest', () => {
   it('trên bản web trả về rỗng, không gọi invoke', async () => {
     vi.resetModules();

@@ -3,6 +3,7 @@ import { render, screen, cleanup, within } from '@testing-library/react';
 import { SettingsPlugins } from '@/components/SettingsPlugins';
 import { FeatureProvider } from '@/contexts/FeatureContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
+import { ExtensionUpdateProvider } from '@/contexts/ExtensionUpdateContext';
 import { PLUGINS, createPluginSdk, pluginAudit } from '@/platform';
 import { storageRemove } from '@/lib/persistentStore';
 
@@ -17,7 +18,9 @@ function renderPanel() {
   return render(
     <LocaleProvider>
       <FeatureProvider>
-        <SettingsPlugins />
+        <ExtensionUpdateProvider>
+          <SettingsPlugins />
+        </ExtensionUpdateProvider>
       </FeatureProvider>
     </LocaleProvider>,
   );

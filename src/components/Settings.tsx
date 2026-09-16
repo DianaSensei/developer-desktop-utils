@@ -41,6 +41,8 @@ import { GROUP_OF_TOOL, clusterToolOrder } from '@/lib/toolGroups';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { CONFIG_FIELDS, SECTION_LABELS, type ConfigSection } from '@/config/appConfig';
 import { useUpdate } from '@/contexts/UpdateContext';
+import { useExtensionUpdates } from '@/contexts/ExtensionUpdateContext';
+import { Badge } from '@/components/ui/badge';
 import { AppLogo } from '@/components/AppLogo';
 import { ExperimentalBadge } from '@/components/ExperimentalBadge';
 import { useOnboarding } from '@/contexts/OnboardingContext';
@@ -305,6 +307,7 @@ export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools, isFavorite, toggleFavorite } = useFeatures();
   const { open: openOnboarding } = useOnboarding();
   const { status: updateStatus, updateInfo, updateAvailable, error: updateError, downloadProgress, autoCheckEnabled, checkHour, setCheckHour, toggleAutoCheck, checkForUpdates, installUpdate, cancelInstall, openUpdateDialog } = useUpdate();
+  const { updates: extensionUpdates } = useExtensionUpdates();
   const { config, setField, resetConfig } = useAppConfig();
   const { locale, setLocale, t } = useLocale();
   const { enabled: mcpBackgroundEnabled, setEnabled: setMcpBackgroundEnabled } = useMcpBackgroundBridge();
@@ -473,13 +476,16 @@ export function Settings() {
                 onClick={() => setActiveSection(s.id)}
                 aria-current={activeSection === s.id ? 'true' : undefined}
                 className={cn(
-                  'w-full rounded-sm border px-2.5 py-2 text-left text-sm transition-colors',
+                  'flex w-full items-center justify-between gap-2 rounded-sm border px-2.5 py-2 text-left text-sm transition-colors',
                   activeSection === s.id
                     ? 'border-line bg-card font-medium text-fg'
                     : 'border-transparent text-fg-mute hover:bg-card/60 hover:text-fg',
                 )}
               >
-                {t(s.label)}
+                <span>{t(s.label)}</span>
+                {s.id === 'plugins' && extensionUpdates.length > 0 && (
+                  <Badge tone="success" pill>{extensionUpdates.length}</Badge>
+                )}
               </button>
             </li>
           ))}
