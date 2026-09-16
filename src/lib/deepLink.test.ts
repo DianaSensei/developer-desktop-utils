@@ -25,6 +25,11 @@ describe('parseInstallUrls', () => {
       [],
     ],
     ['không có tham số nào cả — trả về rỗng', 'desktop-devtool-app://install', []],
+    [
+      'bản canary (scheme riêng desktop-devtool-app-canary) vẫn nhận — cùng chạy chung bundle JS',
+      'desktop-devtool-app-canary://install?manifest=https://a/p.json',
+      ['https://a/p.json'],
+    ],
     ['chuỗi không parse được thành URL — không ném lỗi, trả về rỗng', 'not a url', []],
     ['một CLI argument không liên quan (không phải desktop-devtool-app://) — bỏ qua im lặng', '--some-flag', []],
   ])('%s', (_label, input, expected) => {

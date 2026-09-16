@@ -222,7 +222,10 @@ Cơ chế (xem `src-tauri/src/main.rs`, `src/lib/deepLink.ts`,
 
 1. `tauri-plugin-deep-link` đăng ký scheme `desktop-devtool-app` (config ở
    `tauri.conf.json`'s `plugins.deep-link.desktop.schemes`) — hệ điều hành
-   mở app khi người dùng bấm link này.
+   mở app khi người dùng bấm link này. Bản canary đăng ký scheme riêng
+   (`desktop-devtool-app-canary`, `tauri.canary.conf.json`) để không giành
+   đăng ký OS-level với bản stable — nhưng cả hai bản chạy chung một bundle
+   JS, nên `deepLink.ts`'s `INSTALL_LINK_SCHEMES` chấp nhận cả hai.
 2. `tauri-plugin-single-instance` (feature `deep-link`, đăng ký TRƯỚC mọi
    plugin khác trong `main.rs`) đảm bảo bấm link lần hai khi app đã mở
    không mở thêm cửa sổ — chuyển tiếp URL sang tiến trình đang chạy.

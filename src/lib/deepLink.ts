@@ -18,13 +18,19 @@
 import { isTauri } from '@/lib/platform';
 import { pendingInstall } from '@/lib/pendingInstall';
 
-/** Phải khớp `plugins.deep-link.desktop.schemes` trong `tauri.conf.json`. */
-export const INSTALL_LINK_SCHEME = 'desktop-devtool-app';
+/** Phải khớp `plugins.deep-link.desktop.schemes` trong `tauri.conf.json` VÀ
+ *  `tauri.canary.conf.json` — bản canary đăng ký scheme riêng
+ *  (`desktop-devtool-app-canary`) để không giành đăng ký OS-level với bản
+ *  stable, nhưng cả hai bản chạy CHUNG một bundle JS (`npm run build` không
+ *  đổi theo `--config`, chỉ phần Rust được merge khác) nên hàm parse này
+ *  phải nhận cả hai, không chỉ scheme của bản stable — nếu không, một link
+ *  cài đặt mở đúng bản canary rồi lại bị `parseInstallUrls` âm thầm bỏ qua. */
+export const INSTALL_LINK_SCHEMES = ['desktop-devtool-app', 'desktop-devtool-app-canary'] as const;
 
 /** Parse một chuỗi URL thành danh sách URL manifest cần cài, theo thứ tự
  *  plugin trước rồi tới sidecar service — bỏ qua im lặng nếu không phải
- *  đúng dạng `desktop-devtool-app://install?...` (vd một CLI argument không
- *  liên quan lọt vào `getCurrent()`/`onOpenUrl`). */
+ *  đúng dạng `desktop-devtool-app://install?...` / `...-canary://install?...`
+ *  (vd một CLI argument không liên quan lọt vào `getCurrent()`/`onOpenUrl`). */
 export function parseInstallUrls(raw: string): string[] {
   let parsed: URL;
   try {
@@ -32,7 +38,9 @@ export function parseInstallUrls(raw: string): string[] {
   } catch {
     return [];
   }
-  if (parsed.protocol !== `${INSTALL_LINK_SCHEME}:` || parsed.hostname !== 'install') return [];
+  const scheme = parsed.protocol.slice(0, -1); // bỏ dấu ':' cuối của URL.protocol
+  if (!INSTALL_LINK_SCHEMES.includes(scheme as (typeof INSTALL_LINK_SCHEMES)[number]) || parsed.hostname !== 'install')
+    return [];
   const urls: string[] = [];
   const manifest = parsed.searchParams.get('manifest');
   const service = parsed.searchParams.get('service');
