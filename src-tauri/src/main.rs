@@ -25,11 +25,22 @@ fn main() {
         // này: nếu người dùng bấm một link `desktop-devtool-app://install?...` thứ hai
         // trong khi app đã mở, closure dưới đây chạy trên tiến trình ĐANG
         // CHẠY còn tiến trình mới tự thoát ngay, thay vì mở thêm một cửa sổ
-        // trùng. Callback rỗng là đủ: feature "deep-link" (Cargo.toml) đã tự
-        // gọi `deep_link.handle_cli_arguments(argv)` trước khi chạy closure,
-        // và đó là bước phát ra `deep-link://new-url` mà `onOpenUrl` phía JS
-        // (src/lib/deepLink.ts) đang nghe.
-        .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+        // trùng. feature "deep-link" (Cargo.toml) đã tự gọi
+        // `deep_link.handle_cli_arguments(argv)` trước khi chạy closure, và
+        // đó là bước phát ra `deep-link://new-url` mà `onOpenUrl` phía JS
+        // (src/lib/deepLink.ts) đang nghe — nên closure KHÔNG cần tự parse
+        // URL. Nhưng để cửa sổ rỗng là chưa đủ: hệ điều hành không tự đưa cửa
+        // sổ của tiến trình đang chạy ra trước, nên trước bản sửa này, bấm
+        // link thứ hai trong lúc app đã mở (nhất là khi đang bị thu nhỏ hoặc
+        // ở sau cửa sổ khác) trông như không có gì xảy ra — đây là nguyên
+        // nhân chính của lỗi "im lặng" người dùng báo.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_deep_link::init())
         .setup(|_app| {
             // AppImage không có bước cài đặt nào đăng ký URI scheme vào hệ
