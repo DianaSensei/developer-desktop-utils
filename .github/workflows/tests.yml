@@ -42,7 +42,7 @@ jobs:
       # Node-only job: no Tauri system libraries and no Rust toolchain, so this
       # reports in about a minute rather than waiting on the coverage build.
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Typecheck
         run: npx tsc --noEmit
