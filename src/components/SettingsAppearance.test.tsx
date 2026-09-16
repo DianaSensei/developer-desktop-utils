@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { Settings } from '@/components/Settings';
 import { FeatureProvider } from '@/contexts/FeatureContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
@@ -19,19 +20,21 @@ import { storageGet, storageRemove } from '@/lib/persistentStore';
 
 function renderSettings() {
   return render(
-    <AppConfigProvider>
-      <LocaleProvider>
-        <FeatureProvider>
-          <OnboardingProvider>
-            <UpdateProvider>
-              <ExtensionUpdateProvider>
-                <Settings />
-              </ExtensionUpdateProvider>
-            </UpdateProvider>
-          </OnboardingProvider>
-        </FeatureProvider>
-      </LocaleProvider>
-    </AppConfigProvider>,
+    <MemoryRouter>
+      <AppConfigProvider>
+        <LocaleProvider>
+          <FeatureProvider>
+            <OnboardingProvider>
+              <UpdateProvider>
+                <ExtensionUpdateProvider>
+                  <Settings />
+                </ExtensionUpdateProvider>
+              </UpdateProvider>
+            </OnboardingProvider>
+          </FeatureProvider>
+        </LocaleProvider>
+      </AppConfigProvider>
+    </MemoryRouter>,
   );
 }
 

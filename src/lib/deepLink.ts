@@ -16,7 +16,7 @@ import { pendingInstall } from '@/lib/pendingInstall';
  *  plugin trước rồi tới sidecar service — bỏ qua im lặng nếu không phải
  *  đúng dạng `devtool://install?...` (vd một CLI argument không liên quan
  *  lọt vào `getCurrent()`/`onOpenUrl`). */
-function parseInstallUrls(raw: string): string[] {
+export function parseInstallUrls(raw: string): string[] {
   let parsed: URL;
   try {
     parsed = new URL(raw);
@@ -34,10 +34,15 @@ function parseInstallUrls(raw: string): string[] {
 
 let started = false;
 
+/** Khớp chữ ký `useNavigate()` của react-router — chỉ cần phần dùng ở đây
+ *  (path + state), không kéo nguyên type `NavigateFunction` vào một file
+ *  không phụ thuộc react-router ở chỗ khác. */
+type NavigateWithState = (path: string, options?: { state?: unknown }) => void;
+
 /** Gắn một lần từ `App.tsx`. No-op trên web (deep link là tính năng OS-level
  *  của bản desktop — xem `isTauri`) và nếu gọi lại lần hai (StrictMode mount
  *  kép trong dev). */
-export async function initDeepLinkHandling(navigate: (path: string) => void): Promise<void> {
+export async function initDeepLinkHandling(navigate: NavigateWithState): Promise<void> {
   if (!isTauri || started) return;
   started = true;
 
@@ -47,7 +52,11 @@ export async function initDeepLinkHandling(navigate: (path: string) => void): Pr
     const toInstall = urls.flatMap(parseInstallUrls);
     if (toInstall.length === 0) return;
     pendingInstall.enqueue(toInstall);
-    navigate('/settings');
+    // `state` (không phải query string) vì đây là tín hiệu điều hướng
+    // một-lần cho chính lượt chuyển trang này, không phải thứ nên có mặt
+    // trên URL (không cần chia sẻ được, không cần sống sót qua reload —
+    // Settings.tsx đọc nó ở cả state init lẫn effect, xem giải thích ở đó).
+    navigate('/settings', { state: { section: 'plugins' } });
   };
 
   // Khởi động lạnh: app được chính link này MỞ LÊN (chưa chạy sẵn).

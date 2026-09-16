@@ -85,18 +85,26 @@ export function SettingsExtensionInstaller() {
     void refresh();
   }, [refresh]);
 
-  // `devtool://install?manifest=...&service=...` (starlight-site) đã xếp URL
-  // vào hàng đợi này TRƯỚC khi Settings điều hướng tới tab Plugin —
-  // `runPreview` bên dưới được khai báo sau trong cùng thân hàm, nhưng
-  // closure chỉ thực sự gọi tới nó ở effect phase (sau khi component đã
-  // render xong), lúc đó biến đã được gán — xem giải thích ở đầu
-  // `pendingInstall.ts`. Người dùng vẫn phải tự bấm "Cài đặt" để xác nhận;
-  // đây chỉ tự điền + xem trước thay cho copy/dán tay.
+  // `devtool://install?manifest=...&service=...` (starlight-site) xếp URL
+  // vào hàng đợi này rồi điều hướng tới Settings → Plugin — nhưng nếu người
+  // dùng ĐÃ đứng sẵn ở đây khi link thứ hai tới (single-instance chuyển tiếp
+  // sang tiến trình đang chạy), điều hướng tới path đang đứng sẵn không
+  // remount component, nên không thể chỉ trông chờ effect chạy một lần lúc
+  // mount — phải nghe `pendingInstall.subscribe` để tự kéo hàng đợi mỗi khi
+  // có URL mới, không riêng gì lúc mount. `drain` được khai báo là closure
+  // trong cùng thân hàm nên tham chiếu đúng `runPreview` hiện tại dù effect
+  // đăng ký subscribe trước khi `runPreview` được gán ở dưới — cùng lý do đã
+  // giải thích ở đầu `pendingInstall.ts`. Người dùng vẫn phải tự bấm "Cài
+  // đặt" để xác nhận; đây chỉ tự điền + xem trước thay cho copy/dán tay.
   useEffect(() => {
-    const next = pendingInstall.dequeue();
-    if (!next) return;
-    setUrl(next);
-    void runPreview(next);
+    const drain = () => {
+      const next = pendingInstall.dequeue();
+      if (!next) return;
+      setUrl(next);
+      void runPreview(next);
+    };
+    drain(); // bắt URL đã xếp sẵn trước khi component này mount
+    return pendingInstall.subscribe(drain);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

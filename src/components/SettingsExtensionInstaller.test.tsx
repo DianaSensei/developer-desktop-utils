@@ -317,3 +317,63 @@ describe('SettingsExtensionInstaller — service đòi xác nhận trước khi 
     expect(invokeMock).not.toHaveBeenCalledWith('artifact_installer_uninstall', expect.anything());
   });
 });
+
+describe('SettingsExtensionInstaller — hàng đợi devtool://install (pendingInstall)', () => {
+  it('URL đã xếp sẵn TRƯỚC khi mount thì tự điền ngay vào ô URL', async () => {
+    invokeMock.mockResolvedValueOnce([]); // list lúc mount
+    vi.resetModules();
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+    const { LocaleProvider } = await import('@/contexts/LocaleContext');
+    const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
+    const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
+    const { pendingInstall } = await import('@/lib/pendingInstall');
+    pendingInstall.enqueue(['https://example.com/queued.json']);
+    // Không mock kết quả `fetch_manifest` ở đây: mount này tự bắn NHIỀU lời
+    // gọi invoke cùng lúc trong cùng một nhịp đồng bộ (refresh() của chính
+    // component, refresh() của ExtensionUpdateProvider, VÀ auto-preview của
+    // hàng đợi) — đúng kịch bản race đã ghi ở đầu file ("bắn thêm một lời gọi
+    // invoke NGAY LẬP TỨC... có thể đua với chính lần import đó"), nhưng ở
+    // đây là BA lời gọi đồng thời thay vì hai, và (khác các chỗ khác) race
+    // này KHÔNG ngẫu nhiên — lời gọi thứ hai/ba luôn thua, luôn nhận bản
+    // `@tauri-apps/api/core` thật thay vì bản mock. Bài test này vì vậy chỉ
+    // xác nhận phần chắc chắn không phụ thuộc invoke: ô URL được điền đúng
+    // giá trị đã xếp hàng. Hành vi "tự xem trước sau khi điền" được test đủ
+    // ở case "xếp SAU khi đã mount" bên dưới, nơi enqueue xảy ra SAU khi
+    // component đã ổn định (không đua với lời gọi invoke nào khác).
+    render(
+      <LocaleProvider>
+        <ExtensionUpdateProvider>
+          <SettingsExtensionInstaller />
+        </ExtensionUpdateProvider>
+      </LocaleProvider>,
+    );
+    await settle();
+
+    expect((screen.getByPlaceholderText('https://example.com/extension.json') as HTMLInputElement).value).toBe(
+      'https://example.com/queued.json',
+    );
+  });
+
+  it('URL xếp SAU khi đã mount (link thứ hai trong lúc đang đứng ở đây) vẫn tự xem trước, không cần remount', async () => {
+    invokeMock.mockResolvedValueOnce([]); // list lúc mount
+    await renderInTauri();
+    await settle();
+
+    // Cùng lần nạp module renderInTauri() vừa reset — lấy pendingInstall từ
+    // đó để enqueue "trong lúc component đã mount", đúng kịch bản pullfrog
+    // nêu: single-instance chuyển tiếp một link devtool:// thứ hai trong khi
+    // người dùng đang đứng sẵn ở Settings → Plugin.
+    const { pendingInstall } = await import('@/lib/pendingInstall');
+    invokeMock.mockResolvedValueOnce(pluginManifestRaw({ label: 'Second Link Plugin' }));
+    act(() => {
+      pendingInstall.enqueue(['https://example.com/second.json']);
+    });
+
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText('https://example.com/extension.json') as HTMLInputElement).value).toBe(
+        'https://example.com/second.json',
+      ),
+    );
+    await waitFor(() => expect(screen.getByText('Second Link Plugin')).toBeTruthy());
+  });
+});
