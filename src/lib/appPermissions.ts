@@ -38,6 +38,7 @@ const NAMESPACE_NAMES: Record<string, string> = {
   updater: 'Updater',
   store: 'Store',
   'window-state': 'Window State',
+  'deep-link': 'Deep Link',
 };
 
 /** Lookup table: permission identifier -> human-readable description. Permissions missing here render with the identifier only. */
@@ -68,6 +69,8 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   'http:default':
     'Send HTTP requests. The patterns below include wildcards, so this grant is app-wide; per-tool limits are declared in each plugin manifest and shown under Plugins',
   'core:default': 'Baseline Tauri IPC access (window, app, path, events) the app needs to run',
+  'deep-link:default':
+    'Read the devtool://install link that opened the app, to prefill the extension install screen (Settings → Plugin) — installing still requires your confirmation there',
 };
 
 function normalize(raw: RawPermission): AppPermission {

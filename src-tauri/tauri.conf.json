@@ -53,6 +53,11 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["devtool"]
+      }
+    },
     "updater": {
       "endpoints": [
         "https://github.com/DianaSensei/developer-desktop-utils/releases/latest/download/latest.json"

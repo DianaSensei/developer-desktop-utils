@@ -23,6 +23,14 @@ tauri-plugin-updater = "2"
 tauri-plugin-http = "2"
 tauri-plugin-store = "2"
 tauri-plugin-window-state = "2"
+# devtool://install deep link — trang plugin (starlight-site) mở app rồi đưa
+# thẳng tới màn xác nhận cài đặt của SettingsExtensionInstaller thay vì bắt
+# người dùng tự copy/dán URL manifest. `single-instance` phải đứng TRƯỚC
+# `deep-link` trong .plugin() chain bên main.rs (yêu cầu của chính plugin
+# single-instance) — feature "deep-link" của nó tự chuyển tiếp URL sang app
+# đã mở sẵn, để một cú bấm thứ hai không mở thêm cửa sổ mới.
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.11"

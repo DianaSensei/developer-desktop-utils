@@ -206,3 +206,34 @@ import {
   currentTargetTriple,          // () => Promise<string>
 } from '@/platform';
 ```
+
+## Link `devtool://install` — bấm trên trang web thay vì copy/dán tay
+
+Trang plugin (`starlight-site`'s `plugins.astro`) không bắt người dùng tự
+copy URL manifest rồi dán vào Settings nữa — mỗi thẻ plugin có một nút "Cài
+đặt" trỏ tới:
+
+```
+devtool://install?manifest=<url manifest plugin>&service=<url manifest sidecar, nếu có>
+```
+
+Cơ chế (xem `src-tauri/src/main.rs`, `src/lib/deepLink.ts`,
+`src/lib/pendingInstall.ts`):
+
+1. `tauri-plugin-deep-link` đăng ký scheme `devtool` (config ở
+   `tauri.conf.json`'s `plugins.deep-link.desktop.schemes`) — hệ điều hành
+   mở app khi người dùng bấm link này.
+2. `tauri-plugin-single-instance` (feature `deep-link`, đăng ký TRƯỚC mọi
+   plugin khác trong `main.rs`) đảm bảo bấm link lần hai khi app đã mở
+   không mở thêm cửa sổ — chuyển tiếp URL sang tiến trình đang chạy.
+3. `deepLink.ts` (JS) nghe qua `@tauri-apps/plugin-deep-link`'s
+   `onOpenUrl`/`getCurrent`, tách `manifest`/`service` thành hàng đợi
+   (`pendingInstall.ts`), rồi điều hướng tới `/settings`.
+4. `SettingsExtensionInstaller.tsx` tự lấy URL kế tiếp trong hàng đợi, điền
+   vào ô URL và gọi `fetchArtifactManifestPreview` ngay — **không tự cài**.
+   Người dùng vẫn phải tự bấm "Cài đặt" sau khi xem tên/quyền/nguồn, đúng
+   luồng xác nhận đã có sẵn. Cài xong plugin, nếu hàng đợi còn URL service
+   (sidecar của plugin đó), màn xem trước tiếp theo tự hiện ra.
+
+Không có phần nào ở đây bỏ qua bước xác nhận — deep link chỉ thay việc
+copy/dán URL bằng một cú bấm.

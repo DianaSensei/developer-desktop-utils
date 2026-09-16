@@ -14,13 +14,33 @@ mod artifact_installer;
 mod plugin_data;
 
 use tauri::Manager;
+use tauri_plugin_deep_link::DeepLinkExt;
 
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
 
 fn main() {
     tauri::Builder::default()
+        // Đăng ký TRƯỚC hết mọi `.plugin()` khác — yêu cầu của chính plugin
+        // này: nếu người dùng bấm một link `devtool://install?...` thứ hai
+        // trong khi app đã mở, closure dưới đây chạy trên tiến trình ĐANG
+        // CHẠY còn tiến trình mới tự thoát ngay, thay vì mở thêm một cửa sổ
+        // trùng. Callback rỗng là đủ: feature "deep-link" (Cargo.toml) đã tự
+        // gọi `deep_link.handle_cli_arguments(argv)` trước khi chạy closure,
+        // và đó là bước phát ra `deep-link://new-url` mà `onOpenUrl` phía JS
+        // (src/lib/deepLink.ts) đang nghe.
+        .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|_app| {
+            // AppImage không có bước cài đặt nào đăng ký URI scheme vào hệ
+            // thống (khác .deb/.msi/.dmg, nơi trình cài đặt làm việc đó) — tự
+            // đăng ký lúc khởi động là cách duy nhất `devtool://` hoạt động
+            // trên bản AppImage. Vô hại khi gọi lại nhiều lần hoặc trên các
+            // bản Linux không phải AppImage.
+            #[cfg(target_os = "linux")]
+            {
+                let _ = _app.deep_link().register_all();
+            }
             // Local-only control channel the MCP stdio sidecar
             // (src/bin/devtool-mcp-server.rs) talks to, so an MCP client
             // (Claude Desktop/Code) can drive the API Client tool through
