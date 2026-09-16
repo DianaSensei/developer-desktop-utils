@@ -39,8 +39,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use rmcp::model::{
-    CallToolRequestParams, CallToolResult, Content, ErrorData as McpError, Implementation,
-    ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool,
+    CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, ErrorData as McpError,
+    Implementation, ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig, Tool,
 };
 use rmcp::service::RequestContext;
 use rmcp::transport::io::stdio;
@@ -427,9 +427,9 @@ async fn call_tool(name: &str, args: Value) -> CallToolResult {
         // fine compact for a model.
         Ok(v) => {
             let text = serde_json::to_string(&v).unwrap_or_else(|_| v.to_string());
-            CallToolResult::success(vec![Content::text(text)])
+            CallToolResult::success(vec![ContentBlock::text(text)])
         }
-        Err(e) => CallToolResult::error(vec![Content::text(e)]),
+        Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
     }
 }
 
@@ -483,8 +483,8 @@ fn scripting_reference_tool() -> Tool {
 struct DevToolServer;
 
 impl ServerHandler for DevToolServer {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
                 "Drives every DevTool tool that has registered itself with the running app's \
                  MCP bridge — call list_tools for the current set, since it can grow (a plugin \
@@ -526,13 +526,14 @@ impl ServerHandler for DevToolServer {
         &self,
         request: CallToolRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<CallToolResult, McpError>> + Send + '_ {
+    ) -> impl Future<Output = Result<CallToolResponse, McpError>> + Send + '_ {
         async move {
             if request.name.as_ref() == "get_scripting_reference" {
-                return Ok(CallToolResult::success(vec![Content::text(SCRIPTING_REFERENCE)]));
+                return Ok(CallToolResult::success(vec![ContentBlock::text(SCRIPTING_REFERENCE)])
+                    .into());
             }
             let args = request.arguments.clone().map(Value::Object).unwrap_or_else(|| json!({}));
-            Ok(call_tool(request.name.as_ref(), args).await)
+            Ok(call_tool(request.name.as_ref(), args).await.into())
         }
     }
 }
