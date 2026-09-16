@@ -1,13 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { Settings } from '@/components/Settings';
-import { FeatureProvider } from '@/contexts/FeatureContext';
-import { LocaleProvider } from '@/contexts/LocaleContext';
-import { OnboardingProvider } from '@/contexts/OnboardingContext';
-import { AppConfigProvider } from '@/contexts/AppConfigContext';
-import { UpdateProvider } from '@/contexts/UpdateContext';
-import { ExtensionUpdateProvider } from '@/contexts/ExtensionUpdateContext';
+import { screen, cleanup } from '@testing-library/react';
+import { renderSettings } from '@/testSupport/renderSettings';
 
 /**
  * `devtool://install?...` (src/lib/deepLink.ts) điều hướng tới `/settings`
@@ -16,26 +9,6 @@ import { ExtensionUpdateProvider } from '@/contexts/ExtensionUpdateContext';
  * về mục mặc định (Appearance). Bug này chính là finding pullfrog nêu trên
  * PR #126: điều hướng tới `/settings` không tự chọn mục nào cả.
  */
-
-function renderSettings(initialEntries: Array<{ pathname: string; state?: unknown }>) {
-  return render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <AppConfigProvider>
-        <LocaleProvider>
-          <FeatureProvider>
-            <OnboardingProvider>
-              <UpdateProvider>
-                <ExtensionUpdateProvider>
-                  <Settings />
-                </ExtensionUpdateProvider>
-              </UpdateProvider>
-            </OnboardingProvider>
-          </FeatureProvider>
-        </LocaleProvider>
-      </AppConfigProvider>
-    </MemoryRouter>,
-  );
-}
 
 afterEach(() => {
   cleanup();

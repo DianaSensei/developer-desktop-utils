@@ -1,13 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { Settings } from '@/components/Settings';
-import { FeatureProvider } from '@/contexts/FeatureContext';
-import { LocaleProvider } from '@/contexts/LocaleContext';
-import { OnboardingProvider } from '@/contexts/OnboardingContext';
-import { AppConfigProvider } from '@/contexts/AppConfigContext';
-import { UpdateProvider } from '@/contexts/UpdateContext';
-import { ExtensionUpdateProvider } from '@/contexts/ExtensionUpdateContext';
+import { screen, fireEvent, cleanup } from '@testing-library/react';
+import { renderSettings } from '@/testSupport/renderSettings';
 import { ACCENT_TONES } from '@/lib/accentPreference';
 import { storageGet, storageRemove } from '@/lib/persistentStore';
 
@@ -17,26 +10,6 @@ import { storageGet, storageRemove } from '@/lib/persistentStore';
  * trung vào việc CHỌN thật sự đổi trạng thái và được LƯU LẠI, chứ không chỉ
  * "có render không" (build đã bắt việc đó).
  */
-
-function renderSettings() {
-  return render(
-    <MemoryRouter>
-      <AppConfigProvider>
-        <LocaleProvider>
-          <FeatureProvider>
-            <OnboardingProvider>
-              <UpdateProvider>
-                <ExtensionUpdateProvider>
-                  <Settings />
-                </ExtensionUpdateProvider>
-              </UpdateProvider>
-            </OnboardingProvider>
-          </FeatureProvider>
-        </LocaleProvider>
-      </AppConfigProvider>
-    </MemoryRouter>,
-  );
-}
 
 afterEach(() => {
   cleanup();
