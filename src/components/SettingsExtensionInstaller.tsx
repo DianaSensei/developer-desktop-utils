@@ -17,6 +17,7 @@ import {
   installPlugin,
   installService,
   listInstalledArtifacts,
+  recordKey,
   uninstallArtifact,
   type InstalledArtifactRecord,
   type RemoteArtifactManifest,
@@ -40,7 +41,12 @@ import {
  * ngắt-kết-nối bên dưới KHÔNG phải chuyện lý thuyết.
  */
 
-function recordKey(record: InstalledArtifactRecord): string {
+/** id/bin THẬT gửi xuống Rust (`artifact_installer_uninstall`'s `key`) —
+ *  khác `recordKey` (từ `@/platform`, dùng làm khoá React/UI) khi record có
+ *  `marketId`: `recordKey` trả `<marketId>::<id>` để phân biệt hai market
+ *  cùng id trên MÀN HÌNH, nhưng Rust chỉ biết `manifest.id`/`manifest.bin`
+ *  trần cộng `market_id` truyền riêng — xem `stage_uninstall`. */
+function rawArtifactId(record: InstalledArtifactRecord): string {
   return record.kind === 'plugin' ? record.manifest.id : record.manifest.bin;
 }
 
@@ -58,6 +64,11 @@ export function SettingsExtensionInstaller() {
   const [previewTriple, setPreviewTriple] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  // Market đã cung cấp `url`/`preview` hiện tại — `undefined` cho một URL dán
+  // tay hoặc một deep link (không gắn market nào). Đi kèm khi bấm "Cài đặt"
+  // để hai market khác nhau cùng phát hành một plugin trùng id không đè lên
+  // nhau (xem `installArtifact`).
+  const [previewMarketId, setPreviewMarketId] = useState<string | undefined>(undefined);
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
 
@@ -100,8 +111,8 @@ export function SettingsExtensionInstaller() {
     const drain = () => {
       const next = pendingInstall.dequeue();
       if (!next) return;
-      setUrl(next);
-      void runPreview(next);
+      setUrl(next.url);
+      void runPreview(next.url, next.marketId);
     };
     drain(); // bắt URL đã xếp sẵn trước khi component này mount
     return pendingInstall.subscribe(drain);
@@ -125,11 +136,12 @@ export function SettingsExtensionInstaller() {
     return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;
   }
 
-  const runPreview = async (targetUrl: string) => {
+  const runPreview = async (targetUrl: string, marketId?: string) => {
     setPreview(null);
     setPreviewTriple(null);
     setPreviewError(null);
     setInstallError(null);
+    setPreviewMarketId(marketId);
     if (!targetUrl.trim()) return;
     setPreviewing(true);
     try {
@@ -153,19 +165,21 @@ export function SettingsExtensionInstaller() {
     setInstallError(null);
     setInstalling(true);
     try {
-      await installArtifact(url.trim());
+      await installArtifact(url.trim(), previewMarketId);
       setUrl('');
       setPreview(null);
       setPreviewTriple(null);
       setNeedsRestart(true);
       await refresh();
-      // Deep link cài cả plugin lẫn sidecar service của nó xếp lần lượt hai
-      // URL vào hàng đợi (xem deepLink.ts) — vừa cài xong cái đầu thì tự xem
-      // trước luôn cái kế tiếp, vẫn chờ người dùng bấm "Cài đặt" riêng cho nó.
+      // Deep link/market cài cả plugin lẫn sidecar service của nó xếp lần
+      // lượt hai URL vào hàng đợi, CÙNG marketId (xem deepLink.ts,
+      // SettingsMarketplace.tsx) — vừa cài xong cái đầu thì tự xem trước
+      // luôn cái kế tiếp (giữ đúng marketId của nó), vẫn chờ người dùng bấm
+      // "Cài đặt" riêng cho nó.
       const next = pendingInstall.dequeue();
       if (next) {
-        setUrl(next);
-        await runPreview(next);
+        setUrl(next.url);
+        await runPreview(next.url, next.marketId);
       }
     } catch (e) {
       setInstallError(String(e instanceof Error ? e.message : e));
@@ -179,7 +193,7 @@ export function SettingsExtensionInstaller() {
     setRowBusy((prev) => ({ ...prev, [key]: true }));
     setRowError((prev) => ({ ...prev, [key]: '' }));
     try {
-      await uninstallArtifact(key);
+      await uninstallArtifact(rawArtifactId(record), record.marketId);
       setNeedsRestart(true);
       await refresh();
     } catch (e) {
@@ -199,9 +213,9 @@ export function SettingsExtensionInstaller() {
       // bản ghi cũ khi key trùng, nên "cập nhật" chỉ là "cài lại từ đúng
       // nguồn".
       if (record.kind === 'plugin') {
-        await installPlugin(record.sourceUrl);
+        await installPlugin(record.sourceUrl, record.marketId);
       } else {
-        await installService(record.sourceUrl);
+        await installService(record.sourceUrl, record.marketId);
       }
       setRowUpdateVersion((prev) => ({ ...prev, [key]: undefined }));
       setNeedsRestart(true);
@@ -278,7 +292,15 @@ export function SettingsExtensionInstaller() {
       <div className="flex gap-2">
         <Input
           value={url}
-          onChange={(e) => { setUrl(e.target.value); setPreview(null); setPreviewTriple(null); setPreviewError(null); }}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setPreview(null);
+            setPreviewTriple(null);
+            setPreviewError(null);
+            // Gõ tay lại nghĩa là URL này không còn gắn với market vừa xem
+            // trước trước đó (nếu có) — không giữ lại `previewMarketId` cũ.
+            setPreviewMarketId(undefined);
+          }}
           // Ví dụ URL, không phải câu chữ cần dịch — một chuỗi giống hệt nhau
           // ở cả hai ngôn ngữ trong bảng dịch bị `i18n.test.ts` coi là dấu
           // hiệu quên dịch, nên nó không thuộc về DICTIONARY.
@@ -391,10 +413,15 @@ export function SettingsExtensionInstaller() {
                       {record.kind === 'plugin' ? (
                         <>
                           {record.manifest.label}{' '}
-                          <span className="font-mono text-fg-mute/60">{key}@{record.manifest.version}</span>
+                          <span className="font-mono text-fg-mute/60">{record.manifest.id}@{record.manifest.version}</span>
                         </>
                       ) : (
-                        <span className="font-mono">{key}@{record.manifest.version}</span>
+                        <span className="font-mono">{record.manifest.bin}@{record.manifest.version}</span>
+                      )}
+                      {record.marketId && (
+                        <span className="rounded border px-1.5 py-0.5 font-mono text-[11px] text-fg-mute/70">
+                          {record.marketId}
+                        </span>
                       )}
                     </p>
                     <p className="truncate font-mono text-[11px] text-fg-mute/70">{record.sourceUrl}</p>

@@ -86,9 +86,15 @@ function randomSuffix(): string {
   return Math.random().toString(36).slice(2, 8);
 }
 
+// Kebab-case (chữ thường, số, dấu gạch nối) — CHỦ ĐÍCH, không chỉ để đẹp:
+// `installedPluginManifests()` (installer.ts) ghép id này với id plugin
+// thành một registry id duy nhất (`${marketId}-${pluginId}`), phải khớp
+// `ID_PATTERN` của `validateManifest` (chỉ nhận kebab-case) — một market id
+// chứa `:` hay ký tự hoa sẽ khiến MỌI plugin cài từ market đó bị registry từ
+// chối thẳng, âm thầm biến mất khỏi sidebar.
 export function addCustomMarket(label: string, catalogUrl: string): Market {
   const market: Market = {
-    id: `custom:${Date.now()}:${randomSuffix()}`,
+    id: `custom-${Date.now()}-${randomSuffix()}`,
     label: label.trim(),
     catalogUrl: catalogUrl.trim(),
     builtin: false,

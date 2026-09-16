@@ -128,8 +128,8 @@ describe('SettingsMarketplace — cài đặt (chuyển tiếp qua pendingInstal
 
     expect(onInstallRequested).toHaveBeenCalledTimes(1);
     const { pendingInstall } = await import('@/lib/pendingInstall');
-    expect(pendingInstall.dequeue()).toBe('https://example.com/demo-plugin.json');
-    expect(pendingInstall.dequeue()).toBe('https://example.com/demo-service.json');
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://example.com/demo-plugin.json', marketId: 'official' });
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://example.com/demo-service.json', marketId: 'official' });
   });
 
   it('đã cài đúng bản mới nhất thì nút Install bị vô hiệu hoá, hiện "Installed"', async () => {

@@ -33,6 +33,7 @@ export {
   uninstallArtifact,
   currentTargetTriple,
   checkAllForUpdates,
+  recordKey,
 } from './installer';
 export type {
   RemotePluginManifest,

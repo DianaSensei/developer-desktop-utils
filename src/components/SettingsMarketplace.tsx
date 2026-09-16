@@ -112,7 +112,9 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
 
   const handleInstall = (plugin: MarketPlugin) => {
     const urls = [plugin.pluginManifestUrl, plugin.serviceManifestUrl].filter((u): u is string => Boolean(u));
-    pendingInstall.enqueue(urls);
+    // marketId đi kèm để hai market khác nhau cùng phát hành một plugin
+    // trùng id không đè lên nhau (xem installArtifact/installedPluginManifests).
+    pendingInstall.enqueue(urls, selected?.id);
     onInstallRequested();
   };
 
@@ -202,7 +204,16 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
             <MarketPluginCard
               key={p.id}
               plugin={p}
-              installedRecord={installed.find((r) => r.kind === 'plugin' && r.manifest.id === p.id)}
+              // So khớp id + marketId — plugin cùng id cài từ MỘT market khác
+              // không được coi là "đã cài" cho thẻ này (hai bản cài độc lập,
+              // xem InstalledPluginRecord::market_id phía Rust). Một bản ghi
+              // KHÔNG có marketId (cài từ trước tính năng market, hoặc dán
+              // tay) vẫn được coi là khớp — không đủ thông tin để biết nó
+              // "thuộc" market nào, coi như có thể chính là bản của market
+              // này còn hơn hiện "Install" và mời cài chồng thêm một bản nữa.
+              installedRecord={installed.find(
+                (r) => r.kind === 'plugin' && r.manifest.id === p.id && (r.marketId === selected?.id || r.marketId === undefined),
+              )}
               targetTriple={targetTriple}
               onInstall={() => handleInstall(p)}
             />

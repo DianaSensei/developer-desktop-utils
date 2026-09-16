@@ -25,7 +25,7 @@ export default definePlugin({
 
 | Field | Kiểu | Bắt buộc | Ghi chú |
 |---|---|---|---|
-| `id` | `string` | ✅ | kebab-case (`a-z`, `0-9`, `-`), duy nhất toàn app. Đồng thời là namespace storage và khoá bật/tắt. |
+| `id` | `string` | ✅ | kebab-case (`a-z`, `0-9`, `-`), duy nhất toàn app.[^market-id] Đồng thời là namespace storage và khoá bật/tắt. |
 | `label` | `string` | ✅ | Tên hiển thị. |
 | `icon` | `LucideIcon` | ✅ | Component icon từ `lucide-react`. |
 | `description` | `string` | ✅ | Câu mô tả ngắn. |
@@ -41,6 +41,18 @@ export default definePlugin({
 | `service` | `ServiceDescriptor` | Có điều kiện | Tier B: `{ bin, methods, timeoutMs? }`. Chỉ có nghĩa khi đã khai `service`. Xem [04-tier-b-sidecars.md](./04-tier-b-sidecars.md). |
 | `sdk` | `string` | ✅ | Dải version SDK, dạng `'^M.m.p'`. |
 | `load` | `() => Promise<ComponentType>` | ✅ | Nạp component chính, lazy — chỉ gọi lúc điều hướng lần đầu. |
+
+[^market-id]: Trong CHÍNH MỘT market (một `catalog.json`), `id` vẫn phải duy
+    nhất — không có cơ chế nào ở đây gỡ khỏi tác giả trách nhiệm không đụng id
+    plugin khác trong cùng market mình phát hành. Nhưng khi cài từ Settings →
+    Marketplace, nếu người dùng đã thêm HAI market khác nhau cùng phát hành
+    một `id` trùng nhau (hai tác giả không hề biết nhau), host tự phân biệt
+    hai bản cài đó bằng `marketId + id` (registry id thật trở thành
+    `<marketId>-<id>`, route thành `/installed/<marketId>-<id>`) — cả hai
+    cùng tồn tại, không bản nào âm thầm bị ghi đè. Một plugin cài qua URL dán
+    tay (không qua market nào) vẫn dùng đúng `id`/`route` gốc như trước, không
+    đổi gì. Xem `src/platform/installer.ts`'s `installedPluginManifests()` và
+    `src-tauri/src/artifact_installer.rs`'s `InstalledPluginRecord::market_id`.
 
 ## Bảng quyền (`PluginPermission`)
 

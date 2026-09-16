@@ -424,4 +424,62 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
   // trống test đã biết, ghi lại chứ không giấu: cần một lần xác nhận thủ công
   // trên app thật (cài một plugin ví dụ, xác nhận nó thật sự render) trước
   // khi coi cơ chế này là đã kiểm chứng đầy đủ.
+
+  it('không có marketId (dán tay/bản cài từ trước) thì giữ NGUYÊN id/route gốc', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([installedPluginRaw({ manifest: remoteManifest({ id: 'demo', route: '/demo' }) })]);
+
+    const [a] = await installer.installedPluginManifests();
+    expect(a.manifest.id).toBe('demo');
+    expect(a.manifest.route).toBe('/demo');
+  });
+
+  it('có marketId thì id/route đăng ký registry được ghép marketId — hai market khác nhau cùng id KHÔNG đụng route/storage của nhau', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([
+      installedPluginRaw({ manifest: remoteManifest({ id: 'demo', route: '/demo' }), market_id: 'official' }),
+      installedPluginRaw({ manifest: remoteManifest({ id: 'demo', route: '/demo' }), market_id: 'custom-fork' }),
+    ]);
+
+    const [a, b] = await installer.installedPluginManifests();
+    expect(a.manifest.id).toBe('official-demo');
+    expect(a.manifest.route).toBe('/installed/official-demo');
+    expect(b.manifest.id).toBe('custom-fork-demo');
+    expect(b.manifest.route).toBe('/installed/custom-fork-demo');
+    expect(a.manifest.id).not.toBe(b.manifest.id);
+    expect(a.manifest.route).not.toBe(b.manifest.route);
+  });
+});
+
+describe('recordKey', () => {
+  it('plugin không có marketId dùng id trần — khớp hành vi cũ trước tính năng market', async () => {
+    const installer = await loadInTauri();
+    expect(installer.recordKey({ kind: 'plugin', manifest: remoteManifest(), sourceUrl: 'x', bundlePath: 'x', installedAt: 0 })).toBe(
+      'demo',
+    );
+  });
+
+  it('plugin có marketId dùng khoá ghép, phân biệt được hai bản ghi cùng id khác market', async () => {
+    const installer = await loadInTauri();
+    const a = installer.recordKey({
+      kind: 'plugin', manifest: remoteManifest(), sourceUrl: 'x', bundlePath: 'x', installedAt: 0, marketId: 'official',
+    });
+    const b = installer.recordKey({
+      kind: 'plugin', manifest: remoteManifest(), sourceUrl: 'x', bundlePath: 'x', installedAt: 0, marketId: 'custom-fork',
+    });
+    expect(a).not.toBe(b);
+  });
+
+  it('service luôn dùng bin trần, kể cả có marketId — market của service chỉ để hiển thị', async () => {
+    const installer = await loadInTauri();
+    const key = installer.recordKey({
+      kind: 'service',
+      manifest: { bin: 'devtool-svc-demo', version: '1.0.0', protocol: 1, targets: {} },
+      sourceUrl: 'x',
+      binPath: 'x',
+      installedAt: 0,
+      marketId: 'official',
+    });
+    expect(key).toBe('devtool-svc-demo');
+  });
 });
