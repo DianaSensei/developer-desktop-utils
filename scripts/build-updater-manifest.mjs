@@ -142,14 +142,21 @@ for (const platformDir of readdirSync('downloaded')) {
     const rule = classify(filename);
     if (!rule) continue; // e.g. dmg — unsigned, not part of the manifest
 
-    // The manifest's "signature" field is base64(the .sig file's raw text
-    // content), NOT the file's content verbatim — confirmed by decoding a
-    // real tauri-action-generated latest.json's signature field, which
-    // produces the human-readable minisign block ("untrusted comment: ...").
+    // The manifest's "signature" field is the .sig file's raw text content
+    // VERBATIM, not re-encoded — Tauri's own updater signer already writes
+    // that file as base64(the minisign block), so a real tauri-action
+    // manifest's "signature" string decodes ONCE to the human-readable
+    // minisign block ("untrusted comment: ..."). Re-encoding it here (an
+    // earlier version of this script did `readFileSync(sigPath).toString
+    // ('base64')`) produces a signature field that needs TWO decodes —
+    // confirmed the hard way against v0.9.1-test4's real release: the
+    // in-app updater rejected it with "Invalid encoding in minisign data".
+    // v0.9.0's real, working, tauri-action-built latest.json needs exactly
+    // one decode — verified directly against its actual signature field.
     const sigPath = join(dirname(filePath), `${filename}.sig`);
     let signature;
     try {
-      signature = readFileSync(sigPath).toString('base64');
+      signature = readFileSync(sigPath, 'utf-8').trim();
     } catch {
       continue; // no .sig sibling — not an updater-signed artifact (e.g. dmg)
     }
