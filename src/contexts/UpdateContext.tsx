@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import { isTauri } from '@/lib/platform';
@@ -340,8 +340,12 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('online', handleOnline);
   }, [autoCheckEnabled, checkHour, runCheck]);
 
-  return (
-    <UpdateContext.Provider value={{
+  // Every field here is either primitive state or an already-`useCallback`'d
+  // function, but the object literal itself was still new on every render —
+  // memoize so consumers that only care about a stable slice (e.g. just
+  // `checkForUpdates`) don't re-render on unrelated state changes.
+  const value = useMemo<UpdateContextValue>(
+    () => ({
       status,
       updateInfo,
       error,
@@ -357,10 +361,27 @@ export function UpdateProvider({ children }: { children: React.ReactNode }) {
       checkForUpdates,
       installUpdate,
       cancelInstall,
-    }}>
-      {children}
-    </UpdateContext.Provider>
+    }),
+    [
+      status,
+      updateInfo,
+      error,
+      autoCheckEnabled,
+      updateAvailable,
+      downloadProgress,
+      checkHour,
+      setCheckHour,
+      showUpdateDialog,
+      dismissUpdateDialog,
+      openUpdateDialog,
+      toggleAutoCheck,
+      checkForUpdates,
+      installUpdate,
+      cancelInstall,
+    ]
   );
+
+  return <UpdateContext.Provider value={value}>{children}</UpdateContext.Provider>;
 }
 
 export function useUpdate() {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -986,20 +986,29 @@ function PortsView() {
     (e.command ?? '').toLowerCase().includes(q) ||
     (e.pid != null && String(e.pid).includes(q));
 
-  const scanned = (entries ?? []).filter(matchesFilter);
+  // Filtering/grouping/sorting below used to run inline in the render body —
+  // recomputed on EVERY render, including ones triggered by unrelated state
+  // (typing in the "add favorite" input, e.g.) even though `entries`/`filter`/
+  // `favorites`/`sortCol`/`sortDir` hadn't changed. Memoized so each stage only
+  // redoes work when its own inputs actually change.
+  const scanned = useMemo(() => (entries ?? []).filter(matchesFilter), [entries, q]);
 
   // Favourites mode is a port-centric watchlist: list every favourite port with
   // its live socket(s), or a synthetic "free" row when nothing is bound to it.
-  const favRows: PortRow[] = favorites
-    .filter((port) => !q || String(port).includes(q))
-    .flatMap((port): PortRow[] => {
-      const matches = scanned.filter((e) => e.localPort === port);
-      return matches.length ? matches.map((entry) => ({ kind: 'socket', entry })) : [{ kind: 'free', port }];
-    });
+  const favRows: PortRow[] = useMemo(
+    () =>
+      favorites
+        .filter((port) => !q || String(port).includes(q))
+        .flatMap((port): PortRow[] => {
+          const matches = scanned.filter((e) => e.localPort === port);
+          return matches.length ? matches.map((entry) => ({ kind: 'socket', entry })) : [{ kind: 'free', port }];
+        }),
+    [favorites, q, scanned]
+  );
 
   // Default mode groups sockets by owning process (one row per process), so a
   // server listening on several ports shows once with all its ports as chips.
-  const groups: ProcGroup[] = (() => {
+  const groups: ProcGroup[] = useMemo(() => {
     const map = new Map<string, ProcGroup>();
     for (const e of scanned) {
       const key = e.pid != null
@@ -1024,7 +1033,7 @@ function PortsView() {
     const arr = [...map.values()];
     for (const g of arr) g.ports.sort((a, b) => a.port - b.port || a.protocol.localeCompare(b.protocol));
     return arr;
-  })();
+  }, [scanned]);
 
   // Sort by the active column for both views. Missing numeric values (e.g. a
   // socket with no resolvable process) always sink to the bottom regardless of
@@ -1038,30 +1047,40 @@ function PortsView() {
   };
   const cmpStr = (a: string, b: string) => a.toLowerCase().localeCompare(b.toLowerCase()) * dir;
 
-  const sortedGroups = [...groups].sort((a, b) => {
-    switch (sortCol) {
-      case 'pid': return cmpNum(a.pid, b.pid);
-      case 'mem': return cmpNum(a.memBytes, b.memBytes);
-      case 'uptime': return cmpNum(a.uptimeSecs, b.uptimeSecs);
-      case 'process': return cmpStr(a.project ?? a.processName ?? '', b.project ?? b.processName ?? '');
-      case 'port':
-      default: return ((a.ports[0]?.port ?? 0) - (b.ports[0]?.port ?? 0)) * dir;
-    }
-  });
+  const sortedGroups = useMemo(
+    () =>
+      [...groups].sort((a, b) => {
+        switch (sortCol) {
+          case 'pid': return cmpNum(a.pid, b.pid);
+          case 'mem': return cmpNum(a.memBytes, b.memBytes);
+          case 'uptime': return cmpNum(a.uptimeSecs, b.uptimeSecs);
+          case 'process': return cmpStr(a.project ?? a.processName ?? '', b.project ?? b.processName ?? '');
+          case 'port':
+          default: return ((a.ports[0]?.port ?? 0) - (b.ports[0]?.port ?? 0)) * dir;
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [groups, sortCol, dir]
+  );
 
   // Flat view: one row per socket, sorted by the same active column.
-  const sortedSockets = [...scanned].sort((a, b) => {
-    switch (sortCol) {
-      case 'pid': return cmpNum(a.pid, b.pid);
-      case 'mem': return cmpNum(a.memBytes, b.memBytes);
-      case 'uptime': return cmpNum(a.uptimeSecs, b.uptimeSecs);
-      case 'process': return cmpStr(a.processName ?? '', b.processName ?? '');
-      case 'proto': return cmpStr(a.protocol, b.protocol) || (a.localPort - b.localPort) * dir;
-      case 'address': return cmpStr(a.localAddress, b.localAddress) || (a.localPort - b.localPort) * dir;
-      case 'port':
-      default: return (a.localPort - b.localPort) * dir;
-    }
-  });
+  const sortedSockets = useMemo(
+    () =>
+      [...scanned].sort((a, b) => {
+        switch (sortCol) {
+          case 'pid': return cmpNum(a.pid, b.pid);
+          case 'mem': return cmpNum(a.memBytes, b.memBytes);
+          case 'uptime': return cmpNum(a.uptimeSecs, b.uptimeSecs);
+          case 'process': return cmpStr(a.processName ?? '', b.processName ?? '');
+          case 'proto': return cmpStr(a.protocol, b.protocol) || (a.localPort - b.localPort) * dir;
+          case 'address': return cmpStr(a.localAddress, b.localAddress) || (a.localPort - b.localPort) * dir;
+          case 'port':
+          default: return (a.localPort - b.localPort) * dir;
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scanned, sortCol, dir]
+  );
 
   // Numeric columns default to descending (biggest/longest first) on first click.
   const DEFAULT_DIR: Record<PortSortCol, SortDir> = {

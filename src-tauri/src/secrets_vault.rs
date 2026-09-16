@@ -80,6 +80,18 @@ struct VaultFile {
 #[derive(Default)]
 pub struct VaultState {
     key: Mutex<Option<([u8; KEY_LEN], KeyMode)>>,
+    // Khoá RIÊNG cho TOÀN BỘ một lệnh — cả bước phân giải khoá mã hoá
+    // (`key_for`, có thể TẠO MỚI khoá lúc chưa từng chạm vault) lẫn chu trình
+    // đọc-sửa-ghi `secrets.enc` sau đó — không chỉ phần đọc-sửa-ghi. Lấy khoá
+    // này TRƯỚC `key_for()` ở mọi lệnh: nếu chỉ bọc phần đọc-sửa-ghi (như bản
+    // đầu), hai lệnh ghi ĐẦU TIÊN gọi gần như đồng thời (vd `Promise.all` lưu
+    // nhiều mục 2FA lúc app mới cài) có thể mỗi lệnh tự phân giải MỘT khoá
+    // khác nhau (đường keychain có thể ghi thất bại nửa chừng) trước khi vào
+    // đoạn có khoá, để lại `secrets.enc` mã hoá bằng một khoá không khớp cache/
+    // keychain nữa — cùng loại lỗi mất-cập-nhật-thầm-lặng mà việc bọc riêng
+    // đọc-sửa-ghi định phòng, chỉ là ở bước SỚM hơn. Cùng cách
+    // `artifact_installer::InstalledIndex` đã làm cho `extensions/index.json`.
+    write_lock: Mutex<()>,
 }
 
 fn random_bytes(len: usize) -> Result<Vec<u8>, String> {
@@ -214,14 +226,20 @@ fn write_entries(app: &AppHandle, key: &[u8; KEY_LEN], entries: &Entries) -> Res
         ciphertext: BASE64.encode(&ciphertext),
     };
     let path = app_data(app)?.join(VAULT_FILE);
-    std::fs::write(&path, serde_json::to_string(&file).map_err(|e| e.to_string())?)
+    // Atomic (tmp + rename), cùng khuôn `artifact_installer.rs`'s `write_index`
+    // đã dùng: `write_lock` chỉ chặn hai LỆNH ghi chồng lên nhau, không chặn
+    // được một crash/mất điện giữa lúc `std::fs::write` đang chạy — trước đây
+    // ghi thẳng vào `secrets.enc`, một lần dở dang để lại blob nửa vời mà
+    // `read_entries` chỉ có thể báo "Kho bí mật hỏng", không khôi phục được.
+    let tmp_path = app_data(app)?.join(format!("{VAULT_FILE}.tmp"));
+    std::fs::write(&tmp_path, serde_json::to_string(&file).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+        let _ = std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o600));
     }
-    Ok(())
+    std::fs::rename(&tmp_path, &path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -230,6 +248,7 @@ pub fn secret_vault_get(
     state: tauri::State<'_, VaultState>,
     key: String,
 ) -> Result<Option<String>, String> {
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let (k, _) = key_for(&app, &state)?;
     Ok(read_entries(&app, &k)?.get(&key).cloned())
 }
@@ -241,6 +260,7 @@ pub fn secret_vault_set(
     key: String,
     value: String,
 ) -> Result<(), String> {
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let (k, _) = key_for(&app, &state)?;
     let mut entries = read_entries(&app, &k)?;
     entries.insert(key, value);
@@ -253,6 +273,7 @@ pub fn secret_vault_delete(
     state: tauri::State<'_, VaultState>,
     key: String,
 ) -> Result<(), String> {
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let (k, _) = key_for(&app, &state)?;
     let mut entries = read_entries(&app, &k)?;
     if entries.remove(&key).is_some() {
@@ -263,6 +284,7 @@ pub fn secret_vault_delete(
 
 #[tauri::command]
 pub fn secret_vault_keys(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<Vec<String>, String> {
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let (k, _) = key_for(&app, &state)?;
     Ok(read_entries(&app, &k)?.into_keys().collect())
 }
@@ -270,6 +292,7 @@ pub fn secret_vault_keys(app: AppHandle, state: tauri::State<'_, VaultState>) ->
 /// Xoá toàn bộ nội dung, GIỮ nguyên khoá. Dùng bởi nhánh DEV của frontend.
 #[tauri::command]
 pub fn secret_vault_clear(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<(), String> {
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let (k, _) = key_for(&app, &state)?;
     write_entries(&app, &k, &Entries::new())
 }
@@ -278,6 +301,7 @@ pub fn secret_vault_clear(app: AppHandle, state: tauri::State<'_, VaultState>) -
 /// giải mã được và người dùng CHỦ ĐỘNG chấp nhận mất dữ liệu cũ.
 #[tauri::command]
 pub fn secret_vault_reset(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<(), String> {
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let dir = app_data(&app)?;
     let _ = std::fs::remove_file(dir.join(VAULT_FILE));
     let _ = std::fs::remove_file(dir.join(KEY_FILE));
@@ -290,6 +314,7 @@ pub fn secret_vault_reset(app: AppHandle, state: tauri::State<'_, VaultState>) -
 
 #[tauri::command]
 pub fn secret_vault_status(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<VaultStatus, String> {
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let (k, mode) = key_for(&app, &state)?;
     Ok(VaultStatus {
         encrypted: true,
