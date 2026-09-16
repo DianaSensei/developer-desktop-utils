@@ -20,13 +20,34 @@
 //   - deb is signed but is NOT primary: it gets only "<os>-<arch>-deb", no
 //     bare "linux-x86_64" duplicate (AppImage already owns that key).
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { accessSync, constants, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 
 const RELEASE_TAG = process.env.RELEASE_TAG;
 const RELEASE_NOTES = process.env.RELEASE_NOTES;
 const REPO = process.env.GITHUB_REPOSITORY;
 if (!RELEASE_TAG || !REPO) throw new Error('RELEASE_TAG and GITHUB_REPOSITORY env vars are required');
+
+// Resolve to an absolute path ourselves instead of letting execFileSync hand
+// a bare command name to the OS for PATH lookup (SonarCloud javascript:S4036
+// — "make sure the PATH variable only contains fixed, unwriteable
+// directories"; a bare name trusts every directory on PATH equally, whereas
+// this only trusts whichever one actually has an executable named `gh`).
+function resolveExecutable(name) {
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    const candidate = join(dir, name);
+    try {
+      accessSync(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error(`\`${name}\` not found on PATH`);
+}
+
+const GH = resolveExecutable('gh');
 
 const version = RELEASE_TAG.replace(/^v/, '');
 
@@ -60,7 +81,7 @@ function classify(filename) {
 // exact `https://api.github.com/repos/OWNER/REPO/releases/assets/<id>` form
 // tauri-action itself used — confirmed against v0.9.0's real latest.json),
 // not built by hand from the filename.
-const releaseJson = execFileSync('gh', ['api', `repos/${REPO}/releases/tags/${RELEASE_TAG}`], {
+const releaseJson = execFileSync(GH, ['api', `repos/${REPO}/releases/tags/${RELEASE_TAG}`], {
   encoding: 'utf-8',
 });
 const release = JSON.parse(releaseJson);
