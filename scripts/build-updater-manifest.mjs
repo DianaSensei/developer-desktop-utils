@@ -20,8 +20,8 @@
 //   - deb is signed but is NOT primary: it gets only "<os>-<arch>-deb", no
 //     bare "linux-x86_64" duplicate (AppImage already owns that key).
 import { execFileSync } from 'node:child_process';
-import { accessSync, constants, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import { accessSync, constants, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { basename, delimiter, dirname, join } from 'node:path';
 
 const RELEASE_TAG = process.env.RELEASE_TAG;
 const RELEASE_NOTES = process.env.RELEASE_NOTES;
@@ -77,6 +77,23 @@ function classify(filename) {
   return null;
 }
 
+// Tauri's own bundle output nests one subdirectory per format
+// (bundle/dmg/*.dmg, bundle/macos/*.app.tar.gz, bundle/appimage/*.AppImage,
+// bundle/deb/*.deb, bundle/nsis/*.exe) — confirmed the hard way when v0.9.1's
+// test run found zero files with a flat readdirSync (it only saw the format
+// subdirectory NAMES — "dmg", "macos", etc — which never match any
+// extension). actions/upload-artifact preserves that nesting, so this has
+// to walk it back down instead of assuming a flat directory.
+function walkFiles(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...walkFiles(full));
+    else out.push(full);
+  }
+  return out;
+}
+
 // Asset URLs come from the GitHub REST API response for this release (the
 // exact `https://api.github.com/repos/OWNER/REPO/releases/assets/<id>` form
 // tauri-action itself used — confirmed against v0.9.0's real latest.json),
@@ -93,7 +110,8 @@ for (const platformDir of readdirSync('downloaded')) {
   const osArch = PLATFORM_TO_OS_ARCH[platformDir];
   if (!osArch) continue; // unknown/extra directory — ignore rather than guess
 
-  for (const filename of readdirSync(join('downloaded', platformDir))) {
+  for (const filePath of walkFiles(join('downloaded', platformDir))) {
+    const filename = basename(filePath);
     if (filename.endsWith('.sig')) continue; // handled as a sibling below
     const rule = classify(filename);
     if (!rule) continue; // e.g. dmg — unsigned, not part of the manifest
@@ -102,7 +120,7 @@ for (const platformDir of readdirSync('downloaded')) {
     // content), NOT the file's content verbatim — confirmed by decoding a
     // real tauri-action-generated latest.json's signature field, which
     // produces the human-readable minisign block ("untrusted comment: ...").
-    const sigPath = join('downloaded', platformDir, `${filename}.sig`);
+    const sigPath = join(dirname(filePath), `${filename}.sig`);
     let signature;
     try {
       signature = readFileSync(sigPath).toString('base64');
