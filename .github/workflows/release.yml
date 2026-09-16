@@ -2,9 +2,17 @@ name: Release
 
 # Tag push is the primary trigger. Also runnable manually (workflow_dispatch)
 # for environments that can drive the GitHub Actions API but can't push a tag
-# ref (e.g. a scoped CI bot token) — tauri-action's `tagName` below creates
-# the tag itself, pointed at whatever ref the manual run used, if it doesn't
-# already exist. Same pattern as developer-desktop-util-plugin's release.yml.
+# ref (e.g. a scoped CI bot token).
+#
+# Build-then-tag, not tag-then-build: `build` only ever produces workflow
+# artifacts, never touches git tags or GitHub Releases. `publish` (needs:
+# build) only runs once EVERY platform in the matrix has succeeded — if any
+# one fails, `publish` is skipped by GitHub Actions' own `needs:` semantics,
+# and no tag/release is ever created. This replaced an earlier design where
+# each platform's job created/updated the release itself as it finished:
+# v0.9.0's first run published live with macOS+Linux assets while Windows
+# was still failing, because "publish" wasn't a separate, later step gated
+# on the whole matrix — it was baked into each platform's own build step.
 on:
   push:
     tags:
@@ -16,14 +24,13 @@ on:
         required: true
         type: string
 
-# Least privilege at the top level: the only job here declares the write scopes
-# it actually needs (contents/id-token/attestations). Anything added later
-# starts read-only and has to opt in explicitly.
+# Least privilege at the top level: only `publish` needs write scopes, and
+# only once `build`'s full matrix has already succeeded.
 permissions:
   contents: read
 
 jobs:
-  publish:
+  build:
     strategy:
       fail-fast: false
       matrix:
@@ -53,33 +60,25 @@ jobs:
             rust-target: ''
 
     runs-on: ${{ matrix.platform }}
-    # Bundling + signing + attestation on three platforms.
+    # Bundling + signing on three platforms. No release/tag work here — that's
+    # all in `publish`, so this job needs no elevated permissions.
     timeout-minutes: 90
-
-    permissions:
-      contents: write      # publish the release and upload assets
-      id-token: write      # OIDC token used to sign the provenance attestation
-      attestations: write  # write the attestation to the repo's attestation store
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0   # full history + tags so the changelog can diff previous→new tag
 
       - name: Resolve release tag (workflow_dispatch input, or the pushed tag)
         # shell: bash — the default shell on windows-latest is pwsh, where
         # "$GITHUB_ENV" doesn't expand to the env-file path the way it does
         # in bash, so the append silently no-ops. Confirmed the hard way:
         # v0.9.0's first release run left RELEASE_TAG empty on Windows only
-        # (macOS/Linux default to bash already), producing an empty VERSION
-        # ("Could not determine package name and version.") and a published
-        # release entirely missing Windows installers.
+        # (macOS/Linux default to bash already).
         shell: bash
         run: echo "RELEASE_TAG=${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}" >> "$GITHUB_ENV"
 
       # Derive the app version from the tag (e.g. v0.2.4 -> 0.2.4) and write
-      # it into the config files, so you only have to push a tag — no manual version
-      # bump in tauri.conf.json. tauri-action reads the version from tauri.conf.json.
+      # it into the config files, so you only have to push a tag — no manual
+      # version bump in tauri.conf.json.
       - name: Sync version from tag
         shell: bash
         run: |
@@ -126,20 +125,118 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Windows bundling downloads NSIS (and nsis_tauri_utils.dll) into
+      # %LOCALAPPDATA%\tauri on every run. Cache that dir so later releases reuse it.
+      - name: Cache Tauri bundler tools (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/AppData/Local/tauri
+          key: ${{ runner.os }}-tauri-bundler-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-tauri-bundler-
+
+      # Plain `tauri build` CLI, not tauri-action: tauri-action bundles
+      # build+release+updater-manifest into one step, which is exactly the
+      # coupling this workflow is undoing. Signing (.sig files) and the
+      # updater-artifact bundle (tauri.conf.json's `bundle.createUpdaterArtifacts`)
+      # are native `tauri build` behavior, not something tauri-action adds —
+      # they still happen here as long as the signing env vars are set.
+      - name: Build app
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri:build -- ${{ matrix.args }}
+
+      - name: Locate bundle output directory
+        id: bundle-dir
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ matrix.rust-target }}" ]; then
+            DIR="src-tauri/target/${{ matrix.rust-target }}/release/bundle"
+          else
+            DIR="src-tauri/target/release/bundle"
+          fi
+          [ -d "$DIR" ] || { echo "Bundle dir not found: $DIR" >&2; exit 1; }
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      # Only the installer formats tauri.conf.json's bundle.targets produces
+      # (app/dmg/nsis/appimage/deb) plus each one's .sig — no source/debug
+      # cruft from the bundle dir.
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bundle-${{ matrix.platform }}
+          path: |
+            ${{ steps.bundle-dir.outputs.dir }}/**/*.dmg
+            ${{ steps.bundle-dir.outputs.dir }}/**/*.app.tar.gz
+            ${{ steps.bundle-dir.outputs.dir }}/**/*.app.tar.gz.sig
+            ${{ steps.bundle-dir.outputs.dir }}/**/*.AppImage
+            ${{ steps.bundle-dir.outputs.dir }}/**/*.AppImage.sig
+            ${{ steps.bundle-dir.outputs.dir }}/**/*.deb
+            ${{ steps.bundle-dir.outputs.dir }}/**/*.exe
+            ${{ steps.bundle-dir.outputs.dir }}/**/*.exe.sig
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Everything below is metadata/publish work — no compiled toolchain needed.
+    timeout-minutes: 15
+
+    permissions:
+      contents: write      # create the tag, publish the release, upload assets
+      id-token: write      # OIDC token used to sign the provenance attestation
+      attestations: write  # write the attestation to the repo's attestation store
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # full history + tags so the changelog can diff previous→new tag
+
+      - name: Resolve release tag (workflow_dispatch input, or the pushed tag)
+        shell: bash
+        run: echo "RELEASE_TAG=${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}" >> "$GITHUB_ENV"
+
+      # No merge-multiple: each artifact lands in its own downloaded/bundle-<platform>/
+      # subdirectory, so scripts/build-updater-manifest.mjs can tell which
+      # platform a file came from from its DIRECTORY, not by guessing from the
+      # filename (which only encodes arch, e.g. "aarch64"/"amd64"/"x64" — not
+      # OS, and not reliably even that if naming ever changes).
+      - name: Download all platform bundles
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v6.0.0
+        with:
+          pattern: 'bundle-*'
+          path: downloaded
+
+      - name: List downloaded artifacts
+        run: find downloaded -type f | sort
+
+      # gh release create/upload want a flat file list; the per-platform
+      # subdirectory structure only matters to build-updater-manifest.mjs
+      # (needs: [next step]).
+      - name: Flatten artifacts into a single upload directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          find downloaded -type f -exec cp {} release-assets/ \;
+          ls -la release-assets
+
       # Build the release notes from the full commit log between the previous tag
       # and this tag. This becomes both the GitHub release body AND the updater
       # manifest `notes` field, so the in-app update popup shows the real changes.
       - name: Generate release notes
-        id: notes
         shell: bash
         run: |
           NEW_TAG="${RELEASE_TAG}"
           # Nearest tag reachable from HEAD's parent = the previous release.
-          # HEAD^ instead of "${NEW_TAG}^": on a tag push, HEAD already IS the
-          # tag's commit (that's what triggered the checkout) so they're the
-          # same thing — but on workflow_dispatch, NEW_TAG doesn't exist as a
-          # git ref yet (tauri-action creates it later), so "${NEW_TAG}^"
-          # would fail to resolve while HEAD^ still works.
+          # HEAD^ instead of "${NEW_TAG}^": NEW_TAG doesn't exist as a git ref
+          # yet at this point (the tag is created a few steps below), so
+          # "${NEW_TAG}^" would fail to resolve — HEAD^ works either way.
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
 
           if [ -n "$PREV_TAG" ]; then
@@ -159,101 +256,75 @@ jobs:
             echo "__NOTES_EOF__"
           } >> "$GITHUB_ENV"
 
-      # Windows bundling downloads NSIS (and nsis_tauri_utils.dll) into
-      # %LOCALAPPDATA%\tauri on every run. Cache that dir so later releases reuse it.
-      - name: Cache Tauri bundler tools (Windows)
-        if: matrix.platform == 'windows-latest'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/AppData/Local/tauri
-          key: ${{ runner.os }}-tauri-bundler-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-tauri-bundler-
-
-      # Best-effort: cache Tauri's downloaded bundler tooling on Linux (AppImage
-      # linuxdeploy/AppRun + plugins). Depending on the Tauri version these may be
-      # fetched into the build dir instead, in which case this is a harmless no-op.
-      # - name: Cache Tauri bundler tools (Linux)
-      #   if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm'
-      #   uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      #   with:
-      #     path: |
-      #       ~/.cache/tauri
-      #       ~/.local/share/tauri
-      #     key: ${{ runner.os }}-tauri-bundler-${{ hashFiles('src-tauri/Cargo.lock') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-tauri-bundler-
-
-      - name: Build and publish release
-        id: tauri
-        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+      # This is the point of no return: every platform in `build` already
+      # succeeded (that's what `needs: build` guarantees), so the tag is
+      # created now, for the first time — `gh release create` creates it
+      # itself, pointed at this exact commit, same as
+      # developer-desktop-util-plugin's release.yml already does.
+      - name: Create GitHub Release, tag, and upload installers
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ env.RELEASE_TAG }}
-          releaseName: DevTool ${{ env.RELEASE_TAG }}
-          releaseBody: ${{ env.RELEASE_NOTES }}
-          # Must be published (not draft) for the updater: the endpoint
-          # releases/latest/download/latest.json only resolves to the latest
-          # PUBLISHED release, so drafts are invisible to the in-app updater.
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "DevTool ${RELEASE_TAG}" \
+            --notes "${RELEASE_NOTES}" \
+            --target "${{ github.sha }}" \
+            release-assets/*
+
+      # ── Updater manifest ─────────────────────────────────────────────────
+      # tauri-action used to build this incrementally (each platform's job
+      # merged its entry into the existing release's latest.json). Now that
+      # publishing happens once, after every platform, it's built in one
+      # shot instead — no merge race between matrix jobs to worry about.
+      #
+      # Schema and key names (short "<os>-<arch>" the updater plugin actually
+      # reads, plus "<os>-<arch>-<format>" aliases) copied verbatim from a
+      # real tauri-action-generated latest.json (v0.9.0's), not guessed —
+      # getting this wrong breaks auto-update silently for every user.
+      - name: Generate and upload latest.json (updater manifest)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/build-updater-manifest.mjs
+          gh release upload "${RELEASE_TAG}" latest.json --clobber --repo "${GITHUB_REPOSITORY}"
 
       # ── Verifiable supply chain ─────────────────────────────────────────
       # Everything below turns "trust us" into something a user can check with
       # `gh attestation verify` / `shasum -c`. See SECURITY.md and
       # scripts/verify-release.sh.
 
-      - name: Collect built artifact paths
-        id: artifacts
-        shell: bash
-        env:
-          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
-        run: |
-          # tauri-action reports the bundles it produced as a JSON array.
-          # Keep only the installers/bundles: the .sig files are already covered
-          # by the updater's own minisign signature.
-          node -e '
-            const paths = JSON.parse(process.env.ARTIFACT_PATHS || "[]")
-              .filter((p) => !p.endsWith(".sig"));
-            require("fs").appendFileSync(process.env.GITHUB_OUTPUT,
-              `paths<<__EOF__\n${paths.join("\n")}\n__EOF__\n`);
-            console.log(paths.join("\n"));
-          '
-
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ steps.artifacts.outputs.paths }}
+          subject-path: |
+            release-assets/*.dmg
+            release-assets/*.app.tar.gz
+            release-assets/*.AppImage
+            release-assets/*.deb
+            release-assets/*.exe
 
       - name: Publish SHA256 checksums
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ARTIFACT_LIST: ${{ steps.artifacts.outputs.paths }}
         run: |
           set -euo pipefail
-          sums="SHA256SUMS-${{ matrix.platform }}${{ matrix.rust-target && format('-{0}', matrix.rust-target) || '' }}.txt"
+          sums="SHA256SUMS.txt"
           : > "$sums"
-          while IFS= read -r artifact; do
-            [ -n "$artifact" ] || continue
+          for artifact in release-assets/*; do
             [ -f "$artifact" ] || continue
-            if command -v sha256sum >/dev/null 2>&1; then
-              (cd "$(dirname "$artifact")" && sha256sum "$(basename "$artifact")")
-            else
-              (cd "$(dirname "$artifact")" && shasum -a 256 "$(basename "$artifact")")
-            fi >> "$sums"
-          done <<< "$ARTIFACT_LIST"
+            case "$artifact" in *.sig) continue ;; esac
+            (cd "$(dirname "$artifact")" && sha256sum "$(basename "$artifact")") >> "$sums"
+          done
           cat "$sums"
           gh release upload "${RELEASE_TAG}" "$sums" --clobber --repo "${GITHUB_REPOSITORY}"
 
-      # One SBOM per release is enough — the dependency tree is the same on
-      # every platform, so only the Linux job publishes it.
       - name: Generate SBOM
-        if: matrix.platform == 'ubuntu-22.04'
         uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           path: .
@@ -263,7 +334,6 @@ jobs:
           upload-release-assets: false
 
       - name: Publish SBOM
-        if: matrix.platform == 'ubuntu-22.04'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
