@@ -207,14 +207,14 @@ import {
 } from '@/platform';
 ```
 
-## Link `devtool://install` — bấm trên trang web thay vì copy/dán tay
+## Link `desktop-devtool-app://install` — bấm trên trang web thay vì copy/dán tay
 
 Trang plugin (`starlight-site`'s `plugins.astro`) không bắt người dùng tự
 copy URL manifest rồi dán vào Settings nữa — mỗi thẻ plugin có một nút "Cài
 đặt" trỏ tới:
 
 ```
-devtool://install?manifest=<url manifest plugin>&service=<url manifest sidecar, nếu có>
+desktop-devtool-app://install?manifest=<url manifest plugin>&service=<url manifest sidecar, nếu có>
 ```
 
 Cơ chế (xem `src-tauri/src/main.rs`, `src/lib/deepLink.ts`,

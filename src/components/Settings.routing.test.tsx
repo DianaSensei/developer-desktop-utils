@@ -3,7 +3,7 @@ import { screen, cleanup } from '@testing-library/react';
 import { renderSettings } from '@/testSupport/renderSettings';
 
 /**
- * `devtool://install?...` (src/lib/deepLink.ts) điều hướng tới `/settings`
+ * `desktop-devtool-app://install?...` (src/lib/deepLink.ts) điều hướng tới `/settings`
  * với `{ state: { section: 'plugins' } }` để mở thẳng màn cài đặt tiện ích —
  * xác nhận Settings thực sự đọc `location.state.section` này, chứ không rơi
  * về mục mặc định (Appearance). Bug này chính là finding pullfrog nêu trên

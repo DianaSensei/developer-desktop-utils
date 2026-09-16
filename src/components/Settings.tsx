@@ -321,7 +321,7 @@ export function Settings() {
   // TỰ LÀ sự "mở/đóng" rồi, nên bỏ hẳn kiểu accordion lồng bên trong từng mục.
   // Xem SETTINGS_SECTIONS + nav trái ở cuối file cho danh sách đầy đủ.
   const location = useLocation();
-  // `devtool://install?...` (deepLink.ts) điều hướng tới đây với
+  // `desktop-devtool-app://install?...` (deepLink.ts) điều hướng tới đây với
   // `{ state: { section: 'plugins' } }` để mở thẳng màn cài đặt tiện ích
   // thay vì rơi vào mục mặc định (Appearance). Đọc cả lúc khởi tạo (mở lạnh)
   // lẫn qua effect bên dưới (app đã đứng sẵn ở Settings, một link thứ hai

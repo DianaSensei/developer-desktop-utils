@@ -55,7 +55,7 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["devtool"]
+        "schemes": ["desktop-devtool-app"]
       }
     },
     "updater": {

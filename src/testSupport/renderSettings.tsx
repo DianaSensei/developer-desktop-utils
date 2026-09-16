@@ -12,7 +12,7 @@ import { ExtensionUpdateProvider } from '@/contexts/ExtensionUpdateContext';
  *  every `Settings.*.test.tsx` file — kept in one place so adding a
  *  provider `Settings` starts depending on means editing this one function,
  *  not every test file that renders it. `initialEntries` lets a test drive
- *  `location.state` (e.g. `devtool://install`'s `{ section: 'plugins' }`,
+ *  `location.state` (e.g. `desktop-devtool-app://install`'s `{ section: 'plugins' }`,
  *  see `src/lib/deepLink.ts`). */
 export function renderSettings(
   initialEntries: Array<string | { pathname: string; state?: unknown }> = ['/settings'],

@@ -23,7 +23,7 @@ tauri-plugin-updater = "2"
 tauri-plugin-http = "2"
 tauri-plugin-store = "2"
 tauri-plugin-window-state = "2"
-# devtool://install deep link — trang plugin (starlight-site) mở app rồi đưa
+# desktop-devtool-app://install deep link — trang plugin (starlight-site) mở app rồi đưa
 # thẳng tới màn xác nhận cài đặt của SettingsExtensionInstaller thay vì bắt
 # người dùng tự copy/dán URL manifest. `single-instance` phải đứng TRƯỚC
 # `deep-link` trong .plugin() chain bên main.rs (yêu cầu của chính plugin

@@ -746,7 +746,7 @@ function AppContent() {
     storageSet('devtool-sidebar-collapsed', isCollapsed.toString());
   }, [isCollapsed]);
 
-  // `devtool://install?manifest=...` từ trang plugin (starlight-site) — chỉ
+  // `desktop-devtool-app://install?manifest=...` từ trang plugin (starlight-site) — chỉ
   // gắn một lần cho cả vòng đời app (guard `started` bên trong), nên effect
   // này an toàn khi chạy lại nếu `navigate` đổi identity.
   useEffect(() => {

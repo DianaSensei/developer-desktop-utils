@@ -1,5 +1,5 @@
 // Hàng đợi URL manifest chờ cài — cầu nối giữa `deepLink.ts` (nhận
-// `devtool://install?...` từ hệ điều hành) và `SettingsExtensionInstaller`
+// `desktop-devtool-app://install?...` từ hệ điều hành) và `SettingsExtensionInstaller`
 // (UI xác nhận cài đặt đã có sẵn). Không tự cài gì ở đây: hàng đợi chỉ giữ
 // URL, còn bước xem trước/xác nhận/cài thật vẫn đi qua đúng luồng
 // `fetchArtifactManifestPreview`/`installArtifact` người dùng đã dùng khi tự
@@ -8,7 +8,7 @@
 // qua đúng màn hình xem trước đó).
 //
 // CÓ subscribe/notify (không chỉ enqueue/dequeue tay): nếu người dùng ĐANG
-// đứng ở Settings → Plugin và một link `devtool://` thứ hai tới trong lúc đó,
+// đứng ở Settings → Plugin và một link `desktop-devtool-app://` thứ hai tới trong lúc đó,
 // `SettingsExtensionInstaller` không remount (điều hướng tới path đang đứng
 // sẵn không mount lại component) — effect chỉ chạy lúc mount sẽ bỏ lỡ URL
 // mới. `notify()` cho listener đang mount một cơ hội tự kéo hàng đợi mà

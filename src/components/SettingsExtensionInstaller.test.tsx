@@ -318,7 +318,7 @@ describe('SettingsExtensionInstaller — service đòi xác nhận trước khi 
   });
 });
 
-describe('SettingsExtensionInstaller — hàng đợi devtool://install (pendingInstall)', () => {
+describe('SettingsExtensionInstaller — hàng đợi desktop-devtool-app://install (pendingInstall)', () => {
   it('URL đã xếp sẵn TRƯỚC khi mount thì tự điền ngay vào ô URL', async () => {
     invokeMock.mockResolvedValueOnce([]); // list lúc mount
     vi.resetModules();
@@ -361,7 +361,7 @@ describe('SettingsExtensionInstaller — hàng đợi devtool://install (pending
 
     // Cùng lần nạp module renderInTauri() vừa reset — lấy pendingInstall từ
     // đó để enqueue "trong lúc component đã mount", đúng kịch bản pullfrog
-    // nêu: single-instance chuyển tiếp một link devtool:// thứ hai trong khi
+    // nêu: single-instance chuyển tiếp một link desktop-devtool-app:// thứ hai trong khi
     // người dùng đang đứng sẵn ở Settings → Plugin.
     const { pendingInstall } = await import('@/lib/pendingInstall');
     invokeMock.mockResolvedValueOnce(pluginManifestRaw({ label: 'Second Link Plugin' }));

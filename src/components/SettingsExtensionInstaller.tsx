@@ -85,7 +85,7 @@ export function SettingsExtensionInstaller() {
     void refresh();
   }, [refresh]);
 
-  // `devtool://install?manifest=...&service=...` (starlight-site) xếp URL
+  // `desktop-devtool-app://install?manifest=...&service=...` (starlight-site) xếp URL
   // vào hàng đợi này rồi điều hướng tới Settings → Plugin — nhưng nếu người
   // dùng ĐÃ đứng sẵn ở đây khi link thứ hai tới (single-instance chuyển tiếp
   // sang tiến trình đang chạy), điều hướng tới path đang đứng sẵn không

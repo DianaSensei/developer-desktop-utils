@@ -1,21 +1,30 @@
-// Nhận link `devtool://install?manifest=<url>&service=<url>` từ trang plugin
-// (starlight-site's plugins.astro) và đưa app tới đúng màn hình xác nhận cài
-// đặt đã có sẵn (`SettingsExtensionInstaller`) — xem
+// Nhận link `desktop-devtool-app://install?manifest=<url>&service=<url>` từ
+// trang plugin (starlight-site's plugins.astro) và đưa app tới đúng màn hình
+// xác nhận cài đặt đã có sẵn (`SettingsExtensionInstaller`) — xem
 // `src-tauri/src/main.rs` cho phần đăng ký scheme/plugin phía Rust và
 // `pendingInstall.ts` cho hàng đợi URL nằm giữa hai bên.
 //
-// CHỦ ĐÍCH KHÔNG tự cài ngay khi nhận link: một link `devtool://` có thể đến
-// từ bất kỳ đâu (trang web giả mạo, tin nhắn), nên bước xem trước/xác nhận
-// của SettingsExtensionInstaller (tên, quyền, nguồn) vẫn bắt buộc — file này
-// chỉ tự động điền URL và cuộn tới đó, không thay cho cú bấm "Cài đặt".
+// Scheme trùng CHÍNH XÁC với `identifier` của app trong tauri.conf.json
+// (`com.desktop-devtool-app`, bỏ phần `com.`) — có chủ đích, để không cần
+// đăng ký/kiểm tra trùng với một scheme chung chung (kiểu `devtool://`, dễ
+// đụng ứng dụng khác cùng đăng ký cùng tên) mà vẫn chắc chắn duy nhất.
+//
+// CHỦ ĐÍCH KHÔNG tự cài ngay khi nhận link: một link `desktop-devtool-app://`
+// có thể đến từ bất kỳ đâu (trang web giả mạo, tin nhắn), nên bước xem
+// trước/xác nhận của SettingsExtensionInstaller (tên, quyền, nguồn) vẫn bắt
+// buộc — file này chỉ tự động điền URL và cuộn tới đó, không thay cho cú bấm
+// "Cài đặt".
 
 import { isTauri } from '@/lib/platform';
 import { pendingInstall } from '@/lib/pendingInstall';
 
+/** Phải khớp `plugins.deep-link.desktop.schemes` trong `tauri.conf.json`. */
+export const INSTALL_LINK_SCHEME = 'desktop-devtool-app';
+
 /** Parse một chuỗi URL thành danh sách URL manifest cần cài, theo thứ tự
  *  plugin trước rồi tới sidecar service — bỏ qua im lặng nếu không phải
- *  đúng dạng `devtool://install?...` (vd một CLI argument không liên quan
- *  lọt vào `getCurrent()`/`onOpenUrl`). */
+ *  đúng dạng `desktop-devtool-app://install?...` (vd một CLI argument không
+ *  liên quan lọt vào `getCurrent()`/`onOpenUrl`). */
 export function parseInstallUrls(raw: string): string[] {
   let parsed: URL;
   try {
@@ -23,7 +32,7 @@ export function parseInstallUrls(raw: string): string[] {
   } catch {
     return [];
   }
-  if (parsed.protocol !== 'devtool:' || parsed.hostname !== 'install') return [];
+  if (parsed.protocol !== `${INSTALL_LINK_SCHEME}:` || parsed.hostname !== 'install') return [];
   const urls: string[] = [];
   const manifest = parsed.searchParams.get('manifest');
   const service = parsed.searchParams.get('service');

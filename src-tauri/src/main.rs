@@ -22,7 +22,7 @@ use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
 fn main() {
     tauri::Builder::default()
         // Đăng ký TRƯỚC hết mọi `.plugin()` khác — yêu cầu của chính plugin
-        // này: nếu người dùng bấm một link `devtool://install?...` thứ hai
+        // này: nếu người dùng bấm một link `desktop-devtool-app://install?...` thứ hai
         // trong khi app đã mở, closure dưới đây chạy trên tiến trình ĐANG
         // CHẠY còn tiến trình mới tự thoát ngay, thay vì mở thêm một cửa sổ
         // trùng. Callback rỗng là đủ: feature "deep-link" (Cargo.toml) đã tự
@@ -34,7 +34,7 @@ fn main() {
         .setup(|_app| {
             // AppImage không có bước cài đặt nào đăng ký URI scheme vào hệ
             // thống (khác .deb/.msi/.dmg, nơi trình cài đặt làm việc đó) — tự
-            // đăng ký lúc khởi động là cách duy nhất `devtool://` hoạt động
+            // đăng ký lúc khởi động là cách duy nhất `desktop-devtool-app://` hoạt động
             // trên bản AppImage. Vô hại khi gọi lại nhiều lần hoặc trên các
             // bản Linux không phải AppImage.
             #[cfg(target_os = "linux")]
