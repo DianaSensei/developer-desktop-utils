@@ -103,10 +103,13 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
   const isFavorite = useCallback((featureId: string) => favorites.includes(featureId), [favorites]);
 
   // `FeatureProvider` sits near the top of the provider tree and is read by
-  // every sidebar row and route guard — without memoizing the value, every
-  // state change here (toggling ONE tool, reordering) re-rendered every
-  // consumer regardless of whether their own slice of `features`/`favorites`
-  // actually changed.
+  // every sidebar row and route guard. A real `features`/`favorites` change
+  // (toggling a tool, reordering) still re-renders every consumer — React
+  // context has no per-field subscription, and this memo doesn't add one.
+  // What it DOES fix: without it, the value was a brand-new object on every
+  // render of THIS provider, including ones triggered by something entirely
+  // unrelated re-rendering its parent — every consumer re-rendered then too,
+  // with nothing in features/favorites/etc. having actually changed.
   const value = useMemo<FeatureContextType>(
     () => ({
       features,

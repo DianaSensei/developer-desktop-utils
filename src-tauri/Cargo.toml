@@ -46,11 +46,6 @@ hostname = "0.4"
 netstat2 = "0.11"
 sysinfo = "0.39"
 axum = "0.8"
-# Chỉ dùng trong test (artifact_installer.rs) để dựng một body chunked KHÔNG
-# khai Content-Length trước — mô phỏng đúng "server nói dối/bỏ qua header đó"
-# mà `download_capped` phải tự đếm byte để bắt, cùng chỗ axum/uuid ở trên
-# cũng chỉ phục vụ test chứ không phải code sản phẩm.
-futures-util = { version = "0.3", default-features = false, features = ["std"] }
 # "sync" — Engine dùng Arc<RwLock> nội bộ thay vì Rc<RefCell>, đổi lại Send +
 # Sync: bắt buộc để build MỘT Engine dùng chung qua mọi request (mockserver.rs's
 # `ENGINE`, thay vì dựng lại — tốn cấu hình 6 giới hạn (max_operations,
@@ -84,6 +79,16 @@ getrandom = { version = "0.4", features = ["std"] }
 # (base64 hoá tốn thêm ~33%) — Rust tải trực tiếp xuống đĩa, JS chỉ nhận lại
 # kết quả (đường dẫn cục bộ, hash).
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+[dev-dependencies]
+# Chỉ dùng trong test (artifact_installer.rs) để dựng một body chunked KHÔNG
+# khai Content-Length trước — mô phỏng đúng "server nói dối/bỏ qua header đó"
+# mà `download_capped` phải tự đếm byte để bắt. Khác `axum`/`uuid` ở
+# [dependencies] bên trên (chúng phục vụ cả module production thật —
+# mockserver.rs/service_host.rs/mcp_bridge.rs chạy server axum thật, không chỉ
+# test), `futures-util` không có nơi nào khác dùng ngoài test module này nên
+# thuộc đúng [dev-dependencies].
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 
 [features]
 default = ["custom-protocol"]
