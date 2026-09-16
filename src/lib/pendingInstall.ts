@@ -23,13 +23,23 @@ function notify() {
 let queue: string[] = [];
 
 export const pendingInstall = {
-  /** Thêm một hoặc nhiều URL manifest vào cuối hàng đợi (plugin trước,
-   *  service sau — theo đúng thứ tự deep link truyền vào), rồi báo cho mọi
-   *  listener đang mount (nếu có) để tự kéo ngay, không cần remount. */
+  /** Nạp một hoặc nhiều URL manifest mới (plugin trước, service sau — theo
+   *  đúng thứ tự deep link truyền vào), rồi báo cho mọi listener đang mount
+   *  (nếu có) để tự kéo ngay, không cần remount.
+   *
+   *  THAY THẾ toàn bộ hàng đợi cũ thay vì nối vào cuối: mỗi lần `handle()`
+   *  (deepLink.ts) gọi đây là một cú bấm "Install" MỚI từ bên ngoài — nếu
+   *  người dùng bấm link cho plugin B trong khi vẫn còn URL service của
+   *  plugin A đang treo trong hàng đợi (chưa xác nhận cài xong ở
+   *  `SettingsExtensionInstaller`), nối vào cuối sẽ khiến `dequeue()` (FIFO)
+   *  trả về đúng cái URL cũ của A trước, khiến người dùng thấy "dữ liệu cũ"
+   *  thay vì bản xem trước của B mà họ vừa yêu cầu. Ý định mới luôn thắng ý
+   *  định cũ chưa hoàn tất.
+   */
   enqueue(urls: string[]) {
     const cleaned = urls.map((u) => u.trim()).filter(Boolean);
     if (cleaned.length === 0) return;
-    queue = [...queue, ...cleaned];
+    queue = cleaned;
     notify();
   },
   /** Lấy và xoá URL kế tiếp, hoặc `null` nếu hàng đợi rỗng. */
