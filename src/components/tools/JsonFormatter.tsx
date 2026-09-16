@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { PaneHeader } from '@/components/ui/tool-layout';
@@ -18,7 +19,6 @@ import {
 import { cn } from '@/lib/utils';
 import { SearchInput } from '@/components/ui/search-input';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { SplitPane } from '@/components/ui/split-pane';
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -436,11 +436,12 @@ function lineMatches(line: FlatLine, lowerQuery: string) {
 }
 
 export function JsonFormatter() {
-  const [input, setInput] = usePersistentState('devtool:json:input', '');
-  const [mode, setMode] = usePersistentState<Mode>('devtool:json:mode', 'beautify');
-  const [indentKey, setIndentKey] = usePersistentState('devtool:json:indent', '2');
-  const [quote, setQuote] = usePersistentState('devtool:json:quote', '"');
-  const [showInput, setShowInput] = usePersistentState('devtool:json:showInput', true);
+  const sdk = usePluginSdkFor('json');
+  const [input, setInput] = usePluginState(sdk, 'json:input', '', { legacyKey: 'devtool:json:input' });
+  const [mode, setMode] = usePluginState<Mode>(sdk, 'json:mode', 'beautify', { legacyKey: 'devtool:json:mode' });
+  const [indentKey, setIndentKey] = usePluginState(sdk, 'json:indent', '2', { legacyKey: 'devtool:json:indent' });
+  const [quote, setQuote] = usePluginState(sdk, 'json:quote', '"', { legacyKey: 'devtool:json:quote' });
+  const [showInput, setShowInput] = usePluginState(sdk, 'json:showInput', true, { legacyKey: 'devtool:json:showInput' });
 
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());

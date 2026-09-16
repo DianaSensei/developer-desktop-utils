@@ -6,7 +6,8 @@
 // immutably through small recursive helpers.
 
 import { useCallback, useMemo } from 'react';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, usePluginState, useSecretState } from '@/platform';
+import { useEnvSecrets } from './useEnvSecrets';
 import { storageGet } from '@/lib/persistentStore';
 import { type Cookie, applySetCookies } from './cookies';
 import { paramsFromUrl } from './request';
@@ -403,47 +404,40 @@ function varsForCollection(
 // ─── store hook ─────────────────────────────────────────────────────────────
 
 export function useApiStore() {
+  const sdk = usePluginSdkFor('api-client');
   // The collections tree is edited on every keystroke, so debounce its (large)
   // serialization rather than writing the whole tree to localStorage each time.
-  const [collections, setCollections] = usePersistentState<Collection[]>(
-    'devtool:apiclient:collections', seedCollections, { debounceMs: 400 },
-  );
-  const [environments, setEnvironments] = usePersistentState<Environment[]>(
-    'devtool:apiclient:environments', [], { debounceMs: 300 },
+  const [collections, setCollections] = usePluginState<Collection[]>(sdk, 'apiclient:collections', seedCollections, { debounceMs: 400, legacyKey: 'devtool:apiclient:collections' });
+  // Giá trị của biến `secret` sống trong kho bí mật đã mã hoá; cấu trúc
+  // environments vẫn ở store thường. Xem envSecrets.ts cho lý do không bê cả
+  // tài liệu sang kho.
+  const [strippedEnvironments, setStrippedEnvironments] = usePluginState<Environment[]>(sdk, 'apiclient:environments', [], { debounceMs: 300, legacyKey: 'devtool:apiclient:environments' });
+  const [environments, setEnvironments] = useEnvSecrets(
+    sdk, strippedEnvironments, setStrippedEnvironments,
   );
   // Per-collection remembered choice (collectionId -> envId) and the single,
   // collection-independent global choice — replaces the old single
   // `activeEnvId`. Both `initial` args only ever run once, and only when
   // their own key has never been written — see migrateLegacyActiveEnv.
-  const [activeEnvByCollection, setActiveEnvByCollection] = usePersistentState<Record<string, string>>(
-    'devtool:apiclient:activeEnvByCollection', () => migrateLegacyActiveEnv(environments).byCollection,
+  const [activeEnvByCollection, setActiveEnvByCollection] = usePluginState<Record<string, string>>(
+    sdk, 'apiclient:activeEnvByCollection', () => migrateLegacyActiveEnv(environments).byCollection,
+    { legacyKey: 'devtool:apiclient:activeEnvByCollection' },
   );
-  const [activeGlobalEnvId, setActiveGlobalEnvId] = usePersistentState<string | null>(
-    'devtool:apiclient:activeGlobalEnv', () => migrateLegacyActiveEnv(environments).global,
-  );
-  const [history, setHistory] = usePersistentState<HistoryEntry[]>(
-    'devtool:apiclient:history', [], { debounceMs: 500 },
-  );
-  const [activeRequestId, setActiveRequestId] = usePersistentState<string | null>(
-    'devtool:apiclient:activeRequest', null,
-  );
+  const [activeGlobalEnvId, setActiveGlobalEnvId] = usePluginState<string | null>(sdk, 'apiclient:activeGlobalEnv', () => migrateLegacyActiveEnv(environments).global, { legacyKey: 'devtool:apiclient:activeGlobalEnv' });
+  const [history, setHistory] = usePluginState<HistoryEntry[]>(sdk, 'apiclient:history', [], { debounceMs: 500, legacyKey: 'devtool:apiclient:history' });
+  const [activeRequestId, setActiveRequestId] = usePluginState<string | null>(sdk, 'apiclient:activeRequest', null, { legacyKey: 'devtool:apiclient:activeRequest' });
   // Requests open as tabs, in tab order. activeRequestId points at the focused one.
-  const [openTabIds, setOpenTabIds] = usePersistentState<string[]>(
-    'devtool:apiclient:openTabs', [],
-  );
+  const [openTabIds, setOpenTabIds] = usePluginState<string[]>(sdk, 'apiclient:openTabs', [], { legacyKey: 'devtool:apiclient:openTabs' });
   // Cookie jar: captured from responses, auto-sent to matching requests.
-  const [cookies, setCookies] = usePersistentState<Cookie[]>(
-    'devtool:apiclient:cookies', [], { debounceMs: 300 },
-  );
-  const [cookiesEnabled, setCookiesEnabled] = usePersistentState<boolean>(
-    'devtool:apiclient:cookiesEnabled', true,
-  );
+  const [cookies, setCookies] = usePluginState<Cookie[]>(sdk, 'apiclient:cookies', [], { debounceMs: 300, legacyKey: 'devtool:apiclient:cookies' });
+  const [cookiesEnabled, setCookiesEnabled] = usePluginState<boolean>(sdk, 'apiclient:cookiesEnabled', true, { legacyKey: 'devtool:apiclient:cookiesEnabled' });
   // Local-only secret store, kept separate from environments (Postman's
   // "Vault"). Never touched by import/export or collection scripts — only
   // resolved into the actual outgoing request at send time (see engine.ts).
-  const [vault, setVault] = usePersistentState<KeyValue[]>(
-    'devtool:apiclient:vault', [], { debounceMs: 300 },
-  );
+  //
+  // Toàn bộ nội dung là bí mật theo đúng định nghĩa của nó, nên nó nằm trọn
+  // trong kho đã mã hoá chứ không phải store thường.
+  const [vault, setVault] = useSecretState<KeyValue[]>(sdk, 'vault', []);
 
   // Vault secrets namespaced as `vault.<key>` for {{ }} substitution.
   const vaultVars = useMemo(() => {

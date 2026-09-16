@@ -197,6 +197,97 @@ export const DICTIONARY = {
     en: 'Running in browser — permissions listed below apply to the desktop app only.',
   },
 
+  // ── Settings — Plugins ───────────────────────────────────────────────────
+  'settings.plugins.title': { vi: 'Plugin', en: 'Plugins' },
+  'settings.plugins.description': {
+    vi: 'Mỗi tool là một plugin tự khai báo trong src/plugins/<id>/plugin.ts. Bảng dưới đọc thẳng từ các manifest đó: kênh Platform mà plugin được phép dùng, và lệnh native nằm trong allowlist của nó.',
+    en: 'Every tool is a plugin that declares itself in src/plugins/<id>/plugin.ts. The table below is read straight from those manifests: which Platform channels the plugin may use, and which native commands are in its allowlist.',
+  },
+  'settings.plugins.count': {
+    vi: '{{enabled}}/{{total}} plugin đang bật · Platform SDK {{sdk}}',
+    en: '{{enabled}} of {{total}} plugins on · Platform SDK {{sdk}}',
+  },
+  'settings.plugins.off': { vi: 'đã tắt', en: 'off' },
+  'settings.plugins.noPermissions': { vi: 'Không dùng kênh nào của Platform', en: 'Uses no Platform channel' },
+  'settings.plugins.commands': { vi: 'Lệnh native', en: 'Native commands' },
+  'settings.plugins.hosts': { vi: 'Host được phép gọi', en: 'Allowed hosts' },
+  'settings.plugins.vaultKeychain': {
+    vi: 'Bí mật được mã hoá AES-256-GCM, khoá nằm trong keychain của hệ điều hành.',
+    en: 'Secrets are encrypted with AES-256-GCM; the key lives in the OS keychain.',
+  },
+  'settings.plugins.vaultFile': {
+    vi: 'Bí mật được mã hoá, nhưng máy này không có keychain khả dụng nên khoá nằm trong file chỉ chủ sở hữu đọc được, cạnh dữ liệu — yếu hơn: ai đọc được thư mục dữ liệu app thì đọc được cả hai.',
+    en: 'Secrets are encrypted, but no keychain is available on this machine, so the key sits in an owner-only file next to the data — weaker: anyone who can read the app data folder can read both.',
+  },
+  'settings.plugins.vaultUnreadable': {
+    vi: 'Không giải mã được kho bí mật bằng khoá hiện tại — nhiều khả năng mục trong keychain đã bị xoá hoặc thay.',
+    en: 'The secret store cannot be decrypted with the current key — the keychain entry was most likely removed or replaced.',
+  },
+  'settings.plugins.audit': { vi: 'Nhật ký hoạt động', en: 'Activity log' },
+  'settings.plugins.auditDescription': {
+    vi: 'Mọi lời gọi plugin → Platform trong phiên này, kể cả lời gọi bị từ chối vì thiếu quyền. Chỉ lưu trong bộ nhớ, xoá khi đóng app.',
+    en: 'Every plugin → Platform call this session, including ones denied for a missing permission. Kept in memory only; cleared when the app closes.',
+  },
+  'settings.plugins.auditEmpty': {
+    vi: 'Chưa có lời gọi nào trong phiên này.',
+    en: 'No calls yet this session.',
+  },
+  'settings.plugins.auditDenied': { vi: 'bị từ chối', en: 'denied' },
+
+  // ── Settings — Cài tiện ích (plugin JS + sidecar service) từ bên ngoài ────
+  'settings.plugins.install.title': { vi: 'Cài tiện ích từ bên ngoài', en: 'Install external extension' },
+  'settings.plugins.install.description': {
+    vi: 'Dán URL manifest của một plugin hoặc một sidecar (do bạn phát hành) để cài. Checksum sha256 trong manifest được kiểm trước khi bất kỳ dòng code/binary nào chạy — một URL không tự đủ để tin, kiểm tra vẫn diễn ra dù bạn đã tin nguồn.',
+    en: 'Paste a manifest URL for a plugin or a sidecar (published by you) to install it. The sha256 checksum in the manifest is checked before any of its code/binary ever runs — a URL alone is never enough trust, the check still happens even when you trust the source.',
+  },
+  'settings.plugins.install.webWarning': {
+    vi: 'Đang chạy trong trình duyệt — cài tiện ích chỉ hoạt động trên bản desktop.',
+    en: 'Running in browser — installing extensions only works in the desktop app.',
+  },
+  'settings.plugins.install.preview': { vi: 'Xem trước', en: 'Preview' },
+  'settings.plugins.install.confirm': { vi: 'Cài đặt', en: 'Install' },
+  'settings.plugins.install.previewing': { vi: 'Đang tải manifest…', en: 'Fetching manifest…' },
+  'settings.plugins.install.installing': { vi: 'Đang cài…', en: 'Installing…' },
+  'settings.plugins.install.installed': {
+    vi: 'Đã cài. Khởi động lại app để dùng tiện ích này.',
+    en: 'Installed. Restart the app to use this extension.',
+  },
+  'settings.plugins.install.kind.plugin': { vi: 'Trình cắm', en: 'Plugin' },
+  'settings.plugins.install.kind.service': { vi: 'Dịch vụ', en: 'Service' },
+  'settings.plugins.install.targetTriple': {
+    vi: 'Nền tảng máy này: {{triple}}',
+    en: 'This machine\'s target: {{triple}}',
+  },
+  'settings.plugins.install.targetSupported': {
+    vi: 'Manifest có bản cho nền tảng này.',
+    en: 'The manifest has a build for this platform.',
+  },
+  'settings.plugins.install.targetUnsupported': {
+    vi: 'Manifest KHÔNG có bản cho nền tảng này — cài sẽ bị từ chối.',
+    en: 'The manifest has NO build for this platform — install will be rejected.',
+  },
+  'settings.plugins.installed.title': { vi: 'Đã cài từ bên ngoài', en: 'Installed from outside' },
+  'settings.plugins.installed.empty': { vi: 'Chưa cài tiện ích nào.', en: 'No extensions installed yet.' },
+  'settings.plugins.installed.checkUpdate': { vi: 'Kiểm bản mới', en: 'Check for update' },
+  'settings.plugins.installed.update': { vi: 'Cập nhật', en: 'Update' },
+  'settings.plugins.installed.upToDate': { vi: 'Đã là bản mới nhất', en: 'Up to date' },
+  'settings.plugins.installed.updateAvailable': {
+    vi: 'Có bản {{version}} mới hơn',
+    en: 'Version {{version}} available',
+  },
+  'settings.plugins.installed.uninstall': { vi: 'Gỡ', en: 'Uninstall' },
+  'settings.plugins.installed.serviceWarning': {
+    vi: 'Cập nhật/gỡ sẽ DỪNG sidecar này nếu đang chạy — một kết nối hoặc stream đang mở sẽ bị ngắt ngay.',
+    en: 'Updating/uninstalling will STOP this sidecar if it is running — any open connection or stream will be cut immediately.',
+  },
+  'settings.plugins.installed.confirm': { vi: 'Xác nhận', en: 'Confirm' },
+  'settings.plugins.installed.cancel': { vi: 'Huỷ', en: 'Cancel' },
+  'settings.plugins.restart.needed': {
+    vi: 'Đã thay đổi tiện ích cài từ bên ngoài — khởi động lại để áp dụng.',
+    en: 'External extensions changed — restart to apply.',
+  },
+  'settings.plugins.restart.now': { vi: 'Khởi động lại ngay', en: 'Restart now' },
+
   // ── Settings — MCP ────────────────────────────────────────────────────────
   'settings.mcp.title': { vi: 'Cầu nối MCP', en: 'MCP' },
   'settings.mcp.backgroundTitle': { vi: 'Bridge MCP chạy nền', en: 'Background MCP bridge' },

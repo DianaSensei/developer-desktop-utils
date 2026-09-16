@@ -1,29 +1,26 @@
 // Request execution engine.
 //
-// In the Tauri desktop app we route through the HTTP plugin so the request is
-// made from Rust — no browser `Origin` header, no CORS preflight — letting the
-// tool hit any API like Postman/Bruno would. On the web build we fall back to
-// the standard `fetch` (subject to the target's CORS policy). Requests only ever
-// fire when the user clicks Send.
+// Requests go through `sdk.http.fetch`, which routes to the Tauri HTTP plugin so
+// the request is made from Rust — no browser `Origin` header, no CORS preflight —
+// letting the tool hit any API like Postman/Bruno would, and records the call in
+// the Platform's audit log. On the web build it falls back to the standard
+// `fetch` (subject to the target's CORS policy). Requests only ever fire when the
+// user clicks Send.
 
-import { isTauri } from '@/lib/platform';
+import { getPluginSdk, type PluginFetchInit } from '@/platform';
 import type { ApiRequest, ApiResponse, KeyValue, OAuth2Auth, VarMap } from './types';
 import { newKeyValue } from './types';
 import { substituteVars } from './vars';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
 import { type Cookie, cookieHeader } from './cookies';
-// Type-only — the actual module is loaded dynamically below, only when
-// running in Tauri, so this import never reaches the web build's bundle.
-import type { DangerousSettings } from '@tauri-apps/plugin-http';
+// `request.ts` là module thuần, được store/engine gọi tới chứ không phải một
+// component, nên SDK lấy qua `getPluginSdk`. `sdk.http.fetch` tự lo nhánh
+// Tauri/web y như bản cũ và mang theo cả `maxRedirections`/`danger` — hai tuỳ
+// chọn một HTTP workbench không thể thiếu (xem `PluginFetchInit`).
+type NetFetchInit = PluginFetchInit;
 
-type NetFetchInit = RequestInit & { maxRedirections?: number; danger?: DangerousSettings };
-
-async function netFetch(input: string, init: NetFetchInit): Promise<Response> {
-  if (isTauri) {
-    const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
-    return tauriFetch(input, init);
-  }
-  return fetch(input, init);
+function netFetch(input: string, init: NetFetchInit): Promise<Response> {
+  return getPluginSdk('api-client').http.fetch(input, init);
 }
 
 // ─── variable substitution ──────────────────────────────────────────────────

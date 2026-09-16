@@ -1,33 +1,18 @@
-import {
-  CalendarClock,
-  CaseSensitive,
-  Clock,
-  FileJson,
-  Binary,
-  KeyRound,
-  Regex,
-  GitCompare,
-  QrCode,
-  FileText,
-  CopyMinus,
-  Type,
-  Pipette,
-  Dices,
-  Server,
-  Database,
-  Timer,
-  Network,
-  Disc3,
-  Send,
-  ShieldCheck,
-  ServerCog,
-  ArrowLeftRight,
-  Rabbit,
-  MemoryStick,
-  Container,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from 'lucide-react';
+import { DEFAULT_PLUGIN_ORDER, PLUGINS } from '@/platform';
 
+/**
+ * Metadata tool cho sidebar, Settings và ô tìm kiếm.
+ *
+ * KHÔNG còn là nơi khai báo: từ khi có Platform, nguồn sự thật là manifest của
+ * từng plugin (`src/plugins/<id>/plugin.ts`) và file này chỉ là một VIEW đọc
+ * ra từ registry. Thêm tool = thêm một thư mục plugin, không sửa file này.
+ *
+ * Giữ lại `TOOL_DEFS` / `TOOL_DEF_MAP` / `DEFAULT_TOOL_ORDER` vì hơn một tá
+ * module đã đọc theo hình dạng này (Settings, CommandPalette, toolGroups,
+ * onboarding…); đổi chúng cùng lúc với việc đổi mô hình đăng ký sẽ trộn hai
+ * thay đổi không liên quan vào một diff.
+ */
 export interface ToolDef {
   id: string;
   label: string;
@@ -51,240 +36,22 @@ export interface ToolDef {
   experimental?: boolean;
 }
 
-export const TOOL_DEFS: ToolDef[] = [
-  {
-    id: "cron-generator",
-    label: "Cron Generator",
-    icon: CalendarClock,
-    description: "Build and validate cron expressions with a visual editor.",
-    keywords: ["crontab", "schedule", "quartz", "spring", "job", "timer", "expression"],
-  },
-  {
-    id: "text-transform",
-    label: "Text Transformer",
-    icon: CaseSensitive,
-    description:
-      "Change case, join/split lines, build arrays, and convert Vietnamese phone numbers.",
-    keywords: ["case", "uppercase", "lowercase", "camelcase", "snake case", "kebab", "title case", "lines", "split", "join", "trim", "phone", "vietnamese"],
-  },
-  {
-    id: "text-counter",
-    label: "Text Counter",
-    icon: Type,
-    description: "Count characters, words, lines and estimate reading time.",
-    keywords: ["characters", "words", "lines", "length", "count", "reading time", "bytes", "letters"],
-  },
-  {
-    id: "color-picker",
-    label: "Color Picker",
-    icon: Pipette,
-    description: "Pick colors from an image and convert between HEX, RGB, HSL, and CMYK.",
-    keywords: ["hex", "rgb", "hsl", "cmyk", "eyedropper", "palette", "swatch", "image", "colour"],
-  },
-  {
-    id: "base64",
-    label: "Encode·Hash·Encrypt",
-    icon: Binary,
-    description:
-      "Encode/decode (Base64, URL, Hex, Morse…), image↔Base64, hash text or files (MD5, SHA, HMAC, checksums), password hashing (bcrypt/Argon2), and AES-256 encrypt/decrypt.",
-    keywords: ["base64", "encode", "decode", "url encode", "hex", "morse", "hash", "md5", "sha1", "sha256", "sha512", "hmac", "checksum", "crc", "bcrypt", "argon2", "aes", "encrypt", "decrypt", "cipher", "password"],
-  },
-  {
-    id: "unix-time",
-    label: "Date / Time",
-    icon: Clock,
-    description:
-      "Convert timestamps, compare dates, and format in any timezone.",
-    keywords: ["timestamp", "epoch", "unix time", "date", "time", "timezone", "iso 8601", "utc", "convert", "duration"],
-  },
-  {
-    id: "json",
-    label: "JSON Formatter",
-    icon: FileJson,
-    description:
-      "Format, validate, minify, and explore JSON with syntax highlighting.",
-    keywords: ["json", "format", "validate", "minify", "beautify", "prettify", "tree", "viewer", "parse"],
-  },
-  {
-    id: "data-converter",
-    label: "Data Converter",
-    icon: ArrowLeftRight,
-    description:
-      "Convert structured data between JSON, YAML, TOML, XML, and .properties — fully offline.",
-    keywords: ["json", "yaml", "yml", "toml", "xml", "properties", "convert", "transform"],
-  },
-  {
-    id: "jwt",
-    label: "JWT Debugger",
-    icon: KeyRound,
-    description:
-      "Decode and inspect JWT headers and payloads without verification.",
-    keywords: ["jwt", "token", "decode", "header", "payload", "claims", "bearer", "auth"],
-  },
-  {
-    id: "regex",
-    label: "Regex Tester",
-    icon: Regex,
-    description:
-      "Test regular expressions with live match highlighting and group capture.",
-    keywords: ["regex", "regexp", "regular expression", "match", "pattern", "test", "replace", "capture group"],
-  },
-  {
-    id: "diff",
-    label: "Diff",
-    icon: GitCompare,
-    description:
-      "Compare two text blocks (word-level) or two JSON values (structural, by path).",
-    keywords: ["diff", "compare", "difference", "text", "json", "changes", "merge"],
-  },
-  {
-    id: "qrcode",
-    label: "QR Code",
-    icon: QrCode,
-    description: "Generate QR codes from text or URLs, or decode a QR image back to its content.",
-    keywords: ["qr", "qr code", "barcode", "scan", "decode", "generate", "url"],
-  },
-  {
-    id: "markdown",
-    label: "Markdown",
-    icon: FileText,
-    description: "Live Markdown preview with standard formatting support.",
-    keywords: ["markdown", "md", "preview", "readme", "render", "gfm"],
-  },
-  {
-    id: "deduplicate",
-    label: "Deduplicate",
-    icon: CopyMinus,
-    description: "Remove duplicate lines or items from any list.",
-    keywords: ["deduplicate", "dedup", "unique", "remove duplicates", "distinct", "lines", "list"],
-  },
-  {
-    id: "generator",
-    label: "Generator",
-    icon: Dices,
-    description:
-      "Generate UUIDs, random numbers and text, or realistic fake datasets (names, emails, dates…) exported as JSON, CSV, SQL, and more.",
-    keywords: ["uuid", "guid", "random", "fake data", "mock data", "faker", "test data", "lorem ipsum", "number", "string", "csv", "sql", "seed"],
-  },
-  {
-    id: "kafka-explorer",
-    label: "Kafka Explorer",
-    icon: Server,
-    description:
-      "Browse topics, inspect partitions and offsets, manage consumer groups, and produce messages.",
-    keywords: ["kafka", "topic", "partition", "offset", "consumer group", "producer", "message", "broker", "stream"],
-  },
-  {
-    id: "rabbit-client",
-    label: "RabbitMQ",
-    icon: Rabbit,
-    description:
-      "RabbitMQ management client: browse queues and exchanges, peek and publish messages, view bindings, connections, and cluster overview.",
-    keywords: ["rabbitmq", "rabbit", "amqp", "queue", "exchange", "message broker", "management", "vhost", "binding", "publish", "consume", "broker"],
-  },
-  {
-    id: "redis-client",
-    label: "Redis",
-    icon: MemoryStick,
-    description:
-      "Redis client: browse and edit keys (string, hash, list, set, sorted set), inspect server info, and run raw commands from a CLI console.",
-    keywords: ["redis", "cache", "key-value", "kv", "hash", "sorted set", "zset", "ttl", "expire", "scan", "cli", "in-memory"],
-  },
-  {
-    id: "container-manager",
-    label: "Containers",
-    icon: Container,
-    description:
-      "Manage containers, images, volumes, and networks across Docker-compatible runtimes (colima, Docker Desktop, Rancher Desktop, OrbStack, Podman): live CPU/memory usage, CPU and memory limits editable one-by-one or across a selection, and Compose projects grouped read-only by container label.",
-    keywords: ["docker", "colima", "podman", "rancher desktop", "orbstack", "container", "compose", "docker-compose", "image", "volume", "network", "dockerfile", "containerd", "cpu", "memory", "resource", "limits", "stats", "quota", "prune", "disk usage", "tag", "subnet", "ipam"],
-  },
-  {
-    id: "sql-formatter",
-    label: "SQL Formatter",
-    icon: Database,
-    description:
-      "Format and beautify SQL queries — or MongoDB shell/aggregation queries — with keyword casing, space collapse, and clause line breaks.",
-    keywords: ["sql", "mysql", "postgres", "query", "format", "beautify", "prettify", "mongodb", "mongo", "aggregation"],
-  },
-  {
-    id: "task-tracker",
-    label: "Time Tracker",
-    icon: Timer,
-    description:
-      "Time tracker with timesheet, calendar, and meeting-notes views, projects, tags, and pomodoro.",
-    keywords: ["time tracker", "timer", "timesheet", "pomodoro", "calendar", "clockify", "meeting notes", "project", "task", "stopwatch"],
-  },
-  {
-    id: "network",
-    label: "Network Tools",
-    icon: Network,
-    description:
-      "DNS records (A, AAAA, CNAME, NS, TXT, SOA, SRV, CAA…), propagation, DNSSEC, listening ports & processes, plus what's my IP and IP geolocation lookup.",
-    keywords: ["dns", "ip address", "geolocation", "lookup", "propagation", "dnssec", "nslookup", "dig", "whats my ip", "cname", "txt record", "ports", "listening ports", "open ports", "port viewer", "port in use", "whats using my port", "kill port", "process", "netstat", "lsof", "pid", "tcp", "udp", "socket"],
-  },
-  {
-    id: "lucky-wheel",
-    label: "Lucky Wheel",
-    icon: Disc3,
-    description:
-      "Spin a wheel of your own choices (one per line) to pick a random winner.",
-    keywords: ["wheel", "spinner", "random", "picker", "raffle", "choice", "winner", "decide", "draw"],
-  },
-  {
-    id: "api-client",
-    label: "API Client",
-    icon: Send,
-    description:
-      "Postman/Bruno-style HTTP workbench: collections, environments with {{vars}}, auth, pre/post-request scripts, tests & assertions, and Postman / OpenAPI import.",
-    keywords: ["http", "rest", "api", "request", "postman", "bruno", "insomnia", "curl", "endpoint", "get", "post", "fetch", "client", "openapi", "swagger"],
-  },
-  {
-    id: "mock-server",
-    label: "Mock Server",
-    icon: ServerCog,
-    description:
-      "Run a local HTTP mock server: match requests by method, path, query, header, and body, then reply with templated or Rhai-scripted responses. Live request log.",
-    keywords: ["mock", "stub", "fake api", "http server", "endpoint", "rhai", "response", "wiremock"],
-  },
-  {
-    id: "2fa",
-    label: "2FA Authenticator",
-    icon: ShieldCheck,
-    description:
-      "Generate TOTP and HOTP one-time passwords supporting SHA-1/256/512, 6/8 digits, and 30/60-second periods.",
-    keywords: ["2fa", "mfa", "totp", "hotp", "otp", "authenticator", "one-time password", "google authenticator", "verification code"],
-  },
-];
+export const TOOL_DEFS: ToolDef[] = PLUGINS.map((p) => ({
+  id: p.id,
+  label: p.label,
+  icon: p.icon,
+  description: p.description,
+  // Giữ đúng tính "không khai thì vắng mặt" của hình dạng cũ: `keywords: []`
+  // và `experimental: false` là hai giá trị KHÁC với không khai báo, và có test
+  // đang phân biệt chúng.
+  ...(p.keywords.length > 0 ? { keywords: p.keywords } : {}),
+  ...(p.experimental ? { experimental: true } : {}),
+}));
 
 export const TOOL_DEF_MAP = new Map(TOOL_DEFS.map((t) => [t.id, t]));
 
-// Default tool display order for fresh installs (before any user drag-drop reordering).
-// Edit this array to change the out-of-box sort order before a build.
-export const DEFAULT_TOOL_ORDER: string[] = [
-  "task-tracker",
-  "api-client",
-  "mock-server",
-  "json",
-  "data-converter",
-  "deduplicate",
-  "text-transform",
-  "sql-formatter",
-  "unix-time",
-  "generator",
-  "base64",
-  "text-counter",
-  "regex",
-  "diff",
-  "cron-generator",
-  "kafka-explorer",
-  "rabbit-client",
-  "redis-client",
-  "container-manager",
-  "qrcode",
-  "color-picker",
-  "jwt",
-  "markdown",
-  "lucky-wheel",
-  "network",
-  "2fa",
-];
+/**
+ * Thứ tự hiển thị mặc định cho bản cài mới (trước khi người dùng kéo-thả).
+ * Đổi thứ tự = đổi trường `order` trong manifest của plugin.
+ */
+export const DEFAULT_TOOL_ORDER: string[] = [...DEFAULT_PLUGIN_ORDER];

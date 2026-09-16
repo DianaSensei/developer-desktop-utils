@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Upload, X, AlertCircle, ClipboardPaste } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { DropZone } from '@/components/ui/drop-zone';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { copyImageToClipboard, readImageFromClipboard } from '@/lib/clipboard';
 import { quickPasteHint } from '@/hooks/useQuickPaste';
@@ -32,14 +32,15 @@ function normalizeBase64(raw: string): string {
 }
 
 export function ImageBase64Tool() {
-  const [mode, setMode] = usePersistentState<Mode>('devtool:imgbase64:mode', 'encode');
+  const sdk = usePluginSdkFor('base64');
+  const [mode, setMode] = usePluginState<Mode>(sdk, 'imgbase64:mode', 'encode', { legacyKey: 'devtool:imgbase64:mode' });
 
   // Encode side
   const [encodeDataUrl, setEncodeDataUrl] = useState<string | null>(null);
   const [encodeFile, setEncodeFile] = useState<File | null>(null);
 
   // Decode side
-  const [decodeInput, setDecodeInput] = usePersistentState('devtool:imgbase64:input', '');
+  const [decodeInput, setDecodeInput] = usePluginState(sdk, 'imgbase64:input', '', { legacyKey: 'devtool:imgbase64:input' });
   const [decodeError, setDecodeError] = useState(false);
 
   const processImageFile = useCallback((f: File) => {
@@ -69,8 +70,7 @@ export function ImageBase64Tool() {
   // data URL via the backend, then load it like any other image.
   const loadFromPath = useCallback(async (path: string) => {
     try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const file = await invoke<{ name: string; mime: string; dataUrl: string }>(
+      const file = await sdk.native.invoke<{ name: string; mime: string; dataUrl: string }>(
         'read_file_data_url',
         { path },
       );

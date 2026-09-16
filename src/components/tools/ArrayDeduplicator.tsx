@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Button } from '@/components/ui/button';
 import { ChevronsDown, ChevronsUp, X } from 'lucide-react';
 import { Stat } from '@/components/ui/stat';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
@@ -109,7 +109,8 @@ const AREA_STYLE = {
 } as const;
 
 export function ArrayDeduplicator() {
-  const [mode, setMode] = usePersistentState<DedupeMode>('devtool:deduplicate:mode', 'preserve');
+  const sdk = usePluginSdkFor('deduplicate');
+  const [mode, setMode] = usePluginState<DedupeMode>(sdk, 'deduplicate:mode', 'preserve', { legacyKey: 'devtool:deduplicate:mode' });
   const modeRef = useRef(mode);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 

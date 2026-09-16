@@ -24,7 +24,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { KeyValueEditor } from './KeyValueEditor';
-import { pickJsonFile, saveJsonFile } from './fileio';
+import { pickJsonFile, saveJsonFile } from '@/lib/fileio';
+import { usePluginSdkFor } from '@/platform';
 import { exportEnvironmentNative, exportEnvironmentPostman, importEnvironment as parseEnvironmentFile } from './environments-io';
 import type { Environment, KeyValue } from './types';
 import type { ApiStore } from './store';
@@ -45,6 +46,7 @@ const varCount = (vars: KeyValue[] = []): number =>
   vars.filter((v) => v.enabled && v.key.trim() !== '').length;
 
 export function EnvironmentEditor({ store, open, onClose }: Props) {
+  const sdk = usePluginSdkFor('api-client');
   const { environments } = store;
   const [tab, setTab] = useState<Tab>('environments');
   const [selectedEnvId, setSelectedEnvId] = useState<string | null>(environments[0]?.id ?? null);
@@ -109,7 +111,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   const handleImport = async () => {
     setError(null);
     try {
-      const text = await pickJsonFile();
+      const text = await pickJsonFile(sdk);
       if (!text) return;
       const env = parseEnvironmentFile(text);
       const id = store.importEnvironment(env);
@@ -125,7 +127,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
     try {
       const json = format === 'postman' ? exportEnvironmentPostman(env) : exportEnvironmentNative(env);
       const suffix = format === 'postman' ? '.postman_environment.json' : '.environment.json';
-      await saveJsonFile(`${env.name || 'environment'}${suffix}`, json);
+      await saveJsonFile(sdk, `${env.name || 'environment'}${suffix}`, json);
     } catch (e) {
       setError((e as Error).message);
     }

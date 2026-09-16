@@ -1,7 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod kafka;
 mod checksum;
 mod dropped;
 mod netinfo;
@@ -9,9 +8,10 @@ mod files;
 mod mcp_bridge;
 mod mockserver;
 mod ports;
-mod rabbit;
-mod redis_tool;
-mod container_tool;
+mod secrets_vault;
+mod service_host;
+mod artifact_installer;
+mod plugin_data;
 
 use tauri::Manager;
 
@@ -77,10 +77,10 @@ fn main() {
             }
         })
         .manage(mockserver::MockState::default())
-        .manage(rabbit::ConsumerRegistry::default())
-        .manage(kafka::KafkaConsumerRegistry::default())
-        .manage(redis_tool::PubSubRegistry::default())
-        .manage(container_tool::StreamRegistry::default())
+        // Host cho plugin dịch vụ (tier B) — xem service_host.rs.
+        .manage(service_host::ServiceRegistry::default())
+        .manage(secrets_vault::VaultState::default())
+        .manage(artifact_installer::InstalledIndex::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -113,103 +113,30 @@ fn main() {
             files::read_file_data_url,
             mcp_bridge::mcp_respond,
             mcp_bridge::mcp_sidecar_path,
-            kafka::kafka_list_configs,
-            kafka::kafka_save_config,
-            kafka::kafka_delete_config,
-            kafka::kafka_test_connection,
-            kafka::kafka_list_topics,
-            kafka::kafka_topic_details,
-            kafka::kafka_topic_consumer_groups,
-            kafka::kafka_create_topic,
-            kafka::kafka_list_groups,
-            kafka::kafka_group_details,
-            kafka::kafka_produce,
-            kafka::kafka_produce_batch,
-            kafka::kafka_fetch_messages,
-            kafka::kafka_delete_topic,
-            kafka::kafka_topic_configs,
-            kafka::kafka_consume_start,
-            kafka::kafka_consume_stop,
+            mcp_bridge::mcp_register_tools,
+            mcp_bridge::mcp_unregister_tools,
+            service_host::service_call,
+            service_host::service_stream_start,
+            service_host::service_stream_stop,
+            service_host::service_stop,
+            secrets_vault::secret_vault_get,
+            secrets_vault::secret_vault_set,
+            secrets_vault::secret_vault_delete,
+            secrets_vault::secret_vault_keys,
+            secrets_vault::secret_vault_clear,
+            secrets_vault::secret_vault_reset,
+            secrets_vault::secret_vault_status,
+            artifact_installer::artifact_installer_current_target_triple,
+            artifact_installer::artifact_installer_fetch_manifest,
+            artifact_installer::artifact_installer_install,
+            artifact_installer::artifact_installer_list,
+            artifact_installer::artifact_installer_uninstall,
+            artifact_installer::artifact_installer_read_bundle,
             mockserver::mock_start,
             mockserver::mock_stop,
             mockserver::mock_status,
             mockserver::mock_update_rules,
             mockserver::mock_test_script,
-            rabbit::rabbit_list_configs,
-            rabbit::rabbit_save_config,
-            rabbit::rabbit_delete_config,
-            rabbit::rabbit_rpc_call,
-            rabbit::rabbit_publish,
-            rabbit::rabbit_consume_start,
-            rabbit::rabbit_consume_stop,
-            rabbit::rabbit_amqp_test,
-            rabbit::rabbit_amqp_queues_info,
-            rabbit::rabbit_amqp_exchanges_info,
-            rabbit::rabbit_amqp_declare_queue,
-            rabbit::rabbit_amqp_declare_exchange,
-            rabbit::rabbit_amqp_bind_queue,
-            redis_tool::redis_list_configs,
-            redis_tool::redis_save_config,
-            redis_tool::redis_delete_config,
-            redis_tool::redis_test_connection,
-            redis_tool::redis_overview,
-            redis_tool::redis_scan_keys,
-            redis_tool::redis_key_summary,
-            redis_tool::redis_get_key,
-            redis_tool::redis_set_string,
-            redis_tool::redis_set_ttl,
-            redis_tool::redis_delete_keys,
-            redis_tool::redis_rename_key,
-            redis_tool::redis_exec,
-            redis_tool::redis_memory_usage,
-            redis_tool::redis_pubsub_subscribe,
-            redis_tool::redis_pubsub_unsubscribe,
-            redis_tool::redis_publish,
-            redis_tool::redis_client_list,
-            redis_tool::redis_slowlog,
-            redis_tool::redis_config_get,
-            redis_tool::redis_config_set,
-            container_tool::container_list_configs,
-            container_tool::container_save_config,
-            container_tool::container_delete_config,
-            container_tool::container_detect_sockets,
-            container_tool::container_test_connection,
-            container_tool::container_list,
-            container_tool::container_inspect,
-            container_tool::container_start,
-            container_tool::container_stop,
-            container_tool::container_restart,
-            container_tool::container_pause,
-            container_tool::container_unpause,
-            container_tool::container_remove,
-            container_tool::container_details,
-            container_tool::container_logs_start,
-            container_tool::container_logs_stop,
-            container_tool::container_stats_start,
-            container_tool::container_stats_snapshot,
-            container_tool::container_resources,
-            container_tool::container_update_resources,
-            container_tool::image_list,
-            container_tool::image_inspect,
-            container_tool::image_details,
-            container_tool::image_remove,
-            container_tool::image_pull,
-            container_tool::volume_list,
-            container_tool::volume_remove,
-            container_tool::volume_create,
-            container_tool::volume_sizes,
-            container_tool::network_list,
-            container_tool::network_remove,
-            container_tool::network_create,
-            container_tool::container_prune,
-            container_tool::image_prune,
-            container_tool::image_tag,
-            container_tool::volume_prune,
-            container_tool::volume_details,
-            container_tool::network_prune,
-            container_tool::network_details,
-            container_tool::container_system_info,
-            container_tool::container_system_df,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

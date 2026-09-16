@@ -41,9 +41,9 @@ describe('bản đồ nhóm', () => {
 });
 
 describe('buildNavEntries', () => {
-  it('gộp 26 tool thành 16 mục, không mất tool nào', () => {
+  it('gộp mọi tool thành đúng số mục, không mất tool nào', () => {
     const entries = buildNavEntries({ enabledIds: ALL });
-    expect(entries).toHaveLength(16);
+    expect(entries).toHaveLength(14);
 
     const flat = entries.flatMap((e) => e.tools.map((t) => t.id));
     expect(new Set(flat).size).toBe(TOOL_DEFS.length);
@@ -89,8 +89,8 @@ describe('buildNavEntries', () => {
 
   it('yêu thích một tool trong nhóm thì nổi cả nhóm', () => {
     // Dữ liệu yêu thích vẫn là id TOOL như cũ — không cần di trú.
-    const entries = buildNavEntries({ enabledIds: ALL, favorites: ['rabbit-client'] });
-    expect(idsOf(entries)[0]).toBe('g-brokers');
+    const entries = buildNavEntries({ enabledIds: ALL, favorites: ['text-counter'] });
+    expect(idsOf(entries)[0]).toBe('g-text');
   });
 
   it('tool mới chưa có trong thứ tự đã lưu thì xuống cuối', () => {
@@ -120,7 +120,7 @@ describe('buildNavEntries', () => {
 
 describe('countFavoriteEntries', () => {
   it('đếm mục có ít nhất một tool được yêu thích', () => {
-    const favorites = ['rabbit-client', 'regex'];
+    const favorites = ['text-counter', 'regex'];
     const entries = buildNavEntries({ enabledIds: ALL, favorites });
     expect(countFavoriteEntries(entries, favorites)).toBe(2);
   });
@@ -134,7 +134,8 @@ describe('countFavoriteEntries', () => {
 describe('GROUP_OF_TOOL', () => {
   it('tool đứng riêng không có trong bản đồ', () => {
     expect(GROUP_OF_TOOL.has('api-client')).toBe(false);
-    expect(GROUP_OF_TOOL.get('kafka-explorer')?.id).toBe('g-brokers');
+    expect(GROUP_OF_TOOL.has('kafka-explorer')).toBe(false);
+    expect(GROUP_OF_TOOL.get('text-counter')?.id).toBe('g-text');
   });
 });
 

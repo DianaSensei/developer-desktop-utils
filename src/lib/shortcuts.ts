@@ -47,12 +47,6 @@ export function getShortcutGroups(): ShortcutGroup[] {
       ],
     },
     {
-      toolId: 'container-manager',
-      shortcuts: [
-        { keys: [MOD_KEY, 'F'], description: 'Focus the log search box' },
-      ],
-    },
-    {
       toolId: 'task-tracker',
       shortcuts: [
         { keys: [MOD_KEY, '↵'], description: 'Start or stop the timer, from anywhere in the tool' },

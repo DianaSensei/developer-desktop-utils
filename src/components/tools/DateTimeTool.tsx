@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Label } from '@/components/ui/label';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,6 @@ import {
   differenceInMonths, differenceInYears,
   intervalToDuration,
 } from 'date-fns';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { cn } from '@/lib/utils';
@@ -390,19 +390,20 @@ function DiffDateInput({ value, onChange, tz }: {
 // ─── main ──────────────────────────────────────────────────────────────────
 
 export function DateTimeTool() {
-  const [rawInput, setRawInput] = usePersistentState('devtool:datetime:raw', '');
-  const [inputTz, setInputTz] = usePersistentState('devtool:datetime:inputTz', LOCAL_TZ || 'UTC');
-  const [outputTz, setOutputTz] = usePersistentState('devtool:datetime:outputTz', LOCAL_TZ || 'UTC');
+  const sdk = usePluginSdkFor('unix-time');
+  const [rawInput, setRawInput] = usePluginState(sdk, 'datetime:raw', '', { legacyKey: 'devtool:datetime:raw' });
+  const [inputTz, setInputTz] = usePluginState(sdk, 'datetime:inputTz', LOCAL_TZ || 'UTC', { legacyKey: 'devtool:datetime:inputTz' });
+  const [outputTz, setOutputTz] = usePluginState(sdk, 'datetime:outputTz', LOCAL_TZ || 'UTC', { legacyKey: 'devtool:datetime:outputTz' });
   const [showPicker, setShowPicker] = useState(false);
   // frozen snapshot of parsedDate at the moment picker was opened
   const [pickerSnapshot, setPickerSnapshot] = useState<Date | null>(null);
 
-  const [diffA, setDiffA] = usePersistentState('devtool:datetime:diffA', '');
-  const [diffB, setDiffB] = usePersistentState('devtool:datetime:diffB', '');
-  const [showFormats, setShowFormats] = usePersistentState('devtool:datetime:showFormats', true);
-  const [showBoundaries, setShowBoundaries] = usePersistentState('devtool:datetime:showBoundaries', true);
-  const [showDiff, setShowDiff] = usePersistentState('devtool:datetime:showDiff', true);
-  const [customFmt, setCustomFmt] = usePersistentState('devtool:datetime:customFmt', '');
+  const [diffA, setDiffA] = usePluginState(sdk, 'datetime:diffA', '', { legacyKey: 'devtool:datetime:diffA' });
+  const [diffB, setDiffB] = usePluginState(sdk, 'datetime:diffB', '', { legacyKey: 'devtool:datetime:diffB' });
+  const [showFormats, setShowFormats] = usePluginState(sdk, 'datetime:showFormats', true, { legacyKey: 'devtool:datetime:showFormats' });
+  const [showBoundaries, setShowBoundaries] = usePluginState(sdk, 'datetime:showBoundaries', true, { legacyKey: 'devtool:datetime:showBoundaries' });
+  const [showDiff, setShowDiff] = usePluginState(sdk, 'datetime:showDiff', true, { legacyKey: 'devtool:datetime:showDiff' });
+  const [customFmt, setCustomFmt] = usePluginState(sdk, 'datetime:customFmt', '', { legacyKey: 'devtool:datetime:customFmt' });
 
   const [isLive, setIsLive] = useState(true);
   const [liveDate, setLiveDate] = useState(new Date());

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { EditorView, basicSetup } from 'codemirror';
 import { keymap, placeholder as placeholderExt } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
@@ -7,7 +8,6 @@ import { EditorState } from '@codemirror/state';
 import { useCodeTheme } from '@/components/ui/code-theme';
 import { PaneHeader } from '@/components/ui/tool-layout';
 import ReactMarkdown from 'react-markdown';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 
 const DEFAULT_MARKDOWN = `# Heading 1
@@ -91,7 +91,8 @@ function MarkdownSourceEditor({ value, onChange, placeholder }: { value: string;
 }
 
 export function MarkdownPreview() {
-  const [markdownText, setMarkdownText] = usePersistentState('devtool:markdown:content', DEFAULT_MARKDOWN);
+  const sdk = usePluginSdkFor('markdown');
+  const [markdownText, setMarkdownText] = usePluginState(sdk, 'markdown:content', DEFAULT_MARKDOWN, { legacyKey: 'devtool:markdown:content' });
 
   useQuickPaste(setMarkdownText);
 

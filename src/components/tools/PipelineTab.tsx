@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
@@ -12,7 +13,6 @@ import {
   AlertTriangle, CheckCircle2, ArrowRight, FileText, Braces,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import CryptoJS from 'crypto-js';
 
@@ -907,7 +907,8 @@ const STEP_DEFAULTS: Partial<Record<StepOp, Partial<PipelineStep>>> = {
 const DEFAULT_STEPS: PipelineStep[] = [];
 
 export function PipelineTab({ active }: { active: boolean }) {
-  const [steps, setSteps] = usePersistentState<PipelineStep[]>('devtool:pipeline:steps-v2', DEFAULT_STEPS);
+  const sdk = usePluginSdkFor('base64');
+  const [steps, setSteps] = usePluginState<PipelineStep[]>(sdk, 'pipeline:steps-v2', DEFAULT_STEPS, { legacyKey: 'devtool:pipeline:steps-v2' });
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
 
   // Quick-paste JSON directly into the input step

@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { RunnerDialog } from './RunnerDialog';
 import { newRequest } from './types';
-import { pickDataFile, saveStreamedTextFile } from './fileio';
+import { pickDataFile, saveStreamedTextFile } from '@/lib/fileio';
 import type { ExecResult } from './engine';
 import type { ApiRequest, TestResult, VarMap } from './types';
 
@@ -17,16 +17,18 @@ import type { ApiRequest, TestResult, VarMap } from './types';
 // the test can't drive), so the data-file and export paths are exercised
 // through mocked I/O — everything between the picker and the written text is
 // the real code.
-vi.mock('./fileio', () => ({
+vi.mock('@/lib/fileio', () => ({
   pickDataFile: vi.fn(),
   saveStreamedTextFile: vi.fn(async () => true),
   saveTextFile: vi.fn(async () => {}),
   saveJsonFile: vi.fn(async () => {}),
 }));
 
-/** The text a streamed export would have written, joined from its chunks. */
+/** The text a streamed export would have written, joined from its chunks.
+ *  Đối số đầu giờ là SDK của plugin (quyền file quy về đúng plugin gọi), nên
+ *  tên file và các khối dữ liệu lùi xuống vị trí 2 và 3. */
 function writtenExport(call = 0): { name: string; text: string } {
-  const [name, chunks] = vi.mocked(saveStreamedTextFile).mock.calls[call];
+  const [, name, chunks] = vi.mocked(saveStreamedTextFile).mock.calls[call];
   return { name, text: [...chunks].join('') };
 }
 

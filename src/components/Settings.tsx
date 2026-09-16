@@ -29,6 +29,7 @@ import {
   applyMonoFontToDocument, type MonoFontPreference,
 } from '@/lib/monoFontPreference';
 import { getAppPermissionGroups } from '@/lib/appPermissions';
+import { SettingsPlugins } from '@/components/SettingsPlugins';
 import { getShortcutGroups } from '@/lib/shortcuts';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
@@ -291,6 +292,7 @@ const SETTINGS_SECTIONS = [
   { id: 'tools', label: 'settings.section.tools' },
   { id: 'shortcuts', label: 'settings.section.shortcuts' },
   { id: 'permissions', label: 'settings.permissions.title' },
+  { id: 'plugins', label: 'settings.plugins.title' },
   { id: 'mcp', label: 'settings.mcp.title' },
   { id: 'about', label: 'settings.about.title' },
   { id: 'storage', label: 'settings.storage.title' },
@@ -863,6 +865,8 @@ export function Settings() {
         </div>
             </section>
           )}
+
+          {activeSection === 'plugins' && <SettingsPlugins />}
 
           {activeSection === 'mcp' && (
             <section className="space-y-3">

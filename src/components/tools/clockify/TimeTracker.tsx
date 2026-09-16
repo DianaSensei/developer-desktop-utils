@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePluginSdkFor } from '@/platform';
 import { Play, Square, Trash2, Plus, ChevronRight, Coffee, Timer as TimerIcon, Search, Download, SlidersHorizontal, Check, Pencil, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -240,6 +241,7 @@ function FilterControls({
 }
 
 export function TimeTracker() {
+  const sdk = usePluginSdkFor('task-tracker');
   const { entries, subtasks, running, now, settings, startEntry, stopRunning, addEntry, updateEntry, addSubtask, deleteSubtask, renameTask, projectById, tagById } = useClockify();
 
   // entry-bar draft
@@ -517,7 +519,7 @@ export function TimeTracker() {
   const doExport = async (fmt: 'csv' | 'json', close: () => void) => {
     close();
     try {
-      await saveExport(exportFilename(fmt), fmt, exportText(fmt));
+      await saveExport(sdk, exportFilename(fmt), fmt, exportText(fmt));
     } catch {
       // save cancelled or unavailable — silent
     }

@@ -4,7 +4,20 @@
 
 ## Project Overview
 
-**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, Kafka explorer, RabbitMQ client, API client, mock server, etc.).
+**DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, API client, mock server, etc.).
+
+> **Redis/RabbitMQ/Container Manager/Kafka Explorer are no longer compiled into this repo.**
+> They moved to [`developer-desktop-util-plugin`](https://github.com/DianaSensei/developer-desktop-util-plugin)
+> as optional, install-from-URL plugins (Settings → Extensions) — see
+> `docs/decisions/architecture/platform-plugin-architecture.md` and
+> `docs/decisions/architecture/optional-broker-plugins.md`. Sections
+> below that still describe their internals (liveConnections examples,
+> `docs/human/TOOLS.md`, etc.) are describing code that now lives in that
+> repo; the pattern still applies verbatim there. Each such tool bundles its
+> own MCP tool schema and self-registers with the platform MCP bridge at
+> runtime (see `mcp_bridge.rs`'s `mcp_register_tools`/`mcp_unregister_tools`
+> and `devtool-mcp-server.rs`'s `fetch_registered_tools()`) instead of
+> being hardcoded into `devtool-mcp-server.rs`.
 
 **Key Technologies:**
 - **Frontend**: React 18, TypeScript, Vite 8 (Rolldown bundler)
@@ -61,7 +74,7 @@ devtool/
 │   │   ├── tailwind-preset.cjs  # Tailwind theme preset
 │   │   └── README.md
 │   ├── hooks/
-│   │   ├── usePersistentState.ts  # useState + localStorage
+│   │   ├── usePersistentState.ts  # nền của usePluginState — plugin KHÔNG dùng trực tiếp
 │   │   ├── useQuickPaste.ts       # ⌘V / Ctrl+V clipboard paste
 │   │   ├── useInputHistory.ts     # ⌘Z / ⌘⇧Z undo/redo
 │   │   ├── useImagePaste.ts       # ⌘V / paste event → PNG data URL
@@ -70,16 +83,26 @@ devtool/
 │   │   ├── useDismissable.ts      # Click-outside / Escape dismissal for overlays
 │   │   └── useTauriFileDrop.ts    # OS-level file drag-drop (Tauri webview event)
 │   ├── lib/
-│   │   ├── toolDefs.ts      # TOOL_DEFS array + DEFAULT_TOOL_ORDER — single source of truth
+│   │   ├── toolDefs.ts      # VIEW dẫn xuất từ registry (nguồn sự thật: src/plugins/)
 │   │   ├── toolGuides.tsx   # Per-tool "how to use" guide content for ToolGuideModal
 │   │   ├── liveConnections.ts   # Global live-connection registry (rabbit/kafka live dot)
 │   │   ├── utils.ts         # cn() classname merger
-│   │   ├── clipboard.ts     # copyToClipboard(), copyImageToClipboard(), readImageFromClipboard()
+│   │   ├── clipboard.ts     # nền của sdk.clipboard — plugin đi qua SDK
+│   │   ├── fileio.ts        # nhập/xuất file dùng chung (nhận sdk), 4 plugin dùng
 │   │   ├── faker.ts         # Faker.js helpers for the Generator tool
 │   │   ├── meetings.tsx     # MeetingsProvider + useMeetings() — time-tracker meeting notes
 │   │   ├── network.ts       # DNS / IP utilities for the Network tool
 │   │   ├── otpauth.ts       # TOTP/HOTP logic for the 2FA tool
 │   │   └── properties.ts    # .properties format parser/serializer for Data Converter
+│   ├── platform/            # Platform: hợp đồng Plugin + SDK + registry + audit
+│   │   ├── types.ts         # PluginManifest, PluginPermission, SDK_VERSION
+│   │   ├── manifest.ts      # definePlugin(), validateManifest(), satisfiesSdk()
+│   │   ├── registry.ts      # auto-discovery qua import.meta.glob → PLUGINS
+│   │   ├── sdk.ts           # SDK theo plugin: storage/clipboard/http/native
+│   │   ├── audit.ts         # nhật ký mọi lời gọi plugin → Platform
+│   │   ├── context.ts       # usePluginSdk() — SDK của chính plugin đang render
+│   │   └── index.ts         # bề mặt import duy nhất: '@/platform'
+│   ├── plugins/             # MỘT thư mục cho mỗi tool: <id>/plugin.ts (manifest)
 │   ├── workers/             # Web Workers for heavy computation
 │   │   ├── checksum.worker.ts
 │   │   ├── deduplicate.worker.ts
@@ -98,7 +121,7 @@ devtool/
 │   ├── ai/                  # AI agent guides (this file)
 │   ├── human/               # Human contributor guides
 │   └── design/DESIGN-SYSTEM.md
-├── testing/rabbitmq/        # RabbitMQ integration test harness (Python + Docker)
+├── testing/kafka/           # Kafka integration test harness (Python + Docker)
 ├── public/                  # Static assets
 └── package.json
 ```
@@ -224,32 +247,44 @@ import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 ### Transparency — the user must always know what the app is doing
 
 - **No silent network calls**: any network feature must be user-initiated or preceded by an explicit opt-in (toggle in Settings).
-- **Document permissions**: when adding a Tauri capability, add it to the App Permissions list in `Settings.tsx` so users see what the app can access.
+- **Document permissions**: a plugin declares what it touches in its own manifest
+  (`permissions`, `commands`, `hosts`) — Settings → Plugins renders that list, and the
+  audit log records every call. App-wide Tauri capabilities live in
+  `src-tauri/capabilities/default.json` and surface automatically via `appPermissions.ts`.
 - **Visible progress**: file reads, downloads, and long async operations must show status (spinner, progress text, done/error state).
 - **Minimum-scope access**: use the narrowest Tauri capability that the feature needs (e.g. `fs:read-file` not `fs:allow-all`).
 
 ---
 
-## Adding a New Tool (Step-by-Step)
+## Adding a New Tool = Adding a Plugin
 
-Tool metadata, routing, and feature toggles are kept separate. All four need updating.
+Every tool is a **plugin**: one folder, one manifest. The Platform discovers it
+automatically — there is no registration table to update, and no route to wire in
+`App.tsx`. See [`docs/decisions/architecture/platform-plugin-architecture.md`](../decisions/architecture/platform-plugin-architecture.md)
+for why.
+
+This section covers **compile-time** plugins (`src/plugins/`), always bundled into
+the app. For the full plugin-authoring reference (manifest fields, SDK, Tier B
+sidecars, and installing a plugin/sidecar at runtime from a URL instead of
+compiling it in), see **[`docs/plugin-sdk/`](../plugin-sdk/README.md)**.
 
 ### Step 1: Create the tool component
 
-Create `src/components/tools/YourTool.tsx`. Use the **modern tool pattern**: real-time output (no "Process" button), persisted input, quick-paste, and undo/redo.
+Create `src/components/tools/YourTool.tsx`. Layout, hooks and styling are unchanged;
+the one difference from pre-Platform code is that persisted state goes through the SDK.
 
 ```tsx
 import { useMemo } from 'react';
-import { YourIcon } from 'lucide-react';
 import { ToolToolbar, ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
 import { Textarea } from '@/components/ui/textarea';
 import { CopyButton } from '@/components/ui/copy-button';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function YourTool() {
-  const [input, setInput] = usePersistentState('devtool:yourTool:input', '');
+  const sdk = usePluginSdkFor('your-tool');
+  const [input, setInput] = usePluginState(sdk, 'input', '');
   const output = useMemo(() => input.toUpperCase(), [input]);
 
   useQuickPaste(setInput);
@@ -257,21 +292,17 @@ export function YourTool() {
 
   return (
     <div className="flex flex-col h-full">
-      <ToolToolbar>
-        {/* mode selectors, options */}
-      </ToolToolbar>
+      <ToolToolbar>{/* mode selectors, options */}</ToolToolbar>
       <ToolPanes>
         <ToolPane>
           <PaneHeader label="Input" hint={quickPasteHint} />
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            className="flex-1 min-h-0 resize-none font-mono rounded-none border-0"
-          />
+          <Textarea value={input} onChange={(e) => setInput(e.target.value)}
+            className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" />
         </ToolPane>
         <ToolPane>
           <PaneHeader label="Output" action={<CopyButton value={output} iconClassName="h-3.5 w-3.5" />} />
-          <Textarea value={output} readOnly className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" />
+          <Textarea value={output} readOnly
+            className="flex-1 min-h-0 resize-none font-mono rounded-none border-0" />
         </ToolPane>
       </ToolPanes>
     </div>
@@ -279,56 +310,70 @@ export function YourTool() {
 }
 ```
 
-### Step 2: Add to TOOL_DEFS — `src/lib/toolDefs.ts`
+### Step 2: Declare the plugin — `src/plugins/<id>/plugin.ts`
 
-`TOOL_DEFS` is the single source of truth for tool metadata (id, label, icon, description, keywords). Settings and the sidebar read from it automatically.
+**This is the only registration step.** The folder name MUST equal the `id`.
 
 ```ts
 import { YourIcon } from 'lucide-react';
+import { definePlugin } from '@/platform';
 
-export const TOOL_DEFS: ToolDef[] = [
-  // ... existing tools
-  {
-    id: 'your-tool',
-    label: 'Your Tool',
-    icon: YourIcon,
-    description: 'One-line description shown in sidebar tooltip and Settings.',
-    keywords: ['synonym1', 'synonym2'],   // optional; improves sidebar search
-  },
-];
+export default definePlugin({
+  id: 'your-tool',                       // kebab-case; also the storage namespace
+  label: 'Your Tool',
+  icon: YourIcon,
+  description: 'One-line description shown in sidebar tooltip and Settings.',
+  keywords: ['synonym1', 'synonym2'],    // optional; improves sidebar search
+  route: '/your-tool',                   // absolute, unique
+  order: 265,                            // sidebar position; unique, gaps of 10 by convention
+  defaultEnabled: true,                  // on/off for a fresh install
+  permissions: ['storage', 'clipboard:read', 'clipboard:write'],
+  sdk: '^1.0.0',
+  load: () => import('@/components/tools/YourTool').then((m) => m.YourTool),
+});
 ```
 
-Also add the tool id to `DEFAULT_TOOL_ORDER` (same file) in the desired position for fresh installs.
+**That's it.** Metadata, sidebar order, route, code-splitting and the default
+on/off state all come from this file. `TOOL_DEFS`, `TOOL_ROUTES` and
+`DEFAULT_FEATURES` are now derived views — do not edit them.
 
-### Step 3: Register route in App.tsx
+### Step 3 (optional): Add a tool guide — `src/lib/toolGuides.tsx`
 
-```tsx
-// 1. Lazy-import at top of App.tsx (code-split)
-const YourTool = lazy(() => named(import('@/components/tools/YourTool'), 'YourTool'));
+Tools listed in `toolGuides.tsx` get a hand-written help section shown by the `?`
+button in the app header. Any tool not listed falls back to a generic guide built
+from its description. Add a named export matching the tool id (camelCase the id).
 
-// 2. Add entry to TOOL_ROUTES
-const TOOL_ROUTES: Record<string, { path: string; component: React.ComponentType; fullHeight?: boolean }> = {
-  // ... existing routes
-  'your-tool': { path: '/your-tool', component: YourTool, fullHeight: true },
-};
-```
+### Permissions and the SDK — full reference lives in `docs/plugin-sdk/`
 
-All tools should use `fullHeight: true` — it removes the scrolling wrapper so the tool controls its own overflow.
+The permission table, validation rules, and the entire `sdk.*` surface
+(`storage`, `secrets`, `clipboard`, `files`, `http`, `native`, `service`,
+`openExternal`, `env`) are documented once, kept in sync with the source, in
+**[`docs/plugin-sdk/02-manifest.md`](../plugin-sdk/02-manifest.md)** and
+**[`docs/plugin-sdk/03-sdk-reference.md`](../plugin-sdk/03-sdk-reference.md)**
+— read those instead of duplicating them here. That doc set is written for
+anyone authoring a plugin (compile-time or installed from a URL); this file
+only adds what's specific to a **compile-time** tool living in this repo:
 
-### Step 4: Enable by default — `src/contexts/FeatureContext.tsx`
+- `usePluginSdk()` only works inside a component the Platform mounted —
+  shared components take the SDK as a prop. For plugin code that
+  deliberately mounts outside its own route (e.g. `ApiClientRuntimeProvider`,
+  mounted in `App.tsx` so the MCP bridge answers while another tool is on
+  screen), use `usePluginSdkFor('<plugin-id>')`.
+- Every tool in THIS repo already runs on the SDK: no plugin code reaches
+  `@tauri-apps/*` directly (`guard.test.ts` keeps that at zero), and only two
+  shared-store reads remain — both one-time migrations of keys that predate
+  the namespace.
+- **Never put a credential in `sdk.storage` / `usePersistentState`.** See
+  `src/platform/secrets.ts` for the full reasoning; add a row to
+  `MIGRATIONS` there when moving an existing key into the vault.
 
-```tsx
-const DEFAULT_FEATURES: FeatureSettings = {
-  // ... existing
-  'your-tool': true,
-};
-```
+### Checks that will fail you
 
-### Step 5 (optional): Add a tool guide — `src/lib/toolGuides.tsx`
-
-Tools listed in `toolGuides.tsx` get a hand-written help section shown by the `?` button in the app header. Any tool not listed falls back to a generic guide built from its description. Add a named export matching the tool id (camelCase the id).
-
-**That's it.** No changes needed in `Settings.tsx` — it reads `TOOL_DEFS` automatically.
+- `src/platform/registry.test.ts` — locks the full plugin set, sidebar order,
+  routes and default on/off state. A bad manifest is dropped from the registry and
+  turns this test red rather than silently vanishing from the sidebar.
+- `src/platform/manifest.test.ts` — manifest validation and SDK range rules.
+- `src/platform/sdk.test.ts` — permission enforcement and audit records.
 
 ---
 
@@ -336,13 +381,19 @@ Tools listed in `toolGuides.tsx` get a hand-written help section shown by the `?
 
 All text tools must use these hooks for consistent behavior.
 
-### `usePersistentState(key, initial)` — `src/hooks/usePersistentState.ts`
+### `usePluginState(sdk, key, initial, opts?)` — `@/platform`
 
-Drop-in for `useState` that persists to `localStorage`. Key convention: `devtool:<toolName>:<field>`.
+Drop-in for `useState` that persists. The key is namespaced to the plugin
+(`devtool:<pluginId>:<key>`) and the `storage` permission is checked.
 
 ```tsx
-const [input, setInput] = usePersistentState('devtool:json:input', '');
+const sdk = usePluginSdkFor('json');
+const [input, setInput] = usePluginState(sdk, 'input', '');
 ```
+
+`usePersistentState` (`src/hooks/usePersistentState.ts`) is what this is built on.
+Plugin code must not use it directly — `src/platform/guard.test.ts` counts every
+such import and fails CI when the count rises.
 
 ### `useQuickPaste(onPaste, enabled?)` — `src/hooks/useQuickPaste.ts`
 
@@ -381,7 +432,7 @@ const { dropRef, dragging } = useTauriFileDrop((paths) => loadFile(paths[0]));
 
 Registers click-outside + Escape key handlers to dismiss an overlay/popover. Returns a `ref` to attach to the container.
 
-> Convention: **real-time output** (`useMemo`), **persisted input** (`usePersistentState`), **quick paste** (`useQuickPaste`), **undo/redo** (`useInputHistory`). Tools with no transformable input (UUID/QR generator) may keep an action button.
+> Convention: **real-time output** (`useMemo`), **persisted input** (`usePluginState`), **quick paste** (`useQuickPaste`), **undo/redo** (`useInputHistory`). Tools with no transformable input (UUID/QR generator) may keep an action button.
 
 ---
 
@@ -534,21 +585,20 @@ Common: `space-y-4`, `flex gap-2`, `rounded-lg`, `border`, `p-4`, `text-xs`, `fo
 
 ### Tauri detection
 ```tsx
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+const sdk = usePluginSdkFor('your-tool');
+if (sdk.env.isTauri) { … }        // plugin code
 ```
+Shell code (outside `src/components/tools/`) uses `isTauri` from `@/lib/platform`.
 
-### Clipboard write (Tauri-aware)
+### Clipboard (text and images)
 ```tsx
-import { copyToClipboard } from '@/lib/clipboard';
-await copyToClipboard(text);
+await sdk.clipboard.writeText(text);     // needs 'clipboard:write'
+await sdk.clipboard.readText();          // needs 'clipboard:read'
+await sdk.clipboard.writeImage(blobOrDataUrl);
+const dataUrl = await sdk.clipboard.readImage();   // null when no image
 ```
-
-### Image clipboard (Tauri-aware)
-```tsx
-import { copyImageToClipboard, readImageFromClipboard } from '@/lib/clipboard';
-await copyImageToClipboard(blobOrDataUrl);            // copy an image out
-const dataUrl = await readImageFromClipboard();       // null when no image
-```
+The underlying helpers live in `@/lib/clipboard`; plugin code reaches them through
+the SDK so the permission is checked and the call is audited.
 For "copy image" buttons, reuse `CopyButton` with its `copyAction` prop so the animated Copy→Check affordance is identical to text copies:
 ```tsx
 <CopyButton copyAction={async () => { try { await copyImageToClipboard(src); return true; } catch { return false; } }} label="Copy image" />
@@ -573,9 +623,9 @@ import { CopyButton } from '@/components/ui/copy-button';
 
 ### AppConfig — reading tunable numbers
 ```tsx
-import { useAppConfig } from '@/contexts/AppConfigContext';
+import { usePluginConfig } from '@/platform';
 
-const { config } = useAppConfig();
+const config = usePluginConfig();
 const ms = config.editor.historyDebounceMs;   // default 400
 const feedbackMs = config.editor.copyFeedbackMs;  // default 1500
 ```
@@ -583,9 +633,12 @@ All tunable values are defined in `src/config/appConfig.ts`. Users edit them in 
 
 ### Persist a setting
 ```tsx
-localStorage.setItem('devtool-my-setting', value);
-const saved = localStorage.getItem('devtool-my-setting');
+sdk.storage.set('my-setting', value);          // → devtool:<pluginId>:my-setting
+const saved = sdk.storage.get('my-setting');
 ```
+Never `localStorage` directly: the app's own store (`@/lib/persistentStore`) is what
+survives in the desktop build, and the SDK is what namespaces and audits it. For
+anything credential-shaped use `sdk.secrets` / `useSecretState` instead.
 
 ### Lazy-load a heavy library
 ```tsx
@@ -605,10 +658,11 @@ See `src/workers/checksum.worker.ts` for a reference implementation.
 ## State Management
 
 ### AppConfigContext — `src/contexts/AppConfigContext.tsx`
-Centralized tunable numbers stored in `localStorage` (`devtool-app-config`). Sections: `updates`, `editor`, `generator`, `kafka`. Every value has min/max/step metadata in `CONFIG_FIELDS` and appears automatically in Settings → Configuration.
+Centralized tunable numbers. Sections: `updates`, `editor`, `generator`, `kafka`. Every value has min/max/step metadata in `CONFIG_FIELDS` and appears automatically in Settings → Configuration.
 
 ```tsx
-const { config, setField, resetConfig } = useAppConfig();
+const { config, setField, resetConfig } = useAppConfig();   // shell only
+const config = usePluginConfig();                           // plugin code (read-only)
 ```
 
 ### FeatureContext — `src/contexts/FeatureContext.tsx`
@@ -856,7 +910,7 @@ git push origin main --tags
 
 ### API Client — Runner (`RunnerDialog.tsx`, `runnerStats.ts`, `runnerFlow.ts`, `runnerExport.ts`, `datafile.ts`)
 
-Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per row. **Built to handle ~100k rows**, which constrains how the results may be stored — read [decisions/runner-large-data-runs.md](../decisions/runner-large-data-runs.md) before touching this dialog.
+Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per row. **Built to handle ~100k rows**, which constrains how the results may be stored — read [decisions/architecture/runner-large-data-runs.md](../decisions/architecture/runner-large-data-runs.md) before touching this dialog.
 
 - **Never put the run history in React state.** Records live in `recordsRef` (append-only, read once at export) plus `byIterRef: Map<iter, RunRecord[]>` for O(1) access to the iteration on screen. Stats are folded O(1) per record into `accRef` (`fold`/`toStats` in `runnerStats.ts`). A `tick` state bumped on a 120 ms throttle (`scheduleFlush`/`flushNow`) is the *only* thing that triggers re-render. Re-introducing `setRecords([...prev, r])` or `summarize(records)` in a `useMemo` makes a 100k-row run O(n²) — that was the original bug.
 - **Built-in HTTP 2xx assertion:** the `Require HTTP 2xx` option (default **on**) injects `httpOkTest(...)` at the front of every execution's `tests` — including into the `ExecResult` copy kept for the detail view — so a non-2xx fails like a scripted assertion without anyone writing one. `isOk` itself stays lenient (200–399) on purpose: "only 2xx counts" is the assertion's job, so turning the option off restores the older meaning. Separately, `stats.http2xx` counts HTTP success regardless of the option (the "HTTP 2xx" tile, the by-request column, CSV `httpOk`, JSON `http`).
@@ -868,7 +922,7 @@ Collection/folder run with an optional CSV/JSON data file bound as `{{var}}` per
 
 ### API Client — Name/Value tables (`KeyValueEditor.tsx`)
 
-Shared by query params, headers, url-encoded bodies and environment variables. Three things are easy to break here — see [decisions/keyvalue-resolved-column.md](../decisions/keyvalue-resolved-column.md):
+Shared by query params, headers, url-encoded bodies and environment variables. Three things are easy to break here — see [decisions/ui/keyvalue-resolved-column.md](../decisions/ui/keyvalue-resolved-column.md):
 
 - **Resolved column**: read-only preview of what a row's `{{tokens}}` are worth now (`previewVars` in `vars.ts`, pure + tested). The cell and the show/hide rule live in `ResolvedValue.tsx` and are shared by all three request-pane tables — `KeyValueEditor`, `MultipartEditor` (form-data, which is `{{var}}`-substituted on send and so takes `vars` too) and `RequestPanel`'s path-params table; don't re-implement it in a fourth. Shown only when a table has at least one token, decided over *all* its rows so filtering can't yank the column out mid-type. Unresolved tokens render red and named — they get sent literally. Secrets need no handling here: the `vars` map the UI receives already masks Vault/secret entries at the source (`varMap` in `ApiClient.tsx`).
 - **Zebra `bg-bg-2/20` + hover `bg-bg-2/40`** — DataTable's own pair. Don't set hover equal to the stripe (it was `/20` before the stripe existed); hovering a striped row would then show nothing.
@@ -914,7 +968,7 @@ Key files:
 
 **Connect/Disconnect flow:** a connection must be explicitly connected (`handleConnect` in `RabbitClient.tsx`) — runs AMQP test + management test (if not AMQP-only), then sets `connectedConnId` in `localStorage` (`devtool:rabbit:connectedConnId`). Connecting elsewhere stops the previous connection's consumers (`consumerStore.stopForConn`). The right panel shows `DisconnectedPanel` until connected.
 
-**Connection profiles:** stored in `rabbit-connections.json` in the app data directory (Rust `fs::write`). Fields: `id`, `name`, `host`, `port` (management), `amqpPort`, `vhost`, `username`, `password`, `useTls`, `caPem`, `clientIdentityPkcs12` (base64), `clientIdentityPassword`, `heartbeat`, `connectionName`, `amqpOnly`, `extraHosts` (for HA failover). All fields with `#[serde(default)]` for backward compatibility. `null_as_default` custom deserializer handles legacy `null` values for `Vec<String>` fields.
+**Connection profiles:** stored in `connections.json` inside the sidecar's own data directory (`<app_data>/service-data/devtool-svc-rabbit/` — set via `DEVTOOL_SERVICE_DATA_DIR`, see [`docs/plugin-sdk/04-tier-b-sidecars.md`](../plugin-sdk/04-tier-b-sidecars.md)). Fields: `id`, `name`, `host`, `port` (management), `amqpPort`, `vhost`, `username`, `password`, `useTls`, `caPem`, `clientIdentityPkcs12` (base64), `clientIdentityPassword`, `heartbeat`, `connectionName`, `amqpOnly`, `extraHosts` (for HA failover). All fields with `#[serde(default)]` for backward compatibility. `null_as_default` custom deserializer handles legacy `null` values for `Vec<String>` fields.
 
 **Multiple hosts (HA failover):** `extraHosts: string[]` — additional `"host"` or `"host:port"` entries. `connect_amqp` iterates all endpoints (primary + extras) with a 15 s per-endpoint timeout, returning on first success. `ConnectionForm.tsx` exposes an **Addresses** field (comma-separated `host:port`).
 
@@ -926,15 +980,15 @@ Key files:
 
 **RPC view:** `RpcView.tsx` — module-scope `rpcDraft` (in-memory) seeds and mirrors all fields. Payload uses `CodeEditor` (JSON/plain Segmented + Format button). Reply uses `ResponseViewer` (JSON/plain, auto-detect from contentType). Exchange/routing-key/queue comboboxes use `useRecentMatches` + `RecentSuggestions`.
 
-**Live consumers:** `consumerStore.ts` (module-scope `Map`) manages `rabbit_consume_start` / `rabbit_consume_stop` Rust AMQP consumers. `stopForConn(connId)` stops all consumers for a connection; `stopAll()` on unmount.
+**Live consumers:** `consumerStore.ts` (module-scope `Map`) manages consumers via `rabbitApi.consumeStart`/the returned subscription's `.stop()` (Tier B — `sdk.service.stream('consume-start', …)`/`'consume-stop'` under the hood, not a direct Tauri command). `stopForConn(connId)` stops all consumers for a connection; `stopAll()` on unmount.
 
-**Rust backend (`src-tauri/src/rabbit.rs`):**
-- `rabbit_amqp_test` — connect test (iterates all endpoints)
-- `rabbit_publish` — full AMQP publish with properties + mandatory + publisher confirms → `PublishOutcome`
-- `rabbit_consume_start` / `rabbit_consume_stop` — live consumer via `ConsumerRegistry` (Mutex<HashMap<String, Arc<Notify>>>); prefetch-bounded; peek (non-destructive) or consume (ack)
-- `rabbit_rpc_call` — one-shot request/response via `amq.rabbitmq.reply-to`
-- `rabbit_amqp_queues_info` / `rabbit_amqp_exchanges_info` — passive declare for AMQP-only mode
-- `rabbit_amqp_declare_queue` / `rabbit_amqp_declare_exchange` / `rabbit_amqp_bind_queue` — topology management over AMQP
+**Sidecar backend (`src-tauri/src/bin/devtool-svc-rabbit.rs`, Tier B):** RabbitMQ runs entirely as a sidecar process (`rabbit.rs`, the old compiled-in Tauri commands, is deleted) — see [`docs/plugin-sdk/04-tier-b-sidecars.md`](../plugin-sdk/04-tier-b-sidecars.md) for the general Tier B model. JSONL methods (called via `sdk.service.call`/`stream`, never `sdk.native.invoke`):
+- `amqp-test` — connect test (iterates all endpoints)
+- `publish` — full AMQP publish with properties + mandatory + publisher confirms → `PublishOutcome`
+- `consume-start` (stream) / `consume-stop` — live consumer via an internal `Notify`-keyed registry; prefetch-bounded; peek (non-destructive) or consume (ack). Mid-stream failures are sent as an app-level `{"type":"error"}` event, never a protocol-level error — see the ADR's Tier B section for why.
+- `rpc-call` — one-shot request/response via `amq.rabbitmq.reply-to`
+- `amqp-queues-info` / `amqp-exchanges-info` — passive declare for AMQP-only mode
+- `amqp-declare-queue` / `amqp-declare-exchange` / `amqp-bind-queue` — topology management over AMQP
 
 **Live indicator:** `useEffect(() => { liveConnections.set('rabbit-client', isConnected); }, [isConnected])` in `RabbitClient.tsx`.
 
@@ -955,7 +1009,7 @@ Key files:
 - `mcpRuntimeContext.tsx` / `mcpBridge.ts` — MCP connection-management tools
 - `ConnectionForm.tsx` — AMQP-first form: Addresses (comma-separated multi-host), optional management API toggle, Advanced (vhost), Paste URI collapsible
 - `api.ts` — `rabbitMgmt` HTTP client + `QUEUE_LIST_QUERY` / `EXCHANGE_LIST_QUERY` constants
-- `types.ts` — `RabbitConnection`, `rabbitApi` Tauri invoke wrappers
+- `types.ts` — `RabbitConnection`, `createRabbitApi(sdk)` — the one seam, all `sdk.service.call`/`stream`
 - `consumerStore.ts` — module-scope consumer registry + `stopForConn(id)`
 - `inputHistoryStore.ts` — per-connection exchange/routingKey/queue history
 - `knownNamesStore.ts` — AMQP-only typed queue/exchange names per connection
@@ -973,13 +1027,13 @@ Key files:
 
 **Key detail view (`KeyDetailView.tsx`):** type-aware editors for string/hash/list/set/zset/stream, plus TTL and `MEMORY USAGE` rows. Mutations (`onSetField`, `onPush`, `onSet`, …) apply an **optimistic local update** to the already-fetched `KeyValue` instead of re-running `load()` (a full HSCAN/SSCAN/ZSCAN/XRANGE) after every single field edit — important for a large collection, where a full reload per keystroke-blur would be slow. Errors from a mutation are caught by a shared `runMutation` wrapper and shown inline rather than becoming an unhandled promise rejection. The zset editor's optimistic update deliberately does **not** re-sort by score: the initial fetch comes from `ZSCAN`, whose order isn't guaranteed sorted, so sorting only on edit would make the list visibly reorder itself in a way a plain Refresh wouldn't reproduce.
 
-**Pub/Sub (`PubSubView.tsx`):** subscribes to channels/patterns via `redis_pubsub_subscribe`, which streams `PubSubMessage`s back over a Tauri `Channel` (same `new Channel<T>()` + `onmessage` pattern as `consumerStore.ts`/Kafka's consumer). Unlike Kafka/RabbitMQ's live consumers, there's no module-scope store keeping the subscription alive across view switches — it's owned by the component and stopped on unmount (a `useRef`-held subscription id, cleaned up in a `useEffect` cleanup). This is a deliberate scope call: Pub/Sub here is an ad-hoc debug helper, not a persistent monitor.
+**Pub/Sub (`PubSubView.tsx`):** subscribes to channels/patterns via `redisApi.pubsubSubscribe` (Tier B — `sdk.service.stream('pubsub-subscribe', …)` under the hood; resolves only once the sidecar confirms `{"type":"subscribed"}` or rejects on `{"type":"error"}`, never resolves optimistically). Unlike Kafka/RabbitMQ's live consumers, there's no module-scope store keeping the subscription alive across view switches — it's owned by the component and stopped on unmount (`.stop()` on the returned subscription, held in a `useRef`, cleaned up in a `useEffect` cleanup). This is a deliberate scope call: Pub/Sub here is an ad-hoc debug helper, not a persistent monitor.
 
 **Admin (`AdminView.tsx`):** three `Tabs`-switched sub-views — Clients (`CLIENT LIST`, parsed into loose `key=value` rows so the table survives field-set differences across Redis versions), Slow Log (`SLOWLOG GET`), Config (`CONFIG GET` search + inline edit, `CONFIG SET` gated behind `MathConfirmDialog` since it changes live server behavior for every connected client, not just this one).
 
 **CLI Console (`CliConsole.tsx`):** autocomplete dropdown over `commands.ts` (~90 common commands) while typing the command name, a syntax hint once it's fully typed, and multi-line paste — pasting text containing `\n` runs each line as a sequential command instead of being silently dropped by the single-line `<input>`.
 
-**Rust backend (`src-tauri/src/redis_tool.rs`):** every command opens its own fresh `MultiplexedConnection` (SELECTs `db`, runs, drops) — **except Pub/Sub**, which is inherently long-lived and gets a registry-tracked background task (`PubSubRegistry`, `Mutex<HashMap<String, Arc<Notify>>>`, same shape as `rabbit.rs`'s `ConsumerRegistry`). `connect()` wraps connection establishment in a 6s `tokio::time::timeout` so an unreachable host fails fast instead of hanging the UI. Key browsing always goes through SCAN/HSCAN/SSCAN/ZSCAN/XRANGE (capped at `VALUE_CAP` = 2000), never KEYS/SMEMBERS/HGETALL unbounded. `redis_exec` runs an arbitrary command (args passed as separate RESP protocol arguments, never string-concatenated) and backs both the CLI Console and every type editor's mutate actions, so there's one generic command surface instead of one bespoke Tauri command per Redis command.
+**Sidecar backend (`src-tauri/src/bin/devtool-svc-redis.rs`, Tier B):** Redis runs entirely as a sidecar process (`redis_tool.rs`, the old compiled-in Tauri commands, is deleted) — see [`docs/plugin-sdk/04-tier-b-sidecars.md`](../plugin-sdk/04-tier-b-sidecars.md) for the general Tier B model. Every JSONL method opens its own fresh `MultiplexedConnection` (SELECTs `db`, runs, drops) — **except `pubsub-subscribe`**, which is inherently long-lived and gets a registry-tracked background task (an internal `Notify`-keyed map, same shape as the RabbitMQ sidecar's consumer registry), stopped by the separate `unsubscribe` method (the host's `service_stream_stop` only unregisters its own waiter — it does not signal the sidecar). `connect()` wraps connection establishment in a 6s `tokio::time::timeout` so an unreachable host fails fast instead of hanging the UI. Key browsing always goes through SCAN/HSCAN/SSCAN/ZSCAN/XRANGE (capped at `VALUE_CAP` = 2000), never KEYS/SMEMBERS/HGETALL unbounded. `exec` runs an arbitrary command (args passed as separate RESP protocol arguments, never string-concatenated) and backs both the CLI Console and every type editor's mutate actions, so there's one generic method surface instead of one bespoke method per Redis command.
 
 **Live indicator:** `useEffect(() => { liveConnections.set('redis-client', isConnected); }, [isConnected])` in `RedisClient.tsx`.
 
@@ -997,7 +1051,7 @@ Key files:
 - `useRedisState.ts` — navigation state (`RedisView`) + persisted `connectedConnId`/`db`
 - `mcpRuntimeContext.tsx` / `mcpBridge.ts` — MCP connection-management tools
 - `ConnectionForm.tsx` — host/port/username/password/TLS form
-- `types.ts` — `RedisConnection`, `KeyValue`, `PubSubMessage`, `redisApi` Tauri invoke wrappers
+- `types.ts` — `RedisConnection`, `KeyValue`, `PubSubMessage`, `createRedisApi(sdk)` — the one seam, all `sdk.service.call`/`stream`
 - `useRedisData.ts` — stale-while-revalidate data cache (Overview, Admin tabs)
 - `format.ts` — `INFO` output parsing, byte/uptime/number formatting
 - `commands.ts` — CLI Console autocomplete reference list
@@ -1394,13 +1448,21 @@ import { ViewHeader } from '@/components/ui/view-header';
 ```
 
 ### Most Used Utilities
+
+Plugin code — everything platform-ish comes from one door:
+```tsx
+import {
+  usePluginSdkFor,   // SDK of this plugin (getPluginSdk outside React)
+  usePluginState,    // persisted state, namespaced + permission-checked
+  useSecretState,    // same, but in the encrypted vault
+  usePluginConfig,   // app tunables, read-only
+  useLiveConnection, // the sidebar's live dot
+} from '@/platform';
+```
+
+Shared libraries and UX hooks (no trust boundary, import directly):
 ```tsx
 import { cn } from '@/lib/utils';
-import { copyToClipboard } from '@/lib/clipboard';
-import { useAppConfig } from '@/contexts/AppConfigContext';
-import { useFeatures } from '@/contexts/FeatureContext';
-import { useUpdate } from '@/contexts/UpdateContext';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
@@ -1438,7 +1500,7 @@ import { liveConnections, useLiveConnections } from '@/lib/liveConnections';
 - `jwt-decode` — JWT parsing
 - `uuid` — UUID v4/v7 generation
 
-> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, local network info, and a **Ports** view (listening sockets + owning process, with Processes/Sockets layouts, column sort, scope local/LAN/all, and persisted favourite ports). Uses an **in-memory session store** (not `usePersistentState`) so results survive tab switches but clear on app restart — the one exception is favourite ports, persisted in `localStorage`.
+> **Network Tools** (`src/components/tools/NetworkTools.tsx`, `src/lib/network.ts`): DNS-over-HTTPS lookups, propagation, DNSSEC, public-IP/geo, local network info, and a **Ports** view (listening sockets + owning process, with Processes/Sockets layouts, column sort, scope local/LAN/all, and persisted favourite ports). Uses an **in-memory session store** (not persisted state) so results survive tab switches but clear on app restart — the one exception is favourite ports, which are persisted. Outbound requests go through `sdk.http.fetch`, restricted to the 7 hosts declared in its manifest.
 
 ---
 

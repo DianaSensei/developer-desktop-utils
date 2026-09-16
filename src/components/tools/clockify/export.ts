@@ -2,6 +2,7 @@
 // (native save dialog + fs plugin) and the web build (Blob download).
 
 import { isTauri } from '@/lib/platform';
+import type { PluginSdk } from '@/platform';
 import type { Project, Tag, TimeEntry } from './store';
 import { fmtHM, pad, timeOfDay, toDateInput, weekdayShort } from './time';
 
@@ -87,16 +88,19 @@ export function exportFilename(ext: 'csv' | 'json'): string {
 }
 
 /** Save `text` to a file the user picks, locked to the given extension. */
-export async function saveExport(suggestedName: string, ext: 'csv' | 'json', text: string): Promise<void> {
+export async function saveExport(
+  sdk: PluginSdk,
+  suggestedName: string,
+  ext: 'csv' | 'json',
+  text: string,
+): Promise<void> {
   if (isTauri) {
-    const { save } = await import('@tauri-apps/plugin-dialog');
-    const path = await save({
+    const path = await sdk.files.pickSave({
       defaultPath: suggestedName,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     });
     if (!path) return;
-    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-    await writeTextFile(path, text);
+    await sdk.files.writeText(path, text);
     return;
   }
 

@@ -11,8 +11,8 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { ExplainBand } from '@/components/ui/explain-band';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CodeViewer, JsonEditor, TextEditor } from '@/design-system';
-import { saveTextFile } from '@/components/tools/apiclient/fileio';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { saveTextFile } from '@/lib/fileio';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { parseProperties, stringifyProperties } from '@/lib/properties';
@@ -104,11 +104,12 @@ function errMessage(e: unknown): string {
 }
 
 export function DataConverter() {
-  const [from, setFrom] = usePersistentState<Format>('devtool:dataConverter:from', 'json');
-  const [to, setTo] = usePersistentState<Format>('devtool:dataConverter:to', 'yaml');
-  const [input, setInput] = usePersistentState('devtool:dataConverter:input', '');
-  const [indent, setIndent] = usePersistentState<'2' | '4'>('devtool:dataConverter:indent', '2');
-  const [xmlPretty, setXmlPretty] = usePersistentState('devtool:dataConverter:xmlPretty', true);
+  const sdk = usePluginSdkFor('data-converter');
+  const [from, setFrom] = usePluginState<Format>(sdk, 'dataConverter:from', 'json', { legacyKey: 'devtool:dataConverter:from' });
+  const [to, setTo] = usePluginState<Format>(sdk, 'dataConverter:to', 'yaml', { legacyKey: 'devtool:dataConverter:to' });
+  const [input, setInput] = usePluginState(sdk, 'dataConverter:input', '', { legacyKey: 'devtool:dataConverter:input' });
+  const [indent, setIndent] = usePluginState<'2' | '4'>(sdk, 'dataConverter:indent', '2', { legacyKey: 'devtool:dataConverter:indent' });
+  const [xmlPretty, setXmlPretty] = usePluginState(sdk, 'dataConverter:xmlPretty', true, { legacyKey: 'devtool:dataConverter:xmlPretty' });
 
   const [output, setOutput] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -157,7 +158,7 @@ export function DataConverter() {
   const handleDownload = () => {
     if (!output) return;
     const ext = FORMATS.find((f) => f.value === to)?.ext ?? 'txt';
-    void saveTextFile(`converted.${ext}`, output);
+    void saveTextFile(sdk, `converted.${ext}`, output);
   };
 
   const showXmlOpts = to === 'xml';

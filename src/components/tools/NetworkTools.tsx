@@ -18,11 +18,12 @@ import { Stat, StatGrid } from '@/components/ui/stat';
 import { cn } from '@/lib/utils';
 import { isTauri } from '@/lib/platform';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdk, usePluginSdkFor, usePluginState } from '@/platform';
 import {
   DNS_RECORD_TYPES, DOH_PROVIDERS, DOH_PROVIDER_MAP,
   queryDns, queryAllRecords, checkPropagation, checkDnssec, lookupIp, getLocalNetworkInfo, listListeningPorts,
-  type DnsAnswer, type PropagationRow, type DnssecResult, type IpInfo, type LocalNetworkInfo, type PortEntry,
+  type DnsAnswer, type FetchLike, type PropagationRow, type DnssecResult, type IpInfo,
+  type LocalNetworkInfo, type PortEntry,
 } from '@/lib/network';
 
 type View = 'dns' | 'propagation' | 'dnssec' | 'myip' | 'iplookup' | 'local' | 'ports';
@@ -216,7 +217,22 @@ function StatCard({ icon: Icon, label, value }: { icon: typeof Globe; label: str
 
 // ─── DNS lookup view ────────────────────────────────────────────────────────
 
+/**
+ * `fetch` của Platform cho tool này.
+ *
+ * Đi qua đây thay vì gọi thẳng `@tauri-apps/plugin-http` để lời gọi chạm đúng
+ * một điểm thắt: kiểm host với allowlist khai trong `src/plugins/network/plugin.ts`
+ * rồi ghi audit. Tầng capability của Tauri không thay thế được việc này — nó
+ * gắn theo webview, mà mọi plugin dùng chung một webview, nên nó buộc phải mở
+ * `https://**` cho API Client và vì thế không nói được gì về riêng tool này.
+ */
+function usePlatformFetch(): FetchLike {
+  const sdk = usePluginSdk();
+  return useCallback<FetchLike>((input, init) => sdk.http.fetch(input, init), [sdk]);
+}
+
 function DnsView() {
+  const httpFetch = usePlatformFetch();
   const [domain, setDomain] = useSessionState<string>(SESSION.dns, 'domain');
   const [type, setType] = useSessionState<string>(SESSION.dns, 'type');
   const [providerId, setProviderId] = useSessionState<string>(SESSION.dns, 'providerId');
@@ -233,7 +249,9 @@ function DnsView() {
     setLoading(true); setError(''); setAnswers(null);
     try {
       const provider = DOH_PROVIDER_MAP.get(providerId) ?? DOH_PROVIDERS[0];
-      const res = type === 'ALL' ? await queryAllRecords(name, provider) : await queryDns(name, type, provider);
+      const res = type === 'ALL'
+        ? await queryAllRecords(name, provider, undefined, httpFetch)
+        : await queryDns(name, type, provider, false, undefined, httpFetch);
       setStatus(res.statusName);
       setAnswers(res.answers);
     } catch (e) {
@@ -241,7 +259,7 @@ function DnsView() {
     } finally {
       setLoading(false);
     }
-  }, [domain, type, providerId, setAnswers, setError, setStatus]);
+  }, [domain, type, providerId, httpFetch, setAnswers, setError, setStatus]);
 
   const clear = () => { setDomain(''); setAnswers(null); setStatus(''); setError(''); };
 
@@ -304,6 +322,7 @@ function DnsView() {
 // ─── propagation view ───────────────────────────────────────────────────────
 
 function PropagationView() {
+  const httpFetch = usePlatformFetch();
   const [domain, setDomain] = useSessionState<string>(SESSION.prop, 'domain');
   const [type, setType] = useSessionState<string>(SESSION.prop, 'type');
   const [rows, setRows] = useSessionState<PropagationRow[] | null>(SESSION.prop, 'rows');
@@ -317,13 +336,13 @@ function PropagationView() {
     if (!name) return;
     setLoading(true); setError(''); setRows(null);
     try {
-      setRows(await checkPropagation(name, type));
+      setRows(await checkPropagation(name, type, undefined, httpFetch));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [domain, type, setRows, setError]);
+  }, [domain, type, httpFetch, setRows, setError]);
 
   const clear = () => { setDomain(''); setRows(null); setError(''); };
 
@@ -418,6 +437,7 @@ function DnssecSection({ title, records }: { title: string; records: DnsAnswer[]
 }
 
 function DnssecView() {
+  const httpFetch = usePlatformFetch();
   const [domain, setDomain] = useSessionState<string>(SESSION.dnssec, 'domain');
   const [result, setResult] = useSessionState<DnssecResult | null>(SESSION.dnssec, 'result');
   const [error, setError] = useSessionState<string>(SESSION.dnssec, 'error');
@@ -430,13 +450,13 @@ function DnssecView() {
     if (!name) return;
     setLoading(true); setError(''); setResult(null);
     try {
-      setResult(await checkDnssec(name));
+      setResult(await checkDnssec(name, undefined, undefined, httpFetch));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [domain, setResult, setError]);
+  }, [domain, httpFetch, setResult, setError]);
 
   const clear = () => { setDomain(''); setResult(null); setError(''); };
   const hasData = result && (result.ds.length || result.dnskey.length || result.rrsig.length);
@@ -510,6 +530,7 @@ function IpCard({ info }: { info: IpInfo }) {
 // ─── My IP view ─────────────────────────────────────────────────────────────
 
 function MyIpView() {
+  const httpFetch = usePlatformFetch();
   const [info, setInfo] = useSessionState<IpInfo | null>(SESSION.myip, 'info');
   const [error, setError] = useSessionState<string>(SESSION.myip, 'error');
   const [loading, setLoading] = useState(false);
@@ -517,13 +538,13 @@ function MyIpView() {
   const run = useCallback(async () => {
     setLoading(true); setError(''); setInfo(null);
     try {
-      setInfo(await lookupIp());
+      setInfo(await lookupIp('', undefined, httpFetch));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [setInfo, setError]);
+  }, [httpFetch, setInfo, setError]);
 
   const clear = () => { setInfo(null); setError(''); };
 
@@ -907,6 +928,7 @@ function SocketTableHeader() {
 }
 
 function PortsView() {
+  const sdk = usePluginSdkFor('network');
   const [entries, setEntries] = useSessionState<PortEntry[] | null>(SESSION.ports, 'entries');
   const [error, setError] = useSessionState<string>(SESSION.ports, 'error');
   const [filter, setFilter] = useSessionState<string>(SESSION.ports, 'filter');
@@ -916,7 +938,7 @@ function PortsView() {
   const [sortDir, setSortDir] = useSessionState<SortDir>(SESSION.ports, 'sortDir');
   // Favourites are a user preference, so they persist across app restarts
   // (unlike scan results, which live in the in-memory session store).
-  const [favorites, setFavorites] = usePersistentState<number[]>('devtool:network:favoritePorts', []);
+  const [favorites, setFavorites] = usePluginState<number[]>(sdk, 'network:favoritePorts', [], { legacyKey: 'devtool:network:favoritePorts' });
   const [addValue, setAddValue] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -1215,6 +1237,7 @@ function PortsView() {
 // ─── IP Lookup view ─────────────────────────────────────────────────────────
 
 function IpLookupView() {
+  const httpFetch = usePlatformFetch();
   const [ip, setIp] = useSessionState<string>(SESSION.iplookup, 'ip');
   const [info, setInfo] = useSessionState<IpInfo | null>(SESSION.iplookup, 'info');
   const [error, setError] = useSessionState<string>(SESSION.iplookup, 'error');
@@ -1227,13 +1250,13 @@ function IpLookupView() {
     if (!target) return;
     setLoading(true); setError(''); setInfo(null);
     try {
-      setInfo(await lookupIp(target));
+      setInfo(await lookupIp(target, undefined, httpFetch));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [ip, setInfo, setError]);
+  }, [ip, httpFetch, setInfo, setError]);
 
   const clear = () => { setIp(''); setInfo(null); setError(''); };
 

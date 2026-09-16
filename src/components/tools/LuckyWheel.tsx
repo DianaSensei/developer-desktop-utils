@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Play, Trophy, ArrowDown, ArrowUp, Eraser, Check, Repeat, Timer } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
 
 const SIZE = 460; // internal canvas size (device px handled via DPR)
@@ -123,12 +123,13 @@ function formatTime(ms: number): string {
 }
 
 export function LuckyWheel() {
-  const [raw, setRaw] = usePersistentState('devtool:luckywheel:choices', 'Pizza\nSushi\nBurger\nSalad\nTacos\nNoodles');
-  const [uniqueOnly, setUniqueOnly] = usePersistentState('devtool:luckywheel:uniqueOnly', false);
-  const [removeOnWin, setRemoveOnWin] = usePersistentState('devtool:luckywheel:removeOnWin', false);
-  const [history, setHistory] = usePersistentState<SpinResult[]>('devtool:luckywheel:history', []);
-  const [spinSec, setSpinSec] = usePersistentState('devtool:luckywheel:spinSec', 4);
-  const [autoCount, setAutoCount] = usePersistentState('devtool:luckywheel:autoCount', 3);
+  const sdk = usePluginSdkFor('lucky-wheel');
+  const [raw, setRaw] = usePluginState(sdk, 'luckywheel:choices', 'Pizza\nSushi\nBurger\nSalad\nTacos\nNoodles', { legacyKey: 'devtool:luckywheel:choices' });
+  const [uniqueOnly, setUniqueOnly] = usePluginState(sdk, 'luckywheel:uniqueOnly', false, { legacyKey: 'devtool:luckywheel:uniqueOnly' });
+  const [removeOnWin, setRemoveOnWin] = usePluginState(sdk, 'luckywheel:removeOnWin', false, { legacyKey: 'devtool:luckywheel:removeOnWin' });
+  const [history, setHistory] = usePluginState<SpinResult[]>(sdk, 'luckywheel:history', [], { legacyKey: 'devtool:luckywheel:history' });
+  const [spinSec, setSpinSec] = usePluginState(sdk, 'luckywheel:spinSec', 4, { legacyKey: 'devtool:luckywheel:spinSec' });
+  const [autoCount, setAutoCount] = usePluginState(sdk, 'luckywheel:autoCount', 3, { legacyKey: 'devtool:luckywheel:autoCount' });
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [spinning, setSpinning] = useState(false);
   const [autoLeft, setAutoLeft] = useState(0); // remaining spins in an auto run (0 = not auto)

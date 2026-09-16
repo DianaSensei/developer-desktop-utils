@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdk, useSecretState } from '@/platform';
 import { base32Decode, parseOtpImport, type ParsedOtp } from '@/lib/otpauth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -592,7 +592,8 @@ function InfoPanel() {
         </div>
       </div>
       <p className="border-t pt-2">
-        Secrets are stored in <strong className="text-fg">localStorage</strong> only — nothing leaves your device.
+        Secrets are kept in the app's <strong className="text-fg">separate secret store</strong>, apart from
+        ordinary app settings — nothing leaves your device.
         Secrets must be Base32-encoded (A–Z and 2–7, case-insensitive, spaces ignored).
       </p>
     </div>
@@ -859,7 +860,12 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function TwoFactorAuth() {
-  const [accounts, setAccounts] = usePersistentState<Account[]>('devtool:2fa:accounts', []);
+  // Seed TOTP/HOTP sống trong kho bí mật riêng, không phải mặt phẳng khoá dùng
+  // chung mà `storageGet()` đọc được từ bất cứ đâu trong webview. Kho là bất
+  // đồng bộ nên có `ready`: trước khi đọc xong, tuyệt đối không render "chưa có
+  // tài khoản nào" — người dùng sẽ tưởng mất hết dữ liệu.
+  const sdk = usePluginSdk();
+  const [accounts, setAccounts, accountsReady] = useSecretState<Account[]>(sdk, 'accounts', []);
   const [showForm, setShowForm] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -1052,6 +1058,8 @@ export function TwoFactorAuth() {
               />
             ))}
           </div>
+        ) : !accountsReady ? (
+          <div className="py-8 text-center text-xs text-fg-mute">Loading accounts…</div>
         ) : accounts.length === 0 && !showForm ? (
           <EmptyState onAdd={() => setShowForm(true)} />
         ) : filtered.length === 0 && accounts.length > 0 ? (

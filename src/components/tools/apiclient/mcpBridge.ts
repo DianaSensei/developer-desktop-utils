@@ -24,9 +24,11 @@
 // so it stays UI-only.
 
 import { useEffect, useRef } from 'react';
+import { usePluginSdkFor } from '@/platform';
 import { isTauri } from '@/lib/platform';
 import type { ApiStore } from './store';
 import type { ApiRequest, Auth, Environment, KeyValue, LogEntry, RequestBody, RequestScript, RequestSettings, TreeItem } from './types';
+import { API_CLIENT_MCP_TOOLS } from './mcpTools';
 import { newAuth, newEnvironment, newRequest, uid } from './types';
 import type { ExecResult } from './engine';
 
@@ -485,6 +487,7 @@ function buildHandlers(store: ApiStore, runRequest: RunRequestFn): Record<string
 // for long-lived event listeners that read changing React state (see
 // docs/ai/CLAUDE.md's "Stable refs for long-lived event listeners").
 export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn, enabled = true): void {
+  const sdk = usePluginSdkFor('api-client');
   const handlersRef = useRef<Record<string, ToolHandler>>({});
   handlersRef.current = buildHandlers(store, runRequest);
 
@@ -494,10 +497,16 @@ export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn, enabled 
     let unlisten: (() => void) | null = null;
 
     (async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      const { invoke } = await import('@tauri-apps/api/core');
-      const fn = await listen<McpCallEvent>('mcp:call', async (event) => {
-        const { id, tool, args } = event.payload;
+      // Bundled with THIS tool, not the platform — devtool-mcp-server.rs has
+      // no compiled-in tool list of its own (see that file), so registering
+      // here is what makes its tools show up in `list_tools` at all. Same
+      // 'native' + allowlist gate as `mcp_respond` below.
+      await sdk.native.invoke('mcp_register_tools', { pluginId: sdk.id, tools: API_CLIENT_MCP_TOOLS });
+      // Qua SDK: sự kiện `mcp:call` và lệnh `mcp_respond` đều nằm trong quyền
+      // 'native' + allowlist của plugin, nên cầu nối này cũng hiện trong nhật ký
+      // như mọi lời gọi khác thay vì là một đường đi vòng.
+      const fn = await sdk.native.listen<McpCallEvent>('mcp:call', async (payload) => {
+        const { id, tool, args } = payload;
         const handler = handlersRef.current[tool];
         // Not one of this bridge's tools (e.g. a Mock Server tool while both
         // bridges are listening in the background) — leave it alone rather
@@ -506,9 +515,9 @@ export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn, enabled 
         if (!handler) return;
         try {
           const result = await handler(args ?? {});
-          await invoke('mcp_respond', { id, result: result ?? null, error: null });
+          await sdk.native.invoke('mcp_respond', { id, result: result ?? null, error: null });
         } catch (e) {
-          await invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
+          await sdk.native.invoke('mcp_respond', { id, result: null, error: (e as Error).message ?? String(e) });
         }
       });
       if (cancelled) fn();
@@ -518,6 +527,10 @@ export function useMcpBridge(store: ApiStore, runRequest: RunRequestFn, enabled 
     return () => {
       cancelled = true;
       unlisten?.();
+      // Best-effort — this tool's tools stop answering the moment
+      // `mcp:call` is unlistened anyway; unregistering just keeps
+      // `list_tools` honest about what will actually answer right now.
+      sdk.native.invoke('mcp_unregister_tools', { pluginId: sdk.id }).catch(() => {});
     };
-  }, [enabled]);
+  }, [enabled, sdk]);
 }

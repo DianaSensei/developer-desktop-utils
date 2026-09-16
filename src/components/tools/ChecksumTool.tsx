@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { usePluginSdkFor } from '@/platform';
 import { Input } from '@/components/ui/input';
 import { Upload, X, CheckCircle, XCircle } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -26,6 +27,7 @@ function formatBytes(n: number) {
 }
 
 export function ChecksumTool() {
+  const sdk = usePluginSdkFor('base64');
   const [algo,     setAlgo]     = useState<AlgoId>('sha256');
   const [status,   setStatus]   = useState<Status>('idle');
   const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
@@ -52,15 +54,13 @@ export function ChecksumTool() {
     let unlisten: (() => void) | undefined;
 
     (async () => {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      unlisten = await getCurrentWindow().onDragDropEvent((event) => {
-        const { type } = event.payload;
-        if (type === 'enter' || type === 'over') {
+      unlisten = await sdk.native.onFileDrop((event) => {
+        if (event.type === 'enter' || event.type === 'over') {
           setDragging(true);
-        } else if (type === 'drop') {
+        } else if (event.type === 'drop') {
           setDragging(false);
-          const paths = (event.payload as { type: 'drop'; paths: string[] }).paths;
-          if (paths?.[0]) startTauriHash(paths[0], algoRef.current);
+          const path = event.paths?.[0];
+          if (path) startTauriHash(path, algoRef.current);
         } else {
           setDragging(false);
         }
@@ -82,21 +82,18 @@ export function ChecksumTool() {
     setStatus('hashing');
     setFileInfo(null);
 
-    const { listen }  = await import('@tauri-apps/api/event');
-    const { invoke }  = await import('@tauri-apps/api/core');
-
-    const unlistenInfo = await listen<FileInfo>('checksum:file-info', (e) => {
+    const unlistenInfo = await sdk.native.listen<FileInfo>('checksum:file-info', (payload) => {
       if (jobRef.current !== jobId) return;
-      setFileInfo(e.payload);
+      setFileInfo(payload);
     });
 
-    const unlistenProg = await listen<{ percent: number }>('checksum:progress', (e) => {
+    const unlistenProg = await sdk.native.listen<{ percent: number }>('checksum:progress', (payload) => {
       if (jobRef.current !== jobId) return;
-      setProgress(e.payload.percent);
+      setProgress(payload.percent);
     });
 
     try {
-      const result = await invoke<string>('hash_file', { path, algo: algoId });
+      const result = await sdk.native.invoke<string>('hash_file', { path, algo: algoId });
       if (jobRef.current !== jobId) return;
       setHash(result);
       setStatus('done');
@@ -164,13 +161,13 @@ export function ChecksumTool() {
 
   const handleBrowse = useCallback(async () => {
     if (isTauri) {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const path = await open({ multiple: false, title: 'Select file to hash' }) as string | null;
+      const picked = await sdk.files.pickOpen({ title: 'Select file to hash' });
+      const path = picked?.[0];
       if (path) startTauriHash(path, algoRef.current);
     } else {
       inputRef.current?.click();
     }
-  }, [startTauriHash]);
+  }, [startTauriHash, sdk]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

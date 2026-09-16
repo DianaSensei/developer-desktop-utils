@@ -2,37 +2,34 @@
 
 ## Adding a New Tool
 
+Every tool is a **plugin**: one folder, one manifest. The Platform discovers it
+automatically — there is no registration table and no route to wire up.
+
 ### Step 1: Create the component
 
-Create `src/components/tools/YourTool.tsx`. Use real-time output (no "Process" button), persist the input, and wire up the shared paste/undo hooks:
+Create `src/components/tools/YourTool.tsx`. Use real-time output (no "Process"
+button), persist the input through the Platform SDK, and wire up the shared
+paste/undo hooks:
 
 ```tsx
 import { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { YourIcon } from 'lucide-react';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { useInputHistory } from '@/hooks/useInputHistory';
 
 export function YourTool() {
-  const [input, setInput] = usePersistentState('devtool:yourTool:input', '');
+  const sdk = usePluginSdkFor('your-tool');
+  const [input, setInput] = usePluginState(sdk, 'input', '');
   const output = useMemo(() => input.toUpperCase(), [input]);
 
-  useQuickPaste(setInput);       // ⌘V / Ctrl+V pastes from clipboard
+  useQuickPaste(setInput);          // ⌘V / Ctrl+V pastes from clipboard
   useInputHistory(input, setInput); // ⌘Z / ⌘⇧Z undo/redo
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <YourIcon className="h-5 w-5" />
-          Your Tool
-        </CardTitle>
-        <CardDescription>Brief description</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="tool-full-height">
+      <div className="tool-scrollable tool-padding tool-spacer">
         <div className="space-y-2">
           <Label>Input</Label>
           <Textarea
@@ -47,53 +44,52 @@ export function YourTool() {
             <Textarea value={output} readOnly />
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 ```
 
-### Step 2: Add to `src/lib/toolDefs.ts`
+### Step 2: Declare the plugin — `src/plugins/your-tool/plugin.ts`
 
-`TOOL_DEFS` is the single source of truth for tool metadata. Settings and the sidebar read from it automatically.
+**This is the only registration step.** The folder name must equal the `id`.
 
 ```ts
 import { YourIcon } from 'lucide-react';
+import { definePlugin } from '@/platform';
 
-export const TOOL_DEFS: ToolDef[] = [
-  // ... existing tools
-  {
-    id: 'your-tool',
-    label: 'Your Tool',
-    icon: YourIcon,
-    description: 'One-line description shown in sidebar tooltip and Settings.',
-  },
-];
+export default definePlugin({
+  id: 'your-tool',
+  label: 'Your Tool',
+  icon: YourIcon,
+  description: 'One-line description shown in sidebar tooltip and Settings.',
+  keywords: ['synonym'],              // optional, improves sidebar search
+  route: '/your-tool',                // absolute, unique
+  order: 265,                         // sidebar position, unique
+  defaultEnabled: true,
+  permissions: ['storage', 'clipboard:read', 'clipboard:write'],
+  sdk: '^1.0.0',
+  load: () => import('@/components/tools/YourTool').then((m) => m.YourTool),
+});
 ```
 
-### Step 3: Register the route in `src/App.tsx`
+**Done.** Metadata, sidebar order, route, code-splitting and the default on/off
+state all come from this file. `TOOL_DEFS`, `TOOL_ROUTES` and `DEFAULT_FEATURES`
+are derived views — do not edit them.
 
-```tsx
-// Import your component at the top
-import { YourTool } from '@/components/tools/YourTool';
+### Declaring permissions
 
-// Add to TOOL_ROUTES
-const TOOL_ROUTES = {
-  // ... existing
-  'your-tool': { path: '/your-tool', component: YourTool },
-};
-```
+Only declare what the tool actually touches; Settings → Plugins shows the list to
+users and every call is recorded in the audit log. Some permissions must come with
+an allowlist — `native` with `commands`, `http` with `hosts`, `service` with
+`service.methods` — because a permission without one is unlimited access.
 
-### Step 4: Enable by default in `src/contexts/FeatureContext.tsx`
+Anything credential-shaped (tokens, seeds, passwords) belongs in `sdk.secrets` /
+`useSecretState`, never in `sdk.storage`. When moving an existing key into the
+plugin namespace, always pass `usePluginState(..., { legacyKey: 'devtool:old:key' })`
+or the user's saved data is silently lost.
 
-```tsx
-const DEFAULT_FEATURES: FeatureSettings = {
-  // ... existing
-  'your-tool': true,
-};
-```
-
-**Done.** No changes needed in `Settings.tsx` — it reads `TOOL_DEFS` automatically.
+Full reference: [`docs/decisions/architecture/platform-plugin-architecture.md`](../decisions/architecture/platform-plugin-architecture.md).
 
 ---
 
@@ -133,7 +129,7 @@ className={cn('base', isActive && 'text-acc')}
 ## Best Practices
 
 - **No "Process" button**: compute output from input with `useMemo` — update on every keystroke
-- **Persist input**: use `usePersistentState` so the tool remembers its last value across restarts
+- **Persist input**: use `usePluginState` so the tool remembers its last value across restarts
 - **Copy button**: add a copy-to-clipboard button for outputs using `copyToClipboard` from `@/lib/clipboard`
 - **Heavy computation**: offload anything that could block >16ms to a Web Worker in `src/workers/`
 - **Error states**: always handle errors and show a message in the UI — never let it silently fail

@@ -25,6 +25,9 @@ import { buildCodecHandlers } from './tools/codecMcpBridge';
 import { buildJwtHandlers } from './tools/jwtMcpBridge';
 import { buildJsonHandlers } from './tools/jsonMcpBridge';
 import { useMcpToolEnabledMap } from '@/hooks/useMcpToolEnabled';
+import { CODEC_MCP_TOOLS, JWT_MCP_TOOLS, JSON_MCP_TOOLS } from './mcpUtilityTools';
+
+const UTILITY_PLUGIN_ID = 'devtool-utility';
 
 interface McpCallEvent {
   id: string;
@@ -52,6 +55,18 @@ export function McpUtilityBridge(): null {
     (async () => {
       const { listen } = await import('@tauri-apps/api/event');
       const { invoke } = await import('@tauri-apps/api/core');
+      // Registers only the currently-enabled subset — re-runs (replacing the
+      // prior registration wholesale, see mcp_bridge.rs) whenever one of the
+      // three toggles flips, same as this effect already re-listens for
+      // that. A disabled tool shouldn't appear in list_tools at all, since
+      // devtool_mcp_set_tool_enabled says it "never answers ... at all" for
+      // these three, not just "on screen".
+      const tools = [
+        ...(codecEnabled ? CODEC_MCP_TOOLS : []),
+        ...(jwtEnabled ? JWT_MCP_TOOLS : []),
+        ...(jsonEnabled ? JSON_MCP_TOOLS : []),
+      ];
+      await invoke('mcp_register_tools', { pluginId: UTILITY_PLUGIN_ID, tools });
       const fn = await listen<McpCallEvent>('mcp:call', async (event) => {
         const { id, tool, args } = event.payload;
         const handlers: Record<string, ToolHandler> | null =

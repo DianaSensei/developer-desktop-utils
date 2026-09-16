@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { storageGet, storageSet } from '@/lib/persistentStore';
+import { DEFAULT_PLUGIN_FEATURES } from '@/platform';
 
 interface FeatureSettings {
   [key: string]: boolean;
@@ -22,34 +23,18 @@ const FAVORITES_KEY = 'devtool-favorites';
 
 const FeatureContext = createContext<FeatureContextType | undefined>(undefined);
 
+/**
+ * Bật/tắt mặc định cho bản cài mới, đọc từ `defaultEnabled` của từng manifest
+ * plugin. `settings` được nối thêm vì nó là màn hình của shell, không phải
+ * plugin, và không bao giờ tắt được.
+ *
+ * `FeatureProvider` trộn giá trị đã lưu LÊN TRÊN bảng này, nên một plugin mới
+ * xuất hiện sẽ nhận đúng mặc định của nó thay vì thừa hưởng lựa chọn cũ của
+ * người dùng cho một tool khác.
+ */
 const DEFAULT_FEATURES: FeatureSettings = {
-  'task-tracker': true,
-  'api-client': true,
-  'mock-server': true,
-  'cron-generator': true,
-  'text-transform': true,
-  'text-counter': true,
-  'color-picker': false,
-  'base64': true,
-  'unix-time': true,
-  'json': true,
-  'data-converter': true,
-  'jwt': false,
-  'regex': false,
-  'diff': false,
-  'qrcode': true,
-  'markdown': false,
-  'deduplicate': false,
-  'generator': true,
-  'kafka-explorer': false,
-  'rabbit-client': false,
-  'redis-client': false,
-  'container-manager': false,
-  'sql-formatter': false,
-  'network': false,
-  'lucky-wheel': false,
-  '2fa': true,
-  'settings': true,
+  ...DEFAULT_PLUGIN_FEATURES,
+  settings: true,
 };
 
 export function FeatureProvider({ children }: { children: ReactNode }) {

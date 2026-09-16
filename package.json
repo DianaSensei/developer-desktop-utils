@@ -11,6 +11,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "build:mcp-sidecar": "node scripts/prepare-mcp-sidecar.mjs",
+    "build:service-sidecars": "node scripts/prepare-service-sidecars.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },

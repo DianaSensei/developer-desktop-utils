@@ -7,9 +7,9 @@
 // export as Postman v2.1. Requests only fire when the user clicks Send.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePluginConfig, usePluginMcpBridgeActive, usePluginSdkFor, usePluginState } from '@/platform';
 import { Plus, Search, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { Button } from '@/components/ui/button';
 import type { InlineCodeFieldHandle } from '@/design-system';
 import { RequestQuickOpen } from './RequestQuickOpen';
@@ -29,10 +29,7 @@ import { CookieManager } from './CookieManager';
 import { executeRequest, errToString } from './engine';
 import { useMcpBridge } from './mcpBridge';
 import { useApiClientRuntime } from './mcpRuntimeContext';
-import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
-import { useMcpToolEnabled } from '@/hooks/useMcpToolEnabled';
 import { isScriptSandboxDegraded, stopScriptSandbox, subscribeSandboxStatus } from './scriptHost';
-import { useAppConfig } from '@/contexts/AppConfigContext';
 import type { ApiRequest, ApiResponse, LogEntry, TestResult, VarMap } from './types';
 import { buildResolvedVars } from './vars';
 
@@ -52,9 +49,9 @@ const EMPTY_RUN: RunState = { response: null, error: null, sending: false, tests
 export function ApiClient() {
   const { store, runRequest, persistResult } = useApiClientRuntime();
   const { activeRequest } = store;
-  const { config } = useAppConfig();
-  const { enabled: mcpBackgroundEnabled } = useMcpBackgroundBridge();
-  const { enabled: mcpToolEnabled } = useMcpToolEnabled('api-client');
+  const config = usePluginConfig();
+  const sdk = usePluginSdkFor('api-client');
+  const mcpBridgeActive = usePluginMcpBridgeActive(sdk);
   // Read through a ref so the send/run callbacks don't churn when unrelated
   // config values change.
   const scriptTimeoutRef = useRef(config.apiClient.scriptTimeoutMs);
@@ -76,16 +73,12 @@ export function ApiClient() {
   const [showHistory, setShowHistory] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [runTarget, setRunTarget] = useState<{ title: string; requests: ApiRequest[]; collectionId: string } | null>(null);
-  const [direction, setDirection] = usePersistentState<SplitDirection>(
-    'devtool:apiclient:layout:v2', 'horizontal',
-  );
+  const [direction, setDirection] = usePluginState<SplitDirection>(sdk, 'apiclient:layout:v2', 'horizontal', { legacyKey: 'devtool:apiclient:layout:v2' });
   // Split sizes are persisted per axis, so toggling the layout (or reopening the
   // tool) restores the proportions the user set rather than resetting to 50/50.
-  const [splitH, setSplitH] = usePersistentState('devtool:apiclient:split:horizontal', 50);
-  const [splitV, setSplitV] = usePersistentState('devtool:apiclient:split:vertical', 50);
-  const [sidebarWidth, setSidebarWidth] = usePersistentState(
-    'devtool:apiclient:sidebarWidth', 288,
-  );
+  const [splitH, setSplitH] = usePluginState(sdk, 'apiclient:split:horizontal', 50, { legacyKey: 'devtool:apiclient:split:horizontal' });
+  const [splitV, setSplitV] = usePluginState(sdk, 'apiclient:split:vertical', 50, { legacyKey: 'devtool:apiclient:split:vertical' });
+  const [sidebarWidth, setSidebarWidth] = usePluginState(sdk, 'apiclient:sidebarWidth', 288, { legacyKey: 'devtool:apiclient:sidebarWidth' });
   const [resizing, setResizing] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   // Bumped by RequestTabs' "reveal in sidebar" button. The sidebar already
@@ -196,7 +189,7 @@ export function ApiClient() {
   // this store regardless of which tool is on screen — listening here too
   // would double-answer the same `mcp:call` event. Also skipped outright
   // when the per-tool MCP toggle (Settings → MCP) is off for API Client.
-  useMcpBridge(store, runRequest, mcpToolEnabled && !mcpBackgroundEnabled);
+  useMcpBridge(store, runRequest, mcpBridgeActive);
 
   const send = useCallback(async () => {
     if (!activeRequest) return;

@@ -114,7 +114,9 @@ fn stream<R: Read>(
     Ok(())
 }
 
-fn to_hex(bytes: &[u8]) -> String {
+// `pub(crate)`: artifact_installer.rs dùng lại đúng hàm này để mã hex checksum
+// của bundle tải về, thay vì viết một bản hex-encode thứ hai trong crate.
+pub(crate) fn to_hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
     bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
         write!(s, "{b:02x}").unwrap();

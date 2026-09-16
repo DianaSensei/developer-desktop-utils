@@ -22,9 +22,9 @@
 // setting is on.
 
 import { createContext, useContext, type ReactNode } from 'react';
+import { usePluginConfig } from '@/platform';
 import { useApiStore, type ApiStore } from './store';
 import { useApiRunner } from './useApiRunner';
-import { useAppConfig } from '@/contexts/AppConfigContext';
 import type { RunRequestFn } from './mcpBridge';
 
 interface ApiClientRuntime {
@@ -37,7 +37,7 @@ const ApiClientRuntimeContext = createContext<ApiClientRuntime | null>(null);
 
 export function ApiClientRuntimeProvider({ children }: { children: ReactNode }) {
   const store = useApiStore();
-  const { config } = useAppConfig();
+  const config = usePluginConfig();
   const { runRequest, persistResult } = useApiRunner(store, config.apiClient.scriptTimeoutMs);
 
   return (

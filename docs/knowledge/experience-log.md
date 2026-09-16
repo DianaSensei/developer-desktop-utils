@@ -278,7 +278,7 @@
   `@tauri-apps/plugin-http` xác nhận `danger: DangerousSettings` đã tồn tại sẵn (không cần đoán
   hay thêm Tauri command mới); `curl.ts`'s `tokenize()` đọc trực tiếp để xác nhận nó chỉ xử lý
   `\`/`'`/`"`, không có nhánh nào xử lý `^`.
-- Kết quả: Đã thêm (xem `docs/decisions/transport-error-hints.md` để biết đầy đủ lý do thiết kế):
+- Kết quả: Đã thêm (xem `docs/decisions/architecture/transport-error-hints.md` để biết đầy đủ lý do thiết kế):
   `RequestSettings.verifyTls` (setting mới, mặc định `true`, nối vào `danger` option có sẵn của
   plugin-http) + `looksLikeCertError`/`looksLikeRedirectLoop` (heuristic trong `ResponsePanel.tsx`,
   cùng khuôn với `looksLikeCorsRejection` đã có) + `looksLikeCmdFormat`/`hasSessionCredentials`
@@ -592,3 +592,28 @@
   tag phải khớp 1-1 với type ở phía TypeScript/frontend (Tauri IPC, hay bất kỳ ranh giới JSON
   nào), luôn viết một test nhỏ in ra JSON thật của từng variant trước khi viết type phía kia,
   thay vì đoán theo tên field/derive attribute.
+
+## [2026-09-15] artifact_installer.rs — serde tagged enum không tự "mặc định biến thể X khi thiếu tag" cho backward compat
+- Nguyên nhân: cần đọc được CẢ `index.json` cũ (mảng phẳng `InstalledPluginRecord`, không có
+  trường phân biệt nào) LẪN `index.json` mới (`InstalledArtifactRecord`, internally-tagged
+  `#[serde(tag = "kind")]`, hai biến thể `Plugin`/`Service`) — mà một bản ghi cũ thiếu hẳn
+  trường `kind`. `#[serde(tag = "kind")]` của serde derive yêu cầu trường tag PHẢI có mặt để
+  chọn biến thể; không có cách khai báo "vắng tag thì mặc định biến thể Plugin" bằng attribute
+  thuần, kể cả kết hợp `#[serde(default)]` (default chỉ áp dụng cho FIELD bên trong một biến thể
+  đã được chọn, không áp dụng cho việc CHỌN biến thể).
+- Số lần thử: 1/5 (subagent tauri-react-engineer nhận diện đúng giới hạn ngay từ đầu, không thử
+  attribute trước khi viết Deserialize tay).
+- Kết quả: Đã fix
+- Cách fix: viết `impl<'de> Deserialize<'de> for InstalledArtifactRecord` thủ công — deserialize
+  trước vào `serde_json::Value` trung gian, `.get("kind")` rồi `.unwrap_or("plugin")`, sau đó mới
+  `serde_json::from_value` vào đúng biến thể. `Serialize` vẫn dùng derive bình thường (chiều ghi
+  luôn ghi tường minh `kind`, không cần custom). Test bắt buộc dùng ĐÚNG hình dạng JSON mà code
+  cũ (`plugin_installer.rs`) thật sự ghi ra (`serde_json::to_string_pretty` từ type cũ), không
+  phải JSON gõ tay — vì migration test dùng dữ liệu tự bịa dễ khớp "tình cờ" mà bỏ sót một field
+  thật sự tồn tại trong dữ liệu người dùng.
+- Bài học chung: serde's tagged-enum derive luôn giả định trường tag CÓ MẶT và hợp lệ. Bất cứ khi
+  nào một schema có tag phải đọc ngược được dữ liệu cũ TỪ TRƯỚC KHI có tag (di trú thêm một
+  discriminator vào một danh sách/enum đã tồn tại), câu trả lời gần như chắc chắn là
+  `impl Deserialize` thủ công qua `serde_json::Value` trung gian, không phải cố ép bằng attribute
+  — và luôn seed test bằng bytes do CHÍNH code cũ tạo ra, không phải JSON viết tay theo trí nhớ
+  về hình dạng của nó.

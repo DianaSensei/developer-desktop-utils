@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,6 @@ import { EnvelopeFormatError, decryptAesGcm, encryptAesGcm, isAesGcmEnvelope } f
 import { cn } from '@/lib/utils';
 import { SectionLabel } from '@/components/ui/section-label';
 import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
-import { usePersistentState } from '@/hooks/usePersistentState';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Spinner } from '@/components/ui/spinner';
@@ -518,27 +518,28 @@ export function doDecrypt(algo: CryptoJsAlgo, ciphertext: string, key: string): 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function EncodeHashEncrypt() {
+  const sdk = usePluginSdkFor('base64');
   // Top-level tab
-  const [tab, setTab] = usePersistentState<Tab>('devtool:codec:tab', 'encode');
+  const [tab, setTab] = usePluginState<Tab>(sdk, 'codec:tab', 'encode', { legacyKey: 'devtool:codec:tab' });
 
   // Encode tab
-  const [input, setInput]           = usePersistentState('devtool:codec:input', '');
-  const [algorithm, setAlgorithm]   = usePersistentState('devtool:codec:algorithm', 'base64');
-  const [encodeMode, setEncodeMode] = usePersistentState<EncodeMode>('devtool:codec:mode', 'encode');
+  const [input, setInput]           = usePluginState(sdk, 'codec:input', '', { legacyKey: 'devtool:codec:input' });
+  const [algorithm, setAlgorithm]   = usePluginState(sdk, 'codec:algorithm', 'base64', { legacyKey: 'devtool:codec:algorithm' });
+  const [encodeMode, setEncodeMode] = usePluginState<EncodeMode>(sdk, 'codec:mode', 'encode', { legacyKey: 'devtool:codec:mode' });
 
   // Hash tab
-  const [hashInput, setHashInput]     = usePersistentState('devtool:hash:hashInput', '');
-  const [upperHex, setUpperHex]       = usePersistentState('devtool:hash:upperHex', false);
-  const [hmacKey, setHmacKey]         = usePersistentState('devtool:hash:hmacKey', '');
+  const [hashInput, setHashInput]     = usePluginState(sdk, 'hash:hashInput', '', { legacyKey: 'devtool:hash:hashInput' });
+  const [upperHex, setUpperHex]       = usePluginState(sdk, 'hash:upperHex', false, { legacyKey: 'devtool:hash:upperHex' });
+  const [hmacKey, setHmacKey]         = usePluginState(sdk, 'hash:hmacKey', '', { legacyKey: 'devtool:hash:hmacKey' });
   const [showHmacKey, setShowHmacKey] = useState(false);
   const [verifyAlgo, setVerifyAlgo]   = useState<AlgoId | null>(null);
   const [verifyValue, setVerifyValue] = useState('');
 
   // Encrypt tab
-  const [encryptInput, setEncryptInput] = usePersistentState('devtool:hash:encryptInput', '');
-  const [encryptKey, setEncryptKey]     = usePersistentState('devtool:hash:key', '');
-  const [cryptoMode, setCryptoMode]     = usePersistentState<CryptoMode>('devtool:hash:aesMode', 'encrypt');
-  const [encryptAlgo, setEncryptAlgo]   = usePersistentState<EncryptAlgo>('devtool:hash:encryptAlgo', 'aes-gcm');
+  const [encryptInput, setEncryptInput] = usePluginState(sdk, 'hash:encryptInput', '', { legacyKey: 'devtool:hash:encryptInput' });
+  const [encryptKey, setEncryptKey]     = usePluginState(sdk, 'hash:key', '', { legacyKey: 'devtool:hash:key' });
+  const [cryptoMode, setCryptoMode]     = usePluginState<CryptoMode>(sdk, 'hash:aesMode', 'encrypt', { legacyKey: 'devtool:hash:aesMode' });
+  const [encryptAlgo, setEncryptAlgo]   = usePluginState<EncryptAlgo>(sdk, 'hash:encryptAlgo', 'aes-gcm', { legacyKey: 'devtool:hash:encryptAlgo' });
   const [showKey, setShowKey]           = useState(false);
 
   // Hooks (always called; enabled param gates the listener)

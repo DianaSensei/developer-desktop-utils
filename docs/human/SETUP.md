@@ -198,15 +198,19 @@ npm run tauri:build
 ### Tools / features
 
 **New tool doesn't appear in sidebar**  
-Verify all three registration points have the same ID:
-1. Entry in `TOOL_DEFS` in `src/lib/toolDefs.ts`
-2. Route in `TOOL_ROUTES` in `App.tsx`
-3. Key in `DEFAULT_FEATURES` in `src/contexts/FeatureContext.tsx`
-
-Clear stale localStorage if the ID changed: open DevTools console and run `localStorage.clear()`, then refresh.
+A tool is registered by exactly one file: `src/plugins/<id>/plugin.ts`. Check that
+the folder name equals the manifest `id`, and run `npm test -- registry` — a manifest
+the Platform rejected is listed there with the reason (duplicate id, duplicate route
+or order, bad `sdk` range…).
 
 **Feature toggle doesn't hide/show the tool**  
-Check `FeatureProvider` wraps the router in `App.tsx`. Debug in console: `localStorage.getItem('devtool-features')`.
+Check `FeatureProvider` wraps the router in `App.tsx`. The default on/off state comes
+from `defaultEnabled` in the plugin's manifest.
+
+**A tool says a permission is missing**  
+The Platform blocks SDK calls a plugin didn't declare. The error names the permission
+and the manifest file to add it to; Settings → Plugins also shows the denied call in
+the activity log.
 
 **Settings not persisting after refresh**  
 Check the browser allows localStorage (incognito mode blocks it).

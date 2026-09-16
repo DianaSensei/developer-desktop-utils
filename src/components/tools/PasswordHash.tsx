@@ -4,6 +4,7 @@
 // Hashing is expensive by design, so it runs on an explicit button, not live.
 
 import { useState } from 'react';
+import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
@@ -14,7 +15,6 @@ import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import { Eye, EyeOff, Fingerprint, Check, X } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { usePersistentState } from '@/hooks/usePersistentState';
 
 type Mode = 'hash' | 'verify';
 type Algo = 'bcrypt' | 'argon2id' | 'argon2i' | 'argon2d';
@@ -33,17 +33,18 @@ function randomSalt(len = 16): Uint8Array {
 }
 
 export function PasswordHash() {
-  const [mode, setMode] = usePersistentState<Mode>('devtool:pwhash:mode', 'hash');
-  const [algo, setAlgo] = usePersistentState<Algo>('devtool:pwhash:algo', 'bcrypt');
+  const sdk = usePluginSdkFor('base64');
+  const [mode, setMode] = usePluginState<Mode>(sdk, 'pwhash:mode', 'hash', { legacyKey: 'devtool:pwhash:mode' });
+  const [algo, setAlgo] = usePluginState<Algo>(sdk, 'pwhash:algo', 'bcrypt', { legacyKey: 'devtool:pwhash:algo' });
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
 
   // bcrypt params
-  const [cost, setCost] = usePersistentState('devtool:pwhash:cost', 10);
+  const [cost, setCost] = usePluginState(sdk, 'pwhash:cost', 10, { legacyKey: 'devtool:pwhash:cost' });
   // argon2 params
-  const [memory, setMemory] = usePersistentState('devtool:pwhash:memory', 19456); // KiB (OWASP)
-  const [iterations, setIterations] = usePersistentState('devtool:pwhash:iters', 2);
-  const [parallelism, setParallelism] = usePersistentState('devtool:pwhash:par', 1);
+  const [memory, setMemory] = usePluginState(sdk, 'pwhash:memory', 19456, { legacyKey: 'devtool:pwhash:memory' }); // KiB (OWASP)
+  const [iterations, setIterations] = usePluginState(sdk, 'pwhash:iters', 2, { legacyKey: 'devtool:pwhash:iters' });
+  const [parallelism, setParallelism] = usePluginState(sdk, 'pwhash:par', 1, { legacyKey: 'devtool:pwhash:par' });
 
   // hash mode result
   const [hashOut, setHashOut] = useState('');

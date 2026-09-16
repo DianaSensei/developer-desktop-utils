@@ -2,8 +2,10 @@
 //
 // A third `mcp:call` listener, mounted unconditionally at the app root
 // (App.tsx) alongside McpBackgroundBridge — unlike the API Client / Mock
-// Server / Redis / Kafka bridges, it is never gated by the "Background MCP
-// bridge" setting OR the per-tool toggles, since its whole purpose is to
+// Server bridges (the only two compiled-in tools the Background MCP bridge
+// setting still applies to; every other tool is an externally-installed
+// plugin now, see McpBackgroundBridge.tsx), it is never gated by that
+// setting OR the per-tool toggles, since its whole purpose is to
 // let an MCP client query and control those settings (and the rest of the
 // MCP surface) itself, including turning background mode on or re-enabling
 // a tool it accidentally switched off, without anyone touching Settings →
@@ -22,6 +24,11 @@ import { isTauri } from '@/lib/platform';
 import { useMcpBackgroundBridge } from '@/hooks/useMcpBackgroundBridge';
 import { useMcpToolEnabledMap, MCP_TOOL_IDS, type McpToolId } from '@/hooks/useMcpToolEnabled';
 import { useMockServerRuntime } from '@/components/tools/mockserver/mcpRuntimeContext';
+import { META_MCP_TOOLS } from './mcpMetaTools';
+
+// Registered under this synthetic id — this bridge isn't a plugin (no
+// manifest, no SDK), just the platform's own always-on management surface.
+const META_PLUGIN_ID = 'devtool-platform';
 
 interface McpCallEvent {
   id: string;
@@ -49,7 +56,7 @@ function buildHandlers(deps: Deps): Record<string, ToolHandler> {
       backgroundBridgeEnabled: deps.backgroundEnabled,
       toolsEnabled: deps.toolsEnabled,
       note: deps.backgroundEnabled
-        ? 'API Client, Mock Server, Redis Client, and Kafka Explorer tools all answer MCP calls regardless of which tool is on screen — except any tool switched off in toolsEnabled, which never answers.'
+        ? 'API Client and Mock Server tools answer MCP calls regardless of which tool is on screen (every other tool is an installable plugin — its calls only answer while its own route is open, background bridge or not) — except any tool switched off in toolsEnabled, which never answers.'
         : 'Each tool only answers MCP calls while it is the one on screen (and only if enabled in toolsEnabled). Call devtool_mcp_set_background with enabled:true to lift the on-screen requirement.',
       mockServer: {
         running: deps.mockServer.running,
@@ -111,12 +118,16 @@ export function McpManageBridge(): null {
     (async () => {
       const { listen } = await import('@tauri-apps/api/event');
       const { invoke } = await import('@tauri-apps/api/core');
+      // Unconditional, never unregistered — this bridge IS the platform's own
+      // management surface, mounted for the app's whole lifetime (see the
+      // file-level comment on why it has no `enabled` prop).
+      await invoke('mcp_register_tools', { pluginId: META_PLUGIN_ID, tools: META_MCP_TOOLS });
       const fn = await listen<McpCallEvent>('mcp:call', async (event) => {
         const { id, tool, args } = event.payload;
         const handler = buildHandlers(depsRef.current)[tool];
-        // Not one of this bridge's tools — leave it for the API Client / Mock
-        // Server / Redis / Kafka bridges, which may also be listening on the
-        // same event.
+        // Not one of this bridge's tools — leave it for whichever tool's own
+        // bridge owns it (compiled-in or an installed plugin), which may
+        // also be listening on the same event.
         if (!handler) return;
         try {
           const result = await handler(args ?? {});
