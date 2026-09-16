@@ -261,7 +261,18 @@ jobs:
       # created now, for the first time — `gh release create` creates it
       # itself, pointed at this exact commit, same as
       # developer-desktop-util-plugin's release.yml already does.
-      - name: Create GitHub Release, tag, and upload installers
+      #
+      # --draft: everything past this point (updater manifest, checksums,
+      # SBOM, attestation) can still fail, and a draft is invisible to the
+      # in-app updater (see tauri.conf.json's updater endpoint comment
+      # elsewhere in this repo) — so a failure here leaves an unfinished
+      # DRAFT, not a live release missing files. v0.9.1-test1's manual test
+      # run hit exactly this: the manifest step failed right after this one
+      # published live, leaving a real release with installers but no
+      # latest.json. "Publish the release" (the last step below) is what
+      # flips draft -> published, once every later step has actually
+      # succeeded.
+      - name: Create GitHub Release (draft), tag, and upload installers
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -272,6 +283,7 @@ jobs:
             --title "DevTool ${RELEASE_TAG}" \
             --notes "${RELEASE_NOTES}" \
             --target "${{ github.sha }}" \
+            --draft \
             release-assets/*
 
       # ── Updater manifest ─────────────────────────────────────────────────
@@ -338,3 +350,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${RELEASE_TAG}" devtool-sbom.spdx.json --clobber --repo "${GITHUB_REPOSITORY}"
+
+      # The point of no return: every step above succeeded (a failure in any
+      # of them would have stopped this job before reaching here — no
+      # continue-on-error anywhere in this job), so this is the first and
+      # only point where the release actually becomes visible to the in-app
+      # updater. If this workflow run stops before this step for any reason,
+      # what's left behind is a draft — not a broken published release.
+      - name: Publish the release (flip draft -> published)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${RELEASE_TAG}" --draft=false --repo "${GITHUB_REPOSITORY}"
