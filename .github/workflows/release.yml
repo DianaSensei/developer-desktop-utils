@@ -1,9 +1,20 @@
 name: Release
 
+# Tag push is the primary trigger. Also runnable manually (workflow_dispatch)
+# for environments that can drive the GitHub Actions API but can't push a tag
+# ref (e.g. a scoped CI bot token) — tauri-action's `tagName` below creates
+# the tag itself, pointed at whatever ref the manual run used, if it doesn't
+# already exist. Same pattern as developer-desktop-util-plugin's release.yml.
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag to create (e.g. v0.9.0)'
+        required: true
+        type: string
 
 # Least privilege at the top level: the only job here declares the write scopes
 # it actually needs (contents/id-token/attestations). Anything added later
@@ -55,13 +66,16 @@ jobs:
         with:
           fetch-depth: 0   # full history + tags so the changelog can diff previous→new tag
 
-      # Derive the app version from the pushed tag (e.g. v0.2.4 -> 0.2.4) and write
+      - name: Resolve release tag (workflow_dispatch input, or the pushed tag)
+        run: echo "RELEASE_TAG=${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}" >> "$GITHUB_ENV"
+
+      # Derive the app version from the tag (e.g. v0.2.4 -> 0.2.4) and write
       # it into the config files, so you only have to push a tag — no manual version
       # bump in tauri.conf.json. tauri-action reads the version from tauri.conf.json.
       - name: Sync version from tag
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${RELEASE_TAG#v}"
           echo "Setting version to $VERSION"
           node -e "const f='src-tauri/tauri.conf.json',j=require('./'+f);j.version='$VERSION';require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
           node -e "const f='package.json',j=require('./'+f);j.version='$VERSION';require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
@@ -111,14 +125,19 @@ jobs:
         id: notes
         shell: bash
         run: |
-          NEW_TAG="${GITHUB_REF_NAME}"
-          # Nearest tag reachable from this tag's parent = the previous release.
-          PREV_TAG=$(git describe --tags --abbrev=0 "${NEW_TAG}^" 2>/dev/null || true)
+          NEW_TAG="${RELEASE_TAG}"
+          # Nearest tag reachable from HEAD's parent = the previous release.
+          # HEAD^ instead of "${NEW_TAG}^": on a tag push, HEAD already IS the
+          # tag's commit (that's what triggered the checkout) so they're the
+          # same thing — but on workflow_dispatch, NEW_TAG doesn't exist as a
+          # git ref yet (tauri-action creates it later), so "${NEW_TAG}^"
+          # would fail to resolve while HEAD^ still works.
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
 
           if [ -n "$PREV_TAG" ]; then
-            RANGE="${PREV_TAG}..${NEW_TAG}"
+            RANGE="${PREV_TAG}..HEAD"
           else
-            RANGE="${NEW_TAG}"           # first release — list the whole history
+            RANGE="HEAD"           # first release — list the whole history
           fi
 
           # Every commit in the range (excluding merge commits), as "- subject (hash)".
@@ -165,8 +184,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: DevTool ${{ github.ref_name }}
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: DevTool ${{ env.RELEASE_TAG }}
           releaseBody: ${{ env.RELEASE_NOTES }}
           # Must be published (not draft) for the updater: the endpoint
           # releases/latest/download/latest.json only resolves to the latest
@@ -221,7 +240,7 @@ jobs:
             fi >> "$sums"
           done <<< "$ARTIFACT_LIST"
           cat "$sums"
-          gh release upload "${GITHUB_REF_NAME}" "$sums" --clobber --repo "${GITHUB_REPOSITORY}"
+          gh release upload "${RELEASE_TAG}" "$sums" --clobber --repo "${GITHUB_REPOSITORY}"
 
       # One SBOM per release is enough — the dependency tree is the same on
       # every platform, so only the Linux job publishes it.
@@ -240,4 +259,4 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" devtool-sbom.spdx.json --clobber --repo "${GITHUB_REPOSITORY}"
+        run: gh release upload "${RELEASE_TAG}" devtool-sbom.spdx.json --clobber --repo "${GITHUB_REPOSITORY}"
