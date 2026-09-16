@@ -19,6 +19,7 @@
     "fs:allow-write-text-file",
     "fs:scope-appdata-recursive",
     "process:allow-restart",
+    "deep-link:default",
     "updater:allow-check",
     "updater:allow-download-and-install",
     "store:default",

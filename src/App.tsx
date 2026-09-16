@@ -30,6 +30,7 @@ import { allTools, toolPath } from '@/lib/toolRegistry';
 import { buildNavEntries, countFavoriteEntries, GROUP_OF_TOOL, type NavEntry } from '@/lib/toolGroups';
 import { toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
+import { initDeepLinkHandling } from '@/lib/deepLink';
 import { CommandPalette } from '@/components/CommandPalette';
 import { OpenToolsStrip } from '@/components/OpenToolsStrip';
 import { McpBackgroundBridge } from '@/components/McpBackgroundBridge';
@@ -704,6 +705,7 @@ function Sidebar({
 
 function AppContent() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { isFeatureEnabled, toolOrder } = useFeatures();
   const liveIds = useLiveConnections();
   const { t } = useLocale();
@@ -743,6 +745,13 @@ function AppContent() {
   useEffect(() => {
     storageSet('devtool-sidebar-collapsed', isCollapsed.toString());
   }, [isCollapsed]);
+
+  // `desktop-devtool-app://install?manifest=...` từ trang plugin (starlight-site) — chỉ
+  // gắn một lần cho cả vòng đời app (guard `started` bên trong), nên effect
+  // này an toàn khi chạy lại nếu `navigate` đổi identity.
+  useEffect(() => {
+    void initDeepLinkHandling(navigate);
+  }, [navigate]);
 
   const changeTheme = (value: ThemePreference) => {
     triggerThemeTransition();

@@ -3,6 +3,7 @@ import { Download, RefreshCw, Trash2 } from 'lucide-react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useExtensionUpdates } from '@/contexts/ExtensionUpdateContext';
 import { isTauri } from '@/lib/platform';
+import { pendingInstall } from '@/lib/pendingInstall';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Callout } from '@/components/ui/callout';
@@ -84,6 +85,29 @@ export function SettingsExtensionInstaller() {
     void refresh();
   }, [refresh]);
 
+  // `desktop-devtool-app://install?manifest=...&service=...` (starlight-site) xếp URL
+  // vào hàng đợi này rồi điều hướng tới Settings → Plugin — nhưng nếu người
+  // dùng ĐÃ đứng sẵn ở đây khi link thứ hai tới (single-instance chuyển tiếp
+  // sang tiến trình đang chạy), điều hướng tới path đang đứng sẵn không
+  // remount component, nên không thể chỉ trông chờ effect chạy một lần lúc
+  // mount — phải nghe `pendingInstall.subscribe` để tự kéo hàng đợi mỗi khi
+  // có URL mới, không riêng gì lúc mount. `drain` được khai báo là closure
+  // trong cùng thân hàm nên tham chiếu đúng `runPreview` hiện tại dù effect
+  // đăng ký subscribe trước khi `runPreview` được gán ở dưới — cùng lý do đã
+  // giải thích ở đầu `pendingInstall.ts`. Người dùng vẫn phải tự bấm "Cài
+  // đặt" để xác nhận; đây chỉ tự điền + xem trước thay cho copy/dán tay.
+  useEffect(() => {
+    const drain = () => {
+      const next = pendingInstall.dequeue();
+      if (!next) return;
+      setUrl(next);
+      void runPreview(next);
+    };
+    drain(); // bắt URL đã xếp sẵn trước khi component này mount
+    return pendingInstall.subscribe(drain);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ExtensionUpdateContext đã tự kiểm mọi artifact lúc app khởi động — dùng
   // kết quả đó để hiện sẵn nút "Update" ngay khi mở trang này, thay vì bắt
   // người dùng bấm "Check for update" từng dòng trước (nút đó vẫn còn, cho
@@ -101,15 +125,15 @@ export function SettingsExtensionInstaller() {
     return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;
   }
 
-  const handlePreview = async () => {
+  const runPreview = async (targetUrl: string) => {
     setPreview(null);
     setPreviewTriple(null);
     setPreviewError(null);
     setInstallError(null);
-    if (!url.trim()) return;
+    if (!targetUrl.trim()) return;
     setPreviewing(true);
     try {
-      const manifest = await fetchArtifactManifestPreview(url.trim());
+      const manifest = await fetchArtifactManifestPreview(targetUrl.trim());
       setPreview(manifest);
       if (manifest.kind === 'service') {
         // Hiển thị cho người dùng — TÍNH Ở RUST, không đoán ở phía webview
@@ -123,6 +147,8 @@ export function SettingsExtensionInstaller() {
     }
   };
 
+  const handlePreview = () => runPreview(url);
+
   const handleInstall = async () => {
     setInstallError(null);
     setInstalling(true);
@@ -133,6 +159,14 @@ export function SettingsExtensionInstaller() {
       setPreviewTriple(null);
       setNeedsRestart(true);
       await refresh();
+      // Deep link cài cả plugin lẫn sidecar service của nó xếp lần lượt hai
+      // URL vào hàng đợi (xem deepLink.ts) — vừa cài xong cái đầu thì tự xem
+      // trước luôn cái kế tiếp, vẫn chờ người dùng bấm "Cài đặt" riêng cho nó.
+      const next = pendingInstall.dequeue();
+      if (next) {
+        setUrl(next);
+        await runPreview(next);
+      }
     } catch (e) {
       setInstallError(String(e instanceof Error ? e.message : e));
     } finally {

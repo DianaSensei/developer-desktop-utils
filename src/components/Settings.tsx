@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect, type CSSProperties } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { cn } from '@/lib/utils';
 import {
@@ -303,6 +304,10 @@ const SETTINGS_SECTIONS = [
 
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]['id'];
 
+function isSettingsSectionId(value: unknown): value is SettingsSectionId {
+  return typeof value === 'string' && SETTINGS_SECTIONS.some((s) => s.id === value);
+}
+
 export function Settings() {
   const { features, toggleFeature, resetToDefaults, toolOrder, reorderTools, isFavorite, toggleFavorite } = useFeatures();
   const { open: openOnboarding } = useOnboarding();
@@ -315,7 +320,21 @@ export function Settings() {
   // Một mục đang mở, không phải bốn cờ accordion rời — điều hướng ở nav trái
   // TỰ LÀ sự "mở/đóng" rồi, nên bỏ hẳn kiểu accordion lồng bên trong từng mục.
   // Xem SETTINGS_SECTIONS + nav trái ở cuối file cho danh sách đầy đủ.
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>('appearance');
+  const location = useLocation();
+  // `desktop-devtool-app://install?...` (deepLink.ts) điều hướng tới đây với
+  // `{ state: { section: 'plugins' } }` để mở thẳng màn cài đặt tiện ích
+  // thay vì rơi vào mục mặc định (Appearance). Đọc cả lúc khởi tạo (mở lạnh)
+  // lẫn qua effect bên dưới (app đã đứng sẵn ở Settings, một link thứ hai
+  // chỉ đổi `location.state` chứ không mount lại component này).
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>(() =>
+    isSettingsSectionId((location.state as { section?: unknown } | null)?.section)
+      ? (location.state as { section: SettingsSectionId }).section
+      : 'appearance',
+  );
+  useEffect(() => {
+    const section = (location.state as { section?: unknown } | null)?.section;
+    if (isSettingsSectionId(section)) setActiveSection(section);
+  }, [location.state]);
   const [currentVersion, setCurrentVersion] = useState('');
   const [dataDir, setDataDir] = useState('');
   // Khởi tạo từ storage — main.tsx đã áp tone này lên <html> trước khi React
