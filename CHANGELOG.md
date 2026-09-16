@@ -10,7 +10,7 @@ the app.
 
 These four tools used to ship built into the app. As of this release they've been
 extracted into a separate, optional-install repo
-([`developer-desktop-util-plugin`](https://github.com/DianaSensei/developer-desktop-util-plugin)),
+([`developer-desktop-miniapp`](https://github.com/DianaSensei/developer-desktop-miniapp)),
 so the base app installer stays small and you only download what you actually use.
 
 **If you used any of these tools before upgrading:**

@@ -235,7 +235,7 @@ jobs:
       # succeeded (that's what `needs: build` guarantees), so the tag is
       # created now, for the first time — `gh release create` creates it
       # itself, pointed at this exact commit, same as
-      # developer-desktop-util-plugin's release.yml already does.
+      # developer-desktop-miniapp's release.yml already does.
       #
       # --draft: everything past this point (updater manifest, checksums,
       # SBOM, attestation) can still fail, and a draft is invisible to the

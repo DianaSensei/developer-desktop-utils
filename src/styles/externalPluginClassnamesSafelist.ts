@@ -1,5 +1,5 @@
 /**
- * Tailwind CSS safelist for plugins moved out to `developer-desktop-util-plugin`
+ * Tailwind CSS safelist for plugins moved out to `developer-desktop-miniapp`
  * (redis-client, rabbit-client, container-manager, kafka-explorer — see
  * docs/decisions/architecture/platform-plugin-architecture.md for why they're
  * no longer compiled into this repo).

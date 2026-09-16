@@ -12,7 +12,7 @@
 //     registered by its own owner's frontend bridge (e.g.
 //     src/components/tools/apiclient/mcpBridge.ts calls
 //     `mcp_register_tools` once on mount with API Client's own tool defs;
-//     a Tier-B plugin installed from developer-desktop-util-plugin —
+//     a Tier-B plugin installed from developer-desktop-miniapp —
 //     Redis/RabbitMQ/Container Manager, Kafka Explorer — does the exact
 //     same from ITS OWN mcpBridge.ts). This module has no compiled-in
 //     knowledge of what tools exist — it only stores whatever's been
@@ -205,7 +205,7 @@ async fn list_tools_http(State((_app, state)): State<(AppHandle, McpBridgeState)
 
 /// Called once by a tool's own frontend bridge when it mounts (e.g.
 /// `apiclient/mcpBridge.ts`, or a Tier-B plugin's own `mcpBridge.ts` —
-/// compiled-in or installed from developer-desktop-util-plugin, no
+/// compiled-in or installed from developer-desktop-miniapp, no
 /// difference to this registry). `plugin_id` scopes the entry so a second
 /// call from the SAME plugin (its bridge re-mounting) replaces its list
 /// wholesale rather than duplicating tool names in `GET /tools`.
