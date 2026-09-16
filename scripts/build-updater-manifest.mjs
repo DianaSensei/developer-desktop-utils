@@ -106,12 +106,27 @@ function walkFiles(dir) {
 // release as a draft on purpose (see its "Create GitHub Release (draft)"
 // step) so a failure here doesn't leave a broken published release — so
 // this has to find it a different way: GET /releases lists every release
-// including drafts, filtered by tag_name in JS instead of relying on the
-// GitHub API to resolve a tag ref that may not exist yet.
-const releasesJson = execFileSync(GH, ['api', `repos/${REPO}/releases`, '--paginate'], {
-  encoding: 'utf-8',
-});
-const release = JSON.parse(releasesJson).find((r) => r.tag_name === RELEASE_TAG);
+// including drafts, filtered by tag_name.
+//
+// Filtered with --jq (server-side, before it ever reaches Node) rather than
+// piping the whole `--paginate` array through JSON.parse — confirmed the
+// hard way in v0.9.1-test3's run: this repo already has 90+ releases, each
+// with a full asset array, and the unfiltered response blew past
+// execFileSync's default 1MB maxBuffer (ENOBUFS) well before parsing ever
+// started. --jq also runs per-page under --paginate, so this filters every
+// page down to (at most) the one release that matches instead of buffering
+// all of them.
+// `gh api` doesn't expose jq's --arg (no user-supplied variables into the
+// filter), so RELEASE_TAG has to go straight into the jq string literal —
+// escaped for jq's own string syntax, not shell (execFileSync passes argv
+// directly, no shell involved).
+const tagForJq = RELEASE_TAG.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+const releaseJson = execFileSync(
+  GH,
+  ['api', `repos/${REPO}/releases`, '--paginate', '--jq', `.[] | select(.tag_name == "${tagForJq}")`],
+  { encoding: 'utf-8', maxBuffer: 1024 * 1024 * 20 },
+).trim();
+const release = releaseJson ? JSON.parse(releaseJson.split('\n')[0]) : undefined;
 if (!release) throw new Error(`No release found with tag_name ${RELEASE_TAG} (checked drafts too)`);
 const assetUrlByName = new Map(release.assets.map((a) => [a.name, a.url]));
 
