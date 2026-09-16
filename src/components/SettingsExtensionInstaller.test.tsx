@@ -89,9 +89,22 @@ function installedServiceRaw(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-async function renderInTauri() {
+/**
+ * `resetModules()` + import + render, dùng chung cho MỌI test cần một lần nạp
+ * module riêng (isTauri đọc một lần lúc `@/lib/platform` được nạp — xem ghi
+ * chú ở đầu file). `beforeRender` là hook cho những test cần chen thêm một
+ * bước NGAY TRƯỚC `render()` nhưng vẫn trong cùng epoch module vừa reset (vd
+ * enqueue vào `pendingInstall` trước khi component này mount) — không thể
+ * tách các bước ra một hàm ngoài vì mỗi bước phải cùng một lần `import()`
+ * (sau `resetModules()`, không có `resetModules()` nào xen giữa).
+ */
+async function renderInstaller(opts?: { tauri?: boolean; beforeRender?: () => void | Promise<void> }) {
   vi.resetModules();
-  (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+  if (opts?.tauri ?? true) {
+    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
+  } else {
+    delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+  }
   // Cả `LocaleProvider` lẫn component đều phải đến từ CÙNG một lần nạp module
   // (sau `resetModules()`) — nạp `LocaleProvider` từ một graph module khác thì
   // `useContext` bên trong component không thấy đúng Provider, ném "must be
@@ -99,6 +112,7 @@ async function renderInTauri() {
   const { LocaleProvider } = await import('@/contexts/LocaleContext');
   const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
   const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
+  await opts?.beforeRender?.();
   return render(
     <LocaleProvider>
       <ExtensionUpdateProvider>
@@ -106,6 +120,10 @@ async function renderInTauri() {
       </ExtensionUpdateProvider>
     </LocaleProvider>,
   );
+}
+
+async function renderInTauri() {
+  return renderInstaller({ tauri: true });
 }
 
 afterEach(() => {
@@ -118,18 +136,7 @@ afterEach(() => {
 
 describe('SettingsExtensionInstaller — bản web (không phải Tauri)', () => {
   it('hiện cảnh báo, không gọi invoke', async () => {
-    vi.resetModules();
-    delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
-    const { LocaleProvider } = await import('@/contexts/LocaleContext');
-    const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
-    const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
-    render(
-      <LocaleProvider>
-        <ExtensionUpdateProvider>
-          <SettingsExtensionInstaller />
-        </ExtensionUpdateProvider>
-      </LocaleProvider>,
-    );
+    await renderInstaller({ tauri: false });
 
     expect(screen.getByText(/only works in the desktop app|chỉ hoạt động trên bản desktop/)).toBeTruthy();
     expect(invokeMock).not.toHaveBeenCalled();
@@ -321,13 +328,6 @@ describe('SettingsExtensionInstaller — service đòi xác nhận trước khi 
 describe('SettingsExtensionInstaller — hàng đợi desktop-devtool-app://install (pendingInstall)', () => {
   it('URL đã xếp sẵn TRƯỚC khi mount thì tự điền ngay vào ô URL', async () => {
     invokeMock.mockResolvedValueOnce([]); // list lúc mount
-    vi.resetModules();
-    (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
-    const { LocaleProvider } = await import('@/contexts/LocaleContext');
-    const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
-    const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
-    const { pendingInstall } = await import('@/lib/pendingInstall');
-    pendingInstall.enqueue(['https://example.com/queued.json']);
     // Không mock kết quả `fetch_manifest` ở đây: mount này tự bắn NHIỀU lời
     // gọi invoke cùng lúc trong cùng một nhịp đồng bộ (refresh() của chính
     // component, refresh() của ExtensionUpdateProvider, VÀ auto-preview của
@@ -340,13 +340,13 @@ describe('SettingsExtensionInstaller — hàng đợi desktop-devtool-app://inst
     // giá trị đã xếp hàng. Hành vi "tự xem trước sau khi điền" được test đủ
     // ở case "xếp SAU khi đã mount" bên dưới, nơi enqueue xảy ra SAU khi
     // component đã ổn định (không đua với lời gọi invoke nào khác).
-    render(
-      <LocaleProvider>
-        <ExtensionUpdateProvider>
-          <SettingsExtensionInstaller />
-        </ExtensionUpdateProvider>
-      </LocaleProvider>,
-    );
+    await renderInstaller({
+      tauri: true,
+      beforeRender: async () => {
+        const { pendingInstall } = await import('@/lib/pendingInstall');
+        pendingInstall.enqueue(['https://example.com/queued.json']);
+      },
+    });
     await settle();
 
     expect((screen.getByPlaceholderText('https://example.com/extension.json') as HTMLInputElement).value).toBe(
