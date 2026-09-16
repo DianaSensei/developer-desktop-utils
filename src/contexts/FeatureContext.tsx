@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { storageGet, storageSet } from '@/lib/persistentStore';
 import { DEFAULT_PLUGIN_FEATURES } from '@/platform';
 
@@ -71,41 +71,58 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
     storageSet('devtool-features', JSON.stringify(features));
   }, [features]);
 
-  const toggleFeature = (featureId: string) => {
+  const toggleFeature = useCallback((featureId: string) => {
     setFeatures((prev) => ({
       ...prev,
       [featureId]: !prev[featureId],
     }));
-  };
+  }, []);
 
-  const isFeatureEnabled = (featureId: string) => {
-    return features[featureId] !== false;
-  };
+  const isFeatureEnabled = useCallback(
+    (featureId: string) => features[featureId] !== false,
+    [features]
+  );
 
-  const resetToDefaults = () => {
+  const resetToDefaults = useCallback(() => {
     setFeatures(DEFAULT_FEATURES);
-  };
+  }, []);
 
-  const reorderTools = (order: string[]) => {
+  const reorderTools = useCallback((order: string[]) => {
     setToolOrder(order);
     storageSet(TOOL_ORDER_KEY, JSON.stringify(order));
-  };
+  }, []);
 
   // Most-recently-favorited goes first, so the top of the sidebar reflects the
   // order the user starred things.
-  const toggleFavorite = (featureId: string) => {
+  const toggleFavorite = useCallback((featureId: string) => {
     setFavorites((prev) =>
       prev.includes(featureId) ? prev.filter((id) => id !== featureId) : [featureId, ...prev]
     );
-  };
+  }, []);
 
-  const isFavorite = (featureId: string) => favorites.includes(featureId);
+  const isFavorite = useCallback((featureId: string) => favorites.includes(featureId), [favorites]);
 
-  return (
-    <FeatureContext.Provider value={{ features, toggleFeature, isFeatureEnabled, resetToDefaults, toolOrder, reorderTools, favorites, toggleFavorite, isFavorite }}>
-      {children}
-    </FeatureContext.Provider>
+  // `FeatureProvider` sits near the top of the provider tree and is read by
+  // every sidebar row and route guard — without memoizing the value, every
+  // state change here (toggling ONE tool, reordering) re-rendered every
+  // consumer regardless of whether their own slice of `features`/`favorites`
+  // actually changed.
+  const value = useMemo<FeatureContextType>(
+    () => ({
+      features,
+      toggleFeature,
+      isFeatureEnabled,
+      resetToDefaults,
+      toolOrder,
+      reorderTools,
+      favorites,
+      toggleFavorite,
+      isFavorite,
+    }),
+    [features, toggleFeature, isFeatureEnabled, resetToDefaults, toolOrder, reorderTools, favorites, toggleFavorite, isFavorite]
   );
+
+  return <FeatureContext.Provider value={value}>{children}</FeatureContext.Provider>;
 }
 
 export function useFeatures() {
