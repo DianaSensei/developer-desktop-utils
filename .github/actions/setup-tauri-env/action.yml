@@ -62,7 +62,14 @@ runs:
           librsvg2-dev \
           patchelf
 
+    # --ignore-scripts: SonarCloud flagged the bare `npm ci` (S4830-class —
+    # "package manager scripts should not be executed during installation").
+    # Safe here: package-lock.json's only `hasInstallScript` entry is
+    # fsevents, an optional macOS-only file watcher used by `npm run dev`
+    # — nothing this repo's CI (build/lint/test) ever touches. Verified
+    # `npm ci --ignore-scripts` still installs cleanly and `tsc --noEmit`
+    # still passes.
     - name: Install frontend dependencies
       if: inputs.install-frontend-deps == 'true'
       shell: bash
-      run: npm ci --prefer-offline --no-audit --no-fund
+      run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
