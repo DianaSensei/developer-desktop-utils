@@ -98,10 +98,21 @@ function walkFiles(dir) {
 // exact `https://api.github.com/repos/OWNER/REPO/releases/assets/<id>` form
 // tauri-action itself used — confirmed against v0.9.0's real latest.json),
 // not built by hand from the filename.
-const releaseJson = execFileSync(GH, ['api', `repos/${REPO}/releases/tags/${RELEASE_TAG}`], {
+//
+// GET /releases/tags/{tag} (the obvious-looking endpoint) 404s on a DRAFT
+// release — confirmed the hard way in v0.9.1-test2's run: GitHub doesn't
+// create the actual git tag ref until a release is PUBLISHED, and that
+// endpoint requires the tag to already exist. release.yml creates this
+// release as a draft on purpose (see its "Create GitHub Release (draft)"
+// step) so a failure here doesn't leave a broken published release — so
+// this has to find it a different way: GET /releases lists every release
+// including drafts, filtered by tag_name in JS instead of relying on the
+// GitHub API to resolve a tag ref that may not exist yet.
+const releasesJson = execFileSync(GH, ['api', `repos/${REPO}/releases`, '--paginate'], {
   encoding: 'utf-8',
 });
-const release = JSON.parse(releaseJson);
+const release = JSON.parse(releasesJson).find((r) => r.tag_name === RELEASE_TAG);
+if (!release) throw new Error(`No release found with tag_name ${RELEASE_TAG} (checked drafts too)`);
 const assetUrlByName = new Map(release.assets.map((a) => [a.name, a.url]));
 
 const platforms = {};
