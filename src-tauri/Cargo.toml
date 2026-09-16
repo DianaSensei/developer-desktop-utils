@@ -48,7 +48,7 @@ base64 = "0.23"
 # rmcp's Streamable HTTP server transport) — unreachable here since this bin
 # only ever uses the stdio transport, but GitHub's dependency review flags
 # the crate version regardless of which transport feature is enabled.
-rmcp = { version = "1.4", features = ["transport-io"] }
+rmcp = { version = "3.3", features = ["transport-io"] }
 # Kho bí mật (src/secrets_vault.rs). keyring giữ KHOÁ mã hoá trong keychain của
 # OS; mặc định của crate đã bật cửa hàng của Windows và secret-service của
 # Linux, còn macOS phải bật tay — thiếu nó, bản macOS sẽ âm thầm rơi về đường
