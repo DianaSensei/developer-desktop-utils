@@ -1,6 +1,11 @@
 # Kênh phát hành canary — thử nghiệm kiến trúc mới song song với bản ổn định
 
-**Trạng thái**: đã dựng cơ chế CI, chưa phát hành lần đầu.
+**Trạng thái**: đã RETIRE. Kiến trúc Platform/Plugin đã qua canary
+(`canary-v1.1.0-arch1`, GitHub Release `canary-latest`), được xác nhận ổn
+định, và đã hợp nhất thẳng vào `main` (`v0.9.0` trở đi phát hành từ đó qua
+`release.yml` như bình thường — không còn kênh song song). `release-canary.yml`
+và `src-tauri/tauri.canary.conf.json` đã bị xoá khỏi repo; nội dung dưới đây
+giữ lại làm tài liệu lịch sử cho cơ chế, không còn áp dụng.
 
 ## Vì sao
 
