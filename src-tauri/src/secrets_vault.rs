@@ -80,6 +80,14 @@ struct VaultFile {
 #[derive(Default)]
 pub struct VaultState {
     key: Mutex<Option<([u8; KEY_LEN], KeyMode)>>,
+    // Khoá RIÊNG cho chu trình đọc-sửa-ghi `secrets.enc`. `key` ở trên chỉ cache
+    // khoá mã hoá, không chặn được hai lệnh `secret_vault_set`/`_delete` gọi gần
+    // như đồng thời (vd frontend gọi `Promise.all` lưu nhiều mục 2FA) cùng đọc
+    // entries cũ rồi ghi đè lên nhau — lệnh ghi sau thắng, lệnh trước mất trắng
+    // không báo lỗi. Giữ khoá này xuyên suốt đọc+sửa+ghi trong mỗi lệnh serialize
+    // chúng lại, cùng cách `artifact_installer::InstalledIndex` đã làm cho
+    // `extensions/index.json`.
+    write_lock: Mutex<()>,
 }
 
 fn random_bytes(len: usize) -> Result<Vec<u8>, String> {
@@ -231,6 +239,7 @@ pub fn secret_vault_get(
     key: String,
 ) -> Result<Option<String>, String> {
     let (k, _) = key_for(&app, &state)?;
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     Ok(read_entries(&app, &k)?.get(&key).cloned())
 }
 
@@ -242,6 +251,7 @@ pub fn secret_vault_set(
     value: String,
 ) -> Result<(), String> {
     let (k, _) = key_for(&app, &state)?;
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let mut entries = read_entries(&app, &k)?;
     entries.insert(key, value);
     write_entries(&app, &k, &entries)
@@ -254,6 +264,7 @@ pub fn secret_vault_delete(
     key: String,
 ) -> Result<(), String> {
     let (k, _) = key_for(&app, &state)?;
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let mut entries = read_entries(&app, &k)?;
     if entries.remove(&key).is_some() {
         write_entries(&app, &k, &entries)?;
@@ -264,6 +275,7 @@ pub fn secret_vault_delete(
 #[tauri::command]
 pub fn secret_vault_keys(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<Vec<String>, String> {
     let (k, _) = key_for(&app, &state)?;
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     Ok(read_entries(&app, &k)?.into_keys().collect())
 }
 
@@ -271,6 +283,7 @@ pub fn secret_vault_keys(app: AppHandle, state: tauri::State<'_, VaultState>) ->
 #[tauri::command]
 pub fn secret_vault_clear(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<(), String> {
     let (k, _) = key_for(&app, &state)?;
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     write_entries(&app, &k, &Entries::new())
 }
 
@@ -278,6 +291,7 @@ pub fn secret_vault_clear(app: AppHandle, state: tauri::State<'_, VaultState>) -
 /// giải mã được và người dùng CHỦ ĐỘNG chấp nhận mất dữ liệu cũ.
 #[tauri::command]
 pub fn secret_vault_reset(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<(), String> {
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     let dir = app_data(&app)?;
     let _ = std::fs::remove_file(dir.join(VAULT_FILE));
     let _ = std::fs::remove_file(dir.join(KEY_FILE));
@@ -291,6 +305,7 @@ pub fn secret_vault_reset(app: AppHandle, state: tauri::State<'_, VaultState>) -
 #[tauri::command]
 pub fn secret_vault_status(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<VaultStatus, String> {
     let (k, mode) = key_for(&app, &state)?;
+    let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
     Ok(VaultStatus {
         encrypted: true,
         key_mode: mode,

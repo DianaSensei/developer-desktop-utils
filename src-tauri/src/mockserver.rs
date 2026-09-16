@@ -472,6 +472,17 @@ fn build_engine() -> Engine {
     engine
 }
 
+// Một Engine DÙNG CHUNG cho mọi request script-mode, dựng đúng một lần —
+// trước đây `run_script` tự gọi `build_engine()` mỗi lần được gọi, tức mỗi
+// HTTP request tới một stub script-mode phải trả phí cấu hình 6 giới hạn lại
+// từ đầu, đúng loại chi phí per-request mà comment ở đầu module này (`Arc`
+// rule-set clone, batched log flush, cached `REGEX_CACHE`) đã chủ ý tránh ở
+// mọi chỗ khác. `Engine` bản thân stateless/immutable sau khi cấu hình xong
+// (mọi state của một lần chạy nằm ở `Scope`, tạo mới cho mỗi request) nên
+// dùng chung an toàn — cần feature "sync" của rhai (Cargo.toml) để `Engine`
+// là `Send + Sync`, truy cập được từ nhiều task/thread của server async.
+static ENGINE: OnceLock<Engine> = OnceLock::new();
+
 fn req_to_rhai(ctx: &RequestCtx, params: &HashMap<String, String>) -> RhaiMap {
     let mut map = RhaiMap::new();
     map.insert("method".into(), ctx.method.clone().into());
@@ -497,7 +508,7 @@ fn run_script(
     ctx: &RequestCtx,
     params: &HashMap<String, String>,
 ) -> Result<ResolvedResponse, String> {
-    let engine = build_engine();
+    let engine = ENGINE.get_or_init(build_engine);
     let mut scope = Scope::new();
     scope.push("req", req_to_rhai(ctx, params));
 

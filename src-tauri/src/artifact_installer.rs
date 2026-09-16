@@ -49,6 +49,46 @@ use tauri::{AppHandle, Manager};
 use crate::checksum::to_hex;
 
 // ---------------------------------------------------------------------------
+// Tải xuống có giới hạn kích thước
+// ---------------------------------------------------------------------------
+
+/// Trần cho MỘT lần tải artifact (bundle JS hay binary service). Rộng rãi cho
+/// mọi sidecar thật (vài chục MB), nhưng vẫn hữu hạn: không có trần, một host
+/// bị chiếm/MITM (đúng rủi ro RANH GIỚI TIN CẬY ở đầu file) có thể trả về một
+/// body tuỳ ý lớn và làm app hết bộ nhớ TRƯỚC KHI checksum kịp từ chối nó —
+/// `files.rs`'s `read_file_data_url` đã áp cùng nguyên tắc (`MAX_BYTES`) cho
+/// input do người dùng chọn; artifact tải qua mạng xứng đáng cùng mức cảnh
+/// giác, có phần hơn vì nguồn ở xa chứ không phải đĩa cục bộ của chính máy.
+const MAX_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Tải `url`, từ chối sớm nếu `Content-Length` đã vượt `max_bytes`, và ĐẾM
+/// DẦN khi đọc từng chunk (một server có thể nói dối hoặc bỏ qua header đó) —
+/// không đợi buffer hết toàn bộ body rồi mới kiểm tra kích thước. Nhận
+/// `max_bytes` làm tham số (thay vì đọc thẳng hằng số) để test được với một
+/// trần nhỏ, không phải tải thật hàng trăm MB chỉ để kiểm logic từ chối.
+async fn download_capped(url: &str, max_bytes: u64) -> Result<Vec<u8>, String> {
+    let res = reqwest::get(url).await.map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("Server trả về {}", res.status()));
+    }
+    if let Some(len) = res.content_length() {
+        if len > max_bytes {
+            return Err(format!("File quá lớn ({len} byte; trần {max_bytes} byte) — từ chối tải."));
+        }
+    }
+
+    let mut res = res;
+    let mut buf: Vec<u8> = Vec::new();
+    while let Some(chunk) = res.chunk().await.map_err(|e| e.to_string())? {
+        if buf.len() as u64 + chunk.len() as u64 > max_bytes {
+            return Err(format!("File vượt trần {max_bytes} byte giữa lúc tải — từ chối, dừng tải tiếp."));
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
+}
+
+// ---------------------------------------------------------------------------
 // Manifest thô lấy từ URL người dùng cung cấp
 // ---------------------------------------------------------------------------
 
@@ -310,9 +350,18 @@ fn read_index(dir: &Path) -> Result<Vec<InstalledArtifactRecord>, String> {
     }
 }
 
+/// Ghi ATOMIC (`.tmp` cùng thư mục đích rồi `rename`) — cùng khuôn với binary
+/// service bên dưới (`stage_install_service`). Trước đây dùng `std::fs::write`
+/// thẳng vào `index.json`: một crash/mất điện giữa lúc ghi (dữ liệu KHÔNG
+/// nhỏ — mọi plugin/service đã cài đều nằm chung một file) để lại file nửa
+/// vời mà `read_index` chỉ có thể báo "index.json hỏng", buộc người dùng tự
+/// sửa tay hoặc mất sạch danh sách đã cài.
 fn write_index(dir: &Path, records: &[InstalledArtifactRecord]) -> Result<(), String> {
     let json = serde_json::to_string_pretty(records).map_err(|e| e.to_string())?;
-    std::fs::write(index_path(dir), json).map_err(|e| e.to_string())
+    let final_path = index_path(dir);
+    let tmp_path = dir.join("index.json.tmp");
+    std::fs::write(&tmp_path, json).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp_path, &final_path).map_err(|e| e.to_string())
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -394,7 +443,16 @@ fn stage_install_plugin(
     let plugin_dir = plugins_dir.join(&manifest.id).join(&manifest.version);
     std::fs::create_dir_all(&plugin_dir).map_err(|e| e.to_string())?;
     let bundle_path = plugin_dir.join("bundle.mjs");
-    std::fs::write(&bundle_path, bytes).map_err(|e| e.to_string())?;
+    // Atomic (tmp + rename) — cùng lý do khuôn này đã áp cho binary service:
+    // `artifact_installer_read_bundle` không giữ khoá `InstalledIndex` khi đọc
+    // (chỉ đọc, không sửa index.json), nên một lần cài đè (cùng id, khác
+    // version trung gian) đang ghi `bundle.mjs` có thể trùng lúc frontend gọi
+    // đọc lại bundle cũ. Checksum ở `stage_read_bundle` đã bắt được trường hợp
+    // đọc trúng file dở dang (trả lỗi thay vì nạp JS hỏng), nhưng ghi atomic
+    // loại bỏ hẳn khả năng đó thay vì chỉ phát hiện sau.
+    let tmp_path = plugin_dir.join("bundle.mjs.tmp");
+    std::fs::write(&tmp_path, bytes).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp_path, &bundle_path).map_err(|e| e.to_string())?;
 
     let id = manifest.id.clone();
     let new_version = manifest.version.clone();
@@ -709,13 +767,9 @@ pub async fn artifact_installer_install(
 
     let record = match manifest {
         RemoteArtifactManifest::Plugin(manifest) => {
-            let res = reqwest::get(&manifest.entry)
+            let bytes = download_capped(&manifest.entry, MAX_DOWNLOAD_BYTES)
                 .await
                 .map_err(|e| format!("Không tải được bundle: {e}"))?;
-            if !res.status().is_success() {
-                return Err(format!("Server trả về {} khi tải bundle", res.status()));
-            }
-            let bytes = res.bytes().await.map_err(|e| e.to_string())?;
             stage_install_plugin(&index_dir, &plugins_dir(&app)?, manifest, source_url, &bytes)?
         }
         RemoteArtifactManifest::Service(manifest) => {
@@ -728,13 +782,9 @@ pub async fn artifact_installer_install(
                     available.join(", ")
                 )
             })?;
-            let res = reqwest::get(&target.url)
+            let bytes = download_capped(&target.url, MAX_DOWNLOAD_BYTES)
                 .await
                 .map_err(|e| format!("Không tải được binary: {e}"))?;
-            if !res.status().is_success() {
-                return Err(format!("Server trả về {} khi tải binary", res.status()));
-            }
-            let bytes = res.bytes().await.map_err(|e| e.to_string())?;
             let bin = manifest.bin.clone();
             // Dừng sidecar ĐANG CHẠY (nếu có) TRƯỚC khi ghi/dọn đĩa — hai lý
             // do: (1) self-healing, lần `service_call` kế tiếp tự spawn lại
@@ -758,7 +808,17 @@ pub async fn artifact_installer_install(
 }
 
 #[tauri::command]
-pub fn artifact_installer_list(app: AppHandle) -> Result<Vec<InstalledArtifactRecord>, String> {
+pub async fn artifact_installer_list(
+    app: AppHandle,
+    index_state: tauri::State<'_, InstalledIndex>,
+) -> Result<Vec<InstalledArtifactRecord>, String> {
+    // Cùng khoá install/uninstall giữ — `write_index` giờ atomic (tmp+rename)
+    // nên `read_index` không bao giờ thấy file NỬA VỜI nữa, nhưng không khoá ở
+    // đây thì một `list` chạy giữa lúc install/uninstall đang xử lý (nhiều
+    // bước ghi đĩa khác ngoài index.json — copy bundle, dừng sidecar…) vẫn có
+    // thể đọc trúng index.json của bước TRUNG GIAN thay vì trạng thái cuối
+    // cùng nhất quán.
+    let _guard = index_state.0.lock().await;
     read_index(&extensions_dir(&app)?)
 }
 
@@ -1273,5 +1333,67 @@ mod tests {
             || triple.ends_with("pc-windows-msvc")
             || triple.ends_with("unknown-linux-gnu");
         assert!(os_ok, "{triple}");
+    }
+
+    // -- write_index: ghi atomic, không để lại .tmp mồ côi ----------------------
+
+    #[test]
+    fn write_index_khong_de_lai_tmp_mo_coi_sau_khi_ghi_xong() {
+        let dir = temp_dir("write-index-atomic");
+        let plugin = InstalledArtifactRecord::Plugin(InstalledPluginRecord {
+            manifest: plugin_manifest("https://x/a.mjs", &sha256_hex(b"a")),
+            source_url: "https://x/a.json".into(),
+            bundle_path: "/app-data/plugins/demo/1.0.0/bundle.mjs".into(),
+            installed_at: 1,
+        });
+        write_index(&dir, &[plugin.clone()]).unwrap();
+
+        assert!(index_path(&dir).exists());
+        assert!(!dir.join("index.json.tmp").exists());
+        assert_eq!(read_index(&dir).unwrap(), vec![plugin]);
+    }
+
+    // -- download_capped: trần kích thước ----------------------------------------
+
+    /// Server trả `Content-Length` lớn hơn trần → từ chối NGAY, không tải một
+    /// byte thân bài nào.
+    #[tokio::test]
+    async fn download_capped_tu_choi_ngay_khi_content_length_vuot_tran() {
+        let url = serve_once("x".repeat(1000), "text/plain").await;
+        let err = download_capped(&url, 100).await.unwrap_err();
+        assert!(err.contains("quá lớn"), "{err}");
+    }
+
+    /// Server không khai `Content-Length` đúng (hoặc client bỏ qua nó) — vẫn
+    /// phải bị chặn khi TỔNG byte đã đọc vượt trần, không đợi tải hết mới kiểm.
+    #[tokio::test]
+    async fn download_capped_tu_choi_giua_chung_khi_khong_co_content_length_dang_tin() {
+        let app = Router::new().route(
+            "/",
+            get(|| async {
+                // `StreamBody` để axum không tự set Content-Length từ độ dài
+                // biết trước — mô phỏng đúng "server nói dối/không khai" mà
+                // comment của `download_capped` nhắc tới.
+                let stream = futures_util::stream::iter(vec![Ok::<_, std::io::Error>(
+                    axum::body::Bytes::from("x".repeat(1000)),
+                )]);
+                axum::body::Body::from_stream(stream)
+            }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let err = download_capped(&format!("http://{addr}/"), 100).await.unwrap_err();
+        assert!(err.contains("vượt trần"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn download_capped_nhan_body_trong_tran() {
+        let url = serve_once("hello".into(), "text/plain").await;
+        let bytes = download_capped(&url, 100).await.unwrap();
+        assert_eq!(bytes, b"hello");
     }
 }

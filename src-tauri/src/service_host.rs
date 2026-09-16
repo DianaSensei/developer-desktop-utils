@@ -54,6 +54,12 @@ use tokio::time::timeout;
 /// giải sai payload của nhau.
 pub const SERVICE_PROTOCOL: u32 = 1;
 
+// Trùng giá trị với `mcp_bridge.rs`'s `CALL_TIMEOUT` (và với 30s, một phần của
+// phép tính 35s ở `devtool-mcp-server.rs`) một cách có chủ đích, không phải
+// hằng số dùng chung — mỗi module timeout một loại chờ khác nhau (gọi service
+// sidecar ở đây, chờ webview trả lời ở mcp_bridge.rs), tình cờ cùng độ dài.
+// Đổi một chỗ không cần kéo theo chỗ kia, nhưng nếu định nghĩa lại "độ dài
+// timeout hợp lý cho một lời gọi qua IPC cục bộ" thì nên soát cả ba.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Binary sidecar được phép chạy — ranh giới tin cậy sống Ở ĐÂY, không phải

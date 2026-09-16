@@ -46,7 +46,16 @@ hostname = "0.4"
 netstat2 = "0.11"
 sysinfo = "0.39"
 axum = "0.8"
-rhai = "1"
+# Chỉ dùng trong test (artifact_installer.rs) để dựng một body chunked KHÔNG
+# khai Content-Length trước — mô phỏng đúng "server nói dối/bỏ qua header đó"
+# mà `download_capped` phải tự đếm byte để bắt, cùng chỗ axum/uuid ở trên
+# cũng chỉ phục vụ test chứ không phải code sản phẩm.
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+# "sync" — Engine dùng Arc<RwLock> nội bộ thay vì Rc<RefCell>, đổi lại Send +
+# Sync: bắt buộc để build MỘT Engine dùng chung qua mọi request (mockserver.rs's
+# `ENGINE`, thay vì dựng lại — tốn cấu hình 6 giới hạn (max_operations,
+# max_expr_depths…) — cho MỖI request script-mode).
+rhai = { version = "1", features = ["sync"] }
 regex = "1"
 base64 = "0.23"
 # Official Rust MCP SDK — only used by the devtool-mcp-server bin target

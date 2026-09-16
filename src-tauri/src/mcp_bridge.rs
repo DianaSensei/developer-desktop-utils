@@ -55,6 +55,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+// Trùng giá trị với `service_host.rs`'s `CALL_TIMEOUT` một cách có chủ đích,
+// không phải hằng số dùng chung — xem comment ở đó.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Default)]
@@ -118,6 +120,18 @@ struct DiscoveryFile {
     token: String,
 }
 
+/// So sánh KHÔNG rò rỉ thời gian qua độ dài chuỗi khớp trước khi lệch — bản
+/// `==` thường có thể trả lời sớm ngay byte đầu tiên sai. Rủi ro thực tế ở
+/// đây rất thấp (chỉ loopback, token UUID-v4 ngẫu nhiên, không có kẻ tấn công
+/// từ xa nào đo được độ trễ), nhưng đây là đúng điểm kiểm tin cậy nên vẫn
+/// đáng làm cho chắc thay vì dựa vào "khó khai thác trong thực tế".
+fn constant_time_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
 fn check_auth(state: &McpBridgeState, headers: &HeaderMap) -> bool {
     let expected = state.inner.lock().unwrap().token.clone();
     let got = headers
@@ -125,7 +139,7 @@ fn check_auth(state: &McpBridgeState, headers: &HeaderMap) -> bool {
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
         .unwrap_or("");
-    !expected.is_empty() && got == expected
+    !expected.is_empty() && constant_time_eq(got, &expected)
 }
 
 async fn health() -> impl IntoResponse {
@@ -310,4 +324,18 @@ pub fn start(app: &AppHandle) {
 
         let _ = axum::serve(listener, router).await;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn constant_time_eq_dung_nhu_so_sanh_thuong() {
+        assert!(constant_time_eq("abc", "abc"));
+        assert!(constant_time_eq("", ""));
+        assert!(!constant_time_eq("abc", "abd"));
+        assert!(!constant_time_eq("abc", "ab"));
+        assert!(!constant_time_eq("abc", "abcd"));
+    }
 }
