@@ -14,7 +14,7 @@
 // bridges have registered themselves (`mcp_register_tools`) since the app
 // last launched: API Client and Mock Server register from inside the main
 // app, Kafka Explorer from its own plugin, and any Tier-B plugin installed
-// from developer-desktop-util-plugin (Redis/RabbitMQ/Container Manager, or
+// from developer-desktop-miniapp (Redis/RabbitMQ/Container Manager, or
 // a future one) registers the same way once its own bridge mounts. A tool
 // call is forwarded as a `POST /call`, which the app hands to the running
 // webview to answer — so it only succeeds while DevTool is open and, by
@@ -440,7 +440,7 @@ async fn call_tool(name: &str, args: Value) -> CallToolResult {
 // bundles it: each tool's own frontend bridge (e.g.
 // src/components/tools/apiclient/mcpBridge.ts,
 // src/components/tools/kafka/mcpBridge.ts, or a plugin installed from
-// developer-desktop-util-plugin) registers its own name/description/
+// developer-desktop-miniapp) registers its own name/description/
 // inputSchema with the running app's `mcp_bridge.rs` registry
 // (`mcp_register_tools`) once on mount. `list_tools()` fetches the CURRENT
 // registered set on every call — not once at process startup — so a plugin

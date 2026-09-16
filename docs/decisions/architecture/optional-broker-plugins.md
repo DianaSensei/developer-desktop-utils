@@ -22,7 +22,7 @@ qua `ConsumerRegistry`/`Notify` cho live-consume). Việc viết lại đó đã
 
 Chuyển UI + sidecar của cả bốn (`redis-client`, `rabbit-client`,
 `container-manager`, `kafka-explorer`) sang repo riêng,
-[`developer-desktop-util-plugin`](https://github.com/DianaSensei/developer-desktop-util-plugin),
+[`developer-desktop-miniapp`](https://github.com/DianaSensei/developer-desktop-miniapp),
 cài qua URL (Settings → Extensions) thay vì compile-time. Cơ chế cài-từ-URL
 đã tồn tại từ trước (`docs/plugin-sdk/05-external-install.md`) — quyết định
 này không thêm cơ chế mới, chỉ là lần đầu dùng nó cho một plugin ĐÃ CÓ giá trị

@@ -7,7 +7,7 @@
 **DevTool** is a cross-platform desktop application built with Tauri 2 + React + TypeScript providing developer utilities (text processing, encoding, hashing, color tools, API client, mock server, etc.).
 
 > **Redis/RabbitMQ/Container Manager/Kafka Explorer are no longer compiled into this repo.**
-> They moved to [`developer-desktop-util-plugin`](https://github.com/DianaSensei/developer-desktop-util-plugin)
+> They moved to [`developer-desktop-miniapp`](https://github.com/DianaSensei/developer-desktop-miniapp)
 > as optional, install-from-URL plugins (Settings → Extensions) — see
 > `docs/decisions/architecture/platform-plugin-architecture.md` and
 > `docs/decisions/architecture/optional-broker-plugins.md`. Sections

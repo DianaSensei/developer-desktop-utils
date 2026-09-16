@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildSidecar } from './sidecar.mjs';
 
-// devtool-svc-redis/container/rabbit moved to developer-desktop-util-plugin
+// devtool-svc-redis/container/rabbit moved to developer-desktop-miniapp
 // (optional, install-from-URL sidecars) — see
 // docs/decisions/architecture/optional-broker-plugins.md. Their names
 // stay in `ALLOWED_SERVICES` (service_host.rs) so an install still works,

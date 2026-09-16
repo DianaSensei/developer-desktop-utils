@@ -32,7 +32,7 @@ updates:
   # not, which is the gap this closes.
   #
   # testing/rabbitmq (and its spring-rpc fixture) moved to
-  # developer-desktop-util-plugin along with the RabbitMQ plugin — see
+  # developer-desktop-miniapp along with the RabbitMQ plugin — see
   # docs/decisions/architecture/platform-plugin-architecture.md. Configure
   # dependabot there instead.
   - package-ecosystem: pip

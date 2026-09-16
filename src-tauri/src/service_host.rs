@@ -74,7 +74,7 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 /// khai `service` để gọi tới nó, nên nó không xuất hiện ở bất cứ đâu trong UI.
 ///
 /// `devtool-svc-redis`/`-container`/`-rabbit`/`-kafka`: nguồn đã chuyển sang
-/// repo `developer-desktop-util-plugin` (không phải ai cũng cần Redis/Docker/
+/// repo `developer-desktop-miniapp` (không phải ai cũng cần Redis/Docker/
 /// RabbitMQ/Kafka) — xem docs/decisions/architecture/optional-broker-plugins.md.
 /// Tên vẫn ở lại đây có chủ đích: `05-external-install.md` nói rõ "cài qua
 /// URL KHÔNG tự cấp quyền chạy cho một tên bin mới" — cây quyết định "bin nào

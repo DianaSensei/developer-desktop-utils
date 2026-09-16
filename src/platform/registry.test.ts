@@ -18,7 +18,7 @@ import { TOOL_ROUTES, allTools } from '@/lib/toolRegistry';
  *
  * redis-client/rabbit-client/container-manager/kafka-explorer rời khỏi bảng
  * này (không còn compile-time) khi bốn plugin đó chuyển sang
- * developer-desktop-util-plugin — xem
+ * developer-desktop-miniapp — xem
  * docs/decisions/architecture/optional-broker-plugins.md.
  */
 
