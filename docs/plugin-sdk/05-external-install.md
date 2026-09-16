@@ -220,7 +220,7 @@ desktop-devtool-app://install?manifest=<url manifest plugin>&service=<url manife
 Cơ chế (xem `src-tauri/src/main.rs`, `src/lib/deepLink.ts`,
 `src/lib/pendingInstall.ts`):
 
-1. `tauri-plugin-deep-link` đăng ký scheme `devtool` (config ở
+1. `tauri-plugin-deep-link` đăng ký scheme `desktop-devtool-app` (config ở
    `tauri.conf.json`'s `plugins.deep-link.desktop.schemes`) — hệ điều hành
    mở app khi người dùng bấm link này.
 2. `tauri-plugin-single-instance` (feature `deep-link`, đăng ký TRƯỚC mọi

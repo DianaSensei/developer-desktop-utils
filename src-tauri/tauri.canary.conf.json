@@ -19,6 +19,11 @@
     ]
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["desktop-devtool-app-canary"]
+      }
+    },
     "updater": {
       "endpoints": [
         "https://github.com/DianaSensei/developer-desktop-utils/releases/download/canary-latest/latest.json"
