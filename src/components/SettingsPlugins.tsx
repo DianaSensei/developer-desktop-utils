@@ -5,6 +5,8 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import { PLUGINS, SDK_VERSION, pluginAudit, vaultStatus, type AuditEntry, type VaultStatus } from '@/platform';
 import { SettingsExtensionInstaller } from '@/components/SettingsExtensionInstaller';
+import { SettingsMarketplace } from '@/components/SettingsMarketplace';
+import { Tabs } from '@/components/ui/tabs';
 
 /**
  * Settings → Plugin: cái nhìn duy nhất cho người dùng vào Platform.
@@ -28,6 +30,11 @@ export function SettingsPlugins() {
   const { isFeatureEnabled } = useFeatures();
   const [entries, setEntries] = useState<AuditEntry[]>(() => pluginAudit.recent(MAX_ROWS));
   const [vault, setVault] = useState<VaultStatus | null>(null);
+  // Market trước, "dán URL tay" sau — market là đường chính để phát hiện +
+  // cài tiện ích, URL trần vẫn giữ cho nguồn không nằm trong market nào (một
+  // link do đồng nghiệp gửi riêng, một bản build thử) và là nơi
+  // SettingsMarketplace tự chuyển tới sau khi bấm Install (xem đó).
+  const [extensionsTab, setExtensionsTab] = useState<'marketplace' | 'installUrl'>('marketplace');
 
   useEffect(() => {
     // Nhật ký được ghi cả khi Settings đang đóng, nên đọc lại một lần lúc mount
@@ -72,7 +79,23 @@ export function SettingsPlugins() {
         </p>
       )}
 
-      <SettingsExtensionInstaller />
+      <div className="rounded-lg border">
+        <Tabs
+          tabs={[
+            { id: 'marketplace', label: t('settings.plugins.tabs.marketplace') },
+            { id: 'installUrl', label: t('settings.plugins.tabs.installUrl') },
+          ]}
+          active={extensionsTab}
+          onSelect={(id) => setExtensionsTab(id as 'marketplace' | 'installUrl')}
+        />
+        <div className="p-3">
+          {extensionsTab === 'marketplace' ? (
+            <SettingsMarketplace onInstallRequested={() => setExtensionsTab('installUrl')} />
+          ) : (
+            <SettingsExtensionInstaller />
+          )}
+        </div>
+      </div>
 
       <div className="rounded-lg border divide-y">
         {PLUGINS.map((p) => {

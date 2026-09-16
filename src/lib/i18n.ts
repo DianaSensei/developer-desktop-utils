@@ -282,6 +282,34 @@ export const DICTIONARY = {
   },
   'settings.plugins.installed.confirm': { vi: 'Xác nhận', en: 'Confirm' },
   'settings.plugins.installed.cancel': { vi: 'Huỷ', en: 'Cancel' },
+
+  // ── Settings — Marketplace (chọn market, cài trực tiếp từ danh sách) ─────
+  'settings.plugins.tabs.marketplace': { vi: 'Chợ tiện ích', en: 'Marketplace' },
+  'settings.plugins.tabs.installUrl': { vi: 'Cài từ URL', en: 'Install by URL' },
+  'settings.plugins.marketplace.description': {
+    vi: 'Chọn một market để xem những tiện ích có sẵn ở đó — bấm Cài để tự chuyển sang bước xem trước/xác nhận, không cài thẳng.',
+    en: 'Pick a market to see what it offers — clicking Install jumps you to the same preview/confirm step, nothing installs directly.',
+  },
+  'settings.plugins.marketplace.marketLabel': { vi: 'Nguồn (market)', en: 'Market' },
+  'settings.plugins.marketplace.addMarket': { vi: 'Thêm market', en: 'Add market' },
+  'settings.plugins.marketplace.marketNamePlaceholder': { vi: 'Tên market', en: 'Market name' },
+  'settings.plugins.marketplace.marketUrlPlaceholder': { vi: 'URL catalog.json', en: 'catalog.json URL' },
+  'settings.plugins.marketplace.add': { vi: 'Thêm', en: 'Add' },
+  'settings.plugins.marketplace.remove': { vi: 'Xoá market này', en: 'Remove this market' },
+  'settings.plugins.marketplace.custom': { vi: 'Tự thêm', en: 'Custom' },
+  'settings.plugins.marketplace.loading': { vi: 'Đang tải danh sách plugin…', en: 'Loading plugin list…' },
+  'settings.plugins.marketplace.error': {
+    vi: 'Không tải được market này: {{error}}',
+    en: 'Could not load this market: {{error}}',
+  },
+  'settings.plugins.marketplace.empty': { vi: 'Market này chưa có plugin nào.', en: 'This market has no plugins yet.' },
+  'settings.plugins.marketplace.install': { vi: 'Cài đặt', en: 'Install' },
+  'settings.plugins.marketplace.installed': { vi: 'Đã cài', en: 'Installed' },
+  'settings.plugins.marketplace.updateTo': { vi: 'Cập nhật lên {{version}}', en: 'Update to {{version}}' },
+  'settings.plugins.marketplace.unsupportedPlatform': {
+    vi: 'Không có bản cho nền tảng máy này',
+    en: 'No build for this machine\'s platform',
+  },
   'settings.plugins.restart.needed': {
     vi: 'Đã thay đổi tiện ích cài từ bên ngoài — khởi động lại để áp dụng.',
     en: 'External extensions changed — restart to apply.',
