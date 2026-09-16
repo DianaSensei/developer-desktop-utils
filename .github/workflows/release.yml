@@ -88,42 +88,17 @@ jobs:
           node -e "const f='package.json',j=require('./'+f);j.version='$VERSION';require('fs').writeFileSync(f,JSON.stringify(j,null,2)+'\n')"
           node -e "const fs=require('fs'),f='src-tauri/Cargo.toml';let c=fs.readFileSync(f,'utf8');c=c.replace(/^version = \".*\"/m,'version = \"$VERSION\"');fs.writeFileSync(f,c)"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      # Setup shared with build-cache.yml/coverage.yml — see
+      # .github/actions/setup-tauri-env. save-if: false here: the cache is
+      # created/refreshed by build-cache.yml on main; a tag run can read
+      # main's cache but would otherwise save a tag-scoped copy that no
+      # future tag can reuse.
+      - name: Setup build environment
+        uses: ./.github/actions/setup-tauri-env
         with:
-          node-version: lts/*
-          cache: npm
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable branch
-        with:
-          toolchain: stable
-          targets: ${{ matrix.rust-target }}
-
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri -> target
-          cache-on-failure: true
-          shared-key: ${{ matrix.platform }}-${{ matrix.rust-target }}
-          # Restore only. The cache is created/refreshed by build-cache.yml on main;
-          # a tag run can read main's cache but would otherwise save a tag-scoped
-          # copy that no future tag can reuse, so we never save here.
-          save-if: false
-
-      - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-22.04-arm'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
-      - name: Install frontend dependencies
-        run: npm ci
+          rust-target: ${{ matrix.rust-target }}
+          cache-shared-key: ${{ matrix.platform }}-${{ matrix.rust-target }}
+          cache-save-if: 'false'
 
       # Windows bundling downloads NSIS (and nsis_tauri_utils.dll) into
       # %LOCALAPPDATA%\tauri on every run. Cache that dir so later releases reuse it.
