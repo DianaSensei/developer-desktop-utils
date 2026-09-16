@@ -67,6 +67,14 @@ jobs:
           fetch-depth: 0   # full history + tags so the changelog can diff previous→new tag
 
       - name: Resolve release tag (workflow_dispatch input, or the pushed tag)
+        # shell: bash — the default shell on windows-latest is pwsh, where
+        # "$GITHUB_ENV" doesn't expand to the env-file path the way it does
+        # in bash, so the append silently no-ops. Confirmed the hard way:
+        # v0.9.0's first release run left RELEASE_TAG empty on Windows only
+        # (macOS/Linux default to bash already), producing an empty VERSION
+        # ("Could not determine package name and version.") and a published
+        # release entirely missing Windows installers.
+        shell: bash
         run: echo "RELEASE_TAG=${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}" >> "$GITHUB_ENV"
 
       # Derive the app version from the tag (e.g. v0.2.4 -> 0.2.4) and write
