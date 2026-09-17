@@ -76,47 +76,79 @@ jobs:
           echo "js=$(echo "$changed" | grep -qE '^(src/|package(-lock)?\.json$|tsconfig.*\.json$|vite\.config\.ts$)' && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "actions=$(echo "$changed" | grep -qE '^\.github/' && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-  analyze:
-    name: Analyze (${{ matrix.language }})
+  # Three explicit jobs instead of one matrix: a matrix's `language`/`build-mode`
+  # values only exist inside the job (strategy/steps/outputs) — `jobs.<id>.if`
+  # cannot reference `matrix.*` ("Unrecognized named-value: 'matrix'"), so
+  # per-language gating on `needs.changes.outputs.*` has to live on separate
+  # jobs' own `if:` instead.
+  analyze-actions:
+    name: Analyze (actions)
     needs: changes
-    # On schedule/workflow_dispatch/push-to-main every language always runs
-    # (github.event_name != 'pull_request' short-circuits the changes.* check);
-    # on a PR only the matching language(s) run.
-    if: |
-      github.event_name != 'pull_request' ||
-      (matrix.language == 'rust' && needs.changes.outputs.rust == 'true') ||
-      (matrix.language == 'javascript-typescript' && needs.changes.outputs.js == 'true') ||
-      (matrix.language == 'actions' && needs.changes.outputs.actions == 'true')
+    if: github.event_name != 'pull_request' || needs.changes.outputs.actions == 'true'
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
       security-events: write
-      packages: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: actions
-            build-mode: none
-          - language: javascript-typescript
-            build-mode: none
-          - language: rust
-            build-mode: manual
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
+          languages: actions
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          category: '/language:actions'
+
+  analyze-js:
+    name: Analyze (javascript-typescript)
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.js == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          category: '/language:javascript-typescript'
+
+  analyze-rust:
+    name: Analyze (rust)
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          languages: rust
+          build-mode: manual
 
       # Same cached setup coverage.yml's `rust` job and release.yml already
       # use — reuses the Cargo/registry cache built on main instead of
       # compiling the crate and its dependency tree from nothing.
       - name: Setup build environment
-        if: matrix.language == 'rust'
         uses: ./.github/actions/setup-tauri-env
         with:
           cache-shared-key: coverage
@@ -128,7 +160,6 @@ jobs:
       # runs, and why the frontend build itself doesn't need `npm ci` beyond
       # what setup-tauri-env's install-frontend-deps: 'false' skips here.
       - name: Build frontend (creates ../dist for generate_context!)
-        if: matrix.language == 'rust'
         run: |
           npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
           npm run build
@@ -137,7 +168,6 @@ jobs:
       # exists on disk even for a plain `cargo build` that never bundles
       # anything — see coverage.yml's identical step for the full reason.
       - name: Placeholder externalBin resources
-        if: matrix.language == 'rust'
         run: |
           mkdir -p src-tauri/binaries
           triple=$(rustc -vV | sed -n 's/^host: //p')
@@ -145,10 +175,9 @@ jobs:
           chmod +x src-tauri/binaries/devtool-mcp-server-"$triple" src-tauri/binaries/devtool-svc-echo-"$triple"
 
       - name: Build (rust)
-        if: matrix.language == 'rust'
         run: cargo build --manifest-path src-tauri/Cargo.toml
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
-          category: '/language:${{ matrix.language }}'
+          category: '/language:rust'
