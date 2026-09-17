@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Package, Plus, X } from 'lucide-react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
 import { isTauri } from '@/lib/platform';
-import { pendingInstall } from '@/lib/pendingInstall';
 import {
   addCustomMarket,
   fetchMarketCatalog,
@@ -20,27 +19,20 @@ import { Input } from '@/components/ui/input';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { ExtensionInstallDialog } from '@/components/ExtensionInstallDialog';
 
 /**
  * "Chợ tiện ích" — chọn một market (nguồn catalog.json), tự tải danh sách
- * plugin nó cung cấp, và cho cài NGAY từ đây thay vì phải copy URL manifest
- * từ một trang web rồi dán qua tab "Cài từ URL".
+ * plugin nó cung cấp, và cho cài NGAY từ đây.
  *
- * KHÔNG tự cài gì ở component này: nút Install chỉ xếp URL manifest (+ URL
- * service nếu có) vào `pendingInstall` — đúng hàng đợi mà deep link
- * (`desktop-devtool-app://install`) đã dùng — rồi gọi `onInstallRequested` để
- * component cha chuyển sang tab "Cài từ URL", nơi `SettingsExtensionInstaller`
- * tự kéo hàng đợi và hiện đúng màn hình xem trước/xác nhận đã có sẵn. Không
- * có đường tắt nào bỏ qua bước xác nhận đó — một market tuỳ ý người dùng tự
- * thêm cũng chỉ đáng tin như một URL dán tay, không hơn.
+ * Bấm Install mở thẳng `ExtensionInstallDialog` (URL manifest của plugin +
+ * URL service của nó, nếu có) NGAY TẠI TRANG NÀY — không rời sang tab "Cài
+ * từ URL" nữa. Vẫn KHÔNG có đường tắt nào bỏ qua bước xem trước/xác nhận
+ * trong dialog đó — một market tuỳ ý người dùng tự thêm cũng chỉ đáng tin
+ * như một URL dán tay, không hơn; chỉ có CHỖ hiện màn đó thay đổi.
  */
 
-interface SettingsMarketplaceProps {
-  /** Gọi sau khi đã xếp xong URL vào hàng đợi — cha chuyển sang tab cài đặt. */
-  onInstallRequested: () => void;
-}
-
-export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceProps) {
+export function SettingsMarketplace() {
   const { t } = useLocale();
   const [markets, setMarkets] = useState<Market[]>(() => listMarkets());
   const [selectedId, setSelectedId] = useState(() => getSelectedMarketId());
@@ -53,6 +45,22 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
   const [addingMarket, setAddingMarket] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newUrl, setNewUrl] = useState('');
+
+  // Plugin đang xem trước/xác nhận cài — `null` khi dialog đóng.
+  const [installTarget, setInstallTarget] = useState<MarketPlugin | null>(null);
+  // Nhớ lại theo danh tính plugin, không tính mới mỗi lần render — nếu không,
+  // một re-render bất kỳ trong lúc dialog đang mở (vd `refreshInstalled` sau
+  // khi cài xong) tạo một mảng URL MỚI mỗi lần, khiến effect fetch bên trong
+  // `ExtensionInstallDialog` (khoá theo tham chiếu `urls`) chạy lại vô ích.
+  const installUrls = useMemo(
+    () => (installTarget ? [installTarget.pluginManifestUrl, installTarget.serviceManifestUrl].filter((u): u is string => Boolean(u)) : []),
+    [installTarget],
+  );
+
+  const refreshInstalled = useCallback(async () => {
+    if (!isTauri) return;
+    setInstalled(await listInstalledArtifacts());
+  }, []);
 
   const selected = markets.find((m) => m.id === selectedId) ?? markets[0];
 
@@ -96,13 +104,13 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
     // thứ hai có thể không đi qua `vi.mock` trong test). Gọi tuần tự để lời
     // gọi thứ hai luôn thấy module đã nạp xong từ lời gọi đầu.
     void (async () => {
-      setInstalled(await listInstalledArtifacts());
+      await refreshInstalled();
       // Máy này hỗ trợ target nào — dùng để cảnh báo một plugin có sidecar
       // không có bản cho nền tảng hiện tại, TÍNH Ở RUST giống hệt
       // SettingsExtensionInstaller (không đoán/tính lại ở webview).
       setTargetTriple(await currentTargetTriple());
     })();
-  }, []);
+  }, [refreshInstalled]);
 
   const handleSelectMarket = (id: string) => {
     setSelectedId(id);
@@ -124,14 +132,6 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
     const next = listMarkets();
     setMarkets(next);
     if (selectedId === market.id) handleSelectMarket(next[0].id);
-  };
-
-  const handleInstall = (plugin: MarketPlugin) => {
-    const urls = [plugin.pluginManifestUrl, plugin.serviceManifestUrl].filter((u): u is string => Boolean(u));
-    // marketId đi kèm để hai market khác nhau cùng phát hành một plugin
-    // trùng id không đè lên nhau (xem installArtifact/installedPluginManifests).
-    pendingInstall.enqueue(urls, selected?.id);
-    onInstallRequested();
   };
 
   if (!isTauri) {
@@ -231,11 +231,19 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
                 (r) => r.kind === 'plugin' && r.manifest.id === p.id && (r.marketId === selected?.id || r.marketId === undefined),
               )}
               targetTriple={targetTriple}
-              onInstall={() => handleInstall(p)}
+              onInstall={() => setInstallTarget(p)}
             />
           ))}
         </div>
       )}
+
+      <ExtensionInstallDialog
+        open={installTarget !== null}
+        onOpenChange={(next) => { if (!next) setInstallTarget(null); }}
+        urls={installUrls}
+        marketId={selected?.id}
+        onInstalled={() => void refreshInstalled()}
+      />
     </div>
   );
 }
