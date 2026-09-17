@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { storageRemove } from '@/lib/persistentStore';
 
 /**
@@ -7,9 +7,10 @@ import { storageRemove } from '@/lib/persistentStore';
  * ghi ở `SettingsExtensionInstaller.test.tsx`. `vi.resetModules()` + gán
  * `__TAURI_INTERNALS__` TRƯỚC khi `import('@/components/SettingsMarketplace')`
  * là cách duy nhất mọi module transitively import `@/lib/platform` đọc đúng
- * giá trị test này cần. `listInstalledArtifacts`/`currentTargetTriple` gọi
- * `invoke` qua `@tauri-apps/api/core`; catalog thì đi qua `fetch` toàn cục
- * (không phải `invoke`) — mock riêng từng đường.
+ * giá trị test này cần. `listInstalledArtifacts`/`currentTargetTriple`/xem
+ * trước/cài đặt đều gọi `invoke` qua `@tauri-apps/api/core` — định tuyến
+ * theo TÊN lệnh để không lẫn hình dạng trả về của nhau; catalog thì đi qua
+ * `fetch` toàn cục (không phải `invoke`) — mock riêng đường đó.
  */
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body } as Response;
@@ -32,8 +33,48 @@ function demoCatalog(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-const invokeMock = vi.fn();
-vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: unknown[]) => invokeMock(...args) }));
+function demoPluginManifest() {
+  return {
+    kind: 'plugin', id: 'demo', version: '1.0.0', sdk: '^1.0.0', entry: 'x', integrity: 'a'.repeat(64),
+    label: 'Demo', description: 'A demo plugin', icon: 'puzzle', keywords: [], route: '/demo',
+    permissions: [], commands: [], hosts: [],
+  };
+}
+
+function demoServiceManifest() {
+  return {
+    kind: 'service', bin: 'devtool-svc-demo', version: '1.0.0', protocol: 1,
+    targets: { 'aarch64-apple-darwin': { url: 'https://example.com/bin', sha256: 'a'.repeat(64) } },
+  };
+}
+
+// invoke() thấy nhiều lệnh khác nhau trong CÙNG một lần render (danh sách đã
+// cài, target-triple máy này, xem trước manifest theo URL, rồi cài thật) —
+// định tuyến theo `command` (và `args.url` khi cần) thay vì một
+// `mockResolvedValue` chung, để mỗi lệnh luôn thấy đúng hình dạng của nó.
+let installedArtifacts: unknown[] = [];
+let targetTriple = 'aarch64-apple-darwin';
+const manifestByUrl: Record<string, unknown> = {
+  'https://example.com/demo-plugin.json': demoPluginManifest(),
+  'https://example.com/demo-service.json': demoServiceManifest(),
+};
+const installMock = vi.fn().mockResolvedValue({});
+
+const invokeMock = vi.fn((command: string, args?: { url?: string }) => {
+  switch (command) {
+    case 'artifact_installer_list':
+      return Promise.resolve(installedArtifacts);
+    case 'artifact_installer_current_target_triple':
+      return Promise.resolve(targetTriple);
+    case 'artifact_installer_fetch_manifest':
+      return Promise.resolve(manifestByUrl[args?.url ?? '']);
+    case 'artifact_installer_install':
+      return installMock(args);
+    default:
+      return Promise.resolve(undefined);
+  }
+});
+vi.mock('@tauri-apps/api/core', () => ({ invoke: (...args: Parameters<typeof invokeMock>) => invokeMock(...args) }));
 // `market.ts` đi qua tauri-plugin-http (không phải `invoke`, không phải
 // `fetch` toàn cục) khi `isTauri` — mock nó gọi thẳng `fetch` toàn cục để một
 // `vi.stubGlobal('fetch', ...)` áp dụng cho cả hai môi trường trong cùng test.
@@ -54,18 +95,19 @@ async function renderMarketplace(opts?: { tauri?: boolean }) {
   }
   const { LocaleProvider } = await import('@/contexts/LocaleContext');
   const { SettingsMarketplace } = await import('@/components/SettingsMarketplace');
-  const onInstallRequested = vi.fn();
-  const utils = render(
+  return render(
     <LocaleProvider>
-      <SettingsMarketplace onInstallRequested={onInstallRequested} />
+      <SettingsMarketplace />
     </LocaleProvider>,
   );
-  return { onInstallRequested, ...utils };
 }
 
 afterEach(() => {
   cleanup();
-  invokeMock.mockReset();
+  invokeMock.mockClear();
+  installMock.mockClear();
+  installedArtifacts = [];
+  targetTriple = 'aarch64-apple-darwin';
   delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
   vi.unstubAllGlobals();
   storageRemove('devtool-locale');
@@ -92,7 +134,6 @@ describe('SettingsMarketplace — bản web (không phải Tauri)', () => {
 
 describe('SettingsMarketplace — tải catalog', () => {
   it('hiện danh sách plugin của market chính thức', async () => {
-    invokeMock.mockResolvedValue([]); // listInstalledArtifacts + currentTargetTriple (best-effort)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(demoCatalog())));
 
     await renderMarketplace();
@@ -103,7 +144,6 @@ describe('SettingsMarketplace — tải catalog', () => {
   });
 
   it('catalog rỗng thì nói rõ thay vì để trống', async () => {
-    invokeMock.mockResolvedValue([]);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ plugins: [] })));
 
     await renderMarketplace();
@@ -113,7 +153,6 @@ describe('SettingsMarketplace — tải catalog', () => {
   });
 
   it('market lỗi thì hiện thông báo lỗi rõ ràng', async () => {
-    invokeMock.mockResolvedValue([]);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(null, false, 500)));
 
     await renderMarketplace();
@@ -123,26 +162,29 @@ describe('SettingsMarketplace — tải catalog', () => {
   });
 });
 
-describe('SettingsMarketplace — cài đặt (chuyển tiếp qua pendingInstall)', () => {
-  it('bấm Install xếp cả URL plugin lẫn service vào hàng đợi rồi báo cha chuyển tab', async () => {
-    invokeMock.mockResolvedValue([]);
+describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại trang, không chuyển tab)', () => {
+  it('bấm Install mở dialog xem trước CẢ plugin lẫn service, một lần Cài đặt cài cả hai', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(demoCatalog())));
 
-    const { onInstallRequested } = await renderMarketplace();
+    await renderMarketplace();
     await settle();
     await waitFor(() => expect(screen.getByText(/demo@1\.0\.0/)).toBeTruthy());
 
     fireEvent.click(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }));
 
-    expect(onInstallRequested).toHaveBeenCalledTimes(1);
-    const { pendingInstall } = await import('@/lib/pendingInstall');
-    expect(pendingInstall.dequeue()).toEqual({ url: 'https://example.com/demo-plugin.json', marketId: 'official' });
-    expect(pendingInstall.dequeue()).toEqual({ url: 'https://example.com/demo-service.json', marketId: 'official' });
+    // Dialog xem trước cả hai URL cùng lúc, không rời trang/tab nào.
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByText('devtool-svc-demo@1.0.0')).toBeTruthy());
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Install$|^Cài đặt$/ }));
+
+    await waitFor(() => expect(installMock).toHaveBeenCalledTimes(2));
+    expect(installMock).toHaveBeenCalledWith({ sourceUrl: 'https://example.com/demo-plugin.json', marketId: 'official' });
+    expect(installMock).toHaveBeenCalledWith({ sourceUrl: 'https://example.com/demo-service.json', marketId: 'official' });
   });
 
   it('targets chỉ mang tính tham khảo: nền tảng máy không nằm trong targets thì CẢNH BÁO nhưng vẫn cho bấm Install', async () => {
-    invokeMock.mockResolvedValueOnce([]); // listInstalledArtifacts
-    invokeMock.mockResolvedValueOnce('x86_64-pc-windows-msvc'); // currentTargetTriple — không nằm trong targets bên dưới
+    targetTriple = 'x86_64-pc-windows-msvc'; // không nằm trong targets bên dưới
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse(demoCatalog({ targets: ['aarch64-apple-darwin'] }))),
@@ -158,7 +200,7 @@ describe('SettingsMarketplace — cài đặt (chuyển tiếp qua pendingInstal
   });
 
   it('đã cài đúng bản mới nhất thì nút Install bị vô hiệu hoá, hiện "Installed"', async () => {
-    invokeMock.mockResolvedValueOnce([
+    installedArtifacts = [
       {
         kind: 'plugin',
         manifest: {
@@ -177,8 +219,7 @@ describe('SettingsMarketplace — cài đặt (chuyển tiếp qua pendingInstal
         // hiện "Install" thay vì "Installed", mời cài chồng thêm một bản nữa.
         market_id: null,
       },
-    ]); // listInstalledArtifacts
-    invokeMock.mockResolvedValueOnce('aarch64-apple-darwin'); // currentTargetTriple
+    ];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(demoCatalog())));
 
     await renderMarketplace();

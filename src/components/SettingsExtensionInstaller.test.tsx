@@ -92,13 +92,9 @@ function installedServiceRaw(overrides: Partial<Record<string, unknown>> = {}) {
 /**
  * `resetModules()` + import + render, dùng chung cho MỌI test cần một lần nạp
  * module riêng (isTauri đọc một lần lúc `@/lib/platform` được nạp — xem ghi
- * chú ở đầu file). `beforeRender` là hook cho những test cần chen thêm một
- * bước NGAY TRƯỚC `render()` nhưng vẫn trong cùng epoch module vừa reset (vd
- * enqueue vào `pendingInstall` trước khi component này mount) — không thể
- * tách các bước ra một hàm ngoài vì mỗi bước phải cùng một lần `import()`
- * (sau `resetModules()`, không có `resetModules()` nào xen giữa).
+ * chú ở đầu file).
  */
-async function renderInstaller(opts?: { tauri?: boolean; beforeRender?: () => void | Promise<void> }) {
+async function renderInstaller(opts?: { tauri?: boolean }) {
   vi.resetModules();
   if (opts?.tauri ?? true) {
     (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {};
@@ -112,7 +108,6 @@ async function renderInstaller(opts?: { tauri?: boolean; beforeRender?: () => vo
   const { LocaleProvider } = await import('@/contexts/LocaleContext');
   const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
   const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
-  await opts?.beforeRender?.();
   return render(
     <LocaleProvider>
       <ExtensionUpdateProvider>
@@ -325,89 +320,10 @@ describe('SettingsExtensionInstaller — service đòi xác nhận trước khi 
   });
 });
 
-describe('SettingsExtensionInstaller — hàng đợi desktop-devtool-app://install (pendingInstall)', () => {
-  it('URL đã xếp sẵn TRƯỚC khi mount thì tự điền ngay vào ô URL', async () => {
-    invokeMock.mockResolvedValueOnce([]); // list lúc mount
-    // Không mock kết quả `fetch_manifest` ở đây: mount này tự bắn NHIỀU lời
-    // gọi invoke cùng lúc trong cùng một nhịp đồng bộ (refresh() của chính
-    // component, refresh() của ExtensionUpdateProvider, VÀ auto-preview của
-    // hàng đợi) — đúng kịch bản race đã ghi ở đầu file ("bắn thêm một lời gọi
-    // invoke NGAY LẬP TỨC... có thể đua với chính lần import đó"), nhưng ở
-    // đây là BA lời gọi đồng thời thay vì hai, và (khác các chỗ khác) race
-    // này KHÔNG ngẫu nhiên — lời gọi thứ hai/ba luôn thua, luôn nhận bản
-    // `@tauri-apps/api/core` thật thay vì bản mock. Bài test này vì vậy chỉ
-    // xác nhận phần chắc chắn không phụ thuộc invoke: ô URL được điền đúng
-    // giá trị đã xếp hàng. Hành vi "tự xem trước sau khi điền" được test đủ
-    // ở case "xếp SAU khi đã mount" bên dưới, nơi enqueue xảy ra SAU khi
-    // component đã ổn định (không đua với lời gọi invoke nào khác).
-    await renderInstaller({
-      tauri: true,
-      beforeRender: async () => {
-        const { pendingInstall } = await import('@/lib/pendingInstall');
-        pendingInstall.enqueue(['https://example.com/queued.json']);
-      },
-    });
-    await settle();
-
-    expect((screen.getByPlaceholderText('https://example.com/extension.json') as HTMLInputElement).value).toBe(
-      'https://example.com/queued.json',
-    );
-  });
-
-  it('URL xếp SAU khi đã mount (link thứ hai trong lúc đang đứng ở đây) vẫn tự xem trước, không cần remount', async () => {
-    invokeMock.mockResolvedValueOnce([]); // list lúc mount
-    await renderInTauri();
-    await settle();
-
-    // Cùng lần nạp module renderInTauri() vừa reset — lấy pendingInstall từ
-    // đó để enqueue "trong lúc component đã mount", đúng kịch bản pullfrog
-    // nêu: single-instance chuyển tiếp một link desktop-devtool-app:// thứ hai trong khi
-    // người dùng đang đứng sẵn ở Settings → Plugin.
-    const { pendingInstall } = await import('@/lib/pendingInstall');
-    invokeMock.mockResolvedValueOnce(pluginManifestRaw({ label: 'Second Link Plugin' }));
-    act(() => {
-      pendingInstall.enqueue(['https://example.com/second.json']);
-    });
-
-    await waitFor(() =>
-      expect((screen.getByPlaceholderText('https://example.com/extension.json') as HTMLInputElement).value).toBe(
-        'https://example.com/second.json',
-      ),
-    );
-    await waitFor(() => expect(screen.getByText('Second Link Plugin')).toBeTruthy());
-  });
-
-  // pullfrog bắt đúng ở review #145: bấm lại nút Preview (không phải gõ URL
-  // mới) từng âm thầm xoá `previewMarketId` vì `handlePreview` gọi
-  // `runPreview(url)` không kèm market — Install sau đó cài với
-  // `marketId: undefined`, khiến bản ghi rơi ra khỏi market thật của nó.
-  it('bấm lại Preview cho URL đã xếp từ market không được làm rớt marketId — Install vẫn phải cài đúng market', async () => {
-    invokeMock.mockResolvedValueOnce([]); // list lúc mount
-    await renderInTauri();
-    await settle();
-
-    const { pendingInstall } = await import('@/lib/pendingInstall');
-    invokeMock.mockResolvedValueOnce(pluginManifestRaw({ label: 'Market Plugin' }));
-    act(() => {
-      pendingInstall.enqueue(['https://example.com/market-plugin.json'], 'official');
-    });
-    await waitFor(() => expect(screen.getByText('Market Plugin')).toBeTruthy());
-
-    // Bấm lại Preview cho ĐÚNG url đang có (không gõ gì mới) — market phải
-    // còn nguyên sau lần xem trước lại này.
-    invokeMock.mockResolvedValueOnce(pluginManifestRaw({ label: 'Market Plugin' }));
-    fireEvent.click(screen.getByRole('button', { name: /Preview|Xem trước/ }));
-    await waitFor(() => expect(screen.getByText('Market Plugin')).toBeTruthy());
-
-    invokeMock.mockResolvedValueOnce(installedPluginRaw()); // install
-    invokeMock.mockResolvedValueOnce([]); // refresh sau khi cài
-    fireEvent.click(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }));
-
-    await waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
-        sourceUrl: 'https://example.com/market-plugin.json',
-        marketId: 'official',
-      });
-    });
-  });
-});
+// Bài test "hàng đợi desktop-devtool-app://install (pendingInstall)" trước
+// đây thuộc file này đã bị XOÁ: `SettingsExtensionInstaller` không còn nghe
+// `pendingInstall` nữa (tab "Cài từ URL" giờ chỉ phục vụ URL người dùng tự
+// dán tay) — một lượt cài tới từ deep link/market giờ hiện thẳng
+// `ExtensionInstallDialog`, đè lên trang `SettingsExtensions`, không rơi
+// vào tab này nữa. Xem `SettingsExtensions.pendingInstallTab.test.tsx` cho
+// hành vi mới.

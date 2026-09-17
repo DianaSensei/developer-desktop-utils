@@ -1,20 +1,22 @@
 // Hàng đợi URL manifest chờ cài — cầu nối giữa `deepLink.ts` (nhận
-// `desktop-devtool-app://install?...` từ hệ điều hành)/`SettingsMarketplace`
-// (bấm Install trên một thẻ market) và `SettingsExtensionInstaller` (UI xác
-// nhận cài đặt đã có sẵn). Không tự cài gì ở đây: hàng đợi chỉ giữ URL (+
-// marketId nếu có nguồn), còn bước xem trước/xác nhận/cài thật vẫn đi qua
-// đúng luồng `fetchArtifactManifestPreview`/`installArtifact` người dùng đã
-// dùng khi tự dán URL — deep link/market chỉ thay việc copy/dán bằng một cú
-// bấm, không bỏ qua bước xác nhận (một manifest độc hại trỏ tới từ một link
-// giả mạo, hay từ một market tự thêm, vẫn phải qua đúng màn hình xem trước
-// đó).
+// `desktop-devtool-app://install?...` từ hệ điều hành) và `SettingsExtensions`
+// (nghe hàng đợi này, tự mở `ExtensionInstallDialog` để xem trước/xác nhận).
+// `SettingsMarketplace` KHÔNG dùng hàng đợi này nữa — bấm Install trên một
+// thẻ market mở thẳng `ExtensionInstallDialog` tại chỗ (xem
+// `SettingsMarketplace.tsx`), chỉ deep link mới cần một hàng đợi vì URL tới
+// từ hệ điều hành có thể sớm hơn lúc `SettingsExtensions` kịp mount. Không tự
+// cài gì ở đây: hàng đợi chỉ giữ URL (+ marketId nếu có nguồn), còn bước xem
+// trước/xác nhận/cài thật vẫn đi qua đúng luồng
+// `fetchArtifactManifestPreview`/`installArtifact` — deep link chỉ thay việc
+// copy/dán bằng một cú bấm, không bỏ qua bước xác nhận (một manifest độc hại
+// trỏ tới từ một link giả mạo vẫn phải qua đúng màn hình xem trước đó).
 //
 // CÓ subscribe/notify (không chỉ enqueue/dequeue tay): nếu người dùng ĐANG
-// đứng ở Settings → Plugin và một link `desktop-devtool-app://` thứ hai tới trong lúc đó,
-// `SettingsExtensionInstaller` không remount (điều hướng tới path đang đứng
-// sẵn không mount lại component) — effect chỉ chạy lúc mount sẽ bỏ lỡ URL
-// mới. `notify()` cho listener đang mount một cơ hội tự kéo hàng đợi mà
-// không cần đợi remount.
+// đứng ở Settings → Extensions và một link `desktop-devtool-app://` thứ hai
+// tới trong lúc đó, `SettingsExtensions` không remount (điều hướng tới path
+// đang đứng sẵn không mount lại component) — effect chỉ chạy lúc mount sẽ bỏ
+// lỡ URL mới. `notify()` cho listener đang mount một cơ hội tự kéo hàng đợi
+// mà không cần đợi remount.
 
 export interface PendingInstallItem {
   url: string;
@@ -62,18 +64,18 @@ export const pendingInstall = {
     queue = rest;
     return next;
   },
+  /** Lấy và xoá TOÀN BỘ hàng đợi cùng lúc (mảng rỗng nếu không có gì) — dùng
+   *  khi plugin + sidecar service của nó (hai URL, cùng một cú bấm/link) cần
+   *  hiện chung MỘT màn xem trước/xác nhận thay vì bắt xác nhận riêng từng
+   *  cái, khác `dequeue()` (lấy từng mục một). */
+  dequeueAll(): PendingInstallItem[] {
+    const all = queue;
+    queue = [];
+    return all;
+  },
   /** Đăng ký nghe "có URL mới vừa được thêm". Trả về hàm huỷ đăng ký. */
   subscribe(listener: () => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
-  },
-  /** Hàng đợi có mục đang chờ không — KHÔNG tiêu thụ (khác `dequeue`). Dùng
-   *  bởi `SettingsExtensions.tsx` để chọn tab "Cài từ URL" làm tab hiện hành
-   *  ngay từ lần render đầu khi có sẵn một URL đã xếp hàng TRƯỚC khi trang
-   *  Settings mount (deep link mở app từ trạng thái nguội) — nếu không, tab
-   *  mặc định "Chợ tiện ích" sẽ không bao giờ mount `SettingsExtensionInstaller`
-   *  để tự kéo hàng đợi, và URL nằm im không ai xem trước. */
-  hasPending(): boolean {
-    return queue.length > 0;
   },
 };
