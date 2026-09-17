@@ -129,20 +129,24 @@ jobs:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # CodeQL's Rust extractor only supports build-mode: none — it parses
-      # source directly and doesn't run/trace a real build (confirmed by a
-      # failed run: "Rust does not support the manual build mode. Please try
-      # ... none"). So none of the cached-build machinery the `rust` job in
-      # coverage.yml needs (setup-tauri-env, npm run build, externalBin
-      # placeholders, cargo build) applies here — this job is exactly as
-      # cheap as the other two languages.
+      # CodeQL's Rust extractor only supports build-mode: none (confirmed by
+      # a failed run: "Rust does not support the manual build mode. Please
+      # try ... none") — but that's NOT source-only parsing: per GitHub's
+      # docs, rust-analyzer still compiles and runs build.rs scripts and
+      # compiles proc-macro code (it only skips the full crate build), into
+      # a fresh, uncached cargo_target_dir every run. So this job doesn't
+      # need coverage.yml's rust job's full cached-build sequence
+      # (setup-tauri-env, npm run build, externalBin placeholders, cargo
+      # build) — those exist only for an actual `cargo`/tauri-build
+      # invocation — but it's still heavier than the actions/js-ts jobs,
+      # which is why its timeout stays above theirs.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
