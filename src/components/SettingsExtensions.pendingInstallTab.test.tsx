@@ -6,7 +6,7 @@ import { storageRemove } from '@/lib/persistentStore';
  * pullfrog đã bắt đúng ở PR review: đặt "Chợ tiện ích" làm tab mặc định phá
  * luồng deep link `desktop-devtool-app://install` — chỉ tab "Cài từ URL"
  * mount `SettingsExtensionInstaller`, component DUY NHẤT biết kéo
- * `pendingInstall`. File RIÊNG (không import tĩnh `SettingsPlugins` ở đầu
+ * `pendingInstall`. File RIÊNG (không import tĩnh `SettingsExtensions` ở đầu
  * file, chỉ `import()` động sau `vi.resetModules()`) — cùng quy ước đã dùng
  * ở `SettingsExtensionInstaller.test.tsx`: trộn một import tĩnh (từ describe
  * khác trong CÙNG file, chạy trước bất kỳ `resetModules()` nào) với
@@ -18,19 +18,16 @@ import { storageRemove } from '@/lib/persistentStore';
 
 async function renderPanel() {
   const { LocaleProvider } = await import('@/contexts/LocaleContext');
-  const { FeatureProvider } = await import('@/contexts/FeatureContext');
   const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
-  const { SettingsPlugins } = await import('@/components/SettingsPlugins');
+  const { SettingsExtensions } = await import('@/components/SettingsExtensions');
   const { pendingInstall } = await import('@/lib/pendingInstall');
   return {
     pendingInstall,
     ...render(
       <LocaleProvider>
-        <FeatureProvider>
-          <ExtensionUpdateProvider>
-            <SettingsPlugins />
-          </ExtensionUpdateProvider>
-        </FeatureProvider>
+        <ExtensionUpdateProvider>
+          <SettingsExtensions />
+        </ExtensionUpdateProvider>
       </LocaleProvider>,
     ),
   };
@@ -43,7 +40,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe('Settings — Plugins — tab mặc định theo pendingInstall (deep link/market)', () => {
+describe('Settings — Extensions — tab mặc định theo pendingInstall (deep link/market)', () => {
   it('không có gì đang chờ thì mặc định vào tab Chợ tiện ích', async () => {
     vi.resetModules();
     await renderPanel();

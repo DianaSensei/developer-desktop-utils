@@ -167,7 +167,7 @@ export function SettingsExtensionInstaller() {
   }, [autoUpdates]);
 
   if (!isTauri) {
-    return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;
+    return <Callout tone="info" size="sm">{t('settings.extensions.install.webWarning')}</Callout>;
   }
 
   // Giữ nguyên `previewMarketId` khi bấm lại Preview cho ĐÚNG url đang có sẵn
@@ -301,8 +301,8 @@ export function SettingsExtensionInstaller() {
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-xs font-medium">{t('settings.plugins.install.title')}</p>
-        <p className="text-[11px] text-fg-mute">{t('settings.plugins.install.description')}</p>
+        <p className="text-xs font-medium">{t('settings.extensions.install.title')}</p>
+        <p className="text-[11px] text-fg-mute">{t('settings.extensions.install.description')}</p>
       </div>
 
       <div className="flex gap-2">
@@ -324,7 +324,7 @@ export function SettingsExtensionInstaller() {
           className="flex-1 font-mono text-xs"
         />
         <Button variant="outline" size="sm" onClick={() => void handlePreview()} disabled={!url.trim() || previewing}>
-          {previewing ? <Spinner size="sm" /> : t('settings.plugins.install.preview')}
+          {previewing ? <Spinner size="sm" /> : t('settings.extensions.install.preview')}
         </Button>
       </div>
 
@@ -334,7 +334,7 @@ export function SettingsExtensionInstaller() {
         <div className="rounded-lg border p-3 space-y-2">
           <div className="flex items-center gap-2">
             <span className="rounded border px-1.5 py-0.5 font-mono text-[11px] uppercase text-fg-mute">
-              {preview.kind === 'plugin' ? t('settings.plugins.install.kind.plugin') : t('settings.plugins.install.kind.service')}
+              {preview.kind === 'plugin' ? t('settings.extensions.install.kind.plugin') : t('settings.extensions.install.kind.service')}
             </span>
             {preview.kind === 'plugin' ? (
               <p className="text-xs font-medium">
@@ -362,14 +362,14 @@ export function SettingsExtensionInstaller() {
             <div className="space-y-1">
               {previewTriple && (
                 <p className="text-[11px] text-fg-mute">
-                  {t('settings.plugins.install.targetTriple', { triple: previewTriple })}
+                  {t('settings.extensions.install.targetTriple', { triple: previewTriple })}
                 </p>
               )}
               {previewTargetSupported !== null && (
                 <p className={previewTargetSupported ? 'text-[11px] text-fg-mute' : 'text-[11px] text-bad'}>
                   {previewTargetSupported
-                    ? t('settings.plugins.install.targetSupported')
-                    : t('settings.plugins.install.targetUnsupported')}
+                    ? t('settings.extensions.install.targetSupported')
+                    : t('settings.extensions.install.targetUnsupported')}
                 </p>
               )}
               <div className="flex flex-wrap gap-1">
@@ -384,7 +384,7 @@ export function SettingsExtensionInstaller() {
 
           {installError && <Callout tone="error" size="sm">{installError}</Callout>}
           <Button size="sm" onClick={() => void handleInstall()} disabled={installing}>
-            {installing ? <Spinner size="sm" /> : t('settings.plugins.install.confirm')}
+            {installing ? <Spinner size="sm" /> : t('settings.extensions.install.confirm')}
           </Button>
         </div>
       )}
@@ -395,21 +395,21 @@ export function SettingsExtensionInstaller() {
           size="sm"
           actions={
             <Button size="sm" variant="outline" onClick={() => void handleRestart()}>
-              {t('settings.plugins.restart.now')}
+              {t('settings.extensions.restart.now')}
             </Button>
           }
         >
-          {t('settings.plugins.restart.needed')}
+          {t('settings.extensions.restart.needed')}
         </Callout>
       )}
 
       <div className="space-y-1.5 pt-1">
-        <p className="text-xs font-medium">{t('settings.plugins.installed.title')}</p>
+        <p className="text-xs font-medium">{t('settings.extensions.installed.title')}</p>
       </div>
 
       <div className="rounded-lg border divide-y">
         {installed.length === 0 ? (
-          <p className="px-4 py-3 text-[11px] text-fg-mute">{t('settings.plugins.installed.empty')}</p>
+          <p className="px-4 py-3 text-[11px] text-fg-mute">{t('settings.extensions.installed.empty')}</p>
         ) : (
           installed.map((record) => {
             const key = recordKey(record);
@@ -423,8 +423,8 @@ export function SettingsExtensionInstaller() {
                     <p className="flex items-center gap-1.5 text-xs font-medium">
                       <span className="rounded border px-1.5 py-0.5 font-mono text-[11px] uppercase text-fg-mute">
                         {record.kind === 'plugin'
-                          ? t('settings.plugins.install.kind.plugin')
-                          : t('settings.plugins.install.kind.service')}
+                          ? t('settings.extensions.install.kind.plugin')
+                          : t('settings.extensions.install.kind.service')}
                       </span>
                       {record.kind === 'plugin' ? (
                         <>
@@ -443,11 +443,11 @@ export function SettingsExtensionInstaller() {
                     <p className="truncate font-mono text-[11px] text-fg-mute/70">{record.sourceUrl}</p>
                     {rowError[key] && <p className="text-[11px] text-bad">{rowError[key]}</p>}
                     {updateVersion === 'up-to-date' && (
-                      <p className="text-[11px] text-fg-mute">{t('settings.plugins.installed.upToDate')}</p>
+                      <p className="text-[11px] text-fg-mute">{t('settings.extensions.installed.upToDate')}</p>
                     )}
                     {updateVersion && updateVersion !== 'up-to-date' && (
                       <p className="text-[11px] text-warn">
-                        {t('settings.plugins.installed.updateAvailable', { version: updateVersion })}
+                        {t('settings.extensions.installed.updateAvailable', { version: updateVersion })}
                       </p>
                     )}
                   </div>
@@ -479,15 +479,15 @@ export function SettingsExtensionInstaller() {
                           onClick={() => handleConfirmServiceAction(record, pending)}
                           disabled={busy}
                         >
-                          {busy ? <Spinner size="sm" /> : t('settings.plugins.installed.confirm')}
+                          {busy ? <Spinner size="sm" /> : t('settings.extensions.installed.confirm')}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => handleCancelServiceAction(key)} disabled={busy}>
-                          {t('settings.plugins.installed.cancel')}
+                          {t('settings.extensions.installed.cancel')}
                         </Button>
                       </div>
                     }
                   >
-                    {t('settings.plugins.installed.serviceWarning')}
+                    {t('settings.extensions.installed.serviceWarning')}
                   </Callout>
                 )}
               </div>

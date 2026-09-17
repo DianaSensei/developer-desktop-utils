@@ -73,7 +73,7 @@ export async function initDeepLinkHandling(navigate: NavigateWithState): Promise
     // một-lần cho chính lượt chuyển trang này, không phải thứ nên có mặt
     // trên URL (không cần chia sẻ được, không cần sống sót qua reload —
     // Settings.tsx đọc nó ở cả state init lẫn effect, xem giải thích ở đó).
-    navigate('/settings', { state: { section: 'plugins' } });
+    navigate('/settings', { state: { section: 'extensions' } });
   };
 
   // Khởi động lạnh: app được chính link này MỞ LÊN (chưa chạy sẵn).

@@ -31,6 +31,7 @@ import {
 } from '@/lib/monoFontPreference';
 import { getAppPermissionGroups } from '@/lib/appPermissions';
 import { SettingsPlugins } from '@/components/SettingsPlugins';
+import { SettingsExtensions } from '@/components/SettingsExtensions';
 import { getShortcutGroups } from '@/lib/shortcuts';
 import { Spinner } from '@/components/ui/spinner';
 import { Input } from '@/components/ui/input';
@@ -290,13 +291,17 @@ const SHORTCUT_GROUPS = getShortcutGroups();
 // `label` lấy lại đúng các khoá dịch đã có sẵn của từng mục (không phát sinh
 // khoá i18n mới) — tiêu đề trong SETTINGS_SECTIONS và tiêu đề nội dung mục đó
 // hiển thị PHẢI khớp nhau, đây là nguồn duy nhất cho cả hai.
+// Nhóm theo mức độ dùng: tuỳ biến hằng ngày trước (Appearance/Tools/
+// Shortcuts) → quản lý plugin/tiện ích/tích hợp (Plugins/Extensions/MCP) →
+// thông tin/thiết lập ít đụng tới nhất (Permissions/About/Storage/Config).
 const SETTINGS_SECTIONS = [
   { id: 'appearance', label: 'settings.section.appearance' },
   { id: 'tools', label: 'settings.section.tools' },
   { id: 'shortcuts', label: 'settings.section.shortcuts' },
-  { id: 'permissions', label: 'settings.permissions.title' },
   { id: 'plugins', label: 'settings.plugins.title' },
+  { id: 'extensions', label: 'settings.section.extensions' },
   { id: 'mcp', label: 'settings.mcp.title' },
+  { id: 'permissions', label: 'settings.permissions.title' },
   { id: 'about', label: 'settings.about.title' },
   { id: 'storage', label: 'settings.storage.title' },
   { id: 'config', label: 'settings.config.title' },
@@ -322,7 +327,7 @@ export function Settings() {
   // Xem SETTINGS_SECTIONS + nav trái ở cuối file cho danh sách đầy đủ.
   const location = useLocation();
   // `desktop-devtool-app://install?...` (deepLink.ts) điều hướng tới đây với
-  // `{ state: { section: 'plugins' } }` để mở thẳng màn cài đặt tiện ích
+  // `{ state: { section: 'extensions' } }` để mở thẳng màn cài đặt tiện ích
   // thay vì rơi vào mục mặc định (Appearance). Đọc cả lúc khởi tạo (mở lạnh)
   // lẫn qua effect bên dưới (app đã đứng sẵn ở Settings, một link thứ hai
   // chỉ đổi `location.state` chứ không mount lại component này).
@@ -502,7 +507,7 @@ export function Settings() {
                 )}
               >
                 <span>{t(s.label)}</span>
-                {s.id === 'plugins' && extensionUpdates.length > 0 && (
+                {s.id === 'extensions' && extensionUpdates.length > 0 && (
                   <Badge tone="success" pill>{extensionUpdates.length}</Badge>
                 )}
               </button>
@@ -892,6 +897,8 @@ export function Settings() {
           )}
 
           {activeSection === 'plugins' && <SettingsPlugins />}
+
+          {activeSection === 'extensions' && <SettingsExtensions />}
 
           {activeSection === 'mcp' && (
             <section className="space-y-3">

@@ -169,6 +169,7 @@ export const DICTIONARY = {
   // ── Settings — Appearance / Tools ────────────────────────────────────────
   'settings.section.appearance': { vi: 'Giao diện', en: 'Appearance' },
   'settings.section.tools': { vi: 'Công cụ', en: 'Tools' },
+  'settings.section.extensions': { vi: 'Tiện ích', en: 'Extensions' },
   'settings.tools.enabledCount': { vi: '{{enabled}}/{{total}} đã bật', en: '{{enabled}} of {{total}} enabled' },
   'settings.tools.enableAll': { vi: 'Bật tất cả', en: 'Enable all' },
   'settings.tools.disableAll': { vi: 'Tắt tất cả', en: 'Disable all' },
@@ -197,11 +198,11 @@ export const DICTIONARY = {
     en: 'Running in browser — permissions listed below apply to the desktop app only.',
   },
 
-  // ── Settings — Plugins ───────────────────────────────────────────────────
+  // ── Settings — Plugins (biên dịch sẵn trong app, dùng SDK nội bộ) ────────
   'settings.plugins.title': { vi: 'Plugin', en: 'Plugins' },
   'settings.plugins.description': {
-    vi: 'Mỗi tool là một plugin tự khai báo trong src/plugins/<id>/plugin.ts. Bảng dưới đọc thẳng từ các manifest đó: kênh Platform mà plugin được phép dùng, và lệnh native nằm trong allowlist của nó.',
-    en: 'Every tool is a plugin that declares itself in src/plugins/<id>/plugin.ts. The table below is read straight from those manifests: which Platform channels the plugin may use, and which native commands are in its allowlist.',
+    vi: 'Mỗi tool BIÊN DỊCH SẴN trong app là một plugin tự khai báo trong src/plugins/<id>/plugin.ts. Bảng dưới đọc thẳng từ các manifest đó: kênh Platform mà plugin được phép dùng, và lệnh native nằm trong allowlist của nó. Muốn cài thêm plugin/service KHÁC không có sẵn ở đây, xem mục Tiện ích.',
+    en: 'Every tool already COMPILED INTO the app is a plugin that declares itself in src/plugins/<id>/plugin.ts. The table below is read straight from those manifests: which Platform channels the plugin may use, and which native commands are in its allowlist. To install extra plugins/services not already here, see the Extensions section.',
   },
   'settings.plugins.count': {
     vi: '{{enabled}}/{{total}} plugin đang bật · Platform SDK {{sdk}}',
@@ -234,87 +235,97 @@ export const DICTIONARY = {
   },
   'settings.plugins.auditDenied': { vi: 'bị từ chối', en: 'denied' },
 
-  // ── Settings — Cài tiện ích (plugin JS + sidecar service) từ bên ngoài ────
-  'settings.plugins.install.title': { vi: 'Cài tiện ích từ bên ngoài', en: 'Install external extension' },
-  'settings.plugins.install.description': {
+  // ── Settings — Extensions (cài plugin/sidecar KHÁC ngoài bản biên dịch sẵn,
+  //     qua Marketplace hoặc dán URL manifest tay) ──────────────────────────
+  'settings.extensions.title': { vi: 'Tiện ích', en: 'Extensions' },
+  'settings.extensions.description': {
+    vi: 'Cài thêm plugin hoặc sidecar KHÔNG có sẵn trong bản biên dịch của app — từ Chợ tiện ích hoặc dán URL manifest tay. Đây là tiện ích do chính bạn phát hành, không phải một kho mở cho bên thứ ba. Xem mục Plugin nếu muốn xem quyền của các tool đã có sẵn.',
+    en: 'Install extra plugins or sidecars that are NOT already compiled into the app — from the Marketplace or by pasting a manifest URL. These are extensions you publish yourself, not an open third-party store. See the Plugins section for the permissions of the tools already built in.',
+  },
+  'settings.extensions.tabs.marketplace': { vi: 'Chợ tiện ích', en: 'Marketplace' },
+  'settings.extensions.tabs.installUrl': { vi: 'Cài từ URL', en: 'Install by URL' },
+
+  'settings.extensions.install.title': { vi: 'Cài tiện ích từ bên ngoài', en: 'Install external extension' },
+  'settings.extensions.install.description': {
     vi: 'Dán URL manifest của một plugin hoặc một sidecar (do bạn phát hành) để cài. Checksum sha256 trong manifest được kiểm trước khi bất kỳ dòng code/binary nào chạy — một URL không tự đủ để tin, kiểm tra vẫn diễn ra dù bạn đã tin nguồn.',
     en: 'Paste a manifest URL for a plugin or a sidecar (published by you) to install it. The sha256 checksum in the manifest is checked before any of its code/binary ever runs — a URL alone is never enough trust, the check still happens even when you trust the source.',
   },
-  'settings.plugins.install.webWarning': {
+  'settings.extensions.install.webWarning': {
     vi: 'Đang chạy trong trình duyệt — cài tiện ích chỉ hoạt động trên bản desktop.',
     en: 'Running in browser — installing extensions only works in the desktop app.',
   },
-  'settings.plugins.install.preview': { vi: 'Xem trước', en: 'Preview' },
-  'settings.plugins.install.confirm': { vi: 'Cài đặt', en: 'Install' },
-  'settings.plugins.install.previewing': { vi: 'Đang tải manifest…', en: 'Fetching manifest…' },
-  'settings.plugins.install.installing': { vi: 'Đang cài…', en: 'Installing…' },
-  'settings.plugins.install.installed': {
+  'settings.extensions.install.preview': { vi: 'Xem trước', en: 'Preview' },
+  'settings.extensions.install.confirm': { vi: 'Cài đặt', en: 'Install' },
+  'settings.extensions.install.previewing': { vi: 'Đang tải manifest…', en: 'Fetching manifest…' },
+  'settings.extensions.install.installing': { vi: 'Đang cài…', en: 'Installing…' },
+  'settings.extensions.install.installed': {
     vi: 'Đã cài. Khởi động lại app để dùng tiện ích này.',
     en: 'Installed. Restart the app to use this extension.',
   },
-  'settings.plugins.install.kind.plugin': { vi: 'Trình cắm', en: 'Plugin' },
-  'settings.plugins.install.kind.service': { vi: 'Dịch vụ', en: 'Service' },
-  'settings.plugins.install.targetTriple': {
+  'settings.extensions.install.kind.plugin': { vi: 'Trình cắm', en: 'Plugin' },
+  'settings.extensions.install.kind.service': { vi: 'Dịch vụ', en: 'Service' },
+  'settings.extensions.install.targetTriple': {
     vi: 'Nền tảng máy này: {{triple}}',
     en: 'This machine\'s target: {{triple}}',
   },
-  'settings.plugins.install.targetSupported': {
+  'settings.extensions.install.targetSupported': {
     vi: 'Manifest có bản cho nền tảng này.',
     en: 'The manifest has a build for this platform.',
   },
-  'settings.plugins.install.targetUnsupported': {
+  'settings.extensions.install.targetUnsupported': {
     vi: 'Manifest KHÔNG có bản cho nền tảng này — cài sẽ bị từ chối.',
     en: 'The manifest has NO build for this platform — install will be rejected.',
   },
-  'settings.plugins.installed.title': { vi: 'Đã cài từ bên ngoài', en: 'Installed from outside' },
-  'settings.plugins.installed.empty': { vi: 'Chưa cài tiện ích nào.', en: 'No extensions installed yet.' },
-  'settings.plugins.installed.checkUpdate': { vi: 'Kiểm bản mới', en: 'Check for update' },
-  'settings.plugins.installed.update': { vi: 'Cập nhật', en: 'Update' },
-  'settings.plugins.installed.upToDate': { vi: 'Đã là bản mới nhất', en: 'Up to date' },
-  'settings.plugins.installed.updateAvailable': {
+  'settings.extensions.installed.title': { vi: 'Tiện ích đã cài', en: 'Installed extensions' },
+  'settings.extensions.installed.empty': { vi: 'Chưa cài tiện ích nào.', en: 'No extensions installed yet.' },
+  'settings.extensions.installed.checkUpdate': { vi: 'Kiểm bản mới', en: 'Check for update' },
+  'settings.extensions.installed.update': { vi: 'Cập nhật', en: 'Update' },
+  'settings.extensions.installed.upToDate': { vi: 'Đã là bản mới nhất', en: 'Up to date' },
+  'settings.extensions.installed.updateAvailable': {
     vi: 'Có bản {{version}} mới hơn',
     en: 'Version {{version}} available',
   },
-  'settings.plugins.installed.uninstall': { vi: 'Gỡ', en: 'Uninstall' },
-  'settings.plugins.installed.serviceWarning': {
+  'settings.extensions.installed.uninstall': { vi: 'Gỡ', en: 'Uninstall' },
+  'settings.extensions.installed.serviceWarning': {
     vi: 'Cập nhật/gỡ sẽ DỪNG sidecar này nếu đang chạy — một kết nối hoặc stream đang mở sẽ bị ngắt ngay.',
     en: 'Updating/uninstalling will STOP this sidecar if it is running — any open connection or stream will be cut immediately.',
   },
-  'settings.plugins.installed.confirm': { vi: 'Xác nhận', en: 'Confirm' },
-  'settings.plugins.installed.cancel': { vi: 'Huỷ', en: 'Cancel' },
+  'settings.extensions.installed.confirm': { vi: 'Xác nhận', en: 'Confirm' },
+  'settings.extensions.installed.cancel': { vi: 'Huỷ', en: 'Cancel' },
 
-  // ── Settings — Marketplace (chọn market, cài trực tiếp từ danh sách) ─────
-  'settings.plugins.tabs.marketplace': { vi: 'Chợ tiện ích', en: 'Marketplace' },
-  'settings.plugins.tabs.installUrl': { vi: 'Cài từ URL', en: 'Install by URL' },
-  'settings.plugins.marketplace.description': {
+  // ── Settings — Extensions — Marketplace (chọn market, cài trực tiếp) ─────
+  'settings.extensions.marketplace.description': {
     vi: 'Chọn một market để xem những tiện ích có sẵn ở đó — bấm Cài để tự chuyển sang bước xem trước/xác nhận, không cài thẳng.',
     en: 'Pick a market to see what it offers — clicking Install jumps you to the same preview/confirm step, nothing installs directly.',
   },
-  'settings.plugins.marketplace.marketLabel': { vi: 'Nguồn (market)', en: 'Market' },
-  'settings.plugins.marketplace.addMarket': { vi: 'Thêm market', en: 'Add market' },
-  'settings.plugins.marketplace.marketNamePlaceholder': { vi: 'Tên market', en: 'Market name' },
-  'settings.plugins.marketplace.marketUrlPlaceholder': { vi: 'URL catalog.json', en: 'catalog.json URL' },
-  'settings.plugins.marketplace.add': { vi: 'Thêm', en: 'Add' },
-  'settings.plugins.marketplace.remove': { vi: 'Xoá market này', en: 'Remove this market' },
-  'settings.plugins.marketplace.custom': { vi: 'Tự thêm', en: 'Custom' },
-  'settings.plugins.marketplace.loading': { vi: 'Đang tải danh sách plugin…', en: 'Loading plugin list…' },
-  'settings.plugins.marketplace.error': {
+  'settings.extensions.marketplace.marketLabel': { vi: 'Nguồn (market)', en: 'Market' },
+  'settings.extensions.marketplace.addMarket': { vi: 'Thêm market', en: 'Add market' },
+  'settings.extensions.marketplace.marketNamePlaceholder': { vi: 'Tên market', en: 'Market name' },
+  'settings.extensions.marketplace.marketUrlPlaceholder': { vi: 'URL catalog.json', en: 'catalog.json URL' },
+  'settings.extensions.marketplace.add': { vi: 'Thêm', en: 'Add' },
+  'settings.extensions.marketplace.remove': { vi: 'Xoá market này', en: 'Remove this market' },
+  'settings.extensions.marketplace.custom': { vi: 'Tự thêm', en: 'Custom' },
+  'settings.extensions.marketplace.loading': { vi: 'Đang tải danh sách tiện ích…', en: 'Loading extension list…' },
+  'settings.extensions.marketplace.error': {
     vi: 'Không tải được market này: {{error}}',
     en: 'Could not load this market: {{error}}',
   },
-  'settings.plugins.marketplace.empty': { vi: 'Market này chưa có plugin nào.', en: 'This market has no plugins yet.' },
-  'settings.plugins.marketplace.install': { vi: 'Cài đặt', en: 'Install' },
-  'settings.plugins.marketplace.installed': { vi: 'Đã cài', en: 'Installed' },
-  'settings.plugins.marketplace.updateTo': { vi: 'Cập nhật lên {{version}}', en: 'Update to {{version}}' },
-  'settings.plugins.marketplace.unsupportedPlatform': {
+  'settings.extensions.marketplace.empty': {
+    vi: 'Market này chưa có tiện ích nào.',
+    en: 'This market has no extensions yet.',
+  },
+  'settings.extensions.marketplace.install': { vi: 'Cài đặt', en: 'Install' },
+  'settings.extensions.marketplace.installed': { vi: 'Đã cài', en: 'Installed' },
+  'settings.extensions.marketplace.updateTo': { vi: 'Cập nhật lên {{version}}', en: 'Update to {{version}}' },
+  'settings.extensions.marketplace.unsupportedPlatform': {
     vi: 'Không có bản cho nền tảng máy này',
     en: 'No build for this machine\'s platform',
   },
-  'settings.plugins.restart.needed': {
+  'settings.extensions.restart.needed': {
     vi: 'Đã thay đổi tiện ích cài từ bên ngoài — khởi động lại để áp dụng.',
     en: 'External extensions changed — restart to apply.',
   },
-  'settings.plugins.restart.now': { vi: 'Khởi động lại ngay', en: 'Restart now' },
+  'settings.extensions.restart.now': { vi: 'Khởi động lại ngay', en: 'Restart now' },
 
   // ── Settings — MCP ────────────────────────────────────────────────────────
   'settings.mcp.title': { vi: 'Cầu nối MCP', en: 'MCP' },

@@ -116,7 +116,7 @@ export const PLUGINS: readonly PluginRecord[] = records;
  * — `registry.test.ts` khoá điều đó, nên một manifest hỏng làm đỏ CI thay vì
  * âm thầm mất một tool khỏi sidebar của người dùng. Một plugin cài từ bên
  * ngoài bị từ chối cũng vào đây, nhưng KHÔNG làm CI đỏ (nó không tồn tại lúc
- * build) — Settings → Plugin đọc mảng này để báo cho người dùng biết.
+ * build) — Settings → Extensions đọc mảng này để báo cho người dùng biết.
  */
 export const PLUGIN_ERRORS: PluginLoadError[] = errors;
 
@@ -145,7 +145,7 @@ export function getPlugin(id: string): PluginRecord | undefined {
  * đọc — giữ `PLUGINS` đúng 26 plugin compile-time, khớp `registry.test.ts`.
  *
  * KHÔNG phản ứng lại khi cài/gỡ plugin trong lúc app đang chạy: `PLUGINS` chỉ
- * được đọc lại một lần ở đây. Settings → Plugin nhắc người dùng khởi động lại
+ * được đọc lại một lần ở đây. Settings → Extensions nhắc người dùng khởi động lại
  * app sau khi cài/gỡ/cập nhật — cùng mô hình app đã dùng cho việc TỰ CẬP NHẬT
  * (`UpdateContext` cũng cài xong rồi `relaunch()`), không phải một quyết định
  * riêng cho plugin.
