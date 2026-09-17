@@ -280,7 +280,14 @@ function executePipeline(steps: PipelineStep[]): StepResult[] {
 
 // ─── ID helper ─────────────────────────────────────────────────────────────────
 
-function makeId() { return Math.random().toString(36).slice(2, 9); }
+// `crypto.getRandomValues` thay vì `Math.random()`: chỉ để tránh trùng id
+// giữa các bước pipeline, không có ý nghĩa bảo mật nào ở đây, nhưng
+// `Math.random()` là PRNG không an toàn mà các máy quét tĩnh như SonarCloud
+// luôn gắn cờ bất kể ngữ cảnh dùng.
+function makeId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return Array.from(bytes, (b) => b.toString(36)).join('').slice(0, 7);
+}
 
 // ─── Shared tiny components ────────────────────────────────────────────────────
 

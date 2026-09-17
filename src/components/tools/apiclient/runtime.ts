@@ -15,6 +15,7 @@
 // name itself (see `pm`/`postman` below, which stays the *actual* Postman
 // name for import compatibility, unaffected by this).
 
+import { uid } from './types';
 import type {
   ApiRequest, ApiResponse, Assertion, LogEntry, TestResult, VarMap,
 } from './types';
@@ -318,7 +319,7 @@ export function makeRes(res: ApiResponse) {
   };
 }
 
-const newId = () => `s-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const newId = uid;
 
 // `req` reads and mutates the request draft (a clone) before it is sent.
 export function makeReq(draft: ApiRequest) {
