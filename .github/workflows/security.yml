@@ -71,12 +71,10 @@ jobs:
         working-directory: src-tauri
         run: cargo audit
 
-  # NOTE: CodeQL is not run from this workflow. The repository has CodeQL
-  # "default setup" enabled, which already analyses javascript-typescript, rust,
-  # actions, python and java-kotlin — broader coverage than an advanced config
-  # here would give. GitHub refuses SARIF from an advanced configuration while
-  # default setup is on, so a job here could only ever fail. Manage CodeQL in
-  # Settings -> Code security.
+  # NOTE: CodeQL is not run from this workflow — see .github/workflows/codeql.yml
+  # (Advanced Setup, replacing the old GitHub-managed "default setup": cached
+  # Rust builds, a concurrency group, and path-filtered PR runs instead of a
+  # config-less scan on every PR push and every resulting main push).
 
   # ── Leaked credentials, in the tree and in history ───────────────────────
   secret-scan:

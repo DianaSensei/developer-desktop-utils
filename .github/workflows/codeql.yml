@@ -1,0 +1,154 @@
+name: CodeQL
+
+# Advanced Setup, replacing GitHub's CodeQL "default setup" (see the removed
+# comment in security.yml). Default setup gave three problems with no way to
+# fix them because it isn't a file in this repo: the `rust` analyze job
+# autobuilt the crate from scratch every run (~8.5 min, no cache — the crate
+# itself builds in under a minute with the Cargo cache setup-tauri-env
+# already gives every other workflow), every push to a PR queued a second
+# full scan on top of the first because there was no concurrency group to
+# cancel it, and the same commit got scanned twice — once as the PR head,
+# once again as the resulting push to main.
+#
+# IMPORTANT — this workflow only takes effect once CodeQL "default setup" is
+# turned off: Settings -> Code security and analysis -> CodeQL analysis ->
+# Set up -> Advanced (or Disable, since this file now covers it). GitHub
+# refuses to accept SARIF uploads from an advanced-configuration workflow
+# while default setup is still enabled, so this workflow's runs will show a
+# red X here until that switch is flipped by hand — no gh/API call available
+# from this session — before or immediately after merging.
+on:
+  push:
+    branches: [main]
+    paths-ignore: &codeql-irrelevant
+      - '**/*.md'
+      - 'docs/**'
+      - 'testing/**'
+  pull_request:
+    paths-ignore: *codeql-irrelevant
+  schedule:
+    # Weekly rather than default setup's own cadence — advisories that land
+    # against unchanged dependencies are already covered on the same cadence
+    # as security.yml's cargo-audit/npm-audit schedule's sibling monthly
+    # scan; weekly here just keeps CodeQL's own query packs fresh sooner.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Cheap up-front check so a change touching only, say, GitHub Actions YAML
+  # doesn't also pay for a Rust analyze build, and vice versa. Always true on
+  # schedule/workflow_dispatch/push-to-main so those keep full coverage.
+  changes:
+    name: Detect changed languages
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      js: ${{ steps.filter.outputs.js }}
+      actions: ${{ steps.filter.outputs.actions }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Plain `git diff` against the merge-base (PR) or the pre-push commit
+      # (push to main) instead of a third-party paths-filter action — no
+      # extra dependency to keep pinned/updated for what's a two-line check.
+      - name: Detect changed languages
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base=$(git merge-base "origin/${{ github.event.pull_request.base.ref }}" HEAD)
+          else
+            base="${{ github.event.before }}"
+          fi
+          changed=$(git diff --name-only "$base" "${{ github.sha }}")
+          echo "$changed"
+
+          echo "rust=$(echo "$changed" | grep -qE '^(src-tauri/|Cargo\.lock$)' && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "js=$(echo "$changed" | grep -qE '^(src/|package(-lock)?\.json$|tsconfig.*\.json$|vite\.config\.ts$)' && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "actions=$(echo "$changed" | grep -qE '^\.github/' && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    needs: changes
+    # On schedule/workflow_dispatch/push-to-main every language always runs
+    # (github.event_name != 'pull_request' short-circuits the changes.* check);
+    # on a PR only the matching language(s) run.
+    if: |
+      github.event_name != 'pull_request' ||
+      (matrix.language == 'rust' && needs.changes.outputs.rust == 'true') ||
+      (matrix.language == 'javascript-typescript' && needs.changes.outputs.js == 'true') ||
+      (matrix.language == 'actions' && needs.changes.outputs.actions == 'true')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+          - language: rust
+            build-mode: manual
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # Same cached setup coverage.yml's `rust` job and release.yml already
+      # use — reuses the Cargo/registry cache built on main instead of
+      # compiling the crate and its dependency tree from nothing.
+      - name: Setup build environment
+        if: matrix.language == 'rust'
+        uses: ./.github/actions/setup-tauri-env
+        with:
+          cache-shared-key: coverage
+          cache-save-if: 'false'
+          install-frontend-deps: 'false'
+
+      # generate_context! reads frontendDist (../dist) at compile time — see
+      # coverage.yml's identical step for why this has to exist before cargo
+      # runs, and why the frontend build itself doesn't need `npm ci` beyond
+      # what setup-tauri-env's install-frontend-deps: 'false' skips here.
+      - name: Build frontend (creates ../dist for generate_context!)
+        if: matrix.language == 'rust'
+        run: |
+          npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+          npm run build
+
+      # tauri-build's build.rs checks every bundle.externalBin resource
+      # exists on disk even for a plain `cargo build` that never bundles
+      # anything — see coverage.yml's identical step for the full reason.
+      - name: Placeholder externalBin resources
+        if: matrix.language == 'rust'
+        run: |
+          mkdir -p src-tauri/binaries
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          touch "src-tauri/binaries/devtool-mcp-server-$triple" "src-tauri/binaries/devtool-svc-echo-$triple"
+          chmod +x src-tauri/binaries/devtool-mcp-server-"$triple" src-tauri/binaries/devtool-svc-echo-"$triple"
+
+      - name: Build (rust)
+        if: matrix.language == 'rust'
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          category: '/language:${{ matrix.language }}'
