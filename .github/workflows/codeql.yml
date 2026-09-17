@@ -174,8 +174,10 @@ jobs:
           touch "src-tauri/binaries/devtool-mcp-server-$triple" "src-tauri/binaries/devtool-svc-echo-$triple"
           chmod +x src-tauri/binaries/devtool-mcp-server-"$triple" src-tauri/binaries/devtool-svc-echo-"$triple"
 
+      # --locked: build from the committed Cargo.lock as-is instead of letting
+      # cargo silently re-resolve dependency versions (SonarCloud S8549).
       - name: Build (rust)
-        run: cargo build --manifest-path src-tauri/Cargo.toml
+        run: cargo build --locked --manifest-path src-tauri/Cargo.toml
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
