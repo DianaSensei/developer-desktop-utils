@@ -55,21 +55,36 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
 
   const selected = markets.find((m) => m.id === selectedId) ?? markets[0];
 
-  const load = useCallback(async (market: Market) => {
+  const load = useCallback(async (market: Market, isStale: () => boolean) => {
     setLoading(true);
     setError(null);
     setPlugins(null);
     try {
-      setPlugins(await fetchMarketCatalog(market.catalogUrl));
+      const result = await fetchMarketCatalog(market.catalogUrl);
+      // Người dùng có thể đã đổi sang market khác trong lúc fetch này còn
+      // đang chạy (đổi Select, hoặc thêm/xoá market khiến `selected` đổi
+      // identity) — một response TỚI SAU không được ghi đè danh sách của
+      // market hiện đang chọn, nếu không Select sẽ hiện một market trong khi
+      // card hiện plugin của market khác, và Install xếp nhầm manifest.
+      if (isStale()) return;
+      setPlugins(result);
     } catch (e) {
+      if (isStale()) return;
       setError(String(e instanceof Error ? e.message : e));
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (selected) void load(selected);
+    // Bản web chỉ hiện cảnh báo desktop-only (return sớm bên dưới) — không
+    // có gì để tải, không nên tự bắn request catalog.
+    if (!isTauri || !selected) return;
+    let stale = false;
+    void load(selected, () => stale);
+    return () => {
+      stale = true;
+    };
   }, [selected, load]);
 
   useEffect(() => {
@@ -268,7 +283,11 @@ function MarketPluginCard({
         <p className="text-[11px] text-warn">{t('settings.plugins.marketplace.unsupportedPlatform')}</p>
       )}
 
-      <Button size="sm" onClick={onInstall} disabled={upToDate || unsupported} className="self-start">
+      {/* Cảnh báo, KHÔNG chặn — `targets` chỉ mang tính tham khảo (một market
+          không chính thức có thể thiếu triple dù bản build thật sự có), cùng
+          nguyên tắc SettingsExtensionInstaller đã áp cho cùng field này: xem
+          trước rồi để người dùng tự quyết, không tự ý từ chối thay họ. */}
+      <Button size="sm" onClick={onInstall} disabled={upToDate} className="self-start">
         {upToDate
           ? t('settings.plugins.marketplace.installed')
           : installedVersion

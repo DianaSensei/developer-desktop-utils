@@ -75,10 +75,18 @@ afterEach(() => {
 });
 
 describe('SettingsMarketplace — bản web (không phải Tauri)', () => {
-  it('hiện cảnh báo, không gọi fetch/invoke', async () => {
+  it('hiện cảnh báo, không gọi fetch/invoke — kể cả effect tải catalog', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
     await renderMarketplace({ tauri: false });
+    await settle();
+
     expect(screen.getByText(/only works in the desktop app|chỉ hoạt động trên bản desktop/)).toBeTruthy();
     expect(invokeMock).not.toHaveBeenCalled();
+    // Bản web chỉ hiện cảnh báo, không có gì để hiển thị — effect tải catalog
+    // phải tự dừng ở `!isTauri`, không âm thầm bắn request không ai dùng tới.
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -130,6 +138,23 @@ describe('SettingsMarketplace — cài đặt (chuyển tiếp qua pendingInstal
     const { pendingInstall } = await import('@/lib/pendingInstall');
     expect(pendingInstall.dequeue()).toEqual({ url: 'https://example.com/demo-plugin.json', marketId: 'official' });
     expect(pendingInstall.dequeue()).toEqual({ url: 'https://example.com/demo-service.json', marketId: 'official' });
+  });
+
+  it('targets chỉ mang tính tham khảo: nền tảng máy không nằm trong targets thì CẢNH BÁO nhưng vẫn cho bấm Install', async () => {
+    invokeMock.mockResolvedValueOnce([]); // listInstalledArtifacts
+    invokeMock.mockResolvedValueOnce('x86_64-pc-windows-msvc'); // currentTargetTriple — không nằm trong targets bên dưới
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(demoCatalog({ targets: ['aarch64-apple-darwin'] }))),
+    );
+
+    await renderMarketplace();
+    await settle();
+
+    await waitFor(() => expect(screen.getByText(/demo@1\.0\.0/)).toBeTruthy());
+    expect(screen.getByText(/No build for this machine|Không có bản cho nền tảng máy này/)).toBeTruthy();
+    const installButton = screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }) as HTMLButtonElement;
+    expect(installButton.disabled).toBe(false);
   });
 
   it('đã cài đúng bản mới nhất thì nút Install bị vô hiệu hoá, hiện "Installed"', async () => {

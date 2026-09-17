@@ -96,47 +96,17 @@ export function SettingsExtensionInstaller() {
     void refresh();
   }, [refresh]);
 
-  // `desktop-devtool-app://install?manifest=...&service=...` (starlight-site) xếp URL
-  // vào hàng đợi này rồi điều hướng tới Settings → Plugin — nhưng nếu người
-  // dùng ĐÃ đứng sẵn ở đây khi link thứ hai tới (single-instance chuyển tiếp
-  // sang tiến trình đang chạy), điều hướng tới path đang đứng sẵn không
-  // remount component, nên không thể chỉ trông chờ effect chạy một lần lúc
-  // mount — phải nghe `pendingInstall.subscribe` để tự kéo hàng đợi mỗi khi
-  // có URL mới, không riêng gì lúc mount. `drain` được khai báo là closure
-  // trong cùng thân hàm nên tham chiếu đúng `runPreview` hiện tại dù effect
-  // đăng ký subscribe trước khi `runPreview` được gán ở dưới — cùng lý do đã
-  // giải thích ở đầu `pendingInstall.ts`. Người dùng vẫn phải tự bấm "Cài
-  // đặt" để xác nhận; đây chỉ tự điền + xem trước thay cho copy/dán tay.
-  useEffect(() => {
-    const drain = () => {
-      const next = pendingInstall.dequeue();
-      if (!next) return;
-      setUrl(next.url);
-      void runPreview(next.url, next.marketId);
-    };
-    drain(); // bắt URL đã xếp sẵn trước khi component này mount
-    return pendingInstall.subscribe(drain);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ExtensionUpdateContext đã tự kiểm mọi artifact lúc app khởi động — dùng
-  // kết quả đó để hiện sẵn nút "Update" ngay khi mở trang này, thay vì bắt
-  // người dùng bấm "Check for update" từng dòng trước (nút đó vẫn còn, cho
-  // trường hợp một artifact đổi version SAU lần kiểm lúc khởi động).
-  useEffect(() => {
-    if (autoUpdates.length === 0) return;
-    setRowUpdateVersion((prev) => {
-      const next = { ...prev };
-      for (const u of autoUpdates) next[u.key] = u.remoteVersion;
-      return next;
-    });
-  }, [autoUpdates]);
-
-  if (!isTauri) {
-    return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;
-  }
-
-  const runPreview = async (targetUrl: string, marketId?: string) => {
+  // KHAI BÁO TRƯỚC early return `if (!isTauri) return ...` bên dưới, dù chỉ
+  // effect ngay sau đây (không phải JSX) mới thật sự cần nó ở render này —
+  // effect đó chạy TRƯỚC MỌI early return (Rules of Hooks: hook luôn chạy
+  // theo đúng thứ tự, bất kể return sớm nằm sau chúng), nên nếu `runPreview`
+  // (một `const`) được khai SAU early return, một render với `isTauri` false
+  // sẽ return trước khi tới dòng gán đó — biến vẫn nằm trong TDZ, và
+  // `drain()` (đóng gói `runPreview` trong effect dưới) ném ReferenceError
+  // ngay khi bị gọi (lúc mount, hoặc qua `pendingInstall.subscribe`). Bắt
+  // được bằng test: mount component này ở bản KHÔNG PHẢI Tauri trong khi
+  // `pendingInstall` đã có sẵn một URL.
+  const runPreview = useCallback(async (targetUrl: string, marketId?: string) => {
     setPreview(null);
     setPreviewTriple(null);
     setPreviewError(null);
@@ -157,7 +127,48 @@ export function SettingsExtensionInstaller() {
     } finally {
       setPreviewing(false);
     }
-  };
+  }, []);
+
+  // `desktop-devtool-app://install?manifest=...&service=...` (starlight-site) xếp URL
+  // vào hàng đợi này rồi điều hướng tới Settings → Plugin — nhưng nếu người
+  // dùng ĐÃ đứng sẵn ở đây khi link thứ hai tới (single-instance chuyển tiếp
+  // sang tiến trình đang chạy), điều hướng tới path đang đứng sẵn không
+  // remount component, nên không thể chỉ trông chờ effect chạy một lần lúc
+  // mount — phải nghe `pendingInstall.subscribe` để tự kéo hàng đợi mỗi khi
+  // có URL mới, không riêng gì lúc mount. `drain` được khai báo là closure
+  // trong cùng thân hàm nên tham chiếu đúng `runPreview` hiện tại dù effect
+  // đăng ký subscribe trước khi `runPreview` được gán ở dưới — cùng lý do đã
+  // giải thích ở đầu `pendingInstall.ts`. Người dùng vẫn phải tự bấm "Cài
+  // đặt" để xác nhận; đây chỉ tự điền + xem trước thay cho copy/dán tay.
+  // `runPreview` là `useCallback` với deps `[]` (danh tính ổn định suốt vòng
+  // đời component) nên khai trong deps ở đây không gây effect chạy lại thừa.
+  useEffect(() => {
+    const drain = () => {
+      const next = pendingInstall.dequeue();
+      if (!next) return;
+      setUrl(next.url);
+      void runPreview(next.url, next.marketId);
+    };
+    drain(); // bắt URL đã xếp sẵn trước khi component này mount
+    return pendingInstall.subscribe(drain);
+  }, [runPreview]);
+
+  // ExtensionUpdateContext đã tự kiểm mọi artifact lúc app khởi động — dùng
+  // kết quả đó để hiện sẵn nút "Update" ngay khi mở trang này, thay vì bắt
+  // người dùng bấm "Check for update" từng dòng trước (nút đó vẫn còn, cho
+  // trường hợp một artifact đổi version SAU lần kiểm lúc khởi động).
+  useEffect(() => {
+    if (autoUpdates.length === 0) return;
+    setRowUpdateVersion((prev) => {
+      const next = { ...prev };
+      for (const u of autoUpdates) next[u.key] = u.remoteVersion;
+      return next;
+    });
+  }, [autoUpdates]);
+
+  if (!isTauri) {
+    return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;
+  }
 
   const handlePreview = () => runPreview(url);
 

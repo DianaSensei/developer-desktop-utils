@@ -75,4 +75,20 @@ describe('pendingInstall', () => {
     expect(listener).not.toHaveBeenCalled();
     expect(pendingInstall.dequeue()).toBeNull();
   });
+
+  describe('hasPending', () => {
+    it('false khi hàng đợi rỗng', async () => {
+      const { pendingInstall } = await import('@/lib/pendingInstall');
+      expect(pendingInstall.hasPending()).toBe(false);
+    });
+
+    it('true ngay sau enqueue, KHÔNG tiêu thụ hàng đợi (khác dequeue)', async () => {
+      const { pendingInstall } = await import('@/lib/pendingInstall');
+      pendingInstall.enqueue(['https://a/1.json']);
+      expect(pendingInstall.hasPending()).toBe(true);
+      expect(pendingInstall.hasPending()).toBe(true); // gọi lại vẫn true — không rút mất
+      expect(pendingInstall.dequeue()).toEqual({ url: 'https://a/1.json', marketId: undefined });
+      expect(pendingInstall.hasPending()).toBe(false);
+    });
+  });
 });

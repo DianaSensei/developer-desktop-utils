@@ -81,9 +81,15 @@ export function listMarkets(): Market[] {
 }
 
 // `Date.now()` một mình không đủ duy nhất khi hai lần thêm xảy ra trong cùng
-// millisecond (đã bắt được ngay bằng test) — kèm một số ngẫu nhiên.
+// millisecond (đã bắt được ngay bằng test) — kèm một chuỗi ngẫu nhiên. Dùng
+// `crypto.getRandomValues` thay vì `Math.random()`: chỉ để tránh trùng id,
+// không có ý nghĩa bảo mật nào ở đây, nhưng `Math.random()` là PRNG không an
+// toàn mà SonarCloud (và nhiều máy quét tĩnh khác) luôn gắn cờ bất kể ngữ
+// cảnh dùng — dùng Web Crypto sẵn có (webview lẫn trình duyệt) tránh hẳn cảnh
+// báo mà không tốn thêm dependency nào.
 function randomSuffix(): string {
-  return Math.random().toString(36).slice(2, 8);
+  const bytes = crypto.getRandomValues(new Uint8Array(4));
+  return Array.from(bytes, (b) => b.toString(36)).join('').slice(0, 6);
 }
 
 // Kebab-case (chữ thường, số, dấu gạch nối) — CHỦ ĐÍCH, không chỉ để đẹp:

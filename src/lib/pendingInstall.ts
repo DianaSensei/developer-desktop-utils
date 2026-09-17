@@ -67,4 +67,13 @@ export const pendingInstall = {
     listeners.add(listener);
     return () => listeners.delete(listener);
   },
+  /** Hàng đợi có mục đang chờ không — KHÔNG tiêu thụ (khác `dequeue`). Dùng
+   *  bởi `SettingsPlugins.tsx` để chọn tab "Cài từ URL" làm tab hiện hành
+   *  ngay từ lần render đầu khi có sẵn một URL đã xếp hàng TRƯỚC khi trang
+   *  Settings mount (deep link mở app từ trạng thái nguội) — nếu không, tab
+   *  mặc định "Chợ tiện ích" sẽ không bao giờ mount `SettingsExtensionInstaller`
+   *  để tự kéo hàng đợi, và URL nằm im không ai xem trước. */
+  hasPending(): boolean {
+    return queue.length > 0;
+  },
 };
