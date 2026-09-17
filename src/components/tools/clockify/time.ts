@@ -7,11 +7,15 @@ export const MS_MIN = 60_000;
 export const MS_HOUR = 3_600_000;
 export const MS_DAY = 86_400_000;
 
-const uidCounter = { n: 0 };
-export const uid = (): string =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${(uidCounter.n++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+// `crypto.randomUUID` không có ở vài webview cũ hơn — `crypto.getRandomValues`
+// (chuẩn Web Crypto có mặt rộng hơn nhiều) là phương án dự phòng, thay vì
+// `Math.random()` (PRNG không an toàn, bị các máy quét tĩnh như SonarCloud
+// gắn cờ bất kể ngữ cảnh dùng).
+export const uid = (): string => {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return `${Date.now().toString(36)}-${Array.from(bytes, (b: number) => b.toString(36)).join('').slice(0, 8)}`;
+};
 
 export const pad = pad2;
 

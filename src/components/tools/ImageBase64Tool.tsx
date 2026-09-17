@@ -17,9 +17,13 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-function normalizeBase64(raw: string): string {
+// Only ever hand the browser a data: URL whose declared MIME type is an
+// image — a pasted `data:text/html,...` (or any other non-image type) must
+// not reach the DOM as an <img src>, even though <img> itself never executes
+// markup/script from its src (unlike innerHTML/srcDoc sinks).
+function normalizeBase64(raw: string): string | null {
   const s = raw.trim();
-  if (s.startsWith('data:')) return s;
+  if (s.startsWith('data:')) return /^data:image\//i.test(s) ? s : null;
   // Try to detect image type from base64 magic bytes
   try {
     const header = atob(s.slice(0, 16));
@@ -233,7 +237,7 @@ export function ImageBase64Tool() {
               </div>
             )}
 
-            {decodeError && (
+            {(decodeError || (decodeInput.trim() && decodeSrc == null)) && (
               <div className="flex items-center gap-2 rounded-lg border border-bad/20 bg-bad/8 px-3 py-2">
                 <AlertCircle className="h-3.5 w-3.5 text-bad shrink-0" />
                 <p className="text-xs text-bad">Could not render image — invalid or unsupported base64.</p>
