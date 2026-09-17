@@ -159,9 +159,16 @@ export type InstalledArtifactRecord =
 /** Hình dạng thô (snake_case) nhận trực tiếp từ `invoke` — chỉ dùng nội bộ
  *  file này, không export: mọi nơi khác trong app chỉ nên thấy bản camelCase
  *  ở trên. */
+// `market_id` phía Rust là `Option<String>` KHÔNG có `skip_serializing_if` —
+// một record không market ghi ra JSON `"market_id": null`, không phải vắng
+// hẳn trường này. `?: string | null` phản ánh đúng cả hai khả năng (thiếu
+// hẳn trường, cho index.json rất cũ; hoặc `null`, cho bản ghi bình thường
+// không market) — `toCamelArtifactRecord` bên dưới chuẩn hoá cả hai về
+// `undefined` một lần duy nhất, để KHÔNG chỗ nào khác trong TS phải nhớ so
+// `=== null` thay vì `=== undefined`.
 type RawInstalledArtifactRecord =
-  | { kind: 'plugin'; manifest: RemotePluginManifest; source_url: string; bundle_path: string; installed_at: number; market_id?: string }
-  | { kind: 'service'; manifest: RemoteServiceManifest; source_url: string; bin_path: string; installed_at: number; market_id?: string };
+  | { kind: 'plugin'; manifest: RemotePluginManifest; source_url: string; bundle_path: string; installed_at: number; market_id?: string | null }
+  | { kind: 'service'; manifest: RemoteServiceManifest; source_url: string; bin_path: string; installed_at: number; market_id?: string | null };
 
 /** Bảng tên → icon cố định. Một plugin cài từ bên ngoài không thể `import`
  *  thẳng một icon component (JSON không mang code) — tác giả chọn TÊN, host
@@ -189,7 +196,7 @@ function toCamelArtifactRecord(record: RawInstalledArtifactRecord): InstalledArt
       sourceUrl: record.source_url,
       bundlePath: record.bundle_path,
       installedAt: record.installed_at,
-      marketId: record.market_id,
+      marketId: record.market_id ?? undefined,
     };
   }
   return {
@@ -198,7 +205,7 @@ function toCamelArtifactRecord(record: RawInstalledArtifactRecord): InstalledArt
     sourceUrl: record.source_url,
     binPath: record.bin_path,
     installedAt: record.installed_at,
-    marketId: record.market_id,
+    marketId: record.market_id ?? undefined,
   };
 }
 

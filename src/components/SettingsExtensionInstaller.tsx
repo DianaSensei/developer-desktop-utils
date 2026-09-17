@@ -170,7 +170,12 @@ export function SettingsExtensionInstaller() {
     return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;
   }
 
-  const handlePreview = () => runPreview(url);
+  // Giữ nguyên `previewMarketId` khi bấm lại Preview cho ĐÚNG url đang có sẵn
+  // (vd sau khi hàng đợi tự điền + xem trước, người dùng bấm Preview lần nữa
+  // để tải lại) — chỉ có ô nhập URL tự gõ tay (`onChange` bên dưới) mới thật
+  // sự đổi sang URL khác và cần xoá market cũ. Bấm Preview không phải là một
+  // URL mới, nên không được âm thầm làm rớt market của URL đang xem trước.
+  const handlePreview = () => runPreview(url, previewMarketId);
 
   const handleInstall = async () => {
     setInstallError(null);

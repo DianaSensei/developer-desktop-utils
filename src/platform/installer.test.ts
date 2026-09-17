@@ -212,6 +212,22 @@ describe('fetchArtifactManifestPreview / installArtifact / listInstalledArtifact
     await installer.uninstallArtifact('devtool-svc-demo');
     expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'devtool-svc-demo' });
   });
+
+  // pullfrog bắt đúng ở review #145: `market_id` phía Rust là `Option<String>`
+  // KHÔNG có `skip_serializing_if`, nên một bản ghi không market ghi ra JSON
+  // `"market_id": null` — KHÔNG phải vắng hẳn trường (`undefined`). So sánh
+  // `=== undefined` ở phía TS (SettingsMarketplace's "đã cài" match) sẽ không
+  // bao giờ khớp một bản ghi thật từ Rust, mời cài chồng thêm một bản nữa.
+  it('market_id: null (bản ghi không market, ĐÚNG hình dạng Rust thật gửi) chuẩn hoá thành marketId: undefined', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([
+      installedPluginRaw({ market_id: null }),
+      installedServiceRaw({ market_id: null }),
+    ]);
+    const [plugin, service] = await installer.listInstalledArtifacts();
+    expect(plugin.marketId).toBeUndefined();
+    expect(service.marketId).toBeUndefined();
+  });
 });
 
 describe('currentTargetTriple', () => {

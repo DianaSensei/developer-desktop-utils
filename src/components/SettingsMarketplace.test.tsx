@@ -169,6 +169,13 @@ describe('SettingsMarketplace — cài đặt (chuyển tiếp qua pendingInstal
         source_url: 'https://example.com/demo-plugin.json',
         bundle_path: '/tmp/demo/bundle.mjs',
         installed_at: 1_700_000_000_000,
+        // Hình dạng THẬT Rust gửi cho một bản ghi không market — `null`, không
+        // phải vắng hẳn trường (`Option<String>` không có
+        // `skip_serializing_if`). Bug đã xảy ra: so `=== undefined` phía
+        // component không khớp `null`, khiến bản ghi này (cài từ trước tính
+        // năng market, không thuộc market nào) bị coi là CHƯA cài — nút vẫn
+        // hiện "Install" thay vì "Installed", mời cài chồng thêm một bản nữa.
+        market_id: null,
       },
     ]); // listInstalledArtifacts
     invokeMock.mockResolvedValueOnce('aarch64-apple-darwin'); // currentTargetTriple

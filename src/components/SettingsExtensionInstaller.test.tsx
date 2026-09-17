@@ -376,4 +376,38 @@ describe('SettingsExtensionInstaller — hàng đợi desktop-devtool-app://inst
     );
     await waitFor(() => expect(screen.getByText('Second Link Plugin')).toBeTruthy());
   });
+
+  // pullfrog bắt đúng ở review #145: bấm lại nút Preview (không phải gõ URL
+  // mới) từng âm thầm xoá `previewMarketId` vì `handlePreview` gọi
+  // `runPreview(url)` không kèm market — Install sau đó cài với
+  // `marketId: undefined`, khiến bản ghi rơi ra khỏi market thật của nó.
+  it('bấm lại Preview cho URL đã xếp từ market không được làm rớt marketId — Install vẫn phải cài đúng market', async () => {
+    invokeMock.mockResolvedValueOnce([]); // list lúc mount
+    await renderInTauri();
+    await settle();
+
+    const { pendingInstall } = await import('@/lib/pendingInstall');
+    invokeMock.mockResolvedValueOnce(pluginManifestRaw({ label: 'Market Plugin' }));
+    act(() => {
+      pendingInstall.enqueue(['https://example.com/market-plugin.json'], 'official');
+    });
+    await waitFor(() => expect(screen.getByText('Market Plugin')).toBeTruthy());
+
+    // Bấm lại Preview cho ĐÚNG url đang có (không gõ gì mới) — market phải
+    // còn nguyên sau lần xem trước lại này.
+    invokeMock.mockResolvedValueOnce(pluginManifestRaw({ label: 'Market Plugin' }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview|Xem trước/ }));
+    await waitFor(() => expect(screen.getByText('Market Plugin')).toBeTruthy());
+
+    invokeMock.mockResolvedValueOnce(installedPluginRaw()); // install
+    invokeMock.mockResolvedValueOnce([]); // refresh sau khi cài
+    fireEvent.click(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
+        sourceUrl: 'https://example.com/market-plugin.json',
+        marketId: 'official',
+      });
+    });
+  });
 });
