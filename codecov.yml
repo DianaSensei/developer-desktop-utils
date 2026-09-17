@@ -1,7 +1,9 @@
 # Codecov configuration.
-# Coverage here measures the Rust backend (src-tauri). Much of that crate is
-# Tauri command glue and network/file I/O that can't run in unit tests, so
-# coverage is reported as informational — it never fails CI or blocks a PR.
+# Two flags, one per language, uploaded by .github/workflows/coverage.yml's
+# two jobs: `frontend` (vitest, src/) and `rust` (cargo-llvm-cov, src-tauri/).
+# Both a Tauri command's glue/network/file I/O and a fair amount of frontend
+# UI wiring can't run in unit tests, so every status stays informational — it
+# never fails CI or blocks a PR, for either flag.
 coverage:
   status:
     project:
@@ -11,12 +13,28 @@ coverage:
       default:
         informational: true
 
+flags:
+  frontend:
+    paths:
+      - "src/"
+    # A doc-only/script-only PR skips BOTH jobs (coverage.yml's paths-ignore),
+    # so neither flag uploads anything for that commit — without carryforward
+    # Codecov would report this flag as having "dropped to 0%" instead of
+    # just reusing its last known number.
+    carryforward: true
+  rust:
+    paths:
+      - "src-tauri/src/"
+    carryforward: true
+
 comment:
   layout: "reach, diff, flags, files"
   require_changes: true
 
-# The lcov report only contains the Rust backend (src-tauri/src), so no
-# frontend ignores are needed. Exclude the Tauri entrypoint, which is plumbing
-# that can't be exercised by unit tests.
+# `src-tauri/src/main.rs` is the Tauri entrypoint — plumbing that can't be
+# exercised by unit tests. Frontend exclusions live in vitest.config.ts's own
+# coverage.exclude instead (test files, src/main.tsx, the design-system
+# re-export barrel) — vitest never puts those in its lcov.info, so nothing
+# here needs to repeat them.
 ignore:
   - "src-tauri/src/main.rs"

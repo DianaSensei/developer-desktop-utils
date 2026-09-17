@@ -1,12 +1,13 @@
 name: Coverage
 
-# Skip paths that can't move the Rust coverage number or break `npm run build`
-# / `cargo llvm-cov`: docs, the local docker-compose fixtures used for manual
+# Two independent jobs, one Codecov upload each under its own flag (see
+# codecov.yml): `frontend` (vitest, Node-only) and `rust` (cargo-llvm-cov,
+# the expensive one — Tauri system deps + a full Rust build). Both share the
+# same paths-ignore below since neither can move on a docs-only/script-only
+# change: docs, the local docker-compose fixtures used for manual
 # Kafka/RabbitMQ testing, and the one-off maintenance scripts (icon gen,
 # release verification, MCP-sidecar prep for the desktop build — not the
-# `npm run build` this job actually runs). This is the most expensive
-# workflow here (Tauri system deps + a full Rust build), so it's worth being
-# picky about what triggers it.
+# `npm run build` the rust job runs to embed the frontend).
 on:
   push:
     branches: [main]
@@ -31,7 +32,39 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  coverage:
+  # Node-only, no Tauri system deps/Rust toolchain — reports in well under a
+  # minute, independent of the Rust job below. Uploaded under its own
+  # `frontend` flag (see codecov.yml) so it shows as a separate component
+  # from the Rust coverage, instead of one number that mixes two languages'
+  # very different testability.
+  frontend:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+
+      - name: Generate coverage (lcov, vitest.config.ts's existing coverage block)
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  rust:
     runs-on: ubuntu-22.04
     # Observed median 3 min, worst 7.5 min. The default is 360, so a job wedged
     # on a network stall would otherwise hold a concurrency slot for six hours.
@@ -93,6 +126,7 @@ jobs:
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: lcov.info
+          flags: rust
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
