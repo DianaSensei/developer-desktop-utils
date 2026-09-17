@@ -1,14 +1,11 @@
 name: CodeQL
 
 # Advanced Setup, replacing GitHub's CodeQL "default setup" (see the removed
-# comment in security.yml). Default setup gave three problems with no way to
-# fix them because it isn't a file in this repo: the `rust` analyze job
-# autobuilt the crate from scratch every run (~8.5 min, no cache — the crate
-# itself builds in under a minute with the Cargo cache setup-tauri-env
-# already gives every other workflow), every push to a PR queued a second
-# full scan on top of the first because there was no concurrency group to
-# cancel it, and the same commit got scanned twice — once as the PR head,
-# once again as the resulting push to main.
+# comment in security.yml). Default setup gave two problems with no way to
+# fix them because it isn't a file in this repo: every push to a PR queued a
+# second full scan on top of the first because there was no concurrency
+# group to cancel it, and the same commit got scanned twice — once as the PR
+# head, once again as the resulting push to main.
 #
 # IMPORTANT — this workflow only takes effect once CodeQL "default setup" is
 # turned off: Settings -> Code security and analysis -> CodeQL analysis ->
@@ -132,50 +129,29 @@ jobs:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 25
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # CodeQL's Rust extractor only supports build-mode: none (confirmed by
+      # a failed run: "Rust does not support the manual build mode. Please
+      # try ... none") — but that's NOT source-only parsing: per GitHub's
+      # docs, rust-analyzer still compiles and runs build.rs scripts and
+      # compiles proc-macro code (it only skips the full crate build), into
+      # a fresh, uncached cargo_target_dir every run. So this job doesn't
+      # need coverage.yml's rust job's full cached-build sequence
+      # (setup-tauri-env, npm run build, externalBin placeholders, cargo
+      # build) — those exist only for an actual `cargo`/tauri-build
+      # invocation — but it's still heavier than the actions/js-ts jobs,
+      # which is why its timeout stays above theirs.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           languages: rust
-          build-mode: manual
-
-      # Same cached setup coverage.yml's `rust` job and release.yml already
-      # use — reuses the Cargo/registry cache built on main instead of
-      # compiling the crate and its dependency tree from nothing.
-      - name: Setup build environment
-        uses: ./.github/actions/setup-tauri-env
-        with:
-          cache-shared-key: coverage
-          cache-save-if: 'false'
-          install-frontend-deps: 'false'
-
-      # generate_context! reads frontendDist (../dist) at compile time — see
-      # coverage.yml's identical step for why this has to exist before cargo
-      # runs, and why the frontend build itself doesn't need `npm ci` beyond
-      # what setup-tauri-env's install-frontend-deps: 'false' skips here.
-      - name: Build frontend (creates ../dist for generate_context!)
-        run: |
-          npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
-          npm run build
-
-      # tauri-build's build.rs checks every bundle.externalBin resource
-      # exists on disk even for a plain `cargo build` that never bundles
-      # anything — see coverage.yml's identical step for the full reason.
-      - name: Placeholder externalBin resources
-        run: |
-          mkdir -p src-tauri/binaries
-          triple=$(rustc -vV | sed -n 's/^host: //p')
-          touch "src-tauri/binaries/devtool-mcp-server-$triple" "src-tauri/binaries/devtool-svc-echo-$triple"
-          chmod +x src-tauri/binaries/devtool-mcp-server-"$triple" src-tauri/binaries/devtool-svc-echo-"$triple"
-
-      - name: Build (rust)
-        run: cargo build --manifest-path src-tauri/Cargo.toml
+          build-mode: none
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
