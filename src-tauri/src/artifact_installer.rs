@@ -194,6 +194,18 @@ pub struct InstalledPluginRecord {
     pub source_url: String,
     pub bundle_path: String,
     pub installed_at: i64,
+    /// Market (nguồn catalog.json) đã cài plugin này từ Marketplace, nếu có —
+    /// `None` cho một cài đặt qua URL dán tay hoặc một bản ghi từ trước khi
+    /// tính năng market tồn tại (`#[serde(default)]` đọc được index.json cũ
+    /// không có trường này). Đây là DANH TÍNH thật của một plugin cài từ bên
+    /// ngoài, không chỉ để hiển thị: hai market khác nhau hoàn toàn có thể
+    /// cùng phát hành một plugin trùng `manifest.id` (không có allowlist toàn
+    /// cục nào ép id duy nhất như `ALLOWED_SERVICES` của service_host.rs) —
+    /// mọi chỗ so khớp/dọn đĩa cho PLUGIN bên dưới vì vậy so cả
+    /// `(manifest.id, market_id)`, không chỉ `manifest.id`, để hai bản cài từ
+    /// hai market cùng tồn tại thay vì bản sau âm thầm ghi đè bản trước.
+    #[serde(default)]
+    pub market_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -202,6 +214,15 @@ pub struct InstalledServiceRecord {
     pub source_url: String,
     pub bin_path: String,
     pub installed_at: i64,
+    /// Chỉ để HIỂN THỊ (market nào vừa cài bản đang chạy) — KHÔNG dùng để so
+    /// khớp/dedupe. `bin` của một service luôn phải nằm trong
+    /// `ALLOWED_SERVICES` (service_host.rs), một allowlist TOÀN CỤC cố định —
+    /// hai market cùng nhận cài một `bin` đã được cấp phép nghĩa là chúng
+    /// cùng nhắm một sidecar CHÍNH THỐNG duy nhất, không phải hai sidecar độc
+    /// lập cần chạy song song; giữ nguyên hành vi "cùng bin thì thay bản ghi
+    /// cũ" như trước.
+    #[serde(default)]
+    pub market_id: Option<String>,
 }
 
 /// Bản ghi tổng quát, lưu chung trong MỘT `extensions/index.json` cho cả hai
@@ -263,6 +284,29 @@ impl InstalledArtifactRecord {
             InstalledArtifactRecord::Plugin(p) => &p.manifest.id,
             InstalledArtifactRecord::Service(s) => &s.manifest.bin,
         }
+    }
+
+    /// Market đã cài bản ghi này từ, nếu có — xem `market_id` trên từng struct
+    /// record cho ý nghĩa khác nhau giữa hai kind (danh tính thật với plugin,
+    /// chỉ hiển thị với service).
+    fn market_id(&self) -> Option<&str> {
+        match self {
+            InstalledArtifactRecord::Plugin(p) => p.market_id.as_deref(),
+            InstalledArtifactRecord::Service(s) => s.market_id.as_deref(),
+        }
+    }
+}
+
+/// Thư mục trên đĩa cho MỘT plugin id — `plugins_dir/<id>/` cho một bản cài
+/// không thuộc market nào (URL dán tay, hoặc bản ghi từ trước tính năng
+/// market), `plugins_dir/by-market/<market_id>/<id>/` khi có market. Tách
+/// nhánh "không market" giữ NGUYÊN đường dẫn cũ — không cần di trú file nào
+/// trên đĩa của người dùng đã cài từ trước, chỉ nhánh có market mới ghi vào
+/// một cây con mới.
+fn plugin_disk_dir(plugins_dir: &Path, market_id: Option<&str>, id: &str) -> PathBuf {
+    match market_id {
+        Some(m) => plugins_dir.join("by-market").join(m).join(id),
+        None => plugins_dir.join(id),
     }
 }
 
@@ -429,6 +473,7 @@ fn stage_install_plugin(
     plugins_dir: &Path,
     manifest: RemotePluginManifest,
     source_url: String,
+    market_id: Option<String>,
     bytes: &[u8],
 ) -> Result<InstalledArtifactRecord, String> {
     let actual = sha256_hex(bytes);
@@ -440,7 +485,7 @@ fn stage_install_plugin(
         ));
     }
 
-    let plugin_dir = plugins_dir.join(&manifest.id).join(&manifest.version);
+    let plugin_dir = plugin_disk_dir(plugins_dir, market_id.as_deref(), &manifest.id).join(&manifest.version);
     std::fs::create_dir_all(&plugin_dir).map_err(|e| e.to_string())?;
     let bundle_path = plugin_dir.join("bundle.mjs");
     // Atomic (tmp + rename) — cùng lý do khuôn này đã áp cho binary service:
@@ -461,15 +506,19 @@ fn stage_install_plugin(
         source_url,
         bundle_path: bundle_path.to_string_lossy().into_owned(),
         installed_at: chrono::Utc::now().timestamp_millis(),
+        market_id: market_id.clone(),
     });
 
-    // Cài đè lên chính plugin đó (cùng id) thì thay hẳn bản ghi cũ — không giữ
-    // lại hai bản ghi cho cùng một id, kể cả khác version. Chỉ lọc trong các
-    // bản ghi PLUGIN — không đụng bản ghi service nào dù trùng chuỗi khoá.
+    // Cài đè lên chính plugin đó CÙNG MARKET thì thay hẳn bản ghi cũ — không
+    // giữ lại hai bản ghi cho cùng một (id, market_id), kể cả khác version.
+    // Một market KHÁC cài cùng id là một plugin KHÁC theo đúng danh tính đã
+    // ghi ở `InstalledPluginRecord::market_id` — không lọc, bản ghi mới được
+    // PUSH thêm bên dưới, không thay bản cũ. Chỉ lọc trong các bản ghi PLUGIN
+    // — không đụng bản ghi service nào dù trùng chuỗi khoá.
     let mut old_version: Option<String> = None;
     let mut records = read_index(index_dir)?;
     records.retain(|r| match r {
-        InstalledArtifactRecord::Plugin(p) if p.manifest.id == id => {
+        InstalledArtifactRecord::Plugin(p) if p.manifest.id == id && p.market_id == market_id => {
             old_version = Some(p.manifest.version.clone());
             false
         }
@@ -485,7 +534,7 @@ fn stage_install_plugin(
     // Lỗi xoá (Windows khoá file, quyền đĩa…) không chặn việc cài — best-effort.
     if let Some(old_version) = old_version {
         if old_version != new_version {
-            let _ = std::fs::remove_dir_all(plugins_dir.join(&id).join(&old_version));
+            let _ = std::fs::remove_dir_all(plugin_disk_dir(plugins_dir, market_id.as_deref(), &id).join(&old_version));
         }
     }
 
@@ -521,6 +570,7 @@ fn stage_install_service(
     services_dir: &Path,
     manifest: RemoteServiceManifest,
     source_url: String,
+    market_id: Option<String>,
     target_triple: &str,
     bytes: &[u8],
 ) -> Result<InstalledArtifactRecord, String> {
@@ -567,6 +617,7 @@ fn stage_install_service(
         source_url,
         bin_path: final_path.to_string_lossy().into_owned(),
         installed_at: chrono::Utc::now().timestamp_millis(),
+        market_id,
     });
 
     // Cài đè cùng bin thì thay hẳn bản ghi cũ — theo quyết định đã chốt trong
@@ -604,12 +655,21 @@ fn stage_uninstall(
     plugins_dir: &Path,
     services_dir: &Path,
     key: &str,
+    market_id: Option<&str>,
 ) -> Result<Option<String>, String> {
     let mut records = read_index(index_dir)?;
     let before = records.len();
     let mut removed: Option<InstalledArtifactRecord> = None;
     records.retain(|r| {
-        if r.key() == key {
+        // Plugin: khớp CẢ id lẫn market_id — gỡ đúng bản của đúng market, để
+        // yên bản cùng id của market khác. Service: `market_id` chỉ để hiển
+        // thị (xem struct), nên chỉ khớp theo `bin` như trước — gỡ theo đúng
+        // `key()` là đủ, không kén market_id truyền vào.
+        let matches = match r {
+            InstalledArtifactRecord::Plugin(_) => r.key() == key && r.market_id() == market_id,
+            InstalledArtifactRecord::Service(_) => r.key() == key,
+        };
+        if matches {
             removed = Some(r.clone());
             false
         } else {
@@ -625,7 +685,7 @@ fn stage_uninstall(
 
     match removed {
         Some(InstalledArtifactRecord::Plugin(_)) => {
-            let _ = std::fs::remove_dir_all(plugins_dir.join(key));
+            let _ = std::fs::remove_dir_all(plugin_disk_dir(plugins_dir, market_id, key));
             Ok(None)
         }
         Some(InstalledArtifactRecord::Service(s)) => {
@@ -643,11 +703,11 @@ fn stage_uninstall(
 /// trên đĩa có thể bị sửa sau khi cài (thủ công, hay bởi phần mềm khác) mà
 /// index.json không biết. Chỉ có nghĩa với kind=plugin — service không có khái
 /// niệm "đọc bundle để webview `import()`".
-fn stage_read_bundle(index_dir: &Path, id: &str) -> Result<String, String> {
+fn stage_read_bundle(index_dir: &Path, id: &str, market_id: Option<&str>) -> Result<String, String> {
     let record = read_index(index_dir)?
         .into_iter()
         .find_map(|r| match r {
-            InstalledArtifactRecord::Plugin(p) if p.manifest.id == id => Some(p),
+            InstalledArtifactRecord::Plugin(p) if p.manifest.id == id && p.market_id.as_deref() == market_id => Some(p),
             _ => None,
         })
         .ok_or_else(|| format!("Không có plugin \"{id}\" đang cài"))?;
@@ -759,6 +819,7 @@ pub async fn artifact_installer_install(
     index_state: tauri::State<'_, InstalledIndex>,
     services: tauri::State<'_, crate::service_host::ServiceRegistry>,
     source_url: String,
+    market_id: Option<String>,
 ) -> Result<InstalledArtifactRecord, String> {
     let _guard = index_state.0.lock().await;
 
@@ -770,7 +831,7 @@ pub async fn artifact_installer_install(
             let bytes = download_capped(&manifest.entry, MAX_DOWNLOAD_BYTES)
                 .await
                 .map_err(|e| format!("Không tải được bundle: {e}"))?;
-            stage_install_plugin(&index_dir, &plugins_dir(&app)?, manifest, source_url, &bytes)?
+            stage_install_plugin(&index_dir, &plugins_dir(&app)?, manifest, source_url, market_id, &bytes)?
         }
         RemoteArtifactManifest::Service(manifest) => {
             let triple = current_target_triple();
@@ -798,6 +859,7 @@ pub async fn artifact_installer_install(
                 &services_dir(&app)?,
                 manifest,
                 source_url,
+                market_id,
                 &triple,
                 &bytes,
             )?
@@ -828,6 +890,7 @@ pub async fn artifact_installer_uninstall(
     index_state: tauri::State<'_, InstalledIndex>,
     services: tauri::State<'_, crate::service_host::ServiceRegistry>,
     key: String,
+    market_id: Option<String>,
 ) -> Result<(), String> {
     let _guard = index_state.0.lock().await;
     let stopped_bin = stage_uninstall(
@@ -835,6 +898,7 @@ pub async fn artifact_installer_uninstall(
         &plugins_dir(&app)?,
         &services_dir(&app)?,
         &key,
+        market_id.as_deref(),
     )?;
     if let Some(bin) = stopped_bin {
         // Sidecar đang chạy (nếu có) bị dừng ngay — xem AC8.
@@ -844,8 +908,8 @@ pub async fn artifact_installer_uninstall(
 }
 
 #[tauri::command]
-pub fn artifact_installer_read_bundle(app: AppHandle, id: String) -> Result<String, String> {
-    stage_read_bundle(&extensions_dir(&app)?, &id)
+pub fn artifact_installer_read_bundle(app: AppHandle, id: String, market_id: Option<String>) -> Result<String, String> {
+    stage_read_bundle(&extensions_dir(&app)?, &id, market_id.as_deref())
 }
 
 #[cfg(test)]
@@ -916,6 +980,7 @@ mod tests {
             source_url: "https://x/plugin.json".into(),
             bundle_path: "/app-data/plugins/demo/1.0.0/bundle.mjs".into(),
             installed_at: 1_700_000_000_000,
+            market_id: None,
         };
         let legacy_json = serde_json::to_string_pretty(&vec![old_record.clone()]).unwrap();
         // Xác nhận trước hết rằng đây đúng là hình dạng KHÔNG có "kind" —
@@ -941,12 +1006,14 @@ mod tests {
             source_url: "https://x/a.json".into(),
             bundle_path: "/app-data/plugins/demo/1.0.0/bundle.mjs".into(),
             installed_at: 1,
+            market_id: None,
         });
         let service = InstalledArtifactRecord::Service(InstalledServiceRecord {
             manifest: service_manifest("devtool-svc-demo", &current_target_triple(), "https://x/bin", &sha256_hex(b"b")),
             source_url: "https://x/b.json".into(),
             bin_path: "/app-data/services/devtool-svc-demo/1.0.0/devtool-svc-demo".into(),
             installed_at: 2,
+            market_id: None,
         });
         write_index(&dir, &[plugin.clone(), service.clone()]).unwrap();
 
@@ -1041,7 +1108,7 @@ mod tests {
         let bytes = b"export default 1;";
         let m = plugin_manifest("https://x/bundle.mjs", &sha256_hex(bytes));
 
-        let record = stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/plugin.json".into(), bytes).unwrap();
+        let record = stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/plugin.json".into(), None, bytes).unwrap();
 
         match &record {
             InstalledArtifactRecord::Plugin(p) => assert_eq!(std::fs::read(&p.bundle_path).unwrap(), bytes),
@@ -1057,7 +1124,7 @@ mod tests {
         let bytes = b"export default 1;";
         let m = plugin_manifest("https://x/bundle.mjs", &"0".repeat(64));
 
-        let err = stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/plugin.json".into(), bytes).unwrap_err();
+        let err = stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/plugin.json".into(), None, bytes).unwrap_err();
         assert!(err.contains("không khớp checksum"), "{err}");
 
         assert!(read_index(&index_dir).unwrap().is_empty());
@@ -1069,11 +1136,11 @@ mod tests {
         let index_dir = temp_dir("plugin-overwrite-index");
         let plugins_dir = temp_dir("plugin-overwrite-bundles");
         let v1 = plugin_manifest("https://x/v1.mjs", &sha256_hex(b"v1"));
-        stage_install_plugin(&index_dir, &plugins_dir, v1, "https://x/plugin.json".into(), b"v1").unwrap();
+        stage_install_plugin(&index_dir, &plugins_dir, v1, "https://x/plugin.json".into(), None, b"v1").unwrap();
 
         let mut v2 = plugin_manifest("https://x/v2.mjs", &sha256_hex(b"v2"));
         v2.version = "2.0.0".into();
-        stage_install_plugin(&index_dir, &plugins_dir, v2, "https://x/plugin.json".into(), b"v2").unwrap();
+        stage_install_plugin(&index_dir, &plugins_dir, v2, "https://x/plugin.json".into(), None, b"v2").unwrap();
 
         let records = read_index(&index_dir).unwrap();
         assert_eq!(records.len(), 1, "phải chỉ còn một bản ghi cho cùng id");
@@ -1091,22 +1158,99 @@ mod tests {
         );
     }
 
+    /// Hai market khác nhau cùng phát hành một plugin trùng `id` ("demo") KHÔNG
+    /// được đụng nhau: cả hai bản ghi phải cùng tồn tại trong index, mỗi bản
+    /// nằm một thư mục đĩa riêng (`by-market/<market_id>/demo/`), và gỡ một
+    /// bản không được xoá bản còn lại. Đây chính là hành vi
+    /// "phân biệt bằng marketId + id" người dùng yêu cầu — khác hẳn
+    /// `cai_de_cung_id_plugin_thi_thay_ban_ghi_cu_khong_cong_don` ở trên
+    /// (cùng id, KHÔNG market, vẫn phải dedupe như cũ).
+    #[test]
+    fn hai_market_khac_nhau_cung_id_plugin_cung_ton_tai_khong_de_len_nhau() {
+        let index_dir = temp_dir("plugin-multi-market-index");
+        let plugins_dir = temp_dir("plugin-multi-market-bundles");
+
+        let official = plugin_manifest("https://official.example.com/demo.mjs", &sha256_hex(b"official"));
+        stage_install_plugin(
+            &index_dir,
+            &plugins_dir,
+            official,
+            "https://official.example.com/plugin.json".into(),
+            Some("official".into()),
+            b"official",
+        )
+        .unwrap();
+
+        let mut fork = plugin_manifest("https://fork.example.com/demo.mjs", &sha256_hex(b"fork"));
+        fork.label = "Demo (fork)".into();
+        stage_install_plugin(
+            &index_dir,
+            &plugins_dir,
+            fork,
+            "https://fork.example.com/plugin.json".into(),
+            Some("custom-fork".into()),
+            b"fork",
+        )
+        .unwrap();
+
+        // Cài đè LẦN NỮA từ market "official" (cùng id, cùng market) vẫn phải
+        // dedupe như bình thường — không cộng dồn thành 3 bản ghi.
+        let mut official_v2 = plugin_manifest("https://official.example.com/demo-v2.mjs", &sha256_hex(b"official-v2"));
+        official_v2.version = "2.0.0".into();
+        stage_install_plugin(
+            &index_dir,
+            &plugins_dir,
+            official_v2,
+            "https://official.example.com/plugin.json".into(),
+            Some("official".into()),
+            b"official-v2",
+        )
+        .unwrap();
+
+        let records = read_index(&index_dir).unwrap();
+        assert_eq!(records.len(), 2, "hai market khác nhau phải giữ hai bản ghi riêng");
+        let by_market: std::collections::HashMap<_, _> = records
+            .iter()
+            .map(|r| match r {
+                InstalledArtifactRecord::Plugin(p) => (p.market_id.clone(), p.manifest.version.clone()),
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(by_market.get(&Some("official".to_string())), Some(&"2.0.0".to_string()));
+        assert_eq!(by_market.get(&Some("custom-fork".to_string())), Some(&"1.0.0".to_string()));
+
+        assert!(plugins_dir.join("by-market").join("official").join("demo").join("2.0.0").join("bundle.mjs").exists());
+        assert!(plugins_dir.join("by-market").join("custom-fork").join("demo").join("1.0.0").join("bundle.mjs").exists());
+
+        // Gỡ bản "official" không được đụng bản "custom-fork".
+        let services_dir = temp_dir("plugin-multi-market-services");
+        stage_uninstall(&index_dir, &plugins_dir, &services_dir, "demo", Some("official")).unwrap();
+        let remaining = read_index(&index_dir).unwrap();
+        assert_eq!(remaining.len(), 1);
+        match &remaining[0] {
+            InstalledArtifactRecord::Plugin(p) => assert_eq!(p.market_id.as_deref(), Some("custom-fork")),
+            other => panic!("{other:?}"),
+        }
+        assert!(!plugins_dir.join("by-market").join("official").join("demo").exists());
+        assert!(plugins_dir.join("by-market").join("custom-fork").join("demo").join("1.0.0").join("bundle.mjs").exists());
+    }
+
     #[test]
     fn doc_bundle_kiem_lai_checksum_bat_duoc_file_bi_sua_sau_khi_cai() {
         let index_dir = temp_dir("plugin-reread-index");
         let plugins_dir = temp_dir("plugin-reread-bundles");
         let bytes = b"export default 1;";
         let m = plugin_manifest("https://x/bundle.mjs", &sha256_hex(bytes));
-        let record = stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/plugin.json".into(), bytes).unwrap();
+        let record = stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/plugin.json".into(), None, bytes).unwrap();
         let bundle_path = match &record {
             InstalledArtifactRecord::Plugin(p) => p.bundle_path.clone(),
             _ => unreachable!(),
         };
 
-        assert_eq!(stage_read_bundle(&index_dir, "demo").unwrap(), "export default 1;");
+        assert_eq!(stage_read_bundle(&index_dir, "demo", None).unwrap(), "export default 1;");
 
         std::fs::write(&bundle_path, b"export default 999; // bi sua").unwrap();
-        let err = stage_read_bundle(&index_dir, "demo").unwrap_err();
+        let err = stage_read_bundle(&index_dir, "demo", None).unwrap_err();
         assert!(err.contains("không còn khớp checksum"), "{err}");
     }
 
@@ -1117,9 +1261,9 @@ mod tests {
         let services_dir = temp_dir("plugin-uninstall-services");
         let bytes = b"export default 1;";
         let m = plugin_manifest("https://x/bundle.mjs", &sha256_hex(bytes));
-        stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/plugin.json".into(), bytes).unwrap();
+        stage_install_plugin(&index_dir, &plugins_dir, m, "https://x/plugin.json".into(), None, bytes).unwrap();
 
-        let stopped = stage_uninstall(&index_dir, &plugins_dir, &services_dir, "demo").unwrap();
+        let stopped = stage_uninstall(&index_dir, &plugins_dir, &services_dir, "demo", None).unwrap();
         assert!(stopped.is_none(), "gỡ plugin không cần service_stop");
 
         assert!(read_index(&index_dir).unwrap().is_empty());
@@ -1131,7 +1275,7 @@ mod tests {
         let index_dir = temp_dir("uninstall-missing-index");
         let plugins_dir = temp_dir("uninstall-missing-plugins");
         let services_dir = temp_dir("uninstall-missing-services");
-        let err = stage_uninstall(&index_dir, &plugins_dir, &services_dir, "khong-ton-tai").unwrap_err();
+        let err = stage_uninstall(&index_dir, &plugins_dir, &services_dir, "khong-ton-tai", None).unwrap_err();
         assert!(err.contains("Không có mục"));
     }
 
@@ -1145,7 +1289,7 @@ mod tests {
         let bytes = b"#!/bin/sh\necho hi\n";
         let m = service_manifest("devtool-svc-demo", &triple, "https://x/bin", &sha256_hex(bytes));
 
-        let record = stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), &triple, bytes).unwrap();
+        let record = stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), None, &triple, bytes).unwrap();
 
         let bin_path = match &record {
             InstalledArtifactRecord::Service(s) => s.bin_path.clone(),
@@ -1177,7 +1321,7 @@ mod tests {
         let m = service_manifest("devtool-svc-demo", "khong-phai-triple-that", "https://x/bin", &sha256_hex(bytes));
         let triple = current_target_triple();
 
-        let err = stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), &triple, bytes).unwrap_err();
+        let err = stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), None, &triple, bytes).unwrap_err();
         assert!(err.contains(&triple), "lỗi phải nêu đúng triple đã tính: {err}");
         assert!(err.contains("không có bản"), "{err}");
 
@@ -1193,7 +1337,7 @@ mod tests {
         let bytes = b"binary-that";
         let m = service_manifest("devtool-svc-demo", &triple, "https://x/bin", &"0".repeat(64));
 
-        let err = stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), &triple, bytes).unwrap_err();
+        let err = stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), None, &triple, bytes).unwrap_err();
         assert!(err.contains("không khớp checksum"), "{err}");
 
         assert!(read_index(&index_dir).unwrap().is_empty());
@@ -1210,12 +1354,12 @@ mod tests {
 
         let bytes_v1 = b"v1";
         let m1 = service_manifest("devtool-svc-demo", &triple, "https://x/v1", &sha256_hex(bytes_v1));
-        stage_install_service(&index_dir, &services_dir, m1, "https://x/svc.json".into(), &triple, bytes_v1).unwrap();
+        stage_install_service(&index_dir, &services_dir, m1, "https://x/svc.json".into(), None, &triple, bytes_v1).unwrap();
 
         let bytes_v2 = b"v2-bigger-binary";
         let mut m2 = service_manifest("devtool-svc-demo", &triple, "https://x/v2", &sha256_hex(bytes_v2));
         m2.version = "2.0.0".into();
-        let record2 = stage_install_service(&index_dir, &services_dir, m2, "https://x/svc.json".into(), &triple, bytes_v2).unwrap();
+        let record2 = stage_install_service(&index_dir, &services_dir, m2, "https://x/svc.json".into(), None, &triple, bytes_v2).unwrap();
 
         let records = read_index(&index_dir).unwrap();
         assert_eq!(records.len(), 1, "không giữ song song hai version");
@@ -1242,9 +1386,9 @@ mod tests {
         let triple = current_target_triple();
         let bytes = b"binary";
         let m = service_manifest("devtool-svc-demo", &triple, "https://x/bin", &sha256_hex(bytes));
-        stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), &triple, bytes).unwrap();
+        stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), None, &triple, bytes).unwrap();
 
-        let stopped = stage_uninstall(&index_dir, &plugins_dir, &services_dir, "devtool-svc-demo").unwrap();
+        let stopped = stage_uninstall(&index_dir, &plugins_dir, &services_dir, "devtool-svc-demo", None).unwrap();
         assert_eq!(stopped, Some("devtool-svc-demo".to_string()), "gỡ service phải báo bin cần service_stop");
 
         assert!(read_index(&index_dir).unwrap().is_empty());
@@ -1260,7 +1404,7 @@ mod tests {
         let services_dir = temp_dir("svc-lookup-bin");
         let bytes = b"binary";
         let m = service_manifest("devtool-svc-demo", &triple, "https://x/bin", &sha256_hex(bytes));
-        stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), &triple, bytes).unwrap();
+        stage_install_service(&index_dir, &services_dir, m, "https://x/svc.json".into(), None, &triple, bytes).unwrap();
         let found = installed_service_bin_path_at(&index_dir, "devtool-svc-demo");
         assert!(found.is_some());
 
@@ -1281,6 +1425,7 @@ mod tests {
             source_url: "https://x/plugin.json".into(),
             bundle_path: app_data.join("plugins/demo/1.0.0/bundle.mjs").to_string_lossy().into_owned(),
             installed_at: 42,
+            market_id: None,
         };
         let legacy_plugins_dir = app_data.join("plugins");
         std::fs::create_dir_all(&legacy_plugins_dir).unwrap();
@@ -1308,6 +1453,7 @@ mod tests {
             &app_data.join("plugins"),
             second,
             "https://x/v2.json".into(),
+            None,
             b"v2",
         )
         .unwrap();
@@ -1345,6 +1491,7 @@ mod tests {
             source_url: "https://x/a.json".into(),
             bundle_path: "/app-data/plugins/demo/1.0.0/bundle.mjs".into(),
             installed_at: 1,
+            market_id: None,
         });
         write_index(&dir, &[plugin.clone()]).unwrap();
 

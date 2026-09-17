@@ -17,6 +17,7 @@ import {
   installPlugin,
   installService,
   listInstalledArtifacts,
+  recordKey,
   uninstallArtifact,
   type InstalledArtifactRecord,
   type RemoteArtifactManifest,
@@ -40,7 +41,12 @@ import {
  * ngắt-kết-nối bên dưới KHÔNG phải chuyện lý thuyết.
  */
 
-function recordKey(record: InstalledArtifactRecord): string {
+/** id/bin THẬT gửi xuống Rust (`artifact_installer_uninstall`'s `key`) —
+ *  khác `recordKey` (từ `@/platform`, dùng làm khoá React/UI) khi record có
+ *  `marketId`: `recordKey` trả `<marketId>::<id>` để phân biệt hai market
+ *  cùng id trên MÀN HÌNH, nhưng Rust chỉ biết `manifest.id`/`manifest.bin`
+ *  trần cộng `market_id` truyền riêng — xem `stage_uninstall`. */
+function rawArtifactId(record: InstalledArtifactRecord): string {
   return record.kind === 'plugin' ? record.manifest.id : record.manifest.bin;
 }
 
@@ -58,6 +64,11 @@ export function SettingsExtensionInstaller() {
   const [previewTriple, setPreviewTriple] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  // Market đã cung cấp `url`/`preview` hiện tại — `undefined` cho một URL dán
+  // tay hoặc một deep link (không gắn market nào). Đi kèm khi bấm "Cài đặt"
+  // để hai market khác nhau cùng phát hành một plugin trùng id không đè lên
+  // nhau (xem `installArtifact`).
+  const [previewMarketId, setPreviewMarketId] = useState<string | undefined>(undefined);
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
 
@@ -85,6 +96,39 @@ export function SettingsExtensionInstaller() {
     void refresh();
   }, [refresh]);
 
+  // KHAI BÁO TRƯỚC early return `if (!isTauri) return ...` bên dưới, dù chỉ
+  // effect ngay sau đây (không phải JSX) mới thật sự cần nó ở render này —
+  // effect đó chạy TRƯỚC MỌI early return (Rules of Hooks: hook luôn chạy
+  // theo đúng thứ tự, bất kể return sớm nằm sau chúng), nên nếu `runPreview`
+  // (một `const`) được khai SAU early return, một render với `isTauri` false
+  // sẽ return trước khi tới dòng gán đó — biến vẫn nằm trong TDZ, và
+  // `drain()` (đóng gói `runPreview` trong effect dưới) ném ReferenceError
+  // ngay khi bị gọi (lúc mount, hoặc qua `pendingInstall.subscribe`). Bắt
+  // được bằng test: mount component này ở bản KHÔNG PHẢI Tauri trong khi
+  // `pendingInstall` đã có sẵn một URL.
+  const runPreview = useCallback(async (targetUrl: string, marketId?: string) => {
+    setPreview(null);
+    setPreviewTriple(null);
+    setPreviewError(null);
+    setInstallError(null);
+    setPreviewMarketId(marketId);
+    if (!targetUrl.trim()) return;
+    setPreviewing(true);
+    try {
+      const manifest = await fetchArtifactManifestPreview(targetUrl.trim());
+      setPreview(manifest);
+      if (manifest.kind === 'service') {
+        // Hiển thị cho người dùng — TÍNH Ở RUST, không đoán ở phía webview
+        // (cùng nguyên tắc "quyết định luôn do host" của `sidecar_path`).
+        setPreviewTriple(await currentTargetTriple());
+      }
+    } catch (e) {
+      setPreviewError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setPreviewing(false);
+    }
+  }, []);
+
   // `desktop-devtool-app://install?manifest=...&service=...` (starlight-site) xếp URL
   // vào hàng đợi này rồi điều hướng tới Settings → Plugin — nhưng nếu người
   // dùng ĐÃ đứng sẵn ở đây khi link thứ hai tới (single-instance chuyển tiếp
@@ -96,17 +140,18 @@ export function SettingsExtensionInstaller() {
   // đăng ký subscribe trước khi `runPreview` được gán ở dưới — cùng lý do đã
   // giải thích ở đầu `pendingInstall.ts`. Người dùng vẫn phải tự bấm "Cài
   // đặt" để xác nhận; đây chỉ tự điền + xem trước thay cho copy/dán tay.
+  // `runPreview` là `useCallback` với deps `[]` (danh tính ổn định suốt vòng
+  // đời component) nên khai trong deps ở đây không gây effect chạy lại thừa.
   useEffect(() => {
     const drain = () => {
       const next = pendingInstall.dequeue();
       if (!next) return;
-      setUrl(next);
-      void runPreview(next);
+      setUrl(next.url);
+      void runPreview(next.url, next.marketId);
     };
     drain(); // bắt URL đã xếp sẵn trước khi component này mount
     return pendingInstall.subscribe(drain);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [runPreview]);
 
   // ExtensionUpdateContext đã tự kiểm mọi artifact lúc app khởi động — dùng
   // kết quả đó để hiện sẵn nút "Update" ngay khi mở trang này, thay vì bắt
@@ -125,47 +170,32 @@ export function SettingsExtensionInstaller() {
     return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;
   }
 
-  const runPreview = async (targetUrl: string) => {
-    setPreview(null);
-    setPreviewTriple(null);
-    setPreviewError(null);
-    setInstallError(null);
-    if (!targetUrl.trim()) return;
-    setPreviewing(true);
-    try {
-      const manifest = await fetchArtifactManifestPreview(targetUrl.trim());
-      setPreview(manifest);
-      if (manifest.kind === 'service') {
-        // Hiển thị cho người dùng — TÍNH Ở RUST, không đoán ở phía webview
-        // (cùng nguyên tắc "quyết định luôn do host" của `sidecar_path`).
-        setPreviewTriple(await currentTargetTriple());
-      }
-    } catch (e) {
-      setPreviewError(String(e instanceof Error ? e.message : e));
-    } finally {
-      setPreviewing(false);
-    }
-  };
-
-  const handlePreview = () => runPreview(url);
+  // Giữ nguyên `previewMarketId` khi bấm lại Preview cho ĐÚNG url đang có sẵn
+  // (vd sau khi hàng đợi tự điền + xem trước, người dùng bấm Preview lần nữa
+  // để tải lại) — chỉ có ô nhập URL tự gõ tay (`onChange` bên dưới) mới thật
+  // sự đổi sang URL khác và cần xoá market cũ. Bấm Preview không phải là một
+  // URL mới, nên không được âm thầm làm rớt market của URL đang xem trước.
+  const handlePreview = () => runPreview(url, previewMarketId);
 
   const handleInstall = async () => {
     setInstallError(null);
     setInstalling(true);
     try {
-      await installArtifact(url.trim());
+      await installArtifact(url.trim(), previewMarketId);
       setUrl('');
       setPreview(null);
       setPreviewTriple(null);
       setNeedsRestart(true);
       await refresh();
-      // Deep link cài cả plugin lẫn sidecar service của nó xếp lần lượt hai
-      // URL vào hàng đợi (xem deepLink.ts) — vừa cài xong cái đầu thì tự xem
-      // trước luôn cái kế tiếp, vẫn chờ người dùng bấm "Cài đặt" riêng cho nó.
+      // Deep link/market cài cả plugin lẫn sidecar service của nó xếp lần
+      // lượt hai URL vào hàng đợi, CÙNG marketId (xem deepLink.ts,
+      // SettingsMarketplace.tsx) — vừa cài xong cái đầu thì tự xem trước
+      // luôn cái kế tiếp (giữ đúng marketId của nó), vẫn chờ người dùng bấm
+      // "Cài đặt" riêng cho nó.
       const next = pendingInstall.dequeue();
       if (next) {
-        setUrl(next);
-        await runPreview(next);
+        setUrl(next.url);
+        await runPreview(next.url, next.marketId);
       }
     } catch (e) {
       setInstallError(String(e instanceof Error ? e.message : e));
@@ -179,7 +209,7 @@ export function SettingsExtensionInstaller() {
     setRowBusy((prev) => ({ ...prev, [key]: true }));
     setRowError((prev) => ({ ...prev, [key]: '' }));
     try {
-      await uninstallArtifact(key);
+      await uninstallArtifact(rawArtifactId(record), record.marketId);
       setNeedsRestart(true);
       await refresh();
     } catch (e) {
@@ -199,9 +229,9 @@ export function SettingsExtensionInstaller() {
       // bản ghi cũ khi key trùng, nên "cập nhật" chỉ là "cài lại từ đúng
       // nguồn".
       if (record.kind === 'plugin') {
-        await installPlugin(record.sourceUrl);
+        await installPlugin(record.sourceUrl, record.marketId);
       } else {
-        await installService(record.sourceUrl);
+        await installService(record.sourceUrl, record.marketId);
       }
       setRowUpdateVersion((prev) => ({ ...prev, [key]: undefined }));
       setNeedsRestart(true);
@@ -278,7 +308,15 @@ export function SettingsExtensionInstaller() {
       <div className="flex gap-2">
         <Input
           value={url}
-          onChange={(e) => { setUrl(e.target.value); setPreview(null); setPreviewTriple(null); setPreviewError(null); }}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setPreview(null);
+            setPreviewTriple(null);
+            setPreviewError(null);
+            // Gõ tay lại nghĩa là URL này không còn gắn với market vừa xem
+            // trước trước đó (nếu có) — không giữ lại `previewMarketId` cũ.
+            setPreviewMarketId(undefined);
+          }}
           // Ví dụ URL, không phải câu chữ cần dịch — một chuỗi giống hệt nhau
           // ở cả hai ngôn ngữ trong bảng dịch bị `i18n.test.ts` coi là dấu
           // hiệu quên dịch, nên nó không thuộc về DICTIONARY.
@@ -391,10 +429,15 @@ export function SettingsExtensionInstaller() {
                       {record.kind === 'plugin' ? (
                         <>
                           {record.manifest.label}{' '}
-                          <span className="font-mono text-fg-mute/60">{key}@{record.manifest.version}</span>
+                          <span className="font-mono text-fg-mute/60">{record.manifest.id}@{record.manifest.version}</span>
                         </>
                       ) : (
-                        <span className="font-mono">{key}@{record.manifest.version}</span>
+                        <span className="font-mono">{record.manifest.bin}@{record.manifest.version}</span>
+                      )}
+                      {record.marketId && (
+                        <span className="rounded border px-1.5 py-0.5 font-mono text-[11px] text-fg-mute/70">
+                          {record.marketId}
+                        </span>
                       )}
                     </p>
                     <p className="truncate font-mono text-[11px] text-fg-mute/70">{record.sourceUrl}</p>

@@ -131,6 +131,11 @@ export interface InstalledPluginRecord {
   sourceUrl: string;
   bundlePath: string;
   installedAt: number;
+  /** Market (SettingsMarketplace) đã cài plugin này từ, nếu có — `undefined`
+   *  cho một cài đặt qua URL dán tay hoặc từ trước khi market tồn tại. Đây là
+   *  DANH TÍNH thật của bản ghi, không chỉ để hiển thị: xem
+   *  `artifact_installer.rs`'s `InstalledPluginRecord::market_id`. */
+  marketId?: string;
 }
 
 export interface InstalledServiceRecord {
@@ -138,6 +143,10 @@ export interface InstalledServiceRecord {
   sourceUrl: string;
   binPath: string;
   installedAt: number;
+  /** Chỉ để hiển thị — xem giải thích ở `artifact_installer.rs`'s
+   *  `InstalledServiceRecord::market_id` (không dùng để so khớp/dedupe, khác
+   *  nhánh plugin). */
+  marketId?: string;
 }
 
 /** Bản ghi tổng quát — `InstalledArtifactRecord` phía Rust cũng ghi phẳng
@@ -150,9 +159,16 @@ export type InstalledArtifactRecord =
 /** Hình dạng thô (snake_case) nhận trực tiếp từ `invoke` — chỉ dùng nội bộ
  *  file này, không export: mọi nơi khác trong app chỉ nên thấy bản camelCase
  *  ở trên. */
+// `market_id` phía Rust là `Option<String>` KHÔNG có `skip_serializing_if` —
+// một record không market ghi ra JSON `"market_id": null`, không phải vắng
+// hẳn trường này. `?: string | null` phản ánh đúng cả hai khả năng (thiếu
+// hẳn trường, cho index.json rất cũ; hoặc `null`, cho bản ghi bình thường
+// không market) — `toCamelArtifactRecord` bên dưới chuẩn hoá cả hai về
+// `undefined` một lần duy nhất, để KHÔNG chỗ nào khác trong TS phải nhớ so
+// `=== null` thay vì `=== undefined`.
 type RawInstalledArtifactRecord =
-  | { kind: 'plugin'; manifest: RemotePluginManifest; source_url: string; bundle_path: string; installed_at: number }
-  | { kind: 'service'; manifest: RemoteServiceManifest; source_url: string; bin_path: string; installed_at: number };
+  | { kind: 'plugin'; manifest: RemotePluginManifest; source_url: string; bundle_path: string; installed_at: number; market_id?: string | null }
+  | { kind: 'service'; manifest: RemoteServiceManifest; source_url: string; bin_path: string; installed_at: number; market_id?: string | null };
 
 /** Bảng tên → icon cố định. Một plugin cài từ bên ngoài không thể `import`
  *  thẳng một icon component (JSON không mang code) — tác giả chọn TÊN, host
@@ -180,6 +196,7 @@ function toCamelArtifactRecord(record: RawInstalledArtifactRecord): InstalledArt
       sourceUrl: record.source_url,
       bundlePath: record.bundle_path,
       installedAt: record.installed_at,
+      marketId: record.market_id ?? undefined,
     };
   }
   return {
@@ -188,6 +205,7 @@ function toCamelArtifactRecord(record: RawInstalledArtifactRecord): InstalledArt
     sourceUrl: record.source_url,
     binPath: record.bin_path,
     installedAt: record.installed_at,
+    marketId: record.market_id ?? undefined,
   };
 }
 
@@ -203,10 +221,14 @@ export async function fetchArtifactManifestPreview(url: string): Promise<RemoteA
 }
 
 /** Tải, kiểm checksum, lưu xuống đĩa — dùng chung cho cả hai kind (Rust tự
- *  rẽ nhánh theo `kind` khai trong manifest tại `url`). */
-export async function installArtifact(url: string): Promise<InstalledArtifactRecord> {
+ *  rẽ nhánh theo `kind` khai trong manifest tại `url`). `marketId` đi kèm khi
+ *  URL này tới từ một thẻ trong SettingsMarketplace (xem `pendingInstall.ts`)
+ *  — `undefined` cho một URL dán tay/deep link, giữ nguyên hành vi "một id
+ *  luôn thay bản cũ" như trước tính năng market. */
+export async function installArtifact(url: string, marketId?: string): Promise<InstalledArtifactRecord> {
   const raw = await invokeCommand<RawInstalledArtifactRecord>('artifact_installer_install', {
     sourceUrl: url,
+    marketId,
   });
   return toCamelArtifactRecord(raw);
 }
@@ -219,9 +241,13 @@ export async function listInstalledArtifacts(): Promise<InstalledArtifactRecord[
 
 /** `key` là id (plugin) hoặc bin (service) — cùng tham số `key` mà
  *  `artifact_installer_uninstall` phía Rust nhận, phân biệt kind bằng cách
- *  tìm trong index chứ không cần client khai trước. */
-export async function uninstallArtifact(key: string): Promise<void> {
-  await invokeCommand<void>('artifact_installer_uninstall', { key });
+ *  tìm trong index chứ không cần client khai trước. `marketId` PHẢI khớp
+ *  đúng `record.marketId` của bản ghi muốn gỡ khi đó là một plugin (xem
+ *  `recordKey`/`SettingsExtensionInstaller.tsx`) — thiếu nó khi bản ghi thật
+ *  sự có market sẽ khiến Rust không tìm thấy mục nào để gỡ (lỗi rõ ràng,
+ *  không gỡ nhầm bản của market khác). */
+export async function uninstallArtifact(key: string, marketId?: string): Promise<void> {
+  await invokeCommand<void>('artifact_installer_uninstall', { key, marketId });
 }
 
 /** Target triple của máy đang chạy app, TÍNH Ở RUST — hiển thị cho người
@@ -249,8 +275,8 @@ export async function fetchManifestPreview(url: string): Promise<RemotePluginMan
 
 /** Tải, kiểm checksum, lưu xuống đĩa. Ném lỗi (đã là tiếng Việt dễ đọc, từ
  *  phía Rust) khi mạng lỗi, JSON sai hình dạng, hoặc checksum không khớp. */
-export async function installPlugin(url: string): Promise<InstalledPluginRecord> {
-  const record = await installArtifact(url);
+export async function installPlugin(url: string, marketId?: string): Promise<InstalledPluginRecord> {
+  const record = await installArtifact(url, marketId);
   if (record.kind !== 'plugin') {
     throw new Error(`URL này cài một "${record.kind}", không phải plugin.`);
   }
@@ -265,8 +291,8 @@ export async function listInstalledPlugins(): Promise<InstalledPluginRecord[]> {
     .map(({ kind: _kind, ...rest }) => rest);
 }
 
-export async function uninstallPlugin(id: string): Promise<void> {
-  await uninstallArtifact(id);
+export async function uninstallPlugin(id: string, marketId?: string): Promise<void> {
+  await uninstallArtifact(id, marketId);
 }
 
 /** So version đã cài với version manifest tại `sourceUrl` hiện đang khai. So
@@ -295,8 +321,8 @@ function compareVersions(a: string, b: string): number {
 // một binary native chạy như tiến trình riêng, xem lời giải thích đầu file)
 // ---------------------------------------------------------------------------
 
-export async function installService(url: string): Promise<InstalledServiceRecord> {
-  const record = await installArtifact(url);
+export async function installService(url: string, marketId?: string): Promise<InstalledServiceRecord> {
+  const record = await installArtifact(url, marketId);
   if (record.kind !== 'service') {
     throw new Error(`URL này cài một "${record.kind}", không phải service.`);
   }
@@ -332,11 +358,29 @@ export async function checkForServiceUpdate(
 // ---------------------------------------------------------------------------
 
 export interface ArtifactUpdateAvailable {
-  /** id (plugin) hoặc bin (service) — cùng khoá `recordKey` dùng ở
-   *  SettingsExtensionInstaller.tsx. */
+  /** Cùng khoá `recordKey` dùng ở SettingsExtensionInstaller.tsx — id/bin
+   *  cho một bản ghi không market, hoặc `<marketId>::<id>` cho một plugin cài
+   *  qua market (xem `recordKey` ở đó cho lý do cần phân biệt). */
   key: string;
   record: InstalledArtifactRecord;
   remoteVersion: string;
+}
+
+/** Khoá định danh MỘT bản ghi trong danh sách "đã cài" — id/bin trần cho một
+ *  bản ghi không gắn market (dán tay, hoặc từ trước tính năng market — giữ
+ *  đúng khoá cũ để không phá vỡ gì đang hoạt động), `<marketId>::<id>` khi có
+ *  market. Chỉ có Ý NGHĨA phân biệt cho kind=plugin (hai market có thể cùng
+ *  id); service dùng `bin` trần dù có `marketId` hiển thị — market của một
+ *  service chỉ mang tính thông tin (xem `InstalledServiceRecord::market_id`
+ *  phía Rust), `bin` vẫn là một allowlist toàn cục duy nhất.
+ *  DÙNG CHUNG bởi `checkAllForUpdates` (dưới) và
+ *  `SettingsExtensionInstaller.tsx` — hai nơi phải tính RA CÙNG một khoá cho
+ *  cùng một bản ghi, nếu không badge "có bản mới" sẽ không khớp được dòng nào
+ *  trong danh sách.
+ */
+export function recordKey(record: InstalledArtifactRecord): string {
+  if (record.kind === 'service') return record.manifest.bin;
+  return record.marketId ? `${record.marketId}::${record.manifest.id}` : record.manifest.id;
 }
 
 /** Kiểm từng artifact đã cài, TUẦN TỰ (không Promise.all) — best-effort, một
@@ -361,10 +405,10 @@ export async function checkAllForUpdates(): Promise<ArtifactUpdateAvailable[]> {
     try {
       if (record.kind === 'plugin') {
         const { available, remote } = await checkForUpdate(record);
-        if (available && remote) updates.push({ key: record.manifest.id, record, remoteVersion: remote.version });
+        if (available && remote) updates.push({ key: recordKey(record), record, remoteVersion: remote.version });
       } else {
         const { available, remote } = await checkForServiceUpdate(record);
-        if (available && remote) updates.push({ key: record.manifest.bin, record, remoteVersion: remote.version });
+        if (available && remote) updates.push({ key: recordKey(record), record, remoteVersion: remote.version });
       }
     } catch {
       // Bỏ qua mục này, tiếp tục kiểm các mục còn lại.
@@ -385,8 +429,8 @@ export async function checkAllForUpdates(): Promise<ArtifactUpdateAvailable[]> {
  * Thu hồi URL blob ngay sau khi `import()` xong: một khi promise resolve,
  * thân module đã chạy và export đã nằm trong tay — không cần blob sống thêm.
  */
-async function loadInstalled(id: string): Promise<React.ComponentType> {
-  const source = await invokeCommand<string>('artifact_installer_read_bundle', { id });
+async function loadInstalled(id: string, marketId: string | undefined): Promise<React.ComponentType> {
+  const source = await invokeCommand<string>('artifact_installer_read_bundle', { id, marketId });
   const blob = new Blob([source], { type: 'text/javascript' });
   const url = URL.createObjectURL(blob);
   try {
@@ -419,23 +463,34 @@ export async function installedPluginManifests(): Promise<
     return [];
   }
 
-  return records.map((record, i) => ({
-    source: `installed:${record.manifest.id}@${record.manifest.version}`,
-    manifest: {
-      id: record.manifest.id,
-      label: record.manifest.label,
-      icon: ICONS_BY_NAME[record.manifest.icon] ?? Puzzle,
-      description: record.manifest.description,
-      keywords: record.manifest.keywords,
-      route: record.manifest.route,
-      order: INSTALLED_ORDER_BASE + i,
-      defaultEnabled: true,
-      permissions: record.manifest.permissions,
-      commands: record.manifest.commands,
-      hosts: record.manifest.hosts,
-      service: record.manifest.service,
-      sdk: record.manifest.sdk,
-      load: () => loadInstalled(record.manifest.id),
-    },
-  }));
+  return records.map((record, i) => {
+    // Danh tính registry (id storage/route/quyền/audit đều khoá theo đây, xem
+    // registry.ts's `registerManifest`) PHẢI phân biệt được hai market khác
+    // nhau cùng phát hành một plugin trùng `manifest.id` — không có allowlist
+    // toàn cục nào ép id duy nhất giữa các market (khác `ALLOWED_SERVICES`
+    // của service_host.rs, một danh sách cố định phía Rust). Không có
+    // `marketId` (URL dán tay, hoặc bản cài từ trước khi market tồn tại) thì
+    // giữ NGUYÊN id/route gốc — không đổi hành vi của người dùng đã cài từ
+    // trước tính năng này.
+    const registryId = record.marketId ? `${record.marketId}-${record.manifest.id}` : record.manifest.id;
+    return {
+      source: `installed:${registryId}@${record.manifest.version}`,
+      manifest: {
+        id: registryId,
+        label: record.manifest.label,
+        icon: ICONS_BY_NAME[record.manifest.icon] ?? Puzzle,
+        description: record.manifest.description,
+        keywords: record.manifest.keywords,
+        route: record.marketId ? `/installed/${registryId}` : record.manifest.route,
+        order: INSTALLED_ORDER_BASE + i,
+        defaultEnabled: true,
+        permissions: record.manifest.permissions,
+        commands: record.manifest.commands,
+        hosts: record.manifest.hosts,
+        service: record.manifest.service,
+        sdk: record.manifest.sdk,
+        load: () => loadInstalled(record.manifest.id, record.marketId),
+      },
+    };
+  });
 }

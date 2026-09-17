@@ -13,15 +13,15 @@ describe('pendingInstall', () => {
   it('enqueue rồi dequeue theo đúng thứ tự FIFO', async () => {
     const { pendingInstall } = await import('@/lib/pendingInstall');
     pendingInstall.enqueue(['https://a/1.json', 'https://a/2.json']);
-    expect(pendingInstall.dequeue()).toBe('https://a/1.json');
-    expect(pendingInstall.dequeue()).toBe('https://a/2.json');
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://a/1.json', marketId: undefined });
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://a/2.json', marketId: undefined });
     expect(pendingInstall.dequeue()).toBeNull();
   });
 
   it('tự trim khoảng trắng và bỏ chuỗi rỗng khi enqueue', async () => {
     const { pendingInstall } = await import('@/lib/pendingInstall');
     pendingInstall.enqueue(['  https://a/1.json  ', '', '   ']);
-    expect(pendingInstall.dequeue()).toBe('https://a/1.json');
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://a/1.json', marketId: undefined });
     expect(pendingInstall.dequeue()).toBeNull();
   });
 
@@ -32,8 +32,28 @@ describe('pendingInstall', () => {
     // B phải được xử lý ngay, không phải xếp sau phần còn treo của A.
     pendingInstall.enqueue(['https://a/plugin.json', 'https://a/service.json']);
     pendingInstall.enqueue(['https://b/plugin.json']);
-    expect(pendingInstall.dequeue()).toBe('https://b/plugin.json');
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://b/plugin.json', marketId: undefined });
     expect(pendingInstall.dequeue()).toBeNull();
+  });
+
+  it('gắn marketId cho mọi URL trong cùng một lần enqueue', async () => {
+    const { pendingInstall } = await import('@/lib/pendingInstall');
+    pendingInstall.enqueue(['https://a/plugin.json', 'https://a/service.json'], 'official');
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://a/plugin.json', marketId: 'official' });
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://a/service.json', marketId: 'official' });
+  });
+
+  it('marketId của lần enqueue MỚI thắng — không trộn với marketId của lần trước', async () => {
+    const { pendingInstall } = await import('@/lib/pendingInstall');
+    pendingInstall.enqueue(['https://a/plugin.json'], 'official');
+    pendingInstall.enqueue(['https://b/plugin.json'], 'custom-fork');
+    expect(pendingInstall.dequeue()).toEqual({ url: 'https://b/plugin.json', marketId: 'custom-fork' });
+  });
+
+  it('không truyền marketId (deep link) thì marketId là undefined', async () => {
+    const { pendingInstall } = await import('@/lib/pendingInstall');
+    pendingInstall.enqueue(['https://a/plugin.json']);
+    expect(pendingInstall.dequeue()?.marketId).toBeUndefined();
   });
 
   it('subscribe được gọi khi enqueue thêm URL mới', async () => {
@@ -54,5 +74,21 @@ describe('pendingInstall', () => {
     pendingInstall.enqueue(['', '   ']);
     expect(listener).not.toHaveBeenCalled();
     expect(pendingInstall.dequeue()).toBeNull();
+  });
+
+  describe('hasPending', () => {
+    it('false khi hàng đợi rỗng', async () => {
+      const { pendingInstall } = await import('@/lib/pendingInstall');
+      expect(pendingInstall.hasPending()).toBe(false);
+    });
+
+    it('true ngay sau enqueue, KHÔNG tiêu thụ hàng đợi (khác dequeue)', async () => {
+      const { pendingInstall } = await import('@/lib/pendingInstall');
+      pendingInstall.enqueue(['https://a/1.json']);
+      expect(pendingInstall.hasPending()).toBe(true);
+      expect(pendingInstall.hasPending()).toBe(true); // gọi lại vẫn true — không rút mất
+      expect(pendingInstall.dequeue()).toEqual({ url: 'https://a/1.json', marketId: undefined });
+      expect(pendingInstall.hasPending()).toBe(false);
+    });
   });
 });

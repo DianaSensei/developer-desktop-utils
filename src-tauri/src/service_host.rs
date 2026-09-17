@@ -819,6 +819,7 @@ mod tests {
                 source_url: "https://x/svc.json".into(),
                 bin_path: bin_path.to_string_lossy().into_owned(),
                 installed_at: 1,
+                market_id: None,
             },
         );
         std::fs::write(
