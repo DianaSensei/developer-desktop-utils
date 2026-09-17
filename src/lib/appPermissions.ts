@@ -70,7 +70,7 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
     'Send HTTP requests. The patterns below include wildcards, so this grant is app-wide; per-tool limits are declared in each plugin manifest and shown under Plugins',
   'core:default': 'Baseline Tauri IPC access (window, app, path, events) the app needs to run',
   'deep-link:default':
-    'Read the desktop-devtool-app://install link that opened the app, to prefill the extension install screen (Settings → Plugin) — installing still requires your confirmation there',
+    'Read the desktop-devtool-app://install link that opened the app, to prefill the extension install screen (Settings → Extensions) — installing still requires your confirmation there',
 };
 
 function normalize(raw: RawPermission): AppPermission {

@@ -109,7 +109,7 @@ describe('SettingsMarketplace — tải catalog', () => {
     await renderMarketplace();
     await settle();
 
-    await waitFor(() => expect(screen.getByText(/This market has no plugins yet\.|chưa có plugin nào\./)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/This market has no extensions yet\.|chưa có tiện ích nào\./)).toBeTruthy());
   });
 
   it('market lỗi thì hiện thông báo lỗi rõ ràng', async () => {

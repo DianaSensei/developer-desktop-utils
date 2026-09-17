@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Package, Plus, X } from 'lucide-react';
 import { useLocale } from '@/contexts/LocaleContext';
+import { cn } from '@/lib/utils';
 import { isTauri } from '@/lib/platform';
 import { pendingInstall } from '@/lib/pendingInstall';
 import {
@@ -134,19 +135,19 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
   };
 
   if (!isTauri) {
-    return <Callout tone="info" size="sm">{t('settings.plugins.install.webWarning')}</Callout>;
+    return <Callout tone="info" size="sm">{t('settings.extensions.install.webWarning')}</Callout>;
   }
 
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-xs font-medium">{t('settings.plugins.tabs.marketplace')}</p>
-        <p className="text-[11px] text-fg-mute">{t('settings.plugins.marketplace.description')}</p>
+        <p className="text-xs font-medium">{t('settings.extensions.tabs.marketplace')}</p>
+        <p className="text-[11px] text-fg-mute">{t('settings.extensions.marketplace.description')}</p>
       </div>
 
       <div className="flex items-end gap-2">
         <div className="flex-1 min-w-0 space-y-1">
-          <p className="text-[11px] font-medium text-fg-mute">{t('settings.plugins.marketplace.marketLabel')}</p>
+          <p className="text-[11px] font-medium text-fg-mute">{t('settings.extensions.marketplace.marketLabel')}</p>
           <Select value={selected?.id} onValueChange={handleSelectMarket}>
             <SelectTrigger className="h-ctl w-full text-xs">
               <SelectValue />
@@ -155,7 +156,7 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
               {markets.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.label}
-                  {!m.builtin ? ` · ${t('settings.plugins.marketplace.custom')}` : ''}
+                  {!m.builtin ? ` · ${t('settings.extensions.marketplace.custom')}` : ''}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -165,7 +166,7 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
           <Button
             variant="outline"
             size="sm"
-            title={t('settings.plugins.marketplace.remove')}
+            title={t('settings.extensions.marketplace.remove')}
             onClick={() => handleRemoveMarket(selected)}
           >
             <X className="h-3.5 w-3.5" />
@@ -181,17 +182,17 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
           <Input
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
-            placeholder={t('settings.plugins.marketplace.marketNamePlaceholder')}
+            placeholder={t('settings.extensions.marketplace.marketNamePlaceholder')}
             className="w-40 text-xs"
           />
           <Input
             value={newUrl}
             onChange={(e) => setNewUrl(e.target.value)}
-            placeholder={t('settings.plugins.marketplace.marketUrlPlaceholder')}
+            placeholder={t('settings.extensions.marketplace.marketUrlPlaceholder')}
             className="flex-1 min-w-0 font-mono text-xs"
           />
           <Button size="sm" onClick={handleAddMarket} disabled={!newLabel.trim() || !newUrl.trim()}>
-            {t('settings.plugins.marketplace.add')}
+            {t('settings.extensions.marketplace.add')}
           </Button>
         </div>
       )}
@@ -199,22 +200,22 @@ export function SettingsMarketplace({ onInstallRequested }: SettingsMarketplaceP
       {loading && (
         <div className="flex items-center gap-2 px-1 py-2 text-[11px] text-fg-mute">
           <Spinner size="sm" />
-          {t('settings.plugins.marketplace.loading')}
+          {t('settings.extensions.marketplace.loading')}
         </div>
       )}
 
       {error && (
         <Callout tone="error" size="sm">
-          {t('settings.plugins.marketplace.error', { error })}
+          {t('settings.extensions.marketplace.error', { error })}
         </Callout>
       )}
 
       {plugins && plugins.length === 0 && (
-        <p className="px-1 py-2 text-[11px] text-fg-mute">{t('settings.plugins.marketplace.empty')}</p>
+        <p className="px-1 py-2 text-[11px] text-fg-mute">{t('settings.extensions.marketplace.empty')}</p>
       )}
 
       {plugins && plugins.length > 0 && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(15rem,1fr))]">
           {plugins.map((p) => (
             <MarketPluginCard
               key={p.id}
@@ -258,16 +259,21 @@ function MarketPluginCard({
     !!plugin.targets && plugin.targets.length > 0 && !!targetTriple && !plugin.targets.includes(targetTriple);
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3">
+    <div
+      className={cn(
+        'flex h-full flex-col gap-2 rounded-lg border p-3 transition-colors',
+        upToDate ? 'border-acc/30 bg-acc/5' : 'hover:border-fg-mute/30',
+      )}
+    >
       <div className="flex items-start gap-2">
         <Package className="h-4 w-4 shrink-0 mt-0.5 text-acc" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium">
-            {plugin.label} <span className="font-mono text-fg-mute/60">{plugin.id}@{plugin.version}</span>
-          </p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-fg-mute">{plugin.description}</p>
+          <p className="truncate text-xs font-medium">{plugin.label}</p>
+          <p className="truncate font-mono text-[11px] text-fg-mute/60">{plugin.id}@{plugin.version}</p>
         </div>
       </div>
+
+      <p className="flex-1 text-[11px] leading-relaxed text-fg-mute">{plugin.description}</p>
 
       {plugin.keywords.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -280,7 +286,7 @@ function MarketPluginCard({
       )}
 
       {unsupported && (
-        <p className="text-[11px] text-warn">{t('settings.plugins.marketplace.unsupportedPlatform')}</p>
+        <p className="text-[11px] text-warn">{t('settings.extensions.marketplace.unsupportedPlatform')}</p>
       )}
 
       {/* Cảnh báo, KHÔNG chặn — `targets` chỉ mang tính tham khảo (một market
@@ -289,10 +295,10 @@ function MarketPluginCard({
           trước rồi để người dùng tự quyết, không tự ý từ chối thay họ. */}
       <Button size="sm" onClick={onInstall} disabled={upToDate} className="self-start">
         {upToDate
-          ? t('settings.plugins.marketplace.installed')
+          ? t('settings.extensions.marketplace.installed')
           : installedVersion
-            ? t('settings.plugins.marketplace.updateTo', { version: plugin.version })
-            : t('settings.plugins.marketplace.install')}
+            ? t('settings.extensions.marketplace.updateTo', { version: plugin.version })
+            : t('settings.extensions.marketplace.install')}
       </Button>
     </div>
   );
