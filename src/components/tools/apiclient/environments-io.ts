@@ -8,7 +8,7 @@
 //
 // Vault secrets are never involved here — only plain KeyValue variables travel.
 
-import { newEnvironment, type Environment, type KeyValue } from './types';
+import { newEnvironment, uid, type Environment, type KeyValue } from './types';
 
 interface PmEnvironmentValue { key?: string; value?: string; enabled?: boolean; type?: string }
 interface PmEnvironmentFile {
@@ -52,7 +52,7 @@ function sanitizeVariables(rows: unknown): KeyValue[] {
     const value = typeof rec.value === 'string' ? rec.value : '';
     const secret = rec.secret === true || rec.type === 'secret';
     out.push({
-      id: `iv-${Date.now()}-${Math.random().toString(36).slice(2)}`, key, value,
+      id: uid(), key, value,
       enabled: rec.enabled !== false, ...(secret ? { secret: true } : {}),
     });
   }
