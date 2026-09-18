@@ -44,15 +44,22 @@ export default definePlugin({
 
 [^market-id]: Trong CHÍNH MỘT market (một `catalog.json`), `id` vẫn phải duy
     nhất — không có cơ chế nào ở đây gỡ khỏi tác giả trách nhiệm không đụng id
-    plugin khác trong cùng market mình phát hành. Nhưng khi cài từ Settings →
-    Marketplace, nếu người dùng đã thêm HAI market khác nhau cùng phát hành
-    một `id` trùng nhau (hai tác giả không hề biết nhau), host tự phân biệt
-    hai bản cài đó bằng `marketId + id` (registry id thật trở thành
-    `<marketId>-<id>`, route thành `/installed/<marketId>-<id>`) — cả hai
-    cùng tồn tại, không bản nào âm thầm bị ghi đè. Một plugin cài qua URL dán
-    tay (không qua market nào) vẫn dùng đúng `id`/`route` gốc như trước, không
-    đổi gì. Xem `src/platform/installer.ts`'s `installedPluginManifests()` và
-    `src-tauri/src/artifact_installer.rs`'s `InstalledPluginRecord::market_id`.
+    plugin khác trong cùng market mình phát hành. `id` khai ở đây LUÔN giữ
+    nguyên dạng trần khi đăng ký vào host — không bị host tiền tố gì thêm,
+    dù cài qua URL dán tay hay qua market: đây chính là chuỗi plugin của bạn
+    tự dùng để gọi lại chính mình qua `usePluginSdkFor(id)`/`getPluginSdk(id)`.
+    Nguồn cài (market nào, hay "url" cho URL dán tay) được host lưu riêng
+    dưới dạng `group` — chỉ ảnh hưởng route hiển thị
+    (`/installed/<group>/<id>`), không đụng tới `id` bạn khai.
+    Vì `usePluginSdkFor`/`getPluginSdk` chỉ nhận được `id` (không có
+    `group`) khi plugin tự gọi mình ở phạm vi module (store nền, ngoài React
+    context), host CHẶN VIỆC CÀI nếu `id` bạn khai đã bị một nguồn khác
+    (market khác, URL dán tay, hay một tool có sẵn của chính app) chiếm —
+    người dùng phải gỡ bản cũ trước khi cài bản mới trùng id, hai bản không
+    được phép cùng tồn tại. Đặt `id` đủ cụ thể (không trùng tên phổ biến
+    kiểu `client`/`manager`) để tránh việc này. Xem
+    `src/platform/installer.ts`'s `installedPluginManifests()`/
+    `assertNoConflictingInstall()`.
 
 ## Bảng quyền (`PluginPermission`)
 

@@ -230,6 +230,92 @@ describe('fetchArtifactManifestPreview / installArtifact / listInstalledArtifact
   });
 });
 
+describe('assertNoConflictingInstall — gọi TRƯỚC installArtifact/installPlugin bằng manifest lớp gọi đã xem trước', () => {
+  it('id đã cài từ group KHÁC (market khác, hoặc url ↔ market) — ném lỗi rõ ràng nêu tên group cũ', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([
+      installedPluginRaw({ manifest: remoteManifest({ id: 'container-manager' }), market_id: 'official' }),
+    ]);
+
+    await expect(installer.assertNoConflictingInstall('container-manager', 'custom-fork')).rejects.toThrow(
+      /container-manager.*official/,
+    );
+  });
+
+  it('id đã cài, CÙNG group (cài lại/cập nhật từ đúng nguồn cũ) — KHÔNG ném', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([
+      installedPluginRaw({ manifest: remoteManifest({ id: 'container-manager' }), market_id: 'official' }),
+    ]);
+
+    await expect(installer.assertNoConflictingInstall('container-manager', 'official')).resolves.toBeUndefined();
+  });
+
+  it('không marketId cả hai bên (group "url" cả hai) — cài lại từ URL trần vẫn không bị chặn', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([installedPluginRaw({ manifest: remoteManifest({ id: 'container-manager' }) })]);
+
+    await expect(installer.assertNoConflictingInstall('container-manager', undefined)).resolves.toBeUndefined();
+  });
+
+  it('id chưa từng cài ở đâu — không chặn gì', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([]);
+
+    await expect(installer.assertNoConflictingInstall('container-manager', 'official')).resolves.toBeUndefined();
+  });
+
+  it('đọc index lỗi (đĩa hỏng/quyền) — không chặn cài, để lệnh install thật sự tự báo lỗi rõ hơn', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockRejectedValueOnce(new Error('index.json hỏng'));
+
+    await expect(installer.assertNoConflictingInstall('container-manager', 'official')).resolves.toBeUndefined();
+  });
+
+  it('registeredGroup="core" (id trùng một plugin compile-time, lớp gọi tự tra bằng getPlugin) — ném lỗi riêng, không nhắc "gỡ bản đó" (không gỡ được tool có sẵn)', async () => {
+    const installer = await loadInTauri();
+    // KHÔNG mock invoke ở đây: registeredGroup !== newGroup phải chặn NGAY,
+    // trước khi kịp gọi listInstalledPlugins() — nếu lỡ gọi, invokeMock
+    // (chưa mock resolved value nào) sẽ trả undefined, không phải mảng, và
+    // test sẽ thất bại vì lý do sai (TypeError .find trên undefined), không
+    // phải vì đúng lỗi mong đợi.
+    await expect(installer.assertNoConflictingInstall('json', 'official', 'core')).rejects.toThrow(/json/);
+    await expect(installer.assertNoConflictingInstall('json', 'official', 'core')).rejects.not.toThrow(/gỡ bản đó/i);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('registeredGroup trùng đúng group đang cài (vd cài lại chính plugin compile-time đó — không hợp lệ thật, nhưng hàm không tự biết) — không chặn ở nhánh registeredGroup', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([]); // vẫn rơi xuống nhánh quét đĩa như bình thường
+
+    await expect(installer.assertNoConflictingInstall('json', undefined, 'url')).resolves.toBeUndefined();
+  });
+
+  it('registeredGroup khác "core" (bản ghi registry, có thể đã STALE nếu người dùng vừa gỡ trong phiên này) — KHÔNG tự chặn, luôn rơi xuống quét đĩa', async () => {
+    const installer = await loadInTauri();
+    // registry chỉ nạp một lần lúc bootstrap (registry.ts), không cập nhật
+    // khi cài/gỡ trong lúc app đang chạy — một registeredGroup non-core ở
+    // đây có thể là bản ghi CŨ của một plugin người dùng vừa gỡ, chưa
+    // restart. Tự chặn bằng registeredGroup ở trường hợp này sẽ chặn nhầm
+    // một lượt cài lại hợp lệ — phải luôn quét đĩa (nguồn xác thực đúng
+    // trạng thái hiện tại) để biết còn conflict thật hay không.
+    invokeMock.mockResolvedValueOnce([]); // đĩa: không còn bản nào — plugin cũ đã bị gỡ thật
+    await expect(
+      installer.assertNoConflictingInstall('container-manager', 'custom-fork', 'official'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('registeredGroup khác "core" NHƯNG đĩa xác nhận vẫn còn conflict thật — vẫn ném đúng thông điệp', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([
+      installedPluginRaw({ manifest: remoteManifest({ id: 'container-manager' }), market_id: 'official' }),
+    ]);
+    await expect(
+      installer.assertNoConflictingInstall('container-manager', 'custom-fork', 'official'),
+    ).rejects.toThrow(/container-manager.*official/);
+  });
+});
+
 describe('currentTargetTriple', () => {
   it('gọi đúng lệnh Rust và trả nguyên chuỗi triple', async () => {
     const installer = await loadInTauri();
@@ -441,29 +527,30 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
   // trên app thật (cài một plugin ví dụ, xác nhận nó thật sự render) trước
   // khi coi cơ chế này là đã kiểm chứng đầy đủ.
 
-  it('không có marketId (dán tay/bản cài từ trước) thì giữ NGUYÊN id/route gốc', async () => {
+  it('không có marketId (dán tay/bản cài từ trước) thì group là "url", id giữ nguyên trần', async () => {
     const installer = await loadInTauri();
     invokeMock.mockResolvedValueOnce([installedPluginRaw({ manifest: remoteManifest({ id: 'demo', route: '/demo' }) })]);
 
     const [a] = await installer.installedPluginManifests();
     expect(a.manifest.id).toBe('demo');
-    expect(a.manifest.route).toBe('/demo');
+    expect(a.manifest.group).toBe('url');
+    expect(a.manifest.route).toBe('/installed/url/demo');
   });
 
-  it('có marketId thì id/route đăng ký registry được ghép marketId — hai market khác nhau cùng id KHÔNG đụng route/storage của nhau', async () => {
+  it('có marketId thì group là marketId, id VẪN TRẦN — đây là chuỗi usePluginSdkFor()/getPluginSdk() bên trong bundle tự gọi lại chính mình', async () => {
     const installer = await loadInTauri();
     invokeMock.mockResolvedValueOnce([
       installedPluginRaw({ manifest: remoteManifest({ id: 'demo', route: '/demo' }), market_id: 'official' }),
-      installedPluginRaw({ manifest: remoteManifest({ id: 'demo', route: '/demo' }), market_id: 'custom-fork' }),
     ]);
 
-    const [a, b] = await installer.installedPluginManifests();
-    expect(a.manifest.id).toBe('official-demo');
-    expect(a.manifest.route).toBe('/installed/official-demo');
-    expect(b.manifest.id).toBe('custom-fork-demo');
-    expect(b.manifest.route).toBe('/installed/custom-fork-demo');
-    expect(a.manifest.id).not.toBe(b.manifest.id);
-    expect(a.manifest.route).not.toBe(b.manifest.route);
+    const [a] = await installer.installedPluginManifests();
+    // Mất dòng group ở installer.ts thì id vẫn đúng (không tiền tố), nên
+    // usePluginSdkFor/getPluginSdk vẫn hoạt động — group chỉ ảnh hưởng route
+    // hiển thị và việc phát hiện xung đột lúc CÀI (assertNoConflictingInstall),
+    // không phải danh tính SDK của plugin.
+    expect(a.manifest.id).toBe('demo');
+    expect(a.manifest.group).toBe('official');
+    expect(a.manifest.route).toBe('/installed/official/demo');
   });
 });
 

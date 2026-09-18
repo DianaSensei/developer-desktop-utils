@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
 import {
+  assertNoConflictingInstall,
   currentTargetTriple,
   fetchArtifactManifestPreview,
+  getPlugin,
   installArtifact,
   type RemoteArtifactManifest,
 } from '@/platform';
@@ -94,6 +96,9 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
     setInstalling(true);
     try {
       for (const item of installable) {
+        if (item.manifest.kind === 'plugin') {
+          await assertNoConflictingInstall(item.manifest.id, marketId, getPlugin(item.manifest.id)?.group);
+        }
         await installArtifact(item.url, marketId);
       }
       setDone(true);

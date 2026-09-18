@@ -91,6 +91,20 @@ describe('secrets', () => {
   });
 });
 
+describe('group', () => {
+  it('không khai group trong manifest (mọi plugin compile-time) thì mặc định "core"', () => {
+    const sdk = createPluginSdk(plugin([]));
+    expect(sdk.group).toBe('core');
+  });
+
+  it('có khai group (plugin cài lúc chạy) thì giữ nguyên, id KHÔNG bị đổi theo', () => {
+    const manifest = { ...plugin([]), group: 'official' };
+    const sdk = createPluginSdk(manifest);
+    expect(sdk.id).toBe('demo');
+    expect(sdk.group).toBe('official');
+  });
+});
+
 describe('env', () => {
   it('phơi ra thông tin môi trường mà không cần quyền nào', () => {
     const sdk = createPluginSdk(plugin([]));

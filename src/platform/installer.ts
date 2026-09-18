@@ -209,6 +209,87 @@ function toCamelArtifactRecord(record: RawInstalledArtifactRecord): InstalledArt
   };
 }
 
+/** `PluginManifest.group` hiệu lực của một `marketId` — `"url"` khi không có
+ *  market (URL dán tay), chính `marketId` khi có. Một hàm DÙNG CHUNG giữa
+ *  `installedPluginManifests()` (đọc group cho registry) và
+ *  `assertNoConflictingInstall()` (so group cũ/mới lúc cài) để hai chỗ không
+ *  bao giờ lệch công thức nhau. */
+function installGroup(marketId: string | null | undefined): string {
+  return marketId ?? 'url';
+}
+
+/**
+ * Chặn cài một plugin nếu `id` của nó đã bị MỘT GROUP KHÁC chiếm — vd đã cài
+ * "container-manager" qua URL dán tay (group "url"), giờ cài lại đúng plugin
+ * đó nhưng từ market "official" (group "official"). Cùng `id` khác `group`
+ * cùng đăng ký được vào registry (`registry.ts` không cấm — mô hình là "id
+ * chỉ cần duy nhất TRONG group"), nhưng `usePluginSdkFor`/`getPluginSdk` gọi
+ * MODULE-SCOPE (không qua React context, dùng bởi store nền của Kafka/
+ * RabbitMQ) chỉ nhận được đúng chuỗi `id`, không có `group` — hai bản ghi
+ * cùng tồn tại sẽ khiến lời gọi đó không biết nên trả bản nào, âm thầm gán
+ * nhầm storage/audit/quyền của bản NÀY cho plugin BẢN KIA.
+ *
+ * Chặn ở ĐÂY (trước khi Rust ghi xuống đĩa) thay vì chỉ phát hiện ở
+ * `registry.ts` lúc khởi động app lần sau: người dùng thấy lỗi NGAY khi bấm
+ * cài, kèm hướng dẫn gỡ bản cũ trước — không phải một dòng ẩn trong
+ * `PLUGIN_ERRORS` họ phải tự tìm ra sau khi thắc mắc sao plugin mới cài
+ * không lên.
+ *
+ * GỌI TRƯỚC `installArtifact`/`installPlugin`, không phải bên trong chúng —
+ * mọi lối gọi (ExtensionInstallDialog, SettingsExtensionInstaller) đều ĐÃ xem
+ * trước manifest (`fetchArtifactManifestPreview`/`fetchManifestPreview`) để
+ * hiển thị màn xác nhận trước khi cho bấm Install, nên `id` đã có sẵn trong
+ * tay — fetch lại lần hai bên trong `installArtifact` chỉ để lấy đúng cái nó
+ * vừa có là lãng phí không cần thiết. Chỉ áp dụng cho `kind: "plugin"` —
+ * service khoá theo `bin` qua `ALLOWED_SERVICES`, không thuộc mô hình
+ * group/id này.
+ *
+ * `registeredGroup` — group của một bản ghi ĐANG TRONG REGISTRY (không phải
+ * trên đĩa) đã chiếm đúng `id` này, nếu có. Lớp gọi tự tra bằng
+ * `getPlugin(id)?.group` (đã có sẵn qua `@/platform`) rồi truyền vào — hàm
+ * này KHÔNG tự tra được, vì `registry.ts` đã import `installer.ts` (nạp
+ * ngược lại sẽ vòng lặp).
+ *
+ * CHỈ chặn sớm ở đây khi `registeredGroup === 'core'` (một trong 26 plugin
+ * compile-time — không bao giờ "biến mất" khỏi registry trong lúc app đang
+ * chạy, nên registry luôn đúng cho trường hợp này). Mọi `registeredGroup`
+ * khác 'core' bị BỎ QUA ở đây, rơi xuống quét đĩa bên dưới thay vì tự chặn
+ * — registry chỉ nạp MỘT LẦN lúc bootstrap (`registry.ts`), không cập nhật
+ * khi cài/gỡ trong phiên đang chạy, nên một bản ghi non-core ở đây có thể
+ * đã STALE (người dùng vừa gỡ nó, chưa restart) và tự chặn nhầm một lượt
+ * cài lại hợp lệ. Đĩa (`listInstalledPlugins()`) luôn phản ánh đúng trạng
+ * thái hiện tại nên là nguồn xác thực duy nhất đáng tin cho mọi trường hợp
+ * không phải compile-time.
+ */
+export async function assertNoConflictingInstall(
+  id: string,
+  marketId: string | undefined,
+  registeredGroup?: string,
+): Promise<void> {
+  const newGroup = installGroup(marketId);
+
+  if (registeredGroup === 'core' && registeredGroup !== newGroup) {
+    throw new Error(`Plugin "${id}" trùng id với một tool có sẵn trong app — đổi id khác trong manifest.`);
+  }
+
+  let installed: InstalledPluginRecord[];
+  try {
+    installed = await listInstalledPlugins();
+  } catch {
+    // Đọc index lỗi — không phải việc của bước kiểm tra này; để lời gọi cài
+    // thật sự bên dưới tự báo lỗi đọc/ghi đĩa nếu có, rõ ràng hơn.
+    return;
+  }
+  const conflict = installed.find((r) => r.manifest.id === id && installGroup(r.marketId) !== newGroup);
+  if (conflict) {
+    const oldGroup = installGroup(conflict.marketId);
+    throw new Error(
+      `Plugin "${id}" đã được cài từ nguồn khác ("${oldGroup}"). ` +
+        `Gỡ bản đó trong Settings → Extensions trước khi cài từ nguồn "${newGroup}".`,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tầng tổng quát — dùng bởi SettingsExtensionInstaller (cả hai kind)
 // ---------------------------------------------------------------------------
@@ -224,7 +305,14 @@ export async function fetchArtifactManifestPreview(url: string): Promise<RemoteA
  *  rẽ nhánh theo `kind` khai trong manifest tại `url`). `marketId` đi kèm khi
  *  URL này tới từ một thẻ trong SettingsMarketplace (xem `pendingInstall.ts`)
  *  — `undefined` cho một URL dán tay/deep link, giữ nguyên hành vi "một id
- *  luôn thay bản cũ" như trước tính năng market. */
+ *  luôn thay bản cũ" như trước tính năng market.
+ *
+ *  KHÔNG tự xem trước manifest ở đây để kiểm xung đột group/id — mọi lối gọi
+ *  (ExtensionInstallDialog, SettingsExtensionInstaller) đều ĐÃ xem trước
+ *  manifest để hiển thị màn xác nhận trước khi cho bấm Install, nên đã có sẵn
+ *  `id`/`kind` trong tay. Gọi lại `assertNoConflictingInstall` bằng thông tin
+ *  đó TRƯỚC khi gọi hàm này, thay vì fetch lại lần hai ở đây — xem
+ *  `assertNoConflictingInstall`'s doc comment. */
 export async function installArtifact(url: string, marketId?: string): Promise<InstalledArtifactRecord> {
   const raw = await invokeCommand<RawInstalledArtifactRecord>('artifact_installer_install', {
     sourceUrl: url,
@@ -464,24 +552,36 @@ export async function installedPluginManifests(): Promise<
   }
 
   return records.map((record, i) => {
-    // Danh tính registry (id storage/route/quyền/audit đều khoá theo đây, xem
-    // registry.ts's `registerManifest`) PHẢI phân biệt được hai market khác
-    // nhau cùng phát hành một plugin trùng `manifest.id` — không có allowlist
-    // toàn cục nào ép id duy nhất giữa các market (khác `ALLOWED_SERVICES`
-    // của service_host.rs, một danh sách cố định phía Rust). Không có
-    // `marketId` (URL dán tay, hoặc bản cài từ trước khi market tồn tại) thì
-    // giữ NGUYÊN id/route gốc — không đổi hành vi của người dùng đã cài từ
-    // trước tính năng này.
-    const registryId = record.marketId ? `${record.marketId}-${record.manifest.id}` : record.manifest.id;
+    const group = installGroup(record.marketId);
     return {
-      source: `installed:${registryId}@${record.manifest.version}`,
+      source: `installed:${group}:${record.manifest.id}@${record.manifest.version}`,
       manifest: {
-        id: registryId,
+        // Bundle của plugin gọi `usePluginSdkFor(record.manifest.id)`/
+        // `getPluginSdk(record.manifest.id)` bằng đúng chuỗi này — KHÔNG tiền
+        // tố market, xem `PluginManifest.group`. `installArtifact()` chặn cài
+        // nếu id này đã bị một group khác chiếm, nên tại registry nó vẫn
+        // nhất quán duy nhất toàn app dù không ép kiểu ở đây.
+        //
+        // Namespace storage/secrets (sdk.ts's storageKey/secrets.ts's
+        // vaultKey) khoá theo ĐÚNG field này — với một bản cài qua market,
+        // trước bản sửa này nó là registry id đã tiền tố (`<marketId>-<id>`),
+        // giờ là `id` trần. KHÔNG coi là cần migrate: mọi bản cài qua market
+        // trước bản sửa này chưa từng đọc/ghi được sdk.storage/sdk.secrets
+        // dù chỉ một lần — chính `usePluginSdkFor(record.manifest.id)` ở trên
+        // đã ném lỗi ngay khi gọi (root cause của toàn bộ chuỗi PR này), nên
+        // component không bao giờ chạy tới bất kỳ lời gọi storage/secrets
+        // nào trước khi crash. Không có dữ liệu thật nào tồn tại dưới
+        // namespace cũ để mất.
+        id: record.manifest.id,
+        group,
         label: record.manifest.label,
         icon: ICONS_BY_NAME[record.manifest.icon] ?? Puzzle,
         description: record.manifest.description,
         keywords: record.manifest.keywords,
-        route: record.marketId ? `/installed/${registryId}` : record.manifest.route,
+        // Thống nhất cho MỌI plugin cài lúc chạy (URL trần lẫn market) — route
+        // riêng plugin tự khai (`record.manifest.route`) không còn dùng nữa,
+        // route hiển thị luôn phản ánh đúng group đã cài.
+        route: `/installed/${group}/${record.manifest.id}`,
         order: INSTALLED_ORDER_BASE + i,
         defaultEnabled: true,
         permissions: record.manifest.permissions,

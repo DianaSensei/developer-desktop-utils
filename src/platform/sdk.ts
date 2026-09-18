@@ -130,6 +130,9 @@ export interface PluginFiles {
 
 export interface PluginSdk {
   readonly id: string;
+  /** Nguồn cài — xem `PluginManifest.group`. Metadata, không ảnh hưởng khoá
+   *  storage/audit (vẫn theo `id` một mình). */
+  readonly group: string;
   readonly sdkVersion: string;
   readonly permissions: readonly PluginPermission[];
   readonly env: PluginEnv;
@@ -216,6 +219,7 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
 
   return {
     id,
+    group: manifest.group ?? 'core',
     sdkVersion: SDK_VERSION,
     permissions: manifest.permissions ?? [],
     env: { isTauri, isMac: IS_MAC, modKey: MOD_KEY },

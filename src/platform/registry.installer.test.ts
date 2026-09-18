@@ -119,6 +119,54 @@ describe('initInstalledPlugins', () => {
     expect(registry.getPlugin('installed-demo')?.route).toBe('/a');
   });
 
+  it('plugin cài qua market: id vẫn TRẦN (không tiền tố), group mang tên market — usePluginSdkFor/getPluginSdk gọi bằng id trần vẫn tra được', async () => {
+    // Mô phỏng đúng những gì installedPluginManifests() tự sinh cho một bản
+    // cài có marketId (xem installer.ts): id KHÔNG bị tiền tố, group mới là
+    // chỗ mang thông tin market — khác hẳn cơ chế `<marketId>-<id>` cũ.
+    const { installedPluginManifests } = await import('./installer');
+    vi.mocked(installedPluginManifests).mockResolvedValue([
+      {
+        manifest: installedManifest({ id: 'container-manager', group: 'official', route: '/installed/official/container-manager' }),
+        source: 'installed:official:container-manager@1.0.0',
+      },
+    ]);
+
+    const registry = await freshRegistry();
+    await registry.initInstalledPlugins();
+
+    // Đúng chuỗi bundle của chính plugin tự gọi lại mình
+    // (usePluginSdkFor('container-manager')/getPluginSdk('container-manager'))
+    // — không cần biết registry đã gán group nào cho nó.
+    const record = registry.getPlugin('container-manager');
+    expect(record?.id).toBe('container-manager');
+    expect(record?.group).toBe('official');
+  });
+
+  it('hai plugin cài trùng id (một qua URL trần, một qua market) — bản thứ hai vẫn bị registry từ chối như mọi trùng id khác', async () => {
+    // registry.ts KHÔNG tự phân biệt group khi so trùng id — đó là việc của
+    // installer.ts's assertNoConflictingInstall() (chặn NGAY LÚC CÀI, xem
+    // installer.test.ts). Ở tầng registry, hai bản ghi cùng id trần luôn là
+    // một collision phẳng, bất kể group — giống hệt "hai plugin cài trùng id
+    // với nhau thì chỉ cái đầu được đăng ký" phía trên, chỉ khác nguồn cài.
+    const { installedPluginManifests } = await import('./installer');
+    vi.mocked(installedPluginManifests).mockResolvedValue([
+      {
+        manifest: installedManifest({ id: 'container-manager', group: 'url', route: '/installed/url/container-manager' }),
+        source: 'installed:url:container-manager@1.0.0',
+      },
+      {
+        manifest: installedManifest({ id: 'container-manager', group: 'official', route: '/installed/official/container-manager', order: 100_001 }),
+        source: 'installed:official:container-manager@1.0.0',
+      },
+    ]);
+
+    const registry = await freshRegistry();
+    await registry.initInstalledPlugins();
+
+    expect(registry.getPlugin('container-manager')?.group).toBe('url');
+    expect(registry.PLUGIN_ERRORS.some((e) => e.id === 'container-manager')).toBe(true);
+  });
+
   it('manifest hỏng (thiếu route) bị loại vào PLUGIN_ERRORS, không làm hỏng những manifest hợp lệ khác', async () => {
     const { installedPluginManifests } = await import('./installer');
     vi.mocked(installedPluginManifests).mockResolvedValue([

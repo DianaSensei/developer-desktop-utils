@@ -33,6 +33,14 @@ const records: PluginRecord[] = [];
  *  đây là bắt buộc, không phải trang trí. */
 export const PLUGIN_MAP: Map<string, PluginRecord> = new Map();
 
+// `id` phải duy nhất TOÀN APP trên thực tế, không chỉ trong `group` của nó —
+// dù `PluginManifest.group` tồn tại để phân biệt NGUỒN CÀI, `installer.ts`
+// chặn cài một plugin nếu `id` đã bị một `group` khác chiếm (bắt gỡ bản cũ
+// trước khi cài bản mới), nên tại registry chỉ CẦN VÀ CHỈ CÓ một bảng
+// `seenIds` phẳng — y hệt trước khi khái niệm group ra đời. Xem
+// `PluginManifest.group`'s doc comment cho lý do (usePluginSdkFor/
+// getPluginSdk gọi module-scope chỉ nhận được `id`, không có `group`, nên
+// hai bản ghi cùng `id` coexist thật sẽ khiến lời gọi đó mập mờ).
 const seenIds = new Map<string, string>();
 const seenRoutes = new Map<string, string>();
 const seenOrders = new Map<number, string>();
@@ -83,6 +91,10 @@ function registerManifest(
   const sdk = createPluginSdk(m);
   const record: PluginRecord = {
     ...m,
+    // `'core'` cho mọi plugin compile-time (26 file `src/plugins/<id>/
+    // plugin.ts` không khai field này) — `installer.ts` luôn khai rõ `group`
+    // cho plugin cài lúc chạy, nên `?? 'core'` không bao giờ chạm nhánh đó.
+    group: m.group ?? 'core',
     keywords: m.keywords ?? [],
     experimental: m.experimental ?? false,
     fullHeight: m.fullHeight ?? true,

@@ -93,11 +93,12 @@ function randomSuffix(): string {
 }
 
 // Kebab-case (chữ thường, số, dấu gạch nối) — CHỦ ĐÍCH, không chỉ để đẹp:
-// `installedPluginManifests()` (installer.ts) ghép id này với id plugin
-// thành một registry id duy nhất (`${marketId}-${pluginId}`), phải khớp
-// `ID_PATTERN` của `validateManifest` (chỉ nhận kebab-case) — một market id
-// chứa `:` hay ký tự hoa sẽ khiến MỌI plugin cài từ market đó bị registry từ
-// chối thẳng, âm thầm biến mất khỏi sidebar.
+// `installedPluginManifests()` (installer.ts) dùng market id này làm `group`
+// của mọi plugin cài từ market đó, lộ ra trực tiếp trong route
+// (`/installed/<group>/<id>`) và trong `by-market/<market_id>/` phía đĩa
+// (`artifact_installer.rs`) — một market id chứa `:`, khoảng trắng hay ký tự
+// hoa sẽ làm hỏng route/đường dẫn file của MỌI plugin cài từ market đó.
+
 export function addCustomMarket(label: string, catalogUrl: string): Market {
   const market: Market = {
     id: `custom-${Date.now()}-${randomSuffix()}`,

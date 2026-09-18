@@ -34,6 +34,7 @@ export {
   currentTargetTriple,
   checkAllForUpdates,
   recordKey,
+  assertNoConflictingInstall,
 } from './installer';
 export type {
   RemotePluginManifest,

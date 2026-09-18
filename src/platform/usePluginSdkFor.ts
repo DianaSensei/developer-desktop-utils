@@ -15,6 +15,13 @@ const cache = new Map<string, PluginSdk>();
  * Kết quả được nhớ theo id: SDK gắn danh tính plugin chứ không mang state gì,
  * nên một instance cho mỗi plugin là đủ — và giữ nguyên một tham chiếu giúp các
  * `useMemo([sdk])` phía trên không bị vô hiệu.
+ *
+ * Gọi ở MODULE SCOPE (không qua React context) nên chỉ nhận được đúng
+ * `pluginId` — không biết, và không cần biết, `group` nào đã cài nó. An toàn
+ * vì `installer.ts` chặn cài một plugin nếu `id` của nó đã bị một `group`
+ * KHÁC chiếm (bắt gỡ bản cũ trước) — tại một thời điểm chỉ có đúng một bản
+ * ghi mang `pluginId` này trong registry, nên `getPlugin(pluginId)` không
+ * mập mờ. Xem `PluginManifest.group` cho lý do đầy đủ.
  */
 export function getPluginSdk(pluginId: string): PluginSdk {
   const existing = cache.get(pluginId);
