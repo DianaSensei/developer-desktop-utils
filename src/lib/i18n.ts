@@ -244,6 +244,7 @@ export const DICTIONARY = {
   },
   'settings.extensions.tabs.marketplace': { vi: 'Chợ tiện ích', en: 'Marketplace' },
   'settings.extensions.tabs.installUrl': { vi: 'Cài từ URL', en: 'Install by URL' },
+  'settings.extensions.tabs.installed': { vi: 'Đã cài', en: 'Installed' },
 
   'settings.extensions.install.title': { vi: 'Cài tiện ích từ bên ngoài', en: 'Install external extension' },
   'settings.extensions.install.description': {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor, within, act } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 import { storageRemove } from '@/lib/persistentStore';
 
 /**
@@ -9,15 +9,10 @@ import { storageRemove } from '@/lib/persistentStore';
  * nhất để mọi module transitively import `@/lib/platform` đọc đúng giá trị
  * test này cần.
  *
- * `settle()` NGAY SAU `renderInTauri()`: lần `import('@tauri-apps/api/core')`
- * ĐẦU TIÊN (bên trong `invokeCommand`, gọi lúc mount để `listInstalledArtifacts`
- * chạy) là một dynamic import thật, còn đang "in-flight" khi `render()` trả
- * về. Bắn thêm một sự kiện gọi `invoke` NGAY LẬP TỨC (không chờ gì) có thể đua
- * với chính lần import đó và (quan sát thực nghiệm) đôi khi request một bản
- * KHÔNG qua `vi.mock` — không phải lỗi ở component hay ở `installer.ts`, mà là
- * một cuộc đua giữa `resetModules()` + dynamic import trong bài test. Chờ một
- * nhịp (bọc trong `act` để React cũng flush kịp) trước khi tương tác tiếp là
- * đủ để loại cuộc đua này.
+ * Danh sách "đã cài" (gỡ/cập nhật) không còn ở component này nữa — xem
+ * `SettingsInstalledExtensions.test.tsx`. File này chỉ còn phủ form "cài từ
+ * URL": xem trước + cài, không có gì gọi `listInstalledArtifacts` lúc mount
+ * nữa nên không cần mock "list lúc mount" như bản cũ.
  */
 async function settle(ms = 20) {
   await act(async () => {
@@ -60,17 +55,6 @@ function serviceManifestRaw(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function installedPluginRaw(overrides: Partial<Record<string, unknown>> = {}) {
-  return {
-    kind: 'plugin' as const,
-    manifest: pluginManifestRaw(),
-    source_url: 'https://example.com/plugin.json',
-    bundle_path: '/tmp/demo/1.0.0/bundle.mjs',
-    installed_at: 1_700_000_000_000,
-    ...overrides,
-  };
-}
-
 function installedServiceRaw(overrides: Partial<Record<string, unknown>> = {}) {
   const { manifest: manifestOverrides, ...rest } = overrides;
   return {
@@ -106,13 +90,10 @@ async function renderInstaller(opts?: { tauri?: boolean }) {
   // `useContext` bên trong component không thấy đúng Provider, ném "must be
   // used within a LocaleProvider" dù JSX nhìn đúng.
   const { LocaleProvider } = await import('@/contexts/LocaleContext');
-  const { ExtensionUpdateProvider } = await import('@/contexts/ExtensionUpdateContext');
   const { SettingsExtensionInstaller } = await import('@/components/SettingsExtensionInstaller');
   return render(
     <LocaleProvider>
-      <ExtensionUpdateProvider>
-        <SettingsExtensionInstaller />
-      </ExtensionUpdateProvider>
+      <SettingsExtensionInstaller />
     </LocaleProvider>,
   );
 }
@@ -138,21 +119,8 @@ describe('SettingsExtensionInstaller — bản web (không phải Tauri)', () =>
   });
 });
 
-describe('SettingsExtensionInstaller — danh sách rỗng (empty state)', () => {
-  it('nói rõ chưa cài gì thay vì để trống', async () => {
-    invokeMock.mockResolvedValueOnce([]); // artifact_installer_list lúc mount
-    await renderInTauri();
-    await settle();
-
-    await waitFor(() => {
-      expect(screen.getByText(/No extensions installed yet\.|Chưa cài tiện ích nào\./)).toBeTruthy();
-    });
-  });
-});
-
 describe('SettingsExtensionInstaller — xem trước (preview)', () => {
   it('trạng thái loading: nút Preview vô hiệu hoá trong lúc chờ, rồi hiện kết quả', async () => {
-    invokeMock.mockResolvedValueOnce([]); // list lúc mount
     await renderInTauri();
     await settle();
 
@@ -177,7 +145,6 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
   });
 
   it('trạng thái lỗi: hiện thông báo lỗi từ Rust, không rơi vào success', async () => {
-    invokeMock.mockResolvedValueOnce([]); // list lúc mount
     await renderInTauri();
     await settle();
 
@@ -190,7 +157,6 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
   });
 
   it('kind=service: hiển thị badge Service, target-triple máy hiện tại, và danh sách target manifest có', async () => {
-    invokeMock.mockResolvedValueOnce([]); // list lúc mount
     await renderInTauri();
     await settle();
 
@@ -215,7 +181,6 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
     // plugin) — bấm Install ở đây phải đi thẳng tới artifact_installer_install,
     // không có lệnh list nào chen vào trước.
     invokeMock.mockResolvedValueOnce(installedServiceRaw());
-    invokeMock.mockResolvedValueOnce([installedServiceRaw()]); // refresh sau khi cài
     fireEvent.click(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }));
 
     await waitFor(() => {
@@ -227,7 +192,6 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
   });
 
   it('kind=service: nền tảng không khớp thì cảnh báo rõ, không đoán/thử triple khác', async () => {
-    invokeMock.mockResolvedValueOnce([]); // list lúc mount
     await renderInTauri();
     await settle();
 
@@ -248,9 +212,8 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
   });
 });
 
-describe('SettingsExtensionInstaller — cài đặt (success) và danh sách hỗn hợp', () => {
-  it('cài xong thì bật cờ cần khởi động lại, và danh sách phân biệt badge theo kind', async () => {
-    invokeMock.mockResolvedValueOnce([]); // list lúc mount
+describe('SettingsExtensionInstaller — cài đặt (success)', () => {
+  it('cài xong thì bật cờ cần khởi động lại', async () => {
     await renderInTauri();
     await settle();
 
@@ -261,8 +224,7 @@ describe('SettingsExtensionInstaller — cài đặt (success) và danh sách h�
     await waitFor(() => expect(screen.getByText('Demo')).toBeTruthy());
 
     invokeMock.mockResolvedValueOnce([]); // list, assertNoConflictingInstall trước khi cài
-    invokeMock.mockResolvedValueOnce(installedPluginRaw()); // install
-    invokeMock.mockResolvedValueOnce([installedPluginRaw(), installedServiceRaw()]); // refresh sau khi cài
+    invokeMock.mockResolvedValueOnce(pluginManifestRaw()); // wrapped as InstalledPluginRecord by Rust normally; shape doesn't matter here
 
     fireEvent.click(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }));
 
@@ -272,66 +234,6 @@ describe('SettingsExtensionInstaller — cài đặt (success) và danh sách h�
     expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
       sourceUrl: 'https://example.com/plugin.json',
     });
-
-    const badges = screen.getAllByText(/^(Plugin|Service)$/);
-    expect(badges.map((b) => b.textContent).sort()).toEqual(['Plugin', 'Service']);
-  });
-});
-
-describe('SettingsExtensionInstaller — service đòi xác nhận trước khi cập nhật/gỡ', () => {
-  it('bấm Gỡ trên một dòng service chỉ HIỆN cảnh báo, chưa gọi uninstall — phải bấm Xác nhận mới thật sự gỡ', async () => {
-    invokeMock.mockResolvedValueOnce([installedServiceRaw()]); // list lúc mount
-    await renderInTauri();
-    await settle();
-
-    await waitFor(() => expect(screen.getByText('devtool-svc-demo@1.0.0')).toBeTruthy());
-
-    const row = screen.getByText('devtool-svc-demo@1.0.0').closest('div')!.parentElement!.parentElement!;
-    const uninstallButton = within(row).getAllByRole('button').at(-1)!;
-    fireEvent.click(uninstallButton);
-
-    // Cảnh báo hiện ra, KHÔNG gọi uninstall ngay.
-    await waitFor(() =>
-      expect(
-        screen.getByText(/will STOP this sidecar if it is running|sẽ DỪNG sidecar này nếu đang chạy/),
-      ).toBeTruthy(),
-    );
-    expect(invokeMock).not.toHaveBeenCalledWith('artifact_installer_uninstall', expect.anything());
-
-    invokeMock.mockResolvedValueOnce(undefined); // uninstall
-    invokeMock.mockResolvedValueOnce([]); // refresh sau khi gỡ
-
-    fireEvent.click(screen.getByRole('button', { name: /^Confirm$|^Xác nhận$/ }));
-
-    await waitFor(() => {
-      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'devtool-svc-demo' });
-    });
-  });
-
-  it('bấm Huỷ ở cảnh báo thì không gọi uninstall, cảnh báo biến mất', async () => {
-    invokeMock.mockResolvedValueOnce([installedServiceRaw()]); // list lúc mount
-    await renderInTauri();
-    await settle();
-
-    await waitFor(() => expect(screen.getByText('devtool-svc-demo@1.0.0')).toBeTruthy());
-    const row = screen.getByText('devtool-svc-demo@1.0.0').closest('div')!.parentElement!.parentElement!;
-    const uninstallButton = within(row).getAllByRole('button').at(-1)!;
-    fireEvent.click(uninstallButton);
-
-    await waitFor(() =>
-      expect(
-        screen.getByText(/will STOP this sidecar if it is running|sẽ DỪNG sidecar này nếu đang chạy/),
-      ).toBeTruthy(),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /^Cancel$|^Huỷ$/ }));
-
-    await waitFor(() =>
-      expect(
-        screen.queryByText(/will STOP this sidecar if it is running|sẽ DỪNG sidecar này nếu đang chạy/),
-      ).toBeNull(),
-    );
-    expect(invokeMock).not.toHaveBeenCalledWith('artifact_installer_uninstall', expect.anything());
   });
 });
 

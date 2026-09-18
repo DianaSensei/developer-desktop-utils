@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { SettingsExtensionInstaller } from '@/components/SettingsExtensionInstaller';
+import { SettingsInstalledExtensions } from '@/components/SettingsInstalledExtensions';
 import { SettingsMarketplace } from '@/components/SettingsMarketplace';
 import { ExtensionInstallDialog } from '@/components/ExtensionInstallDialog';
 import { Tabs } from '@/components/ui/tabs';
@@ -8,10 +9,15 @@ import { pendingInstall, type PendingInstallItem } from '@/lib/pendingInstall';
 
 /**
  * Settings → Extensions: cài THÊM plugin/sidecar KHÔNG có sẵn trong bản
- * biên dịch của app, qua Chợ tiện ích hoặc dán URL manifest tay. Tách khỏi
+ * biên dịch của app, qua Chợ tiện ích hoặc dán URL manifest tay — và quản lý
+ * (cập nhật/gỡ) những gì đã cài, bất kể cài từ đường nào. Tách khỏi
  * Settings → Plugins (danh sách tool biên dịch sẵn + nhật ký) — hai câu hỏi
  * khác nhau: "app này có những plugin nào sẵn, quyền gì" so với "tôi muốn
  * cài thêm cái gì đó KHÔNG có sẵn".
+ *
+ * Tab "Đã cài" là tab RIÊNG, không lồng trong "Cài từ URL" hay "Chợ tiện
+ * ích" — trước đây danh sách gỡ/cập nhật bị chôn dưới tab "Cài từ URL", nên
+ * một người chỉ dùng Chợ tiện ích để cài sẽ không bao giờ tìm ra chỗ để gỡ.
  *
  * Một lượt cài tới từ BÊN NGOÀI trang này (deep link
  * `desktop-devtool-app://install`, xử lý ở `deepLink.ts`) hiện `ExtensionInstallDialog`
@@ -22,7 +28,7 @@ import { pendingInstall, type PendingInstallItem } from '@/lib/pendingInstall';
 
 export function SettingsExtensions() {
   const { t } = useLocale();
-  const [tab, setTab] = useState<'marketplace' | 'installUrl'>('marketplace');
+  const [tab, setTab] = useState<'marketplace' | 'installUrl' | 'installed'>('marketplace');
   const [pendingBatch, setPendingBatch] = useState<PendingInstallItem[] | null>(null);
 
   useEffect(() => {
@@ -47,12 +53,19 @@ export function SettingsExtensions() {
           tabs={[
             { id: 'marketplace', label: t('settings.extensions.tabs.marketplace') },
             { id: 'installUrl', label: t('settings.extensions.tabs.installUrl') },
+            { id: 'installed', label: t('settings.extensions.tabs.installed') },
           ]}
           active={tab}
-          onSelect={(id) => setTab(id as 'marketplace' | 'installUrl')}
+          onSelect={(id) => setTab(id as 'marketplace' | 'installUrl' | 'installed')}
         />
         <div className="p-3">
-          {tab === 'marketplace' ? <SettingsMarketplace /> : <SettingsExtensionInstaller />}
+          {tab === 'marketplace' ? (
+            <SettingsMarketplace />
+          ) : tab === 'installUrl' ? (
+            <SettingsExtensionInstaller />
+          ) : (
+            <SettingsInstalledExtensions />
+          )}
         </div>
       </div>
 
