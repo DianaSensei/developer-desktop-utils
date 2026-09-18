@@ -37,6 +37,11 @@ vi.mock('@/platform', async (importOriginal) => {
     currentTargetTriple: () => Promise.resolve('x86_64-unknown-linux-gnu'),
     fetchArtifactManifestPreview: () => Promise.resolve(pluginManifest()),
     installArtifact: vi.fn().mockResolvedValue(pluginManifest()),
+    // Gọi TRƯỚC installArtifact ở ExtensionInstallDialog — thật (không mock)
+    // sẽ đi qua listInstalledPlugins() nội bộ của installer.ts (KHÔNG đi qua
+    // barrel này, nên mock listInstalledArtifacts ở trên không chặn được),
+    // rồi invoke() thật một lệnh Tauri không tồn tại trong jsdom.
+    assertNoConflictingInstall: () => Promise.resolve(),
   };
 });
 // `market.ts` đi qua tauri-plugin-http (không phải `invoke`) khi `isTauri` —

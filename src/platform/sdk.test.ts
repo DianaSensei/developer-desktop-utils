@@ -91,17 +91,17 @@ describe('secrets', () => {
   });
 });
 
-describe('baseId', () => {
-  it('không khai baseId trong manifest thì mặc định bằng id', () => {
+describe('group', () => {
+  it('không khai group trong manifest (mọi plugin compile-time) thì mặc định "core"', () => {
     const sdk = createPluginSdk(plugin([]));
-    expect(sdk.baseId).toBe('demo');
+    expect(sdk.group).toBe('core');
   });
 
-  it('có baseId trong manifest (plugin cài qua market, id đã bị tiền tố) thì giữ nguyên baseId khác id', () => {
-    const manifest = { ...plugin([]), id: 'official-demo', baseId: 'demo' };
+  it('có khai group (plugin cài lúc chạy) thì giữ nguyên, id KHÔNG bị đổi theo', () => {
+    const manifest = { ...plugin([]), group: 'official' };
     const sdk = createPluginSdk(manifest);
-    expect(sdk.id).toBe('official-demo');
-    expect(sdk.baseId).toBe('demo');
+    expect(sdk.id).toBe('demo');
+    expect(sdk.group).toBe('official');
   });
 });
 

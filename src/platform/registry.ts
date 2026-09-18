@@ -11,7 +11,7 @@ import type { PluginLoadError, PluginManifest, PluginRecord } from './types';
  * compile-time), rồi sau đó — lúc app khởi động, xem `initInstalledPlugins()`
  * — nạp thêm plugin đã CÀI TỪ BÊN NGOÀI (`src/platform/installer.ts`). Cả hai
  * loại đi qua đúng một hàm đăng ký (`registerManifest`) nên chịu chung một bộ
- * luật: hợp lệ, không đụng id/baseId/route/order của nhau, và có audit như nhau.
+ * luật: hợp lệ, không đụng id/route/order của nhau, và có audit như nhau.
  *
  * `eager: true` là cố ý và KHÔNG kéo tool vào bundle khởi động: file manifest
  * chỉ chứa metadata + một closure `load` chưa được gọi, nên code thật của tool
@@ -33,23 +33,17 @@ const records: PluginRecord[] = [];
  *  đây là bắt buộc, không phải trang trí. */
 export const PLUGIN_MAP: Map<string, PluginRecord> = new Map();
 
+// `id` phải duy nhất TOÀN APP trên thực tế, không chỉ trong `group` của nó —
+// dù `PluginManifest.group` tồn tại để phân biệt NGUỒN CÀI, `installer.ts`
+// chặn cài một plugin nếu `id` đã bị một `group` khác chiếm (bắt gỡ bản cũ
+// trước khi cài bản mới), nên tại registry chỉ CẦN VÀ CHỈ CÓ một bảng
+// `seenIds` phẳng — y hệt trước khi khái niệm group ra đời. Xem
+// `PluginManifest.group`'s doc comment cho lý do (usePluginSdkFor/
+// getPluginSdk gọi module-scope chỉ nhận được `id`, không có `group`, nên
+// hai bản ghi cùng `id` coexist thật sẽ khiến lời gọi đó mập mờ).
 const seenIds = new Map<string, string>();
 const seenRoutes = new Map<string, string>();
 const seenOrders = new Map<number, string>();
-/**
- * Khoá theo `baseId` HIỆU LỰC (`m.baseId ?? m.id`) — id GỐC mà chính bundle
- * của một plugin tự gọi lại chính mình qua `usePluginSdkFor`/`getPluginSdk`
- * (xem `PluginManifest.baseId`). Cần THÊM một bảng riêng ngoài `seenIds`:
- * hai bản ghi có thể có `id` (khoá registry) khác nhau hoàn toàn — một plugin
- * cài từ URL trần giữ nguyên id gốc, một plugin CÙNG id gốc đó cài từ market
- * lại bị tiền tố — nên không đụng `seenIds`/`seenRoutes` chút nào, ĐĂNG KÝ
- * ĐƯỢC CẢ HAI. Không có bảng này, `getPlugin(baseId)`/`getPluginSdk(baseId)`
- * gọi module-scope (không qua React context, không phân biệt được đang chạy
- * trong bundle nào) sẽ ÂM THẦM khớp bản ghi SAI — storage/audit/permission
- * của một plugin bị gán nhầm cho plugin kia. Từ chối bản đăng ký SAU thay vì
- * để xảy ra chuyện đó, giống hệt cách seenIds/seenRoutes/seenOrders đã làm.
- */
-const seenBaseIds = new Map<string, string>();
 
 /**
  * Đăng ký một manifest — dùng chung cho cả plugin compile-time (glob ở dưới)
@@ -82,20 +76,10 @@ function registerManifest(
     }
   }
 
-  const baseId = m.baseId ?? m.id;
   const clash =
     (seenIds.has(m.id) && `id "${m.id}" đã dùng ở ${seenIds.get(m.id)}`) ||
     (seenRoutes.has(m.route) && `route "${m.route}" đã dùng ở ${seenRoutes.get(m.route)}`) ||
-    (seenOrders.has(m.order) && `order ${m.order} đã dùng ở ${seenOrders.get(m.order)}`) ||
-    // Hai NGUỒN CÀI KHÁC NHAU (URL trần + market, hay hai market khác nhau)
-    // cùng phát hành một plugin trùng id gốc: `id`/`route` không đụng (một
-    // bên có thể bị tiền tố, bên kia thì không) nên ba kiểm tra trên không
-    // bắt được — nhưng usePluginSdkFor/getPluginSdk gọi module-scope bằng
-    // đúng chuỗi baseId này thì không phân biệt được đang chạy trong bundle
-    // nào, sẽ khớp nhầm bản đăng ký TRƯỚC. Từ chối rõ ràng ở đây thay vì để
-    // âm thầm gán sai storage/audit/permission.
-    (seenBaseIds.has(baseId) &&
-      `id gốc "${baseId}" đã dùng ở ${seenBaseIds.get(baseId)} (một plugin khác cùng id, cài từ nguồn khác)`);
+    (seenOrders.has(m.order) && `order ${m.order} đã dùng ở ${seenOrders.get(m.order)}`);
   if (clash) {
     errors.push({ source, id: m.id, reason: clash });
     return;
@@ -103,11 +87,14 @@ function registerManifest(
   seenIds.set(m.id, source);
   seenRoutes.set(m.route, source);
   seenOrders.set(m.order, source);
-  seenBaseIds.set(baseId, source);
 
   const sdk = createPluginSdk(m);
   const record: PluginRecord = {
     ...m,
+    // `'core'` cho mọi plugin compile-time (26 file `src/plugins/<id>/
+    // plugin.ts` không khai field này) — `installer.ts` luôn khai rõ `group`
+    // cho plugin cài lúc chạy, nên `?? 'core'` không bao giờ chạm nhánh đó.
+    group: m.group ?? 'core',
     keywords: m.keywords ?? [],
     experimental: m.experimental ?? false,
     fullHeight: m.fullHeight ?? true,
@@ -153,20 +140,8 @@ export const DEFAULT_PLUGIN_FEATURES: Readonly<Record<string, boolean>> = Object
   records.map((p) => [p.id, p.defaultEnabled]),
 );
 
-/**
- * Tra theo `id` (khoá registry, có thể đã bị tiền tố `<marketId>-`) trước;
- * không thấy thì thử lại theo `baseId` (id GỐC không tiền tố mà chính plugin
- * tự khai và tự gọi lại chính mình bằng đó — xem `PluginManifest.baseId`).
- * Cần cho `getPluginSdk`/`usePluginSdkFor`: code BÊN TRONG bundle của một
- * plugin cài qua market không biết (và không nên biết) registry đã tiền tố
- * mình, nên luôn gọi bằng id gốc.
- *
- * Không còn nhập nhằng "hai bản ghi cùng baseId" ở đây nữa: `registerManifest`
- * đã từ chối bản đăng ký THỨ HAI trùng `baseId` (`seenBaseIds`, phía trên) —
- * `find` do đó chỉ có thể khớp ĐÚNG MỘT bản ghi, hoặc không bản ghi nào.
- */
 export function getPlugin(id: string): PluginRecord | undefined {
-  return PLUGIN_MAP.get(id) ?? records.find((p) => p.baseId === id);
+  return PLUGIN_MAP.get(id);
 }
 
 /**

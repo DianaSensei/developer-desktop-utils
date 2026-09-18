@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Callout } from '@/components/ui/callout';
 import { Spinner } from '@/components/ui/spinner';
 import {
+  assertNoConflictingInstall,
   checkForServiceUpdate,
   checkForUpdate,
   currentTargetTriple,
@@ -146,6 +147,9 @@ export function SettingsExtensionInstaller() {
     setInstallError(null);
     setInstalling(true);
     try {
+      if (preview?.kind === 'plugin') {
+        await assertNoConflictingInstall(preview.id, previewMarketId);
+      }
       await installArtifact(url.trim(), previewMarketId);
       setUrl('');
       setPreview(null);

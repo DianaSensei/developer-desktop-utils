@@ -246,6 +246,7 @@ describe('SettingsExtensionInstaller — cài đặt (success) và danh sách h�
     fireEvent.click(screen.getByRole('button', { name: /Preview|Xem trước/ }));
     await waitFor(() => expect(screen.getByText('Demo')).toBeTruthy());
 
+    invokeMock.mockResolvedValueOnce([]); // list, assertNoConflictingInstall trước khi cài
     invokeMock.mockResolvedValueOnce(installedPluginRaw()); // install
     invokeMock.mockResolvedValueOnce([installedPluginRaw(), installedServiceRaw()]); // refresh sau khi cài
 

@@ -15,6 +15,13 @@ const cache = new Map<string, PluginSdk>();
  * Kết quả được nhớ theo id: SDK gắn danh tính plugin chứ không mang state gì,
  * nên một instance cho mỗi plugin là đủ — và giữ nguyên một tham chiếu giúp các
  * `useMemo([sdk])` phía trên không bị vô hiệu.
+ *
+ * Gọi ở MODULE SCOPE (không qua React context) nên chỉ nhận được đúng
+ * `pluginId` — không biết, và không cần biết, `group` nào đã cài nó. An toàn
+ * vì `installer.ts` chặn cài một plugin nếu `id` của nó đã bị một `group`
+ * KHÁC chiếm (bắt gỡ bản cũ trước) — tại một thời điểm chỉ có đúng một bản
+ * ghi mang `pluginId` này trong registry, nên `getPlugin(pluginId)` không
+ * mập mờ. Xem `PluginManifest.group` cho lý do đầy đủ.
  */
 export function getPluginSdk(pluginId: string): PluginSdk {
   const existing = cache.get(pluginId);
@@ -47,14 +54,7 @@ export function getPluginSdk(pluginId: string): PluginSdk {
 export function usePluginSdkFor(pluginId: string): PluginSdk {
   const fromContext = usePluginSdkOptional();
   return useMemo(() => {
-    // So bằng `baseId`, không phải `id`: một plugin cài từ market chạy dưới
-    // một registry `id` bị tiền tố `<marketId>-` (xem installer.ts), nhưng
-    // bundle của chính plugin đó gọi `usePluginSdkFor(...)` bằng đúng id GỐC
-    // nó tự khai trong manifest — nó không (và không nên) biết registry đã
-    // tiền tố mình. So bằng `id` ở đây khiến MỌI plugin cài qua market luôn
-    // rơi xuống nhánh "không có trong registry" bên dưới, dù đang render
-    // đúng bên trong cây của chính nó.
-    if (fromContext?.baseId === pluginId) return fromContext;
+    if (fromContext?.id === pluginId) return fromContext;
     const manifest = getPlugin(pluginId);
     if (!manifest) {
       throw new Error(

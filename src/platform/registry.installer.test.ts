@@ -119,66 +119,52 @@ describe('initInstalledPlugins', () => {
     expect(registry.getPlugin('installed-demo')?.route).toBe('/a');
   });
 
-  it('plugin cài qua market: getPlugin() tra được cả bằng id đã tiền tố lẫn baseId gốc', async () => {
+  it('plugin cài qua market: id vẫn TRẦN (không tiền tố), group mang tên market — usePluginSdkFor/getPluginSdk gọi bằng id trần vẫn tra được', async () => {
     // Mô phỏng đúng những gì installedPluginManifests() tự sinh cho một bản
-    // cài có marketId (xem installer.ts): id đăng ký bị tiền tố
-    // `<marketId>-`, baseId giữ nguyên id gốc plugin tự khai.
+    // cài có marketId (xem installer.ts): id KHÔNG bị tiền tố, group mới là
+    // chỗ mang thông tin market — khác hẳn cơ chế `<marketId>-<id>` cũ.
     const { installedPluginManifests } = await import('./installer');
     vi.mocked(installedPluginManifests).mockResolvedValue([
       {
-        manifest: installedManifest({ id: 'official-container-manager', baseId: 'container-manager', route: '/installed/official-container-manager' }),
-        source: 'installed:official-container-manager@1.0.0',
+        manifest: installedManifest({ id: 'container-manager', group: 'official', route: '/installed/official/container-manager' }),
+        source: 'installed:official:container-manager@1.0.0',
       },
     ]);
 
     const registry = await freshRegistry();
     await registry.initInstalledPlugins();
 
-    // Đúng registry id (dùng cho routing/storage/audit).
-    expect(registry.getPlugin('official-container-manager')?.baseId).toBe('container-manager');
-    // Đúng id GỐC — đây là cái bundle của chính plugin gọi lại chính mình
-    // bằng (usePluginSdkFor('container-manager')/getPluginSdk('container-manager')).
-    // Thiếu fallback này là đúng lỗi thật đã xảy ra: "Không có plugin
-    // 'container-manager' trong registry" dù plugin ĐÃ cài và ĐANG render.
-    expect(registry.getPlugin('container-manager')?.id).toBe('official-container-manager');
+    // Đúng chuỗi bundle của chính plugin tự gọi lại mình
+    // (usePluginSdkFor('container-manager')/getPluginSdk('container-manager'))
+    // — không cần biết registry đã gán group nào cho nó.
+    const record = registry.getPlugin('container-manager');
+    expect(record?.id).toBe('container-manager');
+    expect(record?.group).toBe('official');
   });
 
-  it('một plugin cài qua URL trần + CÙNG plugin đó cài lại qua market (trùng baseId) — bản thứ hai bị từ chối, không được phép nhận nhầm SDK của bản kia', async () => {
-    // Kịch bản thật: người dùng cài "container-manager" qua URL manifest dán
-    // tay trước (không marketId, giữ nguyên id gốc) — rồi sau đó cài lại
-    // đúng plugin đó nhưng qua market "official". `id`/`route` của hai bản
-    // ghi này KHÁC NHAU HOÀN TOÀN (một bên không tiền tố, một bên có) nên ba
-    // kiểm tra seenIds/seenRoutes/seenOrders không bắt được gì — nếu không có
-    // seenBaseIds, cả hai đăng ký "thành công", và getPluginSdk('container-manager')
-    // gọi module-scope (không qua context) từ bên trong bản market sẽ ÂM THẦM
-    // nhận nhầm sdk của bản URL-install (khớp PLUGIN_MAP theo đúng chuỗi
-    // 'container-manager' trước khi kịp thử baseId) — sai storage/audit/quyền.
+  it('hai plugin cài trùng id (một qua URL trần, một qua market) — bản thứ hai vẫn bị registry từ chối như mọi trùng id khác', async () => {
+    // registry.ts KHÔNG tự phân biệt group khi so trùng id — đó là việc của
+    // installer.ts's assertNoConflictingInstall() (chặn NGAY LÚC CÀI, xem
+    // installer.test.ts). Ở tầng registry, hai bản ghi cùng id trần luôn là
+    // một collision phẳng, bất kể group — giống hệt "hai plugin cài trùng id
+    // với nhau thì chỉ cái đầu được đăng ký" phía trên, chỉ khác nguồn cài.
     const { installedPluginManifests } = await import('./installer');
     vi.mocked(installedPluginManifests).mockResolvedValue([
       {
-        manifest: installedManifest({ id: 'container-manager', baseId: 'container-manager', route: '/container-manager', order: 100_000 }),
-        source: 'installed:container-manager@1.0.0',
+        manifest: installedManifest({ id: 'container-manager', group: 'url', route: '/installed/url/container-manager' }),
+        source: 'installed:url:container-manager@1.0.0',
       },
       {
-        // order khác bản trên: chỉ seenBaseIds mới có thể bắt cặp này — nếu
-        // vô tình để trùng order/route/id với bản kia, test sẽ pass vì một lý
-        // do khác hoàn toàn, không kiểm được đúng thứ cần kiểm.
-        manifest: installedManifest({ id: 'official-container-manager', baseId: 'container-manager', route: '/installed/official-container-manager', order: 100_001 }),
-        source: 'installed:official-container-manager@1.0.0',
+        manifest: installedManifest({ id: 'container-manager', group: 'official', route: '/installed/official/container-manager', order: 100_001 }),
+        source: 'installed:official:container-manager@1.0.0',
       },
     ]);
 
     const registry = await freshRegistry();
     await registry.initInstalledPlugins();
 
-    // Bản đầu (URL trần) đăng ký bình thường.
-    expect(registry.getPlugin('container-manager')?.id).toBe('container-manager');
-    // Bản thứ hai (market) bị TỪ CHỐI rõ ràng — không được phép âm thầm tồn
-    // tại song song rồi gây nhận nhầm danh tính ở getPluginSdk module-scope.
-    expect(registry.getPlugin('official-container-manager')).toBeUndefined();
-    expect(
-      registry.PLUGIN_ERRORS.some((e) => e.id === 'official-container-manager' && e.reason.includes('container-manager')),
-    ).toBe(true);
+    expect(registry.getPlugin('container-manager')?.group).toBe('url');
+    expect(registry.PLUGIN_ERRORS.some((e) => e.id === 'container-manager')).toBe(true);
   });
 
   it('manifest hỏng (thiếu route) bị loại vào PLUGIN_ERRORS, không làm hỏng những manifest hợp lệ khác', async () => {

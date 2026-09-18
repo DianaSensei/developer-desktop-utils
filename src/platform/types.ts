@@ -44,18 +44,38 @@ export type PluginPermission =
   | 'service';
 
 export interface PluginManifest {
-  /** kebab-case, duy nhất toàn app. Đồng thời là khoá bật/tắt và namespace storage. */
+  /**
+   * kebab-case — chuỗi CHÍNH PLUGIN TỰ KHAI và tự dùng để gọi lại chính mình
+   * qua `usePluginSdkFor(id)`/`getPluginSdk(id)` (nó không biết, và không nên
+   * biết, mình thuộc `group` nào lúc build). Đồng thời là khoá bật/tắt và
+   * namespace storage — GIỮ NGUYÊN Ý NGHĨA CŨ, không đổi bởi `group`.
+   *
+   * Chỉ cần duy nhất TRONG `group` của nó theo MÔ HÌNH — nhưng trên thực tế,
+   * `installer.ts` chặn cài một plugin nếu `id` đã bị một `group` KHÁC chiếm
+   * (bắt người dùng gỡ bản cũ trước), nên tại một thời điểm chỉ có ĐÚNG MỘT
+   * bản ghi mang một `id` cho trước tồn tại — `id` vẫn nhất quán duy nhất
+   * toàn app trên thực tế. Lý do: `usePluginSdkFor`/`getPluginSdk` chỉ nhận
+   * được đúng chuỗi `id` này (không có `group`) khi plugin tự gọi mình ở
+   * module-scope (không qua React context, vd store nền của Kafka/RabbitMQ)
+   * — cho hai `group` cùng `id` coexist thật sẽ khiến lời gọi đó không thể
+   * biết nên trả bản ghi nào, âm thầm gán nhầm storage/audit/quyền.
+   */
   id: string;
   /**
-   * Id GỐC như chính plugin tự biết về mình — khác `id` CHỈ khi một plugin cài
-   * từ market bị tiền tố `<marketId>-` để tránh đụng một market khác cùng
-   * phát hành trùng id (xem `installer.ts`'s `installedPluginManifests()`).
-   * Bundle của plugin gọi `usePluginSdkFor('container-manager')` bằng đúng id
-   * này — nó không (và không nên) biết mình đang chạy dưới một registry id đã
-   * bị tiền tố. Không set thì coi như bằng `id` (mọi plugin compile-time và
-   * mọi plugin cài không qua market).
+   * Nguồn plugin được cài từ đâu — thuần METADATA, không tham gia tính khoá
+   * storage/audit (vẫn khoá theo `id` một mình, y hệt trước khi field này ra
+   * đời — không migrate gì). Dùng để: (1) sinh route cho plugin cài lúc chạy
+   * (`/installed/<group>/<id>`), (2) hiển thị nguồn cài trong Settings, và
+   * (3) phân biệt "cài lại/cập nhật CÙNG nguồn" (hợp lệ) với "một `group`
+   * KHÁC cùng khai trùng `id`" (conflict, chặn cài — xem `installer.ts`).
+   *
+   * `"core"` cho 26 plugin compile-time (registry.ts TỰ GÁN khi thiếu — 26
+   * file `src/plugins/<id>/plugin.ts` không cần sửa để khai field này),
+   * `"url"` cho plugin cài qua URL manifest dán tay (không market), hoặc
+   * chính `marketId` cho plugin cài qua market — `installer.ts` luôn khai rõ
+   * cho cả hai loại này, không dựa vào mặc định.
    */
-  baseId?: string;
+  group?: string;
   label: string;
   icon: LucideIcon;
   description: string;
@@ -108,6 +128,8 @@ export interface PluginManifest {
 
 /** Manifest đã qua kiểm tra + các giá trị mặc định đã điền. */
 export interface PluginRecord extends PluginManifest {
+  /** Không còn optional — `registerManifest` đã điền `'core'` khi thiếu. */
+  group: string;
   keywords: string[];
   experimental: boolean;
   fullHeight: boolean;
