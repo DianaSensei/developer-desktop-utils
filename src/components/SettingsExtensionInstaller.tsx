@@ -13,6 +13,7 @@ import {
   checkForUpdate,
   currentTargetTriple,
   fetchArtifactManifestPreview,
+  getPlugin,
   installArtifact,
   installPlugin,
   installService,
@@ -148,7 +149,7 @@ export function SettingsExtensionInstaller() {
     setInstalling(true);
     try {
       if (preview?.kind === 'plugin') {
-        await assertNoConflictingInstall(preview.id, previewMarketId);
+        await assertNoConflictingInstall(preview.id, previewMarketId, getPlugin(preview.id)?.group);
       }
       await installArtifact(url.trim(), previewMarketId);
       setUrl('');

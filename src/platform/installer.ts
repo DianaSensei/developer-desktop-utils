@@ -243,9 +243,36 @@ function installGroup(marketId: string | null | undefined): string {
  * vừa có là lãng phí không cần thiết. Chỉ áp dụng cho `kind: "plugin"` —
  * service khoá theo `bin` qua `ALLOWED_SERVICES`, không thuộc mô hình
  * group/id này.
+ *
+ * `registeredGroup` — group của một bản ghi ĐANG TRONG REGISTRY (không phải
+ * trên đĩa) đã chiếm đúng `id` này, nếu có: 26 plugin compile-time (group
+ * `'core'`), hoặc một plugin đã cài+đăng ký từ lần khởi động TRƯỚC (chưa chắc
+ * còn khớp danh sách trên đĩa nếu người dùng vừa gỡ nó trong phiên này).
+ * Lớp gọi tự tra bằng `getPlugin(id)?.group` (đã có sẵn qua `@/platform`) rồi
+ * truyền vào — hàm này KHÔNG tự tra được, vì `registry.ts` đã import
+ * `installer.ts` (nạp ngược lại sẽ vòng lặp). Thiếu tham số này, cài một
+ * plugin trùng id với một tool có sẵn (vd đặt tên "json") sẽ qua được cửa
+ * này, ghi xuống đĩa, rồi mới bị `registerManifest`'s `seenIds` âm thầm từ
+ * chối ở lần khởi động sau — đúng kiểu lỗi hoãn-đến-sau-restart mà hàm này
+ * tồn tại để tránh.
  */
-export async function assertNoConflictingInstall(id: string, marketId: string | undefined): Promise<void> {
+export async function assertNoConflictingInstall(
+  id: string,
+  marketId: string | undefined,
+  registeredGroup?: string,
+): Promise<void> {
   const newGroup = installGroup(marketId);
+
+  if (registeredGroup !== undefined && registeredGroup !== newGroup) {
+    if (registeredGroup === 'core') {
+      throw new Error(`Plugin "${id}" trùng id với một tool có sẵn trong app — đổi id khác trong manifest.`);
+    }
+    throw new Error(
+      `Plugin "${id}" đã được cài từ nguồn khác ("${registeredGroup}"). ` +
+        `Gỡ bản đó trong Settings → Extensions trước khi cài từ nguồn "${newGroup}".`,
+    );
+  }
+
   let installed: InstalledPluginRecord[];
   try {
     installed = await listInstalledPlugins();
@@ -535,6 +562,17 @@ export async function installedPluginManifests(): Promise<
         // tố market, xem `PluginManifest.group`. `installArtifact()` chặn cài
         // nếu id này đã bị một group khác chiếm, nên tại registry nó vẫn
         // nhất quán duy nhất toàn app dù không ép kiểu ở đây.
+        //
+        // Namespace storage/secrets (sdk.ts's storageKey/secrets.ts's
+        // vaultKey) khoá theo ĐÚNG field này — với một bản cài qua market,
+        // trước bản sửa này nó là registry id đã tiền tố (`<marketId>-<id>`),
+        // giờ là `id` trần. KHÔNG coi là cần migrate: mọi bản cài qua market
+        // trước bản sửa này chưa từng đọc/ghi được sdk.storage/sdk.secrets
+        // dù chỉ một lần — chính `usePluginSdkFor(record.manifest.id)` ở trên
+        // đã ném lỗi ngay khi gọi (root cause của toàn bộ chuỗi PR này), nên
+        // component không bao giờ chạy tới bất kỳ lời gọi storage/secrets
+        // nào trước khi crash. Không có dữ liệu thật nào tồn tại dưới
+        // namespace cũ để mất.
         id: record.manifest.id,
         group,
         label: record.manifest.label,

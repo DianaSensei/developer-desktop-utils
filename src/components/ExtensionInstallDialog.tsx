@@ -10,6 +10,7 @@ import {
   assertNoConflictingInstall,
   currentTargetTriple,
   fetchArtifactManifestPreview,
+  getPlugin,
   installArtifact,
   type RemoteArtifactManifest,
 } from '@/platform';
@@ -96,7 +97,7 @@ export function ExtensionInstallDialog({ urls, marketId, open, onOpenChange, onI
     try {
       for (const item of installable) {
         if (item.manifest.kind === 'plugin') {
-          await assertNoConflictingInstall(item.manifest.id, marketId);
+          await assertNoConflictingInstall(item.manifest.id, marketId, getPlugin(item.manifest.id)?.group);
         }
         await installArtifact(item.url, marketId);
       }

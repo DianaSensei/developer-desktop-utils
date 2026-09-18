@@ -271,6 +271,25 @@ describe('assertNoConflictingInstall — gọi TRƯỚC installArtifact/installP
 
     await expect(installer.assertNoConflictingInstall('container-manager', 'official')).resolves.toBeUndefined();
   });
+
+  it('registeredGroup="core" (id trùng một plugin compile-time, lớp gọi tự tra bằng getPlugin) — ném lỗi riêng, không nhắc "gỡ bản đó" (không gỡ được tool có sẵn)', async () => {
+    const installer = await loadInTauri();
+    // KHÔNG mock invoke ở đây: registeredGroup !== newGroup phải chặn NGAY,
+    // trước khi kịp gọi listInstalledPlugins() — nếu lỡ gọi, invokeMock
+    // (chưa mock resolved value nào) sẽ trả undefined, không phải mảng, và
+    // test sẽ thất bại vì lý do sai (TypeError .find trên undefined), không
+    // phải vì đúng lỗi mong đợi.
+    await expect(installer.assertNoConflictingInstall('json', 'official', 'core')).rejects.toThrow(/json/);
+    await expect(installer.assertNoConflictingInstall('json', 'official', 'core')).rejects.not.toThrow(/gỡ bản đó/i);
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it('registeredGroup trùng đúng group đang cài (vd cài lại chính plugin compile-time đó — không hợp lệ thật, nhưng hàm không tự biết) — không chặn ở nhánh registeredGroup', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([]); // vẫn rơi xuống nhánh quét đĩa như bình thường
+
+    await expect(installer.assertNoConflictingInstall('json', undefined, 'url')).resolves.toBeUndefined();
+  });
 });
 
 describe('currentTargetTriple', () => {
