@@ -448,6 +448,7 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
     const [a] = await installer.installedPluginManifests();
     expect(a.manifest.id).toBe('demo');
     expect(a.manifest.route).toBe('/demo');
+    expect(a.manifest.baseId).toBe('demo');
   });
 
   it('có marketId thì id/route đăng ký registry được ghép marketId — hai market khác nhau cùng id KHÔNG đụng route/storage của nhau', async () => {
@@ -464,6 +465,12 @@ describe('installedPluginManifests — đổi RemotePluginManifest thành Plugin
     expect(b.manifest.route).toBe('/installed/custom-fork-demo');
     expect(a.manifest.id).not.toBe(b.manifest.id);
     expect(a.manifest.route).not.toBe(b.manifest.route);
+    // Cái mà usePluginSdkFor()/getPluginSdk() BÊN TRONG chính bundle của
+    // plugin thực sự gọi lại — mất dòng này ở installer.ts thì cả hai bản
+    // cài lại ném "không có plugin trong registry" y hệt bug gốc, dù id/route
+    // ở trên vẫn đúng. Cả hai market đều giữ baseId gốc, KHÔNG ghép marketId.
+    expect(a.manifest.baseId).toBe('demo');
+    expect(b.manifest.baseId).toBe('demo');
   });
 });
 
