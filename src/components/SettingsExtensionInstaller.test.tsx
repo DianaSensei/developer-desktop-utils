@@ -210,6 +210,47 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
       ).toBeTruthy(),
     );
   });
+
+  it('kind=plugin có khai service: sidecar đó CHƯA cài thì cảnh báo ngay ở bước xem trước', async () => {
+    await renderInTauri();
+    await settle();
+
+    invokeMock.mockResolvedValueOnce(
+      pluginManifestRaw({ service: { bin: 'devtool-svc-redis', methods: ['list'] } }),
+    );
+    invokeMock.mockResolvedValueOnce([]); // listInstalledArtifacts — chưa cài gì
+
+    const input = screen.getByPlaceholderText('https://example.com/extension.json');
+    fireEvent.change(input, { target: { value: 'https://example.com/plugin.json' } });
+    fireEvent.click(screen.getByRole('button', { name: /Preview|Xem trước/ }));
+
+    await waitFor(() => expect(screen.getByText(/devtool-svc-redis/)).toBeTruthy());
+  });
+
+  it('kind=plugin có khai service NHƯNG sidecar đó ĐÃ cài rồi thì không cảnh báo gì', async () => {
+    await renderInTauri();
+    await settle();
+
+    invokeMock.mockResolvedValueOnce(
+      pluginManifestRaw({ service: { bin: 'devtool-svc-redis', methods: ['list'] } }),
+    );
+    invokeMock.mockResolvedValueOnce([
+      {
+        kind: 'service',
+        manifest: { bin: 'devtool-svc-redis', version: '1.0.0', protocol: 1, targets: {} },
+        source_url: 'https://example.com/svc.json',
+        bin_path: '/tmp/devtool-svc-redis',
+        installed_at: 0,
+      },
+    ]);
+
+    const input = screen.getByPlaceholderText('https://example.com/extension.json');
+    fireEvent.change(input, { target: { value: 'https://example.com/plugin.json' } });
+    fireEvent.click(screen.getByRole('button', { name: /Preview|Xem trước/ }));
+
+    await waitFor(() => expect(screen.getByText('Demo')).toBeTruthy());
+    expect(screen.queryByText(/devtool-svc-redis/)).toBeNull();
+  });
 });
 
 describe('SettingsExtensionInstaller — cài đặt (success)', () => {

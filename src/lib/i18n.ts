@@ -289,6 +289,10 @@ export const DICTIONARY = {
     vi: 'Manifest KHÔNG có bản cho nền tảng này — cài sẽ bị từ chối.',
     en: 'The manifest has NO build for this platform — install will be rejected.',
   },
+  'settings.extensions.install.serviceDependencyMissing': {
+    vi: 'Plugin này cần sidecar "{{bin}}" để hoạt động đầy đủ, và sidecar đó CHƯA được cài. Dán URL manifest service của nó (thường đi kèm cùng chỗ với plugin này) và cài riêng — hai URL tách biệt nhau, không tự tải hộ được.',
+    en: 'This plugin needs the "{{bin}}" sidecar to work fully, and it isn’t installed yet. Paste its service manifest URL (usually listed alongside this plugin) and install it separately — the two are separate URLs, this can’t fetch it for you.',
+  },
   'settings.extensions.installed.title': { vi: 'Tiện ích đã cài', en: 'Installed extensions' },
   'settings.extensions.installed.empty': { vi: 'Chưa cài tiện ích nào.', en: 'No extensions installed yet.' },
   'settings.extensions.installed.checkUpdate': { vi: 'Kiểm bản mới', en: 'Check for update' },
@@ -302,6 +306,10 @@ export const DICTIONARY = {
   'settings.extensions.installed.serviceWarning': {
     vi: 'Cập nhật/gỡ sẽ DỪNG sidecar này nếu đang chạy — một kết nối hoặc stream đang mở sẽ bị ngắt ngay.',
     en: 'Updating/uninstalling will STOP this sidecar if it is running — any open connection or stream will be cut immediately.',
+  },
+  'settings.extensions.installed.coupledUninstallNote': {
+    vi: 'Sẽ gỡ luôn "{{label}}" — hai phần này liên quan trực tiếp với nhau (một bên không dùng được nếu thiếu bên kia).',
+    en: 'Will also uninstall "{{label}}" — the two are directly linked (one doesn’t work without the other).',
   },
   'settings.extensions.installed.confirm': { vi: 'Xác nhận', en: 'Confirm' },
   'settings.extensions.installed.cancel': { vi: 'Huỷ', en: 'Cancel' },

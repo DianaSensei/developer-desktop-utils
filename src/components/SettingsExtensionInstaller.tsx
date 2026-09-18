@@ -11,6 +11,7 @@ import {
   fetchArtifactManifestPreview,
   getPlugin,
   installArtifact,
+  listInstalledArtifacts,
   type RemoteArtifactManifest,
 } from '@/platform';
 
@@ -47,6 +48,14 @@ export function SettingsExtensionInstaller() {
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
   const [needsRestart, setNeedsRestart] = useState(false);
+  // `bin` của sidecar mà manifest đang xem trước khai cần (permissions có
+  // 'service') NHƯNG chưa thấy trong danh sách đã cài — `null` khi manifest
+  // không cần service nào, hoặc sidecar đó đã có sẵn. Chỉ mang tính THÔNG
+  // BÁO: URL của manifest plugin không mang theo URL của service đi kèm
+  // (hai tài nguyên tách biệt), nên không thể tự tải/cài hộ — khác lượt cài
+  // từ Chợ tiện ích/deep link, nơi cả hai URL đã có sẵn trong tay
+  // (ExtensionInstallDialog cài cả hai cùng lúc).
+  const [missingServiceBin, setMissingServiceBin] = useState<string | null>(null);
 
   const runPreview = useCallback(async (targetUrl: string, marketId?: string) => {
     setPreview(null);
@@ -54,6 +63,7 @@ export function SettingsExtensionInstaller() {
     setPreviewError(null);
     setInstallError(null);
     setPreviewMarketId(marketId);
+    setMissingServiceBin(null);
     if (!targetUrl.trim()) return;
     setPreviewing(true);
     try {
@@ -63,6 +73,13 @@ export function SettingsExtensionInstaller() {
         // Hiển thị cho người dùng — TÍNH Ở RUST, không đoán ở phía webview
         // (cùng nguyên tắc "quyết định luôn do host" của `sidecar_path`).
         setPreviewTriple(await currentTargetTriple());
+      } else if (manifest.service) {
+        // Plugin này KHAI cần một sidecar — kiểm xem sidecar đó đã cài chưa,
+        // để cảnh báo NGAY ở bước xem trước thay vì để người dùng tự phát
+        // hiện qua lỗi "service call" mơ hồ sau khi đã cài xong.
+        const installed = await listInstalledArtifacts();
+        const hasService = installed.some((r) => r.kind === 'service' && r.manifest.bin === manifest.service!.bin);
+        if (!hasService) setMissingServiceBin(manifest.service.bin);
       }
     } catch (e) {
       setPreviewError(String(e instanceof Error ? e.message : e));
@@ -167,6 +184,11 @@ export function SettingsExtensionInstaller() {
                     </span>
                   ))}
                 </div>
+              )}
+              {missingServiceBin && (
+                <Callout tone="warning" size="sm">
+                  {t('settings.extensions.install.serviceDependencyMissing', { bin: missingServiceBin })}
+                </Callout>
               )}
             </>
           ) : (
