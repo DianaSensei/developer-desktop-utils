@@ -322,6 +322,13 @@ export function Settings() {
   const { locale, setLocale, t } = useLocale();
   const { enabled: mcpBackgroundEnabled, setEnabled: setMcpBackgroundEnabled } = useMcpBackgroundBridge();
   const { isEnabled: isMcpToolEnabled, setToolEnabled: setMcpToolEnabled } = useMcpToolEnabledMap();
+  // Redis/Kafka/RabbitMQ/Containers là plugin cài thêm (không còn biên dịch
+  // sẵn) — `MCP_TOOL_IDS` là danh sách TĨNH, không tự biết plugin nào ĐANG
+  // thật sự có mặt. Không lọc thì dòng bật/tắt MCP của một tool CHƯA cài vẫn
+  // hiện ra (đổi công tắc không có tác dụng gì, vì không có gì để bật/tắt) —
+  // lọc theo `TOOL_DEFS` (nguồn từ registry, chỉ chứa plugin ĐÃ đăng ký) để
+  // danh sách này luôn khớp đúng những gì người dùng thật sự có trong app.
+  const availableMcpToolIds = MCP_TOOL_IDS.filter((id) => TOOL_DEFS.some((td) => td.id === id));
   // Một mục đang mở, không phải bốn cờ accordion rời — điều hướng ở nav trái
   // TỰ LÀ sự "mở/đóng" rồi, nên bỏ hẳn kiểu accordion lồng bên trong từng mục.
   // Xem SETTINGS_SECTIONS + nav trái ở cuối file cho danh sách đầy đủ.
@@ -929,7 +936,7 @@ export function Settings() {
                   {t('settings.mcp.perToolDescription')}
                 </p>
               </div>
-              {MCP_TOOL_IDS.map((id) => {
+              {availableMcpToolIds.map((id) => {
                 const label = TOOL_DEFS.find((td) => td.id === id)?.label ?? id;
                 const enabled = isMcpToolEnabled(id);
                 return (

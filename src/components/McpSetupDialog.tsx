@@ -32,6 +32,13 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
   // Per-tool kill switch — independent of the background toggle above, and
   // (same reasoning) one shared value with Settings → MCP's own list.
   const { isEnabled: isToolEnabled, setToolEnabled } = useMcpToolEnabledMap();
+  // Redis Client/Kafka Explorer/RabbitMQ Client/Containers are installable
+  // plugins now, not compiled in — MCP_TOOL_IDS is a static list that
+  // doesn't know which of them are actually present. Filter by TOOL_DEFS
+  // (sourced from the registry, so it only lists plugins actually
+  // registered) so this dialog never shows a toggle for a tool that isn't
+  // even installed.
+  const availableMcpToolIds = MCP_TOOL_IDS.filter((id) => TOOL_DEFS.some((td) => td.id === id));
 
   useEffect(() => {
     if (!open) return;
@@ -94,7 +101,7 @@ export function McpSetupDialog({ open, onClose }: { open: boolean; onClose: () =
                 Off means that tool never answers an MCP call — on screen or in the background.
               </p>
             </div>
-            {MCP_TOOL_IDS.map((id) => {
+            {availableMcpToolIds.map((id) => {
               const label = TOOL_DEFS.find((td) => td.id === id)?.label ?? id;
               const enabled = isToolEnabled(id);
               return (
