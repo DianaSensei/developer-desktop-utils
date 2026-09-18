@@ -245,16 +245,21 @@ function installGroup(marketId: string | null | undefined): string {
  * group/id này.
  *
  * `registeredGroup` — group của một bản ghi ĐANG TRONG REGISTRY (không phải
- * trên đĩa) đã chiếm đúng `id` này, nếu có: 26 plugin compile-time (group
- * `'core'`), hoặc một plugin đã cài+đăng ký từ lần khởi động TRƯỚC (chưa chắc
- * còn khớp danh sách trên đĩa nếu người dùng vừa gỡ nó trong phiên này).
- * Lớp gọi tự tra bằng `getPlugin(id)?.group` (đã có sẵn qua `@/platform`) rồi
- * truyền vào — hàm này KHÔNG tự tra được, vì `registry.ts` đã import
- * `installer.ts` (nạp ngược lại sẽ vòng lặp). Thiếu tham số này, cài một
- * plugin trùng id với một tool có sẵn (vd đặt tên "json") sẽ qua được cửa
- * này, ghi xuống đĩa, rồi mới bị `registerManifest`'s `seenIds` âm thầm từ
- * chối ở lần khởi động sau — đúng kiểu lỗi hoãn-đến-sau-restart mà hàm này
- * tồn tại để tránh.
+ * trên đĩa) đã chiếm đúng `id` này, nếu có. Lớp gọi tự tra bằng
+ * `getPlugin(id)?.group` (đã có sẵn qua `@/platform`) rồi truyền vào — hàm
+ * này KHÔNG tự tra được, vì `registry.ts` đã import `installer.ts` (nạp
+ * ngược lại sẽ vòng lặp).
+ *
+ * CHỈ chặn sớm ở đây khi `registeredGroup === 'core'` (một trong 26 plugin
+ * compile-time — không bao giờ "biến mất" khỏi registry trong lúc app đang
+ * chạy, nên registry luôn đúng cho trường hợp này). Mọi `registeredGroup`
+ * khác 'core' bị BỎ QUA ở đây, rơi xuống quét đĩa bên dưới thay vì tự chặn
+ * — registry chỉ nạp MỘT LẦN lúc bootstrap (`registry.ts`), không cập nhật
+ * khi cài/gỡ trong phiên đang chạy, nên một bản ghi non-core ở đây có thể
+ * đã STALE (người dùng vừa gỡ nó, chưa restart) và tự chặn nhầm một lượt
+ * cài lại hợp lệ. Đĩa (`listInstalledPlugins()`) luôn phản ánh đúng trạng
+ * thái hiện tại nên là nguồn xác thực duy nhất đáng tin cho mọi trường hợp
+ * không phải compile-time.
  */
 export async function assertNoConflictingInstall(
   id: string,
@@ -263,14 +268,8 @@ export async function assertNoConflictingInstall(
 ): Promise<void> {
   const newGroup = installGroup(marketId);
 
-  if (registeredGroup !== undefined && registeredGroup !== newGroup) {
-    if (registeredGroup === 'core') {
-      throw new Error(`Plugin "${id}" trùng id với một tool có sẵn trong app — đổi id khác trong manifest.`);
-    }
-    throw new Error(
-      `Plugin "${id}" đã được cài từ nguồn khác ("${registeredGroup}"). ` +
-        `Gỡ bản đó trong Settings → Extensions trước khi cài từ nguồn "${newGroup}".`,
-    );
+  if (registeredGroup === 'core' && registeredGroup !== newGroup) {
+    throw new Error(`Plugin "${id}" trùng id với một tool có sẵn trong app — đổi id khác trong manifest.`);
   }
 
   let installed: InstalledPluginRecord[];

@@ -291,14 +291,28 @@ describe('assertNoConflictingInstall — gọi TRƯỚC installArtifact/installP
     await expect(installer.assertNoConflictingInstall('json', undefined, 'url')).resolves.toBeUndefined();
   });
 
-  it('registeredGroup khác "core" (plugin đã cài+đăng ký từ lần khởi động TRƯỚC, khác group đang cài) — ném đúng thông điệp "gỡ bản đó", không cần quét đĩa', async () => {
+  it('registeredGroup khác "core" (bản ghi registry, có thể đã STALE nếu người dùng vừa gỡ trong phiên này) — KHÔNG tự chặn, luôn rơi xuống quét đĩa', async () => {
     const installer = await loadInTauri();
-    // KHÔNG mock invoke: nhánh registeredGroup phải chặn trước khi kịp gọi
-    // listInstalledPlugins() — cùng lý do với test "core" phía trên.
-    await expect(installer.assertNoConflictingInstall('container-manager', 'custom-fork', 'official')).rejects.toThrow(
-      /container-manager.*official/,
-    );
-    expect(invokeMock).not.toHaveBeenCalled();
+    // registry chỉ nạp một lần lúc bootstrap (registry.ts), không cập nhật
+    // khi cài/gỡ trong lúc app đang chạy — một registeredGroup non-core ở
+    // đây có thể là bản ghi CŨ của một plugin người dùng vừa gỡ, chưa
+    // restart. Tự chặn bằng registeredGroup ở trường hợp này sẽ chặn nhầm
+    // một lượt cài lại hợp lệ — phải luôn quét đĩa (nguồn xác thực đúng
+    // trạng thái hiện tại) để biết còn conflict thật hay không.
+    invokeMock.mockResolvedValueOnce([]); // đĩa: không còn bản nào — plugin cũ đã bị gỡ thật
+    await expect(
+      installer.assertNoConflictingInstall('container-manager', 'custom-fork', 'official'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('registeredGroup khác "core" NHƯNG đĩa xác nhận vẫn còn conflict thật — vẫn ném đúng thông điệp', async () => {
+    const installer = await loadInTauri();
+    invokeMock.mockResolvedValueOnce([
+      installedPluginRaw({ manifest: remoteManifest({ id: 'container-manager' }), market_id: 'official' }),
+    ]);
+    await expect(
+      installer.assertNoConflictingInstall('container-manager', 'custom-fork', 'official'),
+    ).rejects.toThrow(/container-manager.*official/);
   });
 });
 
