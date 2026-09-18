@@ -35,6 +35,7 @@ export {
   checkAllForUpdates,
   recordKey,
   assertNoConflictingInstall,
+  findCoupledRecord,
 } from './installer';
 export type {
   RemotePluginManifest,

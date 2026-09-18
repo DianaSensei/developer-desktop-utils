@@ -586,3 +586,67 @@ describe('recordKey', () => {
     expect(key).toBe('devtool-svc-demo');
   });
 });
+
+describe('findCoupledRecord', () => {
+  function pluginRecord(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      kind: 'plugin' as const,
+      manifest: remoteManifest(overrides),
+      sourceUrl: 'x',
+      bundlePath: 'x',
+      installedAt: 0,
+    };
+  }
+
+  function serviceRecord(bin: string) {
+    return {
+      kind: 'service' as const,
+      manifest: { bin, version: '1.0.0', protocol: 1, targets: {} },
+      sourceUrl: 'x',
+      binPath: 'x',
+      installedAt: 0,
+    };
+  }
+
+  it('plugin khai service.bin + đúng một sidecar cùng bin đã cài → trả về sidecar đó', async () => {
+    const installer = await loadInTauri();
+    const plugin = pluginRecord({ id: 'redis-client', service: { bin: 'devtool-svc-redis', methods: ['list'] } });
+    const service = serviceRecord('devtool-svc-redis');
+    expect(installer.findCoupledRecord(plugin, [plugin, service])).toBe(service);
+  });
+
+  it('đối xứng: gọi với bản ghi service trả về plugin PHỤ THUỘC DUY NHẤT vào nó', async () => {
+    const installer = await loadInTauri();
+    const plugin = pluginRecord({ id: 'redis-client', service: { bin: 'devtool-svc-redis', methods: ['list'] } });
+    const service = serviceRecord('devtool-svc-redis');
+    expect(installer.findCoupledRecord(service, [plugin, service])).toBe(plugin);
+  });
+
+  it('plugin không khai service nào → không có gì để ghép cặp', async () => {
+    const installer = await loadInTauri();
+    const plugin = pluginRecord({ id: 'json' });
+    expect(installer.findCoupledRecord(plugin, [plugin])).toBeUndefined();
+  });
+
+  it('plugin khai service.bin nhưng sidecar đó CHƯA cài → không có gì để ghép cặp', async () => {
+    const installer = await loadInTauri();
+    const plugin = pluginRecord({ id: 'redis-client', service: { bin: 'devtool-svc-redis', methods: ['list'] } });
+    expect(installer.findCoupledRecord(plugin, [plugin])).toBeUndefined();
+  });
+
+  it('service bị NHIỀU plugin dùng chung → độc lập, không ghép cặp với plugin nào', async () => {
+    const installer = await loadInTauri();
+    const pluginA = pluginRecord({ id: 'plugin-a', service: { bin: 'shared-svc', methods: ['list'] } });
+    const pluginB = pluginRecord({ id: 'plugin-b', service: { bin: 'shared-svc', methods: ['list'] } });
+    const service = serviceRecord('shared-svc');
+    expect(installer.findCoupledRecord(pluginA, [pluginA, pluginB, service])).toBeUndefined();
+    expect(installer.findCoupledRecord(pluginB, [pluginA, pluginB, service])).toBeUndefined();
+    expect(installer.findCoupledRecord(service, [pluginA, pluginB, service])).toBeUndefined();
+  });
+
+  it('service cài riêng, không plugin nào phụ thuộc → độc lập', async () => {
+    const installer = await loadInTauri();
+    const service = serviceRecord('standalone-svc');
+    expect(installer.findCoupledRecord(service, [service])).toBeUndefined();
+  });
+});

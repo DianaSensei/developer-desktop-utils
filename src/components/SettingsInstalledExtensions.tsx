@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   checkForServiceUpdate,
   checkForUpdate,
+  findCoupledRecord,
   installPlugin,
   installService,
   listInstalledArtifacts,
@@ -36,6 +37,13 @@ import {
  *  giải thích đầy đủ ở bản gốc trong SettingsExtensionInstaller.tsx. */
 function rawArtifactId(record: InstalledArtifactRecord): string {
   return record.kind === 'plugin' ? record.manifest.id : record.manifest.bin;
+}
+
+/** Tên hiển thị ngắn gọn cho bản ghi PHÍA BÊN KIA của một cặp liên quan
+ *  (`findCoupledRecord`) — dùng trong lời cảnh báo trước khi gỡ, để người
+ *  dùng biết CHÍNH XÁC cái gì sẽ bị gỡ theo, không chỉ "một thứ liên quan". */
+function coupledLabel(record: InstalledArtifactRecord): string {
+  return record.kind === 'plugin' ? record.manifest.label : record.manifest.bin;
 }
 
 /** Hành động đang chờ người dùng xác nhận cho một dòng `kind=service` — chỉ
@@ -77,19 +85,36 @@ export function SettingsInstalledExtensions() {
     return <Callout tone="info" size="sm">{t('settings.extensions.install.webWarning')}</Callout>;
   }
 
+  /**
+   * Gỡ MỘT bản ghi — cùng lúc gỡ theo bản ghi LIÊN QUAN đến nó, nếu có
+   * (`findCoupledRecord`: một plugin Tier B và sidecar riêng của nó, khi
+   * không ai khác dùng chung sidecar đó). Bỏ lại phần kia sẽ để một sidecar
+   * mồ côi (không tool nào gọi tới) hoặc một plugin gọi vào một bin đã biến
+   * mất — hai phần ĐỘC LẬP (sidecar dùng chung, hoặc không ai phụ thuộc) thì
+   * không bị kéo theo, `coupled` khi đó là `undefined`.
+   */
   const performUninstall = async (record: InstalledArtifactRecord) => {
     const key = recordKey(record);
-    setRowBusy((prev) => ({ ...prev, [key]: true }));
+    const coupled = findCoupledRecord(record, installed);
+    const coupledKey = coupled ? recordKey(coupled) : undefined;
+    setRowBusy((prev) => ({ ...prev, [key]: true, ...(coupledKey ? { [coupledKey]: true } : {}) }));
     setRowError((prev) => ({ ...prev, [key]: '' }));
     try {
       await uninstallArtifact(rawArtifactId(record), record.marketId);
+      if (coupled) {
+        await uninstallArtifact(rawArtifactId(coupled), coupled.marketId);
+      }
       setNeedsRestart(true);
       await refresh();
     } catch (e) {
       setRowError((prev) => ({ ...prev, [key]: String(e instanceof Error ? e.message : e) }));
     } finally {
-      setRowBusy((prev) => ({ ...prev, [key]: false }));
-      setPendingServiceAction((prev) => ({ ...prev, [key]: undefined }));
+      setRowBusy((prev) => ({ ...prev, [key]: false, ...(coupledKey ? { [coupledKey]: false } : {}) }));
+      setPendingServiceAction((prev) => ({
+        ...prev,
+        [key]: undefined,
+        ...(coupledKey ? { [coupledKey]: undefined } : {}),
+      }));
     }
   };
 
@@ -114,11 +139,13 @@ export function SettingsInstalledExtensions() {
     }
   };
 
-  /** Plugin: thực hiện ngay (không có tiến trình nào bị dừng). Service: bước
-   *  đầu chỉ HIỆN cảnh báo, hành động thật chỉ chạy sau khi người dùng bấm
-   *  "Xác nhận" ở `handleConfirmServiceAction`. */
+  /** Plugin KHÔNG có sidecar liên quan: thực hiện ngay (không có tiến trình
+   *  nào bị dừng). Service, hoặc một plugin CÓ sidecar liên quan (gỡ nó kéo
+   *  theo dừng sidecar đó): bước đầu chỉ HIỆN cảnh báo, hành động thật chỉ
+   *  chạy sau khi người dùng bấm "Xác nhận" ở `handleConfirmServiceAction`. */
   const handleUninstallClick = (record: InstalledArtifactRecord) => {
-    if (record.kind === 'plugin') {
+    const coupled = findCoupledRecord(record, installed);
+    if (record.kind === 'plugin' && !coupled) {
       void performUninstall(record);
       return;
     }
@@ -190,6 +217,7 @@ export function SettingsInstalledExtensions() {
             const busy = rowBusy[key] ?? false;
             const updateVersion = rowUpdateVersion[key];
             const pending = pendingServiceAction[key];
+            const coupled = findCoupledRecord(record, installed);
             return (
               <div key={key} className="flex flex-col gap-2 px-4 py-3">
                 <div className="flex items-start gap-3">
@@ -261,7 +289,12 @@ export function SettingsInstalledExtensions() {
                       </div>
                     }
                   >
-                    {t('settings.extensions.installed.serviceWarning')}
+                    {pending === 'uninstall' && coupled && (
+                      <p className="mb-1 font-medium">
+                        {t('settings.extensions.installed.coupledUninstallNote', { label: coupledLabel(coupled) })}
+                      </p>
+                    )}
+                    {record.kind === 'service' && t('settings.extensions.installed.serviceWarning')}
                   </Callout>
                 )}
               </div>

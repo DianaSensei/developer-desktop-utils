@@ -224,3 +224,107 @@ describe('SettingsInstalledExtensions — gỡ một plugin', () => {
     });
   });
 });
+
+describe('SettingsInstalledExtensions — plugin + sidecar riêng LIÊN QUAN đến nhau (findCoupledRecord)', () => {
+  function coupledPluginRaw(overrides: Partial<Record<string, unknown>> = {}) {
+    return installedPluginRaw({
+      manifest: pluginManifestRaw({
+        id: 'redis-client',
+        label: 'Redis',
+        permissions: ['service'],
+        service: { bin: 'devtool-svc-demo', methods: ['list'] },
+      }),
+      ...overrides,
+    });
+  }
+
+  it('gỡ plugin có sidecar riêng (không ai dùng chung) đòi xác nhận, nêu rõ sẽ gỡ luôn sidecar, rồi gỡ CẢ HAI', async () => {
+    invokeMock.mockResolvedValueOnce([coupledPluginRaw(), installedServiceRaw()]); // list lúc mount
+    await renderInTauri();
+    await settle();
+
+    await waitFor(() => expect(screen.getByText('Redis')).toBeTruthy());
+    const row = screen.getByText('Redis').closest('div')!.parentElement!.parentElement!;
+    const uninstallButton = within(row).getAllByRole('button').at(-1)!;
+    fireEvent.click(uninstallButton);
+
+    // Xác nhận trước, CHƯA gọi uninstall nào — vì gỡ plugin này kéo theo
+    // dừng sidecar của nó.
+    await waitFor(() => expect(screen.getAllByText(/devtool-svc-demo/).length).toBeGreaterThan(0));
+    expect(invokeMock).not.toHaveBeenCalledWith('artifact_installer_uninstall', expect.anything());
+
+    invokeMock.mockResolvedValueOnce(undefined); // uninstall plugin
+    invokeMock.mockResolvedValueOnce(undefined); // uninstall sidecar liên quan
+    invokeMock.mockResolvedValueOnce([]); // refresh sau khi gỡ cả hai
+
+    fireEvent.click(screen.getByRole('button', { name: /^Confirm$|^Xác nhận$/ }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'redis-client', marketId: undefined });
+      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'devtool-svc-demo', marketId: undefined });
+    });
+  });
+
+  it('gỡ sidecar (chiều ngược lại) cũng đòi xác nhận và nêu rõ plugin sẽ gỡ theo', async () => {
+    invokeMock.mockResolvedValueOnce([coupledPluginRaw(), installedServiceRaw()]); // list lúc mount
+    await renderInTauri();
+    await settle();
+
+    await waitFor(() => expect(screen.getByText('devtool-svc-demo@1.0.0')).toBeTruthy());
+    const row = screen.getByText('devtool-svc-demo@1.0.0').closest('div')!.parentElement!.parentElement!;
+    const uninstallButton = within(row).getAllByRole('button').at(-1)!;
+    fireEvent.click(uninstallButton);
+
+    await waitFor(() => expect(screen.getAllByText(/Redis/).length).toBeGreaterThan(0));
+
+    invokeMock.mockResolvedValueOnce(undefined); // uninstall service
+    invokeMock.mockResolvedValueOnce(undefined); // uninstall plugin liên quan
+    invokeMock.mockResolvedValueOnce([]); // refresh
+
+    fireEvent.click(screen.getByRole('button', { name: /^Confirm$|^Xác nhận$/ }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'devtool-svc-demo', marketId: undefined });
+      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'redis-client', marketId: undefined });
+    });
+  });
+
+  it('sidecar dùng chung bởi 2 plugin → ĐỘC LẬP, gỡ một plugin không kéo theo sidecar, không cần xác nhận', async () => {
+    const pluginA = coupledPluginRaw({ manifest: pluginManifestRaw({ id: 'plugin-a', label: 'Plugin A', permissions: ['service'], service: { bin: 'devtool-svc-demo', methods: ['list'] } }) });
+    const pluginB = coupledPluginRaw({ manifest: pluginManifestRaw({ id: 'plugin-b', label: 'Plugin B', permissions: ['service'], service: { bin: 'devtool-svc-demo', methods: ['list'] } }) });
+    invokeMock.mockResolvedValueOnce([pluginA, pluginB, installedServiceRaw()]); // list lúc mount
+    await renderInTauri();
+    await settle();
+
+    await waitFor(() => expect(screen.getByText('Plugin A')).toBeTruthy());
+    const row = screen.getByText('Plugin A').closest('div')!.parentElement!.parentElement!;
+    const uninstallButton = within(row).getAllByRole('button').at(-1)!;
+
+    invokeMock.mockResolvedValueOnce(undefined); // uninstall plugin-a — CHỈ một lần, không kéo theo sidecar
+    invokeMock.mockResolvedValueOnce([pluginB, installedServiceRaw()]); // refresh
+    fireEvent.click(uninstallButton);
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'plugin-a', marketId: undefined });
+    });
+    expect(invokeMock).not.toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'devtool-svc-demo', marketId: undefined });
+  });
+
+  it('plugin khai service.bin nhưng sidecar CHƯA cài → gỡ ngay, không đòi xác nhận (không có gì để ghép cặp)', async () => {
+    invokeMock.mockResolvedValueOnce([coupledPluginRaw()]); // list lúc mount — KHÔNG có sidecar nào cài kèm
+    await renderInTauri();
+    await settle();
+
+    await waitFor(() => expect(screen.getByText('Redis')).toBeTruthy());
+    const row = screen.getByText('Redis').closest('div')!.parentElement!.parentElement!;
+    const uninstallButton = within(row).getAllByRole('button').at(-1)!;
+
+    invokeMock.mockResolvedValueOnce(undefined); // uninstall
+    invokeMock.mockResolvedValueOnce([]); // refresh
+    fireEvent.click(uninstallButton);
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('artifact_installer_uninstall', { key: 'redis-client', marketId: undefined });
+    });
+  });
+});

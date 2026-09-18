@@ -471,6 +471,49 @@ export function recordKey(record: InstalledArtifactRecord): string {
   return record.marketId ? `${record.marketId}::${record.manifest.id}` : record.manifest.id;
 }
 
+/**
+ * Một plugin Tier B khai `service: { bin, ... }` trong manifest của nó CÓ
+ * THỂ đi kèm một sidecar cài riêng (`kind: "service"`, cùng `bin`) — hai bản
+ * ghi cài đặt khác nhau cho cùng MỘT "tiện ích" theo mắt người dùng. Khi cả
+ * hai đang cùng cài và không ai khác phụ thuộc sidecar đó, chúng LIÊN QUAN
+ * đến nhau — gỡ một bên mà không gỡ bên kia để lại một sidecar mồ côi
+ * (không tool nào gọi tới) hoặc một plugin gọi `sdk.service.call` vào một
+ * bin đã biến mất.
+ *
+ * Trả về bản ghi PHÍA BÊN KIA nếu, và chỉ nếu, quan hệ này ĐỘC QUYỀN — nghĩa
+ * là không có bản ghi plugin ĐÃ CÀI nào khác cùng khai `service.bin` này.
+ * Một sidecar dùng chung bởi ≥2 plugin, hoặc một service cài riêng không
+ * plugin nào phụ thuộc, là hai phần ĐỘC LẬP — gỡ bên này không kéo theo bên
+ * kia, để người dùng tự quyết từng phần.
+ *
+ * Đối xứng hai chiều: gọi với một bản ghi plugin trả về sidecar của nó (nếu
+ * có, độc quyền); gọi với một bản ghi service trả về plugin PHỤ THUỘC DUY
+ * NHẤT vào nó (nếu có).
+ */
+export function findCoupledRecord(
+  record: InstalledArtifactRecord,
+  installed: InstalledArtifactRecord[],
+): InstalledArtifactRecord | undefined {
+  if (record.kind === 'plugin') {
+    const bin = record.manifest.service?.bin;
+    if (!bin) return undefined;
+    const service = installed.find((r): r is Extract<InstalledArtifactRecord, { kind: 'service' }> =>
+      r.kind === 'service' && r.manifest.bin === bin,
+    );
+    if (!service) return undefined;
+    const otherDependents = installed.filter(
+      (r) => r.kind === 'plugin' && r.manifest.id !== record.manifest.id && r.manifest.service?.bin === bin,
+    );
+    return otherDependents.length === 0 ? service : undefined;
+  }
+
+  const dependents = installed.filter(
+    (r): r is Extract<InstalledArtifactRecord, { kind: 'plugin' }> =>
+      r.kind === 'plugin' && r.manifest.service?.bin === record.manifest.bin,
+  );
+  return dependents.length === 1 ? dependents[0] : undefined;
+}
+
 /** Kiểm từng artifact đã cài, TUẦN TỰ (không Promise.all) — best-effort, một
  *  nguồn lỗi (mạng, URL đã đổi/chết) chỉ loại đúng mục đó khỏi kết quả, không
  *  chặn việc kiểm các mục còn lại hay ném lỗi ra ngoài (lời gọi này chạy nền
