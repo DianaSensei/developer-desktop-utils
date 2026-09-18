@@ -336,8 +336,15 @@ export const DICTIONARY = {
     en: 'This market has no extensions yet.',
   },
   'settings.extensions.marketplace.install': { vi: 'Cài đặt', en: 'Install' },
+  'settings.extensions.marketplace.installBeta': { vi: 'Cài bản Beta', en: 'Install Beta' },
   'settings.extensions.marketplace.installed': { vi: 'Đã cài', en: 'Installed' },
   'settings.extensions.marketplace.updateTo': { vi: 'Cập nhật lên {{version}}', en: 'Update to {{version}}' },
+  'settings.extensions.marketplace.switchToBeta': { vi: 'Chuyển sang Beta', en: 'Switch to Beta' },
+  'settings.extensions.marketplace.switchToStable': { vi: 'Chuyển về Stable', en: 'Switch to Stable' },
+  // Nhãn kênh cạnh version đã cài — CHỈ hiện khi có bản beta (plugin.beta),
+  // để không thêm chữ thừa cho plugin chưa từng phát hành beta bao giờ.
+  'settings.extensions.marketplace.channelStable': { vi: 'Bản ổn định', en: 'Stable' },
+  'settings.extensions.marketplace.channelBeta': { vi: 'Bản Beta', en: 'Beta' },
   'settings.extensions.marketplace.unsupportedPlatform': {
     vi: 'Không có bản cho nền tảng máy này',
     en: 'No build for this machine\'s platform',
