@@ -23,17 +23,33 @@ export interface Market {
   builtin: boolean;
 }
 
-export interface MarketPlugin {
-  id: string;
-  label: string;
-  description: string;
+/** Một bản cài được — dùng cho cả bản stable (field phẳng của `MarketPlugin`)
+ *  lẫn bản `beta` tuỳ chọn: cùng ba thứ cần để cài (version, URL manifest
+ *  plugin, URL manifest service nếu có), khác nhau đúng một tầng lồng. */
+export interface MarketPluginVariant {
   version: string;
-  keywords: string[];
   pluginManifestUrl: string;
   serviceManifestUrl?: string;
   /** Target triple mà sidecar (nếu có) hỗ trợ — thiếu/rỗng nghĩa là không rõ,
    *  không nên dùng để TỪ CHỐI cài, chỉ để cảnh báo. */
   targets?: string[];
+}
+
+export interface MarketPlugin extends MarketPluginVariant {
+  id: string;
+  label: string;
+  description: string;
+  keywords: string[];
+  /**
+   * Bản beta của CÙNG plugin này, nếu tác giả có phát hành — cùng id, khác
+   * version/URL. Một plugin CHỈ được cài MỘT bản tại một thời điểm (channel
+   * không phải một chiều cài độc lập như market khác nhau): chọn cài bản
+   * beta khi đang có bản stable (hoặc ngược lại) THAY THẾ hẳn bản đang cài,
+   * không cài chồng hai bản — xem `SettingsMarketplace.tsx`'s nút "Switch
+   * channel". Thiếu field này nghĩa là tác giả chưa phát hành beta, không
+   * phải lỗi hình dạng.
+   */
+  beta?: MarketPluginVariant;
 }
 
 const BUILTIN_MARKETS: Market[] = [
@@ -139,27 +155,39 @@ async function marketFetch(url: string): Promise<Response> {
   return fetch(url);
 }
 
-function toMarketPlugin(raw: unknown): MarketPlugin | null {
+/** Rẽ nhánh dùng chung cho cả field phẳng của `MarketPlugin` lẫn `r.beta` —
+ *  cùng ba field bắt buộc/tuỳ chọn của `MarketPluginVariant`. `r`/`raw` tách
+ *  riêng vì `beta` không tự có `id`/`label`/`description`/`keywords` (kế thừa
+ *  từ plugin cha), chỉ có phần "cài được" mà thôi. */
+function toMarketPluginVariant(raw: unknown): MarketPluginVariant | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  if (
-    !isNonEmptyString(r.id) ||
-    !isNonEmptyString(r.label) ||
-    !isNonEmptyString(r.description) ||
-    !isNonEmptyString(r.version) ||
-    !isNonEmptyString(r.pluginManifestUrl)
-  ) {
-    return null;
-  }
+  if (!isNonEmptyString(r.version) || !isNonEmptyString(r.pluginManifestUrl)) return null;
   return {
-    id: r.id,
-    label: r.label,
-    description: r.description,
     version: r.version,
-    keywords: Array.isArray(r.keywords) ? r.keywords.filter(isNonEmptyString) : [],
     pluginManifestUrl: r.pluginManifestUrl,
     serviceManifestUrl: isNonEmptyString(r.serviceManifestUrl) ? r.serviceManifestUrl : undefined,
     targets: Array.isArray(r.targets) ? r.targets.filter(isNonEmptyString) : undefined,
+  };
+}
+
+function toMarketPlugin(raw: unknown): MarketPlugin | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const stable = toMarketPluginVariant(r);
+  if (!stable || !isNonEmptyString(r.id) || !isNonEmptyString(r.label) || !isNonEmptyString(r.description)) {
+    return null;
+  }
+  return {
+    ...stable,
+    id: r.id,
+    label: r.label,
+    description: r.description,
+    keywords: Array.isArray(r.keywords) ? r.keywords.filter(isNonEmptyString) : [],
+    // Hình dạng sai (thiếu version/pluginManifestUrl bên trong `beta`) chỉ
+    // làm RỚT bản beta đó, không loại cả plugin — cùng nguyên tắc
+    // `fetchMarketCatalog`'s doc comment đã ghi cho một MỤC catalog hỏng.
+    beta: toMarketPluginVariant(r.beta) ?? undefined,
   };
 }
 

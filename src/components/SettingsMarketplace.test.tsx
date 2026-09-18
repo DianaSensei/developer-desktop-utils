@@ -199,6 +199,123 @@ describe('SettingsMarketplace — cài đặt (dialog xác nhận ngay tại tra
     expect(installButton.disabled).toBe(false);
   });
 
+  it('plugin có bản beta: chưa cài thì hiện CẢ hai nút Install và Install Beta', async () => {
+    manifestByUrl['https://example.com/demo-plugin-beta.json'] = { ...demoPluginManifest(), version: '1.1.0-beta.1' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          demoCatalog({
+            beta: { version: '1.1.0-beta.1', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
+          }),
+        ),
+      ),
+    );
+
+    await renderMarketplace();
+    await settle();
+    await waitFor(() => expect(screen.getByText(/demo@1\.0\.0/)).toBeTruthy());
+
+    expect(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Install Beta|Cài bản Beta/ })).toBeTruthy();
+  });
+
+  it('bấm "Install Beta" mở dialog xem trước ĐÚNG URL của bản beta, không phải bản stable', async () => {
+    manifestByUrl['https://example.com/demo-plugin-beta.json'] = { ...demoPluginManifest(), version: '1.1.0-beta.1' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          demoCatalog({
+            beta: { version: '1.1.0-beta.1', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
+          }),
+        ),
+      ),
+    );
+
+    await renderMarketplace();
+    await settle();
+    await waitFor(() => expect(screen.getByText(/demo@1\.0\.0/)).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: /Install Beta|Cài bản Beta/ }));
+
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByText(/demo@1\.1\.0-beta\.1/)).toBeTruthy());
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Install$|^Cài đặt$/ }));
+
+    await waitFor(() => expect(installMock).toHaveBeenCalledTimes(1));
+    expect(installMock).toHaveBeenCalledWith({
+      sourceUrl: 'https://example.com/demo-plugin-beta.json',
+      marketId: 'official',
+    });
+  });
+
+  it('đã cài bản beta thì hiện nút "Switch to Stable", KHÔNG phải "Switch to Beta"', async () => {
+    installedArtifacts = [
+      {
+        kind: 'plugin',
+        manifest: { ...demoPluginManifest(), version: '1.1.0-beta.1' },
+        source_url: 'https://example.com/demo-plugin-beta.json',
+        bundle_path: '/tmp/demo/bundle.mjs',
+        installed_at: 1_700_000_000_000,
+        market_id: 'official',
+      },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          demoCatalog({
+            beta: { version: '1.1.0-beta.1', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
+          }),
+        ),
+      ),
+    );
+
+    await renderMarketplace();
+    await settle();
+
+    // Hàng hiện version THẬT đã cài (bản beta), không phải version stable của
+    // catalog — cùng lý do đã ghi trong MarketPluginCard.
+    await waitFor(() => expect(screen.getByText(/demo@1\.1\.0-beta\.1/)).toBeTruthy());
+    expect(screen.getByRole('button', { name: /Switch to Stable|Chuyển về Stable/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Switch to Beta|Chuyển sang Beta/ })).toBeNull();
+    // Nút chính (cập nhật bản beta) bị vô hiệu vì đã là bản beta mới nhất.
+    expect((screen.getByRole('button', { name: /^Installed$|^Đã cài$/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('đã cài bản stable, có beta mới hơn thì hiện nút "Switch to Beta"', async () => {
+    manifestByUrl['https://example.com/demo-plugin-beta.json'] = { ...demoPluginManifest(), version: '1.1.0-beta.1' };
+    installedArtifacts = [
+      {
+        kind: 'plugin',
+        manifest: demoPluginManifest(),
+        source_url: 'https://example.com/demo-plugin.json',
+        bundle_path: '/tmp/demo/bundle.mjs',
+        installed_at: 1_700_000_000_000,
+        market_id: 'official',
+      },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          demoCatalog({
+            beta: { version: '1.1.0-beta.1', pluginManifestUrl: 'https://example.com/demo-plugin-beta.json' },
+          }),
+        ),
+      ),
+    );
+
+    await renderMarketplace();
+    await settle();
+
+    await waitFor(() => expect(screen.getByText(/demo@1\.0\.0/)).toBeTruthy());
+    expect(screen.getByRole('button', { name: /Switch to Beta|Chuyển sang Beta/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Switch to Stable|Chuyển về Stable/ })).toBeNull();
+  });
+
   it('đã cài đúng bản mới nhất thì nút Install bị vô hiệu hoá, hiện "Installed"', async () => {
     installedArtifacts = [
       {
