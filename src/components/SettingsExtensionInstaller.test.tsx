@@ -210,6 +210,20 @@ describe('SettingsExtensionInstaller — xem trước (preview)', () => {
     expect(
       screen.getByText(/The manifest has a build for this platform\.|Manifest có bản cho nền tảng này\./),
     ).toBeTruthy();
+
+    // kind=service KHÔNG đi qua assertNoConflictingInstall (chỉ áp dụng cho
+    // plugin) — bấm Install ở đây phải đi thẳng tới artifact_installer_install,
+    // không có lệnh list nào chen vào trước.
+    invokeMock.mockResolvedValueOnce(installedServiceRaw());
+    invokeMock.mockResolvedValueOnce([installedServiceRaw()]); // refresh sau khi cài
+    fireEvent.click(screen.getByRole('button', { name: /^Install$|^Cài đặt$/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/External extensions changed|Đã thay đổi tiện ích/)).toBeTruthy();
+    });
+    expect(invokeMock).toHaveBeenCalledWith('artifact_installer_install', {
+      sourceUrl: 'https://example.com/svc.json',
+    });
   });
 
   it('kind=service: nền tảng không khớp thì cảnh báo rõ, không đoán/thử triple khác', async () => {
