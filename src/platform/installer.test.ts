@@ -290,6 +290,16 @@ describe('assertNoConflictingInstall — gọi TRƯỚC installArtifact/installP
 
     await expect(installer.assertNoConflictingInstall('json', undefined, 'url')).resolves.toBeUndefined();
   });
+
+  it('registeredGroup khác "core" (plugin đã cài+đăng ký từ lần khởi động TRƯỚC, khác group đang cài) — ném đúng thông điệp "gỡ bản đó", không cần quét đĩa', async () => {
+    const installer = await loadInTauri();
+    // KHÔNG mock invoke: nhánh registeredGroup phải chặn trước khi kịp gọi
+    // listInstalledPlugins() — cùng lý do với test "core" phía trên.
+    await expect(installer.assertNoConflictingInstall('container-manager', 'custom-fork', 'official')).rejects.toThrow(
+      /container-manager.*official/,
+    );
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('currentTargetTriple', () => {
