@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Globe, ShieldCheck, Terminal } from 'lucide-react';
+import { ChevronDown, ChevronRight, Globe, Search, ShieldCheck, Terminal, X } from 'lucide-react';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 import { PLUGINS, SDK_VERSION, pluginAudit, vaultStatus, type AuditEntry, type VaultStatus } from '@/platform';
 
 /**
@@ -28,6 +29,11 @@ export function SettingsPlugins() {
   const { isFeatureEnabled } = useFeatures();
   const [entries, setEntries] = useState<AuditEntry[]>(() => pluginAudit.recent(MAX_ROWS));
   const [vault, setVault] = useState<VaultStatus | null>(null);
+  // Đóng theo mặc định: nhật ký này dài (tới MAX_ROWS dòng) và ít khi cần
+  // tra ngay khi mở trang — một mục gấp lại, tự mở khi cần, đỡ chiếm chỗ hơn
+  // hẳn so với luôn hiện sẵn dưới bảng quyền.
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditQuery, setAuditQuery] = useState('');
 
   useEffect(() => {
     // Nhật ký được ghi cả khi Settings đang đóng, nên đọc lại một lần lúc mount
@@ -50,6 +56,19 @@ export function SettingsPlugins() {
   }, []);
 
   const enabledCount = PLUGINS.filter((p) => isFeatureEnabled(p.id)).length;
+
+  // Khớp theo id tool TRƯỚC HẾT (đúng câu hỏi hay gặp nhất — "tool nào gọi
+  // gì"), nhưng cũng khớp channel/action/detail/quyền thiếu để một từ khoá
+  // bất kỳ (vd tên một lệnh native, hay "denied") cũng lọc được, không chỉ
+  // riêng id.
+  const auditQueryLower = auditQuery.trim().toLowerCase();
+  const filteredEntries = auditQueryLower
+    ? entries.filter((e) =>
+        [e.pluginId, e.channel, e.action, e.detail, e.missingPermission].some((field) =>
+          field?.toLowerCase().includes(auditQueryLower),
+        ),
+      )
+    : entries;
 
   return (
     <section className="space-y-3">
@@ -135,27 +154,64 @@ export function SettingsPlugins() {
         <p className="text-[11px] text-fg-mute">{t('settings.plugins.auditDescription')}</p>
       </div>
 
-      <div className="rounded-lg border divide-y">
-        {entries.length === 0 ? (
-          <p className="px-4 py-3 text-[11px] text-fg-mute">{t('settings.plugins.auditEmpty')}</p>
-        ) : (
-          entries.map((e, i) => (
-            <div key={`${e.ts}-${i}`} className="flex items-baseline gap-2 px-4 py-1.5 font-mono text-[11px]">
-              <span className="text-fg-mute/50 tabular-nums">{timeOf(e.ts)}</span>
-              <span className="min-w-0 truncate text-fg-mute/80">{e.pluginId}</span>
-              <span className="text-fg-mute/50">{e.channel}</span>
-              <span className="min-w-0 flex-1 truncate">{e.action}</span>
-              {e.detail && <span className="hidden sm:inline truncate text-fg-mute/60">{e.detail}</span>}
-              {!e.allowed && (
-                <span className="shrink-0 text-warn">
-                  {t('settings.plugins.auditDenied')}
-                  {e.missingPermission ? ` · ${e.missingPermission}` : ''}
-                </span>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={() => setAuditOpen((v) => !v)}
+        className="flex items-center gap-1.5 text-[11px] text-fg-mute hover:text-fg transition-colors"
+      >
+        {auditOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        {auditOpen
+          ? t('settings.plugins.auditHide')
+          : t('settings.plugins.auditShow', { count: String(entries.length) })}
+      </button>
+
+      {auditOpen && (
+        <>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-mute/60" />
+            <Input
+              value={auditQuery}
+              onChange={(e) => setAuditQuery(e.target.value)}
+              placeholder={t('settings.plugins.auditSearchPlaceholder')}
+              className="pl-8 pr-8 h-ctl text-xs bg-bg-2/40 border-line"
+            />
+            {auditQuery && (
+              <button
+                onClick={() => setAuditQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-mute/60 hover:text-fg transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-lg border divide-y">
+            {entries.length === 0 ? (
+              <p className="px-4 py-3 text-[11px] text-fg-mute">{t('settings.plugins.auditEmpty')}</p>
+            ) : filteredEntries.length === 0 ? (
+              <p className="px-4 py-3 text-[11px] text-fg-mute">
+                {t('settings.plugins.auditNoMatch', { query: auditQuery })}
+              </p>
+            ) : (
+              filteredEntries.map((e, i) => (
+                <div key={`${e.ts}-${i}`} className="flex items-baseline gap-2 px-4 py-1.5 font-mono text-[11px]">
+                  <span className="text-fg-mute/50 tabular-nums">{timeOf(e.ts)}</span>
+                  <span className="min-w-0 truncate text-fg-mute/80">{e.pluginId}</span>
+                  <span className="text-fg-mute/50">{e.channel}</span>
+                  <span className="min-w-0 flex-1 truncate">{e.action}</span>
+                  {e.detail && <span className="hidden sm:inline truncate text-fg-mute/60">{e.detail}</span>}
+                  {!e.allowed && (
+                    <span className="shrink-0 text-warn">
+                      {t('settings.plugins.auditDenied')}
+                      {e.missingPermission ? ` · ${e.missingPermission}` : ''}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </section>
   );
 }
