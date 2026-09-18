@@ -128,8 +128,21 @@ export const DEFAULT_PLUGIN_FEATURES: Readonly<Record<string, boolean>> = Object
   records.map((p) => [p.id, p.defaultEnabled]),
 );
 
+/**
+ * Tra theo `id` (khoá registry, có thể đã bị tiền tố `<marketId>-`) trước;
+ * không thấy thì thử lại theo `baseId` (id GỐC không tiền tố mà chính plugin
+ * tự khai và tự gọi lại chính mình bằng đó — xem `PluginManifest.baseId`).
+ * Cần cho `getPluginSdk`/`usePluginSdkFor`: code BÊN TRONG bundle của một
+ * plugin cài qua market không biết (và không nên biết) registry đã tiền tố
+ * mình, nên luôn gọi bằng id gốc.
+ *
+ * Nhập nhằng khi hai market khác nhau cùng cài một plugin trùng `baseId` —
+ * trả về bản ghi ĐĂNG KÝ TRƯỚC. Đây là giới hạn đã có sẵn của việc để một
+ * plugin module-scope singleton (`getPluginSdk`'s cache) tự nhận diện mình
+ * bằng đúng một chuỗi id, không phải lỗi mới do fallback này gây ra.
+ */
 export function getPlugin(id: string): PluginRecord | undefined {
-  return PLUGIN_MAP.get(id);
+  return PLUGIN_MAP.get(id) ?? records.find((p) => p.baseId === id);
 }
 
 /**

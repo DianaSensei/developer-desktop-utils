@@ -130,6 +130,10 @@ export interface PluginFiles {
 
 export interface PluginSdk {
   readonly id: string;
+  /** Id gốc không tiền tố market — xem `PluginManifest.baseId`. Bằng `id` khi
+   *  plugin không cài qua market. `usePluginSdkFor` so khớp bằng field này,
+   *  không phải `id`, vì đó là cái plugin tự truyền vào lời gọi của chính nó. */
+  readonly baseId: string;
   readonly sdkVersion: string;
   readonly permissions: readonly PluginPermission[];
   readonly env: PluginEnv;
@@ -216,6 +220,7 @@ export function createPluginSdk(manifest: PluginManifest): PluginSdk {
 
   return {
     id,
+    baseId: manifest.baseId ?? id,
     sdkVersion: SDK_VERSION,
     permissions: manifest.permissions ?? [],
     env: { isTauri, isMac: IS_MAC, modKey: MOD_KEY },

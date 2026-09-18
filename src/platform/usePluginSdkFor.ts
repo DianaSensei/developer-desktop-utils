@@ -47,7 +47,14 @@ export function getPluginSdk(pluginId: string): PluginSdk {
 export function usePluginSdkFor(pluginId: string): PluginSdk {
   const fromContext = usePluginSdkOptional();
   return useMemo(() => {
-    if (fromContext?.id === pluginId) return fromContext;
+    // So bằng `baseId`, không phải `id`: một plugin cài từ market chạy dưới
+    // một registry `id` bị tiền tố `<marketId>-` (xem installer.ts), nhưng
+    // bundle của chính plugin đó gọi `usePluginSdkFor(...)` bằng đúng id GỐC
+    // nó tự khai trong manifest — nó không (và không nên) biết registry đã
+    // tiền tố mình. So bằng `id` ở đây khiến MỌI plugin cài qua market luôn
+    // rơi xuống nhánh "không có trong registry" bên dưới, dù đang render
+    // đúng bên trong cây của chính nó.
+    if (fromContext?.baseId === pluginId) return fromContext;
     const manifest = getPlugin(pluginId);
     if (!manifest) {
       throw new Error(

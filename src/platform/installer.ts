@@ -477,6 +477,10 @@ export async function installedPluginManifests(): Promise<
       source: `installed:${registryId}@${record.manifest.version}`,
       manifest: {
         id: registryId,
+        // Chỉ khác `id` khi có tiền tố market — bundle của plugin gọi
+        // `usePluginSdkFor(record.manifest.id)` bằng đúng id GỐC này, không
+        // biết gì về tiền tố market (xem PluginManifest.baseId).
+        baseId: record.manifest.id,
         label: record.manifest.label,
         icon: ICONS_BY_NAME[record.manifest.icon] ?? Puzzle,
         description: record.manifest.description,

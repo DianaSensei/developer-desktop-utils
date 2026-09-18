@@ -119,6 +119,30 @@ describe('initInstalledPlugins', () => {
     expect(registry.getPlugin('installed-demo')?.route).toBe('/a');
   });
 
+  it('plugin cài qua market: getPlugin() tra được cả bằng id đã tiền tố lẫn baseId gốc', async () => {
+    // Mô phỏng đúng những gì installedPluginManifests() tự sinh cho một bản
+    // cài có marketId (xem installer.ts): id đăng ký bị tiền tố
+    // `<marketId>-`, baseId giữ nguyên id gốc plugin tự khai.
+    const { installedPluginManifests } = await import('./installer');
+    vi.mocked(installedPluginManifests).mockResolvedValue([
+      {
+        manifest: installedManifest({ id: 'official-container-manager', baseId: 'container-manager', route: '/installed/official-container-manager' }),
+        source: 'installed:official-container-manager@1.0.0',
+      },
+    ]);
+
+    const registry = await freshRegistry();
+    await registry.initInstalledPlugins();
+
+    // Đúng registry id (dùng cho routing/storage/audit).
+    expect(registry.getPlugin('official-container-manager')?.baseId).toBe('container-manager');
+    // Đúng id GỐC — đây là cái bundle của chính plugin gọi lại chính mình
+    // bằng (usePluginSdkFor('container-manager')/getPluginSdk('container-manager')).
+    // Thiếu fallback này là đúng lỗi thật đã xảy ra: "Không có plugin
+    // 'container-manager' trong registry" dù plugin ĐÃ cài và ĐANG render.
+    expect(registry.getPlugin('container-manager')?.id).toBe('official-container-manager');
+  });
+
   it('manifest hỏng (thiếu route) bị loại vào PLUGIN_ERRORS, không làm hỏng những manifest hợp lệ khác', async () => {
     const { installedPluginManifests } = await import('./installer');
     vi.mocked(installedPluginManifests).mockResolvedValue([

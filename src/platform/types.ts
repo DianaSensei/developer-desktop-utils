@@ -46,6 +46,16 @@ export type PluginPermission =
 export interface PluginManifest {
   /** kebab-case, duy nhất toàn app. Đồng thời là khoá bật/tắt và namespace storage. */
   id: string;
+  /**
+   * Id GỐC như chính plugin tự biết về mình — khác `id` CHỈ khi một plugin cài
+   * từ market bị tiền tố `<marketId>-` để tránh đụng một market khác cùng
+   * phát hành trùng id (xem `installer.ts`'s `installedPluginManifests()`).
+   * Bundle của plugin gọi `usePluginSdkFor('container-manager')` bằng đúng id
+   * này — nó không (và không nên) biết mình đang chạy dưới một registry id đã
+   * bị tiền tố. Không set thì coi như bằng `id` (mọi plugin compile-time và
+   * mọi plugin cài không qua market).
+   */
+  baseId?: string;
   label: string;
   icon: LucideIcon;
   description: string;

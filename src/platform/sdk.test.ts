@@ -91,6 +91,20 @@ describe('secrets', () => {
   });
 });
 
+describe('baseId', () => {
+  it('không khai baseId trong manifest thì mặc định bằng id', () => {
+    const sdk = createPluginSdk(plugin([]));
+    expect(sdk.baseId).toBe('demo');
+  });
+
+  it('có baseId trong manifest (plugin cài qua market, id đã bị tiền tố) thì giữ nguyên baseId khác id', () => {
+    const manifest = { ...plugin([]), id: 'official-demo', baseId: 'demo' };
+    const sdk = createPluginSdk(manifest);
+    expect(sdk.id).toBe('official-demo');
+    expect(sdk.baseId).toBe('demo');
+  });
+});
+
 describe('env', () => {
   it('phơi ra thông tin môi trường mà không cần quyền nào', () => {
     const sdk = createPluginSdk(plugin([]));
