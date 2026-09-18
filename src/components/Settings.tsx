@@ -294,16 +294,19 @@ const SHORTCUT_GROUPS = getShortcutGroups();
 // Nhóm theo mức độ dùng: tuỳ biến hằng ngày trước (Appearance/Tools/
 // Shortcuts) → quản lý plugin/tiện ích/tích hợp (Plugins/Extensions/MCP) →
 // thông tin/thiết lập ít đụng tới nhất (Permissions/About/Storage/Config).
+// "Plugin" (SettingsPlugins — quyền + nhật ký của tool biên dịch sẵn) và
+// "Storage" (vị trí thư mục dữ liệu) không còn là mục riêng: gộp Plugin vào
+// Tools (cùng nói về TOOL, chỉ khác góc nhìn — bật/tắt so với quyền/nhật ký)
+// và Storage vào About (một dòng thông tin đơn lẻ không đáng một mục riêng
+// trong nav trái).
 const SETTINGS_SECTIONS = [
   { id: 'appearance', label: 'settings.section.appearance' },
   { id: 'tools', label: 'settings.section.tools' },
   { id: 'shortcuts', label: 'settings.section.shortcuts' },
-  { id: 'plugins', label: 'settings.plugins.title' },
   { id: 'extensions', label: 'settings.section.extensions' },
   { id: 'mcp', label: 'settings.mcp.title' },
   { id: 'permissions', label: 'settings.permissions.title' },
   { id: 'about', label: 'settings.about.title' },
-  { id: 'storage', label: 'settings.storage.title' },
   { id: 'config', label: 'settings.config.title' },
 ] as const satisfies ReadonlyArray<{ id: string; label: TranslationKey }>;
 
@@ -811,6 +814,14 @@ export function Settings() {
           })()}
         </div>
 
+        {/* Quyền + nhật ký hoạt động của mọi tool biên dịch sẵn — trước đây
+            là mục "Plugin" riêng, gộp về đây vì cùng nói về TOOL, chỉ khác
+            góc nhìn (bật/tắt ở trên, quyền được phép làm gì/đã làm gì ở
+            dưới) so với việc tách thành hai mục cạnh nhau trong nav. */}
+        <div className="pt-2 border-t border-line">
+          <SettingsPlugins />
+        </div>
+
             </section>
           )}
 
@@ -902,8 +913,6 @@ export function Settings() {
         </div>
             </section>
           )}
-
-          {activeSection === 'plugins' && <SettingsPlugins />}
 
           {activeSection === 'extensions' && <SettingsExtensions />}
 
@@ -1121,11 +1130,10 @@ export function Settings() {
             </p>
           </div>
         </div>
-            </section>
-          )}
 
-          {activeSection === 'storage' && (
-            <section className="space-y-3">
+        {/* Vị trí thư mục dữ liệu — trước đây là mục "Data & Storage" riêng,
+            gộp về About vì chỉ có một dòng thông tin, không đáng một mục
+            riêng trong nav trái. */}
         <div className="rounded-lg border divide-y">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">

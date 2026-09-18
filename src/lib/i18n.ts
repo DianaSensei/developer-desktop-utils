@@ -199,7 +199,6 @@ export const DICTIONARY = {
   },
 
   // ── Settings — Plugins (biên dịch sẵn trong app, dùng SDK nội bộ) ────────
-  'settings.plugins.title': { vi: 'Plugin', en: 'Plugins' },
   'settings.plugins.description': {
     vi: 'Mỗi tool BIÊN DỊCH SẴN trong app là một plugin tự khai báo trong src/plugins/<id>/plugin.ts. Bảng dưới đọc thẳng từ các manifest đó: kênh Platform mà plugin được phép dùng, và lệnh native nằm trong allowlist của nó. Muốn cài thêm plugin/service KHÁC không có sẵn ở đây, xem mục Tiện ích.',
     en: 'Every tool already COMPILED INTO the app is a plugin that declares itself in src/plugins/<id>/plugin.ts. The table below is read straight from those manifests: which Platform channels the plugin may use, and which native commands are in its allowlist. To install extra plugins/services not already here, see the Extensions section.',
@@ -234,6 +233,19 @@ export const DICTIONARY = {
     en: 'No calls yet this session.',
   },
   'settings.plugins.auditDenied': { vi: 'bị từ chối', en: 'denied' },
+  'settings.plugins.auditShow': {
+    vi: 'Hiện nhật ký ({{count}})',
+    en: 'Show activity log ({{count}})',
+  },
+  'settings.plugins.auditHide': { vi: 'Ẩn nhật ký', en: 'Hide activity log' },
+  'settings.plugins.auditSearchPlaceholder': {
+    vi: 'Tìm theo id tool, hành động, chi tiết…',
+    en: 'Search by tool id, action, detail…',
+  },
+  'settings.plugins.auditNoMatch': {
+    vi: 'Không có lời gọi nào khớp "{{query}}".',
+    en: 'No calls match "{{query}}".',
+  },
 
   // ── Settings — Extensions (cài plugin/sidecar KHÁC ngoài bản biên dịch sẵn,
   //     qua Marketplace hoặc dán URL manifest tay) ──────────────────────────
@@ -374,8 +386,7 @@ export const DICTIONARY = {
     en: 'Everything runs on your device. Network access only happens when you ask for it, plus the daily check for app updates — no telemetry, analytics, or other data leaves your machine.',
   },
 
-  // ── Settings — Data & Storage ─────────────────────────────────────────────
-  'settings.storage.title': { vi: 'Dữ liệu & Lưu trữ', en: 'Data & Storage' },
+  // ── Settings — Data & Storage (gộp vào About, không còn mục riêng) ────────
   'settings.storage.location': { vi: 'Nơi lưu dữ liệu của bạn', en: 'Where your data is stored' },
   'settings.storage.resolving': { vi: 'Đang xác định…', en: 'Resolving…' },
   'settings.storage.webOnly': { vi: 'Thư mục dữ liệu app (chỉ có ở bản desktop).', en: 'App data folder (available in the desktop app).' },
