@@ -15,16 +15,28 @@
    `py-5`, `translate-x-full`; Redis mất `min-h-16`, `mx-5`, `align-top`;
    RabbitMQ mất `py-5`, `min-h-16`, `min-h-20`, `-mt-2.5`.
 
-   `@source inline(...)` buộc Tailwind phát sinh các thang đo dưới đây dù không
-   file nào trong `src/**` dùng tới, nên plugin có một nền ổn định để dựa vào.
+   ĐÃ CÓ MỘT CƠ CHẾ TRƯỚC FILE NÀY: `externalPluginClassnamesSafelist.ts` —
+   một bản chụp class được trích ra MỘT LẦN lúc bốn tool tách khỏi repo này
+   (commit 1b59500 / 5ad6ba2), tồn tại chỉ để Tailwind quét thấy. Nó không hỏng;
+   nó CŨ. Chính comment của nó đã báo trước: "no automated re-sync". Mã plugin
+   đi tiếp sau ngày đó, thêm class mới, và không có gì đồng bộ lại — đó là lý do
+   chính xác vì sao `bottom-3`, `py-5`, `align-top`, `translate-x-full`,
+   `min-h-16` không có rule, trong khi `max-w-[9rem]` hay
+   `grid-cols-[3rem_minmax(0,1fr)_6.5rem_5.5rem]` (có trong bản chụp) thì có.
+
+   `@source inline(...)` dưới đây bù đúng điểm yếu đó cho phần THANG ĐO CHUNG:
+   nó liệt kê theo thang, không theo cách dùng, nên không cần đọc mã plugin và
+   không bao giờ cũ đi. Hai file bổ sung nhau, không thay thế nhau — bản chụp
+   kia vẫn là thứ duy nhất phủ được các giá trị tuỳ ý plugin đang dùng.
    Giữ danh sách ở mức THANG ĐO CHUNG (khoảng cách, kích thước, vị trí) —
    những thứ một layout bất kỳ cũng cần. Không thêm class trang trí vào đây:
    màu, bóng, bo góc của plugin phải đến từ từ vựng design-system, thứ app chủ
    vốn đã dùng khắp nơi.
 
-   KHÔNG thể bảo đảm giá trị tuỳ ý (`max-w-[12rem]`, `grid-cols-[minmax(...)]`)
-   — mỗi cái là một rule riêng, không thang đo nào liệt kê hết được. Plugin
-   phải viết chúng bằng inline `style`.
+   KHÔNG thang đo nào liệt kê nổi giá trị tuỳ ý (`max-w-[12rem]`,
+   `grid-cols-[minmax(...)]`) — mỗi cái là một rule riêng. Chúng vẫn phụ thuộc
+   bản chụp kia, tức vẫn cũ đi được; nên plugin phải viết chúng bằng inline
+   `style`, và repo plugin có test chặn lại (`ui/hostCssClasses.test.ts`).
    ========================================================================== */
 
 /* Thang spacing: margin/padding mọi phía, gap, và bù âm cho margin. */

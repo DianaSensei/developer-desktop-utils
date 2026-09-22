@@ -174,6 +174,13 @@ Vì vậy kích thước theo viewport hoặc theo pixel phải viết bằng in
 <div className="flex flex-col" style={{ height: '68vh', maxHeight: 'calc(100vh - 13rem)' }} />
 ```
 
+**Đã có một cơ chế cho việc này từ trước:**
+`src/styles/externalPluginClassnamesSafelist.ts` — bản chụp class trích ra MỘT
+LẦN lúc bốn tool tách khỏi repo app chủ, tồn tại chỉ để Tailwind quét thấy. Nó
+không hỏng, nó **cũ**: chính comment của nó đã báo trước "no automated
+re-sync", và mã plugin đi tiếp sau ngày đó. Nếu bạn thêm class mới vào một
+plugin, đừng cho rằng nó đã được phủ.
+
 **Utility có tên cũng không miễn nhiễm.** Rà soát cả bốn plugin bằng đúng
 file CSS app chủ biên dịch ra cho thấy `bottom-3`, `pl-1.5`, `-ml-1.5`,
 `py-5`, `h-64`, `m-4`, `mx-5`, `min-h-16`, `min-h-20`, `-mt-2.5`,
@@ -181,7 +188,10 @@ file CSS app chủ biên dịch ra cho thấy `bottom-3`, `pl-1.5`, `-ml-1.5`,
 ngay cạnh `h-64` thì có. Vì thế `src/styles/plugin-utilities.css` dùng
 `@source inline(...)` ép Tailwind phát sinh sẵn các thang đo chung (spacing,
 kích thước, vị trí, lưới, canh dọc) cho plugin dựa vào, dù không file nào
-trong `src/**` dùng tới.
+trong `src/**` dùng tới. Nó liệt kê theo THANG ĐO chứ không theo cách dùng,
+nên không cần đọc mã plugin và không cũ đi được — bù đúng điểm yếu của bản
+chụp. Hai file bổ sung nhau: bản chụp vẫn là thứ duy nhất phủ được các giá trị
+tuỳ ý plugin đang dùng.
 
 Safelist đó chỉ có ở bản app chủ từ đây trở đi. **Plugin cài vào bản app chủ
 nào người dùng đang có**, nên mã plugin vẫn phải chạy đúng trên bản cũ — và
