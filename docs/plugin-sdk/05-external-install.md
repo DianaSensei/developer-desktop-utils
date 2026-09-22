@@ -146,6 +146,41 @@ shasum -a 256 bundle.mjs
 # hoặc: python3 -c "import hashlib; print(hashlib.sha256(open('bundle.mjs','rb').read()).hexdigest())"
 ```
 
+### CSS: bundle plugin KHÔNG mang stylesheet của riêng nó
+
+Bundle plugin chỉ là **JavaScript** — không có file CSS nào đi kèm, và toàn
+bộ giao diện ăn theo stylesheet Tailwind mà app chủ đã biên dịch sẵn.
+Stylesheet đó sinh ra bằng cách quét `src/**` của **app chủ**
+(`tailwind.config.js` → `content`), vốn không bao giờ chứa mã nguồn plugin
+(plugin được cài lúc chạy từ một URL, không có mặt lúc app build). Hệ quả:
+một class chỉ xuất hiện trong mã plugin sẽ nằm trong DOM mà **không có rule
+nào phía sau** — im lặng không làm gì cả.
+
+- **Utility có tên** (`flex`, `p-2`, `text-xs`, `h-ctl`, token design-system):
+  an toàn trên thực tế — app chủ dùng chung bộ kit nên rule đã có sẵn.
+- **Giá trị tuỳ ý (arbitrary value)** — `h-[68vh]`, `max-h-[70vh]`,
+  `grid-cols-[1fr_auto]`… — **không an toàn**: mỗi class là một rule riêng,
+  chỉ được phát sinh nếu tình cờ có file nào trong `src/**` của app chủ viết
+  y hệt từng ký tự.
+
+Vì vậy kích thước theo viewport hoặc theo pixel phải viết bằng inline
+`style`, thứ không build step nào bỏ đi được:
+
+```tsx
+// có thể không có rule nào trong stylesheet của app chủ
+<div className="flex h-[68vh] max-h-[calc(100vh-13rem)] flex-col" />
+
+// luôn áp dụng
+<div className="flex flex-col" style={{ height: '68vh', maxHeight: 'calc(100vh - 13rem)' }} />
+```
+
+Đây không phải lo xa: dialog xem log của Container Manager đã mất đúng hai
+class này, hộp log rơi về `height: auto`, phình theo từng dòng log đổ về và
+đẩy dialog tràn khỏi cả trên lẫn dưới màn hình — thanh công cụ của chính nó
+không với tới được. Repo plugin
+(`developer-desktop-miniapp`) chặn lại bằng một test quét mã nguồn
+(`ui/hostCssClasses.test.ts` trên nhánh `app/container-manager/main`).
+
 ## Build một sidecar đúng chuẩn để publish
 
 Xem [04-tier-b-sidecars.md](./04-tier-b-sidecars.md) cho cách viết sidecar.
