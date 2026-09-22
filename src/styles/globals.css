@@ -2,6 +2,8 @@
 @import "../design-system/tokens.css";
 
 @import "tailwindcss";
+/* Thang utility bảo đảm cho plugin cài lúc chạy — xem file đó. */
+@import "./plugin-utilities.css";
 /* Keep the JS config as the source of truth for now: it carries the portable
    design-kit preset chain (design/tailwind-preset.cjs), the colour vocabulary
    and the animate plugin. Migrating it to CSS `@theme` is a separate step. */

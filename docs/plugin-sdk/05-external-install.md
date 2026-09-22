@@ -174,12 +174,33 @@ Vì vậy kích thước theo viewport hoặc theo pixel phải viết bằng in
 <div className="flex flex-col" style={{ height: '68vh', maxHeight: 'calc(100vh - 13rem)' }} />
 ```
 
+**Utility có tên cũng không miễn nhiễm.** Rà soát cả bốn plugin bằng đúng
+file CSS app chủ biên dịch ra cho thấy `bottom-3`, `pl-1.5`, `-ml-1.5`,
+`py-5`, `h-64`, `m-4`, `mx-5`, `min-h-16`, `min-h-20`, `-mt-2.5`,
+`align-top`, `translate-x-full` đều KHÔNG có rule — trong khi `max-h-64` nằm
+ngay cạnh `h-64` thì có. Vì thế `src/styles/plugin-utilities.css` dùng
+`@source inline(...)` ép Tailwind phát sinh sẵn các thang đo chung (spacing,
+kích thước, vị trí, lưới, canh dọc) cho plugin dựa vào, dù không file nào
+trong `src/**` dùng tới.
+
+Safelist đó chỉ có ở bản app chủ từ đây trở đi. **Plugin cài vào bản app chủ
+nào người dùng đang có**, nên mã plugin vẫn phải chạy đúng trên bản cũ — và
+không safelist nào phủ nổi giá trị tuỳ ý. Repo plugin
+(`developer-desktop-miniapp`) kiểm bằng `scripts/check-host-classes.mjs`:
+nó phân giải mọi class plugin viết ra dựa trên một file CSS app chủ thật,
+chạy với bản phát hành cũ nhất còn hỗ trợ.
+
+```bash
+# trong checkout app chủ
+npm run build
+# trong repo plugin
+node scripts/check-host-classes.mjs ../developer-desktop-utils/dist/assets/*.css
+```
+
 Đây không phải lo xa: dialog xem log của Container Manager đã mất đúng hai
-class này, hộp log rơi về `height: auto`, phình theo từng dòng log đổ về và
-đẩy dialog tràn khỏi cả trên lẫn dưới màn hình — thanh công cụ của chính nó
-không với tới được. Repo plugin
-(`developer-desktop-miniapp`) chặn lại bằng một test quét mã nguồn
-(`ui/hostCssClasses.test.ts` trên nhánh `app/container-manager/main`).
+class kích thước, hộp log rơi về `height: auto`, phình theo từng dòng log đổ
+về và đẩy dialog tràn khỏi cả trên lẫn dưới màn hình — thanh công cụ của
+chính nó không với tới được.
 
 ## Build một sidecar đúng chuẩn để publish
 
