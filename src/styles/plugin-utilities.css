@@ -1,0 +1,49 @@
+/* ============================================================================
+   Bề mặt utility bảo đảm cho plugin cài từ bên ngoài
+   ----------------------------------------------------------------------------
+   Plugin (Settings → Extensions) được build thành MỘT file ESM và **không mang
+   CSS của riêng nó** — xem `docs/plugin-sdk/05-external-install.md`. Toàn bộ
+   giao diện plugin ăn theo stylesheet này, vốn sinh ra bằng cách quét `src/**`
+   của app chủ. Mã nguồn plugin không có mặt lúc app build (nó được tải lúc
+   chạy từ một URL), nên trước file này, một class chỉ có trong plugin sẽ nằm
+   trong DOM mà **không có rule nào phía sau** — im lặng không làm gì cả.
+
+   Điều đó biến "app chủ có tình cờ dùng class này ở đâu đó không" thành hợp
+   đồng API ngầm, và nó đã gãy thật: Container Manager mất `bottom-3` (nút
+   "Jump to latest" rơi lên đỉnh khung log), `pl-1.5`/`-ml-1.5`/`border-bad/60`
+   (vạch đỏ đánh dấu dòng stderr biến mất); Kafka Explorer mất `h-64`, `m-4`,
+   `py-5`, `translate-x-full`; Redis mất `min-h-16`, `mx-5`, `align-top`;
+   RabbitMQ mất `py-5`, `min-h-16`, `min-h-20`, `-mt-2.5`.
+
+   `@source inline(...)` buộc Tailwind phát sinh các thang đo dưới đây dù không
+   file nào trong `src/**` dùng tới, nên plugin có một nền ổn định để dựa vào.
+   Giữ danh sách ở mức THANG ĐO CHUNG (khoảng cách, kích thước, vị trí) —
+   những thứ một layout bất kỳ cũng cần. Không thêm class trang trí vào đây:
+   màu, bóng, bo góc của plugin phải đến từ từ vựng design-system, thứ app chủ
+   vốn đã dùng khắp nơi.
+
+   KHÔNG thể bảo đảm giá trị tuỳ ý (`max-w-[12rem]`, `grid-cols-[minmax(...)]`)
+   — mỗi cái là một rule riêng, không thang đo nào liệt kê hết được. Plugin
+   phải viết chúng bằng inline `style`.
+   ========================================================================== */
+
+/* Thang spacing: margin/padding mọi phía, gap, và bù âm cho margin. */
+@source inline("{,-}m{,x,y,s,e,t,r,b,l}-{0,0.5,1,1.5,2,2.5,3,3.5,4,5,6,7,8,9,10,11,12,14,16,20,24}");
+@source inline("p{,x,y,s,e,t,r,b,l}-{0,0.5,1,1.5,2,2.5,3,3.5,4,5,6,7,8,9,10,11,12,14,16,20,24}");
+@source inline("gap{,-x,-y}-{0,0.5,1,1.5,2,2.5,3,3.5,4,5,6,8,10,12}");
+
+/* Thang kích thước + các từ khoá nội tại hay dùng để dựng pane cuộn. */
+@source inline("{w,h,size,min-w,min-h,max-w,max-h}-{0,px,0.5,1,1.5,2,2.5,3,3.5,4,5,6,7,8,9,10,11,12,14,16,20,24,28,32,36,40,44,48,56,64,72,80,96}");
+@source inline("{w,h,min-w,min-h,max-w,max-h}-{full,screen,fit,min,max,none,auto}");
+
+/* Vị trí cho overlay/badge/nút nổi — chỗ `bottom-3` đã gãy. */
+@source inline("{,-}{inset,inset-x,inset-y,top,right,bottom,left,start,end}-{0,px,0.5,1,1.5,2,2.5,3,3.5,4,5,6,8,10,12,full,auto}");
+@source inline("{,-}{inset,inset-x,inset-y,top,right,bottom,left}-{1/2,1/3,2/3,1/4,3/4}");
+
+/* Biến đổi dùng cho panel trượt và canh giữa tuyệt đối. */
+@source inline("{,-}translate-{x,y}-{0,px,0.5,1,1.5,2,2.5,3,4,6,8,full,1/2}");
+
+/* Lưới và canh dọc — `grid-cols-N` tuỳ ý và `align-top` đều từng thiếu. */
+@source inline("grid-{cols,rows}-{1,2,3,4,5,6,7,8,9,10,11,12,none}");
+@source inline("col-span-{1,2,3,4,5,6,full}");
+@source inline("align-{baseline,top,middle,bottom,text-top,text-bottom,sub,super}");
