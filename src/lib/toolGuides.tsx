@@ -265,9 +265,22 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
   }),
 
   jwt: makeGuide({
-    use: ['Paste a JWT (header.payload.signature) — the decoded header and payload show as formatted JSON instantly.'],
-    know: ['Decoding happens entirely on your machine; nothing is sent anywhere.'],
-    caveat: ['This decodes only — it does NOT verify the signature, so don’t trust a token’s contents based on this alone.'],
+    use: [
+      'Decode: paste a JWT (header.payload.signature) — header and payload show as formatted JSON instantly, with exp / nbf / iat rendered as real times and flagged when expired.',
+      <>Verify: pick the algorithm you <strong className="text-fg">expect</strong>, paste the key (shared secret for <Tok>HS*</Tok>; PEM public key, X.509 certificate, JWK or a whole JWK Set for the rest), and optionally require an issuer / audience.</>,
+      <>Sign: edit the claims, set an expiry like <Tok>1h</Tok> or <Tok>7d</Tok>, paste a private key — or press <strong className="text-fg">Generate pair</strong> to get a fresh one, which also fills the public key for the Verify side.</>,
+      <>Algorithms: <Tok>HS256/384/512</Tok>, <Tok>RS256/384/512</Tok>, <Tok>PS256/384/512</Tok>, <Tok>ES256/384/512</Tok>, <Tok>EdDSA</Tok>, and unsigned <Tok>none</Tok>.</>,
+    ],
+    know: [
+      'Everything runs on your machine through the OS webview’s own Web Crypto — no key, token or claim is ever sent anywhere.',
+      <>For <Tok>HS*</Tok>, pick how the secret is written down (plain text / base64 / base64url / hex). A secret from <Tok>openssl rand -base64 32</Tok> is <em>bytes</em>, and HMAC-ing its printed characters instead produces a token the real service rejects.</>,
+      'Tokens and keys are held in the OS secret store, not in ordinary app storage.',
+    ],
+    caveat: [
+      <>Verify never reads the algorithm off the token’s own <Tok>alg</Tok> header — trusting it is exactly how algorithm-confusion attacks work — so a token whose header disagrees with your choice is rejected as a mismatch.</>,
+      <>Web Crypto only imports PKCS#8 private keys (<Tok>-----BEGIN PRIVATE KEY-----</Tok>). Convert a PKCS#1 or SEC1 key with <Tok>openssl pkcs8 -topk8 -nocrypt</Tok>.</>,
+      <>Ed25519 is missing from some webviews; unavailable algorithms are greyed out in the picker. A token signed with <Tok>none</Tok> carries no signature and proves nothing.</>,
+    ],
   }),
 
   regex: makeGuide({
