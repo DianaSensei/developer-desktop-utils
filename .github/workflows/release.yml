@@ -30,7 +30,55 @@ permissions:
   contents: read
 
 jobs:
+  # `tests.yml` (frontend vitest) and `coverage.yml` (frontend vitest + Rust
+  # `cargo llvm-cov`, which runs the Rust suite too) only trigger on
+  # `pull_request`/`push: main` — neither ever runs on a tag push, and
+  # `workflow_dispatch` here accepts ANY ref. Without this job, a release
+  # tag pushed on a commit whose CI run was stale, skipped, or simply never
+  # existed for that ref would go straight through `tauri build` (which
+  # only TYPECHECKS as a side effect of `npm run build`'s `tsc && vite
+  # build`) to bundling and publishing — no test ever actually runs.
+  # Making this its own job, gating `build` via `needs`, is what makes the
+  # release pipeline self-sufficient instead of trusting an assumption
+  # about some other workflow's earlier, possibly-unrelated run.
+  test:
+    name: Test (frontend + Rust) before building a release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Shares coverage.yml's cache key (restore-only here — save-if:
+      # 'false', same reasoning as `build`'s own setup below: a tag run
+      # would otherwise save a copy no other run could reuse).
+      - name: Setup build environment
+        uses: ./.github/actions/setup-tauri-env
+        with:
+          cache-shared-key: coverage
+          cache-save-if: 'false'
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Frontend unit tests
+        run: npm test
+
+      # tauri-build's build.rs checks that every `bundle.externalBin`
+      # resource (tauri.conf.json) exists on disk, even for a plain `cargo
+      # test` that never bundles anything — same placeholder technique
+      # coverage.yml's `rust` job already uses for the same reason.
+      - name: Placeholder externalBin resources (cargo test doesn't run sidecars, just needs them to exist)
+        run: |
+          mkdir -p src-tauri/binaries
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          touch "src-tauri/binaries/devtool-mcp-server-$triple" "src-tauri/binaries/devtool-svc-echo-$triple"
+          chmod +x src-tauri/binaries/devtool-mcp-server-"$triple" src-tauri/binaries/devtool-svc-echo-"$triple"
+
+      - name: Rust unit tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
   build:
+    needs: test
     strategy:
       fail-fast: false
       matrix:
