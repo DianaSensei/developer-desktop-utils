@@ -148,6 +148,8 @@ export default definePlugin({
 });
 ```
 
-`service.bin` phải khớp một mục trong `bundle.externalBin` của
-`tauri.conf.json` VÀ nằm trong `ALLOWED_SERVICES` (hằng số Rust) — xem
+Sidecar cài qua URL chỉ cần `service.bin` dạng `devtool-svc-<kebab-case>`;
+người dùng được hỏi đồng ý lần đầu chạy. Chỉ sidecar DevTool đóng gói sẵn mới
+cần khớp `bundle.externalBin` của `tauri.conf.json` và nằm trong
+`ALLOWED_SERVICES` (hằng số Rust) — xem
 [04-tier-b-sidecars.md](./04-tier-b-sidecars.md) cho toàn bộ quy trình.

@@ -408,7 +408,7 @@ fn write_index(dir: &Path, records: &[InstalledArtifactRecord]) -> Result<(), St
     std::fs::rename(&tmp_path, &final_path).map_err(|e| e.to_string())
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     to_hex(&sha2::Sha256::digest(bytes))
 }
 
@@ -744,6 +744,21 @@ pub fn installed_service_bin_path_at(index_dir: &Path, bin: &str) -> Option<Path
     })
 }
 
+/// URL manifest mà bản ghi kind=service của `bin` được cài từ — chỉ để HIỂN THỊ
+/// trong hộp thoại xin phép. `index.json` nằm trong app_data nên webview ghi được,
+/// vì vậy đây là thông tin tham khảo, không phải căn cứ tin cậy: căn cứ thật là
+/// đường dẫn và SHA-256 của file sắp chạy.
+pub fn installed_service_source_url_at(index_dir: &Path, bin: &str) -> Option<String> {
+    read_index(index_dir).ok()?.into_iter().find_map(|r| match r {
+        InstalledArtifactRecord::Service(s) if s.manifest.bin == bin => Some(s.source_url),
+        _ => None,
+    })
+}
+
+pub fn installed_service_source_url(app: &AppHandle, bin: &str) -> Option<String> {
+    installed_service_source_url_at(&extensions_dir(app).ok()?, bin)
+}
+
 // ---------------------------------------------------------------------------
 // current_target_triple — TÍNH Ở RUST, không nhận từ client/manifest
 // ---------------------------------------------------------------------------
@@ -902,7 +917,9 @@ pub async fn artifact_installer_uninstall(
     )?;
     if let Some(bin) = stopped_bin {
         // Sidecar đang chạy (nếu có) bị dừng ngay — xem AC8.
-        let _ = crate::service_host::service_stop(services.clone(), bin).await;
+        let _ = crate::service_host::service_stop(services.clone(), bin.clone()).await;
+        // Gỡ cài đặt cũng thu hồi sự đồng ý: cài lại sau này phải được hỏi lại.
+        services.trust.revoke(&bin);
     }
     Ok(())
 }
