@@ -223,13 +223,13 @@ Xem [04-tier-b-sidecars.md](./04-tier-b-sidecars.md) cho cách viết sidecar.
 3. Host mỗi binary ở một URL `https://` (GitHub Release asset là lựa chọn
    đơn giản — public, ổn định, không cần hạ tầng riêng).
 4. Viết manifest `kind: "service"` liệt kê từng target-triple → `{url, sha256}`.
-5. Tên bin trong manifest (`bin`) phải khớp một tên đã có sẵn trong
-   `ALLOWED_SERVICES` của app đang cài — **cài qua URL KHÔNG tự cấp quyền
-   chạy cho một tên bin mới**; đây là ranh giới tin cậy cố ý (xem
-   01-architecture.md). Sidecar bạn tự viết cho DevTool của chính mình thì
-   bạn cũng là người thêm tên vào `ALLOWED_SERVICES` khi build app — cơ chế
-   URL chỉ thay đổi CHỖ LẤY BYTES, không thay đổi AI QUYẾT ĐỊNH tên nào
-   được phép chạy.
+5. Tên bin trong manifest (`bin`) phải có dạng `devtool-svc-<kebab-case>`.
+   **Cài qua URL KHÔNG tự cấp quyền chạy** — manifest do webview đọc nên không
+   thể là nơi cấp quyền. Nếu tên không nằm trong `ALLOWED_SERVICES` của app
+   (danh sách các sidecar DevTool tự đóng gói), lần đầu được gọi app hỏi
+   người dùng qua hộp thoại native (đường dẫn + SHA-256), rồi nhớ quyết định
+   trong keychain gắn với mã băm. Không cần phát hành lại app cho mỗi plugin
+   mới; xem 01-architecture.md.
 
 ## Nơi lưu và độ ưu tiên lúc chạy
 

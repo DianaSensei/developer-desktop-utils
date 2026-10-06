@@ -72,13 +72,29 @@ mật — nó không phải, và biết chính xác nó LÀ gì quan trọng hơ
   phải rào chắn runtime. Nó biến "quyền là mô tả" thành "quyền là hàng rào
   thật" theo nghĩa: nếu không ai lách qua SDK, thì allowlist trong manifest
   đúng là nơi DUY NHẤT quyết định một lời gọi có đi tiếp hay không.
-- **Ranh giới thật, có giá trị bảo mật, nằm ở Tier B:** `ALLOWED_SERVICES`
-  trong `service_host.rs` là một hằng số Rust CỨNG, quyết định lúc BIÊN
-  DỊCH — không đổi được lúc chạy, không do manifest hay webview quyết định.
-  Một plugin khai `service: { bin: 'ten-la' }` mà `ten-la` không nằm trong
-  `ALLOWED_SERVICES` thì lời gọi bị từ chối, bất kể manifest nói gì. Đây là
-  lý do: manifest do webview đọc — thứ ta đang muốn giới hạn khả năng của
-  nó — nên nó không thể là nơi cấp quyền chạy tiến trình.
+- **Ranh giới thật, có giá trị bảo mật, nằm ở Tier B:** quyền chạy một tiến
+  trình KHÔNG do manifest hay webview quyết định — manifest do webview đọc,
+  thứ ta đang muốn giới hạn khả năng của nó, nên nó không thể là nơi cấp
+  quyền. Có đúng hai nguồn quyền, cả hai nằm ở Rust (`service_host.rs`):
+  1. `ALLOWED_SERVICES` — hằng số CỨNG, quyết định lúc BIÊN DỊCH, cho các
+     sidecar DevTool tự đóng gói. Chạy không hỏi.
+  2. **Sự đồng ý của người dùng** — với mọi tên khác dạng
+     `devtool-svc-<kebab-case>`, lần đầu chạy app hiện hộp thoại native
+     (đường dẫn + SHA-256 của file sắp chạy) và hỏi. Hộp thoại do Rust bật,
+     webview chỉ kích hoạt được câu hỏi chứ không trả lời thay được. Nhờ đó
+     một plugin mới kèm sidecar không đòi phát hành lại app.
+
+  **Quyết định đồng ý lưu ở keychain của OS, không phải file trong
+  `app_data`:** capability mặc định cho webview ghi tự do vào `app_data`
+  (`fs:allow-write-file` + `fs:scope-appdata-recursive`), nên mọi thứ ở đó —
+  kể cả `extensions/index.json` — webview tự sửa được. Mỗi mục gắn với SHA-256
+  của file: binary bị thay hay cập nhật thì hỏi lại. Máy không có keychain thì
+  quyết định chỉ sống trong phiên (hỏi thừa, không bao giờ hỏi thiếu). Gỡ
+  cài đặt thu hồi quyết định.
+
+  Giới hạn cần biết: đồng ý là đồng ý chạy với đầy đủ quyền của người dùng,
+  không có sandbox; và mã băm được tính ngay trước khi spawn, không giữ file
+  khoá nên về lý thuyết có cửa sổ thời gian rất ngắn giữa băm và chạy.
 - **Vì sao không cần sandbox chống mã độc lúc này:** mọi plugin (kể cả
   plugin cài từ URL bên ngoài) hiện do chính người phát hành DevTool viết
   và tự host. Đây không phải kho plugin bên thứ ba. Rủi ro thật đang được

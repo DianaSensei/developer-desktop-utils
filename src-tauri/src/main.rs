@@ -10,6 +10,7 @@ mod mockserver;
 mod ports;
 mod secrets_vault;
 mod service_host;
+mod service_trust;
 mod artifact_installer;
 mod plugin_data;
 
