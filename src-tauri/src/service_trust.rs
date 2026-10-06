@@ -49,7 +49,8 @@ pub struct KeyringBackend;
 
 impl TrustBackend for KeyringBackend {
     fn load(&self) -> Result<Vec<TrustEntry>, String> {
-        let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|e| e.to_string())?;
+        let entry =
+            keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|e| e.to_string())?;
         match entry.get_password() {
             Ok(json) => Ok(serde_json::from_str(&json).unwrap_or_default()),
             Err(keyring::Error::NoEntry) => Ok(Vec::new()),
@@ -58,7 +59,8 @@ impl TrustBackend for KeyringBackend {
     }
 
     fn save(&self, entries: &[TrustEntry]) -> Result<(), String> {
-        let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|e| e.to_string())?;
+        let entry =
+            keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|e| e.to_string())?;
         let json = serde_json::to_string(entries).map_err(|e| e.to_string())?;
         entry.set_password(&json).map_err(|e| e.to_string())
     }
@@ -82,7 +84,11 @@ impl Default for ServiceTrust {
 
 impl ServiceTrust {
     pub fn new(backend: Box<dyn TrustBackend>) -> Self {
-        Self { backend, entries: Mutex::new(None), gate: AsyncMutex::new(()) }
+        Self {
+            backend,
+            entries: Mutex::new(None),
+            gate: AsyncMutex::new(()),
+        }
     }
 
     fn with_entries<R>(&self, f: impl FnOnce(&mut Vec<TrustEntry>) -> R) -> R {
@@ -102,7 +108,10 @@ impl ServiceTrust {
     fn grant(&self, bin: &str, sha256: &str) {
         let snapshot = self.with_entries(|e| {
             e.retain(|t| t.bin != bin);
-            e.push(TrustEntry { bin: bin.to_string(), sha256: sha256.to_string() });
+            e.push(TrustEntry {
+                bin: bin.to_string(),
+                sha256: sha256.to_string(),
+            });
             e.clone()
         });
         if let Err(e) = self.backend.save(&snapshot) {
@@ -143,22 +152,146 @@ impl ServiceTrust {
     }
 }
 
-/// Nội dung hộp thoại. Nêu những gì người dùng cần để quyết định: cái gì sẽ
-/// chạy, ở đâu, từ nguồn nào.
-pub fn consent_message(bin: &str, path: &std::path::Path, sha256: &str, source: Option<&str>) -> String {
-    let mut msg = format!(
-        "Một plugin muốn chạy chương trình native \"{bin}\" trên máy của bạn.\n\n\
-         Đường dẫn: {}\nSHA-256: {sha256}\n",
-        path.display()
-    );
-    if let Some(source) = source {
-        msg.push_str(&format!("Nguồn ghi trong danh sách cài đặt: {source}\n"));
+/// Ngôn ngữ của hộp thoại — theo ngôn ngữ người dùng chọn trong app (khoá
+/// `devtool-locale` của `app-settings.json`, cùng khoá `LocaleContext.tsx` ghi).
+/// Thiếu hoặc lạ thì tiếng Anh. File nằm trong app_data nên webview ghi được,
+/// nhưng nó chỉ đổi được NGÔN NGỮ của câu hỏi, không đổi được câu trả lời.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Locale {
+    Vi,
+    En,
+}
+
+pub fn locale_from_settings(app_settings_json: &str) -> Locale {
+    let v: serde_json::Value = serde_json::from_str(app_settings_json).unwrap_or_default();
+    match v.get("devtool-locale").and_then(|l| l.as_str()) {
+        Some("vi") => Locale::Vi,
+        _ => Locale::En,
     }
-    msg.push_str(
-        "\nChương trình này chạy với đầy đủ quyền của bạn, không có sandbox. \
-         Chỉ cho phép nếu bạn tin nguồn của nó.",
-    );
-    msg
+}
+
+/// Hộp thoại native: tiêu đề, nội dung, nút đồng ý, nút từ chối.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsentDialog {
+    pub title: String,
+    pub message: String,
+    pub allow: String,
+    pub deny: String,
+}
+
+/// Cách gọi thư mục home theo quy ước của từng hệ điều hành.
+const HOME_MARK: &str = if cfg!(windows) { "%USERPROFILE%" } else { "~" };
+
+/// Thư mục home thay bằng `~` (macOS, Linux) hoặc `%USERPROFILE%` (Windows) —
+/// ngắn hơn, và không lộ tên tài khoản khi người dùng chụp màn hình gửi đi.
+fn shorten_home(path: &str, home: Option<&str>, mark: &str) -> String {
+    match home.filter(|h| !h.is_empty()) {
+        // `get` rather than slicing: a non-ASCII account name ("Thông") must not panic
+        // when the cut falls inside a character of a path that does not match.
+        Some(h)
+            if path
+                .get(..h.len())
+                .is_some_and(|p| p.eq_ignore_ascii_case(h)) =>
+        {
+            format!("{mark}{}", &path[h.len()..])
+        }
+        _ => path.to_string(),
+    }
+}
+
+/// Thư mục chứa file, rút gọn: với bản cài qua URL là `~/…/services/<bin>/<version>`.
+/// Làm việc trên chuỗi, chấp nhận cả `/` lẫn `\`, và giữ đúng dấu phân cách của
+/// đường dẫn — để kết quả giống nhau dù đường dẫn đến từ macOS, Linux hay Windows.
+fn short_location(path: &str, home: Option<&str>, mark: &str) -> String {
+    let sep = if path.contains('\\') && !path.contains('/') {
+        '\\'
+    } else {
+        '/'
+    };
+    let dir = match path.rfind(['/', '\\']) {
+        Some(i) => &path[..i],
+        None => path,
+    };
+    let dir = shorten_home(dir, home, mark);
+    let parts: Vec<&str> = dir.split(['/', '\\']).collect();
+    match parts.iter().position(|p| *p == "services") {
+        Some(i) if i > 1 => format!("{mark}{sep}…{sep}{}", parts[i..].join(&sep.to_string())),
+        _ => dir,
+    }
+}
+
+/// Đủ để đối chiếu bằng mắt mà không phải đọc 64 ký tự.
+fn short_hash(sha256: &str) -> String {
+    if sha256.len() <= 20 {
+        return sha256.to_string();
+    }
+    format!("{}…{}", &sha256[..12], &sha256[sha256.len() - 6..])
+}
+
+/// Nguồn không có `https://` và query; dài thì giữ host và tên file cuối.
+fn short_source(url: &str) -> String {
+    let bare = url.split(['?', '#']).next().unwrap_or(url);
+    let bare = bare
+        .strip_prefix("https://")
+        .or_else(|| bare.strip_prefix("http://"))
+        .unwrap_or(bare);
+    if bare.chars().count() <= 60 {
+        return bare.to_string();
+    }
+    let host = bare.split('/').next().unwrap_or(bare);
+    let last = bare.rsplit('/').next().unwrap_or("");
+    format!("{host}/…/{last}")
+}
+
+/// Nội dung hộp thoại xin phép. Theo quy ước hộp thoại quyền của macOS: tiêu đề
+/// là một câu hỏi có tên chương trình; thân là một câu giải thích, ba dòng nhận
+/// diện (ở đâu, mã băm, từ đâu) và một câu nhắc; nút nói rõ hành động.
+pub fn consent_dialog(
+    locale: Locale,
+    bin: &str,
+    path: &std::path::Path,
+    sha256: &str,
+    source: Option<&str>,
+    home: Option<&str>,
+) -> ConsentDialog {
+    let name = bin.strip_prefix("devtool-svc-").unwrap_or(bin);
+    let location = short_location(&path.to_string_lossy(), home, HOME_MARK);
+    let hash = short_hash(sha256);
+    let source = source.map(short_source);
+    match locale {
+        Locale::Vi => {
+            let mut message = format!(
+                "Một plugin muốn chạy chương trình này trên máy bạn, với toàn quyền của tài khoản bạn.\n\n\
+                 Thư mục: {location}\nSHA-256: {hash}"
+            );
+            if let Some(src) = &source {
+                message.push_str(&format!("\nNguồn: {src}"));
+            }
+            message.push_str("\n\nChỉ cho phép nếu bạn tin nguồn này. Nếu chương trình thay đổi, DevTool sẽ hỏi lại.");
+            ConsentDialog {
+                title: format!("Cho phép “{name}” chạy?"),
+                message,
+                allow: "Cho phép".into(),
+                deny: "Không cho phép".into(),
+            }
+        }
+        Locale::En => {
+            let mut message = format!(
+                "A plugin wants to run this program on your computer, with your full user permissions.\n\n\
+                 Folder: {location}\nSHA-256: {hash}"
+            );
+            if let Some(src) = &source {
+                message.push_str(&format!("\nSource: {src}"));
+            }
+            message.push_str("\n\nAllow it only if you trust its source. DevTool will ask again if the program changes.");
+            ConsentDialog {
+                title: format!("Allow “{name}” to run?"),
+                message,
+                allow: "Allow".into(),
+                deny: "Don’t Allow".into(),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -196,9 +329,21 @@ mod tests {
 
         let trust = ServiceTrust::new(Box::new(backend.clone()));
         let a = asked.clone();
-        trust.ensure("devtool-svc-x", "aa", || async move { a.fetch_add(1, Ordering::SeqCst); true }).await.unwrap();
+        trust
+            .ensure("devtool-svc-x", "aa", || async move {
+                a.fetch_add(1, Ordering::SeqCst);
+                true
+            })
+            .await
+            .unwrap();
         let a = asked.clone();
-        trust.ensure("devtool-svc-x", "aa", || async move { a.fetch_add(1, Ordering::SeqCst); true }).await.unwrap();
+        trust
+            .ensure("devtool-svc-x", "aa", || async move {
+                a.fetch_add(1, Ordering::SeqCst);
+                true
+            })
+            .await
+            .unwrap();
         assert_eq!(asked.load(Ordering::SeqCst), 1);
 
         // "Khởi động lại": một ServiceTrust mới đọc lại từ backend.
@@ -209,7 +354,10 @@ mod tests {
     #[tokio::test]
     async fn tu_choi_thi_loi_va_khong_ghi_nho() {
         let trust = ServiceTrust::new(Box::new(Mem::default()));
-        let err = trust.ensure("devtool-svc-x", "aa", || async { false }).await.unwrap_err();
+        let err = trust
+            .ensure("devtool-svc-x", "aa", || async { false })
+            .await
+            .unwrap_err();
         assert!(err.contains("từ chối"), "{err}");
         assert!(!trust.is_trusted("devtool-svc-x", "aa"));
     }
@@ -217,20 +365,32 @@ mod tests {
     #[tokio::test]
     async fn doi_noi_dung_binary_thi_hoi_lai() {
         let trust = ServiceTrust::new(Box::new(Mem::default()));
-        trust.ensure("devtool-svc-x", "aa", || async { true }).await.unwrap();
+        trust
+            .ensure("devtool-svc-x", "aa", || async { true })
+            .await
+            .unwrap();
         // Cùng tên, mã băm khác → quyền cũ không áp dụng.
         assert!(!trust.is_trusted("devtool-svc-x", "bb"));
-        let err = trust.ensure("devtool-svc-x", "bb", || async { false }).await.unwrap_err();
+        let err = trust
+            .ensure("devtool-svc-x", "bb", || async { false })
+            .await
+            .unwrap_err();
         assert!(err.contains("từ chối"));
         // Và cho phép bản mới thì bản cũ không còn được tin.
-        trust.ensure("devtool-svc-x", "bb", || async { true }).await.unwrap();
+        trust
+            .ensure("devtool-svc-x", "bb", || async { true })
+            .await
+            .unwrap();
         assert!(!trust.is_trusted("devtool-svc-x", "aa"));
     }
 
     #[tokio::test]
     async fn khong_co_keychain_thi_van_chay_trong_phien_va_hoi_lai_lan_sau() {
         let trust = ServiceTrust::new(Box::new(Broken));
-        trust.ensure("devtool-svc-x", "aa", || async { true }).await.unwrap();
+        trust
+            .ensure("devtool-svc-x", "aa", || async { true })
+            .await
+            .unwrap();
         assert!(trust.is_trusted("devtool-svc-x", "aa"));
         // Phiên mới (không đọc được gì từ backend hỏng) → chưa tin ai.
         let next = ServiceTrust::new(Box::new(Broken));
@@ -270,11 +430,119 @@ mod tests {
     }
 
     #[test]
-    fn hop_thoai_neu_du_thong_tin_de_quyet_dinh() {
-        let m = consent_message("devtool-svc-x", std::path::Path::new("/p/x"), "abc123", Some("https://h/m.json"));
-        for needle in ["devtool-svc-x", "/p/x", "abc123", "https://h/m.json", "sandbox"] {
-            assert!(m.contains(needle), "thiếu {needle}: {m}");
-        }
-        assert!(!consent_message("b", std::path::Path::new("/p"), "s", None).contains("Nguồn"));
+    fn hop_thoai_gon_va_du_thong_tin_de_quyet_dinh() {
+        let path = std::path::Path::new(
+            "/Users/an/Library/Application Support/com.x/services/devtool-svc-service-list-automation/0.1.0/devtool-svc-service-list-automation",
+        );
+        let sha = "2009009a8a4529e8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4529e8";
+        let src = "https://github.com/DianaSensei/mm-service-list-automation/releases/download/service-list-automation-v0.1.0/service-list-automation-service.manifest.json?x=1";
+        let d = consent_dialog(
+            Locale::Vi,
+            "devtool-svc-service-list-automation",
+            path,
+            sha,
+            Some(src),
+            Some("/Users/an"),
+        );
+        assert_eq!(d.title, "Cho phép “service-list-automation” chạy?");
+        assert_eq!(
+            (d.allow.as_str(), d.deny.as_str()),
+            ("Cho phép", "Không cho phép")
+        );
+        assert!(
+            d.message
+                .contains("Thư mục: ~/…/services/devtool-svc-service-list-automation/0.1.0"),
+            "{}",
+            d.message
+        );
+        assert!(
+            d.message.contains("SHA-256: 2009009a8a45…4529e8"),
+            "{}",
+            d.message
+        );
+        assert!(
+            d.message
+                .contains("Nguồn: github.com/…/service-list-automation-service.manifest.json"),
+            "{}",
+            d.message
+        );
+        assert!(!d.message.contains("/Users/an"), "home must not appear");
+        assert!(d.message.contains("toàn quyền"));
+
+        let en = consent_dialog(Locale::En, "devtool-svc-x", path, sha, None, None);
+        assert_eq!(en.title, "Allow “x” to run?");
+        assert!(!en.message.contains("Source:"));
+        assert_eq!(en.deny, "Don’t Allow");
+    }
+
+    #[test]
+    fn duong_dan_rut_gon_dung_cho_ca_ba_he_dieu_hanh() {
+        let bin = "devtool-svc-x";
+        // macOS
+        assert_eq!(
+            short_location(
+                &format!("/Users/an/Library/Application Support/com.x/services/{bin}/0.1.0/{bin}"),
+                Some("/Users/an"),
+                "~"
+            ),
+            format!("~/…/services/{bin}/0.1.0")
+        );
+        // Linux
+        assert_eq!(
+            short_location(
+                &format!("/home/an/.local/share/com.x/services/{bin}/0.1.0/{bin}"),
+                Some("/home/an"),
+                "~"
+            ),
+            format!("~/…/services/{bin}/0.1.0")
+        );
+        // Windows: backslashes kept, home written the Windows way, drive letter case ignored
+        assert_eq!(
+            short_location(
+                &format!(r"C:\Users\An\AppData\Roaming\com.x\services\{bin}\0.1.0\{bin}.exe"),
+                Some(r"c:\users\an"),
+                "%USERPROFILE%"
+            ),
+            format!(r"%USERPROFILE%\…\services\{bin}\0.1.0")
+        );
+        // Not an installed sidecar (a dev build beside the exe): the folder, home shortened.
+        assert_eq!(
+            short_location(
+                "/Users/an/dev/target/debug/devtool-svc-x",
+                Some("/Users/an"),
+                "~"
+            ),
+            "~/dev/target/debug"
+        );
+    }
+
+    #[test]
+    fn ngon_ngu_theo_lua_chon_trong_app() {
+        assert_eq!(
+            locale_from_settings(r#"{"devtool-locale":"vi"}"#),
+            Locale::Vi
+        );
+        assert_eq!(
+            locale_from_settings(r#"{"devtool-locale":"en"}"#),
+            Locale::En
+        );
+        assert_eq!(locale_from_settings("{}"), Locale::En);
+        assert_eq!(locale_from_settings("hỏng"), Locale::En);
+    }
+
+    #[test]
+    fn rut_gon_khong_lam_hong_gia_tri_ngan() {
+        assert_eq!(short_hash("abc"), "abc");
+        assert_eq!(short_source("https://h/m.json"), "h/m.json");
+        assert_eq!(shorten_home("/opt/x", Some("/Users/a"), "~"), "/opt/x");
+        // Non-ASCII account names: matching and non-matching paths, no panic.
+        assert_eq!(
+            shorten_home("/Users/Thông/x", Some("/Users/Thông"), "~"),
+            "~/x"
+        );
+        assert_eq!(
+            shorten_home("/Users/ăn/x", Some("/Users/a"), "~"),
+            "/Users/ăn/x"
+        );
     }
 }

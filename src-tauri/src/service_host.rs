@@ -408,18 +408,28 @@ fn service_data_dir(app_data_dir: &std::path::Path, bin: &str) -> std::path::Pat
 
 /// Hộp thoại native hỏi người dùng. Trả lời đi qua `oneshot`, nên không chặn luồng
 /// nào trong lúc chờ. Webview không có đường nào để trả lời thay.
-async fn ask_user(app: &AppHandle, message: String) -> bool {
+async fn ask_user(app: &AppHandle, dialog: crate::service_trust::ConsentDialog) -> bool {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
     let (tx, rx) = oneshot::channel();
     app.dialog()
-        .message(message)
-        .title("Cho phép chạy chương trình native?")
+        .message(dialog.message)
+        .title(dialog.title)
         .kind(MessageDialogKind::Warning)
-        .buttons(MessageDialogButtons::OkCancelCustom("Cho phép".into(), "Từ chối".into()))
+        .buttons(MessageDialogButtons::OkCancelCustom(dialog.allow, dialog.deny))
         .show(move |allowed| {
             let _ = tx.send(allowed);
         });
     rx.await.unwrap_or(false)
+}
+
+/// Ngôn ngữ người dùng đã chọn trong app, cho hộp thoại xin phép.
+fn ui_locale(app: &AppHandle) -> crate::service_trust::Locale {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .and_then(|d| std::fs::read_to_string(d.join("app-settings.json")).ok())
+        .map(|raw| crate::service_trust::locale_from_settings(&raw))
+        .unwrap_or(crate::service_trust::Locale::En)
 }
 
 /// Sidecar của DevTool chạy không hỏi; mọi sidecar khác cần người dùng đồng ý
@@ -434,10 +444,11 @@ async fn ensure_trusted(app: &AppHandle, registry: &ServiceRegistry, bin: &str) 
         .map_err(|e| format!("Không đọc được \"{}\": {e}", path.display()))?;
     let sha256 = crate::artifact_installer::sha256_hex(&bytes);
     let source = crate::artifact_installer::installed_service_source_url(app, bin);
-    let message = crate::service_trust::consent_message(bin, &path, &sha256, source.as_deref());
+    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).ok();
+    let dialog = crate::service_trust::consent_dialog(ui_locale(app), bin, &path, &sha256, source.as_deref(), home.as_deref());
     registry
         .trust
-        .ensure(bin, &sha256, || ask_user(app, message))
+        .ensure(bin, &sha256, || ask_user(app, dialog))
         .await
 }
 
