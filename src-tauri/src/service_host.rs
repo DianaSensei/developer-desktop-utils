@@ -278,16 +278,23 @@ fn resolve_sidecar_path(
 /// xuống hành vi CŨ (tìm cạnh `current_exe()`, đúng quy ước với
 /// `mcp_bridge::mcp_sidecar_path`, nên không cần thêm tauri-plugin-shell hay
 /// mở quyền chạy tiến trình ở tầng capability).
-fn sidecar_path(app: &AppHandle, bin: &str) -> Result<std::path::PathBuf, String> {
-    // `extensions_dir` tự tạo thư mục nếu chưa có — lỗi ở đây (app_data
-    // không đọc được) không nên chặn hẳn fallback cạnh-exe, nên chỉ bỏ qua
-    // (`.ok()`) thay vì `?`.
+/// Hai nơi một sidecar có thể nằm: index của bản tải-về (nếu đọc được) và thư
+/// mục cạnh file thực thi. Dùng chung cho `sidecar_path` và `ensure_trusted`.
+fn sidecar_dirs(app: &AppHandle) -> Result<(Option<std::path::PathBuf>, std::path::PathBuf), String> {
     let index_dir = crate::artifact_installer::extensions_dir(app).ok();
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let beside_dir = exe
         .parent()
         .ok_or("Không xác định được thư mục cài đặt của app")?
         .to_path_buf();
+    Ok((index_dir, beside_dir))
+}
+
+fn sidecar_path(app: &AppHandle, bin: &str) -> Result<std::path::PathBuf, String> {
+    // `extensions_dir` tự tạo thư mục nếu chưa có — lỗi ở đây (app_data
+    // không đọc được) không nên chặn hẳn fallback cạnh-exe, nên `sidecar_dirs`
+    // chỉ bỏ qua (`.ok()`) thay vì `?`.
+    let (index_dir, beside_dir) = sidecar_dirs(app)?;
     resolve_sidecar_path(index_dir.as_deref(), &beside_dir, bin)
 }
 
@@ -422,34 +429,60 @@ async fn ask_user(app: &AppHandle, dialog: crate::service_trust::ConsentDialog) 
     rx.await.unwrap_or(false)
 }
 
-/// Ngôn ngữ người dùng đã chọn trong app, cho hộp thoại xin phép.
-fn ui_locale(app: &AppHandle) -> crate::service_trust::Locale {
-    app.path()
-        .app_data_dir()
-        .ok()
+/// Ngôn ngữ người dùng đã chọn trong app, cho hộp thoại xin phép — đọc từ
+/// `app-settings.json` trong `app_data` (cùng khoá `LocaleContext.tsx` ghi).
+fn ui_locale_at(app_data: Option<&std::path::Path>) -> crate::service_trust::Locale {
+    app_data
         .and_then(|d| std::fs::read_to_string(d.join("app-settings.json")).ok())
         .map(|raw| crate::service_trust::locale_from_settings(&raw))
         .unwrap_or(crate::service_trust::Locale::En)
 }
 
-/// Sidecar của DevTool chạy không hỏi; mọi sidecar khác cần người dùng đồng ý
-/// cho ĐÚNG file sắp chạy (mã băm lúc này, không phải lúc cài).
-async fn ensure_trusted(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<(), String> {
+/// Phần QUYẾT ĐỊNH của `ensure_trusted`, không cần `AppHandle`: mọi thứ lấy từ
+/// app (thư mục, home) và cách hỏi người dùng đều là tham số, nên test được trọn
+/// đường đi — sidecar có sẵn, hỏi đúng một lần, từ chối, thiếu file, ngôn ngữ.
+async fn ensure_trusted_with<F, Fut>(
+    trust: &crate::service_trust::ServiceTrust,
+    bin: &str,
+    index_dir: Option<&std::path::Path>,
+    beside_dir: &std::path::Path,
+    app_data: Option<&std::path::Path>,
+    home: Option<&str>,
+    ask: F,
+) -> Result<(), String>
+where
+    F: FnOnce(crate::service_trust::ConsentDialog) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
     if ALLOWED_SERVICES.contains(&bin) {
         return Ok(());
     }
-    let path = sidecar_path(app, bin)?;
+    let path = resolve_sidecar_path(index_dir, beside_dir, bin)?;
     let bytes = tokio::fs::read(&path)
         .await
         .map_err(|e| format!("Không đọc được \"{}\": {e}", path.display()))?;
     let sha256 = crate::artifact_installer::sha256_hex(&bytes);
-    let source = crate::artifact_installer::installed_service_source_url(app, bin);
+    let source = index_dir.and_then(|d| crate::artifact_installer::installed_service_source_url_at(d, bin));
+    let dialog = crate::service_trust::consent_dialog(ui_locale_at(app_data), bin, &path, &sha256, source.as_deref(), home);
+    trust.ensure(bin, &sha256, || ask(dialog)).await
+}
+
+/// Sidecar của DevTool chạy không hỏi; mọi sidecar khác cần người dùng đồng ý
+/// cho ĐÚNG file sắp chạy (mã băm lúc này, không phải lúc cài).
+async fn ensure_trusted(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<(), String> {
+    let (index_dir, beside_dir) = sidecar_dirs(app)?;
+    let app_data = app.path().app_data_dir().ok();
     let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).ok();
-    let dialog = crate::service_trust::consent_dialog(ui_locale(app), bin, &path, &sha256, source.as_deref(), home.as_deref());
-    registry
-        .trust
-        .ensure(bin, &sha256, || ask_user(app, dialog))
-        .await
+    ensure_trusted_with(
+        &registry.trust,
+        bin,
+        index_dir.as_deref(),
+        &beside_dir,
+        app_data.as_deref(),
+        home.as_deref(),
+        |dialog| ask_user(app, dialog),
+    )
+    .await
 }
 
 async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<Arc<RunningSidecar>, String> {
@@ -671,6 +704,110 @@ mod tests {
         assert!(reject_reason(&request("devtool-svc-service-list-automation", SERVICE_PROTOCOL)).is_none());
         assert!(!ALLOWED_SERVICES.contains(&"devtool-svc-service-list-automation"));
         assert!(is_valid_service_name("devtool-svc-redis"));
+    }
+
+    // ── ensure_trusted_with: the consent decision, end to end, without an app ──
+
+    fn fake_installed_sidecar(bin: &str, contents: &[u8]) -> (std::path::PathBuf, std::path::PathBuf) {
+        let root = temp_dir("trust");
+        let bin_path = root.join(bin);
+        std::fs::write(&bin_path, contents).unwrap();
+        let extensions = root.join("extensions");
+        std::fs::create_dir_all(&extensions).unwrap();
+        write_fake_service_index(&extensions, bin, &bin_path);
+        (root, extensions)
+    }
+
+    fn memory_trust() -> crate::service_trust::ServiceTrust {
+        crate::service_trust::ServiceTrust::new(Box::new(crate::service_trust::MemoryBackend::default()))
+    }
+
+    #[tokio::test]
+    async fn sidecar_dong_goi_san_khong_bao_gio_hoi() {
+        let trust = memory_trust();
+        // Not even a file is needed: a bundled name never reaches the question.
+        let nowhere = std::path::Path::new("/nonexistent");
+        let r = ensure_trusted_with(&trust, "devtool-svc-echo", None, nowhere, None, None, |_| async {
+            panic!("must not ask for a bundled sidecar")
+        })
+        .await;
+        assert!(r.is_ok());
+    }
+
+    #[tokio::test]
+    async fn sidecar_cai_them_hoi_mot_lan_voi_hop_thoai_du_thong_tin() {
+        let bin = "devtool-svc-trusttest";
+        let (root, extensions) = fake_installed_sidecar(bin, b"binary v1");
+        let trust = memory_trust();
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+
+        for _ in 0..2 {
+            let seen = seen.clone();
+            ensure_trusted_with(&trust, bin, Some(&extensions), &root, None, None, move |d| async move {
+                seen.lock().unwrap().push(d);
+                true
+            })
+            .await
+            .unwrap();
+        }
+        let dialogs = seen.lock().unwrap();
+        assert_eq!(dialogs.len(), 1, "allowed once, then remembered");
+        assert_eq!(dialogs[0].title, "Allow “trusttest” to run?");
+        let sha = crate::artifact_installer::sha256_hex(b"binary v1");
+        assert!(dialogs[0].message.contains(&sha[..12]), "{}", dialogs[0].message);
+        assert!(dialogs[0].message.contains("Source:"), "the install source comes from the index");
+    }
+
+    #[tokio::test]
+    async fn tu_choi_thi_khong_chay_va_doi_file_thi_hoi_lai() {
+        let bin = "devtool-svc-trusttest2";
+        let (root, extensions) = fake_installed_sidecar(bin, b"v1");
+        let trust = memory_trust();
+        let denied = ensure_trusted_with(&trust, bin, Some(&extensions), &root, None, None, |_| async { false }).await;
+        assert!(denied.unwrap_err().contains("từ chối"));
+
+        ensure_trusted_with(&trust, bin, Some(&extensions), &root, None, None, |_| async { true }).await.unwrap();
+        // Same name, new bytes: the earlier answer does not carry over.
+        std::fs::write(root.join(bin), b"v2").unwrap();
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let a = asked.clone();
+        ensure_trusted_with(&trust, bin, Some(&extensions), &root, None, None, move |_| async move {
+            a.store(true, std::sync::atomic::Ordering::SeqCst);
+            true
+        })
+        .await
+        .unwrap();
+        assert!(asked.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn khong_tim_thay_sidecar_thi_bao_loi_khong_hoi() {
+        let trust = memory_trust();
+        let empty = temp_dir("trust-missing");
+        let r = ensure_trusted_with(&trust, "devtool-svc-khong-co", None, &empty, None, None, |_| async {
+            panic!("nothing to ask about")
+        })
+        .await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn hop_thoai_theo_ngon_ngu_trong_app() {
+        let bin = "devtool-svc-trusttest3";
+        let (root, extensions) = fake_installed_sidecar(bin, b"x");
+        std::fs::write(root.join("app-settings.json"), r#"{"devtool-locale":"vi"}"#).unwrap();
+        let trust = memory_trust();
+        let title = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+        let t = title.clone();
+        ensure_trusted_with(&trust, bin, Some(&extensions), &root, Some(&root), None, move |d| async move {
+            *t.lock().unwrap() = d.title;
+            true
+        })
+        .await
+        .unwrap();
+        assert_eq!(*title.lock().unwrap(), "Cho phép “trusttest3” chạy?");
+        assert_eq!(ui_locale_at(None), crate::service_trust::Locale::En);
+        assert_eq!(ui_locale_at(Some(&temp_dir("no-settings"))), crate::service_trust::Locale::En);
     }
 
     #[test]

@@ -755,10 +755,6 @@ pub fn installed_service_source_url_at(index_dir: &Path, bin: &str) -> Option<St
     })
 }
 
-pub fn installed_service_source_url(app: &AppHandle, bin: &str) -> Option<String> {
-    installed_service_source_url_at(&extensions_dir(app).ok()?, bin)
-}
-
 // ---------------------------------------------------------------------------
 // current_target_triple — TÍNH Ở RUST, không nhận từ client/manifest
 // ---------------------------------------------------------------------------
@@ -990,6 +986,27 @@ mod tests {
     /// Không dùng dữ liệu bịa: đi qua đúng `InstalledPluginRecord` +
     /// `serde_json::to_string_pretty`, đúng những gì `write_index` bản cũ đã
     /// làm.
+    #[test]
+    fn nguon_cai_dat_cua_sidecar_doc_tu_index() {
+        let dir = temp_dir("source-url");
+        assert_eq!(installed_service_source_url_at(&dir, "devtool-svc-x"), None, "no index yet");
+        let record = InstalledArtifactRecord::Service(InstalledServiceRecord {
+            manifest: RemoteServiceManifest {
+                bin: "devtool-svc-x".into(),
+                version: "1.0.0".into(),
+                protocol: 1,
+                targets: HashMap::new(),
+            },
+            source_url: "https://example.com/svc.json".into(),
+            bin_path: dir.join("x").to_string_lossy().into_owned(),
+            installed_at: 0,
+            market_id: None,
+        });
+        write_index(&dir, &[record]).unwrap();
+        assert_eq!(installed_service_source_url_at(&dir, "devtool-svc-x").as_deref(), Some("https://example.com/svc.json"));
+        assert_eq!(installed_service_source_url_at(&dir, "devtool-svc-y"), None);
+    }
+
     #[test]
     fn doc_index_json_cu_khong_co_kind_tu_dong_thanh_toan_bo_plugin() {
         let old_record = InstalledPluginRecord {

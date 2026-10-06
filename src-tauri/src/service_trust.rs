@@ -66,6 +66,22 @@ impl TrustBackend for KeyringBackend {
     }
 }
 
+/// In-memory backend for tests elsewhere in the crate (the real one is the keychain).
+#[cfg(test)]
+#[derive(Default)]
+pub(crate) struct MemoryBackend(Mutex<Vec<TrustEntry>>);
+
+#[cfg(test)]
+impl TrustBackend for MemoryBackend {
+    fn load(&self) -> Result<Vec<TrustEntry>, String> {
+        Ok(self.0.lock().unwrap().clone())
+    }
+    fn save(&self, entries: &[TrustEntry]) -> Result<(), String> {
+        *self.0.lock().unwrap() = entries.to_vec();
+        Ok(())
+    }
+}
+
 pub struct ServiceTrust {
     backend: Box<dyn TrustBackend>,
     /// `None` cho tới lần đọc đầu tiên. Luôn là nguồn sự thật trong phiên, kể cả
