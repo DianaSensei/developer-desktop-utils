@@ -146,6 +146,29 @@ shasum -a 256 bundle.mjs
 # hoặc: python3 -c "import hashlib; print(hashlib.sha256(open('bundle.mjs','rb').read()).hexdigest())"
 ```
 
+### UI: dùng bộ component của app chủ — `__DEVTOOL_VENDOR__.ui` (SDK ≥ 1.1.0)
+
+Đừng tự chép Button/Input/Select vào bundle. Từ SDK 1.1.0, app chủ gắn sẵn toàn bộ
+design system lên `window.__DEVTOOL_VENDOR__.ui` **trước khi** thân bundle của bạn chạy
+(nạp lười trong `installer.ts`'s `ensureVendorUi()`), nên đọc nó đồng bộ ở top-level là an
+toàn:
+
+```tsx
+const { Button, Input, Segmented, EmptyState, ToolToolbar, ToolPanes, ToolPane, PaneHeader,
+  CopyButton, useQuickPaste, useInputHistory, useLocale, ToolHeaderActions, cn } =
+  window.__DEVTOOL_VENDOR__.ui!;
+```
+
+`ui` = mọi export của `@/design-system` + `useQuickPaste`/`quickPasteHint`,
+`useInputHistory`, `useImagePaste`, `useLocale`, `useMessages` + `defineMessages` (song ngữ
+VI/EN cho chữ của chính plugin — cùng cách các tool có sẵn làm), `ToolHeaderActions` (danh sách đầy đủ:
+`src/platform/vendorUi.ts`). Khai `sdk: '^1.1.0'` trong manifest — app chủ cũ hơn sẽ từ chối
+cài thay vì để plugin vỡ lúc chạy vì `ui` là `undefined`.
+
+Lợi ích ngoài việc nhẹ bundle: class Tailwind của các component này **luôn có rule** (chính
+app chủ dùng chúng), nên phần lớn rắc rối ở mục CSS dưới đây không còn áp dụng cho UI dựng
+bằng `ui.*`. Chỉ class bạn tự viết thêm mới cần tuân theo mục đó.
+
 ### CSS: bundle plugin KHÔNG mang stylesheet của riêng nó
 
 Bundle plugin chỉ là **JavaScript** — không có file CSS nào đi kèm, và toàn

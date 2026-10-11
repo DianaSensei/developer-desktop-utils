@@ -1,8 +1,18 @@
 import { useEffect, useRef } from 'react';
 import { isTauri, IS_MAC as isMac } from '@/lib/platform';
 
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+
 export { isMac };
+/** Bản tiếng Anh cố định — giữ cho chỗ nằm ngoài React. Trong component dùng `useQuickPasteHint()`. */
 export const quickPasteHint = isMac ? 'Press ⌘V to paste' : 'Press Ctrl+V to paste';
+
+/** Gợi ý "⌘V để dán" theo ngôn ngữ đang chọn. */
+export function useQuickPasteHint(): string {
+  const m = useMessages(COMMON);
+  return m(isMac ? 'quickPasteMac' : 'quickPasteOther');
+}
 
 async function readClipboard(): Promise<string> {
   if (isTauri) {

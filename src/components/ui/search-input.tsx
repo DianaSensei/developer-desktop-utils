@@ -5,9 +5,11 @@
 // again.
 
 import * as React from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input, type InputProps } from '@/components/ui/input';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export interface SearchInputProps extends Omit<InputProps, 'onChange' | 'value' | 'type'> {
   value: string;
@@ -15,12 +17,17 @@ export interface SearchInputProps extends Omit<InputProps, 'onChange' | 'value' 
   /** Shows a × button to clear the value when non-empty. Default true. */
   clearable?: boolean;
   containerClassName?: string;
+  /** Icon đầu ô — mặc định kính lúp; đổi khi ô nhập không phải "tìm" (VD: ô nhập domain). */
+  icon?: LucideIcon;
 }
 
 export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ value, onChange, clearable = true, placeholder = 'Search', className, containerClassName, ...props }, ref) => (
+  ({ value, onChange, clearable = true, placeholder, className, containerClassName, icon: Icon = Search, ...props }, ref) => {
+    const ui = useMessages(UI);
+    placeholder ??= ui('search');
+    return (
     <div className={cn('relative', containerClassName)}>
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-mute/60" />
+      <Icon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-mute/60" />
       <Input
         ref={ref}
         type="text"
@@ -40,14 +47,15 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         <button
           type="button"
           onClick={() => onChange('')}
-          aria-label="Clear search"
-          title="Clear"
+          aria-label={ui('clearSearch')}
+          title={ui('clear')}
           className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
         >
           <X className="h-3.5 w-3.5" />
         </button>
       )}
     </div>
-  ),
+    );
+  },
 );
 SearchInput.displayName = 'SearchInput';

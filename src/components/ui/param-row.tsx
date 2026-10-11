@@ -18,6 +18,8 @@ import * as React from 'react';
 import { HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export interface ParamRowProps {
   label: React.ReactNode;
@@ -43,10 +45,11 @@ export function ParamRow({
   children,
   className,
 }: ParamRowProps) {
+  const ui = useMessages(UI);
   return (
     <div className={cn('border-b border-line-soft py-2.5 last:border-b-0', className)}>
       <div className="flex items-baseline gap-3">
-        <span className="flex min-w-0 items-center gap-1 text-[13px] font-medium">
+        <span className="flex min-w-0 items-center gap-1 text-dense font-medium">
           <span className="truncate">{label}</span>
           {help && (
             // Icon chứ không phải chữ "?" trong vòng tròn: một glyph cỡ 9–10px
@@ -55,7 +58,7 @@ export function ParamRow({
               <span
                 tabIndex={0}
                 role="button"
-                aria-label="Giải thích thêm"
+                aria-label={ui('moreInfo')}
                 className={cn(
                   'shrink-0 cursor-help text-fg-mute/70',
                   'transition-colors hover:text-fg-mute',
@@ -81,12 +84,12 @@ export function ParamRow({
               {tag}
             </span>
           )}
-          <span className="font-mono text-[13px] font-semibold tabular-nums">{value}</span>
+          <span className="font-mono text-dense font-semibold tabular-nums">{value}</span>
         </span>
       </div>
 
       {children && (
-        <p className="mt-0.5 pr-1 text-[12.5px] leading-snug text-fg-mute">
+        <p className="mt-0.5 pr-1 text-xs leading-snug text-fg-mute">
           {children}
         </p>
       )}

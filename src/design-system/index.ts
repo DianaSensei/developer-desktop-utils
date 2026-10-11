@@ -29,6 +29,7 @@ export {
 export { ModalShell, type ModalShellProps } from '@/components/ui/modal-shell';
 export { Tooltip, type TooltipProps } from '@/components/ui/tooltip';
 export { Segmented, type SegmentedProps, type SegmentedOption } from '@/components/ui/segmented';
+export { ToggleChip, type ToggleChipProps } from '@/components/ui/toggle-chip';
 export { CopyButton, type CopyButtonProps } from '@/components/ui/copy-button';
 export { EmptyState } from '@/components/ui/empty-state';
 export { DropZone, type DropZoneProps } from '@/components/ui/drop-zone';

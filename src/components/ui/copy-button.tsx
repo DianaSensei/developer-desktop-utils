@@ -4,6 +4,8 @@ import { Button, type ButtonProps } from '@/components/ui/button';
 import { copyToClipboard } from '@/lib/clipboard';
 import { useAppConfig } from '@/contexts/AppConfigContext';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export interface CopyButtonProps extends Omit<ButtonProps, 'onClick' | 'children' | 'value'> {
   /** Text to copy, or a (possibly async) getter resolved at click time. */
@@ -41,7 +43,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
       value,
       copyAction,
       label,
-      copiedLabel = 'Copied',
+      copiedLabel,
       iconClassName = 'h-3.5 w-3.5',
       icon: Icon = Copy,
       onCopied,
@@ -54,6 +56,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
     },
     ref
   ) => {
+    const ui = useMessages(UI);
     const { config } = useAppConfig();
     const [copied, setCopied] = React.useState(false);
     const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,8 +89,8 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
         size={size}
         disabled={disabled}
         onClick={handleCopy}
-        title={title ?? (copied ? 'Copied' : 'Copy')}
-        aria-label={typeof label === 'string' ? label : 'Copy'}
+        title={title ?? (copied ? ui('copied') : ui('copy'))}
+        aria-label={typeof label === 'string' ? label : ui('copy')}
         className={className}
         {...props}
       >
@@ -126,7 +129,7 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
           />
         </span>
         {label != null && (
-          <span className="ml-1.5 whitespace-nowrap">{copied ? copiedLabel : label}</span>
+          <span className="ml-1.5 whitespace-nowrap">{copied ? (copiedLabel ?? ui('copied')) : label}</span>
         )}
       </Button>
     );

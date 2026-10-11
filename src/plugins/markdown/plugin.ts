@@ -11,7 +11,7 @@ export default definePlugin({
   route: '/markdown',
   order: 230,
   defaultEnabled: false,
-  permissions: ['storage', 'clipboard:read', 'clipboard:write'],
+  permissions: ['storage', 'clipboard:read', 'clipboard:write', 'open-url'],
   sdk: '^1.0.0',
   load: () => import('@/components/tools/MarkdownPreview').then((m) => m.MarkdownPreview),
 });

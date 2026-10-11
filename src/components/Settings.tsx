@@ -626,7 +626,7 @@ export function Settings() {
               <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-fg-mute">
                 {t('settings.monoFont.previewLabel')}
               </span>
-              <code className="min-w-0 truncate font-mono text-[13px] text-fg">
+              <code className="min-w-0 truncate font-mono text-dense text-fg">
                 {'const ok = (a !== b) && (a >= b) ? a => a * 2 : null;'}
               </code>
             </div>

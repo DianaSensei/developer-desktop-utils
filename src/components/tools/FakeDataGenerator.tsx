@@ -12,6 +12,9 @@ import { saveTextFile } from '@/lib/fileio';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Plus, X, Download, RefreshCw } from 'lucide-react';
 import { generateRows, serializeRows, ROW_FORMATS, DATE_FORMATS, FAKER_TYPE_GROUPS, type FieldDef, type FakerType, type RowFormat, type DateFormat } from '@/lib/faker';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/Generator.messages';
+import COMMON from '@/components/tools/common.messages';
 
 const DEFAULT_FIELDS: FieldDef[] = [
   { id: 'f1', name: 'id', type: 'uuid' },
@@ -23,6 +26,8 @@ const DEFAULT_FIELDS: FieldDef[] = [
 const newId = () => `f${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 
 export function FakeDataGenerator() {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
   const sdk = usePluginSdkFor('generator');
   const [fields, setFields] = usePluginState<FieldDef[]>(sdk, 'fakeData:fields', DEFAULT_FIELDS, { legacyKey: 'devtool:fakeData:fields' });
   const [count, setCount] = usePluginState(sdk, 'fakeData:count', 10, { legacyKey: 'devtool:fakeData:count' });
@@ -65,7 +70,7 @@ export function FakeDataGenerator() {
       {/* Toolbar */}
       <div className="shrink-0 header-chrome px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-fg-mute">Rows</span>
+          <span className="text-xs text-fg-mute">{m('rows')}</span>
           <Input
             type="number"
             min={1}
@@ -76,7 +81,7 @@ export function FakeDataGenerator() {
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-fg-mute">Seed</span>
+          <span className="text-xs text-fg-mute">{m('seed')}</span>
           <Input
             type="number"
             value={seed}
@@ -87,7 +92,8 @@ export function FakeDataGenerator() {
             variant="ghost"
             size="icon"
             onClick={() => setSeed(Math.floor(Math.random() * 1e9))}
-            title="New random seed"
+            title={m('newSeed')}
+            aria-label={m('newSeed')}
             className="h-ctl w-ctl rounded-sm text-fg-mute hover:text-fg"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -95,7 +101,7 @@ export function FakeDataGenerator() {
         </div>
         <div className="h-4 w-px bg-line" />
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-fg-mute">Format</span>
+          <span className="text-xs text-fg-mute">{m('format')}</span>
           <Select value={format} onValueChange={(v) => setFormat(v as RowFormat)}>
             <SelectTrigger className="h-ctl w-28 text-xs rounded-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -105,7 +111,7 @@ export function FakeDataGenerator() {
         </div>
         {format === 'sql' && (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-fg-mute">Table</span>
+            <span className="text-xs text-fg-mute">{m('table')}</span>
             <Input
               value={table}
               onChange={(e) => setTable(e.target.value)}
@@ -116,7 +122,7 @@ export function FakeDataGenerator() {
         )}
         {format === 'properties' && (
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-fg-mute">Prefix</span>
+            <span className="text-xs text-fg-mute">{m('prefix')}</span>
             <Input
               value={prefix}
               onChange={(e) => setPrefix(e.target.value)}
@@ -132,9 +138,9 @@ export function FakeDataGenerator() {
         {/* Schema builder */}
         <div className="flex w-[360px] shrink-0 flex-col min-h-0">
           <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
-            <span>Fields</span>
+            <span>{m('fields')}</span>
             <Button variant="ghost" size="sm" onClick={addField} className="h-6 gap-1 px-1.5 text-xs">
-              <Plus className="h-3.5 w-3.5" /> Add
+              <Plus className="h-3.5 w-3.5" /> {m('add')}
             </Button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 space-y-2">
@@ -144,12 +150,13 @@ export function FakeDataGenerator() {
                   <Input
                     value={f.name}
                     onChange={(e) => updateField(f.id, { name: e.target.value })}
-                    placeholder="field name"
+                    placeholder={m('fieldName')}
                     className="h-ctl flex-1 text-xs font-mono rounded-sm"
                   />
                   <button
                     onClick={() => removeField(f.id)}
-                    title="Remove field"
+                    title={m('removeField')}
+                    aria-label={m('removeField')}
                     className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:bg-bad/10 hover:text-bad"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -161,8 +168,8 @@ export function FakeDataGenerator() {
                     <SelectContent>
                       {FAKER_TYPE_GROUPS.map((g) => (
                         <SelectGroup key={g.group}>
-                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute/70">{g.group}</SelectLabel>
-                          {g.types.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                          <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute/70">{m(`group.${g.group}` as 'group.Misc')}</SelectLabel>
+                          {g.types.map((t) => <SelectItem key={t.value} value={t.value}>{m(`type.${t.value}` as 'type.uuid')}</SelectItem>)}
                         </SelectGroup>
                       ))}
                     </SelectContent>
@@ -184,7 +191,7 @@ export function FakeDataGenerator() {
                       {DATE_FORMATS.map((d) => (
                         <SelectItem key={d.value} value={d.value}>
                           <span className="flex items-baseline gap-2">
-                            {d.label}
+                            {m(`date.${d.value}` as 'date.iso')}
                             <span className="font-mono text-[11px] text-fg-mute">{d.example}</span>
                           </span>
                         </SelectItem>
@@ -196,14 +203,14 @@ export function FakeDataGenerator() {
                   <Input
                     value={f.values ?? ''}
                     onChange={(e) => updateField(f.id, { values: e.target.value })}
-                    placeholder="comma,separated,values"
+                    placeholder={m('enumPlaceholder')}
                     className="h-ctl text-xs font-mono rounded-sm"
                   />
                 )}
               </div>
             ))}
             {fields.length === 0 && (
-              <p className="px-1 py-6 text-center text-xs text-fg-mute">No fields — add one to start.</p>
+              <p className="px-1 py-6 text-center text-xs text-fg-mute">{m('noFields')}</p>
             )}
           </div>
         </div>
@@ -211,9 +218,9 @@ export function FakeDataGenerator() {
         {/* Output */}
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
-            <span>{safeCount.toLocaleString()} row{safeCount !== 1 ? 's' : ''}</span>
+            <span>{m(safeCount === 1 ? 'rowCountOne' : 'rowCount', { n: safeCount.toLocaleString() })}</span>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={handleDownload} disabled={!output} title="Download" className="h-6 w-6 rounded text-fg-mute hover:text-fg">
+              <Button variant="ghost" size="icon" onClick={handleDownload} disabled={!output} title={c('download')} aria-label={c('download')} className="h-6 w-6 rounded text-fg-mute hover:text-fg">
                 <Download className="h-3.5 w-3.5" />
               </Button>
               <CopyButton value={() => output} iconClassName="h-3.5 w-3.5" disabled={!output} />

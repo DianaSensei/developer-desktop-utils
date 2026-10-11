@@ -2,6 +2,8 @@ import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
@@ -84,13 +86,19 @@ const DialogContent = React.forwardRef<
       {!hideClose && (
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-fg-mute opacity-70 transition-opacity hover:opacity-100 hover:bg-bg-2 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus disabled:pointer-events-none">
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only"><CloseText /></span>
         </DialogPrimitive.Close>
       )}
     </DialogPrimitive.Content>
   </DialogPortal>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
+
+/** Chữ "Đóng" cho trình đọc màn hình — component riêng vì DialogContent là
+ *  forwardRef thân biểu thức, không gọi hook trực tiếp được. */
+function CloseText() {
+  return <>{useMessages(UI)('close')}</>;
+}
 
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('flex flex-col space-y-1.5 text-left', className)} {...props} />;

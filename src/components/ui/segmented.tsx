@@ -131,7 +131,7 @@ export function Segmented<T extends string>({
             // rounded-md: the app's one semantic shape for "this is
             // selected" (design/RULES.md's "Bo góc cho 'đang chọn'" rule) —
             // matches Tabs' active pill, App-shell's selected nav row, etc.
-            'pointer-events-none absolute inset-y-0.5 left-0 rounded-md bg-acc shadow-soft',
+            'pointer-events-none absolute inset-y-0.5 left-0 rounded-md bg-acc shadow-btn',
             ready.current && 'motion-safe:transition-transform motion-safe:duration-base motion-safe:ease-spring',
           )}
           style={{ width: thumb.w, transform: `translateX(${thumb.x}px)` }}

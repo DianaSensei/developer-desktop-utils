@@ -10,13 +10,16 @@ import { Copy, Download, Check, Upload, X, QrCode as QrCodeIcon, ScanLine, Exter
 import { Spinner } from '@/components/ui/spinner';
 import QRCode from 'qrcode';
 import { type PluginSdk, usePluginConfig, usePluginSdkFor, usePluginState } from '@/platform';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useTauriFileDrop } from '@/hooks/useTauriFileDrop';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { copyImageToClipboard } from '@/lib/clipboard';
 import { cn } from '@/lib/utils';
 import { isTauri } from '@/lib/platform';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/QRCodeTool.messages';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 
 type FrameStyle = 'none' | 'border' | 'scan-bottom' | 'scan-top';
 type LogoPreset = 'none' | 'scan-me' | '📱' | '🔗' | '📶' | 'custom';
@@ -316,6 +319,8 @@ const LOGO_PRESETS: Array<{ value: LogoPreset; display: string }> = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 function QrGenerator() {
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const sdk = usePluginSdkFor('qrcode');
   const config = usePluginConfig();
   const [text,        setText]        = usePluginState(sdk, 'qrcode:text',        '', { legacyKey: 'devtool:qrcode:text' });
@@ -348,7 +353,7 @@ function QrGenerator() {
         setDataUrl(c.toDataURL('image/png'));
         setError('');
       })
-      .catch(() => { if (!cancelled) { setError('Failed to generate QR code'); setDataUrl(''); } });
+      .catch(() => { if (!cancelled) { setError(m('generateFailed')); setDataUrl(''); } });
     return () => { cancelled = true; };
   }, [text, darkColor, lightColor, transparent, frame, logo, customImageUrl]);
 
@@ -360,7 +365,7 @@ function QrGenerator() {
       setCustomImageUrl(result.dataUrl);
       setLogo('custom');
       setError('');
-    } catch { setError('Failed to load image'); }
+    } catch { setError(m('loadImageFailed')); }
   };
 
   const clearCustomImage = () => {
@@ -380,7 +385,7 @@ function QrGenerator() {
       setCopied(true);
       if (copyTimer.current) clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopied(false), config.editor.copyFeedbackMs);
-    } catch { setError('Image clipboard not supported — use Download instead'); }
+    } catch { setError(m('imageClipboardUnsupported')); }
   };
 
   const chip = (active: boolean) =>
@@ -395,7 +400,7 @@ function QrGenerator() {
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={`Enter text or URL — ${quickPasteHint}`}
+            placeholder={m('inputPlaceholder', { hint: quickPasteHint })}
             className="h-ctl-lg"
           />
         </div>
@@ -403,12 +408,12 @@ function QrGenerator() {
         <div className="rounded-lg border divide-y text-sm">
           {/* Frame */}
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">Frame</span>
+            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">{m('frame')}</span>
             <div className="flex gap-1.5 flex-wrap">
               {FRAME_OPTIONS.map((f) => (
-                <button key={f.value} onClick={() => setFrame(f.value)}
+                <button key={f.value} type="button" onClick={() => setFrame(f.value)} aria-pressed={frame === f.value}
                   className={cn(chip(frame === f.value), 'px-2.5 py-1')}>
-                  {f.label}
+                  {m(`frame.${f.value}` as 'frame.none')}
                 </button>
               ))}
             </div>
@@ -416,10 +421,10 @@ function QrGenerator() {
 
           {/* Logo */}
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">Logo</span>
+            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">{m('logo')}</span>
             <div className="flex gap-1.5 flex-wrap items-center">
               {LOGO_PRESETS.map((l) => (
-                <button key={l.value}
+                <button key={l.value} type="button" aria-pressed={logo === l.value}
                   onClick={() => { setLogo(l.value); if (l.value !== 'custom') { customImageRef.current = null; setCustomImageUrl(''); } }}
                   className={cn(chip(logo === l.value), 'px-2 py-1 leading-tight')}
                   style={{ minWidth: 38 }}>
@@ -436,16 +441,16 @@ function QrGenerator() {
                     <button
                       type="button"
                       onClick={clearCustomImage}
-                      aria-label="Remove custom logo"
-                      title="Remove custom logo"
+                      aria-label={m('removeLogo')}
+                      title={m('removeLogo')}
                       className="rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </div>
-                : <button onClick={handleUpload} className={cn(chip(false), 'flex items-center gap-1 px-2 py-1')}>
+                : <button type="button" onClick={handleUpload} className={cn(chip(false), 'flex items-center gap-1 px-2 py-1')}>
                     <Upload className="h-3 w-3" />
-                    Upload
+                    {m('upload')}
                   </button>
               }
             </div>
@@ -453,10 +458,10 @@ function QrGenerator() {
 
           {/* Color */}
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">Color</span>
+            <span className="w-12 shrink-0 text-xs text-fg-mute font-medium">{m('color')}</span>
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <ColorPicker value={darkColor} onChange={setDarkColor} title="QR foreground color" />
+                <ColorPicker value={darkColor} onChange={setDarkColor} title={m('foreground')} />
                 <span className="text-xs text-fg-mute font-mono">{darkColor.toUpperCase()} FG</span>
               </div>
               <div className={cn('flex items-center gap-1.5', transparent && 'opacity-40')}>
@@ -464,15 +469,15 @@ function QrGenerator() {
                   value={lightColor}
                   disabled={transparent}
                   onChange={(c) => { setLightColor(c); setTransparent(false); }}
-                  title="Background color"
+                  title={m('background')}
                 />
                 <span className="text-xs text-fg-mute font-mono">
-                  {transparent ? 'Transparent' : `${lightColor.toUpperCase()} BG`}
+                  {transparent ? m('transparent') : `${lightColor.toUpperCase()} BG`}
                 </span>
               </div>
-              <button onClick={() => setTransparent((v) => !v)} className={cn(chip(transparent), 'px-2 py-1')}>
-                Transparent BG
-              </button>
+              <ToggleChip pressed={transparent} onPressedChange={setTransparent}>
+                {m('transparentBg')}
+              </ToggleChip>
             </div>
           </div>
         </div>
@@ -482,16 +487,16 @@ function QrGenerator() {
         {dataUrl && (
           <div className="space-y-3">
             <div className="flex justify-center p-6 rounded-lg border bg-bg shadow-sm">
-              <img src={dataUrl} alt="QR Code" className="max-w-full w-[280px]" />
+              <img src={dataUrl} alt={m('qrAlt')} className="max-w-full w-[280px]" />
             </div>
             <div className="flex gap-2">
               <Button onClick={copyImage} className="flex-1">
                 {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                {copied ? 'Copied!' : 'Copy Image'}
+                {copied ? m('copied') : m('copyImage')}
               </Button>
               <Button onClick={() => canvasRef.current && downloadPng(sdk, canvasRef.current)} variant="outline" className="flex-1">
                 <Download className="h-4 w-4 mr-2" />
-                Download PNG
+                {m('downloadPng')}
               </Button>
             </div>
           </div>
@@ -517,6 +522,8 @@ async function decodeQrFromImage(img: HTMLImageElement): Promise<string | null> 
 }
 
 function QrReader() {
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const sdk = usePluginSdkFor('qrcode');
   const [imageUrl, setImageUrl] = useState('');
   const [result, setResult] = useState('');
@@ -533,10 +540,10 @@ function QrReader() {
       const text = await decodeQrFromImage(img);
       if (id !== runId.current) return;
       if (text) setResult(text);
-      else setError('No QR code found in this image.');
+      else setError(m('noQrFound'));
     } catch {
       if (id !== runId.current) return;
-      setError('Could not read the image.');
+      setError(m('readImageFailed'));
     } finally {
       if (id === runId.current) setLoading(false);
     }
@@ -548,7 +555,7 @@ function QrReader() {
       if (!r) return;
       await run(r.img, r.dataUrl);
     } catch {
-      setError('Failed to load image.');
+      setError(m('loadImageFailedDot'));
     }
   };
 
@@ -556,7 +563,7 @@ function QrReader() {
   const loadFromDataUrl = (dataUrl: string) => {
     const img = new Image();
     img.onload = () => run(img, dataUrl);
-    img.onerror = () => setError('Failed to load image.');
+    img.onerror = () => setError(m('loadImageFailedDot'));
     img.src = dataUrl;
   };
   useImagePaste(loadFromDataUrl);
@@ -566,10 +573,10 @@ function QrReader() {
   const loadFromPath = async (path: string) => {
     try {
       const file = await sdk.native.invoke<{ mime: string; dataUrl: string }>('read_file_data_url', { path });
-      if (!file.mime.startsWith('image/')) { setError('That file is not an image.'); return; }
+      if (!file.mime.startsWith('image/')) { setError(m('notAnImage')); return; }
       loadFromDataUrl(file.dataUrl);
     } catch {
-      setError('Could not read the dropped file.');
+      setError(m('dropReadFailed'));
     }
   };
   const { dropRef, dragging } = useTauriFileDrop<HTMLDivElement>((paths) => {
@@ -580,7 +587,7 @@ function QrReader() {
     const { readImageFromClipboard } = await import('@/lib/clipboard');
     const dataUrl = await readImageFromClipboard();
     if (dataUrl) loadFromDataUrl(dataUrl);
-    else setError('No image on the clipboard to read.');
+    else setError(m('noClipboardImage'));
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -592,7 +599,7 @@ function QrReader() {
       const dataUrl = reader.result as string;
       const img = new Image();
       img.onload = () => run(img, dataUrl);
-      img.onerror = () => setError('Failed to load image.');
+      img.onerror = () => setError(m('loadImageFailedDot'));
       img.src = dataUrl;
     };
     reader.readAsDataURL(file);
@@ -623,15 +630,15 @@ function QrReader() {
         {loading
           ? <Spinner size="lg" className="text-fg-mute" />
           : <Upload className="h-6 w-6 text-fg-mute" />}
-        <p className="text-sm font-medium">Click to upload or drop a QR image</p>
-        <p className="text-xs text-fg-mute">PNG, JPG, GIF, or WebP</p>
+        <p className="text-sm font-medium">{m('dropHint')}</p>
+        <p className="text-xs text-fg-mute">{m('formats')}</p>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); void pasteFromClipboard(); }}
           className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-line bg-bg px-2.5 py-1 text-xs font-medium text-fg-mute transition-colors hover:bg-bg-2/50 hover:text-fg"
         >
           <ClipboardPaste className="h-3.5 w-3.5" />
-          Paste from clipboard · {quickPasteHint}
+          {m('pasteFromClipboard', { hint: quickPasteHint })}
         </button>
       </div>
 
@@ -639,20 +646,20 @@ function QrReader() {
 
       {imageUrl && (
         <div className="flex justify-center rounded-lg border bg-bg p-6 shadow-sm">
-          <img src={imageUrl} alt="Uploaded QR" className="w-[200px] max-w-full object-contain" />
+          <img src={imageUrl} alt={m('uploadedAlt')} className="w-[200px] max-w-full object-contain" />
         </div>
       )}
 
       {result && (
         <div className="space-y-2">
-          <span className="text-xs font-medium text-fg-mute">Decoded content</span>
+          <span className="text-xs font-medium text-fg-mute">{m('decodedContent')}</span>
           <Textarea value={result} readOnly className="min-h-[80px] resize-y font-mono text-sm" />
           <div className="flex gap-2">
-            <CopyButton value={() => result} label="Copy content" variant="default" size="default" className="flex-1" iconClassName="h-4 w-4" />
+            <CopyButton value={() => result} label={m('copyContent')} variant="default" size="default" className="flex-1" iconClassName="h-4 w-4" />
             {isUrl && (
               <Button onClick={openLink} variant="outline" className="flex-1">
                 <ExternalLink className="h-4 w-4 mr-2" />
-                Open link
+                {m('openLink')}
               </Button>
             )}
           </div>
@@ -667,6 +674,7 @@ function QrReader() {
 type QrMode = 'generate' | 'read';
 
 export function QRCodeTool() {
+  const m = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('qrcode');
   const [mode, setMode] = usePluginState<QrMode>(sdk, 'qrcode:mode', 'generate', { legacyKey: 'devtool:qrcode:mode' });
 
@@ -677,10 +685,10 @@ export function QRCodeTool() {
           value={mode}
           onValueChange={setMode}
           options={[
-            { value: 'generate', label: 'Generate', icon: QrCodeIcon },
-            { value: 'read', label: 'Read', icon: ScanLine },
+            { value: 'generate', label: m('generate'), icon: QrCodeIcon },
+            { value: 'read', label: m('read'), icon: ScanLine },
           ]}
-          aria-label="QR mode"
+          aria-label={m('modeLabel')}
         />
         {mode === 'generate' ? <QrGenerator /> : <QrReader />}
       </div>

@@ -17,7 +17,7 @@ import type { ServiceDescriptor } from './service';
  */
 
 /** Version của Platform SDK. Plugin khai `sdk: '^1.0.0'` để chốt tương thích. */
-export const SDK_VERSION = '1.0.0';
+export const SDK_VERSION = '1.1.0';
 
 /**
  * Quyền một plugin phải khai báo trước khi dùng kênh tương ứng của SDK.

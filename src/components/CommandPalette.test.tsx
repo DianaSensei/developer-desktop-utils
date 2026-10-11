@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { CommandPalette } from '@/components/CommandPalette';
 import { FeatureProvider } from '@/contexts/FeatureContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 
 /**
  * ⌘K là điểm điều hướng trung tâm — hỏng lặng lẽ ở đây ảnh hưởng cả app. Test
@@ -23,7 +24,9 @@ function renderPalette() {
     <MemoryRouter>
       <LocaleProvider>
         <FeatureProvider>
-          <CommandPalette />
+          <WorkspaceProvider>
+            <CommandPalette />
+          </WorkspaceProvider>
         </FeatureProvider>
       </LocaleProvider>
     </MemoryRouter>,

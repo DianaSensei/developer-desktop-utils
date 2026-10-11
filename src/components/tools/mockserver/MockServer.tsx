@@ -24,6 +24,9 @@ import { newStub, type MockConfig, type Stub } from './types';
 import { useMcpBridge } from './mcpBridge';
 import { useMockServerRuntime } from './mcpRuntimeContext';
 import { McpSetupDialog } from '@/components/McpSetupDialog';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/mockserver/MockServer.messages';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 // Sentinel selection id for the editable "no-match" fallback response.
 const FALLBACK_ID = '__fallback__';
@@ -36,6 +39,9 @@ const badgeClass = (method: string) =>
     : methodBadgeStyle(method as HttpMethod);
 
 export function MockServer() {
+  const m = useMessages(MESSAGES);
+  // Xoá stub = mất cả matcher, response và script — hỏi lại trước.
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const mockServer = useMockServerRuntime();
   const {
     config, setConfig, updateConfig, updateStub,
@@ -136,7 +142,7 @@ export function MockServer() {
   const stubListPane = (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-line px-3 py-1.5">
-        <span className="text-xs font-medium text-fg-mute">Stubs</span>
+        <span className="text-xs font-medium text-fg-mute">{m('stubs')}</span>
         <div className="flex items-center gap-0.5">
           <CopyButton
             value={exportJson}
@@ -146,7 +152,7 @@ export function MockServer() {
             size="icon"
             className="h-ctl w-ctl"
             label=""
-            title="Copy all stubs as JSON"
+            title={m('copyAllStubs')}
           />
           <Button
             type="button"
@@ -154,12 +160,12 @@ export function MockServer() {
             size="icon"
             className="h-ctl w-ctl"
             onClick={() => { setImportText(''); setImportError(null); setImportOpen(true); }}
-            aria-label="Import stubs"
-            title="Import stubs from JSON"
+            aria-label={m('importStubs')}
+            title={m('importStubsJson')}
           >
             <Upload className="h-3.5 w-3.5" />
           </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-ctl w-ctl" onClick={addStub} aria-label="Add stub" title="Add stub">
+          <Button type="button" variant="ghost" size="icon" className="h-ctl w-ctl" onClick={addStub} aria-label={m('addStub')} title={m('addStub')}>
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -187,16 +193,16 @@ export function MockServer() {
               <div className="truncate font-mono text-[11px] text-fg-mute">{s.path}</div>
             </div>
             <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
-              <IconBtn label="Move up" title="Move up" disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveStub(s.id, -1); }}>
+              <IconBtn label={m('moveUp')} title={m('moveUp')} disabled={i === 0} onClick={(e) => { e.stopPropagation(); moveStub(s.id, -1); }}>
                 <ChevronUp className="h-3.5 w-3.5" />
               </IconBtn>
-              <IconBtn label="Move down" title="Move down" disabled={i === config.stubs.length - 1} onClick={(e) => { e.stopPropagation(); moveStub(s.id, 1); }}>
+              <IconBtn label={m('moveDown')} title={m('moveDown')} disabled={i === config.stubs.length - 1} onClick={(e) => { e.stopPropagation(); moveStub(s.id, 1); }}>
                 <ChevronDown className="h-3.5 w-3.5" />
               </IconBtn>
-              <IconBtn label="Duplicate stub" title="Duplicate" onClick={(e) => { e.stopPropagation(); duplicateStub(s); }}>
+              <IconBtn label={m('duplicateStub')} title={m('duplicate')} onClick={(e) => { e.stopPropagation(); duplicateStub(s); }}>
                 <CopyIcon className="h-3.5 w-3.5" />
               </IconBtn>
-              <IconBtn label="Delete stub" title="Delete" danger onClick={(e) => { e.stopPropagation(); deleteStub(s.id); }}>
+              <IconBtn label={m('deleteStub')} title={m('delete')} danger onClick={(e) => { e.stopPropagation(); setPendingDelete(s); }}>
                 <Trash2 className="h-3.5 w-3.5" />
               </IconBtn>
             </div>
@@ -226,7 +232,7 @@ export function MockServer() {
           <Ban className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium">No-match response</div>
+          <div className="truncate text-xs font-medium">{m('noMatchResponse')}</div>
           <div className="truncate font-mono text-[11px] text-fg-mute">default · {config.notFoundStatus}</div>
         </div>
       </button>
@@ -239,7 +245,7 @@ export function MockServer() {
     ) : selected ? (
       <StubEditor key={selected.id} stub={selected} onChange={(patch) => updateStub(selected.id, patch)} testScript={testScript} />
     ) : (
-      <div className="flex h-full w-full flex-1 items-center justify-center text-sm text-fg-mute">Select or add a stub.</div>
+      <div className="flex h-full w-full flex-1 items-center justify-center text-sm text-fg-mute">{m('selectOrAdd')}</div>
     );
 
   return (
@@ -248,7 +254,7 @@ export function MockServer() {
       <ToolToolbar className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5">
           <StatusDot tone={status.running ? 'live' : 'idle'} size="md" glow={status.running} />
-          <span className="text-xs font-medium">{status.running ? 'Running' : 'Stopped'}</span>
+          <span className="text-xs font-medium">{status.running ? m('running') : m('stopped')}</span>
         </div>
 
         <Select value={config.host} onValueChange={(v) => setConfig((p) => ({ ...p, host: v }))} disabled={status.running}>
@@ -256,8 +262,8 @@ export function MockServer() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="127.0.0.1" className="text-xs">Local (localhost · IPv4+IPv6)</SelectItem>
-            <SelectItem value="0.0.0.0" className="text-xs">0.0.0.0 (LAN)</SelectItem>
+            <SelectItem value="127.0.0.1" className="text-xs">{m('hostLocal')}</SelectItem>
+            <SelectItem value="0.0.0.0" className="text-xs">{m('hostLan')}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -267,18 +273,18 @@ export function MockServer() {
           onChange={(e) => setConfig((p) => ({ ...p, port: Math.max(0, Number(e.target.value) || 0) }))}
           disabled={status.running}
           className="h-ctl w-24 text-xs"
-          aria-label="Port"
+          aria-label={m('port')}
         />
 
         {status.running ? (
           <Button type="button" variant="destructive" size="sm" className="h-ctl text-xs" onClick={() => { void stop().catch(() => {}); }} disabled={busy}>
             <Square className="mr-1 h-3.5 w-3.5" />
-            Stop
+            {m('stop')}
           </Button>
         ) : (
           <Button type="button" size="sm" className="h-ctl text-xs" onClick={() => { void start().catch(() => {}); }} disabled={busy || !isTauri}>
             <Play className="mr-1 h-3.5 w-3.5" />
-            Start
+            {m('start')}
           </Button>
         )}
 
@@ -290,12 +296,12 @@ export function MockServer() {
         {config.host === '0.0.0.0' && (
           <span className="flex items-center gap-1 text-[11px] text-warn">
             <AlertTriangle className="h-3.5 w-3.5" />
-            Exposed to your local network
+            {m('exposed')}
           </span>
         )}
 
         {error && <span className="text-[11px] text-bad">{error}</span>}
-        {!isTauri && <span className="text-[11px] text-fg-mute">Server runs in the desktop app only.</span>}
+        {!isTauri && <span className="text-[11px] text-fg-mute">{m('desktopOnly')}</span>}
 
         <Button
           type="button"
@@ -316,7 +322,7 @@ export function MockServer() {
           onClick={() => setLogVisible((v) => !v)}
         >
           {logVisible ? <PanelRightClose className="mr-1 h-3.5 w-3.5" /> : <PanelRightOpen className="mr-1 h-3.5 w-3.5" />}
-          {logVisible ? 'Hide log' : 'Show log'}
+          {logVisible ? m('hideLog') : m('showLog')}
         </Button>
       </ToolToolbar>
 
@@ -362,9 +368,9 @@ export function MockServer() {
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Import stubs</DialogTitle>
+            <DialogTitle>{m('importStubs')}</DialogTitle>
             <DialogDescription>
-              Paste a Mock Server config exported with the JSON button. This replaces your current stubs and settings.
+              {m('importDesc')}
             </DialogDescription>
           </DialogHeader>
           <textarea
@@ -377,16 +383,25 @@ export function MockServer() {
           {importError && <Callout tone="error" size="sm">{importError}</Callout>}
           <DialogFooter>
             <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(false)}>
-              Cancel
+              {m('cancel')}
             </Button>
             <Button type="button" size="sm" onClick={doImport} disabled={!importText.trim()}>
-              Import
+              {m('import')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <McpSetupDialog open={mcpSetupOpen} onClose={() => setMcpSetupOpen(false)} />
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        title={m('deleteTitle')}
+        description={m('deleteDesc', { name: pendingDelete?.name || m('unnamed') })}
+        confirmLabel={m('delete')}
+        destructive
+        onConfirm={() => { if (pendingDelete) deleteStub(pendingDelete.id); setPendingDelete(null); }}
+      />
     </div>
   );
 }

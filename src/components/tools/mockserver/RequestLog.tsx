@@ -5,6 +5,8 @@ import { PaneHeader } from '@/components/ui/tool-layout';
 import { methodColor } from '../apiclient/method-color';
 import type { HttpMethod } from '../apiclient/types';
 import type { RequestLogEntry } from './types';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/mockserver/MockServer.messages';
 
 function statusColor(status: number): string {
   // 5xx/4xx là lỗi, 2xx thành công — hệ trạng thái. 3xx (redirect) không
@@ -27,13 +29,14 @@ interface Props {
 }
 
 export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
+  const m = useMessages(MESSAGES);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = log.find((e) => e.id === selectedId) ?? null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PaneHeader
-        label="Request log"
+        label={m('requestLog')}
         hint={log.length ? `${log.length}` : undefined}
         action={
           <Button
@@ -45,7 +48,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
             disabled={!log.length}
           >
             <Trash2 className="mr-1 h-3.5 w-3.5" />
-            Clear
+            {m('clear')}
           </Button>
         }
       />
@@ -53,7 +56,7 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
       {log.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-fg-mute">
           <Inbox className="h-ctl w-ctl opacity-40" />
-          <p className="text-xs">Incoming requests appear here while the server is running.</p>
+          <p className="text-xs">{m('logEmpty')}</p>
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -88,25 +91,25 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
 
           {selected && (
             <div className="max-h-[45%] shrink-0 space-y-2 overflow-y-auto border-t border-line bg-bg-2/10 p-3 text-xs">
-              <Detail label="Time" value={new Date(selected.ts).toLocaleTimeString()} />
+              <Detail label={m('time')} value={new Date(selected.ts).toLocaleTimeString()} />
               <div className="flex gap-2">
-                <span className="w-14 shrink-0 text-fg-mute">Matched</span>
+                <span className="w-14 shrink-0 text-fg-mute">{m('matched')}</span>
                 {selected.matchedStubId ? (
                   <button
                     type="button"
                     onClick={() => selected.matchedStubId && onSelectStub?.(selected.matchedStubId)}
                     className="truncate text-left font-medium text-acc hover:underline"
-                    title="Open this stub"
+                    title={m('openStub')}
                   >
                     {stubName?.(selected.matchedStubId) ?? '(deleted stub)'}
                   </button>
                 ) : (
-                  <span className="text-warn">No stub — default response</span>
+                  <span className="text-warn">{m('noStub')}</span>
                 )}
               </div>
               {selected.reqHeaders.length > 0 && (
                 <div>
-                  <div className="mb-0.5 text-fg-mute">Request headers</div>
+                  <div className="mb-0.5 text-fg-mute">{m('requestHeaders')}</div>
                   <pre className="whitespace-pre-wrap break-words font-mono text-[11px]">
                     {selected.reqHeaders.map((h) => `${h.key}: ${h.value}`).join('\n')}
                   </pre>
@@ -114,12 +117,12 @@ export function RequestLog({ log, onClear, stubName, onSelectStub }: Props) {
               )}
               {selected.reqBody && (
                 <div>
-                  <div className="mb-0.5 text-fg-mute">Request body</div>
+                  <div className="mb-0.5 text-fg-mute">{m('requestBody')}</div>
                   <pre className="whitespace-pre-wrap break-words font-mono text-[11px]">{selected.reqBody}</pre>
                 </div>
               )}
               <div>
-                <div className="mb-0.5 text-fg-mute">Response body</div>
+                <div className="mb-0.5 text-fg-mute">{m('responseBody')}</div>
                 <pre className="whitespace-pre-wrap break-words font-mono text-[11px]">{selected.resBody}</pre>
               </div>
             </div>

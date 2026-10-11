@@ -21,7 +21,7 @@ export function GuideSection({
         <Icon className={cn('h-3.5 w-3.5', tone === 'caveat' ? 'text-warn' : 'text-acc-ink')} />
         {title}
       </h3>
-      <div className="space-y-1 pl-5 text-[12px] leading-relaxed text-fg-mute">{children}</div>
+      <div className="space-y-1 pl-5 text-xs leading-relaxed text-fg-mute">{children}</div>
     </section>
   );
 }
@@ -61,7 +61,7 @@ function makeGuide(g: { use: ReactNode[]; know?: ReactNode[]; caveat?: ReactNode
 export function GenericGuide({ description }: { description: string }) {
   return (
     <>
-      {description && <p className="text-[12px] leading-relaxed text-fg-mute">{description}</p>}
+      {description && <p className="text-xs leading-relaxed text-fg-mute">{description}</p>}
       <GuideSection icon={Lightbulb} title="Good to know">
         <List items={[
           'Most tools update their output live as you type — no “run” button needed.',
@@ -165,6 +165,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Type a cron expression, or build it field-by-field with the per-field inputs and suggestions.',
       'Apply a preset (every minute, hourly, daily…) as a starting point.',
       'Read the plain-English explanation to confirm what it will do.',
+      'Check “Next runs”: the next five fire times in your local time zone.',
     ],
     know: [
       'Linux uses 5 fields; Quartz 6–7 (adds seconds + optional year); Spring uses 6.',
@@ -185,6 +186,8 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
     ],
     know: [
       '“Array” outputs a JSON array; case modes treat _ and - as word boundaries.',
+      'Case modes (camelCase, PascalCase, snake_case, CONSTANT_CASE, kebab-case, Title Case) convert each line on its own — paste a list of identifiers and get a list back.',
+      '“All cases at once” shows every case side by side, each with its own Copy button.',
       'VN phone converts between the old 11-digit and new 10-digit formats (handles 0, +84 and separators).',
     ],
     caveat: ['VN phone leaves unrecognized prefixes unchanged.'],
@@ -196,7 +199,7 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Expand sections for byte size (UTF-8/16/32), encoding fit, and Unicode character composition.',
     ],
     know: [
-      'Words split on whitespace, paragraphs on blank lines, sentences on . ! ?; reading time = words ÷ 200 (rounded up).',
+      'Words split on whitespace, paragraphs on blank lines, sentences on . ! ?; reading time = words ÷ 200, shown as “< 1 min” below one minute.',
       'Emoji and surrogate pairs are counted correctly as single code points.',
     ],
     caveat: ['Sentence detection is naive — abbreviations and ellipses aren’t special-cased.'],
@@ -255,6 +258,8 @@ export const TOOL_GUIDES: Record<string, ReactNode> = {
       'Paste JSON — lenient input is allowed (single quotes, unquoted keys, trailing commas, comments).',
       'Switch mode: Beautify (interactive tree), Minify, or JSON String (escaped for pasting into code).',
       'In Beautify, click nodes to collapse/expand, search to filter, and copy the selected path.',
+      'Search shows a match count — press Enter / ⇧Enter (or the arrows) to jump between matches.',
+      'Keyboard: focus the tree, then ↑/↓ to move, → / ← to expand or collapse, Enter to toggle.',
       'Choose indent (2/4/tab) and quote style; collapse the input pane for more room.',
     ],
     know: ['The status bar flags parse errors; the tree shows item/field counts and a breadcrumb path.'],
@@ -437,4 +442,10 @@ export const TOOL_GUIDE_VERSIONS: Record<string, number> = {
   settings: 1,
   // 5 — script review when importing a collection.
   'api-client': 5,
+  // 2 — case modes work per line; PascalCase/CONSTANT/kebab/Title + "All cases" view.
+  'text-transform': 2,
+  // 2 — "Next runs" preview.
+  'cron-generator': 2,
+  // 2 — match count + jump, keyboard tree navigation.
+  json: 2,
 };

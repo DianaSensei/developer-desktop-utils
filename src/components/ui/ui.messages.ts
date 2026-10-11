@@ -1,0 +1,31 @@
+import { defineMessages } from '@/lib/i18n';
+
+/** Chữ bên trong component của kit — dùng `useMessages` nên đổi ngôn ngữ là đổi ngay. */
+export default defineMessages({
+  confirm: { vi: 'Xác nhận', en: 'Confirm' },
+  cancel: { vi: 'Huỷ', en: 'Cancel' },
+  working: { vi: 'Đang xử lý…', en: 'Working…' },
+  retry: { vi: 'Thử lại', en: 'Retry' },
+  copy: { vi: 'Sao chép', en: 'Copy' },
+  copied: { vi: 'Đã sao chép', en: 'Copied' },
+  close: { vi: 'Đóng', en: 'Close' },
+  back: { vi: 'Quay lại', en: 'Back' },
+  search: { vi: 'Tìm', en: 'Search' },
+  clearSearch: { vi: 'Xoá tìm kiếm', en: 'Clear search' },
+  clear: { vi: 'Xoá', en: 'Clear' },
+  loading: { vi: 'Đang tải…', en: 'Loading…' },
+  loadingShort: { vi: 'Đang tải', en: 'Loading' },
+  moreInfo: { vi: 'Giải thích thêm', en: 'More details' },
+  moreTabs: { vi: 'Thêm tab', en: 'More tabs' },
+  resize: { vi: 'Kéo để đổi kích thước · bấm đúp để đặt lại', en: 'Drag to resize · double-click to reset' },
+  pickColor: { vi: 'Chọn màu', en: 'Pick a color' },
+  pickDate: { vi: 'Chọn ngày', en: 'Pick a date' },
+  prevMonth: { vi: 'Tháng trước', en: 'Previous month' },
+  nextMonth: { vi: 'Tháng sau', en: 'Next month' },
+  today: { vi: 'Hôm nay', en: 'Today' },
+  now: { vi: 'Bây giờ', en: 'Now' },
+  hour: { vi: 'Giờ', en: 'Hr' },
+  minute: { vi: 'Phút', en: 'Min' },
+  second: { vi: 'Giây', en: 'Sec' },
+  remoteImage: { vi: 'Ảnh từ xa', en: 'Remote image' },
+});

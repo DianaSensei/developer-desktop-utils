@@ -15,6 +15,9 @@ import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import { Eye, EyeOff, Fingerprint, Check, X } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/EncodeHashEncrypt.messages';
+import COMMON from '@/components/tools/common.messages';
 
 type Mode = 'hash' | 'verify';
 type Algo = 'bcrypt' | 'argon2id' | 'argon2i' | 'argon2d';
@@ -33,6 +36,8 @@ function randomSalt(len = 16): Uint8Array {
 }
 
 export function PasswordHash() {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
   const sdk = usePluginSdkFor('base64');
   const [mode, setMode] = usePluginState<Mode>(sdk, 'pwhash:mode', 'hash', { legacyKey: 'devtool:pwhash:mode' });
   const [algo, setAlgo] = usePluginState<Algo>(sdk, 'pwhash:algo', 'bcrypt', { legacyKey: 'devtool:pwhash:algo' });
@@ -76,7 +81,7 @@ export function PasswordHash() {
         }));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Hashing failed');
+      setError(e instanceof Error ? e.message : m('hashingFailed'));
     } finally {
       setBusy(false);
     }
@@ -94,11 +99,11 @@ export function PasswordHash() {
         const { argon2Verify } = await import('hash-wasm');
         ok = await argon2Verify({ password, hash });
       } else {
-        throw new Error('Unrecognized hash — expected a bcrypt ($2b$…) or Argon2 ($argon2id$…) string.');
+        throw new Error(m('unrecognizedHash'));
       }
       setVerifyResult(ok);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Verification failed');
+      setError(e instanceof Error ? e.message : m('verificationFailed'));
     } finally {
       setBusy(false);
     }
@@ -112,13 +117,13 @@ export function PasswordHash() {
           value={mode}
           onValueChange={(v) => { setMode(v); setError(null); }}
           options={[
-            { value: 'hash', label: 'Hash' },
-            { value: 'verify', label: 'Verify' },
+            { value: 'hash', label: m('hash') },
+            { value: 'verify', label: m('verify') },
           ]}
-          aria-label="Mode"
+          aria-label={m('mode')}
         />
         <span className="hidden text-xs text-fg-mute sm:block">
-          {mode === 'hash' ? 'Hash a password with a random salt.' : 'Check a password against an existing hash (algorithm auto-detected).'}
+          {mode === 'hash' ? m('hashHint') : m('verifyHint')}
         </span>
       </div>
 
@@ -136,21 +141,21 @@ export function PasswordHash() {
 
               {algo === 'bcrypt' ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-fg-mute">Cost</span>
+                  <span className="text-xs text-fg-mute">{m('cost')}</span>
                   <Input type="number" min={4} max={20} value={cost} onChange={(e) => setCost(parseInt(e.target.value) || 10)} className="h-ctl w-20 text-xs rounded-sm" />
                 </div>
               ) : (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-fg-mute">Memory (KiB)</span>
+                    <span className="text-xs text-fg-mute">{m('memory')}</span>
                     <Input type="number" min={8} value={memory} onChange={(e) => setMemory(parseInt(e.target.value) || 8)} className="h-ctl w-24 text-xs rounded-sm" />
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-fg-mute">Iterations</span>
+                    <span className="text-xs text-fg-mute">{m('iterations')}</span>
                     <Input type="number" min={1} value={iterations} onChange={(e) => setIterations(parseInt(e.target.value) || 1)} className="h-ctl w-20 text-xs rounded-sm" />
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-fg-mute">Parallelism</span>
+                    <span className="text-xs text-fg-mute">{m('parallelism')}</span>
                     <Input type="number" min={1} value={parallelism} onChange={(e) => setParallelism(parseInt(e.target.value) || 1)} className="h-ctl w-20 text-xs rounded-sm" />
                   </div>
                 </>
@@ -158,22 +163,22 @@ export function PasswordHash() {
             </div>
 
             <ToolSection>
-              <ToolLabel>Password</ToolLabel>
-              <ToolHint>A random salt is generated for each hash, so the output changes every time.</ToolHint>
+              <ToolLabel>{m('password')}</ToolLabel>
+              <ToolHint>{m('randomSaltHint')}</ToolHint>
               <div className="relative">
                 <Input
                   type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter a password to hash…"
+                  placeholder={m('passwordToHash')}
                   className="h-ctl-lg pr-9 font-mono text-sm"
                   onKeyDown={(e) => { if (e.key === 'Enter' && password) void runHash(); }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? 'Hide password' : 'Show password'}
-                  title={showPw ? 'Hide password' : 'Show password'}
+                  aria-label={showPw ? m('hidePassword') : m('showPassword')}
+                  title={showPw ? m('hidePassword') : m('showPassword')}
                   aria-pressed={showPw}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
                 >
@@ -184,7 +189,7 @@ export function PasswordHash() {
 
             <Button onClick={() => void runHash()} disabled={!password || busy} size="sm" className="gap-1.5">
               {busy ? <Spinner size="sm" /> : <Fingerprint className="h-3.5 w-3.5" />}
-              {busy ? 'Hashing…' : 'Hash password'}
+              {busy ? m('hashing') : m('hashPassword')}
             </Button>
 
             {error && <Callout tone="error" size="sm">{error}</Callout>}
@@ -192,8 +197,8 @@ export function PasswordHash() {
             {hashOut && (
               <ToolSection>
                 <div className="flex items-center justify-between">
-                  <ToolLabel>Hash</ToolLabel>
-                  <CopyButton value={hashOut} label="Copy" variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
+                  <ToolLabel>{m('hash')}</ToolLabel>
+                  <CopyButton value={hashOut} label={c('copy')} variant="ghost" size="sm" className="h-6 px-2 text-xs" iconClassName="h-3 w-3" />
                 </div>
                 <div className="rounded-lg border border-line bg-bg-2/30 px-3 py-2.5">
                   <p className="break-all font-mono text-xs text-fg/90">{hashOut}</p>
@@ -206,20 +211,20 @@ export function PasswordHash() {
         {mode === 'verify' && (
           <>
             <ToolSection>
-              <ToolLabel>Password</ToolLabel>
+              <ToolLabel>{m('password')}</ToolLabel>
               <div className="relative">
                 <Input
                   type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setVerifyResult(null); }}
-                  placeholder="Enter the password…"
+                  placeholder={m('enterPassword')}
                   className="h-ctl-lg pr-9 font-mono text-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? 'Hide password' : 'Show password'}
-                  title={showPw ? 'Hide password' : 'Show password'}
+                  aria-label={showPw ? m('hidePassword') : m('showPassword')}
+                  title={showPw ? m('hidePassword') : m('showPassword')}
                   aria-pressed={showPw}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
                 >
@@ -229,8 +234,8 @@ export function PasswordHash() {
             </ToolSection>
 
             <ToolSection>
-              <ToolLabel>Hash</ToolLabel>
-              <ToolHint>Paste a bcrypt ($2b$…) or Argon2 ($argon2id$…) hash — the algorithm is detected automatically.</ToolHint>
+              <ToolLabel>{m('hash')}</ToolLabel>
+              <ToolHint>{m('pasteHashHint')}</ToolHint>
               <Input
                 value={verifyHash}
                 onChange={(e) => { setVerifyHash(e.target.value); setVerifyResult(null); }}
@@ -241,7 +246,7 @@ export function PasswordHash() {
 
             <Button onClick={() => void runVerify()} disabled={!password || !verifyHash.trim() || busy} size="sm" className="gap-1.5">
               {busy ? <Spinner size="sm" /> : <Check className="h-3.5 w-3.5" />}
-              {busy ? 'Verifying…' : 'Verify'}
+              {busy ? m('verifying') : m('verify')}
             </Button>
 
             {error && <Callout tone="error" size="sm">{error}</Callout>}
@@ -253,7 +258,7 @@ export function PasswordHash() {
                   ? 'border-ok-edge bg-ok-tint text-ok'
                   : 'border-bad/30 bg-bad/8 text-bad',
               )}>
-                {verifyResult ? <><Check className="h-4 w-4" /> Match — the password matches this hash.</> : <><X className="h-4 w-4" /> No match.</>}
+                {verifyResult ? <><Check className="h-4 w-4" /> {m('passwordMatches')}</> : <><X className="h-4 w-4" /> {m('noMatchDot')}</>}
               </div>
             )}
           </>

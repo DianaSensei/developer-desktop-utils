@@ -93,9 +93,11 @@ describe('ParamRow', () => {
 
   it('chỉ hiện nút trợ giúp khi có nội dung help', () => {
     const { rerender } = render(<ParamRow label="A" value="1" />);
-    expect(screen.queryByLabelText('Giải thích thêm')).toBeNull();
+    // Nhãn theo ngôn ngữ (ui.messages.ts) — ngoài LocaleProvider là tiếng Anh.
+    const helpLabel = /Giải thích thêm|More details/;
+    expect(screen.queryByLabelText(helpLabel)).toBeNull();
     rerender(<ParamRow label="A" value="1" help="Sâu hơn" />);
-    expect(screen.getByLabelText('Giải thích thêm')).toBeTruthy();
+    expect(screen.getByLabelText(helpLabel)).toBeTruthy();
   });
 });
 

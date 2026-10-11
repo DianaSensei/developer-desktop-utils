@@ -5,9 +5,12 @@ import { ChevronsDown, ChevronsUp, X } from 'lucide-react';
 import { Stat } from '@/components/ui/stat';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/ArrayDeduplicator.messages';
 
 type DedupeMode = 'preserve' | 'sort';
 
@@ -109,6 +112,9 @@ const AREA_STYLE = {
 } as const;
 
 export function ArrayDeduplicator() {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
+  const quickPasteHint = useQuickPasteHint();
   const sdk = usePluginSdkFor('deduplicate');
   const [mode, setMode] = usePluginState<DedupeMode>(sdk, 'deduplicate:mode', 'preserve', { legacyKey: 'devtool:deduplicate:mode' });
   const modeRef = useRef(mode);
@@ -425,19 +431,19 @@ export function ArrayDeduplicator() {
           onValueChange={(v) => setMode(v)}
           size="sm"
           options={[
-            { value: 'preserve', label: 'Preserve Order' },
-            { value: 'sort', label: 'Sort' },
+            { value: 'preserve', label: m('preserveOrder') },
+            { value: 'sort', label: m('sort') },
           ]}
-          aria-label="Dedupe mode"
+          aria-label={m('modeLabel')}
         />
 
         <div className="ml-auto flex items-center gap-5">
           {isProcessing && <Spinner size="sm" className="text-fg-mute" />}
-          <Stat variant="inline" label="original" value={count(stats?.original)} />
+          <Stat variant="inline" label={m('original')} value={count(stats?.original)} />
           <div className="w-px h-4 bg-line" />
-          <Stat variant="inline" tone="success" label="unique" value={count(stats?.unique)} />
+          <Stat variant="inline" tone="success" label={m('unique')} value={count(stats?.unique)} />
           <div className="w-px h-4 bg-line" />
-          <Stat variant="inline" tone="danger" label="removed" value={count(stats?.removed)} />
+          <Stat variant="inline" tone="danger" label={m('removed')} value={count(stats?.removed)} />
         </div>
       </div>
 
@@ -447,15 +453,15 @@ export function ArrayDeduplicator() {
         {/* Input pane */}
         <div className={cn('flex-1 min-w-0 flex flex-col', mode === 'sort' && 'border-r border-line')}>
           <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-line bg-bg-2/30">
-            <span className="text-xs font-medium text-fg-mute">Input · one item per line</span>
+            <span className="text-xs font-medium text-fg-mute">{m('inputHint')}</span>
             <div className="flex items-center gap-0.5">
-              <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Jump to top" disabled={!hasInput} onClick={handleScrollTop}>
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title={m('jumpTop')} aria-label={m('jumpTop')} disabled={!hasInput} onClick={handleScrollTop}>
                 <ChevronsUp className="h-3.5 w-3.5" />
               </Button>
-              <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Jump to bottom" disabled={!hasInput} onClick={handleScrollBottom}>
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title={m('jumpBottom')} aria-label={m('jumpBottom')} disabled={!hasInput} onClick={handleScrollBottom}>
                 <ChevronsDown className="h-3.5 w-3.5" />
               </Button>
-              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 hover:text-bad" title="Clear input" disabled={!hasInput} onClick={handleClear}>
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 hover:text-bad" title={m('clearInput')} aria-label={m('clearInput')} disabled={!hasInput} onClick={handleClear}>
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -466,7 +472,7 @@ export function ArrayDeduplicator() {
               ref={inputRef}
               defaultValue={currentValueRef.current}
               onChange={(e) => onValueChange(e.target.value)}
-              placeholder={`apple\nbanana\napple\norange — ${quickPasteHint}`}
+              placeholder={m('placeholder', { hint: quickPasteHint })}
               spellCheck={false}
               wrap={AREA_WRAP}
               className={areaClass}
@@ -497,10 +503,10 @@ export function ArrayDeduplicator() {
           style={{ opacity: isProcessing ? 0.55 : 1 }}
         >
           <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-line bg-bg-2/30">
-            <span className="text-xs font-medium text-fg-mute">Output</span>
+            <span className="text-xs font-medium text-fg-mute">{c('output')}</span>
             <CopyButton
               value={() => result?.output ?? ''}
-              label="Copy"
+              label={c('copy')}
               variant="ghost"
               size="sm"
               disabled={isProcessing || !result?.output}

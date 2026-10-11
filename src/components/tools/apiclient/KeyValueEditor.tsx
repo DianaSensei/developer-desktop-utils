@@ -16,6 +16,7 @@ import { InlineCodeField, SearchInput, TextEditor } from '@/design-system';
 import { copyToClipboard } from '@/lib/clipboard';
 import { type KeyValue, type VarMap, newKeyValue } from './types';
 import { ResolvedValue, showsResolvedColumn } from './ResolvedValue';
+import { t } from './i18n';
 
 interface Props {
   rows: KeyValue[];
@@ -58,10 +59,8 @@ const isFilled = (r: KeyValue) => r.key !== '' || r.value !== '';
  *  the list by eye is faster than typing a filter. */
 const FILTER_THRESHOLD = 8;
 
-const DUPLICATE_KEY_TEXT: Record<'params' | 'headers', string> = {
-  params: 'Both values are sent — repeated query params are all included.',
-  headers: 'Only the last value is sent — a repeated header name overwrites earlier ones.',
-};
+const duplicateKeyText = (kind: 'params' | 'headers') =>
+  kind === 'params' ? t('kv.dupParams') : t('kv.dupHeaders');
 
 /**
  * Whether two enabled rows collide on name, by the rules of the thing being
@@ -117,10 +116,10 @@ export function parseBulkText(text: string): KeyValue[] {
 export function KeyValueEditor({
   rows,
   onChange,
-  keyPlaceholder = 'Name',
-  valuePlaceholder = 'Value',
-  nameLabel = 'Name',
-  valueLabel = 'Value',
+  keyPlaceholder = t('name'),
+  valuePlaceholder = t('value'),
+  nameLabel = t('name'),
+  valueLabel = t('value'),
   bulkEdit = true,
   vars,
   masked = false,
@@ -236,15 +235,15 @@ export function KeyValueEditor({
         />
         <div className="flex shrink-0 items-center justify-between">
           <span className="text-[11px] text-fg-mute">
-            One <code className="rounded bg-bg-2 px-1">{keyPlaceholder.toLowerCase()}: {valuePlaceholder.toLowerCase()}</code> per line
+            {t('kv.onePerLine')} <code className="rounded bg-bg-2 px-1">{keyPlaceholder.toLowerCase()}: {valuePlaceholder.toLowerCase()}</code> {t('kv.perLine')}
             {/* `{'//'}`, not a bare `//`: as raw JSX children those two
                 characters read as the start of a comment to anything parsing
                 this file (a linter flagged exactly that), even though React
                 renders them as the literal text we want here. */}
-            {' · '}prefix <code className="rounded bg-bg-2 px-1">{'//'}</code> to disable a row
+            {' · '}{t('kv.prefixToDisable')} <code className="rounded bg-bg-2 px-1">{'//'}</code> {t('kv.toDisableRow')}
           </span>
           <button onClick={() => setBulk(false)} className="text-[11px] text-fg-mute transition-colors hover:text-fg">
-            Key-Value Edit
+            {t('kv.keyValueEdit')}
           </button>
         </div>
       </div>
@@ -286,10 +285,10 @@ export function KeyValueEditor({
           <SearchInput
             value={ownFilter}
             onChange={setOwnFilter}
-            placeholder={`Filter ${realRows.length} rows…`}
+            placeholder={t('kv.filterRows', { n: realRows.length })}
             className="h-ctl text-xs"
             containerClassName="min-w-0 flex-1"
-            aria-label="Filter rows"
+            aria-label={t('kv.filterRowsLabel')}
           />
           <span className="shrink-0 text-[11px] tabular-nums text-fg-mute">
             {ownQ || q ? `${visibleRows.length}/${realRows.length}` : `${realRows.length} rows`}
@@ -307,7 +306,7 @@ export function KeyValueEditor({
           <div />
           <div className="border-r px-3 py-1.5">{nameLabel}</div>
           <div className="border-r px-3 py-1.5">{valueLabel}</div>
-          {showResolved && <div className="border-r px-3 py-1.5">Resolved</div>}
+          {showResolved && <div className="border-r px-3 py-1.5">{t('req.resolved')}</div>}
           {secretToggle && <div />}
           <div />
         </div>
@@ -345,13 +344,13 @@ export function KeyValueEditor({
       </div>
 
       {hasDuplicateKeys && duplicateKeyHint && (
-        <Callout tone="info" size="sm">Duplicate name — {DUPLICATE_KEY_TEXT[duplicateKeyHint]}</Callout>
+        <Callout tone="info" size="sm">{t('kv.dupName', { detail: duplicateKeyText(duplicateKeyHint) })}</Callout>
       )}
 
       {bulkEdit && (
         <div className="flex justify-end">
           <button onClick={enterBulk} className="text-[11px] text-fg-mute transition-colors hover:text-fg">
-            Bulk Edit
+            {t('kv.bulkEdit')}
           </button>
         </div>
       )}
@@ -412,7 +411,7 @@ function KeyValueRow({
             aria-label={`${row.key || keyPlaceholder} — ${row.enabled ? 'enabled' : 'disabled'}`}
             onClick={() => onEdit({ enabled: !row.enabled })}
             className="group/toggle flex w-full cursor-pointer items-center justify-center transition-colors hover:bg-bg-2/60 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-focus"
-            title={row.enabled ? 'Disable' : 'Enable'}
+            title={row.enabled ? t('req.disable') : t('req.enable')}
           >
             <span
               className={cn(
@@ -470,7 +469,7 @@ function KeyValueRow({
                 'rounded p-1 transition-colors',
                 row.secret ? 'text-acc-ink hover:text-acc' : 'text-fg-mute/40 opacity-0 group-hover:opacity-100 hover:text-fg',
               )}
-              title={row.secret ? 'Marked as secret — masked here and excluded from generated code/export' : 'Mark as secret'}
+              title={row.secret ? t('kv.markedSecret') : t('kv.markSecret')}
             >
               {row.secret ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
             </button>
@@ -485,7 +484,8 @@ function KeyValueRow({
             type="button"
             onClick={onRemove}
             className="rounded p-1 text-fg-mute/40 opacity-0 transition-all group-hover:opacity-100 hover:text-bad"
-            title="Remove"
+            title={t('remove')}
+            aria-label={t('remove')}
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -548,7 +548,7 @@ function ValueCell({
             type="button"
             onClick={onToggleReveal}
             className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
-            title={revealed ? 'Hide value' : 'Reveal value'}
+            title={revealed ? t('auth.hideValue') : t('auth.revealValue')}
           >
             {revealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
           </button>
@@ -558,7 +558,7 @@ function ValueCell({
             type="button"
             onClick={onCopy}
             className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
-            title={copied ? 'Copied' : 'Copy value'}
+            title={copied ? t('res.copied') : t('res.copyValue')}
           >
             {copied ? <Check className="h-3 w-3 text-ok" /> : <Copy className="h-3 w-3" />}
           </button>

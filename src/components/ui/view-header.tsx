@@ -2,6 +2,8 @@ import * as React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export interface ViewHeaderProps {
   icon: LucideIcon;
@@ -22,6 +24,7 @@ export interface ViewHeaderProps {
  * re-deriving the icon/title/subtitle markup (which had drifted between them).
  */
 export function ViewHeader({ icon: Icon, title, subtitle, actions, onBack, className }: ViewHeaderProps) {
+  const ui = useMessages(UI);
   return (
     <div className={cn('shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-line', className)}>
       <div className="flex items-center gap-2.5 min-w-0">
@@ -29,7 +32,8 @@ export function ViewHeader({ icon: Icon, title, subtitle, actions, onBack, class
           <button
             type="button"
             onClick={() => onBack()}
-            title="Back"
+            title={ui('back')}
+            aria-label={ui('back')}
             className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-sm text-fg-mute hover:text-fg hover:bg-bg-2/60 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />

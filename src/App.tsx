@@ -20,19 +20,20 @@ import {
   Minus,
   Square,
   Copy,
-  FlaskConical,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useDesktopChrome } from '@/hooks/useDesktopChrome';
 import { useThemeSync, triggerThemeTransition } from '@/hooks/useThemeSync';
 import { TOOL_DEF_MAP, DEFAULT_TOOL_ORDER } from '@/lib/toolDefs';
 import { allTools, toolPath } from '@/lib/toolRegistry';
-import { buildNavEntries, countFavoriteEntries, GROUP_OF_TOOL, type NavEntry } from '@/lib/toolGroups';
+import { buildNavEntries, countFavoriteEntries, type NavEntry } from '@/lib/toolGroups';
 import { toolMatchesQuery } from '@/lib/toolSearch';
 import { useLiveConnections } from '@/lib/liveConnections';
 import { initDeepLinkHandling } from '@/lib/deepLink';
 import { CommandPalette } from '@/components/CommandPalette';
-import { OpenToolsStrip } from '@/components/OpenToolsStrip';
+import { WorkspaceBar } from '@/components/WorkspaceBar';
+import { ToolIdentity } from '@/components/ToolIdentity';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { McpBackgroundBridge } from '@/components/McpBackgroundBridge';
 import { McpManageBridge } from '@/components/McpManageBridge';
 import { McpUtilityBridge } from '@/components/McpUtilityBridge';
@@ -707,7 +708,6 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isFeatureEnabled, toolOrder } = useFeatures();
-  const liveIds = useLiveConnections();
   const { t } = useLocale();
   useDesktopChrome();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -772,15 +772,6 @@ function AppContent() {
     applySavedOrder(enabledTools, toolOrder).find((t) => t.featureId !== 'settings')?.path
     ?? '/settings';
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
-  const ActiveIcon = activeTool.icon;
-  // Tool đang mở có nằm trong nhóm nhiều tool không? Nếu có, header hiện tên
-  // NHÓM cùng tab con thay vì tên tool — để người dùng thấy được các tool anh em
-  // mà không phải quay lại sidebar.
-  const activeGroup = GROUP_OF_TOOL.get(activeTool.featureId);
-  const activeGroupTabs = (activeGroup?.toolIds ?? [])
-    .filter((id) => isFeatureEnabled(id))
-    .map((id) => TOOL_DEF_MAP.get(id))
-    .filter((def): def is NonNullable<typeof def> => !!def);
   const isFullHeight = !!(activeTool as typeof allTools[0] & { fullHeight?: boolean }).fullHeight;
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideIsWhatsNew, setGuideIsWhatsNew] = useState(false);
@@ -854,88 +845,15 @@ function AppContent() {
       <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 lg:hidden" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')}>
         <Menu className="h-3.5 w-3.5" />
       </Button>
-      {/* No live dot here: this icon sits outside the switch-tool tablist
-          below (it's a single fixed badge, not one of the clickable tabs),
-          and the selected tab already carries its own live dot — showing it
-          twice for the same tool was redundant. */}
-      <div
-        key={activeTool.path}
-        className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
-      >
-        <ActiveIcon className="h-3.5 w-3.5 text-acc" />
-      </div>
-      {activeGroupTabs.length > 1 ? (
-        <div
-          key={`${activeTool.path}-tabs`}
-          role="tablist"
-          aria-label={activeGroup!.label}
-          className="inline-flex h-6 shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
-        >
-          {activeGroupTabs.map((def) => {
-              const p = toolPath(def.id);
-              const on = p === location.pathname;
-              const live = liveIds.includes(def.id);
-              return (
-                <Link
-                  key={def.id}
-                  to={p}
-                  role="tab"
-                  aria-selected={on}
-                  className={cn(
-                    // rounded-md: same "đang chọn" shape used everywhere else.
-                    'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs leading-none transition-colors',
-                    'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
-                    on
-                      ? 'bg-acc font-semibold text-acc-fg shadow-soft'
-                      : 'text-fg-mute hover:text-fg',
-                  )}
-                >
-                  {/* Sibling tool tabs (Kafka/RabbitMQ/Redis…) can each be live
-                      independently of which one is currently open — without
-                      this dot, switching away from a connected tool hides any
-                      sign it's still running until you click back into it.
-
-                      The ring only shows on the SELECTED tab: that's the one
-                      sitting on a full-strength `bg-acc` fill, where an
-                      accent tone close to --ok's green hue can nearly swallow
-                      the plain dot. `ring-acc-fg` is the same token the tab
-                      label's own text already leans on for contrast against
-                      that fill, so the ring stays legible for every accent
-                      color instead of just the ones far enough from green. */}
-                  {live && (
-                    <span
-                      className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-ok', on && 'ring-2 ring-acc-fg/70')}
-                      title={t('shell.titlebar.running')}
-                    />
-                  )}
-                  {def.label}
-                </Link>
-              );
-            })}
-        </div>
-      ) : (
-        <div
-          key={`${activeTool.path}-label`}
-          className="inline-flex h-6 shrink-0 items-center overflow-x-auto rounded-md bg-sunk p-0.5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
-        >
-          {/* Chữ thường, không phải viên thuốc accent: `--acc` nghĩa là "cái
-              này tương tác được" hoặc "cái này đang được chọn" (RULES.md).
-              Tên tool đang mở không phải một lựa chọn trong nhóm — không có
-              gì để chọn khác, nó chỉ là nhãn. Tô accent vào đây vừa là ồn
-              nhất màn hình cho một thứ bấm-vào-không-làm-gì, vừa tạo thêm
-              một hình dạng "đang chọn" thứ tư (đã có: sidebar nav, tab
-              titlebar, Tabs pill, Segmented) — xem khối tương đương trong
-              OpenToolsStrip's fallback, nơi đã sửa đúng hướng này trước. */}
-          <h2 className="inline-flex h-full min-w-0 items-center gap-1 whitespace-nowrap px-2 text-xs font-semibold leading-none text-fg">
-            {activeTool.label}
-            {activeTool.experimental && (
-              <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
-                <FlaskConical className="h-3 w-3 opacity-80" />
-              </span>
-            )}
-          </h2>
-        </div>
-      )}
+      {/* Thanh workspace chiếm chỗ của danh tính tool khi có gì để chuyển
+          qua lại (≥2 tab hoặc ≥2 workspace) — tab đang chọn đã nói tool nào
+          đang mở. Ít hơn thế thì hiện danh tính như cũ (fallback). Trước đây
+          dải "Open tools" chỉ nằm trong header bản web, nên trên app desktop
+          (luôn dùng titlebar hợp nhất này) nó KHÔNG BAO GIỜ hiện. */}
+      <WorkspaceBar
+        size="titlebar"
+        fallback={<ToolIdentity size="titlebar" />}
+      />
     </div>
   );
 
@@ -1080,14 +998,14 @@ function AppContent() {
               lệch bậc. py-2.5 trước đó ra 54px, lệch 4px so với sidebar. */}
           <div className="flex items-center justify-between px-4 py-2 sm:px-5">
             <div className="flex items-center gap-2.5">
-              <Button variant="ghost" size="icon" className="lg:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)}>
+              <Button variant="ghost" size="icon" className="lg:hidden h-ctl w-ctl" onClick={() => setSidebarOpen(true)} title={t('shell.titlebar.openMenu')} aria-label={t('shell.titlebar.openMenu')}>
                 <Menu className="h-4 w-4" />
               </Button>
               {/* Không chấm live ở đây: icon này nằm ngoài tablist switch-tool
                   bên cạnh (nó là badge cố định, không phải một tab bấm được),
                   và tab đang chọn trong tablist đã tự có chấm live của nó —
                   hiện hai chấm cho cùng một tool là thừa. */}
-              {/* ── Vì sao danh tính tool nằm SAU `OpenToolsStrip` ──────────
+              {/* ── Vì sao danh tính tool nằm SAU `WorkspaceBar` ──────────
                   Trước đây đỉnh cửa sổ có HAI dải chồng nhau nói gần như cùng
                   một chuyện: hàng header mang icon + tên tool đang mở, và ngay
                   dưới nó là dải tab liệt kê các tool đang mở — trong đó tab
@@ -1097,91 +1015,9 @@ function AppContent() {
                   Giờ strip dựng THẲNG trong hàng này (`inline`), và khối danh
                   tính bên dưới chỉ là `fallback` — nó hiện đúng khi có ít hơn
                   hai tab, tức lúc strip không có gì để nói. Một dải, 50px. */}
-              <OpenToolsStrip
-                inline
-                fallback={
-                  <div className="flex min-w-0 items-center gap-2.5">
-              <div
-                key={activeTool.path}
-                className="relative flex h-ctl w-ctl shrink-0 items-center justify-center rounded-md border border-acc/15 bg-acc/10 motion-safe:animate-in motion-safe:zoom-in-75 motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-spring"
-              >
-                <ActiveIcon className="h-4 w-4 text-acc" />
-              </div>
-              {/* Tên NHÓM ("Generate") không nói cái gì đang mở — tab con đã liệt
-                  kê đúng thứ đó rồi ("Generator" đang bật). Giữ cả hai là lặp:
-                  một chữ chung chung phía trước, một chữ cụ thể phía sau. Nên
-                  bỏ hẳn <h2> tên nhóm, để tablist tự làm tiêu đề.
-
-                  Tool đứng riêng (không thuộc nhóm, hoặc nhóm chỉ còn 1 tool
-                  bật) vẫn dựng ĐÚNG khung máng lõm + pill này để header không
-                  đổi hình dạng khi chuyển qua lại giữa tool đơn và tool trong
-                  nhóm — chỉ khác là pill đó KHÔNG phải link/tab, vì không có gì
-                  để chuyển tới. Không role="tablist"/"tab" trong trường hợp
-                  này: hứa điều hướng bàn phím cho một mục duy nhất là hứa suông. */}
-              {activeGroupTabs.length > 1 ? (
-                <div
-                  key={`${activeTool.path}-tabs`}
-                  role="tablist"
-                  aria-label={activeGroup!.label}
-                  className="inline-flex h-ctl shrink-0 items-center gap-1 overflow-x-auto rounded-md bg-sunk p-1 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
-                >
-                  {activeGroupTabs.map((def) => {
-                      const p = toolPath(def.id);
-                      const on = p === location.pathname;
-                      const live = liveIds.includes(def.id);
-                      return (
-                        <Link
-                          key={def.id}
-                          to={p}
-                          role="tab"
-                          aria-selected={on}
-                          className={cn(
-                            'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-md px-3.5 text-sm leading-none transition-colors',
-                            'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
-                            on
-                              ? 'bg-acc font-semibold text-acc-fg shadow-soft'
-                              : 'text-fg-mute hover:text-fg',
-                          )}
-                        >
-                          {/* Xem chú thích ở khối titlebarNav phía trên — cùng lý
-                              do: tab anh em (Kafka/RabbitMQ/Redis…) có thể đang
-                              live độc lập với tab đang mở, và cùng cách sửa:
-                              viền ring-acc-fg chỉ khi được chọn, để chấm không
-                              chìm vào nền bg-acc khi accent ngả sắc xanh lá. */}
-                          {live && (
-                            <span
-                              className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-ok', on && 'ring-2 ring-acc-fg/70')}
-                              title={t('shell.titlebar.running')}
-                            />
-                          )}
-                          {def.label}
-                        </Link>
-                      );
-                    })}
-                </div>
-              ) : (
-                /* Tên tool KHÔNG còn là viên thuốc accent đặc.
-                   `--acc` nghĩa là "cái này tương tác được" hoặc "cái này đang
-                   được chọn" (design/RULES.md). Tên của tool đang mở không phải
-                   một lựa chọn trong nhóm — không có gì để chọn khác, nó chỉ là
-                   nhãn. Tô nó bằng accent làm thứ ồn nhất màn hình lại là thứ
-                   bấm vào không có gì xảy ra, và tạo ra hình dạng "đang chọn"
-                   thứ ba trong vòng 200px chiều dọc (viên thuốc ở đây, tab bo
-                   `rounded-md` bên dưới, toggle trong tool). Giờ nó là chữ. */
-                <h2
-                  key={`${activeTool.path}-label`}
-                  className="inline-flex min-w-0 shrink items-center gap-1.5 truncate text-sm font-semibold leading-none motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-base motion-safe:ease-out-soft"
-                >
-                  <span className="truncate">{activeTool.label}</span>
-                  {activeTool.experimental && (
-                    <span title={t('shell.experimental.badge')} className="inline-flex shrink-0">
-                      <FlaskConical className="h-3.5 w-3.5 text-fg-mute" />
-                    </span>
-                  )}
-                </h2>
-              )}
-                  </div>
-                }
+              <WorkspaceBar
+                size="header"
+                fallback={<ToolIdentity size="header" />}
               />
             </div>
             <div className="flex min-w-0 items-center gap-1">
@@ -1260,13 +1096,15 @@ function App() {
                   <ApiClientRuntimeProvider>
                     <MockServerRuntimeProvider>
                       <Router>
-                        <AppContent />
-                        <UpdateDialog />
-                        <OnboardingFlow />
-                        <CommandPalette />
-                        <McpBackgroundBridge />
-                        <McpManageBridge />
-                        <McpUtilityBridge />
+                        <WorkspaceProvider>
+                          <AppContent />
+                          <UpdateDialog />
+                          <OnboardingFlow />
+                          <CommandPalette />
+                          <McpBackgroundBridge />
+                          <McpManageBridge />
+                          <McpUtilityBridge />
+                        </WorkspaceProvider>
                       </Router>
                     </MockServerRuntimeProvider>
                   </ApiClientRuntimeProvider>

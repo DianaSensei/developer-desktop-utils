@@ -1,5 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 /**
  * Khối chờ có hình dạng — thay cho một cái spinner đặt giữa panel trống.
@@ -60,8 +62,9 @@ export interface SkeletonTextProps {
 
 /** Vài dòng chữ giả — cho mô tả, thân thông báo, ô chú thích. */
 export function SkeletonText({ lines = 3, className }: SkeletonTextProps) {
+  const ui = useMessages(UI);
   return (
-    <div role="status" aria-label="Đang tải" className={cn('space-y-2', className)}>
+    <div role="status" aria-label={ui('loadingShort')} className={cn('space-y-2', className)}>
       {Array.from({ length: lines }, (_, i) => (
         <Skeleton
           key={i}
@@ -87,9 +90,10 @@ export interface SkeletonListProps {
  * nháy): các hàng dài bằng nhau chằn chặn đọc ra là đồ hoạ, không phải dữ liệu.
  */
 export function SkeletonList({ rows = 6, leading, className }: SkeletonListProps) {
+  const ui = useMessages(UI);
   const WIDTHS = ['w-2/3', 'w-1/2', 'w-3/5', 'w-5/12', 'w-7/12', 'w-1/2'];
   return (
-    <div role="status" aria-label="Đang tải" className={cn('divide-y divide-line', className)}>
+    <div role="status" aria-label={ui('loadingShort')} className={cn('divide-y divide-line', className)}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-3 px-3 py-2.5">
           {leading && <Skeleton circle className="h-5 w-5 shrink-0" />}

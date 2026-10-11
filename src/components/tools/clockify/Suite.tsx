@@ -21,6 +21,8 @@ import { TimeTracker } from './TimeTracker';
 import { Timesheet } from './Timesheet';
 import { CalendarView } from './CalendarView';
 import { MeetingNotes } from './MeetingNotes';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/clockify/TimeTracker.messages';
 
 type TabId = 'tracker' | 'timesheet' | 'calendar' | 'notes';
 
@@ -32,6 +34,7 @@ const TABS: { id: TabId; label: string; icon: typeof Clock; render: () => JSX.El
 ];
 
 function SuiteInner() {
+  const tr = useMessages(MESSAGES);
   const { running, now, stopRunning, projectById } = useClockify();
   const [tab, setTab] = useState<TabId>('tracker');
   const [showProjects, setShowProjects] = useState(false);
@@ -56,7 +59,7 @@ function SuiteInner() {
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
-                {t.label}
+                {tr(`tab.${t.id}` as 'tab.tracker')}
               </button>
             );
           })}
@@ -70,7 +73,7 @@ function SuiteInner() {
           >
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--live)]" />
             <span className="font-mono tabular-nums">{fmtTimer(now - running.start)}</span>
-            <span className="max-w-[120px] truncate">{running.description || runningProject?.name || 'Tracking'}</span>
+            <span className="max-w-[120px] truncate">{running.description || runningProject?.name || tr('tracking')}</span>
             <Square
               className="h-3 w-3 fill-current"
               onClick={(e) => { e.stopPropagation(); stopRunning(); }}
@@ -78,10 +81,10 @@ function SuiteInner() {
           </button>
         )}
 
-        <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0" title="Projects" onClick={() => setShowProjects(true)}>
+        <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0" title={tr('projects')} aria-label={tr('projects')} onClick={() => setShowProjects(true)}>
           <FolderKanban className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0" title="Settings" onClick={() => setShowSettings(true)}>
+        <Button variant="ghost" size="icon" className="h-ctl w-ctl shrink-0" title={tr('settings')} aria-label={tr('settings')} onClick={() => setShowSettings(true)}>
           <SettingsIcon className="h-4 w-4" />
         </Button>
       </div>
@@ -96,18 +99,19 @@ function SuiteInner() {
 }
 
 function ProjectManager({ onClose }: { onClose: () => void }) {
+  const tr = useMessages(MESSAGES);
   const { projects, addProject, updateProject, deleteProject } = useClockify();
   const [name, setName] = useState('');
 
   return (
-    <Modal open onClose={onClose} title="Projects" width="max-w-lg">
+    <Modal open onClose={onClose} title={tr('projects')} width="max-w-lg">
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) { addProject(name.trim()); setName(''); } }}
-            placeholder="New project name…"
+            placeholder={tr('newProjectName')}
             className="h-ctl flex-1"
           />
           <Button size="sm" className="gap-1.5" onClick={() => { if (name.trim()) { addProject(name.trim()); setName(''); } }}>
@@ -116,7 +120,7 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="max-h-[50vh] divide-y overflow-y-auto rounded-lg border border-line">
-          {projects.length === 0 && <p className="px-3 py-4 text-center text-xs text-fg-mute">No projects yet.</p>}
+          {projects.length === 0 && <p className="px-3 py-4 text-center text-xs text-fg-mute">{tr('noProjects')}</p>}
           {projects.map((p) => (
             <div key={p.id} className={cn('flex items-center gap-2 px-2.5 py-2', p.archived && 'opacity-50')}>
               <ColorMenu color={p.color} onPick={(c) => updateProject(p.id, { color: c })} />
@@ -127,13 +131,13 @@ function ProjectManager({ onClose }: { onClose: () => void }) {
               >
                 {p.archived ? 'restore' : 'archive'}
               </button>
-              <ConfirmButton onConfirm={() => deleteProject(p.id)} title="Delete project">
+              <ConfirmButton onConfirm={() => deleteProject(p.id)} title={tr('deleteProject')}>
                 <Trash2 className="h-3.5 w-3.5" />
               </ConfirmButton>
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-fg-mute">Deleting a project keeps its time entries but unassigns them.</p>
+        <p className="text-[11px] text-fg-mute">{tr('deleteProjectHint')}</p>
       </div>
     </Modal>
   );
@@ -159,6 +163,7 @@ function ColorMenu({ color, onPick }: { color: string; onPick: (c: string) => vo
 }
 
 function SettingsPanel({ onClose }: { onClose: () => void }) {
+  const tr = useMessages(MESSAGES);
   const { settings, updateSettings } = useClockify();
 
   // Daily target is derived from the work-hours ranges so the rest of the suite stays consistent.
@@ -169,22 +174,22 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal open onClose={onClose} title="Settings">
+    <Modal open onClose={onClose} title={tr('settings')}>
       <div className="space-y-4">
         <section className="space-y-2.5">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">General</h4>
-          <Toggle label="Week starts Monday" checked={settings.weekStartsMon} onChange={(v) => updateSettings({ weekStartsMon: v })} />
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">{tr('general')}</h4>
+          <Toggle label={tr('weekStartsMonday')} checked={settings.weekStartsMon} onChange={(v) => updateSettings({ weekStartsMon: v })} />
         </section>
 
         <section className="space-y-2.5 border-t border-line pt-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">Work hours</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">{tr('workHours')}</h4>
             <span className="text-[11px] text-fg-mute">
               Target <span className="font-mono font-medium text-fg">{dailyTarget}h</span>/day
             </span>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-fg-mute">Work (before lunch)</span>
+            <span className="text-fg-mute">{tr('workBeforeLunch')}</span>
             <div className="flex items-center gap-1.5">
               <TimePicker value={settings.workStart} onChange={(v) => setWorkHours({ workStart: v })} />
               <span className="text-fg-mute">–</span>
@@ -192,7 +197,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-fg-mute">Lunch break</span>
+            <span className="text-fg-mute">{tr('lunchBreak')}</span>
             <div className="flex items-center gap-1.5">
               <TimePicker value={settings.lunchStart} onChange={(v) => setWorkHours({ lunchStart: v })} />
               <span className="text-fg-mute">–</span>
@@ -200,7 +205,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-fg-mute">Work (after lunch)</span>
+            <span className="text-fg-mute">{tr('workAfterLunch')}</span>
             <div className="flex items-center gap-1.5">
               <TimePicker value={settings.lunchEnd} onChange={(v) => setWorkHours({ lunchEnd: v })} />
               <span className="text-fg-mute">–</span>
@@ -210,21 +215,21 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
         </section>
 
         <section className="space-y-2.5 border-t border-line pt-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">Pomodoro</h4>
-          <Toggle label="Enable Pomodoro indicator" checked={settings.pomodoro} onChange={(v) => updateSettings({ pomodoro: v })} />
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-mute">{tr('pomodoro')}</h4>
+          <Toggle label={tr('enablePomodoro')} checked={settings.pomodoro} onChange={(v) => updateSettings({ pomodoro: v })} />
           <label className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-fg-mute">Work (min)</span>
+            <span className="text-fg-mute">{tr('workMin')}</span>
             <NumberStepper value={settings.workMinutes} min={1} max={180} onChange={(v) => updateSettings({ workMinutes: v })} />
           </label>
           <label className="flex items-center justify-between gap-3 text-xs">
-            <span className="text-fg-mute">Break (min)</span>
+            <span className="text-fg-mute">{tr('breakMin')}</span>
             <NumberStepper value={settings.breakMinutes} min={1} max={120} onChange={(v) => updateSettings({ breakMinutes: v })} />
           </label>
-          <Toggle label="Phase chime" checked={settings.sound} onChange={(v) => updateSettings({ sound: v })} />
+          <Toggle label={tr('phaseChime')} checked={settings.sound} onChange={(v) => updateSettings({ sound: v })} />
         </section>
 
         <div className="flex justify-end border-t border-line pt-3">
-          <Button size="sm" onClick={onClose}>Done</Button>
+          <Button size="sm" onClick={onClose}>{tr('done')}</Button>
         </div>
       </div>
     </Modal>

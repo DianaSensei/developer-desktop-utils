@@ -29,6 +29,7 @@ import { usePluginSdkFor } from '@/platform';
 import { exportEnvironmentNative, exportEnvironmentPostman, importEnvironment as parseEnvironmentFile } from './environments-io';
 import type { Environment, KeyValue } from './types';
 import type { ApiStore } from './store';
+import { t } from './i18n';
 
 interface Props {
   store: ApiStore;
@@ -96,12 +97,12 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   const tabDefs: TabDef[] = [
     {
       id: 'environments',
-      label: 'Environments',
+      label: t('env.environments'),
       badge: environments.length > 0 ? <Badge pill size="xs" className="ml-1">{environments.length}</Badge> : undefined,
     },
     ...(activeCollection ? [{
       id: 'collectionVars',
-      label: 'Collection Variables',
+      label: t('env.collectionVars'),
       badge: varCount(activeCollection.variables) > 0
         ? <Badge pill size="xs" className="ml-1">{varCount(activeCollection.variables)}</Badge>
         : undefined,
@@ -149,8 +150,8 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
             X — instead of a 34px button sitting 7px higher than the 24px one
             next to it. */}
         <DialogHeader className="h-14 flex-row items-center justify-between space-y-0 border-b px-4 pr-12">
-          <DialogTitle>Environments</DialogTitle>
-          <IconButton size="xs" onClick={handleImport} title="Import environment (Postman or this app's export)">
+          <DialogTitle>{t('env.environments')}</DialogTitle>
+          <IconButton size="xs" onClick={handleImport} title={t('env.import')} aria-label={t('env.import')}>
             <Upload className="h-3.5 w-3.5" />
           </IconButton>
         </DialogHeader>
@@ -174,28 +175,20 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
               onClick={() => setExplainerOpen((o) => !o)}
               className="whitespace-nowrap text-[11px] font-medium text-fg-mute underline decoration-dotted underline-offset-2 transition-colors hover:text-fg"
             >
-              {explainerOpen ? 'Show less' : 'Learn more'}
+              {explainerOpen ? t('env.showLess') : t('env.learnMore')}
             </button>
           }
         >
           {explainerOpen ? (
             <>
-              A <strong className="text-fg">Collection environment</strong> is scoped to one
-              collection and follows whichever one the active request belongs to. A{' '}
-              <strong className="text-fg">Global environment</strong> applies everywhere and
-              stays active across collections. Both can be &ldquo;Active&rdquo; at the same
-              time — the Collection one wins on a name collision.{' '}
-              <strong className="text-fg">Collection Variables</strong> are the always-on
-              fallback beneath either: <em>Collection env → Global env → Collection
-              Variables</em>. Use any of them with{' '}
-              <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code> in a request.
+              {t('env.explainLong')}
             </>
           ) : (
             <>
-              Precedence: <strong className="text-fg">Collection env</strong> →{' '}
-              <strong className="text-fg">Global env</strong> →{' '}
-              <strong className="text-fg">Collection Variables</strong>. Use{' '}
-              <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code> in a request.
+              {t('env.precedence')} <strong className="text-fg">{t('env.collectionEnv')}</strong> →{' '}
+              <strong className="text-fg">{t('env.globalEnv')}</strong> →{' '}
+              <strong className="text-fg">{t('env.collectionVars')}</strong>{t('env.use')}{' '}
+              <code className="rounded bg-bg-2 px-1">{'{{name}}'}</code> {t('env.inRequest')}
             </>
           )}
         </Callout>
@@ -206,19 +199,17 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
             <div className="mx-auto max-w-3xl space-y-4">
               <div>
-                <h3 className="text-sm font-medium">Collection Variables</h3>
+                <h3 className="text-sm font-medium">{t('env.collectionVars')}</h3>
                 <p className="text-[11px] text-fg-mute">
-                  Shared defaults for every request in <strong className="text-fg">{activeCollection.name}</strong>,
-                  regardless of which environment is active — a variable of the same name in the
-                  active environment still wins.
+                  {t('env.sharedDefaultsA')} <strong className="text-fg">{activeCollection.name}</strong>{t('env.sharedDefaultsB')}
                 </p>
               </div>
               <VarFilterBox rows={activeCollection.variables ?? []} value={varFilter} onChange={setVarFilter} />
               <KeyValueEditor
                 rows={activeCollection.variables ?? []}
                 onChange={(variables) => store.setCollectionVariables(activeCollection.id, variables)}
-                keyPlaceholder="Variable"
-                valuePlaceholder="Value"
+                keyPlaceholder={t('env.variable')}
+                valuePlaceholder={t('value')}
                 filterQuery={varFilter}
               />
             </div>
@@ -235,16 +226,16 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                 <SearchInput
                   value={query}
                   onChange={setQuery}
-                  placeholder="Search environments"
+                  placeholder={t('env.searchEnvs')}
                   className="h-ctl text-xs"
                 />
               </div>
               <div className="flex-1 overflow-y-auto py-1">
                 <Section
-                  title={activeCollection?.name ?? 'Collection'}
+                  title={activeCollection?.name ?? t('env.collection')}
                   disabled={!store.activeCollectionId}
                   empty={filteredCollectionEnvs.length === 0}
-                  emptyText={q ? 'No matches' : 'No environments'}
+                  emptyText={q ? t('env.noMatches') : t('env.noEnvs')}
                   onAdd={() => setSelectedEnvId(store.addEnvironment(store.activeCollectionId))}
                 >
                   {filteredCollectionEnvs.map((e) => (
@@ -252,9 +243,9 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   ))}
                 </Section>
                 <Section
-                  title="Global"
+                  title={t('env.global')}
                   empty={filteredGlobalEnvs.length === 0}
-                  emptyText={q ? 'No matches' : 'No environments'}
+                  emptyText={q ? t('env.noMatches') : t('env.noEnvs')}
                   onAdd={() => setSelectedEnvId(store.addEnvironment(null))}
                 >
                   {filteredGlobalEnvs.map((e) => (
@@ -271,9 +262,9 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <div className="flex items-center gap-2">
                     <span
                       className="max-w-[30%] shrink truncate rounded bg-bg-2 px-1.5 py-0.5 text-[11px] font-medium text-fg-mute"
-                      title={selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
+                      title={selected.collectionId ? (activeCollection?.name ?? t('env.collection')) : t('env.global')}
                     >
-                      {selected.collectionId ? (activeCollection?.name ?? 'Collection') : 'Global'}
+                      {selected.collectionId ? (activeCollection?.name ?? t('env.collection')) : t('env.global')}
                     </span>
                     <Input
                       value={selected.name}
@@ -292,12 +283,12 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                         }
                       }}
                       title={store.isEnvActive(selected)
-                        ? 'This is the active environment for its scope — its variables are applied to requests. Click to deactivate.'
+                        ? t('env.activeHint')
                         : selected.collectionId
-                          ? 'Make this the active Collection environment: its variables apply to requests in this collection, winning over a Global environment and Collection Variables.'
-                          : 'Make this the active Global environment: its variables apply across every collection, beneath a Collection environment but above Collection Variables.'}
+                          ? t('env.makeActiveCollection')
+                          : t('env.makeActiveGlobal')}
                     >
-                      {store.isEnvActive(selected) ? 'Active' : 'Set active'}
+                      {store.isEnvActive(selected) ? t('env.active') : t('env.setActive')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -307,20 +298,22 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                         const id = store.duplicateEnvironment(selected.id);
                         if (id) setSelectedEnvId(id);
                       }}
-                      title="Duplicate environment"
+                      title={t('env.duplicate')}
+                      aria-label={t('env.duplicate')}
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger
-                        title="Export environment"
+                        title={t('env.export')}
+                        aria-label={t('env.export')}
                         className="flex h-ctl w-ctl shrink-0 items-center justify-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg"
                       >
                         <Download className="h-4 w-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleExport(selected, 'postman')}>Export (Postman)</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExport(selected, 'native')}>Export (DevTool)</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport(selected, 'postman')}>{t('env.exportPostman')}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport(selected, 'native')}>{t('env.exportNative')}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                     <Button
@@ -328,7 +321,8 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                       size="icon"
                       className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-bad"
                       onClick={() => store.deleteEnvironment(selected.id)}
-                      title="Delete environment"
+                      title={t('env.delete')}
+                      aria-label={t('env.delete')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -337,15 +331,14 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                   <KeyValueEditor
                     rows={selected.variables}
                     onChange={(variables) => store.updateEnvironment(selected.id, { variables })}
-                    keyPlaceholder="Variable"
-                    valuePlaceholder="Value"
+                    keyPlaceholder={t('env.variable')}
+                    valuePlaceholder={t('value')}
                     masked={(row) => !!row.secret}
                     secretToggle
                     filterQuery={varFilter}
                   />
                   <p className="text-[11px] text-fg-mute">
-                    Click the lock icon to mark a value secret — it stays masked here and is left out
-                    of generated code, exports, and history the same way the Vault is.
+                    {t('env.secretHint')}
                   </p>
                 </div>
               ) : (
@@ -353,8 +346,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                 // hunting for the + beside a section caption. Put the action here.
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
                   <p className="max-w-[22rem] text-xs text-fg-mute">
-                    No environments yet. An environment is a set of variables you can switch on and
-                    off — e.g. one for Dev, one for Prod — without editing your requests.
+                    {t('env.noneYet')}
                   </p>
                   <Button
                     variant="outline"
@@ -362,7 +354,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
                     className="gap-1.5 text-xs"
                     onClick={() => setSelectedEnvId(store.addEnvironment(store.activeCollectionId))}
                   >
-                    <Plus className="h-3.5 w-3.5" /> New environment
+                    <Plus className="h-3.5 w-3.5" /> {t('env.new')}
                   </Button>
                 </div>
               )}
@@ -387,7 +379,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
 const LIST_ROW = 'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-bg-2/60';
 const LIST_SLOT = 'flex w-3 shrink-0 items-center justify-center';
 
-function Section({ title, onAdd, disabled, empty, emptyText = 'No environments', children }: {
+function Section({ title, onAdd, disabled, empty, emptyText, children }: {
   title: string; onAdd: () => void; disabled?: boolean; empty?: boolean; emptyText?: string; children: React.ReactNode;
 }) {
   return (
@@ -397,14 +389,15 @@ function Section({ title, onAdd, disabled, empty, emptyText = 'No environments',
           <span className={LIST_SLOT} aria-hidden />
           <SectionLabel className="min-w-0 truncate" title={title}>{title}</SectionLabel>
         </div>
-        <IconButton size="xs" onClick={onAdd} disabled={disabled} title={`New ${title} environment`}>
+        <IconButton size="xs" onClick={onAdd} disabled={disabled} title={t('env.newIn', { scope: title })}
+          aria-label={t('env.newIn', { scope: title })}>
           <Plus className="h-3.5 w-3.5" />
         </IconButton>
       </div>
       {/* An empty section used to render a caption, a +, and then nothing —
           which reads as broken rather than as "there is nothing here yet". */}
       {empty
-        ? <p className="py-1 pl-8 pr-3 text-[11px] text-fg-mute/70">{emptyText}</p>
+        ? <p className="py-1 pl-8 pr-3 text-[11px] text-fg-mute/70">{emptyText ?? t('env.noEnvs')}</p>
         : children}
     </div>
   );
@@ -423,7 +416,7 @@ function EnvRow({ env, active, selected, onClick }: {
 }) {
   return (
     <button onClick={onClick} className={cn(LIST_ROW, selected && 'bg-acc-tint text-acc-ink')}>
-      <span className={LIST_SLOT}>{active && <StatusDot tone="live" size="xs" title="Active environment" />}</span>
+      <span className={LIST_SLOT}>{active && <StatusDot tone="live" size="xs" title={t('env.activeEnv')} />}</span>
       <span className="min-w-0 flex-1 truncate">{env.name}</span>
       <VarCountBadge count={varCount(env.variables)} />
     </button>
@@ -438,5 +431,5 @@ const VAR_FILTER_THRESHOLD = 8;
 
 function VarFilterBox({ rows, value, onChange }: { rows: KeyValue[]; value: string; onChange: (v: string) => void }) {
   if (rows.length <= VAR_FILTER_THRESHOLD) return null;
-  return <SearchInput value={value} onChange={onChange} placeholder="Filter variables" className="h-ctl text-xs" />;
+  return <SearchInput value={value} onChange={onChange} placeholder={t('env.filterVars')} className="h-ctl text-xs" />;
 }

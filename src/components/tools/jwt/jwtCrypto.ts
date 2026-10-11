@@ -281,6 +281,8 @@ export interface ClaimRow {
   value: string;
   /** Absolute time plus "in 3 minutes" / "12 days ago" for the time claims. */
   detail?: string;
+  /** Thời điểm claim trừ "bây giờ" (ms) — để UI tự viết `detail` theo ngôn ngữ đang chọn. */
+  deltaMs?: number;
   tone: ClaimTone;
 }
 
@@ -306,6 +308,7 @@ function timeRow(claim: string, label: string, seconds: unknown, now: number, to
     label,
     value: new Date(when).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC'),
     detail: formatRelative(when - now),
+    deltaMs: when - now,
     tone: tone(when - now),
   };
 }

@@ -103,9 +103,17 @@ const RULES: Rule[] = [
     why: 'Rê chuột đổi nền/viền, không đổi vị trí — design/RULES.md.',
   },
   {
+    key: 'offScaleText',
+    label: 'cỡ chữ ngoài thang',
+    // Thang: text-[11px] (gợi ý) · text-xs (12) · text-dense (13) · text-sm (14)…
+    // `text-[12.5px]`, `text-[13px]` viết tay là bậc thứ N+1 không ai đặt tên.
+    pattern: /text-\[(?!11px\])[0-9.]+px\]/g,
+    why: 'Dùng bậc có tên: text-[11px] / text-xs / text-dense / text-sm / text-base…',
+  },
+  {
     key: 'handRolledTooltip',
     label: 'tooltip tự chế',
-    pattern: /group-hover:block/g,
+    pattern: /group-hover(?:\/\w+)?:block/g,
     why: 'Dùng component <Tooltip> — bản tự chế không xử lý bàn phím và tràn viewport.',
   },
 ];

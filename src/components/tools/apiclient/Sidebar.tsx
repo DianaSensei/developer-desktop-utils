@@ -47,6 +47,7 @@ import { NodeSettingsDialog, type NodeSettingsTarget } from './NodeSettingsDialo
 import { ImportCurlDialog } from './ImportCurlDialog';
 import { McpSetupDialog } from '@/components/McpSetupDialog';
 import { collectionMatches, itemMatches } from './treeSearch';
+import { t } from './i18n';
 
 const emptyScript = (s?: RequestScript): RequestScript => s ?? { req: '', res: '' };
 const inheritAuth = (a?: Auth): Auth => a ?? newAuth();
@@ -316,17 +317,17 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
           <Boxes className="h-3.5 w-3.5" /> Collections
         </div>
         <div className="flex items-center gap-0.5">
-          <IconButton size="xs" title="New collection" onClick={() => store.addCollection()} className="hover:bg-bg-2">
+          <IconButton size="xs" title={t('side.newCollection')} aria-label={t('side.newCollection')} onClick={() => store.addCollection()} className="hover:bg-bg-2">
             <Plus className="h-3.5 w-3.5" />
           </IconButton>
           <DropdownMenu>
-            <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
+            <DropdownMenuTrigger title={t('more')} aria-label={t('more')} className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
               <MoreVertical className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>Import collection / OpenAPI / .bru</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCurlOpen(true)} icon={<Code2 className="h-3.5 w-3.5" />}>Import cURL</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setMcpSetupOpen(true)} icon={<Plug className="h-3.5 w-3.5" />}>MCP for Claude Code…</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleImport} icon={<Upload className="h-3.5 w-3.5" />}>{t('side.importCollection')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCurlOpen(true)} icon={<Code2 className="h-3.5 w-3.5" />}>{t('side.importCurl')}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setMcpSetupOpen(true)} icon={<Plug className="h-3.5 w-3.5" />}>{t('side.mcp')}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -338,7 +339,7 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
             placeholder says so because a name-only search is what every
             other tree search in the app does, and nobody would try "users"
             for a request called "List all" otherwise. */}
-        <SearchInput ref={searchInputRef} value={query} onChange={setQuery} placeholder="Search name, URL, method" className="h-ctl text-xs" />
+        <SearchInput ref={searchInputRef} value={query} onChange={setQuery} placeholder={t('side.searchPlaceholder')} className="h-ctl text-xs" />
       </div>
 
       {error && (
@@ -350,7 +351,7 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
           <ul className="max-h-32 min-w-0 flex-1 space-y-1 overflow-y-auto">
             {notices.map((n) => <li key={n} className="break-words">{n}</li>)}
           </ul>
-          <IconButton size="xs" title="Dismiss" onClick={() => setNotices([])} className="hover:bg-bg-2">
+          <IconButton size="xs" title={t('dismiss')} aria-label={t('dismiss')} onClick={() => setNotices([])} className="hover:bg-bg-2">
             <X className="h-3.5 w-3.5" />
           </IconButton>
         </div>
@@ -361,17 +362,17 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
         {store.collections.length === 0 ? (
           <EmptyState
             icon={Boxes}
-            title="No collections yet"
-            description="Create a collection, or import a Postman file / OpenAPI spec / Bruno request to get started."
-            action={{ label: 'New collection', onClick: () => store.addCollection() }}
-            secondaryAction={{ label: 'Import…', onClick: handleImport }}
+            title={t('side.noCollections')}
+            description={t('side.noCollectionsDesc')}
+            action={{ label: t('side.newCollection'), onClick: () => store.addCollection() }}
+            secondaryAction={{ label: t('side.importEllipsis'), onClick: handleImport }}
             className="px-4 py-8"
           />
         ) : visible.length === 0 ? (
           <EmptyState
             icon={SearchX}
-            title="No matches"
-            description={`Nothing in your collections matches "${query}".`}
+            title={t('side.noMatches')}
+            description={t('side.noMatchesDesc', { q: query })}
             className="px-4 py-8"
           />
         ) : (
@@ -389,7 +390,7 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
           onOpenChange={(o) => { if (!o) setPendingDelete(null); }}
           title={pendingDelete.title}
           description={pendingDelete.description}
-          confirmLabel="Delete"
+          confirmLabel={t('delete')}
           onConfirm={pendingDelete.onConfirm}
         />
       )}
@@ -427,8 +428,8 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
   };
 
   const removeCollection = () => ctx.confirmDelete({
-    title: 'Delete collection?',
-    description: `This removes "${collection.name}" and everything inside it. This can't be undone.`,
+    title: t('side.deleteCollection'),
+    description: t('side.deleteCollectionDesc', { name: collection.name }),
     onConfirm: () => store.deleteCollection(collection.id),
   });
 
@@ -437,15 +438,15 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
   // a second hover button next to it (one action per row keeps the row from
   // getting crowded — see RequestNode's own entries below for the same call).
   const entries: MenuEntry[] = [
-    { icon: <FilePlus2 className="h-3.5 w-3.5" />, label: 'New Request', onClick: () => store.addItem(collection.id, 'request') },
-    { icon: <FolderPlus className="h-3.5 w-3.5" />, label: 'New Folder', onClick: () => store.addItem(collection.id, 'folder') },
-    { icon: <Play className="h-3.5 w-3.5" />, label: 'Run', sep: true, onClick: () => ctx.onRun(collection.name, flattenRequests(collection.items), collection.id) },
-    { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', sep: true, onClick: () => store.cloneCollection(collection.id) },
-    { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(collection.id) },
-    { icon: <Download className="h-3.5 w-3.5" />, label: 'Export (Postman)', onClick: handleExport },
-    { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId: collection.id, nodeId: null, name: collection.name, kind: 'Collection', script: emptyScript(collection.script), auth: inheritAuth(collection.auth), headers: emptyHeaders(collection.headers) }) },
-    { icon: <ChevronsDownUp className="h-3.5 w-3.5" />, label: collapsed ? 'Expand' : 'Collapse', onClick: () => store.toggleCollapse(collection.id) },
-    { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeCollection },
+    { icon: <FilePlus2 className="h-3.5 w-3.5" />, label: t('side.newRequest'), onClick: () => store.addItem(collection.id, 'request') },
+    { icon: <FolderPlus className="h-3.5 w-3.5" />, label: t('side.newFolder'), onClick: () => store.addItem(collection.id, 'folder') },
+    { icon: <Play className="h-3.5 w-3.5" />, label: t('side.run'), sep: true, onClick: () => ctx.onRun(collection.name, flattenRequests(collection.items), collection.id) },
+    { icon: <CopyPlus className="h-3.5 w-3.5" />, label: t('side.clone'), sep: true, onClick: () => store.cloneCollection(collection.id) },
+    { icon: <Pencil className="h-3.5 w-3.5" />, label: t('side.rename'), onClick: () => ctx.setEditingId(collection.id) },
+    { icon: <Download className="h-3.5 w-3.5" />, label: t('side.exportPostman'), onClick: handleExport },
+    { icon: <Code2 className="h-3.5 w-3.5" />, label: t('side.settings'), onClick: () => ctx.onSettings({ collectionId: collection.id, nodeId: null, name: collection.name, kind: 'Collection', script: emptyScript(collection.script), auth: inheritAuth(collection.auth), headers: emptyHeaders(collection.headers) }) },
+    { icon: <ChevronsDownUp className="h-3.5 w-3.5" />, label: collapsed ? t('side.expand') : t('side.collapse'), onClick: () => store.toggleCollapse(collection.id) },
+    { icon: <Trash2 className="h-3.5 w-3.5" />, label: t('remove'), danger: true, sep: true, onClick: removeCollection },
   ];
 
   // Collapsed and still holding the open request — the dot on Row is the only
@@ -468,7 +469,7 @@ const CollectionNode = memo(function CollectionNode({ collection, ctx }: { colle
         onToggle={() => store.toggleCollapse(collection.id)}
         onRename={(name) => store.renameCollection(collection.id, name)}
         entries={entries}
-        actions={<IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
+        actions={<IconBtn title={t('more')} onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
       />
       {!collapsed && collection.items.filter((it) => !ctx.q || itemMatches(it, ctx.q)).map((item) => (
         <TreeNode key={item.id} item={item} depth={1} collectionId={collection.id} ctx={ctx} />
@@ -489,20 +490,20 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
   const collapsed = !!folder.collapsed && !ctx.q;
 
   const removeFolder = () => ctx.confirmDelete({
-    title: 'Delete folder?',
-    description: `This removes "${folder.name}" and everything inside it. This can't be undone.`,
+    title: t('side.deleteFolder'),
+    description: t('side.deleteCollectionDesc', { name: folder.name }),
     onConfirm: () => store.deleteItem(collectionId, folder.id),
   });
 
   const entries: MenuEntry[] = [
-    { icon: <FilePlus2 className="h-3.5 w-3.5" />, label: 'New Request', onClick: () => store.addItem(collectionId, 'request', folder.id) },
-    { icon: <FolderPlus className="h-3.5 w-3.5" />, label: 'New Folder', onClick: () => store.addItem(collectionId, 'folder', folder.id) },
-    { icon: <Play className="h-3.5 w-3.5" />, label: 'Run', sep: true, onClick: () => ctx.onRun(folder.name, flattenRequests(folder.items), collectionId) },
-    { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', sep: true, onClick: () => store.cloneItem(collectionId, folder.id) },
-    { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(folder.id) },
-    { icon: <Code2 className="h-3.5 w-3.5" />, label: 'Settings…', onClick: () => ctx.onSettings({ collectionId, nodeId: folder.id, name: folder.name, kind: 'Folder', script: emptyScript(folder.script), auth: inheritAuth(folder.auth), headers: emptyHeaders(folder.headers) }) },
-    { icon: <ChevronsDownUp className="h-3.5 w-3.5" />, label: collapsed ? 'Expand' : 'Collapse', onClick: () => store.toggleCollapse(collectionId, folder.id) },
-    { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeFolder },
+    { icon: <FilePlus2 className="h-3.5 w-3.5" />, label: t('side.newRequest'), onClick: () => store.addItem(collectionId, 'request', folder.id) },
+    { icon: <FolderPlus className="h-3.5 w-3.5" />, label: t('side.newFolder'), onClick: () => store.addItem(collectionId, 'folder', folder.id) },
+    { icon: <Play className="h-3.5 w-3.5" />, label: t('side.run'), sep: true, onClick: () => ctx.onRun(folder.name, flattenRequests(folder.items), collectionId) },
+    { icon: <CopyPlus className="h-3.5 w-3.5" />, label: t('side.clone'), sep: true, onClick: () => store.cloneItem(collectionId, folder.id) },
+    { icon: <Pencil className="h-3.5 w-3.5" />, label: t('side.rename'), onClick: () => ctx.setEditingId(folder.id) },
+    { icon: <Code2 className="h-3.5 w-3.5" />, label: t('side.settings'), onClick: () => ctx.onSettings({ collectionId, nodeId: folder.id, name: folder.name, kind: 'Folder', script: emptyScript(folder.script), auth: inheritAuth(folder.auth), headers: emptyHeaders(folder.headers) }) },
+    { icon: <ChevronsDownUp className="h-3.5 w-3.5" />, label: collapsed ? t('side.expand') : t('side.collapse'), onClick: () => store.toggleCollapse(collectionId, folder.id) },
+    { icon: <Trash2 className="h-3.5 w-3.5" />, label: t('remove'), danger: true, sep: true, onClick: removeFolder },
   ];
 
   // Open/closed folder icon (VS Code convention) — folders previously had no
@@ -528,7 +529,7 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
         onToggle={() => store.toggleCollapse(collectionId, folder.id)}
         onRename={(name) => store.renameItem(folder.id, name)}
         entries={entries}
-        actions={<IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
+        actions={<IconBtn title={t('more')} onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
       />
       {!collapsed && folder.items.filter((it) => !ctx.q || itemMatches(it, ctx.q)).map((child) => (
         <TreeNode key={child.id} item={child} depth={depth + 1} collectionId={collectionId} ctx={ctx} />
@@ -542,15 +543,15 @@ const RequestNode = memo(function RequestNode({ request, depth, collectionId, ct
   const active = ctx.activeRequestId === request.id;
 
   const removeRequest = () => ctx.confirmDelete({
-    title: 'Delete request?',
-    description: `This removes "${request.name}". This can't be undone.`,
+    title: t('side.deleteRequest'),
+    description: t('side.deleteRequestDesc', { name: request.name }),
     onConfirm: () => store.deleteItem(collectionId, request.id),
   });
 
   const entries: MenuEntry[] = [
-    { icon: <CopyPlus className="h-3.5 w-3.5" />, label: 'Clone', onClick: () => store.cloneItem(collectionId, request.id) },
-    { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Rename', onClick: () => ctx.setEditingId(request.id) },
-    { icon: <Trash2 className="h-3.5 w-3.5" />, label: 'Remove', danger: true, sep: true, onClick: removeRequest },
+    { icon: <CopyPlus className="h-3.5 w-3.5" />, label: t('side.clone'), onClick: () => store.cloneItem(collectionId, request.id) },
+    { icon: <Pencil className="h-3.5 w-3.5" />, label: t('side.rename'), onClick: () => ctx.setEditingId(request.id) },
+    { icon: <Trash2 className="h-3.5 w-3.5" />, label: t('remove'), danger: true, sep: true, onClick: removeRequest },
   ];
 
   return (
@@ -579,7 +580,7 @@ const RequestNode = memo(function RequestNode({ request, depth, collectionId, ct
       // One hover affordance per row — clone and remove both live in this menu
       // (and on right-click), so a second and third button only cost the name
       // the width it needs.
-      actions={<IconBtn title="More" onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
+      actions={<IconBtn title={t('more')} onClick={(e) => ctx.openMenu(e, entries)}><MoreVertical className="h-3.5 w-3.5" /></IconBtn>}
     />
   );
 });
@@ -756,7 +757,7 @@ function Row({
           {badge}
           {dot && (
             <span
-              title="Contains the open request"
+              title={t('side.containsOpen')}
               className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-acc"
             />
           )}

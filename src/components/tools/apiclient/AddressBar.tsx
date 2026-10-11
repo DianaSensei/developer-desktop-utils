@@ -12,6 +12,7 @@ import { InlineCodeField, type InlineCodeFieldHandle } from '@/design-system';
 import { paramsFromUrl } from './request';
 import { parseCurl } from './curl';
 import { type ApiRequest, HTTP_METHODS } from './types';
+import { t } from './i18n';
 
 interface Props {
   request: ApiRequest;
@@ -72,8 +73,8 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
       <Input
         value={request.name}
         onChange={(e) => onRename(e.target.value)}
-        placeholder="Request name"
-        aria-label="Request name"
+        placeholder={t('addr.requestName')}
+        aria-label={t('addr.requestName')}
         className="mb-1 h-6 w-full truncate rounded-sm border-0 bg-transparent px-1.5 text-sm font-semibold text-fg shadow-none transition-colors hover:bg-bg-2/50 focus-visible:bg-bg-2/70 focus-visible:ring-[3px] focus-visible:ring-focus"
       />
       {/* h-ctl, not h-ctl-lg: this bar used to be the one control in the app
@@ -126,7 +127,7 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
         </div>
 
         {/* Code generator */}
-        <IconButton onClick={onGenerateCode} title="Generate Code">
+        <IconButton onClick={onGenerateCode} title={t('addr.generateCode')} aria-label={t('addr.generateCode')}>
           <Code2 className="h-4 w-4" />
         </IconButton>
 
@@ -137,8 +138,8 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
             bar's own rounded-lg + overflow-hidden already clips this flush
             corner into that curve, so it still reads as one rounded pill. */}
         {sending ? (
-          <Button variant="destructive" size="sm" onClick={onCancel} title="Cancel the request in flight" className="h-ctl gap-1.5 rounded-none press">
-            <X className="h-3.5 w-3.5" /> Cancel
+          <Button variant="destructive" size="sm" onClick={onCancel} title={t('addr.cancelInFlight')} className="h-ctl gap-1.5 rounded-none press">
+            <X className="h-3.5 w-3.5" /> {t('cancel')}
           </Button>
         ) : (
           // sc/scMod: the shortcut printed inline (Send │ ⌘⏎) is how a new user
@@ -148,12 +149,12 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
             size="sm"
             onClick={onSend}
             disabled={!request.url.trim()}
-            title={request.url.trim() ? 'Send the request' : 'Enter a URL to send'}
+            title={request.url.trim() ? t('addr.sendTitle') : t('addr.enterUrl')}
             className="h-ctl gap-1.5 rounded-none shadow-sm press"
             sc="⏎"
             scMod
           >
-            <Send className="h-3.5 w-3.5" /> Send
+            <Send className="h-3.5 w-3.5" /> {t('addr.send')}
           </Button>
         )}
       </div>

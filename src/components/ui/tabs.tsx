@@ -20,6 +20,8 @@ import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, u
 import { ChevronsRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 export interface TabDef {
   id: string;
@@ -204,13 +206,14 @@ const TabBtn = forwardRef<HTMLButtonElement, {
 TabBtn.displayName = 'TabBtn';
 
 function TabOverflow({ tabs, onSelect }: { tabs: TabDef[]; onSelect: (id: string) => void }) {
+  const ui = useMessages(UI);
   const [open, setOpen] = useState(false);
   // Click-outside + Escape, instead of a full-screen invisible backdrop that
   // swallowed hover and scroll events over the rest of the panel.
   const ref = useDismissable<HTMLDivElement>(open, () => setOpen(false));
   return (
     <div ref={ref} className="relative ml-3 shrink-0">
-      <button onClick={() => setOpen((o) => !o)} title="More tabs" className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-bg-2/50 hover:text-fg">
+      <button onClick={() => setOpen((o) => !o)} title={ui('moreTabs')} aria-label={ui('moreTabs')} className="rounded-md p-1.5 text-fg-mute transition-colors hover:bg-bg-2/50 hover:text-fg">
         <ChevronsRight className="h-4 w-4" />
       </button>
       {open && (

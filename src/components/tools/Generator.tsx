@@ -6,12 +6,16 @@ import { Segmented } from '@/components/ui/segmented';
 import { Dices, FlaskConical } from 'lucide-react';
 import { RandomGenerator } from './RandomGenerator';
 import { FakeDataGenerator } from './FakeDataGenerator';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/Generator.messages';
 
 type Mode = 'random' | 'fake';
 
 export function Generator() {
   const sdk = usePluginSdkFor('generator');
   const [mode, setMode] = usePluginState<Mode>(sdk, 'generator:tab', 'random', { legacyKey: 'devtool:generator:tab' });
+
+  const m = useMessages(MESSAGES);
 
   return (
     <div className="flex flex-col h-full">
@@ -20,10 +24,10 @@ export function Generator() {
           value={mode}
           onValueChange={setMode}
           options={[
-            { value: 'random', label: 'Random', icon: Dices },
-            { value: 'fake', label: 'Test Data', icon: FlaskConical },
+            { value: 'random', label: m('random'), icon: Dices },
+            { value: 'fake', label: m('testData'), icon: FlaskConical },
           ]}
-          aria-label="Generator type"
+          aria-label={m('typeLabel')}
         />
       </div>
       <div className="flex-1 min-h-0">

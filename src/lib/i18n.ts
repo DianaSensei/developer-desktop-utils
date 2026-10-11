@@ -1,9 +1,9 @@
 /**
  * Hạ tầng song ngữ — VI/EN, chuyển được lúc chạy.
  *
- * G3 chỉ dịch CHUỖI CỦA SHELL (sidebar, ⌘K, Settings) — 24 tool vẫn tiếng Anh,
- * dịch dần trong chính đợt di cư của từng tool ở G4. Gộp hết vào một PR khổng
- * lồ dịch toàn app sẽ không ai review nổi.
+ * Từ điển phẳng bên dưới là của SHELL (sidebar, ⌘K, Settings, workspace). Mỗi
+ * tool có từ điển riêng `<Tool>.messages.ts` nằm cạnh nó (xem `defineMessages`
+ * ở cuối file), component của kit dùng `components/ui/ui.messages.ts`.
  *
  * Từ điển PHẲNG, không lồng namespace: `{ vi, en }` theo từng khoá, để:
  *   - thiếu bản dịch lộ ra ngay ở kiểu TypeScript (cả hai field bắt buộc)
@@ -18,7 +18,7 @@ export type Locale = 'vi' | 'en';
 
 export const LOCALES: Locale[] = ['vi', 'en'];
 
-type Entry = Record<Locale, string>;
+export type Entry = Record<Locale, string>;
 
 export const DICTIONARY = {
   // ── Sidebar ────────────────────────────────────────────────────────────
@@ -152,9 +152,31 @@ export const DICTIONARY = {
   'shell.titlebar.close': { vi: 'Đóng', en: 'Close' },
   'shell.titlebar.themeCycleTap': { vi: 'Giao diện: {{theme}} (chạm để đổi)', en: 'Theme: {{theme}} (tap to cycle)' },
 
-  // ── Open tools strip — tools visited this session, click to jump back ──
-  'shell.openTools.label': { vi: 'Tool đã mở trong phiên này', en: 'Tools opened this session' },
-  'shell.openTools.close': { vi: 'Đóng {{label}} khỏi dải tool đã mở', en: 'Close {{label}} from open tools' },
+  // ── Workspace — bộ tab tool có tên, lưu qua các lần mở app ─────────────
+  'shell.workspace.tabsLabel': { vi: 'Tab của workspace {{name}}', en: 'Tabs in workspace {{name}}' },
+  'shell.workspace.defaultName': { vi: 'Workspace số {{n}}', en: 'Workspace {{n}}' },
+  'shell.workspace.switcher': { vi: 'Đổi workspace — đang ở {{name}}', en: 'Switch workspace — current: {{name}}' },
+  'shell.workspace.menuLabel': { vi: 'Workspace', en: 'Workspaces' },
+  'shell.workspace.tabCount': { vi: '{{n}} tab', en: '{{n}} tabs' },
+  'shell.workspace.new': { vi: 'Workspace mới…', en: 'New workspace…' },
+  'shell.workspace.rename': { vi: 'Đổi tên…', en: 'Rename…' },
+  'shell.workspace.delete': { vi: 'Xoá workspace này', en: 'Delete this workspace' },
+  'shell.workspace.closeTab': { vi: 'Đóng tab {{label}}', en: 'Close {{label}} tab' },
+  'shell.workspace.closeOthers': { vi: 'Đóng các tab khác', en: 'Close other tabs' },
+  'shell.workspace.openTool': { vi: 'Mở tool khác ({{shortcut}})', en: 'Open another tool ({{shortcut}})' },
+  'shell.workspace.dialogCreate': { vi: 'Workspace mới', en: 'New workspace' },
+  'shell.workspace.dialogRename': { vi: 'Đổi tên workspace', en: 'Rename workspace' },
+  'shell.workspace.dialogHint': {
+    vi: 'Mỗi workspace giữ một bộ tab riêng. Tool đang mở sẽ là tab đầu tiên.',
+    en: 'Each workspace keeps its own set of tabs. The tool on screen becomes its first tab.',
+  },
+  'shell.workspace.namePlaceholder': { vi: 'VD: Debug backend', en: 'e.g. Backend debugging' },
+  'shell.workspace.create': { vi: 'Tạo', en: 'Create' },
+  'shell.workspace.save': { vi: 'Lưu', en: 'Save' },
+  'shell.workspace.cancel': { vi: 'Huỷ', en: 'Cancel' },
+  'palette.section.workspaces': { vi: 'Workspace', en: 'Workspaces' },
+  'palette.workspace.switch': { vi: 'Chuyển sang', en: 'Switch to' },
+  'palette.workspace.empty': { vi: 'Chưa có tab nào', en: 'No tabs yet' },
 
   // ── ⌘K command palette — a11y-only title ────────────────────────────────
   'palette.title': { vi: 'Bảng lệnh', en: 'Command palette' },
@@ -465,4 +487,27 @@ export function translate(
 export function detectDefaultLocale(): Locale {
   if (typeof navigator === 'undefined') return 'en';
   return navigator.language?.toLowerCase().startsWith('vi') ? 'vi' : 'en';
+}
+
+// ── Từ điển theo tool ────────────────────────────────────────────────────
+//
+// Từ điển phẳng ở trên là của SHELL. Mỗi tool giữ từ điển riêng trong file
+// `<Tool>.messages.ts` nằm cạnh nó: dồn hàng trăm câu của 22 tool vào một file
+// chung thì không ai review nổi, và một tool bị xoá/tách ra plugin ngoài sẽ để
+// lại khoá mồ côi. `toolMessages.test.ts` quét mọi file `*.messages.ts` để bắt
+// bản dịch rỗng.
+
+export type Messages = Record<string, Entry>;
+
+/** Khai một từ điển tool — chỉ để TypeScript suy ra đúng tập khoá. */
+export function defineMessages<M extends Messages>(messages: M): M {
+  return messages;
+}
+
+/** Nội suy `{{param}}` — dùng chung cho từ điển shell và từ điển tool. */
+export function interpolate(text: string, params?: Record<string, string | number>): string {
+  if (!params) return text;
+  let out = text;
+  for (const [k, v] of Object.entries(params)) out = out.split(`{{${k}}}`).join(String(v));
+  return out;
 }

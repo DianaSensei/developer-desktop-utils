@@ -27,6 +27,8 @@ import {
   toDateInput,
   weekStart,
 } from './time';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/clockify/TimeTracker.messages';
 
 type Period = 'day' | 'week' | 'month' | 'all' | 'range';
 const PERIODS: { id: Period; label: string }[] = [
@@ -68,6 +70,7 @@ function EditableTime({ ts, dayTs, onCommit }: { ts: number; dayTs: number; onCo
 
 // One time record (history line) inside a task.
 function HistoryRow({ entry }: { entry: TimeEntry }) {
+  const tr = useMessages(MESSAGES);
   const { now, updateEntry, deleteEntry } = useClockify();
   const running = entry.end === null;
   const day = dayStart(entry.start);
@@ -79,7 +82,7 @@ function HistoryRow({ entry }: { entry: TimeEntry }) {
         <EditableTime ts={entry.start} dayTs={day} onCommit={(v) => updateEntry(entry.id, { start: Math.min(v, entry.end ?? Date.now()) })} />
         <span className="text-fg-mute">–</span>
         {running ? (
-          <span className="w-[64px] text-center text-[var(--live)]">now</span>
+          <span className="w-[64px] text-center text-[var(--live)]">{tr('now')}</span>
         ) : (
           <EditableTime ts={entry.end!} dayTs={day} onCommit={(v) => updateEntry(entry.id, { end: Math.max(v, entry.start) })} />
         )}
@@ -94,7 +97,7 @@ function HistoryRow({ entry }: { entry: TimeEntry }) {
           className="ml-auto h-ctl w-16 text-xs"
         />
       )}
-      <ConfirmButton onConfirm={() => deleteEntry(entry.id)} title="Delete record" className="flex h-6 w-6 items-center justify-center rounded hover:bg-bg-2">
+      <ConfirmButton onConfirm={() => deleteEntry(entry.id)} title={tr('deleteRecord')} className="flex h-6 w-6 items-center justify-center rounded hover:bg-bg-2">
         <Trash2 className="h-3 w-3" />
       </ConfirmButton>
     </div>
@@ -103,6 +106,7 @@ function HistoryRow({ entry }: { entry: TimeEntry }) {
 
 // Inline "add a subtask" input shown at the bottom of an expanded task.
 function AddSubtaskInput({ onAdd }: { onAdd: (name: string) => void }) {
+  const tr = useMessages(MESSAGES);
   const [v, setV] = useState('');
   const submit = () => { const n = v.trim(); if (n) { onAdd(n); setV(''); } };
   return (
@@ -112,10 +116,10 @@ function AddSubtaskInput({ onAdd }: { onAdd: (name: string) => void }) {
         value={v}
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-        placeholder="Add subtask…"
+        placeholder={tr('addSubtask')}
         className="h-ctl flex-1 text-xs"
       />
-      <Button size="sm" variant="outline" className="h-ctl" onClick={submit} disabled={!v.trim()}>Add</Button>
+      <Button size="sm" variant="outline" className="h-ctl" onClick={submit} disabled={!v.trim()}>{tr('add')}</Button>
     </div>
   );
 }
@@ -159,6 +163,7 @@ function FilterControls({
   activeCount: number;
   onClear: () => void;
 }) {
+  const tr = useMessages(MESSAGES);
   const { projects, tags } = useClockify();
   const active = projects.filter((p) => !p.archived);
   const toggleTag = (id: string) => onTags(tagIds.includes(id) ? tagIds.filter((x) => x !== id) : [...tagIds, id]);
@@ -170,7 +175,8 @@ function FilterControls({
       trigger={({ toggle }) => (
         <button
           onClick={toggle}
-          title={activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active` : 'Filter tasks'}
+          title={activeCount > 0 ? tr(activeCount > 1 ? 'filtersActive' : 'filterActive', { n: activeCount }) : tr('filterTasks')}
+          aria-label={tr('filterTasks')}
           className={cn(
             'relative flex h-ctl w-ctl items-center justify-center rounded-sm border transition-colors hover:bg-bg-2 hover:text-fg',
             activeCount > 0 ? 'border-acc/50 text-fg' : 'text-fg-mute'
@@ -188,9 +194,9 @@ function FilterControls({
       {() => (
         <div className="space-y-3">
           <div className="space-y-1">
-            <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">Project</p>
+            <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">{tr('project')}</p>
             <div className="max-h-40 overflow-y-auto">
-              {([['all', 'All projects'], [null, 'No project']] as const).map(([val, label]) => (
+              {([['all', tr('allProjects')], [null, tr('noProject')]] as const).map(([val, label]) => (
                 <button
                   key={String(val)}
                   onClick={() => onProject(val)}
@@ -215,7 +221,7 @@ function FilterControls({
 
           {tags.length > 0 && (
             <div className="space-y-1 border-t border-line pt-2">
-              <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">Tags</p>
+              <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">{tr('tags')}</p>
               <div className="max-h-40 overflow-y-auto">
                 {tags.map((t) => (
                   <button key={t.id} onClick={() => toggleTag(t.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2">
@@ -231,7 +237,7 @@ function FilterControls({
 
           {activeCount > 0 && (
             <button onClick={onClear} className="w-full rounded border border-line py-1.5 text-xs text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg">
-              Clear filters
+              {tr('clearFilters')}
             </button>
           )}
         </div>
@@ -241,6 +247,7 @@ function FilterControls({
 }
 
 export function TimeTracker() {
+  const tr = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('task-tracker');
   const { entries, subtasks, running, now, settings, startEntry, stopRunning, addEntry, updateEntry, addSubtask, deleteSubtask, renameTask, projectById, tagById } = useClockify();
 
@@ -434,11 +441,11 @@ export function TimeTracker() {
   const manualDayTs = parseDateInput(manualDate);
   const manualDayLabel =
     manualDayTs === null
-      ? 'Set date'
+      ? tr('setDate')
       : manualDayTs === dayStart(now)
-        ? 'Today'
+        ? tr('today')
         : manualDayTs === dayStart(now) - 86_400_000
-          ? 'Yesterday'
+          ? tr('yesterday')
           : shortDate(manualDayTs);
 
   const addManual = () => {
@@ -536,7 +543,7 @@ export function TimeTracker() {
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && mode === 'timer' && isNewTask && start()}
-            placeholder="What are you working on?"
+            placeholder={tr('whatWorkingOn')}
             className="h-ctl-lg min-w-[180px] flex-1 text-sm"
           />
           <ProjectPicker value={projectId} taskValue={taskId} onChange={(p, t) => { setProjectId(p); setTaskId(t); }} />
@@ -555,7 +562,7 @@ export function TimeTracker() {
                   onClick={() => setMode(m)}
                   className={cn('rounded px-2.5 text-xs font-medium capitalize transition-colors', mode === m ? 'bg-fg/10 text-fg' : 'text-fg-mute hover:text-fg')}
                 >
-                  {m}
+                  {tr(`mode.${m}`)}
                 </button>
               ))}
             </div>
@@ -570,7 +577,7 @@ export function TimeTracker() {
                 trigger={({ open, toggle }) => (
                   <button
                     onClick={toggle}
-                    title="Set date & time"
+                    title={tr('setDateTime')}
                     className={cn('flex h-full w-[88px] flex-col items-center justify-center gap-0.5 border-l leading-none transition-colors hover:bg-bg-2', open && 'bg-bg-2')}
                   >
                     <span className="text-[11px] font-medium text-fg-mute">{manualDayLabel}</span>
@@ -589,24 +596,24 @@ export function TimeTracker() {
                         onClick={() => setManualKind(k)}
                         className={cn('flex-1 rounded px-2 py-1 font-medium capitalize transition-colors', manualKind === k ? 'bg-fg/10' : 'text-fg-mute hover:text-fg')}
                       >
-                        {k}
+                        {tr(`kind.${k}`)}
                       </button>
                     ))}
                   </div>
                   {manualKind === 'range' ? (
                     <div className="flex items-center justify-between gap-2">
                       <label className="flex flex-1 flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute">Start</span>
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute">{tr('start')}</span>
                         <TimeStepperField value={manualStart} onChange={setManualStart} className="w-full" />
                       </label>
                       <span className="mt-4 text-fg-mute">–</span>
                       <label className="flex flex-1 flex-col gap-1">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute">End</span>
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-fg-mute">{tr('end')}</span>
                         <TimeStepperField value={manualEnd} onChange={setManualEnd} className="w-full" />
                       </label>
                     </div>
                   ) : (
-                    <Input value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} placeholder="1:30 or 90m" className="h-ctl-lg w-full text-center font-mono text-sm" />
+                    <Input value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} placeholder={tr('durationPlaceholder')} className="h-ctl-lg w-full text-center font-mono text-sm" />
                   )}
                 </div>
               )}
@@ -618,22 +625,22 @@ export function TimeTracker() {
               <>
                 {/* Start a different task without stopping first — the running one stops automatically. */}
                 {isNewTask && (
-                  <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={start} title="Start this task (stops the current one)">
-                    <Play className="h-4 w-4" /> Start
+                  <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={start} title={tr('startStopsCurrent')}>
+                    <Play className="h-4 w-4" /> {tr('start')}
                   </Button>
                 )}
-                <Button variant="destructive" className="h-ctl-lg min-w-[100px] gap-2" onClick={stopRunning} title={`Stop (${TOGGLE_HINT})`}>
-                  <Square className="h-4 w-4 fill-current" /> Stop
+                <Button variant="destructive" className="h-ctl-lg min-w-[100px] gap-2" onClick={stopRunning} title={tr('stopHint', { key: TOGGLE_HINT })}>
+                  <Square className="h-4 w-4 fill-current" /> {tr('stop')}
                 </Button>
               </>
             ) : (
-              <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={start} disabled={!hasTitle} title={hasTitle ? `Start (${TOGGLE_HINT})` : 'Enter a task name to start'}>
-                <Play className="h-4 w-4" /> Start
+              <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={start} disabled={!hasTitle} title={hasTitle ? tr('startHint', { key: TOGGLE_HINT }) : tr('enterNameToStart')}>
+                <Play className="h-4 w-4" /> {tr('start')}
               </Button>
             )
           ) : (
-            <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={addManual} disabled={!hasTitle || manualMs <= 0} title={!hasTitle ? 'Enter a task name to add time' : manualMs <= 0 ? 'Set a valid time range' : undefined}>
-              <Plus className="h-4 w-4" /> Add
+            <Button className="h-ctl-lg min-w-[100px] gap-2" onClick={addManual} disabled={!hasTitle || manualMs <= 0} title={!hasTitle ? tr('enterNameToAdd') : manualMs <= 0 ? tr('setValidRange') : undefined}>
+              <Plus className="h-4 w-4" /> {tr('add')}
             </Button>
           )}
         </div>
@@ -659,14 +666,14 @@ export function TimeTracker() {
             Only shown when idle (no timer running, nothing typed) so it never clutters. */}
         {mode === 'timer' && !running && desc.trim() === '' && groups.length > 0 && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <span className="mr-0.5 text-[11px] font-medium text-fg-mute">Continue</span>
+            <span className="mr-0.5 text-[11px] font-medium text-fg-mute">{tr('continue')}</span>
             {groups.slice(0, 4).map((g) => {
               const project = projectById(g.projectId);
               return (
                 <button
                   key={g.key}
                   onClick={() => resumeGroup(g)}
-                  title={`Resume “${g.name}”`}
+                  title={tr('resume', { name: g.name })}
                   className="group flex max-w-[220px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-fg-mute transition-colors hover:border-acc/50 hover:bg-bg-2 hover:text-fg"
                 >
                   <Play className="h-3 w-3 shrink-0 fill-current text-acc" />
@@ -689,7 +696,7 @@ export function TimeTracker() {
                 onClick={() => setPeriod(p.id)}
                 className={cn('rounded px-2 py-1 font-medium transition-colors', period === p.id ? 'bg-fg/10 text-fg' : 'text-fg-mute hover:text-fg')}
               >
-                {p.label}
+                {tr(`period.${p.id}`)}
               </button>
             ))}
           </div>
@@ -705,7 +712,7 @@ export function TimeTracker() {
         <div className="ml-auto flex items-center gap-3">
           {/* Daily goal — today's time vs target */}
           {targetMs > 0 && (
-            <div className="flex items-center gap-2" title={`Today vs your ${settings.dailyTargetHours}h daily target`}>
+            <div className="flex items-center gap-2" title={tr('todayVsTarget', { h: settings.dailyTargetHours })}>
               <div className="relative h-1.5 w-14 overflow-hidden rounded-full bg-bg-2">
                 <div
                   className={cn('h-full rounded-full transition-[width] duration-500', overMs >= 0 ? 'bg-ok' : 'bg-acc')}
@@ -713,7 +720,7 @@ export function TimeTracker() {
                 />
               </div>
               <span className="whitespace-nowrap text-[11px] text-fg-mute">
-                Today <span className="font-mono tabular-nums text-fg">{fmtTotal(todayTotal)}</span>
+                {tr('today')} <span className="font-mono tabular-nums text-fg">{fmtTotal(todayTotal)}</span>
                 <span className="text-fg-mute/70"> / {settings.dailyTargetHours}h</span>
               </span>
             </div>
@@ -721,7 +728,7 @@ export function TimeTracker() {
 
           {/* Period total */}
           <span className="whitespace-nowrap text-fg-mute">
-            {period === 'all' ? 'Total' : period === 'range' ? 'Range' : `This ${period}`}{' '}
+            {period === 'all' ? tr('total') : period === 'range' ? tr('period.range') : tr(`this.${period}`)}{' '}
             <span className="font-mono tabular-nums text-fg">{fmtTotal(periodTotal)}</span>
           </span>
 
@@ -735,17 +742,18 @@ export function TimeTracker() {
                 onChange={(e) => setQuery(e.target.value)}
                 onBlur={() => { if (!query) setSearchOpen(false); }}
                 onKeyDown={(e) => { if (e.key === 'Escape') { setQuery(''); setSearchOpen(false); } }}
-                placeholder="Search…"
+                placeholder={tr('search')}
+                aria-label={tr('searchTasks')}
                 className="h-ctl w-44 pl-8 pr-7 text-xs"
               />
               {query && (
-                <button onClick={() => { setQuery(''); setSearchOpen(false); }} title="Clear" className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg">
+                <button onClick={() => { setQuery(''); setSearchOpen(false); }} title={tr('clear')} aria-label={tr('clear')} className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-mute hover:text-fg">
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
           ) : (
-            <button onClick={() => setSearchOpen(true)} title="Search tasks" className="flex h-ctl w-ctl items-center justify-center rounded-sm border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg">
+            <button onClick={() => setSearchOpen(true)} title={tr('searchTasks')} aria-label={tr('searchTasks')} className="flex h-ctl w-ctl items-center justify-center rounded-sm border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg">
               <Search className="h-3.5 w-3.5" />
             </button>
           )}
@@ -769,7 +777,8 @@ export function TimeTracker() {
                 onClick={() => hasExportable && toggle()}
                 disabled={!hasExportable}
                 className="flex h-ctl w-ctl items-center justify-center rounded-sm border text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-40"
-                title={hasExportable ? 'Export visible entries' : 'Nothing to export'}
+                title={hasExportable ? tr('exportVisible') : tr('nothingToExport')}
+                aria-label={tr('exportVisible')}
               >
                 <Download className="h-3.5 w-3.5" />
               </button>
@@ -778,10 +787,10 @@ export function TimeTracker() {
             {(close) => (
               <div className="space-y-0.5">
                 <button onClick={() => doExport('csv', close)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2">
-                  <Download className="h-3.5 w-3.5 text-fg-mute" /> Export CSV
+                  <Download className="h-3.5 w-3.5 text-fg-mute" /> {tr('exportCsv')}
                 </button>
                 <button onClick={() => doExport('json', close)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-2">
-                  <Download className="h-3.5 w-3.5 text-fg-mute" /> Export JSON
+                  <Download className="h-3.5 w-3.5 text-fg-mute" /> {tr('exportJson')}
                 </button>
               </div>
             )}
@@ -795,15 +804,15 @@ export function TimeTracker() {
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-fg-mute">
             <TimerIcon className="h-ctl w-ctl opacity-30" />
             {q || filterCount > 0 ? (
-              <p className="text-sm">No tasks match your search or filters.</p>
+              <p className="text-sm">{tr('noTasksMatch')}</p>
             ) : entries.length === 0 ? (
               <>
-                <p className="text-sm font-medium text-fg">Start tracking your time</p>
-                <p className="text-xs">Type what you're working on above, then press <span className="font-medium text-fg">Start</span>.</p>
+                <p className="text-sm font-medium text-fg">{tr('startTracking')}</p>
+                <p className="text-xs">{tr('startHintBefore')} <span className="font-medium text-fg">{tr('start')}</span>.</p>
               </>
             ) : (
               <p className="text-sm">
-                {period === 'range' ? 'No time tracked in this range.' : `No time tracked this ${period}.`}
+                {period === 'range' ? tr('noneRange') : tr(`none.${period}`)}
               </p>
             )}
           </div>
@@ -862,7 +871,7 @@ export function TimeTracker() {
                   )}
                   <span className={cn('shrink-0 font-mono text-sm tabular-nums', isRunning && 'text-[var(--live)]')}>{fmtTotal(total)}</span>
                   {isRunning ? (
-                    <Button size="icon" variant="ghost" className="h-ctl w-ctl text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title="Stop">
+                    <Button size="icon" variant="ghost" className="h-ctl w-ctl text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title={tr('stop')} aria-label={tr('stop')}>
                       <Square className="h-4 w-4 fill-current" />
                     </Button>
                   ) : (
@@ -870,7 +879,8 @@ export function TimeTracker() {
                       size="icon"
                       variant="ghost"
                       className="h-ctl w-ctl text-fg-mute hover:text-fg"
-                      title={g.hasSub ? 'Resume the latest subtask' : 'Start this task'}
+                      title={g.hasSub ? tr('resumeLatestSubtask') : tr('startThisTask')}
+                      aria-label={g.hasSub ? tr('resumeLatestSubtask') : tr('startThisTask')}
                       onClick={startTask}
                     >
                       <Play className="h-4 w-4" />
@@ -898,21 +908,21 @@ export function TimeTracker() {
                                 </button>
                                 <span className={cn('shrink-0 font-mono text-xs tabular-nums', sg.running && 'text-[var(--live)]')}>{fmtTotal(subTotal)}</span>
                                 {sg.running ? (
-                                  <Button size="icon" variant="ghost" className="h-ctl w-ctl text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title="Stop">
+                                  <Button size="icon" variant="ghost" className="h-ctl w-ctl text-[var(--live)] hover:bg-[hsl(var(--live-c)/0.10)]" onClick={stopRunning} title={tr('stop')} aria-label={tr('stop')}>
                                     <Square className="h-3.5 w-3.5 fill-current" />
                                   </Button>
                                 ) : (
-                                  <Button size="icon" variant="ghost" className="h-ctl w-ctl text-fg-mute hover:text-fg" title="Start this subtask" onClick={() => resumeTask(g.name, g.projectId, g.tagIds, sg.name)}>
+                                  <Button size="icon" variant="ghost" className="h-ctl w-ctl text-fg-mute hover:text-fg" title={tr('startThisSubtask')} aria-label={tr('startThisSubtask')} onClick={() => resumeTask(g.name, g.projectId, g.tagIds, sg.name)}>
                                     <Play className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
-                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title="Delete subtask" className="flex h-ctl w-ctl items-center justify-center rounded text-fg-mute hover:bg-bg-2">
+                                <ConfirmButton onConfirm={() => deleteSubtask(g.name, sg.name)} title={tr('deleteSubtask')} className="flex h-ctl w-ctl items-center justify-center rounded text-fg-mute hover:bg-bg-2">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </ConfirmButton>
                               </div>
                               {subOpen && (sg.recs.length > 0
                                 ? <div className="divide-y bg-bg-2/30">{sg.recs.map((e) => <HistoryRow key={e.id} entry={e} />)}</div>
-                                : <p className="py-2 pl-12 pr-3 text-xs text-fg-mute">No time tracked yet.</p>)}
+                                : <p className="py-2 pl-12 pr-3 text-xs text-fg-mute">{tr('noTimeYet')}</p>)}
                             </div>
                           );
                         })}
@@ -926,7 +936,7 @@ export function TimeTracker() {
                               <div className="flex items-center gap-2 py-2 pl-8 pr-3">
                                 <button onClick={() => toggleExpand(subKey)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
                                   <ChevronRight className={cn('h-3 w-3 shrink-0 text-fg-mute transition-transform', subOpen && 'rotate-90')} />
-                                  <span className="truncate text-sm italic text-fg-mute">General</span>
+                                  <span className="truncate text-sm italic text-fg-mute">{tr('generalSub')}</span>
                                   <Badge pill>{g.directRecs.length}</Badge>
                                   {directRunning && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--live)]" />}
                                 </button>

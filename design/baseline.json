@@ -9,6 +9,7 @@
     "premiumUtilities": 0,
     "hardcodedRadius": 0,
     "hoverLift": 0,
-    "handRolledTooltip": 0
+    "handRolledTooltip": 0,
+    "offScaleText": 0
   }
 }

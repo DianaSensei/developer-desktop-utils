@@ -18,6 +18,7 @@ import { EnvQuickView } from './EnvQuickView';
 import type { ApiStore } from './store';
 import type { SplitDirection } from './ApiClient';
 import type { ApiResponse, Collection, ResolvedVar, TreeItem } from './types';
+import { t } from './i18n';
 
 // The one slice of ApiClient's per-tab RunState a tab actually needs to know
 // about — kept as its own shape (rather than importing RunState) so this
@@ -125,10 +126,10 @@ export function RequestTabs({
     const others = ids.filter((t) => t !== id);
     const toRight = ids.slice(idx + 1);
     return [
-      { label: 'Close', onClick: () => store.closeTab(id) },
-      { label: 'Close Others', disabled: others.length === 0, onClick: () => store.closeTabs(others) },
-      { label: 'Close to the Right', disabled: toRight.length === 0, onClick: () => store.closeTabs(toRight) },
-      { label: 'Close All', sep: true, onClick: () => store.closeTabs(ids) },
+      { label: t('tabs.close'), onClick: () => store.closeTab(id) },
+      { label: t('tabs.closeOthers'), disabled: others.length === 0, onClick: () => store.closeTabs(others) },
+      { label: t('tabs.closeRight'), disabled: toRight.length === 0, onClick: () => store.closeTabs(toRight) },
+      { label: t('tabs.closeAll'), sep: true, onClick: () => store.closeTabs(ids) },
     ];
   };
 
@@ -189,7 +190,7 @@ export function RequestTabs({
                   the moment it starts, and the spinner is what tells you
                   which of several tabs is still waiting. */}
               {run?.sending
-                ? <Spinner size="xs" className="shrink-0 text-fg-mute" label="Sending" />
+                ? <Spinner size="xs" className="shrink-0 text-fg-mute" label={t('tabs.sending')} />
                 : failed && <StatusDot tone="error" size="xs" className="shrink-0" />}
               {/* The slot keeps its 16px whether or not the × is showing, so a
                   tab's label doesn't reflow the moment the pointer enters it. */}
@@ -199,7 +200,8 @@ export function RequestTabs({
                   'grid h-4 w-4 shrink-0 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                   active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                 )}
-                title="Close tab"
+                title={t('tabs.closeTab')}
+                aria-label={t('tabs.closeTab')}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -209,11 +211,12 @@ export function RequestTabs({
         {historyActive && (
           <div className="group relative flex shrink-0 items-center gap-1.5 rounded-md bg-card px-2.5 py-1.5 text-xs text-fg shadow-sm motion-safe:animate-scale-in">
             <Clock className="h-3.5 w-3.5 shrink-0 text-acc-ink" />
-            <span>History</span>
+            <span>{t('tabs.history')}</span>
             <button
               onClick={onCloseHistory}
               className="grid h-4 w-4 shrink-0 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
-              title="Close history"
+              title={t('tabs.closeHistory')}
+                aria-label={t('tabs.closeHistory')}
             >
               <X className="h-3 w-3" />
             </button>
@@ -233,7 +236,7 @@ export function RequestTabs({
           tabs open (or a narrower window) the strip scrolls/clips before this
           ever would, and "open a new request" is exactly the one action that
           must never end up scrolled out of reach. */}
-      <IconButton onClick={onNewRequest} title="New request" className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg">
+      <IconButton onClick={onNewRequest} title={t('tabs.newRequest')} aria-label={t('tabs.newRequest')} className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg">
         <Plus className="h-4 w-4" />
       </IconButton>
 
@@ -247,7 +250,8 @@ export function RequestTabs({
       <IconButton
         onClick={onRevealActive}
         disabled={historyActive || !activeRequestId}
-        title="Reveal in sidebar"
+        title={t('tabs.reveal')}
+        aria-label={t('tabs.reveal')}
         className="h-auto w-auto shrink-0 rounded-none border-l border-line px-2 hover:bg-bg"
       >
         <Folder className="h-4 w-4" />
@@ -303,18 +307,18 @@ export function RequestTabs({
               with "…". */}
           <SelectTrigger
             className="h-ctl w-28 min-w-[4.5rem] shrink text-xs rounded-sm"
-            title="Collection environment — scoped to this collection, follows whichever collection the active request belongs to"
+            title={t('tabs.collectionEnvHint')}
           >
             <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
               <Folder className="h-3 w-3 shrink-0 opacity-70" />
-              <SelectValue placeholder="No Environment" />
+              <SelectValue placeholder={t('noEnvironment')} />
             </div>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">No Environment</SelectItem>
+            <SelectItem value="none">{t('noEnvironment')}</SelectItem>
             {collectionEnvs.length > 0 && (
               <SelectGroup>
-                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">{collection?.name ?? 'Collection'}</SelectLabel>
+                <SelectLabel className="text-[11px] uppercase tracking-wide text-fg-mute">{collection?.name ?? t('tabs.collection')}</SelectLabel>
                 {collectionEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
               </SelectGroup>
             )}
@@ -326,15 +330,15 @@ export function RequestTabs({
         >
           <SelectTrigger
             className="h-ctl w-28 min-w-[4.5rem] shrink text-xs rounded-sm"
-            title="Global environment — applies across every collection, unaffected by which one is active"
+            title={t('tabs.globalEnvHint')}
           >
             <div className="flex min-w-0 items-center gap-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate">
               <Globe className="h-3 w-3 shrink-0 opacity-70" />
-              <SelectValue placeholder="No Global Env" />
+              <SelectValue placeholder={t('tabs.noGlobalEnv')} />
             </div>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">No Global Env</SelectItem>
+            <SelectItem value="none">{t('tabs.noGlobalEnv')}</SelectItem>
             {globalEnvs.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -353,14 +357,16 @@ export function RequestTabs({
         <span className="mx-0.5 h-5 w-px bg-line" />
         <IconButton
           onClick={onOpenHistory}
-          title="History"
+          title={t('tabs.history')}
+          aria-label={t('tabs.history')}
           className={cn('hover:bg-bg', historyActive && 'text-acc-ink')}
         >
           <Clock className="h-4 w-4" />
         </IconButton>
         <IconButton
           onClick={onToggleDirection}
-          title={direction === 'horizontal' ? 'Switch to stacked layout' : 'Switch to side-by-side layout'}
+          title={direction === 'horizontal' ? t('tabs.stacked') : t('tabs.sideBySide')}
+          aria-label={direction === 'horizontal' ? t('tabs.stacked') : t('tabs.sideBySide')}
           className="hover:bg-bg"
         >
           {direction === 'horizontal' ? <Rows2 className="h-4 w-4" /> : <Columns2 className="h-4 w-4" />}

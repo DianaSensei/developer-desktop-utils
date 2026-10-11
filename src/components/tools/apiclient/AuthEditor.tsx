@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { InlineCodeField } from '@/design-system';
 import { clearOAuthTokenCache } from './request';
 import type { ApiKeyAuth, Auth, AuthType, OAuth2Auth, VarMap } from './types';
+import { t } from './i18n';
 
 const AUTH_TYPES: { id: AuthType; label: string }[] = [
   { id: 'none', label: 'No Auth' },
@@ -59,7 +60,8 @@ function AuthField({ label, value, onValue, placeholder, vars, masked }: {
               type="button"
               onClick={() => setRevealed((r) => !r)}
               className="shrink-0 rounded p-1 text-fg-mute/50 transition-colors hover:text-fg"
-              title={revealed ? 'Hide value' : 'Reveal value'}
+              title={revealed ? t('auth.hideValue') : t('auth.revealValue')}
+              aria-label={revealed ? t('auth.hideValue') : t('auth.revealValue')}
             >
               {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             </button>
@@ -95,20 +97,20 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
       <Select value={auth.type} onValueChange={(v) => set({ type: v as AuthType })}>
         <SelectTrigger className="h-ctl w-48 text-xs"><SelectValue /></SelectTrigger>
         <SelectContent>
-          {types.map((a) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
+          {types.map((a) => <SelectItem key={a.id} value={a.id}>{a.id === 'none' ? t('auth.none') : a.id === 'inherit' ? t('auth.inherit') : a.label}</SelectItem>)}
         </SelectContent>
       </Select>
 
-      {auth.type === 'none' && <p className="py-4 text-center text-xs text-fg-mute">This request uses no authorization.</p>}
-      {auth.type === 'inherit' && <p className="py-4 text-center text-xs text-fg-mute">Inherits auth from the parent folder or collection.</p>}
+      {auth.type === 'none' && <p className="py-4 text-center text-xs text-fg-mute">{t('auth.noneDesc')}</p>}
+      {auth.type === 'inherit' && <p className="py-4 text-center text-xs text-fg-mute">{t('auth.inheritDesc')}</p>}
 
       {auth.type === 'bearer' && (
-        <AuthField vars={vars} masked label="Token" value={auth.token} onValue={(v) => set({ token: v })} placeholder="Token or {{var}}" />
+        <AuthField vars={vars} masked label={t('auth.token')} value={auth.token} onValue={(v) => set({ token: v })} placeholder={t('auth.tokenPh')} />
       )}
 
       {(auth.type === 'basic' || auth.type === 'digest') && (
         <div className="space-y-2">
-          <AuthField vars={vars} label="Username" value={auth.username} onValue={(v) => set({ username: v })} placeholder="Username or {{var}}" />
+          <AuthField vars={vars} label={t('auth.username')} value={auth.username} onValue={(v) => set({ username: v })} placeholder={t('auth.usernamePh')} />
           {/* Same masked AuthField as every other credential here, not a bare
               `type="password"` Input: the two fields sat side by side in
               different shells, and the placeholder already promised
@@ -116,24 +118,24 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
               variable name looked exactly like a correct one. request.ts
               substitutes this value (see `sub(req.auth.password)`), so the
               highlighting was the only piece missing. */}
-          <AuthField vars={vars} masked label="Password" value={auth.password} onValue={(v) => set({ password: v })} placeholder="Password or {{var}}" />
+          <AuthField vars={vars} masked label={t('auth.password')} value={auth.password} onValue={(v) => set({ password: v })} placeholder={t('auth.passwordPh')} />
           {auth.type === 'digest' && (
-            <p className="text-[11px] text-fg-mute">The server's 401 challenge is answered automatically with an MD5 Digest response.</p>
+            <p className="text-[11px] text-fg-mute">{t('auth.digestDesc')}</p>
           )}
         </div>
       )}
 
       {auth.type === 'apikey' && (
         <div className="space-y-2">
-          <AuthField vars={vars} label="Key" value={auth.apiKey.key} onValue={(v) => setApiKey({ key: v })} placeholder="X-API-Key" />
-          <AuthField vars={vars} masked label="Value" value={auth.apiKey.value} onValue={(v) => setApiKey({ value: v })} placeholder="Value or {{var}}" />
+          <AuthField vars={vars} label={t('key')} value={auth.apiKey.key} onValue={(v) => setApiKey({ key: v })} placeholder="X-API-Key" />
+          <AuthField vars={vars} masked label={t('value')} value={auth.apiKey.value} onValue={(v) => setApiKey({ value: v })} placeholder={t('auth.valuePh')} />
           <div className="space-y-1.5">
-            <Label className="text-xs">Add to</Label>
+            <Label className="text-xs">{t('auth.addTo')}</Label>
             <Select value={auth.apiKey.placement} onValueChange={(v) => setApiKey({ placement: v as ApiKeyAuth['placement'] })}>
               <SelectTrigger className="h-ctl w-40 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="header">Header</SelectItem>
-                <SelectItem value="query">Query Param</SelectItem>
+                <SelectItem value="header">{t('auth.header')}</SelectItem>
+                <SelectItem value="query">{t('auth.queryParam')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -143,29 +145,28 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
       {auth.type === 'oauth2' && (
         <div className="space-y-2">
           <div className="space-y-1.5">
-            <Label className="text-xs">Grant Type</Label>
+            <Label className="text-xs">{t('auth.grantType')}</Label>
             <Select value={auth.oauth2.grantType} onValueChange={(v) => setOAuth({ grantType: v as OAuth2Auth['grantType'] })}>
               <SelectTrigger className="h-ctl w-52 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="client_credentials">Client Credentials</SelectItem>
-                <SelectItem value="password">Password</SelectItem>
+                <SelectItem value="client_credentials">{t('auth.clientCredentials')}</SelectItem>
+                <SelectItem value="password">{t('auth.password')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <AuthField vars={vars} label="Access Token URL" value={auth.oauth2.tokenUrl} onValue={(v) => setOAuth({ tokenUrl: v })} placeholder="https://auth.example.com/oauth/token" />
-          <AuthField vars={vars} label="Client ID" value={auth.oauth2.clientId} onValue={(v) => setOAuth({ clientId: v })} />
-          <AuthField vars={vars} masked label="Client Secret" value={auth.oauth2.clientSecret} onValue={(v) => setOAuth({ clientSecret: v })} />
-          <AuthField vars={vars} label="Scope" value={auth.oauth2.scope} onValue={(v) => setOAuth({ scope: v })} placeholder="read write" />
+          <AuthField vars={vars} label={t('auth.accessTokenUrl')} value={auth.oauth2.tokenUrl} onValue={(v) => setOAuth({ tokenUrl: v })} placeholder="https://auth.example.com/oauth/token" />
+          <AuthField vars={vars} label={t('auth.clientId')} value={auth.oauth2.clientId} onValue={(v) => setOAuth({ clientId: v })} />
+          <AuthField vars={vars} masked label={t('auth.clientSecret')} value={auth.oauth2.clientSecret} onValue={(v) => setOAuth({ clientSecret: v })} />
+          <AuthField vars={vars} label={t('auth.scope')} value={auth.oauth2.scope} onValue={(v) => setOAuth({ scope: v })} placeholder="read write" />
           {auth.oauth2.grantType === 'password' && (
             <>
-              <AuthField vars={vars} label="Username" value={auth.oauth2.username} onValue={(v) => setOAuth({ username: v })} />
-              <AuthField vars={vars} masked label="Password" value={auth.oauth2.password} onValue={(v) => setOAuth({ password: v })} />
+              <AuthField vars={vars} label={t('auth.username')} value={auth.oauth2.username} onValue={(v) => setOAuth({ username: v })} />
+              <AuthField vars={vars} masked label={t('auth.password')} value={auth.oauth2.password} onValue={(v) => setOAuth({ password: v })} />
             </>
           )}
           <div className="flex items-start justify-between gap-3">
             <p className="text-[11px] text-fg-mute">
-              The access token is fetched on the first send and reused until it expires, then sent as a Bearer header.
-              It is held in memory only — never written to disk.
+              {t('auth.oauthDesc')}
             </p>
             <Button
               type="button"
@@ -175,7 +176,7 @@ export function AuthEditor({ auth, onChange, allowInherit = true, vars }: {
               onClick={forgetToken}
             >
               {tokenCleared ? <Check className="h-3 w-3 text-ok" /> : <RotateCcw className="h-3 w-3" />}
-              {tokenCleared ? 'Cleared' : 'Clear token'}
+              {tokenCleared ? t('auth.cleared') : t('auth.clearToken')}
             </Button>
           </div>
         </div>

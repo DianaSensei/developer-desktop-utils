@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Layers, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { allTools } from '@/lib/toolRegistry';
 import { toolMatchesQuery } from '@/lib/toolSearch';
@@ -10,10 +10,23 @@ import { detectClipboardIntent, type ClipboardIntent } from '@/lib/clipboardInte
 import { readTextFromClipboard } from '@/lib/clipboard';
 import { useFeatures } from '@/contexts/FeatureContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useWorkspaces, workspaceLabel } from '@/contexts/WorkspaceContext';
+import type { Workspace } from '@/lib/workspaces';
 import { StatusChip } from '@/components/ui/status-chip';
 import { Keycap } from '@/components/ui/keycap';
 
 type Tool = (typeof allTools)[number];
+
+type Item =
+  | { kind: 'tool'; tool: Tool; clipboard?: boolean }
+  | { kind: 'workspace'; ws: Workspace; name: string };
+
+const OPEN_EVENT = 'devtool:open-command-palette';
+
+/** Mở ⌘K từ chỗ khác trong shell (nút "+" trên thanh workspace). */
+export function requestCommandPalette() {
+  window.dispatchEvent(new Event(OPEN_EVENT));
+}
 
 /**
  * ⌘K — trung tâm điều hướng của app.
@@ -39,6 +52,7 @@ export function CommandPalette() {
   const { isFeatureEnabled, toggleFeature, toolOrder } = useFeatures();
   const { t } = useLocale();
   const navigate = useNavigate();
+  const { workspaces, active: activeWs, switchWorkspace } = useWorkspaces();
 
   // ⌘K / Ctrl+K mở-đóng, hoạt động bất kể đang focus ở đâu — đúng kỳ vọng của
   // một command palette. Không chặn phím khác nên không đụng shortcut của tool.
@@ -49,8 +63,13 @@ export function CommandPalette() {
         setOpen((o) => !o);
       }
     }
+    const onRequest = () => setOpen(true);
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener(OPEN_EVENT, onRequest);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener(OPEN_EVENT, onRequest);
+    };
   }, []);
 
   // Mỗi lần mở: xoá truy vấn cũ, đọc lại clipboard. Đọc MỘT LẦN lúc mở, không
@@ -88,7 +107,22 @@ export function CommandPalette() {
       ? allTools.find((tl) => tl.featureId === clipboardIntent.toolId) ?? null
       : null;
 
-  const items = clipboardTool ? [clipboardTool, ...results] : results;
+  // Workspace khác workspace đang dùng — đứng đầu danh sách khi chưa gõ gì
+  // (chuyển bộ việc là thao tác hay làm nhất sau mở tool), và khớp theo tên
+  // khi đã gõ.
+  const workspaceItems: Item[] = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return workspaces
+      .map((ws, i) => ({ ws, name: workspaceLabel(ws, i, (n) => t('shell.workspace.defaultName', { n })) }))
+      .filter(({ ws, name }) => ws.id !== activeWs.id && (!q || name.toLowerCase().includes(q)))
+      .map(({ ws, name }) => ({ kind: 'workspace' as const, ws, name }));
+  }, [workspaces, activeWs.id, query, t]);
+
+  const items: Item[] = [
+    ...(clipboardTool ? [{ kind: 'tool' as const, tool: clipboardTool, clipboard: true }] : []),
+    ...workspaceItems,
+    ...results.map((tool) => ({ kind: 'tool' as const, tool })),
+  ];
   const activeItem = items[selected] ?? null;
 
   React.useEffect(() => {
@@ -104,6 +138,15 @@ export function CommandPalette() {
     [isFeatureEnabled, toggleFeature, navigate],
   );
 
+  const pick = (item: Item) => {
+    if (item.kind === 'tool') {
+      select(item.tool);
+    } else {
+      switchWorkspace(item.ws.id);
+      setOpen(false);
+    }
+  };
+
   function onQueryKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -113,7 +156,7 @@ export function CommandPalette() {
       setSelected((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (activeItem) select(activeItem);
+      if (activeItem) pick(activeItem);
     }
   }
 
@@ -156,52 +199,74 @@ export function CommandPalette() {
           <div className="flex h-[380px]">
             <div className="w-[56%] shrink-0 overflow-y-auto border-r border-line p-1.5">
               {items.length === 0 && (
-                <p className="px-2.5 py-8 text-center text-[13px] text-fg-mute">
+                <p className="px-2.5 py-8 text-center text-dense text-fg-mute">
                   {t('palette.empty', { query })}
                 </p>
               )}
 
-              {clipboardTool && clipboardIntent && (
-                <div className="mb-1.5 border-b border-line-soft pb-1.5">
-                  <ClipboardRow
-                    tool={clipboardTool}
-                    reasonKey={clipboardIntent.reasonKey}
-                    active={selected === 0}
-                    onHover={() => setSelected(0)}
-                    onPick={() => select(clipboardTool)}
-                    refCb={(el) => {
-                      itemRefs.current[0] = el;
-                    }}
-                  />
-                </div>
-              )}
-
-              {results.map((tool, i) => {
-                const index = clipboardTool ? i + 1 : i;
+              {items.map((item, index) => {
+                const refCb = (el: HTMLButtonElement | null) => {
+                  itemRefs.current[index] = el;
+                };
+                if (item.kind === 'workspace') {
+                  const first = index === 0 || items[index - 1].kind !== 'workspace';
+                  const last = items[index + 1]?.kind !== 'workspace';
+                  return (
+                    <div key={item.ws.id} className={cn(last && 'mb-1.5 border-b border-line-soft pb-1.5')}>
+                      {first && (
+                        <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
+                          {t('palette.section.workspaces')}
+                        </p>
+                      )}
+                      <WorkspaceRow
+                        name={item.name}
+                        count={item.ws.toolIds.length}
+                        active={selected === index}
+                        onHover={() => setSelected(index)}
+                        onPick={() => pick(item)}
+                        refCb={refCb}
+                      />
+                    </div>
+                  );
+                }
+                if (item.clipboard && clipboardIntent) {
+                  return (
+                    <div key={`clip-${item.tool.featureId}`} className="mb-1.5 border-b border-line-soft pb-1.5">
+                      <ClipboardRow
+                        tool={item.tool}
+                        reasonKey={clipboardIntent.reasonKey}
+                        active={selected === index}
+                        onHover={() => setSelected(index)}
+                        onPick={() => pick(item)}
+                        refCb={refCb}
+                      />
+                    </div>
+                  );
+                }
                 return (
                   <ToolRow
-                    key={tool.featureId}
-                    tool={tool}
+                    key={item.tool.featureId}
+                    tool={item.tool}
                     active={selected === index}
-                    enabled={isFeatureEnabled(tool.featureId)}
+                    enabled={isFeatureEnabled(item.tool.featureId)}
                     disabledHint={t('palette.disabledHint')}
                     onHover={() => setSelected(index)}
-                    onPick={() => select(tool)}
-                    refCb={(el) => {
-                      itemRefs.current[index] = el;
-                    }}
+                    onPick={() => pick(item)}
+                    refCb={refCb}
                   />
                 );
               })}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
-              {activeItem ? (
+              {activeItem?.kind === 'tool' ? (
                 <Preview
-                  tool={activeItem}
-                  enabled={isFeatureEnabled(activeItem.featureId)}
+                  tool={activeItem.tool}
+                  enabled={isFeatureEnabled(activeItem.tool.featureId)}
                   disabledHint={t('palette.disabledHint')}
                 />
+              ) : activeItem?.kind === 'workspace' ? (
+                <WorkspacePreview ws={activeItem.ws} name={activeItem.name} />
               ) : null}
             </div>
           </div>
@@ -300,7 +365,7 @@ function ClipboardRow({
           {t('palette.clipboardHint')}
         </StatusChip>
       </span>
-      <span className="truncate pl-[26px] text-[12px] text-fg-mute">{t(reasonKey)}</span>
+      <span className="truncate pl-[26px] text-xs text-fg-mute">{t(reasonKey)}</span>
     </button>
   );
 }
@@ -331,7 +396,7 @@ function Preview({
         </div>
       </div>
       {tool.description && (
-        <p className="text-[13px] leading-relaxed text-fg-mute">{tool.description}</p>
+        <p className="text-dense leading-relaxed text-fg-mute">{tool.description}</p>
       )}
       {tool.keywords && tool.keywords.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -344,6 +409,75 @@ function Preview({
             </span>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+function WorkspaceRow({
+  name,
+  count,
+  active,
+  onHover,
+  onPick,
+  refCb,
+}: {
+  name: string;
+  count: number;
+  active: boolean;
+  onHover: () => void;
+  onPick: () => void;
+  refCb: (el: HTMLButtonElement | null) => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <button
+      ref={refCb}
+      type="button"
+      onClick={onPick}
+      onMouseEnter={onHover}
+      className={cn(
+        'flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left text-sm transition-colors',
+        active ? 'bg-acc-tint text-acc-ink' : 'text-fg hover:bg-bg-2/50',
+      )}
+    >
+      <Layers className={cn('h-4 w-4 shrink-0', active ? 'text-acc-ink' : 'text-fg-mute')} />
+      <span className="min-w-0 flex-1 truncate">
+        <span className="text-fg-mute">{t('palette.workspace.switch')} </span>
+        {name}
+      </span>
+      <span className="shrink-0 text-[11px] text-fg-mute">{t('shell.workspace.tabCount', { n: count })}</span>
+    </button>
+  );
+}
+
+function WorkspacePreview({ ws, name }: { ws: Workspace; name: string }) {
+  const { t } = useLocale();
+  const tools = ws.toolIds
+    .map((id) => allTools.find((tool) => tool.featureId === id))
+    .filter((tool): tool is Tool => !!tool);
+  return (
+    <div className="flex h-full flex-col gap-3">
+      <div className="flex items-center gap-2.5">
+        <span className="grid h-ctl w-ctl shrink-0 place-items-center rounded-sm border border-line bg-sunk">
+          <Layers className="h-4 w-4 text-acc-ink" />
+        </span>
+        <h3 className="min-w-0 truncate text-sm font-semibold">{name}</h3>
+      </div>
+      {tools.length === 0 ? (
+        <p className="text-dense text-fg-mute">{t('palette.workspace.empty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {tools.map((tool) => {
+            const Icon = tool.icon;
+            return (
+              <li key={tool.featureId} className="flex items-center gap-2 text-dense text-fg-mute">
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{tool.label}</span>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
