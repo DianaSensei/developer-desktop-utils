@@ -11,13 +11,17 @@ import {
   Globe, Search, RefreshCw, MapPin, Wifi, Building2,
   Network as NetworkIcon, ShieldCheck, ShieldAlert, CheckCircle2, XCircle,
   AlertCircle, Clock, Server, X, Router, Laptop, Plug, Star, Plus, ChevronUp, ChevronDown, Info,
+  type LucideIcon,
 } from 'lucide-react';
 import { Callout } from '@/components/ui/callout';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SearchInput } from '@/components/ui/search-input';
 import { SectionLabel } from '@/components/ui/section-label';
 import { Stat, StatGrid } from '@/components/ui/stat';
 import { cn } from '@/lib/utils';
 import { isTauri } from '@/lib/platform';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { usePluginSdk, usePluginSdkFor, usePluginState } from '@/platform';
 import {
   DNS_RECORD_TYPES, DOH_PROVIDERS, DOH_PROVIDER_MAP,
@@ -25,6 +29,9 @@ import {
   type DnsAnswer, type FetchLike, type PropagationRow, type DnssecResult, type IpInfo,
   type LocalNetworkInfo, type PortEntry,
 } from '@/lib/network';
+import { useMessages } from '@/contexts/LocaleContext';
+import { Tooltip } from '@/components/ui/tooltip';
+import MESSAGES from '@/components/tools/NetworkTools.messages';
 
 type View = 'dns' | 'propagation' | 'dnssec' | 'myip' | 'iplookup' | 'local' | 'ports';
 type Category = 'dns' | 'ip' | 'machine';
@@ -113,27 +120,9 @@ function CopyBtn({ value }: { value: string }) {
   );
 }
 
-// Shared label badge used across result lists (DNS record type, interface
-// family, port protocol/status) so every result surface reads the same way.
-function Pill({ children, tone = 'primary', className }: {
-  children: React.ReactNode;
-  tone?: 'primary' | 'muted' | 'amber';
-  className?: string;
-}) {
-  const tones = {
-    primary: 'bg-acc/10 text-acc',
-    muted: 'bg-bg-2 text-fg-mute',
-    amber: 'bg-warn-tint text-warn',
-  };
-  return (
-    <span className={cn('w-fit rounded px-1.5 py-0.5 text-center font-mono text-[11px] font-semibold', tones[tone], className)}>
-      {children}
-    </span>
-  );
-}
-
 // Bar shown above results: a short summary on the left, a Clear action on the right.
 function MetaBar({ summary, onClear }: { summary: React.ReactNode; onClear: () => void }) {
+  const m = useMessages(MESSAGES);
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[11px] text-fg-mute">{summary}</span>
@@ -142,7 +131,7 @@ function MetaBar({ summary, onClear }: { summary: React.ReactNode; onClear: () =
         onClick={onClear}
         className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-fg-mute hover:text-fg hover:bg-bg-2 transition-colors"
       >
-        <X className="h-3 w-3" /> Clear
+        <X className="h-3 w-3" /> {m('clear')}
       </button>
     </div>
   );
@@ -152,42 +141,23 @@ function ErrorBox({ message }: { message: string }) {
   return <Callout tone="error" size="sm">{message}</Callout>;
 }
 
-function Empty({ icon: Icon = Globe, children }: { icon?: typeof Globe; children: React.ReactNode }) {
+// Nhãn nhỏ cho danh sách kết quả (loại bản ghi DNS, họ địa chỉ, giao thức
+// cổng) — dùng `Badge` của kit thay cho bản tự viết trước đây.
+const PILL_TONE = { primary: 'accent', muted: 'neutral', amber: 'warning' } as const;
+function Pill({ children, tone = 'primary', className }: {
+  children: React.ReactNode;
+  tone?: keyof typeof PILL_TONE;
+  className?: string;
+}) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-card">
-        <Icon className="h-6 w-6 text-fg-mute/40" />
-      </div>
-      <p className="max-w-xs text-sm text-fg-mute">{children}</p>
-    </div>
+    <Badge tone={PILL_TONE[tone]} size="xs" className={cn('w-fit justify-center font-mono font-semibold', className)}>
+      {children}
+    </Badge>
   );
 }
 
-// Consistent toolbar input with a leading icon.
-function SearchInput({
-  value, onChange, onEnter, placeholder, icon: Icon = Globe, mono,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onEnter: () => void;
-  placeholder: string;
-  icon?: typeof Globe;
-  mono?: boolean;
-}) {
-  return (
-    <div className="relative flex-1 min-w-[200px]">
-      <Icon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-mute/60" />
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && onEnter()}
-        placeholder={placeholder}
-        className={cn('h-ctl-lg pl-9 text-sm', mono && 'font-mono')}
-        spellCheck={false}
-        autoComplete="off"
-      />
-    </div>
-  );
+function Empty({ icon = Globe, children }: { icon?: LucideIcon; children: React.ReactNode }) {
+  return <EmptyState icon={icon} description={children} className="h-full py-6" />;
 }
 
 // Common shell: pinned toolbar on top, scrollable result region below.
@@ -232,6 +202,8 @@ function usePlatformFetch(): FetchLike {
 }
 
 function DnsView() {
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const httpFetch = usePlatformFetch();
   const [domain, setDomain] = useSessionState<string>(SESSION.dns, 'domain');
   const [type, setType] = useSessionState<string>(SESSION.dns, 'type');
@@ -267,7 +239,7 @@ function DnsView() {
     <ViewShell
       toolbar={
         <>
-          <SearchInput value={domain} onChange={setDomain} onEnter={run} placeholder={`example.com — ${quickPasteHint}`} />
+          <SearchInput icon={Globe} value={domain} onChange={setDomain} placeholder={m('domainPlaceholder', { hint: quickPasteHint })} onKeyDown={(e) => e.key === 'Enter' && run()} containerClassName="flex-1 min-w-[200px]" className="h-ctl-lg text-sm" spellCheck={false} autoComplete="off" />
           <Select value={type} onValueChange={setType}>
             <SelectTrigger className="h-ctl-lg w-24 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -283,7 +255,7 @@ function DnsView() {
           </Select>
           <Button onClick={run} disabled={loading || !domain.trim()} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <Search className="h-4 w-4" />}
-            Lookup
+            {m('lookup')}
           </Button>
         </>
       }
@@ -291,7 +263,7 @@ function DnsView() {
       {error ? <ErrorBox message={error} /> : answers ? (
         <div className="space-y-2">
           <MetaBar
-            summary={`${answers.length} record${answers.length === 1 ? '' : 's'}${status && status !== 'NOERROR' ? ` · ${status}` : ''}`}
+            summary={`${m(answers.length === 1 ? 'recordsOne' : 'records', { n: answers.length })}${status && status !== 'NOERROR' ? ` · ${status}` : ''}`}
             onClear={clear}
           />
           {answers.length === 0 ? (
@@ -305,7 +277,7 @@ function DnsView() {
                 <div key={i} className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2">
                   <Pill className="shrink-0 w-12">{a.typeName}</Pill>
                   <span className="flex-1 font-mono text-xs break-all">{a.data}</span>
-                  <span className="shrink-0 text-[11px] text-fg-mute tabular-nums" title="TTL (seconds)">{a.ttl}s</span>
+                  <span className="shrink-0 text-[11px] text-fg-mute tabular-nums" title={m('ttlSeconds')}>{a.ttl}s</span>
                   <CopyBtn value={a.data} />
                 </div>
               ))}
@@ -313,7 +285,7 @@ function DnsView() {
           )}
         </div>
       ) : !loading ? (
-        <Empty>Enter a domain and pick a record type to look up its DNS records.</Empty>
+        <Empty>{m('dnsEmpty')}</Empty>
       ) : null}
     </ViewShell>
   );
@@ -322,6 +294,8 @@ function DnsView() {
 // ─── propagation view ───────────────────────────────────────────────────────
 
 function PropagationView() {
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const httpFetch = usePlatformFetch();
   const [domain, setDomain] = useSessionState<string>(SESSION.prop, 'domain');
   const [type, setType] = useSessionState<string>(SESSION.prop, 'type');
@@ -359,7 +333,7 @@ function PropagationView() {
     <ViewShell
       toolbar={
         <>
-          <SearchInput value={domain} onChange={setDomain} onEnter={run} placeholder={`example.com — ${quickPasteHint}`} />
+          <SearchInput icon={Globe} value={domain} onChange={setDomain} placeholder={m('domainPlaceholder', { hint: quickPasteHint })} onKeyDown={(e) => e.key === 'Enter' && run()} containerClassName="flex-1 min-w-[200px]" className="h-ctl-lg text-sm" spellCheck={false} autoComplete="off" />
           <Select value={type} onValueChange={setType}>
             <SelectTrigger className="h-ctl-lg w-24 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -368,14 +342,14 @@ function PropagationView() {
           </Select>
           <Button onClick={run} disabled={loading || !domain.trim()} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
-            Check
+            {m('check')}
           </Button>
         </>
       }
     >
       {error ? <ErrorBox message={error} /> : rows ? (
         <div className="space-y-2">
-          <MetaBar summary={`${type} across ${rows.length} resolvers`} onClear={clear} />
+          <MetaBar summary={m('acrossResolvers', { type, n: rows.length })} onClear={clear} />
           {consistent !== null && (
             <Callout
               tone={consistent ? 'success' : 'warning'}
@@ -383,7 +357,7 @@ function PropagationView() {
               icon={consistent ? CheckCircle2 : AlertCircle}
               className="font-medium"
             >
-              {consistent ? 'Fully propagated — all resolvers agree.' : 'Not yet consistent — resolvers returned different answers.'}
+              {consistent ? m('propagated') : m('notPropagated')}
             </Callout>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
@@ -408,7 +382,7 @@ function PropagationView() {
           </div>
         </div>
       ) : !loading ? (
-        <Empty icon={NetworkIcon}>Compare a record across Cloudflare, Google, Quad9, and AdGuard resolvers.</Empty>
+        <Empty icon={NetworkIcon}>{m('propagationEmpty')}</Empty>
       ) : null}
     </ViewShell>
   );
@@ -437,6 +411,8 @@ function DnssecSection({ title, records }: { title: string; records: DnsAnswer[]
 }
 
 function DnssecView() {
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const httpFetch = usePlatformFetch();
   const [domain, setDomain] = useSessionState<string>(SESSION.dnssec, 'domain');
   const [result, setResult] = useSessionState<DnssecResult | null>(SESSION.dnssec, 'result');
@@ -465,43 +441,43 @@ function DnssecView() {
     <ViewShell
       toolbar={
         <>
-          <SearchInput value={domain} onChange={setDomain} onEnter={run} placeholder={`example.com — ${quickPasteHint}`} />
+          <SearchInput icon={Globe} value={domain} onChange={setDomain} placeholder={m('domainPlaceholder', { hint: quickPasteHint })} onKeyDown={(e) => e.key === 'Enter' && run()} containerClassName="flex-1 min-w-[200px]" className="h-ctl-lg text-sm" spellCheck={false} autoComplete="off" />
           <Button onClick={run} disabled={loading || !domain.trim()} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <ShieldCheck className="h-4 w-4" />}
-            Check
+            {m('check')}
           </Button>
         </>
       }
     >
       {error ? <ErrorBox message={error} /> : result ? (
         <div className="space-y-2">
-          <MetaBar summary="DNSSEC chain" onClear={clear} />
+          <MetaBar summary={m('dnssecChain')} onClear={clear} />
           <Callout
             tone={result.validated ? 'success' : 'warning'}
             icon={result.validated ? ShieldCheck : ShieldAlert}
             className="font-medium"
           >
             {result.validated
-              ? 'DNSSEC validated — the resolver authenticated this domain (AD flag set).'
-              : 'No DNSSEC validation — domain is unsigned or the chain of trust is incomplete.'}
+              ? m('dnssecValid')
+              : m('dnssecInvalid')}
           </Callout>
           {hasData ? (
             <div className="space-y-2">
               <div className="grid gap-2 lg:grid-cols-2">
-                <DnssecSection title="DS records" records={result.ds} />
-                <DnssecSection title="DNSKEY records" records={result.dnskey} />
+                <DnssecSection title={m('dsRecords')} records={result.ds} />
+                <DnssecSection title={m('dnskeyRecords')} records={result.dnskey} />
               </div>
-              <DnssecSection title="RRSIG signatures" records={result.rrsig} />
+              <DnssecSection title={m('rrsigSignatures')} records={result.rrsig} />
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-lg border bg-bg-2/30 px-3 py-2.5 text-xs text-fg-mute">
               <AlertCircle className="h-4 w-4 shrink-0" />
-              No DS, DNSKEY, or RRSIG records published for this domain.
+              {m('noDnssecRecords')}
             </div>
           )}
         </div>
       ) : !loading ? (
-        <Empty icon={ShieldCheck}>Check whether a domain publishes DNSSEC records and validates.</Empty>
+        <Empty icon={ShieldCheck}>{m('dnssecEmpty')}</Empty>
       ) : null}
     </ViewShell>
   );
@@ -510,14 +486,15 @@ function DnssecView() {
 // ─── IP info card (shared by My IP + IP Lookup) ─────────────────────────────
 
 function IpCard({ info }: { info: IpInfo }) {
+  const m = useMessages(MESSAGES);
   const fields: { label: string; value: string; icon: typeof Globe }[] = [
-    { label: 'IP address', value: `${info.ip}${info.type ? `  (${info.type})` : ''}`, icon: NetworkIcon },
-    { label: 'Location', value: [info.city, info.region, `${info.country} ${info.flag}`].filter((s) => s && s.trim()).join(', '), icon: MapPin },
-    { label: 'Coordinates', value: info.lat || info.lon ? `${info.lat}, ${info.lon}` : '', icon: Globe },
-    { label: 'Timezone', value: info.timezone, icon: Clock },
-    { label: 'ISP', value: info.isp, icon: Wifi },
-    { label: 'Organization', value: info.org, icon: Building2 },
-    { label: 'ASN', value: info.asn, icon: Server },
+    { label: m('ipAddress'), value: `${info.ip}${info.type ? `  (${info.type})` : ''}`, icon: NetworkIcon },
+    { label: m('location'), value: [info.city, info.region, `${info.country} ${info.flag}`].filter((s) => s && s.trim()).join(', '), icon: MapPin },
+    { label: m('coordinates'), value: info.lat || info.lon ? `${info.lat}, ${info.lon}` : '', icon: Globe },
+    { label: m('timezone'), value: info.timezone, icon: Clock },
+    { label: m('isp'), value: info.isp, icon: Wifi },
+    { label: m('organization'), value: info.org, icon: Building2 },
+    { label: m('asn'), value: info.asn, icon: Server },
   ].filter((r) => r.value);
 
   return (
@@ -530,6 +507,7 @@ function IpCard({ info }: { info: IpInfo }) {
 // ─── My IP view ─────────────────────────────────────────────────────────────
 
 function MyIpView() {
+  const m = useMessages(MESSAGES);
   const httpFetch = usePlatformFetch();
   const [info, setInfo] = useSessionState<IpInfo | null>(SESSION.myip, 'info');
   const [error, setError] = useSessionState<string>(SESSION.myip, 'error');
@@ -554,7 +532,7 @@ function MyIpView() {
         <>
           <Button onClick={run} disabled={loading} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
-            {info ? 'Refresh' : 'Detect my public IP'}
+            {info ? m('refresh') : m('detectMyIp')}
           </Button>
           {info && (
             <div className="flex items-baseline gap-2">
@@ -567,11 +545,11 @@ function MyIpView() {
     >
       {error ? <ErrorBox message={error} /> : info ? (
         <div className="space-y-2">
-          <MetaBar summary="Your public IP" onClear={clear} />
+          <MetaBar summary={m('yourPublicIp')} onClear={clear} />
           <IpCard info={info} />
         </div>
       ) : !loading ? (
-        <Empty icon={NetworkIcon}>Detect your current public IP address and its geolocation.</Empty>
+        <Empty icon={NetworkIcon}>{m('myIpEmpty')}</Empty>
       ) : null}
     </ViewShell>
   );
@@ -580,6 +558,7 @@ function MyIpView() {
 // ─── Local Network view (desktop only) ──────────────────────────────────────
 
 function LocalNetworkView() {
+  const m = useMessages(MESSAGES);
   const [info, setInfo] = useSessionState<LocalNetworkInfo | null>(SESSION.local, 'info');
   const [error, setError] = useSessionState<string>(SESSION.local, 'error');
   const [loading, setLoading] = useState(false);
@@ -605,9 +584,9 @@ function LocalNetworkView() {
   const clear = () => { setInfo(null); setError(''); };
 
   const summary = info ? [
-    { label: 'Hostname', value: info.hostname, icon: Laptop },
-    { label: 'Primary IPv4', value: info.primaryIpv4 ?? '', icon: NetworkIcon },
-    { label: 'Primary IPv6', value: info.primaryIpv6 ?? '', icon: NetworkIcon },
+    { label: m('hostname'), value: info.hostname, icon: Laptop },
+    { label: m('primaryIpv4'), value: info.primaryIpv4 ?? '', icon: NetworkIcon },
+    { label: m('primaryIpv6'), value: info.primaryIpv6 ?? '', icon: NetworkIcon },
   ].filter((f) => f.value) : [];
 
   return (
@@ -616,7 +595,7 @@ function LocalNetworkView() {
         <>
           <Button onClick={run} disabled={loading || !IS_TAURI} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
-            {info ? 'Refresh' : 'Detect local network'}
+            {info ? m('refresh') : m('detectLocal')}
           </Button>
           {info?.hostname && (
             <span className="font-mono text-lg font-semibold">{info.hostname}</span>
@@ -625,17 +604,17 @@ function LocalNetworkView() {
       }
     >
       {!IS_TAURI ? (
-        <Empty icon={Router}>Local network info reads your machine's interfaces and is only available in the desktop app.</Empty>
+        <Empty icon={Router}>{m('desktopOnlyLocal')}</Empty>
       ) : error ? <ErrorBox message={error} /> : info ? (
         <div className="space-y-2.5">
-          <MetaBar summary="Read locally — nothing leaves this machine" onClear={clear} />
+          <MetaBar summary={m('readLocally')} onClear={clear} />
           <StatGrid>
             {summary.map((f) => <StatCard key={f.label} icon={f.icon} label={f.label} value={f.value} />)}
           </StatGrid>
 
           {info.interfaces.length > 0 && (
             <>
-              <SectionLabel rule className="px-0.5 pt-1" count={info.interfaces.length}>Interfaces</SectionLabel>
+              <SectionLabel rule className="px-0.5 pt-1" count={info.interfaces.length}>{m('interfaces')}</SectionLabel>
               <div className="grid gap-1.5 lg:grid-cols-2">
                 {info.interfaces.map((iface, i) => (
                   <div
@@ -648,7 +627,7 @@ function LocalNetworkView() {
                     <Pill className="shrink-0 w-12">{iface.family === 'IPv6' ? 'v6' : 'v4'}</Pill>
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] text-fg-mute">
-                        {iface.name}{iface.internal && ' · internal'}
+                        {iface.name}{iface.internal && m('internal')}
                       </p>
                       <p className="font-mono text-xs break-all">{iface.ip}</p>
                     </div>
@@ -660,7 +639,7 @@ function LocalNetworkView() {
           )}
         </div>
       ) : !loading ? (
-        <Empty icon={Router}>Show this machine's hostname, LAN addresses, and network interfaces.</Empty>
+        <Empty icon={Router}>{m('localEmpty')}</Empty>
       ) : null}
     </ViewShell>
   );
@@ -701,11 +680,7 @@ interface ProcGroup {
 // Classify the addresses a port is bound to into a short reachability scope.
 type ScopeLabel = 'local' | 'LAN' | 'all';
 
-const SCOPE_DESC: Record<ScopeLabel, string> = {
-  local: 'Loopback only (127.0.0.1 / ::1) — not reachable from other machines',
-  LAN: 'Bound to a specific interface — reachable on your network',
-  all: 'Bound to all interfaces (0.0.0.0 / ::) — reachable on your network',
-};
+// Mô tả từng phạm vi nằm trong NetworkTools.messages.ts (`scope.local`…).
 
 function bindScope(addresses: string[]): { label: ScopeLabel; exposed: boolean } {
   const isWild = (a: string) => a === '0.0.0.0' || a === '::';
@@ -757,6 +732,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
   isFav: (port: number) => boolean;
   onToggleFav: (port: number) => void;
 }) {
+  const m = useMessages(MESSAGES);
   const emoji = group.framework ? FRAMEWORK_EMOJI[group.framework] : undefined;
   const title = group.project ?? group.processName ?? '—';
   // Show the command; if the title already came from the project, keep the
@@ -767,7 +743,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
   return (
     <div className={cn(PROC_GRID, 'px-3 py-2')}>
       {/* PID — first column */}
-      <span className="py-0.5 font-mono text-[11px] tabular-nums text-fg-mute" title="Process ID">
+      <span className="py-0.5 font-mono text-[11px] tabular-nums text-fg-mute" title={m('processId')}>
         {group.pid != null ? group.pid : '—'}
       </span>
 
@@ -782,7 +758,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
               type="button"
               onClick={() => onToggleFav(p.port)}
               aria-pressed={fav}
-              title={`${p.port}/${p.protocol} on ${p.addresses.join(', ')} · ${fav ? 'remove from' : 'add to'} favourites`}
+              title={m('portOnFav', { port: p.port, proto: p.protocol, addr: p.addresses.join(', '), action: fav ? m('removeFromFav') : m('addToFav') })}
               className="group/port flex h-5 items-center gap-1.5 text-left"
             >
               <Star className={cn('h-3 w-3 shrink-0', fav ? 'fill-current text-warn' : 'text-transparent group-hover/port:text-fg-mute/40')} />
@@ -811,7 +787,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
                 'flex h-5 items-center gap-1.5 text-[11px] font-medium',
                 scope.exposed ? 'text-warn' : 'text-fg-mute/50',
               )}
-              title={`${SCOPE_DESC[scope.label]} — ${p.addresses.join(', ')}`}
+              title={`${m(`scope.${scope.label}`)} — ${p.addresses.join(', ')}`}
             >
               <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', scope.exposed ? 'bg-warn' : 'bg-fg-mute/30')} />
               {scope.label}
@@ -825,7 +801,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
         <div className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium" title={title}>{title}</span>
           {group.framework && (
-            <span className="shrink-0 text-[11px] text-fg-mute" title="Detected framework">
+            <span className="shrink-0 text-[11px] text-fg-mute" title={m('detectedFramework')}>
               {emoji && <span aria-hidden>{emoji} </span>}{group.framework}
             </span>
           )}
@@ -835,7 +811,7 @@ function ProcessRow({ group, isFav, onToggleFav }: {
             <button
               type="button"
               onClick={() => setCmdOpen((o) => !o)}
-              title={cmdOpen ? 'Click to collapse' : 'Click to show the full command'}
+              title={cmdOpen ? m('collapse') : m('showCommand')}
               className={cn(
                 'min-w-0 flex-1 text-left font-mono text-[11px] leading-tight text-fg-mute/70 hover:text-fg-mute',
                 cmdOpen ? 'whitespace-pre-wrap break-all' : 'truncate',
@@ -853,10 +829,10 @@ function ProcessRow({ group, isFav, onToggleFav }: {
       </div>
 
       {/* MEM · UPTIME — quiet, right-aligned metric columns */}
-      <span className="py-0.5 text-right font-mono text-xs tabular-nums text-fg-mute" title="Resident memory">
+      <span className="py-0.5 text-right font-mono text-xs tabular-nums text-fg-mute" title={m('residentMemory')}>
         {group.memBytes != null ? formatMem(group.memBytes) : ''}
       </span>
-      <span className="py-0.5 text-right text-[11px] tabular-nums text-fg-mute" title="Uptime">
+      <span className="py-0.5 text-right text-[11px] tabular-nums text-fg-mute" title={m('uptime')}>
         {group.uptimeSecs != null ? formatUptime(group.uptimeSecs) : ''}
       </span>
     </div>
@@ -865,12 +841,13 @@ function ProcessRow({ group, isFav, onToggleFav }: {
 
 // Small star toggle used by the socket (flat / favourites) rows.
 function FavStar({ port, fav, onToggle }: { port: number; fav: boolean; onToggle: (port: number) => void }) {
+  const m = useMessages(MESSAGES);
   return (
     <button
       type="button"
       onClick={() => onToggle(port)}
       aria-pressed={fav}
-      title={fav ? `Remove port ${port} from favourites` : `Add port ${port} to favourites`}
+      title={fav ? m('removePortFav', { port }) : m('addPortFav', { port })}
       className={cn(
         'group/star flex h-6 w-6 items-center justify-center rounded transition-colors',
         fav ? 'text-warn' : 'text-fg-mute/40 hover:text-fg-mute',
@@ -902,12 +879,13 @@ function SocketRow({ entry, isFav, onToggleFav }: {
 
 // A favourite port that isn't currently listening (favourites watchlist only).
 function FreeRow({ port, fav, onToggle }: { port: number; fav: boolean; onToggle: (port: number) => void }) {
+  const m = useMessages(MESSAGES);
   return (
     <div className={cn(PORTS_GRID, 'px-3 py-1.5 text-xs opacity-60')}>
       <FavStar port={port} fav={fav} onToggle={onToggle} />
       <span className="font-mono font-semibold tabular-nums">{port}</span>
-      <Pill tone="muted">FREE</Pill>
-      <span className="italic text-fg-mute">not listening</span>
+      <Pill tone="muted">{m('free')}</Pill>
+      <span className="italic text-fg-mute">{m('notListening')}</span>
       <span className="text-fg-mute">—</span>
       <span className="text-fg-mute">—</span>
     </div>
@@ -916,18 +894,20 @@ function FreeRow({ port, fav, onToggle }: { port: number; fav: boolean; onToggle
 
 // Header row for the socket (flat / favourites) table.
 function SocketTableHeader() {
+  const m = useMessages(MESSAGES);
   return (
     <div className={cn(PORTS_GRID, 'border-b bg-bg-2/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute')}>
       {/* Empty placeholder for the star column — must stay in flow so it occupies
           its grid track (an sr-only span is position:absolute and would shift
           every following header one column to the left). */}
       <span aria-hidden="true" />
-      <span>Port</span><span>Proto</span><span>Process</span><span>PID</span><span>Address</span>
+      <span>{m('port')}</span><span>{m('proto')}</span><span>{m('process')}</span><span>{m('pid')}</span><span>{m('address')}</span>
     </div>
   );
 }
 
 function PortsView() {
+  const m = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('network');
   const [entries, setEntries] = useSessionState<PortEntry[] | null>(SESSION.ports, 'entries');
   const [error, setError] = useSessionState<string>(SESSION.ports, 'error');
@@ -1123,24 +1103,25 @@ function PortsView() {
         <>
           <Button onClick={run} disabled={loading || !IS_TAURI} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
-            {entries ? 'Refresh' : 'Scan ports'}
+            {entries ? m('refresh') : m('scanPorts')}
           </Button>
           {!favOnly && (
             <Segmented
               value={viewMode}
               onValueChange={(v) => setViewMode(v as PortViewMode)}
-              options={[{ value: 'grouped', label: 'Processes' }, { value: 'flat', label: 'Sockets' }]}
-              aria-label="Group by process or list every socket"
+              options={[{ value: 'grouped', label: m('processes') }, { value: 'flat', label: m('sockets') }]}
+              aria-label={m('groupByLabel')}
             />
           )}
           <Button
             variant="outline"
             onClick={() => setFavOnly((v) => !v)}
             className={cn('h-ctl-lg gap-1.5', favBtnActive)}
-            title="Show only your favourite ports"
+            title={m('favOnlyHint')}
+            aria-pressed={favOnly}
           >
             <Star className={cn('h-4 w-4', favOnly && 'fill-current')} />
-            Favourites{favorites.length > 0 ? ` (${favorites.length})` : ''}
+            {m('favourites')}{favorites.length > 0 ? ` (${favorites.length})` : ''}
           </Button>
           {favOnly ? (
             <div className="relative flex-1 min-w-[160px]">
@@ -1149,7 +1130,8 @@ function PortsView() {
                 value={addValue}
                 onChange={(e) => setAddValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addFavorite()}
-                placeholder="Add a port, e.g. 3000"
+                placeholder={m('addPortPlaceholder')}
+                aria-label={m('addPortPlaceholder')}
                 inputMode="numeric"
                 className="h-ctl-lg pl-9 text-sm font-mono"
                 spellCheck={false}
@@ -1157,28 +1139,31 @@ function PortsView() {
               />
             </div>
           ) : entries && entries.length > 0 ? (
-            <SearchInput value={filter} onChange={setFilter} onEnter={() => {}} icon={Search} placeholder="Filter by port, process, framework, project, or PID…" />
+            <SearchInput value={filter} onChange={setFilter} icon={Search} placeholder={m('filterPlaceholder')} containerClassName="flex-1 min-w-[200px]" className="h-ctl-lg text-sm" spellCheck={false} autoComplete="off" />
           ) : null}
         </>
       }
     >
       {!IS_TAURI ? (
-        <Empty icon={Plug}>The port viewer reads your machine's listening sockets and is only available in the desktop app.</Empty>
+        <Empty icon={Plug}>{m('desktopOnlyPorts')}</Empty>
       ) : error ? <ErrorBox message={error} /> : favOnly && favorites.length === 0 ? (
-        <Empty icon={Star}>No favourite ports yet. Add one above, or star a port in the full list to track whether it's free or in use.</Empty>
+        <Empty icon={Star}>{m('noFavPorts')}</Empty>
       ) : entries ? (
         <div className="space-y-2.5">
           <MetaBar
             summary={
               favOnly
-                ? `${favorites.length} favourite ${favorites.length === 1 ? 'port' : 'ports'} · read locally`
-                : `${groups.length} ${groups.length === 1 ? 'process' : 'processes'} · ${scanned.length}${filter.trim() ? ` of ${entries.length}` : ''} listening ${entries.length === 1 ? 'socket' : 'sockets'} · read locally`
+                ? m(favorites.length === 1 ? 'favSummaryOne' : 'favSummary', { n: favorites.length })
+                : m('portsSummary', {
+                    procs: groups.length,
+                    sockets: filter.trim() ? m('socketsOf', { shown: scanned.length, total: entries.length }) : scanned.length,
+                  })
             }
             onClear={clear}
           />
           {favOnly ? (
             favRows.length === 0 ? (
-              <p className="px-1 py-6 text-center text-xs text-fg-mute">No favourite ports match "{filter}".</p>
+              <p className="px-1 py-6 text-center text-xs text-fg-mute">{m('noFavMatch', { filter })}</p>
             ) : (
               <div className="overflow-hidden rounded-lg border">
                 <SocketTableHeader />
@@ -1194,17 +1179,17 @@ function PortsView() {
           ) : viewMode === 'flat' ? (
             sortedSockets.length === 0 ? (
               <p className="px-1 py-6 text-center text-xs text-fg-mute">
-                {entries.length === 0 ? 'No listening ports found.' : `Nothing matches "${filter}"`}
+                {entries.length === 0 ? m('noListening') : m('nothingMatches', { filter })}
               </p>
             ) : (
               <div className="overflow-hidden rounded-lg border">
                 <div className={cn(PORTS_GRID, 'border-b bg-bg-2/40 px-3 py-1.5 text-[11px] font-semibold text-fg-mute')}>
                   <span aria-hidden="true" />
-                  {sortHeader('port', 'Port')}
-                  {sortHeader('proto', 'Proto')}
-                  {sortHeader('process', 'Process')}
-                  {sortHeader('pid', 'PID')}
-                  {sortHeader('address', 'Address')}
+                  {sortHeader('port', m('port'))}
+                  {sortHeader('proto', m('proto'))}
+                  {sortHeader('process', m('process'))}
+                  {sortHeader('pid', m('pid'))}
+                  {sortHeader('address', m('address'))}
                 </div>
                 <div className="divide-y">
                   {sortedSockets.map((e, i) => (
@@ -1215,25 +1200,30 @@ function PortsView() {
             )
           ) : groups.length === 0 ? (
             <p className="px-1 py-6 text-center text-xs text-fg-mute">
-              {entries.length === 0 ? 'No listening ports found.' : `Nothing matches "${filter}"`}
+              {entries.length === 0 ? m('noListening') : m('nothingMatches', { filter })}
             </p>
           ) : (
             <div className="overflow-hidden rounded-lg border">
               <div className={cn(PROC_GRID, 'border-b bg-bg-2/40 px-3 py-1.5 text-[11px] font-semibold text-fg-mute')}>
-                {sortHeader('pid', 'PID')}
+                {sortHeader('pid', m('pid'))}
                 {/* Indent past the in-cell favourite star (w-3 + gap-1.5) so the
                     label sits above the port numbers, not the star. */}
-                {sortHeader('port', 'Port', false, 'pl-[18px]')}
-                <span
-                  className="flex cursor-help items-center gap-1 uppercase tracking-wide"
-                  title={`Where each port is reachable.\n• local — ${SCOPE_DESC.local}\n• LAN — ${SCOPE_DESC.LAN}\n• all — ${SCOPE_DESC.all}`}
+                {sortHeader('port', m('port'), false, 'pl-[18px]')}
+                {/* Tooltip của kit thay cho `title` — `title` không mở được bằng bàn phím. */}
+                <Tooltip
+                  label={m('scopeHelp')}
+                  description={<>• local — {m('scope.local')}<br />• LAN — {m('scope.LAN')}<br />• all — {m('scope.all')}</>}
+                  side="bottom"
+                  width={300}
                 >
-                  Scope
-                  <Info className="h-3 w-3 text-fg-mute/50" />
-                </span>
-                {sortHeader('process', 'Process')}
-                {sortHeader('mem', 'Mem', true)}
-                {sortHeader('uptime', 'Uptime', true)}
+                  <span tabIndex={0} className="flex cursor-help items-center gap-1 uppercase tracking-wide focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
+                    {m('scope')}
+                    <Info className="h-3 w-3 text-fg-mute/50" />
+                  </span>
+                </Tooltip>
+                {sortHeader('process', m('process'))}
+                {sortHeader('mem', m('mem'), true)}
+                {sortHeader('uptime', m('uptime'), true)}
               </div>
               <div className="divide-y">
                 {sortedGroups.map((g) => (
@@ -1243,11 +1233,11 @@ function PortsView() {
             </div>
           )}
           <p className="px-1 text-[11px] text-fg-mute/70">
-            Shows your own user's processes. System or other-user processes may need elevated privileges to appear — an OS restriction, not a tool limit.
+            {m('ownProcessesNote')}
           </p>
         </div>
       ) : !loading ? (
-        <Empty icon={Plug}>List the TCP/UDP ports this machine is listening on and the process that owns each one. Star the ports you care about to track them.</Empty>
+        <Empty icon={Plug}>{m('portsEmpty')}</Empty>
       ) : null}
     </ViewShell>
   );
@@ -1256,6 +1246,8 @@ function PortsView() {
 // ─── IP Lookup view ─────────────────────────────────────────────────────────
 
 function IpLookupView() {
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const httpFetch = usePlatformFetch();
   const [ip, setIp] = useSessionState<string>(SESSION.iplookup, 'ip');
   const [info, setInfo] = useSessionState<IpInfo | null>(SESSION.iplookup, 'info');
@@ -1283,21 +1275,21 @@ function IpLookupView() {
     <ViewShell
       toolbar={
         <>
-          <SearchInput value={ip} onChange={setIp} onEnter={run} icon={MapPin} mono placeholder={`8.8.8.8 or 2606:4700:4700::1111 — ${quickPasteHint}`} />
+          <SearchInput value={ip} onChange={setIp} icon={MapPin} placeholder={m('ipPlaceholder', { hint: quickPasteHint })} onKeyDown={(e) => e.key === 'Enter' && run()} containerClassName="flex-1 min-w-[200px]" className="h-ctl-lg text-sm font-mono" spellCheck={false} autoComplete="off" />
           <Button onClick={run} disabled={loading || !ip.trim()} className="h-ctl-lg gap-1.5">
             {loading ? <Spinner /> : <Search className="h-4 w-4" />}
-            Lookup
+            {m('lookup')}
           </Button>
         </>
       }
     >
       {error ? <ErrorBox message={error} /> : info ? (
         <div className="space-y-2">
-          <MetaBar summary={`Lookup for ${info.ip}`} onClear={clear} />
+          <MetaBar summary={m('lookupFor', { ip: info.ip })} onClear={clear} />
           <IpCard info={info} />
         </div>
       ) : !loading ? (
-        <Empty icon={MapPin}>Enter any IPv4 or IPv6 address to see its geolocation, ISP, and ASN.</Empty>
+        <Empty icon={MapPin}>{m('ipLookupEmpty')}</Empty>
       ) : null}
     </ViewShell>
   );
@@ -1306,6 +1298,7 @@ function IpLookupView() {
 // ─── root ───────────────────────────────────────────────────────────────────
 
 export function NetworkTools() {
+  const m = useMessages(MESSAGES);
   const [view, setView] = useSessionState<View>(SESSION.nav, 'view');
   const activeCategory = VIEW_META[view].category;
 
@@ -1348,7 +1341,7 @@ export function NetworkTools() {
           different active treatments, keeping the azure accent restrained. */}
       <div className="shrink-0 border-b border-line">
         {/* Primary: categories — underline tabs */}
-        <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar px-2 sm:px-3" role="tablist" aria-label="Network category">
+        <div className="flex items-center gap-0.5 overflow-x-auto no-scrollbar px-2 sm:px-3" role="tablist" aria-label={m('categoryLabel')}>
           {CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             const active = cat.id === activeCategory;
@@ -1364,7 +1357,7 @@ export function NetworkTools() {
                 )}
               >
                 <Icon className="h-4 w-4" />
-                {cat.label}
+                {m(`cat.${cat.id}` as 'cat.dns')}
                 <span
                   className={cn(
                     'absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-acc transition-opacity duration-200',
@@ -1376,7 +1369,7 @@ export function NetworkTools() {
           })}
         </div>
         {/* Secondary: views within the active category — tinted pills */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar px-2 pb-2 pt-1.5 sm:px-3" role="tablist" aria-label="Network view">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar px-2 pb-2 pt-1.5 sm:px-3" role="tablist" aria-label={m('viewLabel')}>
           {subViews.map((v) => {
             const meta = VIEW_META[v];
             const Icon = meta.icon;
@@ -1395,7 +1388,7 @@ export function NetworkTools() {
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
-                {meta.label}
+                {m(`view.${v}` as 'view.dns')}
               </button>
             );
           })}

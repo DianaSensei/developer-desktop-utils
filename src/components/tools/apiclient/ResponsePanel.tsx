@@ -30,6 +30,8 @@ import { usePluginSdkFor } from '@/platform';
 import { queryJson } from './jsonpath';
 import { CodeViewer, type CodeViewerHandle } from '@/design-system';
 import type { RequestPanelTab } from './RequestPanel';
+// `tr`, không phải `t`: file này đã có biến `t` (timing của response).
+import { t as tr } from './i18n';
 
 // Labels scriptPhases.ts attaches to a request's *own* scripts (as opposed to
 // an inherited collection/folder script, which has no single tab of its own
@@ -79,7 +81,7 @@ const FORMAT_META: Record<Format, { label: string; icon: typeof Braces }> = {
   html: { label: 'HTML', icon: Code2 },
   xml: { label: 'XML', icon: FileText },
   javascript: { label: 'JavaScript', icon: FileCode },
-  raw: { label: 'Raw', icon: FileText },
+  raw: { label: 'Raw', icon: FileText }, // hiển thị qua tr('res.raw') — nhãn duy nhất cần dịch
   hex: { label: 'Hex', icon: Binary },
   base64: { label: 'Base64', icon: Hash },
 };
@@ -256,13 +258,13 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
     // Keycap, the same glyphs the Send button and the ⌘P palette print,
     // so the shortcut reads identically everywhere it's shown.
     const shortcuts: { label: string; key: string; mod?: boolean }[] = [
-      { label: 'Send Request', key: '⏎', mod: true },
-      { label: 'Focus URL', key: 'L', mod: true },
-      { label: 'Go to Request', key: 'P', mod: true },
-      { label: 'New Request', key: 'B', mod: true },
-      { label: 'Switch Tab', key: 'Ctrl+Tab' },
-      { label: 'Close Tab', key: 'W', mod: true },
-      { label: 'Edit Environments', key: 'E', mod: true },
+      { label: tr('res.sc.send'), key: '⏎', mod: true },
+      { label: tr('res.sc.focusUrl'), key: 'L', mod: true },
+      { label: tr('res.sc.goTo'), key: 'P', mod: true },
+      { label: tr('res.sc.new'), key: 'B', mod: true },
+      { label: tr('res.sc.switchTab'), key: 'Ctrl+Tab' },
+      { label: tr('res.sc.closeTab'), key: 'W', mod: true },
+      { label: tr('res.sc.envs'), key: 'E', mod: true },
     ];
     return (
       <Centered>
@@ -282,25 +284,25 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
     return (
       <Centered>
         <Spinner size="lg" className="text-fg-mute/60" />
-        <p className="text-xs text-fg-mute">Sending request…</p>
+        <p className="text-xs text-fg-mute">{tr('res.sending')}</p>
       </Centered>
     );
   }
 
   // Tab definitions (only the relevant ones for the current response state).
   const tabDefs: TabDef[] = [
-    { id: 'body', label: 'Response' },
-    ...(response ? [{ id: 'headers', label: 'Headers', badge: <span className="text-[11px] text-fg-mute">{response.headers.length}</span> }] : []),
-    ...(response ? [{ id: 'timeline', label: 'Timeline' }] : []),
+    { id: 'body', label: tr('response') },
+    ...(response ? [{ id: 'headers', label: tr('headers'), badge: <span className="text-[11px] text-fg-mute">{response.headers.length}</span> }] : []),
+    ...(response ? [{ id: 'timeline', label: tr('res.timeline') }] : []),
     {
-      id: 'tests', label: 'Tests',
+      id: 'tests', label: tr('res.tests'),
       badge: tests.length > 0 ? (
         <span className={cn('rounded px-1 text-[11px]', failed ? 'bg-bad-tint text-bad' : 'bg-ok-tint text-ok')}>
           {tests.length - failed}/{tests.length}
         </span>
       ) : undefined,
     },
-    { id: 'console', label: 'Console', badge: logs.length > 0 ? <span className="text-[11px] text-fg-mute">{logs.length}</span> : undefined },
+    { id: 'console', label: tr('res.console'), badge: logs.length > 0 ? <span className="text-[11px] text-fg-mute">{logs.length}</span> : undefined },
   ];
   // The active tab may vanish when a run ends without a response (Headers /
   // Timeline only exist alongside one) — fall back rather than render nothing.
@@ -326,11 +328,11 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       className="flex items-center gap-2.5 motion-safe:animate-fade-in-up"
     >
       <span className={cn('font-semibold', statusColor(response.status))}>{response.status} {response.statusText}</span>
-      <span className="font-mono text-fg-mute" title="Total round-trip time">{response.timeMs} ms</span>
-      <span className="font-mono text-fg-mute" title="Body size">{formatBytes(response.sizeBytes)}</span>
+      <span className="font-mono text-fg-mute" title={tr('res.roundTrip')}>{response.timeMs} ms</span>
+      <span className="font-mono text-fg-mute" title={tr('res.bodySize')}>{formatBytes(response.sizeBytes)}</span>
     </span>
   ) : (
-    <span className="font-semibold text-bad">No response</span>
+    <span className="font-semibold text-bad">{tr('res.noResponse')}</span>
   );
 
   // Body / Headers actions. `xs` controls (24px) on a py-1 row: this is a
@@ -346,7 +348,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         <IconButton
           size="xs"
           onClick={() => codeViewerRef.current?.openSearch()}
-          title={`Search in response (${isMac ? '⌘F' : 'Ctrl+F'})`}
+          title={tr('res.search', { key: isMac ? '⌘F' : 'Ctrl+F' })}
         >
           <Search className="h-3.5 w-3.5" />
         </IconButton>
@@ -355,13 +357,13 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         <IconButton
           size="xs"
           onClick={() => setShowFilter((s) => !s)}
-          title="Filter (JSONPath)"
+          title={tr('res.filter')}
           active={showFilter || !!filter}
         >
           <Filter className="h-3.5 w-3.5" />
         </IconButton>
       )}
-      <IconButton size="xs" onClick={copy} title={copied ? 'Copied' : activeTab === 'headers' ? 'Copy all headers' : 'Copy body'} className={cn(copied && 'text-ok')}>
+      <IconButton size="xs" onClick={copy} title={copied ? tr('res.copied') : activeTab === 'headers' ? tr('res.copyHeaders') : tr('res.copyBody')} className={cn(copied && 'text-ok')}>
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       </IconButton>
       <ActionsMenu onSave={saveResponse} onClear={onClear} />
@@ -410,7 +412,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                   onClick={() => onJumpToTab!(e.jumpTab!)}
                   className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium underline-offset-2 hover:underline"
                 >
-                  Open script
+                  {tr('res.openScript')}
                 </button>
               )}
             </div>
@@ -420,10 +422,9 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
 
       {corsHint && (
         <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
-          <Callout tone="warning" size="sm" title="Looks like an Origin/CORS check">
-            The server may be rejecting this for missing an <code className="rounded bg-bg-2 px-1">Origin</code> header
-            — unlike a browser tab, this app's requests don't send one automatically. Try adding an{' '}
-            <code className="rounded bg-bg-2 px-1">Origin</code> header on the Params tab with the value the API expects.
+          <Callout tone="warning" size="sm" title={tr('res.corsTitle')}>
+            {tr('res.corsA')} <code className="rounded bg-bg-2 px-1">Origin</code> {tr('res.corsB')}{' '}
+            <code className="rounded bg-bg-2 px-1">Origin</code> {tr('res.corsC')}
           </Callout>
         </div>
       )}
@@ -431,16 +432,14 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       {certHint && (
         <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
           <Callout
-            tone="warning" size="sm" title="Looks like a certificate problem"
+            tone="warning" size="sm" title={tr('res.certTitle')}
             actions={onJumpToSettings && (
               <button onClick={onJumpToSettings} className="rounded px-1.5 py-0.5 text-[11px] font-medium underline-offset-2 hover:underline">
-                Open Settings
+                {tr('res.openSettings')}
               </button>
             )}
           >
-            The server's TLS certificate may be self-signed, expired, or for a different hostname — common when
-            testing a local/dev server. Settings tab → SSL Certificate Verification can turn this check off for
-            this request (only for a server you trust).
+            {tr('res.certBody')}
           </Callout>
         </div>
       )}
@@ -448,16 +447,15 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
       {redirectHint && (
         <div className="shrink-0 border-b border-warn/20 px-3 py-2 motion-safe:animate-fade-in-up">
           <Callout
-            tone="warning" size="sm" title="Too many redirects"
+            tone="warning" size="sm" title={tr('res.redirectTitle')}
             actions={onJumpToSettings && (
               <button onClick={onJumpToSettings} className="rounded px-1.5 py-0.5 text-[11px] font-medium underline-offset-2 hover:underline">
-                Open Settings
+                {tr('res.openSettings')}
               </button>
             )}
           >
-            The redirect chain exceeded Max Redirects
-            {request ? ` (currently ${request.settings.maxRedirects})` : ''}. If the API is genuinely bouncing
-            between the same URLs, that's a server-side loop; otherwise raise the limit in the Settings tab.
+            {tr('res.redirectA')}
+            {request ? tr('res.redirectCurrent', { n: request.settings.maxRedirects }) : ''}{tr('res.redirectB')}
           </Callout>
         </div>
       )}
@@ -488,15 +486,15 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
                     spellCheck={false}
                     autoFocus
                   />
-                  {filter && filterResult && !filterResult.ok && <span className="shrink-0 text-[11px] text-bad">invalid</span>}
-                  {filter && <button onClick={() => setFilter('')} title="Clear" className="shrink-0 rounded p-0.5 text-fg-mute hover:text-fg"><X className="h-3.5 w-3.5" /></button>}
+                  {filter && filterResult && !filterResult.ok && <span className="shrink-0 text-[11px] text-bad">{tr('res.invalid')}</span>}
+                  {filter && <button onClick={() => setFilter('')} title={tr('clear')} aria-label={tr('clear')} className="shrink-0 rounded p-0.5 text-fg-mute hover:text-fg"><X className="h-3.5 w-3.5" /></button>}
                 </div>
               )}
             </>
-          ) : <p className="p-3 text-xs text-fg-mute">Empty response body.</p>
+          ) : <p className="p-3 text-xs text-fg-mute">{tr('res.emptyBody')}</p>
         )}
         {activeTab === 'body' && !response && !error && (
-          <p className="p-3 text-xs text-fg-mute">No response — see the Tests and Console tabs for what ran.</p>
+          <p className="p-3 text-xs text-fg-mute">{tr('res.noResponseSee')}</p>
         )}
         {activeTab === 'headers' && response && (
           <div className="min-h-0 flex-1 divide-y overflow-auto text-xs">
@@ -507,7 +505,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         {activeTab === 'tests' && (
           <div className="min-h-0 flex-1 overflow-auto">
             {tests.length === 0
-              ? <p className="p-3 text-xs text-fg-mute">No tests or assertions ran.</p>
+              ? <p className="p-3 text-xs text-fg-mute">{tr('res.noTests')}</p>
               : (
                 <div className="divide-y text-xs">
                   {tests.map((t, i) => (
@@ -528,7 +526,7 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
         {activeTab === 'console' && (
           <div className="min-h-0 flex-1 overflow-auto">
             {logs.length === 0
-              ? <p className="p-3 text-xs text-fg-mute">No console output.</p>
+              ? <p className="p-3 text-xs text-fg-mute">{tr('res.noConsole')}</p>
               : (
                 <div className="divide-y font-mono text-xs">
                   {logs.map((l, i) => (
@@ -563,7 +561,7 @@ function HeaderRow({ name, value }: { name: string; value: string }) {
       <button
         type="button"
         onClick={copy}
-        title={copied ? 'Copied' : 'Copy value'}
+        title={copied ? tr('res.copied') : tr('res.copyValue')}
         className={cn(
           'shrink-0 rounded p-0.5 text-fg-mute/60 transition-all hover:text-fg focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
           copied ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
@@ -606,16 +604,16 @@ function Centered({ children }: { children: React.ReactNode }) {
 function ActionsMenu({ onSave, onClear }: { onSave: () => void; onClear?: () => void }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger title="More" className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
+      <DropdownMenuTrigger title={tr('more')} aria-label={tr('more')} className="grid h-6 w-6 place-items-center rounded-sm text-fg-mute transition-colors hover:bg-acc hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
         <MoreHorizontal className="h-3.5 w-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[11rem]">
         <DropdownMenuItem onClick={onSave} icon={<Download className="h-3.5 w-3.5" />}>
-          Save response…
+          {tr('res.saveResponse')}
         </DropdownMenuItem>
         {onClear && (
           <DropdownMenuItem onClick={onClear} icon={<Eraser className="h-3.5 w-3.5" />}>
-            Clear response
+            {tr('res.clearResponse')}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -631,7 +629,7 @@ function ResponseBody({ response, kind, format, preview, text, plain, viewerRef 
 }) {
   if (preview) {
     if (kind === 'html' || format === 'html') {
-      return <iframe title="Response preview" sandbox="" srcDoc={response.body} className="min-h-0 flex-1 border-0 bg-white dark:bg-[hsl(var(--bg-c))]" />;
+      return <iframe title={tr('res.preview')} sandbox="" srcDoc={response.body} className="min-h-0 flex-1 border-0 bg-white dark:bg-[hsl(var(--bg-c))]" />;
     }
     if (kind === 'image') {
       // Use the preserved bytes; the decoded text copy of a PNG is not an image.
@@ -639,7 +637,7 @@ function ResponseBody({ response, kind, format, preview, text, plain, viewerRef 
       if (!b64) {
         return (
           <div className="flex min-h-0 flex-1 items-center justify-center p-4 text-xs text-fg-mute">
-            Image too large to preview.
+            {tr('res.imageTooLarge')}
           </div>
         );
       }
@@ -655,10 +653,10 @@ function ResponseBody({ response, kind, format, preview, text, plain, viewerRef 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
         <Binary className="h-ctl w-ctl text-fg-mute/30" />
         <p className="text-xs text-fg-mute">
-          Binary response ({response.contentType || 'unknown type'}, {formatBytes(response.sizeBytes)}).
+          {tr('res.binary', { type: response.contentType || tr('res.unknownType'), size: formatBytes(response.sizeBytes) })}
         </p>
         <p className="text-[11px] text-fg-mute/80">
-          Switch the format to Hex or Base64 to inspect it, or save it from the … menu.
+          {tr('res.binaryHint')}
         </p>
       </div>
     );
@@ -684,13 +682,13 @@ function Timeline({ response }: { response: ApiResponse }) {
       </div>
       {t && (
         <div className="space-y-1">
-          <TimingBar label="Waiting (TTFB)" ms={t.ttfbMs} total={response.timeMs} tone="bg-[hsl(var(--cat-1-c)/0.85)]" />
-          <TimingBar label="Download" ms={t.downloadMs} total={response.timeMs} tone="bg-[hsl(var(--cat-2-c)/0.85)]" />
+          <TimingBar label={tr('res.ttfb')} ms={t.ttfbMs} total={response.timeMs} tone="bg-[hsl(var(--cat-1-c)/0.85)]" />
+          <TimingBar label={tr('download')} ms={t.downloadMs} total={response.timeMs} tone="bg-[hsl(var(--cat-2-c)/0.85)]" />
         </div>
       )}
       <div className="space-y-0.5 text-fg-mute">
-        <p>Total time: <span className="text-fg">{response.timeMs} ms</span></p>
-        <p>Size: <span className="text-fg">{formatBytes(response.sizeBytes)}</span></p>
+        <p>{tr('res.totalTime')} <span className="text-fg">{response.timeMs} ms</span></p>
+        <p>{tr('res.size')} <span className="text-fg">{formatBytes(response.sizeBytes)}</span></p>
         {response.contentType && <p>Content-Type: <span className="text-fg">{response.contentType}</span></p>}
         {response.url && <p className="break-all">URL: <span className="text-fg">{response.url}</span></p>}
       </div>
@@ -729,7 +727,7 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
         icon={<RowIcon className="h-3.5 w-3.5 shrink-0" />}
       >
         <span className="flex w-full items-center justify-between gap-2">
-          {FORMAT_META[id].label}
+          {id === 'raw' ? tr('res.raw') : FORMAT_META[id].label}
           {active && <Check className="h-3.5 w-3.5 text-acc-ink" />}
         </span>
       </DropdownMenuItem>
@@ -739,13 +737,13 @@ function FormatDropdown({ format, onChange, preview, onPreview, kind }: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex h-6 items-center gap-1 rounded-sm border border-line bg-bg px-1.5 font-mono text-[11px] text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
-        <Icon className="h-3 w-3" /> {FORMAT_META[format].label}
+        <Icon className="h-3 w-3" /> {format === 'raw' ? tr('res.raw') : FORMAT_META[format].label}
         <ChevronDown className="h-3 w-3" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48 p-1.5">
         <div className={cn('flex items-center justify-between px-2 py-1.5 text-xs', !canPreview && 'opacity-50')}>
-          <span>Preview</span>
-          <Switch checked={preview} onCheckedChange={onPreview} disabled={!canPreview} aria-label="Preview" />
+          <span>{tr('res.previewToggle')}</span>
+          <Switch checked={preview} onCheckedChange={onPreview} disabled={!canPreview} aria-label={tr('res.previewToggle')} />
         </div>
         <DropdownMenuSeparator />
         {SYNTAX_FORMATS.map((f) => <Row key={f} id={f} />)}

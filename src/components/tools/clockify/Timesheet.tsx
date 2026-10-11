@@ -5,10 +5,13 @@ import { cn } from '@/lib/utils';
 import { useClockify } from './store';
 import { ColorDot, DurationInput, ProjectPicker } from './ui';
 import { addDays, fmtHM, sameDay, weekDays, weekRangeLabel, weekStart, weekdayShort } from './time';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/clockify/TimeTracker.messages';
 
 const comboKey = (p: string | null, t: string | null) => `${p ?? 'none'}|${t ?? 'none'}`;
 
 export function Timesheet() {
+  const tr = useMessages(MESSAGES);
   const { entries, settings, projectById, taskById, setDayTotal, now } = useClockify();
   const [anchor, setAnchor] = useState(() => now);
   const [extraRows, setExtraRows] = useState<Array<{ p: string | null; t: string | null }>>([]);
@@ -47,13 +50,13 @@ export function Timesheet() {
     <div className="flex h-full flex-col">
       {/* Week nav */}
       <div className="flex shrink-0 items-center gap-2 border-b p-3">
-        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, -7))}>
+        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, -7))} aria-label={tr('previousWeek')} title={tr('previousWeek')}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <Button variant="outline" size="sm" className="h-ctl" onClick={() => setAnchor(now)}>
-          Today
+          {tr('today')}
         </Button>
-        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, 7))}>
+        <Button variant="outline" size="icon" className="h-ctl w-ctl" onClick={() => setAnchor((a) => addDays(a, 7))} aria-label={tr('nextWeek')} title={tr('nextWeek')}>
           <ChevronRight className="h-4 w-4" />
         </Button>
         <span className="ml-2 text-sm font-medium">{weekRangeLabel(anchor, settings.weekStartsMon)}</span>
@@ -68,7 +71,7 @@ export function Timesheet() {
           <thead>
             <tr>
               <th className="sticky left-0 z-10 w-56 bg-bg px-2 py-2 text-left text-xs font-medium text-fg-mute">
-                Project / Task
+                {tr('projectTask')}
               </th>
               {days.map((d) => (
                 <th key={d} className={cn('px-1 py-2 text-center text-xs font-medium', sameDay(d, now) ? 'text-fg' : 'text-fg-mute')}>
@@ -76,14 +79,14 @@ export function Timesheet() {
                   <div className="font-normal opacity-70">{new Date(d).getDate()}</div>
                 </th>
               ))}
-              <th className="px-2 py-2 text-center text-xs font-medium text-fg-mute">Total</th>
+              <th className="px-2 py-2 text-center text-xs font-medium text-fg-mute">{tr('total')}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
                 <td colSpan={9} className="py-10 text-center text-xs text-fg-mute">
-                  No rows yet. Add a project row below or track time in the Time Tracker.
+                  {tr('noRows')}
                 </td>
               </tr>
             )}
@@ -96,7 +99,7 @@ export function Timesheet() {
                     <div className="flex items-center gap-1.5">
                       <ColorDot color={project?.color} />
                       <span className={cn('truncate text-sm', !project && 'text-fg-mute')}>
-                        {project ? project.name : 'No project'}
+                        {project ? project.name : tr('noProject')}
                         {task ? ` · ${task.name}` : ''}
                       </span>
                     </div>
@@ -112,7 +115,7 @@ export function Timesheet() {
             })}
             {/* day totals */}
             <tr>
-              <td className="sticky left-0 z-10 bg-bg px-2 py-2 text-xs font-medium text-fg-mute">Daily total</td>
+              <td className="sticky left-0 z-10 bg-bg px-2 py-2 text-xs font-medium text-fg-mute">{tr('dailyTotal')}</td>
               {days.map((d) => (
                 <td key={d} className="px-1 py-2 text-center font-mono text-xs tabular-nums text-fg-mute">
                   {fmtHM(dayTotal(d))}
@@ -125,7 +128,7 @@ export function Timesheet() {
 
         {/* Add row */}
         <div className="mt-3 flex items-center gap-2">
-          <span className="text-xs text-fg-mute">Add row:</span>
+          <span className="text-xs text-fg-mute">{tr('addRow')}</span>
           <ProjectPicker
             value={null}
             onChange={(p, t) => {

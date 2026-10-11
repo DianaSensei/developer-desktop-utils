@@ -2,6 +2,8 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 /**
  * Centered modal chrome — backdrop, panel, labelled header, close button.
@@ -73,6 +75,7 @@ export function ModalShell({
   overlayClassName,
   children,
 }: ModalShellProps) {
+  const ui = useMessages(UI);
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descId = useId();
@@ -179,7 +182,8 @@ export function ModalShell({
           <button
             type="button"
             onClick={requestClose}
-            aria-label="Close"
+            aria-label={ui('close')}
+            title={ui('close')}
             className="shrink-0 rounded p-1 text-fg-mute transition-colors hover:bg-bg-2 hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
           >
             <X className="h-4 w-4" />

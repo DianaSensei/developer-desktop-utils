@@ -13,6 +13,8 @@
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 const SIZE_CLASS = {
   xs: 'h-3 w-3',
@@ -47,7 +49,9 @@ export interface LoadingRowProps {
 }
 
 /** Muted inline "⟳ Loading…" line — the placeholder a view shows while fetching. */
-export function LoadingRow({ label = 'Loading…', size = 'md', className }: LoadingRowProps) {
+export function LoadingRow({ label, size = 'md', className }: LoadingRowProps) {
+  const ui = useMessages(UI);
+  label ??= ui('loading');
   return (
     <div
       role="status"

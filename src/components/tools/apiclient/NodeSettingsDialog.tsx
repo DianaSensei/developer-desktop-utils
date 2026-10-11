@@ -17,6 +17,7 @@ import { scriptCallsNetwork } from './collectionScripts';
 import { PRE_REQUEST_SNIPPETS, POST_RESPONSE_SNIPPETS, appendSnippet } from './scriptSnippets';
 import { SnippetMenu } from './SnippetMenu';
 import { type Auth, type KeyValue, type RequestScript, type VarMap, newAuth } from './types';
+import { t } from './i18n';
 
 export interface NodeSettingsTarget {
   collectionId: string;
@@ -59,7 +60,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
       <DialogContent size="xl" scrollable>
         <DialogHeader className="border-b px-4 py-3">
           <DialogTitle>
-            {target.kind} settings — <span className="font-normal text-fg-mute">{target.name}</span>
+            {t('node.settingsTitle', { kind: t(target.kind === 'Collection' ? 'node.collection' : 'node.folder') })} <span className="font-normal text-fg-mute">{target.name}</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -68,7 +69,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
             collection's tabs behave (and collapse into ») like every other
             tab strip in the tool. */}
         <Tabs
-          tabs={[{ id: 'scripts', label: 'Scripts' }, { id: 'auth', label: 'Auth' }, { id: 'headers', label: 'Headers' }]}
+          tabs={[{ id: 'scripts', label: t('node.scripts') }, { id: 'auth', label: t('req.tab.auth') }, { id: 'headers', label: t('headers') }]}
           active={tab}
           onSelect={(id) => setTab(id as NodeTab)}
           className="px-4"
@@ -104,8 +105,8 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
         )}
 
         <div className="flex justify-end gap-2 border-t px-4 py-3">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save}>Save</Button>
+          <Button variant="outline" onClick={onClose}>{t('cancel')}</Button>
+          <Button onClick={save}>{t('save')}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -131,8 +132,8 @@ function ScriptPane({ kind, phase, onPhaseChange, script, onScriptChange }: {
           value={phase}
           onValueChange={onPhaseChange}
           size="sm"
-          aria-label="Script phase"
-          options={[{ value: 'req', label: 'Pre-request' }, { value: 'res', label: 'Post-response' }]}
+          aria-label={t('req.scriptPhase')}
+          options={[{ value: 'req', label: t('req.preRequest') }, { value: 'res', label: t('req.postResponse') }]}
         />
         <SnippetMenu
           snippets={isReq ? PRE_REQUEST_SNIPPETS : POST_RESPONSE_SNIPPETS}
@@ -142,8 +143,8 @@ function ScriptPane({ kind, phase, onPhaseChange, script, onScriptChange }: {
         />
       </div>
       <Label className="text-[11px] font-normal text-fg-mute">
-        Runs for every request inside this {kind.toLowerCase()}
-        {isReq ? ', before each send.' : ', after each response.'}
+        {t('node.runsFor', { kind: t(kind === 'Collection' ? 'node.collection' : 'node.folder').toLowerCase() })}
+        {isReq ? t('node.beforeSend') : t('node.afterResponse')}
       </Label>
       <div className="flex h-72 flex-col">
         <JavaScriptEditor
@@ -156,8 +157,7 @@ function ScriptPane({ kind, phase, onPhaseChange, script, onScriptChange }: {
       </div>
       {scriptCallsNetwork(value) && (
         <Callout tone="warning" size="sm">
-          This script can make its own network request, separate from the Send button — review
-          it before running scripts from a source you don't fully trust.
+          {t('req.networkNotice')}
         </Callout>
       )}
     </div>

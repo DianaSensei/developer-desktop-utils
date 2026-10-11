@@ -52,7 +52,7 @@ export function OutlineNotice({
       )}
     >
       <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', t.pip)} />
-      <p className="min-w-0 flex-1 text-[13px] leading-snug">
+      <p className="min-w-0 flex-1 text-dense leading-snug">
         {label && <span className={cn('font-medium', t.label)}>{label} · </span>}
         {children}
       </p>

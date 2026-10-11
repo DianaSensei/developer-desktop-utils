@@ -22,6 +22,7 @@ import { statusColor } from './request';
 import { ResponsePanel } from './ResponsePanel';
 import type { ApiStore } from './store';
 import { type ApiRequest, type HistoryEntry, type KeyValue, normalizeRequest, uid } from './types';
+import { t } from './i18n';
 
 // ─── formatting ─────────────────────────────────────────────────────────────
 
@@ -38,8 +39,8 @@ function dayLabel(ts: number): string {
   const today = startOfDay(Date.now());
   const day = startOfDay(ts);
   const diff = Math.round((today - day) / 86_400_000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
+  if (diff === 0) return t('hist.today');
+  if (diff === 1) return t('hist.yesterday');
   return new Date(ts).toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 }
 
@@ -62,9 +63,9 @@ function splitUrl(url: string): { host: string; path: string } {
 type StatusFilter = 'all' | 'ok' | 'failed';
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'ok', label: 'OK' },
-  { value: 'failed', label: 'Failed' },
+  { value: 'all', label: 'all' },
+  { value: 'ok', label: 'ok' },
+  { value: 'failed', label: 'failed' },
 ];
 
 const matchesFilter = (h: HistoryEntry, f: StatusFilter) =>
@@ -115,13 +116,14 @@ export function HistoryView({ store, onExit }: Props) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
         <SectionLabel className="min-w-0" count={history.length}>
-          <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> History</span>
+          <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {t('hist.title')}</span>
         </SectionLabel>
         <IconButton
           size="xs"
           onClick={() => store.clearHistory()}
           disabled={history.length === 0}
-          title="Clear history"
+          title={t('hist.clear')}
+          aria-label={t('hist.clear')}
           className="hover:text-bad"
         >
           <Eraser className="h-3.5 w-3.5" />
@@ -132,16 +134,16 @@ export function HistoryView({ store, onExit }: Props) {
           under test fills it, so finding one call meant scrolling past its
           neighbours. */}
       <div className="flex shrink-0 flex-col gap-1.5 border-b px-3 py-2">
-        <SearchInput value={query} onChange={setQuery} placeholder="Search URL, method, status" className="h-ctl text-xs" />
-        <Segmented value={filter} onValueChange={setFilter} options={STATUS_FILTERS} size="sm" aria-label="Filter by outcome" />
+        <SearchInput value={query} onChange={setQuery} placeholder={t('hist.search')} className="h-ctl text-xs" />
+        <Segmented value={filter} onValueChange={setFilter} options={STATUS_FILTERS.map((f) => ({ ...f, label: t(`hist.${f.value}`) }))} size="sm" aria-label={t('hist.filterOutcome')} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {history.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-fg-mute">No requests sent yet.</p>
+          <p className="px-3 py-6 text-center text-xs text-fg-mute">{t('hist.empty')}</p>
         ) : visible.length === 0 ? (
           <p className="px-3 py-6 text-center text-xs text-fg-mute">
-            No sends match this search.
+            {t('hist.noMatch')}
           </p>
         ) : (
           groups.map((g) => (
@@ -181,7 +183,7 @@ export function HistoryView({ store, onExit }: Props) {
             <HistoryDetail key={selected.id} entry={selected} store={store} onExit={onExit} />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center text-xs text-fg-mute">
-              Select a send to inspect its request and response.
+              {t('hist.selectSend')}
             </div>
           )
         }
@@ -259,15 +261,15 @@ function HistoryDetail({ entry, store, onExit }: {
         <div className="flex items-center gap-2">
           <span className={cn('shrink-0 text-[11px] font-bold uppercase', methodColor(entry.method))}>{entry.method}</span>
           <span className="min-w-0 flex-1 truncate font-mono text-xs" title={entry.url}>{entry.url}</span>
-          <CopyButton value={entry.url} icon={Link2} title="Copy URL" iconClassName="h-3.5 w-3.5" />
+          <CopyButton value={entry.url} icon={Link2} title={t('hist.copyUrl')} iconClassName="h-3.5 w-3.5" />
           <IconButton
             size="xs"
             onClick={restore}
             disabled={!entry.request || !targetCollectionId}
             title={
-              !entry.request ? 'This entry has no saved request'
-                : !targetCollectionId ? 'Create a collection first'
-                  : 'Open as a new request'
+              !entry.request ? t('hist.noSavedRequest')
+                : !targetCollectionId ? t('hist.createCollectionFirst')
+                  : t('hist.openAsNew')
             }
           >
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -283,7 +285,7 @@ function HistoryDetail({ entry, store, onExit }: {
             <span className="shrink-0">{new Date(entry.at).toLocaleString()}</span>
             <span aria-hidden>·</span>
             <span className={cn('shrink-0 font-semibold', entry.error ? 'text-bad' : statusColor(entry.status))}>
-              {entry.error ? 'Failed' : `${entry.status} ${entry.response?.statusText ?? ''}`.trim()}
+              {entry.error ? t('hist.failed') : `${entry.status} ${entry.response?.statusText ?? ''}`.trim()}
             </span>
             <span aria-hidden>·</span>
             <span className="shrink-0">{fmtDuration(entry.timeMs)}</span>
@@ -291,10 +293,10 @@ function HistoryDetail({ entry, store, onExit }: {
           <Segmented
             value={tab}
             onValueChange={setTab}
-            options={[{ value: 'request', label: 'Request' }, { value: 'response', label: 'Response' }]}
+            options={[{ value: 'request', label: t('request') }, { value: 'response', label: t('response') }]}
             size="sm"
             className="shrink-0"
-            aria-label="Show request or response"
+            aria-label={t('hist.showReqRes')}
           />
         </div>
       </div>
@@ -311,7 +313,7 @@ function HistoryDetail({ entry, store, onExit }: {
         />
       ) : (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-fg-mute">
-          No response was captured for this entry.
+          {t('hist.noResponse')}
         </div>
       )}
     </div>
@@ -334,7 +336,7 @@ function RequestDetail({ entry }: { entry: HistoryEntry }) {
   if (!req) {
     return (
       <div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-fg-mute">
-        This entry predates request capture, so only its response was kept.
+        {t('hist.predates')}
       </div>
     );
   }
@@ -347,49 +349,49 @@ function RequestDetail({ entry }: { entry: HistoryEntry }) {
 
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-      <Section title="General">
+      <Section title={t('general')}>
         <DetailTable rows={[
-          { id: 'method', key: 'Method', value: req.method },
+          { id: 'method', key: t('hist.method'), value: req.method },
           { id: 'url', key: 'URL', value: entry.url },
-          ...(finalUrl ? [{ id: 'final', key: 'Final URL', value: finalUrl }] : []),
-          { id: 'auth', key: 'Auth', value: authSummary(req) },
+          ...(finalUrl ? [{ id: 'final', key: t('hist.finalUrl'), value: finalUrl }] : []),
+          { id: 'auth', key: t('hist.auth'), value: authSummary(req) },
         ]} />
       </Section>
 
       {query.length > 0 && (
-        <Section title="Query" count={query.length}>
+        <Section title={t('req.query')} count={query.length}>
           <DetailTable rows={query} />
         </Section>
       )}
 
       {pathParams.length > 0 && (
-        <Section title="Path" count={pathParams.length}>
+        <Section title={t('req.path')} count={pathParams.length}>
           <DetailTable rows={pathParams.map((p) => ({ id: p.id, key: `:${p.key}`, value: p.value }))} />
         </Section>
       )}
 
       <Section
-        title="Headers"
+        title={t('headers')}
         count={headers.length}
         actions={headers.length > 0 && (
-          <CopyButton value={() => headers.map((h) => `${h.key}: ${h.value}`).join('\n')} title="Copy headers" iconClassName="h-3 w-3" />
+          <CopyButton value={() => headers.map((h) => `${h.key}: ${h.value}`).join('\n')} title={t('hist.copyHeaders')} iconClassName="h-3 w-3" />
         )}
       >
         {headers.length > 0
           ? <DetailTable rows={headers} />
-          : <Empty>No headers were sent.</Empty>}
+          : <Empty>{t('hist.noHeadersSent')}</Empty>}
       </Section>
 
       <Section
-        title="Body"
-        actions={body && <CopyButton value={body} title="Copy body" iconClassName="h-3 w-3" />}
+        title={t('body')}
+        actions={body && <CopyButton value={body} title={t('hist.copyBody')} iconClassName="h-3 w-3" />}
       >
         {body ? (
           <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border bg-bg-2/30 p-2.5 font-mono text-[11px] leading-relaxed">
             {body}
           </pre>
         ) : (
-          <Empty>No body was sent.</Empty>
+          <Empty>{t('hist.noBodySent')}</Empty>
         )}
       </Section>
     </div>
@@ -421,7 +423,7 @@ function DetailTable({ rows }: { rows: { id: string; key: string; value: string 
         <div key={r.id} className={cn('grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)]', i > 0 && 'border-t')}>
           <div className="min-w-0 break-words border-r bg-bg-2/25 px-2.5 py-1.5 font-medium text-fg-mute">{r.key}</div>
           <div className="min-w-0 whitespace-pre-wrap break-all px-2.5 py-1.5 font-mono">
-            {r.value || <span className="text-fg-mute/50">(empty)</span>}
+            {r.value || <span className="text-fg-mute/50">{t('hist.empty2')}</span>}
           </div>
         </div>
       ))}
@@ -433,13 +435,13 @@ function DetailTable({ rows }: { rows: { id: string; key: string; value: string 
 // itself, which history deliberately does not keep in the clear.
 function authSummary(req: ApiRequest): string {
   switch (req.auth?.type) {
-    case 'bearer': return 'Bearer token';
-    case 'basic': return `Basic — ${req.auth.username || '(no username)'}`;
-    case 'digest': return `Digest — ${req.auth.username || '(no username)'}`;
-    case 'apikey': return `API key — ${req.auth.apiKey.key || '(unnamed)'} in ${req.auth.apiKey.placement}`;
+    case 'bearer': return t('hist.bearer');
+    case 'basic': return `Basic — ${req.auth.username || t('hist.noUsername')}`;
+    case 'digest': return `Digest — ${req.auth.username || t('hist.noUsername')}`;
+    case 'apikey': return t('hist.apiKeyIn', { key: req.auth.apiKey.key || t('hist.unnamed'), placement: req.auth.apiKey.placement });
     case 'oauth2': return `OAuth2 — ${req.auth.oauth2.grantType}`;
-    case 'inherit': return 'Inherited from the parent folder or collection';
-    default: return 'None';
+    case 'inherit': return t('hist.inherited');
+    default: return t('hist.none');
   }
 }
 

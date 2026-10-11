@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { newMatcher, type Matcher, type MatcherOp, type MatcherTarget } from './types';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/mockserver/MockServer.messages';
 
 const TARGETS: { value: MatcherTarget; label: string }[] = [
   { value: 'query', label: 'Query' },
@@ -25,6 +27,7 @@ interface Props {
 }
 
 export function MatcherEditor({ matchers, onChange }: Props) {
+  const tr = useMessages(MESSAGES);
   const update = (id: string, patch: Partial<Matcher>) =>
     onChange(matchers.map((m) => (m.id === id ? { ...m, ...patch } : m)));
   const remove = (id: string) => onChange(matchers.filter((m) => m.id !== id));
@@ -34,8 +37,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
     <div className="space-y-2">
       {matchers.length === 0 && (
         <p className="text-[11px] text-fg-mute">
-          No extra matchers — the stub matches on method and path alone. Add a matcher to also require a
-          query param, header, path param, or body condition.
+          {tr('noMatchers')}
         </p>
       )}
 
@@ -63,7 +65,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
               <SelectContent>
                 {TARGETS.map((t) => (
                   <SelectItem key={t.value} value={t.value} className="text-xs">
-                    {t.label}
+                    {tr(`target.${t.value}` as 'target.query')}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -81,8 +83,8 @@ export function MatcherEditor({ matchers, onChange }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="whole" className="text-xs">Whole body</SelectItem>
-                  <SelectItem value="field" className="text-xs">JSON field</SelectItem>
+                  <SelectItem value="whole" className="text-xs">{tr('wholeBody')}</SelectItem>
+                  <SelectItem value="field" className="text-xs">{tr('jsonField')}</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -105,7 +107,7 @@ export function MatcherEditor({ matchers, onChange }: Props) {
               <SelectContent>
                 {OPS.map((o) => (
                   <SelectItem key={o.value} value={o.value} className="text-xs">
-                    {o.label}
+                    {tr(`op.${o.value}` as 'op.equals')}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -129,7 +131,8 @@ export function MatcherEditor({ matchers, onChange }: Props) {
               size="icon"
               className="h-ctl w-ctl shrink-0 text-fg-mute hover:text-bad"
               onClick={() => remove(m.id)}
-              aria-label="Remove matcher"
+              aria-label={tr('removeMatcher')}
+              title={tr('removeMatcher')}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -139,13 +142,13 @@ export function MatcherEditor({ matchers, onChange }: Props) {
 
       {matchers.some((m) => m.target === 'body' && (m.bodyMode ?? (m.key ? 'field' : 'whole')) === 'field') && (
         <p className="text-[11px] text-fg-mute">
-          JSON field paths read the request body as JSON, e.g. <code>user.name</code> or <code>items.0.id</code>.
+          {tr('jsonFieldHintA')} <code>user.name</code> {tr('or')} <code>items.0.id</code>.
         </p>
       )}
 
       <Button type="button" variant="outline" size="sm" className="h-ctl text-xs" onClick={add}>
         <Plus className="mr-1 h-3.5 w-3.5" />
-        Add matcher
+        {tr('addMatcher')}
       </Button>
     </div>
   );

@@ -6,7 +6,9 @@ import { Segmented } from '@/components/ui/segmented';
 import { DropZone } from '@/components/ui/drop-zone';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { copyImageToClipboard, readImageFromClipboard } from '@/lib/clipboard';
-import { quickPasteHint } from '@/hooks/useQuickPaste';
+import { useQuickPasteHint } from '@/hooks/useQuickPaste';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/EncodeHashEncrypt.messages';
 
 type Mode = 'encode' | 'decode';
 
@@ -36,6 +38,8 @@ function normalizeBase64(raw: string): string | null {
 }
 
 export function ImageBase64Tool() {
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const sdk = usePluginSdkFor('base64');
   const [mode, setMode] = usePluginState<Mode>(sdk, 'imgbase64:mode', 'encode', { legacyKey: 'devtool:imgbase64:mode' });
 
@@ -111,10 +115,10 @@ export function ImageBase64Tool() {
           value={mode}
           onValueChange={setMode}
           options={[
-            { value: 'encode', label: 'Image → Base64' },
-            { value: 'decode', label: 'Base64 → Image' },
+            { value: 'encode', label: m('imageToBase64') },
+            { value: 'decode', label: m('base64ToImage') },
           ]}
-          aria-label="Image/Base64 mode"
+          aria-label={m('imageModeLabel')}
         />
 
         {mode === 'encode' ? (
@@ -123,8 +127,8 @@ export function ImageBase64Tool() {
             {!encodeDataUrl ? (
               <DropZone
                 icon={Upload}
-                title="Drop an image here"
-                hint="or click to browse · PNG, JPG, GIF, WebP…"
+                title={m('dropImage')}
+                hint={m('dropImageHint')}
                 accept="image/*"
                 onFiles={(files) => { const f = files[0]; if (f) processImageFile(f); }}
                 onPaths={(paths) => { if (paths[0]) void loadFromPath(paths[0]); }}
@@ -135,7 +139,7 @@ export function ImageBase64Tool() {
                   className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-line bg-bg px-2.5 py-1 text-xs font-medium text-fg-mute transition-colors hover:bg-bg-2/50 hover:text-fg"
                 >
                   <ClipboardPaste className="h-3.5 w-3.5" />
-                  Paste from clipboard · {quickPasteHint}
+                  {m('pasteFromClipboard', { hint: quickPasteHint })}
                 </button>
               </DropZone>
             ) : (
@@ -146,8 +150,8 @@ export function ImageBase64Tool() {
                   <button
                     type="button"
                     onClick={clearEncode}
-                    aria-label="Remove image"
-                    title="Remove image"
+                    aria-label={m('removeImage')}
+                    title={m('removeImage')}
                     className="absolute top-2 right-2 p-1 rounded-md bg-bg/80 border hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -164,11 +168,11 @@ export function ImageBase64Tool() {
                 {/* Base64 output */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-fg-mute">Base64 (raw, without data URL prefix)</span>
+                    <span className="text-xs text-fg-mute">{m('rawBase64')}</span>
                     <div className="flex gap-1.5">
                       <CopyButton
                         value={base64Only}
-                        label="Copy raw"
+                        label={m('copyRaw')}
                         variant="ghost"
                         size="sm"
                         className="h-6 px-1.5 text-[11px] text-fg-mute hover:text-fg"
@@ -176,7 +180,7 @@ export function ImageBase64Tool() {
                       />
                       <CopyButton
                         value={() => encodeDataUrl ?? ''}
-                        label="Copy data URL"
+                        label={m('copyDataUrl')}
                         variant="ghost"
                         size="sm"
                         className="h-6 px-1.5 text-[11px] text-fg-mute hover:text-fg"
@@ -198,11 +202,11 @@ export function ImageBase64Tool() {
           <div className="space-y-3">
             {/* Input */}
             <div className="space-y-1.5">
-              <span className="text-xs text-fg-mute">Paste base64 string or data URL</span>
+              <span className="text-xs text-fg-mute">{m('pasteBase64')}</span>
               <textarea
                 value={decodeInput}
                 onChange={(e) => { setDecodeInput(e.target.value); setDecodeError(false); }}
-                placeholder="data:image/png;base64,iVBORw0KGgo… or raw base64"
+                placeholder={m('base64Placeholder')}
                 className="w-full rounded-lg border border-line bg-bg px-3 py-2 font-mono text-[11px] leading-relaxed resize-none h-24 outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus placeholder:text-fg-mute/50"
               />
             </div>
@@ -227,7 +231,7 @@ export function ImageBase64Tool() {
                         return false;
                       }
                     }}
-                    label="Copy image"
+                    label={m('copyImage')}
                     variant="ghost"
                     size="sm"
                     className="absolute top-2 right-2 h-ctl bg-bg/80 px-2 text-[11px] text-fg-mute hover:text-fg"
@@ -240,12 +244,12 @@ export function ImageBase64Tool() {
             {(decodeError || (decodeInput.trim() && decodeSrc == null)) && (
               <div className="flex items-center gap-2 rounded-lg border border-bad/20 bg-bad/8 px-3 py-2">
                 <AlertCircle className="h-3.5 w-3.5 text-bad shrink-0" />
-                <p className="text-xs text-bad">Could not render image — invalid or unsupported base64.</p>
+                <p className="text-xs text-bad">{m('renderFailed')}</p>
               </div>
             )}
 
             {!decodeInput.trim() && (
-              <p className="text-xs text-fg-mute">The image will appear here as you paste base64.</p>
+              <p className="text-xs text-fg-mute">{m('imageWillAppear')}</p>
             )}
           </div>
         )}

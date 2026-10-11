@@ -116,6 +116,26 @@ const RULES: Rule[] = [
     },
   },
   {
+    key: 'anchorDownloadInPluginCode',
+    label: 'code plugin tải file bằng <a download>',
+    why: 'Trong webview Tauri thẻ đó không ghi ra file — dùng saveTextFile / saveBinaryFile của lib/fileio.ts (có nhánh hộp Save của OS).',
+    // Nhánh web có chủ đích (sau `if (isTauri) … return`) của QR Code và Time
+    // Tracker export vẫn dùng thẻ này — chỉ đếm file KHÔNG có nhánh Tauri.
+    count: () => {
+      let total = 0;
+      const byFile: Array<[string, number]> = [];
+      for (const file of PLUGIN_FILES) {
+        const src = stripComments(readFileSync(file, 'utf-8'));
+        const hits = src.match(/\.download\s*=/g)?.length ?? 0;
+        if (hits > 0 && !/isTauri|IS_TAURI/.test(src)) {
+          total += hits;
+          byFile.push([relative(SRC, file), hits]);
+        }
+      }
+      return { total, byFile };
+    },
+  },
+  {
     key: 'secretishKeyInSharedStore',
     label: 'khoá mang dáng credential nằm trong store dùng chung',
     why: 'Credential thuộc về kho bí mật (sdk.secrets / useSecretState), xem src/platform/secrets.ts.',

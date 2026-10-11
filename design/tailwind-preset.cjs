@@ -28,6 +28,12 @@ module.exports = {
   theme: {
     container: { center: true, padding: '2rem', screens: { '2xl': '1400px' } },
     extend: {
+      // Một bậc giữa `text-xs` (12px) và `text-sm` (14px): thân chữ trong panel
+      // dày đặc (ExplainBand, OutlineNotice, ParamRow, mô tả trong ⌘K). Trước
+      // đây viết tay `text-[13px]` ở 14 chỗ — giờ là một bậc có tên trong thang.
+      fontSize: {
+        dense: ['13px', { lineHeight: '1.45' }],
+      },
       fontFamily: {
         sans: ['var(--sans)'],
         // Lần đầu tiên `mono` được khai báo. Trước đây `font-mono` dùng 356 lần

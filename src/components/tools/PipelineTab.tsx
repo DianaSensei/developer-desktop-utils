@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,9 @@ import {
 import { cn } from '@/lib/utils';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import CryptoJS from 'crypto-js';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/EncodeHashEncrypt.messages';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -220,6 +224,13 @@ function mergeJsonFields(existing: FieldConfig[], flatMap: Record<string, string
 
 // ─── Step execution ────────────────────────────────────────────────────────────
 
+/** Lỗi do chính pipeline sinh ra — dịch lúc hiển thị (`errorText`). */
+const KEY_REQUIRED = '\u0000secretKeyRequired';
+const STEP_FAILED = '\u0000stepFailed';
+function errorText(error: string, t: (k: 'secretKeyRequired' | 'stepFailed') => string) {
+  return error === KEY_REQUIRED ? t('secretKeyRequired') : error === STEP_FAILED ? t('stepFailed') : error;
+}
+
 function executeStep(step: PipelineStep, input: string): StepResult {
   try {
     switch (step.op) {
@@ -247,7 +258,7 @@ function executeStep(step: PipelineStep, input: string): StepResult {
       }
       case 'hmac': {
         if (!input) return { output: '' };
-        if (!step.key) return { output: '', error: 'Secret key required' };
+        if (!step.key) return { output: '', error: KEY_REQUIRED };
         const r = computeHmac((step.algorithm ?? 'sha256') as HashAlgo, input, step.key);
         return { output: step.upperHex ? r.toUpperCase() : r };
       }
@@ -262,7 +273,7 @@ function executeStep(step: PipelineStep, input: string): StepResult {
       default:          return { output: input };
     }
   } catch (err) {
-    return { output: '', error: err instanceof Error ? err.message : 'Step failed' };
+    return { output: '', error: err instanceof Error ? err.message : STEP_FAILED };
   }
 }
 
@@ -292,25 +303,27 @@ function makeId() {
 // ─── Shared tiny components ────────────────────────────────────────────────────
 
 function HexToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const t = useMessages(MESSAGES);
   return (
-    <button
-      type="button" onClick={() => onChange(!value)}
-      className={cn(
-        'text-[11px] font-mono px-2 h-ctl rounded-sm border transition-colors',
-        value ? 'border-acc/50 bg-acc/10 text-acc' : 'border-line bg-bg-2/30 text-fg-mute hover:text-fg'
-      )}
+    <ToggleChip
+      pressed={value}
+      onPressedChange={onChange}
+      className="px-2 font-mono"
+      title={t('uppercaseHex')}
+      aria-label={t('uppercaseHex')}
     >
       {value ? 'ABC' : 'abc'}
-    </button>
+    </ToggleChip>
   );
 }
 
 function CopyBtn({ value, mini = false }: { value: string; mini?: boolean }) {
+  const c = useMessages(COMMON);
   return (
     <CopyButton
       value={value}
       disabled={!value}
-      label={mini ? undefined : 'Copy'}
+      label={mini ? undefined : c('copy')}
       variant="ghost"
       size="sm"
       className={cn(
@@ -323,6 +336,7 @@ function CopyBtn({ value, mini = false }: { value: string; mini?: boolean }) {
 }
 
 function OutputText({ value }: { value: string }) {
+  const t = useMessages(MESSAGES);
   const [expanded, setExpanded] = useState(false);
   const LIMIT = 160;
   const long = value.length > LIMIT;
@@ -332,7 +346,7 @@ function OutputText({ value }: { value: string }) {
       {long && (
         <button type="button" onClick={() => setExpanded((v) => !v)}
           className="ml-1 text-acc text-[11px] font-sans underline underline-offset-2">
-          {expanded ? 'less' : `+${value.length - LIMIT} more`}
+          {expanded ? t('less') : t('more', { n: value.length - LIMIT })}
         </button>
       )}
     </span>
@@ -352,6 +366,7 @@ interface FieldRowProps {
 }
 
 function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove }: FieldRowProps) {
+  const t = useMessages(MESSAGES);
   const jsonVal = flatMap && field.type === 'json' ? flatMap[field.key] : undefined;
   const missing = field.type === 'json' && flatMap !== null && !(field.key in (flatMap ?? {}));
 
@@ -378,7 +393,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
               const k = e.target.value;
               onChange({ key: k, enabled: k.length > 0 });
             }}
-            placeholder="key"
+            placeholder={t('key')}
             className="h-ctl text-xs font-mono"
           />
         ) : (
@@ -399,7 +414,7 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
           <Input
             value={field.customValue ?? ''}
             onChange={(e) => onChange({ customValue: e.target.value })}
-            placeholder="value"
+            placeholder={t('value')}
             className="h-ctl text-xs font-mono"
           />
         ) : (
@@ -418,18 +433,18 @@ function FieldRow({ field, flatMap, isFirst, isLast, onChange, onRemove, onMove 
           them invisible to anyone tabbing through the row. */}
       <div className="shrink-0 flex items-center gap-px opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
         <button type="button" disabled={isFirst} onClick={() => onMove(-1)}
-          aria-label="Move field up" title="Move field up"
+          aria-label={t('moveFieldUp')} title={t('moveFieldUp')}
           className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
           <ChevronUp className="h-3.5 w-3.5" />
         </button>
         <button type="button" disabled={isLast} onClick={() => onMove(1)}
-          aria-label="Move field down" title="Move field down"
+          aria-label={t('moveFieldDown')} title={t('moveFieldDown')}
           className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
           <ChevronDown className="h-3.5 w-3.5" />
         </button>
         {field.type === 'custom' && (
           <button type="button" onClick={onRemove}
-            aria-label="Remove field" title="Remove field"
+            aria-label={t('removeField')} title={t('removeField')}
             className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-bad transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
             <Trash2 className="h-3 w-3" />
           </button>
@@ -456,6 +471,7 @@ function JsonInputSection({
   jsonText, jsonFields, jsonSeparator, jsonSort, jsonFormat,
   onJsonTextChange, onFieldsChange, onUpdate,
 }: JsonInputSectionProps) {
+  const t = useMessages(MESSAGES);
   // Flat map for the field-value preview column
   const flatMap = useMemo<Record<string, string> | null>(() => {
     if (!jsonText.trim()) return null;
@@ -466,7 +482,7 @@ function JsonInputSection({
   const jsonError = useMemo(() => {
     if (!jsonText.trim()) return null;
     try { JSON.parse(jsonText); return null; }
-    catch (e) { return e instanceof Error ? e.message : 'Invalid JSON'; }
+    catch (e) { return e instanceof Error ? e.message : t('invalidJson'); }
   }, [jsonText]);
 
   const handleJsonChange = (text: string) => {
@@ -509,7 +525,7 @@ function JsonInputSection({
         <JsonEditor
           value={jsonText}
           onChange={handleJsonChange}
-          placeholder={'Paste JSON here\n\n{ "amount": "50000", "orderId": "abc", ... }'}
+          placeholder={t('pasteJson')}
           className={cn('min-h-[110px]', jsonError && jsonText.trim() && 'border-warn-edge')}
         />
         {/* Validity badge */}
@@ -530,39 +546,39 @@ function JsonInputSection({
       {/* ── Output options ── */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-fg-mute font-medium">Sep</span>
+          <span className="text-[11px] text-fg-mute font-medium">{t('sep')}</span>
           <Select value={jsonSeparator} onValueChange={(v) => onUpdate({ jsonSeparator: v })}>
             <SelectTrigger className="h-ctl w-36 text-xs rounded-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {SEP_OPTIONS.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+              {SEP_OPTIONS.map((s) => <SelectItem key={s.id} value={s.id}>{t(s.id === '\n' ? 'sep.newline' : (`sep.${s.id}` as 'sep.&'))}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-fg-mute font-medium">Format</span>
+          <span className="text-[11px] text-fg-mute font-medium">{t('format')}</span>
           <Segmented
             value={jsonFormat}
             onValueChange={(v) => onUpdate({ jsonFormat: v })}
             size="sm"
             options={[
               { value: 'key=value', label: 'key=value' },
-              { value: 'value', label: 'value only' },
+              { value: 'value', label: t('valueOnly') },
             ]}
-            aria-label="JSON format"
+            aria-label={t('jsonFormat')}
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-fg-mute font-medium">Sort</span>
+          <span className="text-[11px] text-fg-mute font-medium">{t('sort')}</span>
           <Segmented
             value={jsonSort}
             onValueChange={(v) => onUpdate({ jsonSort: v })}
             size="sm"
             options={[
-              { value: 'none', label: 'None' },
+              { value: 'none', label: t('sortNone') },
               { value: 'asc', label: 'A→Z' },
               { value: 'desc', label: 'Z→A' },
             ]}
-            aria-label="JSON sort"
+            aria-label={t('jsonSort')}
           />
         </div>
       </div>
@@ -573,8 +589,8 @@ function JsonInputSection({
           {/* Header */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-bg-2/30 border-b border-line">
             <div className="w-4" />
-            <span className="w-36 shrink-0 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">Field</span>
-            <span className="flex-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">Value</span>
+            <span className="w-36 shrink-0 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{t('field')}</span>
+            <span className="flex-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{t('value')}</span>
           </div>
           {/* Rows */}
           <div className="px-3 divide-y divide-line-soft">
@@ -600,7 +616,7 @@ function JsonInputSection({
         className="flex items-center gap-1.5 text-xs text-fg-mute hover:text-fg transition-colors"
       >
         <Plus className="h-3.5 w-3.5" />
-        Add custom field
+        {t('addCustomField')}
       </button>
     </div>
   );
@@ -609,6 +625,7 @@ function JsonInputSection({
 // ─── Step output bar ───────────────────────────────────────────────────────────
 
 function StepOutputBar({ result }: { result: StepResult | undefined }) {
+  const t = useMessages(MESSAGES);
   if (!result) return null;
   return (
     <div className={cn(
@@ -620,7 +637,7 @@ function StepOutputBar({ result }: { result: StepResult | undefined }) {
       <ArrowRight className="h-3.5 w-3.5 shrink-0 mt-px text-fg-mute/50" />
       <span className="flex-1 min-w-0">
         {result.error
-          ? <span className="flex items-center gap-1.5"><AlertTriangle className="h-3 w-3 shrink-0" />{result.error}</span>
+          ? <span className="flex items-center gap-1.5"><AlertTriangle className="h-3 w-3 shrink-0" />{errorText(result.error, t)}</span>
           : result.output
             ? <OutputText value={result.output} />
             : <span className="opacity-30 italic">—</span>
@@ -647,7 +664,7 @@ interface StepCardProps {
 }
 
 function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, onRemove, onMoveUp, onMoveDown }: StepCardProps) {
-  const meta = OP_META[step.op];
+  const t = useMessages(MESSAGES);
 
   return (
     <div className={cn(
@@ -670,13 +687,13 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <SelectContent>
             {OP_GROUPS.map((group) => (
               <div key={group.label}>
-                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{group.label}</div>
+                <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-fg-mute uppercase tracking-wide">{t(`group.${group.label}` as 'group.Text')}</div>
                 {group.ops.map((op) => {
                   const m = OP_META[op];
                   return (
                     <SelectItem key={op} value={op}>
                       <span className="flex items-center gap-2">
-                        <m.icon className={cn('h-3 w-3', m.color)} />{m.label}
+                        <m.icon className={cn('h-3 w-3', m.color)} />{t(`op.${op}`)}
                       </span>
                     </SelectItem>
                   );
@@ -688,17 +705,17 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
 
         <div className="flex items-center gap-0.5 ml-auto">
           <button type="button" disabled={index === 0} onClick={onMoveUp}
-            aria-label="Move step up" title="Move step up"
+            aria-label={t('moveStepUp')} title={t('moveStepUp')}
             className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
             <ChevronUp className="h-3.5 w-3.5" />
           </button>
           <button type="button" disabled={index === total - 1} onClick={onMoveDown}
-            aria-label="Move step down" title="Move step down"
+            aria-label={t('moveStepDown')} title={t('moveStepDown')}
             className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-fg disabled:opacity-20 transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
           <button type="button" onClick={onRemove}
-            aria-label="Remove step" title="Remove step"
+            aria-label={t('removeStep')} title={t('removeStep')}
             className="h-6 w-6 rounded flex items-center justify-center text-fg-mute hover:text-bad transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -712,7 +729,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
           <Textarea
             value={step.textValue ?? ''}
             onChange={(e) => onUpdate({ textValue: e.target.value })}
-            placeholder="Type or paste any text…"
+            placeholder={t('anyText')}
             className="min-h-[90px] font-mono text-xs resize-y leading-relaxed"
             spellCheck={false}
           />
@@ -762,14 +779,14 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
                 type={showKey ? 'text' : 'password'}
                 value={step.key ?? ''}
                 onChange={(e) => onUpdate({ key: e.target.value })}
-                placeholder="Secret key…"
+                placeholder={t('secretKeyPlaceholder')}
                 className="h-ctl pr-9 font-mono text-sm"
               />
               <button
                 type="button"
                 onClick={onToggleKey}
-                aria-label={showKey ? 'Hide key' : 'Show key'}
-                title={showKey ? 'Hide key' : 'Show key'}
+                aria-label={showKey ? t('hideKey') : t('showKey')}
+                title={showKey ? t('hideKey') : t('showKey')}
                 aria-pressed={showKey}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded text-fg-mute transition-colors hover:text-fg focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
               >
@@ -798,7 +815,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
             <Input
               value={step.text ?? ''}
               onChange={(e) => onUpdate({ text: e.target.value })}
-              placeholder={step.op === 'prepend' ? 'Text to prepend…' : 'Text to append…'}
+              placeholder={step.op === 'prepend' ? t('textToPrepend') : t('textToAppend')}
               className="h-ctl text-xs font-mono flex-1"
             />
           </div>
@@ -808,19 +825,19 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
         {step.op === 'replace' && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <p className="text-[11px] text-fg-mute mb-1">Find (all occurrences)</p>
-              <Input value={step.find ?? ''} onChange={(e) => onUpdate({ find: e.target.value })} placeholder="Find…" className="h-ctl text-xs font-mono" />
+              <p className="text-[11px] text-fg-mute mb-1">{t('findAll')}</p>
+              <Input value={step.find ?? ''} onChange={(e) => onUpdate({ find: e.target.value })} placeholder={t('find')} className="h-ctl text-xs font-mono" />
             </div>
             <div>
-              <p className="text-[11px] text-fg-mute mb-1">Replace with (empty = delete)</p>
-              <Input value={step.replacement ?? ''} onChange={(e) => onUpdate({ replacement: e.target.value })} placeholder="Replace with…" className="h-ctl text-xs font-mono" />
+              <p className="text-[11px] text-fg-mute mb-1">{t('replaceWith')}</p>
+              <Input value={step.replacement ?? ''} onChange={(e) => onUpdate({ replacement: e.target.value })} placeholder={t('replaceWithPlaceholder')} className="h-ctl text-xs font-mono" />
             </div>
           </div>
         )}
 
         {/* No-param ops */}
         {(step.op === 'uppercase' || step.op === 'lowercase' || step.op === 'trim') && (
-          <p className="text-xs text-fg-mute">{meta.hint}</p>
+          <p className="text-xs text-fg-mute">{t(`opHint.${step.op}`)}</p>
         )}
       </div>
 
@@ -832,6 +849,7 @@ function StepCard({ step, index, total, result, showKey, onToggleKey, onUpdate, 
 // ─── Add step panel ────────────────────────────────────────────────────────────
 
 function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
+  const t = useMessages(MESSAGES);
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
@@ -849,12 +867,12 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
       <div className="w-px h-3 bg-line/50" />
       <div className="w-full rounded-lg border border-dashed border-acc/30 bg-acc/3 p-3 space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold">Add a step</p>
+          <p className="text-xs font-semibold">{t('addStep')}</p>
           <button type="button" onClick={() => setOpen(false)} className="text-xs text-fg-mute hover:text-fg">✕</button>
         </div>
         {OP_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-[11px] font-semibold text-fg-mute uppercase tracking-wide mb-1.5">{group.label}</p>
+            <p className="text-[11px] font-semibold text-fg-mute uppercase tracking-wide mb-1.5">{t(`group.${group.label}` as 'group.Text')}</p>
             <div className="flex flex-wrap gap-1.5">
               {group.ops.map((op) => {
                 const m = OP_META[op]; const Icon = m.icon;
@@ -862,7 +880,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
                   <button key={op} type="button"
                     onClick={() => { onAdd(op); setOpen(false); }}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-line bg-card text-xs font-medium hover:border-acc/40 hover:bg-acc/5 hover:text-acc transition-all">
-                    <Icon className={cn('h-3.5 w-3.5', m.color)} />{m.label}
+                    <Icon className={cn('h-3.5 w-3.5', m.color)} />{t(`op.${op}`)}
                   </button>
                 );
               })}
@@ -877,6 +895,7 @@ function AddStepPanel({ onAdd }: { onAdd: (op: StepOp) => void }) {
 // ─── Final result ──────────────────────────────────────────────────────────────
 
 function FinalResult({ result }: { result: StepResult | undefined }) {
+  const t = useMessages(MESSAGES);
   if (!result || (!result.output && !result.error)) return null;
   const ok = !!result.output && !result.error;
   return (
@@ -884,15 +903,15 @@ function FinalResult({ result }: { result: StepResult | undefined }) {
       <div className="flex items-center justify-between mb-2.5">
         <span className="flex items-center gap-1.5 text-xs font-semibold">
           {ok ? <CheckCircle2 className="h-4 w-4 text-acc" /> : <AlertTriangle className="h-4 w-4 text-bad" />}
-          {ok ? 'Final Result' : 'Pipeline Error'}
+          {ok ? t('finalResult') : t('pipelineError')}
         </span>
         {ok && <CopyBtn value={result.output} />}
       </div>
       {ok
         ? <p className="font-mono text-sm leading-relaxed break-all text-fg">{result.output}</p>
-        : <p className="text-sm text-bad">{result.error}</p>
+        : <p className="text-sm text-bad">{errorText(result.error ?? '', t)}</p>
       }
-      {ok && <p className="text-[11px] text-fg-mute/40 mt-1.5">{result.output.length} chars</p>}
+      {ok && <p className="text-[11px] text-fg-mute/40 mt-1.5">{t('chars', { n: result.output.length })}</p>}
     </div>
   );
 }
@@ -914,6 +933,7 @@ const STEP_DEFAULTS: Partial<Record<StepOp, Partial<PipelineStep>>> = {
 const DEFAULT_STEPS: PipelineStep[] = [];
 
 export function PipelineTab({ active }: { active: boolean }) {
+  const t = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('base64');
   const [steps, setSteps] = usePluginState<PipelineStep[]>(sdk, 'pipeline:steps-v2', DEFAULT_STEPS, { legacyKey: 'devtool:pipeline:steps-v2' });
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -970,8 +990,8 @@ export function PipelineTab({ active }: { active: boolean }) {
       {/* Empty state */}
       {steps.length === 0 && (
         <div className="flex flex-col items-center gap-2 py-10 text-center text-fg-mute">
-          <p className="text-sm font-medium">No steps yet</p>
-          <p className="text-xs">Add a node below to start building your pipeline.</p>
+          <p className="text-sm font-medium">{t('noSteps')}</p>
+          <p className="text-xs">{t('addNodeHint')}</p>
         </div>
       )}
 

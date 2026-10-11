@@ -36,6 +36,8 @@ declare global {
       reactDom: typeof ReactDOM;
       reactDomFull: typeof ReactDOMFull;
       jsxRuntime: { jsx: typeof jsx; jsxs: typeof jsxs; Fragment: typeof Fragment };
+      /** Bộ UI của app chủ — nạp lười, có sẵn trước khi bundle plugin chạy. SDK ≥ 1.1.0. */
+      ui?: typeof import('./platform/vendorUi');
       platform: {
         usePluginSdk: typeof usePluginSdk;
         usePluginSdkFor: typeof usePluginSdkFor;

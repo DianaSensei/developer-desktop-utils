@@ -7,8 +7,11 @@ import { markdown } from '@codemirror/lang-markdown';
 import { EditorState } from '@codemirror/state';
 import { useCodeTheme } from '@/components/ui/code-theme';
 import { PaneHeader } from '@/components/ui/tool-layout';
-import ReactMarkdown from 'react-markdown';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { MarkdownView } from '@/components/ui/markdown-view';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
+import { useInputHistory } from '@/hooks/useInputHistory';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/MarkdownPreview.messages';
 
 const DEFAULT_MARKDOWN = `# Heading 1
 ## Heading 2
@@ -92,23 +95,26 @@ function MarkdownSourceEditor({ value, onChange, placeholder }: { value: string;
 
 export function MarkdownPreview() {
   const sdk = usePluginSdkFor('markdown');
+  const m = useMessages(MESSAGES);
+  const quickPasteHint = useQuickPasteHint();
   const [markdownText, setMarkdownText] = usePluginState(sdk, 'markdown:content', DEFAULT_MARKDOWN, { legacyKey: 'devtool:markdown:content' });
 
   useQuickPaste(setMarkdownText);
+  useInputHistory(markdownText, setMarkdownText);
 
   return (
-    <div className="grid grid-cols-2 h-full divide-x overflow-hidden">
+    <div className="grid h-full grid-rows-2 divide-y divide-line overflow-hidden md:grid-cols-2 md:grid-rows-1 md:divide-x md:divide-y-0">
       {/* Editor */}
       <div className="flex flex-col min-h-0">
-        <PaneHeader label="Markdown" hint={quickPasteHint} />
-        <MarkdownSourceEditor value={markdownText} onChange={setMarkdownText} placeholder="Enter markdown here" />
+        <PaneHeader label={m('markdown')} hint={quickPasteHint} />
+        <MarkdownSourceEditor value={markdownText} onChange={setMarkdownText} placeholder={m('placeholder')} />
       </div>
 
       {/* Preview */}
       <div className="flex flex-col min-h-0">
-        <PaneHeader label="Preview" />
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 prose dark:prose-invert prose-sm max-w-none">
-          <ReactMarkdown>{markdownText}</ReactMarkdown>
+        <PaneHeader label={m('preview')} />
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          <MarkdownView remoteImageLabel={m('remoteImage')} onOpenLink={(url) => void sdk.openExternal(url)}>{markdownText}</MarkdownView>
         </div>
       </div>
     </div>

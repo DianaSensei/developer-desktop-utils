@@ -8,10 +8,16 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Layers } from 'lucide-react';
 import { DataTable, Thead, Tbody, Tr, Th, Td, DataTableStatus } from '@/components/ui/data-table';
 import { cn } from '@/lib/utils';
-import { quickPasteHint, useQuickPaste } from '@/hooks/useQuickPaste';
+import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
+import { useMessages } from '@/contexts/LocaleContext';
+import COMMON from '@/components/tools/common.messages';
+import MESSAGES from '@/components/tools/RegexTester.messages';
 
 type ResultView = 'matches' | 'highlight' | 'extract' | 'replace';
+
+/** Lỗi do chính tool sinh ra — dịch lúc hiển thị. */
+const TOO_SLOW = '\u0000tooSlow';
 
 interface Preset {
   label: string;
@@ -151,6 +157,9 @@ function parseGroupNames(pattern: string): (string | null)[] {
 }
 
 export function RegexTester() {
+  const m = useMessages(MESSAGES);
+  const c = useMessages(COMMON);
+  const quickPasteHint = useQuickPasteHint();
   const sdk = usePluginSdkFor('regex');
   const [pattern, setPattern] = usePluginState(sdk, 'regex:pattern', '', { legacyKey: 'devtool:regex:pattern' });
   const [flags, setFlags] = usePluginState(sdk, 'regex:flags', 'g', { legacyKey: 'devtool:regex:flags' });
@@ -236,7 +245,7 @@ export function RegexTester() {
       worker.terminate();
       makeWorker();
       if (id === reqIdRef.current) {
-        const msg = 'Pattern is too slow to evaluate (possible catastrophic backtracking). Try simplifying it.';
+        const msg = TOO_SLOW;
         setResult({ matches: [], error: msg });
         setReplaceResult({ output: '', error: msg });
       }
@@ -285,11 +294,13 @@ export function RegexTester() {
           />
           <span className="font-mono text-sm text-fg-mute select-none">/</span>
           <div className="inline-flex h-ctl rounded-sm border border-line bg-bg-2/50 p-0.5 gap-px">
-            {FLAG_DEFS.map(({ flag, title }) => (
+            {FLAG_DEFS.map(({ flag }) => (
               <button
                 key={flag}
                 type="button"
-                title={title}
+                title={m(`flag.${flag}` as 'flag.g')}
+                aria-label={m(`flag.${flag}` as 'flag.g')}
+                aria-pressed={flags.includes(flag)}
                 onClick={() => toggleFlag(flag)}
                 className={cn(
                   'w-6 rounded-md font-mono text-xs font-medium transition-all duration-150',
@@ -327,18 +338,18 @@ export function RegexTester() {
         {/* Active preset description — plain-language hint */}
         {activePreset && (
           <p className="text-[11px] text-fg-mute/80 leading-relaxed">
-            {activePreset.description} · click the chip again to reload sample text
+            {m(`preset.${activePreset.label}` as 'preset.Email')} · {m('presetReload')}
           </p>
         )}
       </div>
 
       {/* Test string — fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col">
-        <PaneHeader label="Test String" hint={quickPasteHint} />
+        <PaneHeader label={m('testString')} hint={quickPasteHint} />
         <Textarea
           value={testString}
           onChange={(e) => setTestString(e.target.value)}
-          placeholder="Paste or type text here, or pick a preset above to load an example"
+          placeholder={m('testPlaceholder')}
           className="flex-1 min-h-0 resize-none rounded-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm p-4"
         />
       </div>
@@ -349,7 +360,7 @@ export function RegexTester() {
           {/* Status bar: count + stats + view tabs + copy-all */}
           <div className="shrink-0 px-1 border-b border-line bg-bg-2/10 flex items-center">
             {result.error ? (
-              <span className="px-3 py-1.5 text-xs font-semibold text-bad">Error</span>
+              <span className="px-3 py-1.5 text-xs font-semibold text-bad">{c('error')}</span>
             ) : (
               <>
                 {/* Match count + coverage stats */}
@@ -357,14 +368,14 @@ export function RegexTester() {
                   'shrink-0 px-3 py-1.5 text-xs font-semibold whitespace-nowrap',
                   result.matches.length > 0 ? 'text-ok' : 'text-fg-mute'
                 )}>
-                  {result.matches.length} match{result.matches.length !== 1 ? 'es' : ''}
+                  {m(result.matches.length === 1 ? 'matchCountOne' : 'matchCount', { n: result.matches.length })}
                   {stats && stats.chars > 0 && (
-                    <span className="font-normal text-fg-mute"> · {stats.chars} chars · {stats.pct}%</span>
+                    <span className="font-normal text-fg-mute">{m('matchStats', { chars: stats.chars, pct: stats.pct })}</span>
                   )}
                 </span>
                 {/* View tabs */}
                 <div className="flex-1 min-w-0 flex items-center overflow-x-auto no-scrollbar">
-                  {RESULT_VIEWS.map(({ id, label }) => (
+                  {RESULT_VIEWS.map(({ id }) => (
                     <button
                       key={id}
                       type="button"
@@ -376,7 +387,7 @@ export function RegexTester() {
                           : 'text-fg-mute hover:text-fg border-transparent'
                       )}
                     >
-                      {label}
+                      {m(`view.${id}`)}
                     </button>
                   ))}
                 </div>
@@ -385,7 +396,7 @@ export function RegexTester() {
                   <CopyButton
                     value={() => result.matches.map((m) => m[0]).join('\n')}
                     icon={Layers}
-                    label="Copy all"
+                    label={c('copyAll')}
                     variant="ghost"
                     size="sm"
                     className="shrink-0 h-6 px-2 mr-1 text-xs"
@@ -400,7 +411,7 @@ export function RegexTester() {
           <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
             {result.error && (
               <div className="px-3 py-2.5 bg-bad/8 border border-bad/20 rounded-lg">
-                <p className="font-mono text-sm text-bad">{result.error}</p>
+                <p className="font-mono text-sm text-bad">{result.error === TOO_SLOW ? m('tooSlow') : result.error}</p>
               </div>
             )}
 
@@ -408,7 +419,7 @@ export function RegexTester() {
             {!result.error && resultView === 'matches' && (
               result.matches.length === 0 ? (
                 <div className="px-3 py-2.5 bg-bg-2/50 border border-line rounded-lg">
-                  <p className="text-sm text-fg-mute">No matches found</p>
+                  <p className="text-sm text-fg-mute">{c('noMatches')}</p>
                 </div>
               ) : (
                 /* ── Vì sao THẺ đổi thành LƯỚI ───────────────────────────────
@@ -438,15 +449,15 @@ export function RegexTester() {
                         {/* Cột số giữ bề rộng CỐ ĐỊNH, cột giá trị ăn hết phần
                             còn lại. Không ràng buộc thì hai cột số dãn ra bằng
                             cột nội dung và bảng đọc ra rỗng tuếch ở giữa. */}
-                        <Th className="w-20 whitespace-nowrap" align="right" sub="index" subTone="number">Pos</Th>
-                        <Th className="w-20 whitespace-nowrap" align="right" sub="chars" subTone="number">Len</Th>
-                        <Th className="w-full whitespace-nowrap" sub="string" subTone="string">Match</Th>
+                        <Th className="w-20 whitespace-nowrap" align="right" sub="index" subTone="number">{m('pos')}</Th>
+                        <Th className="w-20 whitespace-nowrap" align="right" sub="chars" subTone="number">{m('len')}</Th>
+                        <Th className="w-full whitespace-nowrap" sub="string" subTone="string">{m('match')}</Th>
                         {groupNames.map((name, gIdx) => (
                           <Th key={gIdx} className="whitespace-nowrap" sub="string" subTone="string">
-                            {name ? `<${name}>` : `Group ${gIdx + 1}`}
+                            {name ? `<${name}>` : m('group', { n: gIdx + 1 })}
                           </Th>
                         ))}
-                        <Th className="w-9" aria-label="Copy" />
+                        <Th className="w-9" aria-label={c('copy')} />
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -486,14 +497,14 @@ export function RegexTester() {
                   <div className="flex flex-wrap gap-1.5 px-1">
                     {MATCH_COLORS.slice(0, Math.min(result.matches.length, MATCH_COLORS.length)).map((color, idx) => (
                       <span key={idx} className={cn('text-[11px] font-medium px-1.5 py-0.5 rounded', color)}>
-                        Match {idx + 1}{idx === MATCH_COLORS.length - 1 && result.matches.length > MATCH_COLORS.length ? `–${result.matches.length}` : ''}
+                        {m('matchN', { n: idx + 1 })}{idx === MATCH_COLORS.length - 1 && result.matches.length > MATCH_COLORS.length ? `–${result.matches.length}` : ''}
                       </span>
                     ))}
                   </div>
                 )}
                 <div className="font-mono text-sm whitespace-pre-wrap break-all leading-relaxed p-3 rounded-lg border border-line bg-bg-2/20 min-h-[80px]">
                   {highlightSegments.length === 0 && (
-                    <span className="text-fg-mute/60">Enter a test string above</span>
+                    <span className="text-fg-mute/60">{m('enterTestString')}</span>
                   )}
                   {highlightSegments.map((seg, idx) =>
                     seg.isMatch ? (
@@ -516,14 +527,14 @@ export function RegexTester() {
             {!result.error && resultView === 'extract' && (
               result.matches.length === 0 ? (
                 <div className="px-3 py-2.5 bg-bg-2/50 border border-line rounded-lg">
-                  <p className="text-sm text-fg-mute">No matches to extract</p>
+                  <p className="text-sm text-fg-mute">{m('noExtract')}</p>
                 </div>
               ) : !result.matches.some((m) => m.length > 1) ? (
                 <div className="space-y-3">
                   <div className="px-3 py-2.5 bg-bg-2/50 border border-line rounded-lg space-y-1">
-                    <p className="text-sm text-fg-mute">No capturing groups — showing all matches.</p>
+                    <p className="text-sm text-fg-mute">{m('noGroups')}</p>
                     <p className="text-[11px] text-fg-mute/70">
-                      Wrap parts of your pattern in <code className="font-mono">( )</code> to capture them as groups.
+                      {m('wrapToCapture')} <code className="font-mono">( )</code> {m('wrapToCaptureAfter')}
                     </p>
                   </div>
                   {/* Flat match list as a simple table when no groups */}
@@ -531,9 +542,9 @@ export function RegexTester() {
                     <Thead>
                       <Tr>
                         <Th className="whitespace-nowrap">#</Th>
-                        <Th className="whitespace-nowrap">Pos</Th>
-                        <Th className="whitespace-nowrap">Len</Th>
-                        <Th className="whitespace-nowrap">Match</Th>
+                        <Th className="whitespace-nowrap">{m('pos')}</Th>
+                        <Th className="whitespace-nowrap">{m('len')}</Th>
+                        <Th className="whitespace-nowrap">{m('match')}</Th>
                       </Tr>
                     </Thead>
                     <Tbody zebra>
@@ -552,15 +563,15 @@ export function RegexTester() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-1">
                     <p className="text-[11px] text-fg-mute">
-                      {result.matches[0].length - 1} group{result.matches[0].length - 1 !== 1 ? 's' : ''} captured per match
+                      {m(result.matches[0].length - 1 === 1 ? 'groupsPerMatchOne' : 'groupsPerMatch', { n: result.matches[0].length - 1 })}
                     </p>
                     <CopyButton
                       value={() => {
-                        const header = ['#', 'Pos', 'Match', ...result.matches[0].slice(1).map((_, i) => groupNames[i] ? `<${groupNames[i]}>` : `Group ${i + 1}`)].join('\t');
+                        const header = ['#', m('pos'), m('match'), ...result.matches[0].slice(1).map((_, i) => groupNames[i] ? `<${groupNames[i]}>` : m('group', { n: i + 1 }))].join('\t');
                         const rows = result.matches.map((m, i) => [i + 1, m.index, m[0], ...m.slice(1).map(g => g ?? '')].join('\t'));
                         return [header, ...rows].join('\n');
                       }}
-                      label="Copy table"
+                      label={m('copyTable')}
                       variant="ghost"
                       size="sm"
                       className="h-5 px-2 text-[11px]"
@@ -571,11 +582,11 @@ export function RegexTester() {
                     <Thead>
                       <Tr>
                         <Th className="whitespace-nowrap">#</Th>
-                        <Th className="whitespace-nowrap">Pos</Th>
-                        <Th className="whitespace-nowrap">Match</Th>
+                        <Th className="whitespace-nowrap">{m('pos')}</Th>
+                        <Th className="whitespace-nowrap">{m('match')}</Th>
                         {result.matches[0].slice(1).map((_, gIdx) => (
                           <Th key={gIdx} className="whitespace-nowrap">
-                            {groupNames[gIdx] ? `<${groupNames[gIdx]}>` : `Group ${gIdx + 1}`}
+                            {groupNames[gIdx] ? `<${groupNames[gIdx]}>` : m('group', { n: gIdx + 1 })}
                           </Th>
                         ))}
                       </Tr>
@@ -603,35 +614,35 @@ export function RegexTester() {
             {!result.error && resultView === 'replace' && (
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-fg">Replacement text</label>
+                  <label className="text-xs font-medium text-fg">{m('replacementText')}</label>
                   <Input
                     value={replacement}
                     onChange={(e) => setReplacement(e.target.value)}
-                    placeholder="Type replacement text here, or leave empty to delete matches"
+                    placeholder={m('replacementPlaceholder')}
                     className="h-ctl font-mono text-sm rounded-sm"
                   />
                   <p className="text-[11px] text-fg-mute">
-                    Advanced: <code className="font-mono">$1</code>, <code className="font-mono">$2</code>… insert captured groups · <code className="font-mono">$&</code> inserts the whole match · <code className="font-mono">{'$<name>'}</code> for named groups
+                    {m('advanced')} <code className="font-mono">$1</code>, <code className="font-mono">$2</code>… {m('advancedGroups')} · <code className="font-mono">$&</code> {m('advancedWhole')} · <code className="font-mono">{'$<name>'}</code> {m('advancedNamed')}
                   </p>
                 </div>
                 {replaceResult.error ? (
                   <div className="px-3 py-2.5 bg-bad/8 border border-bad/20 rounded-lg">
-                    <p className="font-mono text-sm text-bad">{replaceResult.error}</p>
+                    <p className="font-mono text-sm text-bad">{replaceResult.error === TOO_SLOW ? m('tooSlow') : replaceResult.error}</p>
                   </div>
                 ) : (
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-medium text-fg">
-                        Result
+                        {c('result')}
                         {replaceResult.output !== deferredTest && (
                           <span className="ml-2 text-[11px] font-normal text-fg-mute">
-                            {deferredTest.length} → {replaceResult.output.length} chars
+                            {m('charsDelta', { from: deferredTest.length, to: replaceResult.output.length })}
                           </span>
                         )}
                       </label>
                       <CopyButton
                         value={replaceResult.output}
-                        label="Copy"
+                        label={c('copy')}
                         variant="ghost"
                         size="sm"
                         className="h-6 px-2 text-xs"
@@ -643,7 +654,7 @@ export function RegexTester() {
                       value={replaceResult.output}
                       readOnly
                       className="min-h-[80px] font-mono text-sm resize-none rounded-lg"
-                      placeholder="Result appears here"
+                      placeholder={m('resultPlaceholder')}
                     />
                   </div>
                 )}

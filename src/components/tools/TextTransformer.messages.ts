@@ -1,0 +1,26 @@
+import { defineMessages } from '@/lib/i18n';
+
+export default defineMessages({
+  'mode.single-line': { vi: 'Gộp thành một dòng', en: 'To Single Line' },
+  'mode.multiple-lines': { vi: 'Tách thành nhiều dòng', en: 'To Multiple Lines' },
+  'mode.array': { vi: 'Thành mảng', en: 'To Array' },
+  'mode.uppercase': { vi: 'Thành CHỮ HOA', en: 'To UPPERCASE' },
+  'mode.lowercase': { vi: 'Thành chữ thường', en: 'To lowercase' },
+  'mode.all-cases': { vi: 'Mọi kiểu chữ cùng lúc', en: 'All cases at once' },
+  'mode.camelcase': { vi: 'Thành camelCase', en: 'To camelCase' },
+  'mode.pascalcase': { vi: 'Thành PascalCase', en: 'To PascalCase' },
+  'mode.snakecase': { vi: 'Thành snake_case', en: 'To snake_case' },
+  'mode.constantcase': { vi: 'Thành CONSTANT_CASE', en: 'To CONSTANT_CASE' },
+  'mode.kebabcase': { vi: 'Thành kebab-case', en: 'To kebab-case' },
+  'mode.titlecase': { vi: 'Thành Title Case', en: 'To Title Case' },
+  'mode.vn-phone-new': { vi: 'SĐT VN → mới (10 số)', en: 'VN Phone → New (10-digit)' },
+  'mode.vn-phone-old': { vi: 'SĐT VN → cũ (11 số)', en: 'VN Phone → Old (11-digit)' },
+  selectTransform: { vi: 'Chọn phép biến đổi', en: 'Select transform' },
+  removeWhitespace: { vi: 'Bỏ khoảng trắng giữa các dòng', en: 'Remove whitespace between lines' },
+  removeChars: { vi: 'Bỏ ký tự', en: 'Remove chars' },
+  removeCharsExample: { vi: 'VD: ,.;!?', en: 'e.g. ,.;!?' },
+  splitBy: { vi: 'Tách theo', en: 'Split by' },
+  inputPlaceholder: { vi: 'Nhập văn bản cần biến đổi', en: 'Enter text to transform' },
+  allCases: { vi: 'Mọi kiểu chữ', en: 'All cases' },
+  outputPlaceholder: { vi: 'Kết quả hiện ở đây', en: 'Result appears here' },
+});

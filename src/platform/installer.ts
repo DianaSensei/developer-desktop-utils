@@ -561,7 +561,10 @@ export async function checkAllForUpdates(): Promise<ArtifactUpdateAvailable[]> {
  * thân module đã chạy và export đã nằm trong tay — không cần blob sống thêm.
  */
 async function loadInstalled(id: string, marketId: string | undefined): Promise<React.ComponentType> {
-  const source = await invokeCommand<string>('artifact_installer_read_bundle', { id, marketId });
+  const [source] = await Promise.all([
+    invokeCommand<string>('artifact_installer_read_bundle', { id, marketId }),
+    ensureVendorUi(),
+  ]);
   const blob = new Blob([source], { type: 'text/javascript' });
   const url = URL.createObjectURL(blob);
   try {
@@ -570,6 +573,16 @@ async function loadInstalled(id: string, marketId: string | undefined): Promise<
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/**
+ * Gắn `window.__DEVTOOL_VENDOR__.ui` (xem `vendorUi.ts`) trước khi thân bundle
+ * plugin chạy — bundle đọc `ui` ĐỒNG BỘ ở top-level, nên phải có sẵn trước
+ * `import()`. Chỉ nạp một lần; lần sau trả ngay.
+ */
+export async function ensureVendorUi(): Promise<void> {
+  if (typeof window === 'undefined' || !window.__DEVTOOL_VENDOR__ || window.__DEVTOOL_VENDOR__.ui) return;
+  window.__DEVTOOL_VENDOR__.ui = await import('./vendorUi');
 }
 
 /** Installed plugin luôn xếp SAU mọi plugin compile-time, theo thứ tự cài —

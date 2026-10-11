@@ -10,7 +10,10 @@ import {
 } from 'lucide-react';
 import { isTauri } from '@/lib/platform';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
+import { saveBinaryFile } from '@/lib/fileio';
 import { copyToClipboard } from '@/lib/clipboard';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/ColorPicker.messages';
 
 // ---------------------------------------------------------------------------
 // Color conversions
@@ -152,6 +155,7 @@ function Help({ text }: { text: string }) {
 
 export function ColorPicker() {
   const sdk = usePluginSdkFor('color-picker');
+  const m = useMessages(MESSAGES);
   const [color, setColor] = usePluginState(sdk, 'colorPicker:color', '#2596be', { legacyKey: 'devtool:colorPicker:color' });
   const [imageSrc, setImageSrc] = useState<string>('');
   const [palette, setPalette] = useState<string[]>([]);
@@ -326,8 +330,8 @@ export function ColorPicker() {
     if (!hasEyeDropper) {
       setEyeError(
         isTauri
-          ? 'Screen picking needs the EyeDropper API, which the macOS app webview (WebKit) doesn’t support. Use it in the web build (Chrome/Edge), or upload a screenshot above and pick from it.'
-          : 'Your browser doesn’t support the EyeDropper API. Try Chrome or Edge.'
+          ? m('eyeDropperDesktop')
+          : m('eyeDropperBrowser')
       );
       return;
     }
@@ -354,10 +358,9 @@ export function ColorPicker() {
     c.width = w * palette.length; c.height = h;
     const ctx = c.getContext('2d')!;
     palette.forEach((hex, i) => { ctx.fillStyle = hex; ctx.fillRect(i * w, 0, w, h); });
-    const a = document.createElement('a');
-    a.href = c.toDataURL('image/png');
-    a.download = 'palette.png';
-    a.click();
+    // `saveBinaryFile`, không phải `<a download>` — thẻ đó không ghi ra file
+    // nào trong webview Tauri (xem lib/fileio.ts).
+    void saveBinaryFile(sdk, 'palette.png', c.toDataURL('image/png').split(',')[1]);
   };
 
   const savePalette = () => {
@@ -369,7 +372,8 @@ export function ColorPicker() {
     <button
       key={`${hex}-${i}`}
       onClick={() => setColor(hex)}
-      title={`${hex} — click to select`}
+      title={m('clickToSelect', { hex })}
+      aria-label={m('clickToSelect', { hex })}
       className="h-full min-w-8 flex-1 transition-transform hover:z-10 hover:scale-110"
       style={{ backgroundColor: hex }}
     />
@@ -380,7 +384,7 @@ export function ColorPicker() {
     value ? (
       <button
         onClick={() => copy(id, value.c)}
-        title={`Click to copy ${value.c}`}
+        title={m('clickToCopy', { value: value.c })}
         className="group flex w-full min-w-0 items-center gap-1 rounded-lg px-1.5 py-1 text-left font-mono text-xs transition-colors hover:bg-bg-2"
       >
         <span className="min-w-0 flex-1 truncate">{value.d}</span>
@@ -412,8 +416,8 @@ export function ColorPicker() {
         <div className="min-w-0 space-y-5">
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
-              <h2 className="text-sm font-semibold">Image</h2>
-              <Help text="Move over the image to magnify it, then click to pick the color under the crosshair." />
+              <h2 className="text-sm font-semibold">{m('image')}</h2>
+              <Help text={m('imageHelp')} />
             </div>
             <div className="relative w-full overflow-hidden rounded-lg border bg-bg-2/30">
               <canvas
@@ -444,20 +448,20 @@ export function ColorPicker() {
         <div className="min-w-0 space-y-5">
           <div className="space-y-3">
             <div className="flex items-center gap-1.5">
-              <h2 className="text-sm font-semibold">Colors</h2>
-              <Help text="Selected is your last pick (click the sliders to fine-tune it). Hovering tracks the cursor over the image. Click any value to copy it." />
+              <h2 className="text-sm font-semibold">{m('colors')}</h2>
+              <Help text={m('colorsHelp')} />
             </div>
 
             <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-2 gap-y-1 rounded-lg border bg-card p-2.5">
               {/* Column headers */}
               <span />
               <div className="flex items-center justify-between gap-1 px-1.5">
-                <SectionLabel>Selected</SectionLabel>
+                <SectionLabel>{m('selected')}</SectionLabel>
                 <ColorField
                   value={color}
                   onChange={setColor}
                   className="relative h-5 w-5"
-                  title="Adjust the selected color"
+                  title={m('adjustSelected')}
                 >
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-white mix-blend-difference">
                     <SlidersHorizontal className="h-2.5 w-2.5" />
@@ -465,16 +469,16 @@ export function ColorPicker() {
                 </ColorField>
               </div>
               <span className="px-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
-                Hovering
+                {m('hovering')}
               </span>
 
               {/* Swatch row */}
               <span />
-              <div className="h-11 rounded-lg border border-line shadow-sm" style={{ backgroundColor: color }} title={`Selected ${color}`} />
+              <div className="h-11 rounded-lg border border-line shadow-sm" style={{ backgroundColor: color }} title={m('selectedColor', { color })} />
               <div
                 className="h-11 rounded-md border shadow-sm"
                 style={hoverColor ? { backgroundColor: hoverColor } : undefined}
-                title={hoverColor ? `Hovering ${hoverColor}` : 'Move over the image'}
+                title={hoverColor ? m('hoveringColor', { color: hoverColor }) : m('moveOverImage')}
               />
 
               {/* Format rows */}
@@ -490,41 +494,41 @@ export function ColorPicker() {
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
-                <h2 className="text-sm font-semibold">Color Palette</h2>
-                <Help text="Colors extracted from the image. Click a swatch to select it. When there are more than fit, the strip scrolls sideways." />
+                <h2 className="text-sm font-semibold">{m('palette')}</h2>
+                <Help text={m('paletteHelp')} />
                 {paletteScrollable && (
                   <span className="flex items-center gap-0.5 text-[11px] text-fg-mute">
-                    <ArrowLeftRight className="h-3 w-3" /> scroll
+                    <ArrowLeftRight className="h-3 w-3" /> {m('scroll')}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={downloadPalette}
-                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-line text-fg-mute transition-colors hover:bg-bg-2"
-                  title="Download palette as PNG">
+                <Button variant="outline" size="icon" onClick={downloadPalette} disabled={palette.length === 0}
+                  className="h-ctl w-ctl rounded-sm text-fg-mute"
+                  title={m('downloadPalette')} aria-label={m('downloadPalette')}>
                   <Download className="h-3.5 w-3.5" />
-                </button>
-                <button onClick={savePalette}
-                  className="flex h-ctl w-ctl items-center justify-center rounded-sm border border-line text-fg-mute transition-colors hover:bg-bg-2"
-                  title="Copy all hex codes">
+                </Button>
+                <Button variant="outline" size="icon" onClick={savePalette} disabled={palette.length === 0}
+                  className="h-ctl w-ctl rounded-sm text-fg-mute"
+                  title={m('copyHexes')} aria-label={m('copyHexes')}>
                   {copied === 'palette' ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
+                </Button>
               </div>
             </div>
             <div ref={paletteRef} className="flex h-10 w-full overflow-x-auto overflow-y-hidden no-scrollbar rounded-lg border">
               {palette.length > 0 ? palette.map((hex, i) => swatch(hex, i))
-                : <div className="flex flex-1 items-center justify-center text-xs text-fg-mute">No colors</div>}
+                : <div className="flex flex-1 items-center justify-center text-xs text-fg-mute">{m('noColors')}</div>}
             </div>
           </div>
 
           {/* Use your own image */}
           <div className="space-y-2 rounded-lg border bg-bg-2/30 p-3">
-            <h3 className="text-sm font-semibold">Use your own image</h3>
+            <h3 className="text-sm font-semibold">{m('ownImage')}</h3>
             <Button onClick={onUpload} className="w-full gap-2">
-              <ImageIcon className="h-4 w-4" /> Use your image
+              <ImageIcon className="h-4 w-4" /> {m('useImage')}
             </Button>
             <Button onClick={pickFromScreen} variant="outline" className="w-full gap-2">
-              <Pipette className="h-4 w-4" /> Pick from Screen
+              <Pipette className="h-4 w-4" /> {m('pickFromScreen')}
             </Button>
             {eyeError && <Callout tone="error" size="sm">{eyeError}</Callout>}
           </div>

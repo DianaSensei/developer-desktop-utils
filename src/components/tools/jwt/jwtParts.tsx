@@ -9,6 +9,8 @@ import {
   JWT_ALGORITHMS, SECRET_ENCODINGS, algorithmSpec, isAlgorithmSupported, isAsymmetric, isHmac,
   type ClaimRow, type JwtAlgorithm, type SecretEncoding,
 } from './jwtCrypto';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/jwt/JwtDebugger.messages';
 
 /**
  * Which algorithms this webview can actually perform.
@@ -42,11 +44,12 @@ export function AlgorithmSelect({ value, onChange, support }: {
   // Grouped by family: fourteen flat entries is a wall, and the grouping is
   // the thing that answers "which one do I even want" (shared secret vs key
   // pair) before the digest size does.
+  const m = useMessages(MESSAGES);
   const families = [...new Map(JWT_ALGORITHMS.map((a) => [a.family, a.familyLabel])).entries()];
 
   return (
     <Select value={value} onValueChange={(v) => onChange(v as JwtAlgorithm)}>
-      <SelectTrigger className="h-ctl w-[132px] text-xs" aria-label="Signing algorithm">
+      <SelectTrigger className="h-ctl w-[132px] text-xs" aria-label={m('signingAlgorithm')}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -61,7 +64,7 @@ export function AlgorithmSelect({ value, onChange, support }: {
                   value={alg}
                   disabled={unsupported}
                   className="text-xs"
-                  title={unsupported ? `${alg} is not available in this webview's Web Crypto` : undefined}
+                  title={unsupported ? m('notInWebview', { alg }) : undefined}
                 >
                   {alg}{unsupported ? ' — unavailable here' : ''}
                 </SelectItem>
@@ -87,14 +90,16 @@ export function KeyField({
   onGenerate?: () => void;
   generating?: boolean;
 }) {
+  const m = useMessages(MESSAGES);
   const spec = algorithmSpec(algorithm);
   const hmac = isHmac(algorithm);
-  const label = hmac ? 'Shared secret' : purpose === 'sign' ? 'Private key' : 'Public key or certificate';
+  const label = hmac ? m('sharedSecret') : purpose === 'sign' ? m('privateKey') : m('publicKeyOrCert');
+  const curve = algorithm === 'ES256' ? 'P-256' : algorithm === 'ES384' ? 'P-384' : 'P-521';
 
   if (algorithm === 'none') {
     return (
       <p className="text-[11px] text-fg-mute">
-        <code className="font-mono">alg: none</code> takes no key — the token is left unsigned.
+        <code className="font-mono">alg: none</code> {m('noneTakesNoKey')}
       </p>
     );
   }
@@ -105,12 +110,12 @@ export function KeyField({
         <span className="text-xs font-medium text-fg">{label}</span>
         {hmac && (
           <Select value={encoding} onValueChange={(v) => onEncodingChange(v as SecretEncoding)}>
-            <SelectTrigger className="h-ctl w-[118px] text-[11px]" aria-label="How the secret is encoded">
+            <SelectTrigger className="h-ctl w-[118px] text-[11px]" aria-label={m('secretEncoding')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {SECRET_ENCODINGS.map((e) => (
-                <SelectItem key={e.value} value={e.value} className="text-xs">{e.label}</SelectItem>
+                <SelectItem key={e.value} value={e.value} className="text-xs">{e.value === 'utf8' ? m('plainText') : e.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -120,7 +125,7 @@ export function KeyField({
           {isAsymmetric(algorithm) && onGenerate && (
             <Button variant="outline" size="sm" className="h-ctl gap-1.5 text-[11px]" onClick={onGenerate} disabled={generating}>
               {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              Generate pair
+              {m('generatePair')}
             </Button>
           )}
         </span>
@@ -132,7 +137,7 @@ export function KeyField({
         placeholder={hmac ? 'your-256-bit-secret' : purpose === 'sign' ? '-----BEGIN PRIVATE KEY-----' : '-----BEGIN PUBLIC KEY-----'}
         className="min-h-[92px] resize-y font-mono text-xs"
       />
-      {spec && <p className="text-[11px] text-fg-mute">{spec.keyHint}</p>}
+      {spec && <p className="text-[11px] text-fg-mute">{m(`hint.${spec.family}` as 'hint.rsa', { curve })}</p>}
     </div>
   );
 }
@@ -144,11 +149,20 @@ const TONE_CLASS: Record<ClaimRow['tone'], string> = {
   bad: 'text-bad',
 };
 
+function relative(deltaMs: number, m: ReturnType<typeof useMessages<typeof MESSAGES>>) {
+  const abs = Math.abs(deltaMs);
+  for (const [ms, unit] of [[86_400_000, 'day'], [3_600_000, 'hour'], [60_000, 'minute'], [1000, 'second']] as const) {
+    if (abs >= ms) return m(deltaMs < 0 ? `ago.${unit}` : `in.${unit}`, { n: Math.round(abs / ms) });
+  }
+  return m('justNow');
+}
+
 export function ClaimTable({ rows }: { rows: ClaimRow[] }) {
+  const m = useMessages(MESSAGES);
   if (rows.length === 0) return null;
   return (
     <div className="space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-wider text-fg-mute">Registered claims</div>
+      <div className="text-xs font-semibold uppercase tracking-wider text-fg-mute">{m('registeredClaims')}</div>
       <div className="overflow-hidden rounded-md border border-line">
         {rows.map((row, i) => (
           <div
@@ -156,9 +170,9 @@ export function ClaimTable({ rows }: { rows: ClaimRow[] }) {
             className={cn('flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-3 py-1.5 text-xs', i > 0 && 'border-t border-line')}
           >
             <span className="w-16 shrink-0 font-mono text-[11px] text-fg-mute">{row.claim}</span>
-            <span className="w-24 shrink-0 text-[11px] text-fg-mute">{row.label}</span>
+            <span className="w-24 shrink-0 text-[11px] text-fg-mute">{`claim.${row.claim}` in MESSAGES ? m(`claim.${row.claim}` as 'claim.exp') : row.label}</span>
             <span className={cn('min-w-0 break-all font-mono', TONE_CLASS[row.tone])}>{row.value}</span>
-            {row.detail && <span className={cn('text-[11px]', TONE_CLASS[row.tone])}>({row.detail})</span>}
+            {row.detail && <span className={cn('text-[11px]', TONE_CLASS[row.tone])}>({row.deltaMs !== undefined ? relative(row.deltaMs, m) : row.detail})</span>}
           </div>
         ))}
       </div>
@@ -167,12 +181,13 @@ export function ClaimTable({ rows }: { rows: ClaimRow[] }) {
 }
 
 export function EmptyHint({ ready }: { ready: boolean }) {
+  const m = useMessages(MESSAGES);
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 pt-12 text-center text-fg-mute">
       <KeyRound className="h-12 w-12 text-fg-mute/25" />
-      <p className="text-sm font-medium">{ready ? 'Paste a JWT to decode it' : 'Loading…'}</p>
+      <p className="text-sm font-medium">{ready ? m('pasteToDecode') : m('loading')}</p>
       <p className="text-[11px] text-fg-mute/70">
-        Verify and sign with HS/RS/PS/ES256-512, EdDSA — or unsigned <code className="font-mono">none</code>
+        {m('emptySub')} <code className="font-mono">none</code>
       </p>
     </div>
   );

@@ -6,6 +6,8 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/utils';
 import { isTauri } from '@/lib/platform';
+import { useMessages } from '@/contexts/LocaleContext';
+import MESSAGES from '@/components/tools/EncodeHashEncrypt.messages';
 
 const ALGORITHMS = [
   { label: 'MD5',     id: 'md5'    },
@@ -27,6 +29,7 @@ function formatBytes(n: number) {
 }
 
 export function ChecksumTool() {
+  const m = useMessages(MESSAGES);
   const sdk = usePluginSdkFor('base64');
   const [algo,     setAlgo]     = useState<AlgoId>('sha256');
   const [status,   setStatus]   = useState<Status>('idle');
@@ -161,7 +164,7 @@ export function ChecksumTool() {
 
   const handleBrowse = useCallback(async () => {
     if (isTauri) {
-      const picked = await sdk.files.pickOpen({ title: 'Select file to hash' });
+      const picked = await sdk.files.pickOpen({ title: m('selectFileToHash') });
       const path = picked?.[0];
       if (path) startTauriHash(path, algoRef.current);
     } else {
@@ -206,12 +209,12 @@ export function ChecksumTool() {
 
         {/* Algorithm */}
         <div className="space-y-1.5">
-          <div className="text-xs text-fg-mute font-medium">Algorithm</div>
+          <div className="text-xs text-fg-mute font-medium">{m('algorithm')}</div>
           <Segmented
             value={algo}
             onValueChange={handleAlgoChange}
             options={ALGORITHMS.map(({ label, id }) => ({ value: id, label }))}
-            aria-label="Checksum algorithm"
+            aria-label={m('checksumAlgorithm')}
           />
         </div>
 
@@ -234,9 +237,9 @@ export function ChecksumTool() {
           )}
           <Upload className="h-ctl w-ctl text-fg-mute/50" />
           <div className="text-center">
-            <p className="text-sm font-medium">Drop a file here</p>
+            <p className="text-sm font-medium">{m('dropFile')}</p>
             <p className="text-xs text-fg-mute mt-0.5">
-              or click to browse · <span className="font-mono">{algoLabel}</span> will be computed
+              {m('browseToCompute', { algo: algoLabel })}
             </p>
           </div>
         </div>
@@ -251,8 +254,8 @@ export function ChecksumTool() {
             <button
               type="button"
               onClick={clear}
-              aria-label="Remove file"
-              title="Remove file"
+              aria-label={m('removeFile')}
+              title={m('removeFile')}
               className="ml-3 shrink-0 p-1 rounded hover:bg-bg-2 text-fg-mute hover:text-fg transition-colors focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus"
             >
               <X className="h-3.5 w-3.5" />
@@ -292,7 +295,7 @@ export function ChecksumTool() {
                 <span className="flex-1 font-mono text-xs break-all">{hash}</span>
                 <CopyButton
                   value={hash}
-                  title="Copy hash"
+                  title={m('copyHash')}
                   className="h-6 w-6 shrink-0 rounded text-fg-mute"
                   iconClassName="h-3 w-3"
                 />
@@ -302,13 +305,13 @@ export function ChecksumTool() {
             {/* Verify */}
             <div className="space-y-1.5">
               <div className="text-xs text-fg-mute">
-                Verify — paste an expected hash to compare
+                {m('verifyExpected')}
               </div>
               <div className="relative">
                 <Input
                   value={verify}
                   onChange={(e) => setVerify(e.target.value)}
-                  placeholder="Paste a known hash…"
+                  placeholder={m('knownHash')}
                   className="h-ctl text-xs font-mono pr-8"
                 />
                 {verifyNorm && (
@@ -323,7 +326,7 @@ export function ChecksumTool() {
                 <p className={cn('text-xs', hashMatch
                   ? 'text-ok'
                   : 'text-bad')}>
-                  {hashMatch ? 'Hashes match ✓' : 'Hashes do not match ✗'}
+                  {hashMatch ? m('hashesMatch') : m('hashesDiffer')}
                 </p>
               )}
             </div>
@@ -332,7 +335,7 @@ export function ChecksumTool() {
 
         {status === 'error' && (
           <p className="text-xs text-bad">
-            Failed to compute checksum. The file may be inaccessible.
+            {m('checksumFailed')}
           </p>
         )}
 

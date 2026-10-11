@@ -1,4 +1,4 @@
-import { MOD_KEY } from './platform';
+import { IS_MAC, MOD_KEY } from './platform';
 
 /**
  * Reference data for the Settings → Keyboard Shortcuts section. Not run
@@ -35,6 +35,12 @@ export function getShortcutGroups(): ShortcutGroup[] {
         { keys: [MOD_KEY, 'V'], description: "Quick-paste the clipboard into a tool's primary input" },
         { keys: [MOD_KEY, 'Z'], description: 'Undo the last edit' },
         { keys: [MOD_KEY, '⇧', 'Z'], description: 'Redo' },
+        // WorkspaceContext.tsx — keys checked by `e.code`, see the handler there.
+        { keys: [MOD_KEY, '1–8'], description: 'Jump to tab 1–8 of the current workspace' },
+        { keys: [MOD_KEY, '9'], description: 'Jump to the last tab of the current workspace' },
+        { keys: [MOD_KEY, '⇧', '[ / ]'], description: 'Previous / next tab in the current workspace' },
+        ...(IS_MAC ? [] : [{ keys: [MOD_KEY, 'PgUp / PgDn'], description: 'Previous / next tab in the current workspace' }]),
+        { keys: [MOD_KEY, IS_MAC ? '⌥' : 'Alt', '1–9'], description: 'Switch to workspace 1–9' },
       ],
     },
     {

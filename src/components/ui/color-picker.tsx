@@ -2,6 +2,8 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { useDismissable } from '@/hooks/useDismissable';
 import { useAnimatedOpen } from '@/hooks/useAnimatedOpen';
+import { useMessages } from '@/contexts/LocaleContext';
+import UI from '@/components/ui/ui.messages';
 
 // ---------------------------------------------------------------------------
 // Cross-platform color picker — replaces the native <input type="color">.
@@ -110,6 +112,7 @@ export interface ColorPickerProps {
 }
 
 export function ColorPicker({ value, onChange, disabled, className, wrapClassName, title, children }: ColorPickerProps) {
+  const ui = useMessages(UI);
   const { open, closing, visible, toggle, close } = useAnimatedOpen();
   const wrapRef = useDismissable<HTMLDivElement>(open, close);
 
@@ -143,7 +146,7 @@ export function ColorPicker({ value, onChange, disabled, className, wrapClassNam
         type="button"
         disabled={disabled}
         title={title}
-        aria-label="Pick a color"
+        aria-label={ui('pickColor')}
         onClick={() => !disabled && toggle()}
         style={{ backgroundColor: value }}
         className={cn(
