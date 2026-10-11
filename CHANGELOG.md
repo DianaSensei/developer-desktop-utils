@@ -6,6 +6,17 @@ the app.
 
 ## Unreleased
 
+### Plugins with a native helper no longer need a new app release
+
+A plugin that ships a native helper program (a "sidecar") used to work only if its
+name was hard-coded into the app. Now, the first time such a plugin runs its helper,
+DevTool shows a native confirmation dialog with the program's path and SHA-256 and
+asks whether to allow it. Your answer is remembered in the OS keychain for that exact
+file — a different build of the helper asks again, and uninstalling the plugin forgets
+the decision. Helpers bundled with DevTool itself (Redis, RabbitMQ, Container Manager,
+Kafka Explorer) run without asking, as before. See
+`docs/plugin-sdk/01-architecture.md`.
+
 ### ⚠️ Breaking: Redis, RabbitMQ, Container Manager, and Kafka Explorer are now optional plugins
 
 These four tools used to ship built into the app. As of this release they've been

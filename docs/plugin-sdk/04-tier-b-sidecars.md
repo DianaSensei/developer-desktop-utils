@@ -352,8 +352,16 @@ cho sidecar của bạn — không đọc/ghi ra ngoài nó, không đoán một
 
 ## Đăng ký sidecar vào app
 
-Ba chỗ cần sửa — thiếu một trong ba thì sidecar build được, test được, nhưng
-KHÔNG chạy được từ app thật:
+**Sidecar chỉ cài qua URL (phần lớn plugin bên ngoài) KHÔNG cần sửa gì trong
+app.** Tên bin chỉ cần có dạng `devtool-svc-<kebab-case>`. Lần đầu plugin gọi
+nó, app hiện một hộp thoại native với đường dẫn + SHA-256 của file sắp chạy và
+hỏi người dùng có cho phép không (xem "Sự đồng ý của người dùng" ở
+01-architecture.md). Đồng ý được nhớ trong keychain, gắn với mã băm: cập nhật
+binary sang bản khác thì hỏi lại.
+
+Ba chỗ dưới đây chỉ dành cho sidecar do chính DevTool đóng gói sẵn, chạy
+không hỏi — thiếu một trong ba thì sidecar build được, test được, nhưng KHÔNG
+chạy được từ app thật:
 
 1. **`src-tauri/src/service_host.rs`** — thêm tên bin vào `ALLOWED_SERVICES`
    (hằng số Rust, ranh giới tin cậy thật — xem 01-architecture.md).
