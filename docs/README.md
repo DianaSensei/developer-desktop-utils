@@ -11,6 +11,7 @@ Chỉ mục cho toàn bộ `docs/`. Mỗi thư mục con phục vụ MỘT loạ
 | Muốn dùng DevTool qua MCP (Claude Desktop/Code) | [`human/mcp-server.md`](./human/mcp-server.md) |
 | **Muốn viết một plugin MỚI** (cài qua URL hoặc built-in) | [`plugin-sdk/README.md`](./plugin-sdk/README.md) |
 | AI agent / người bảo trì chính app này | [`ai/CLAUDE.md`](./ai/CLAUDE.md) |
+| Audit bảo mật / review code: ranh giới tin cậy, bản đồ code, các phát hiện | [`AUDIT.md`](./AUDIT.md) |
 | Muốn hiểu vì sao một quyết định kiến trúc/UI được chọn | [`decisions/`](#decisions--adr) |
 | Muốn xem cái gì đã thay đổi và tại sao (sau khi merge) | [`changelog/`](./changelog/) |
 | Điều tra một bug đã xảy ra thật, muốn biết nguyên nhân gốc | [`postmortems/`](./postmortems/) |
@@ -22,6 +23,7 @@ Chỉ mục cho toàn bộ `docs/`. Mỗi thư mục con phục vụ MỘT loạ
 
 ```
 docs/
+├── AUDIT.md               — hướng dẫn cho người audit: ranh giới tin cậy, phát hiện
 ├── ai/CLAUDE.md            — nguồn sự thật cho AI agent làm việc TRÊN chính app này
 ├── human/                  — hướng dẫn cho người: setup, đóng góp, MCP, per-tool
 ├── plugin-sdk/             — tài liệu THAM KHẢO cho việc viết một plugin mới
