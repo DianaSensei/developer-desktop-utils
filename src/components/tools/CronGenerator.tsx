@@ -820,7 +820,9 @@ export function CronGenerator() {
                 {m('previewUnsupported')} <code className="font-mono">{nextRuns.unsupported}</code> {m('previewUnsupportedAfter')}
               </p>
             ) : nextRuns.runs.length === 0 ? (
-              <p className="text-xs text-fg-mute">{m('neverFires', { years: nextRuns.searchedYears })}</p>
+              <p className="text-xs text-fg-mute">
+                {nextRuns.searchedYears === null ? m('noFutureRuns') : m('neverFires', { years: nextRuns.searchedYears })}
+              </p>
             ) : (
               <ol className="divide-y divide-line rounded-sm border border-line bg-card">
                 {nextRuns.runs.map((run) => (
@@ -833,7 +835,9 @@ export function CronGenerator() {
                     nói rõ thay vì để danh sách ngắn trông như bị cắt. */}
                 {nextRuns.runs.length < 5 && (
                   <li className="px-3 py-1.5 text-[11px] text-fg-mute">
-                    {m('fewRuns', { n: nextRuns.runs.length, years: nextRuns.searchedYears })}
+                    {nextRuns.searchedYears === null
+                      ? m('allRemainingRuns')
+                      : m('fewRuns', { n: nextRuns.runs.length, years: nextRuns.searchedYears })}
                   </li>
                 )}
               </ol>
