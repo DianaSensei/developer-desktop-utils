@@ -76,10 +76,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Chỉ phụ thuộc vào URL, KHÔNG vào activeId: khi chuyển workspace, đổi
   // activeId và navigate xảy ra liền nhau — nếu effect này cũng chạy theo
   // activeId thì ở nhịp giữa nó sẽ ghi tool CŨ vào workspace MỚI.
+  //
+  // Theo `location.key`, không chỉ theo pathname: đóng tab cuối rồi chọn lại
+  // ĐÚNG tool đó (sidebar, ⌘K) là điều hướng tới cùng pathname — pathname không
+  // đổi nên effect cũ không chạy và tab không bao giờ quay lại. Mỗi lần điều
+  // hướng có key mới, kể cả tới cùng một đường dẫn.
   useEffect(() => {
     if (!activeToolId) return;
     setState((s) => visitTool(s, activeToolId));
-  }, [activeToolId]);
+  }, [activeToolId, location.key]);
 
   const active = activeWorkspace(state);
 
@@ -95,14 +100,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const closeTool = useCallback(
     (toolId: string) => {
-      const { state: next, next: target } = closeToolIn(stateRef.current, toolId);
+      const { state: next, next: target } = closeToolIn(stateRef.current, toolId, isFeatureEnabled);
       setState(next);
       if (target) navigate(toolPath(target));
     },
-    [navigate],
+    [navigate, isFeatureEnabled],
   );
 
-  const closeOtherTools = useCallback((toolId: string) => setState((s) => closeOtherToolsIn(s, toolId)), []);
+  // Tab giữ lại thành tab đang mở — phải điều hướng tới nó, nếu không URL (thứ
+  // quyết định tool trên màn hình và tab được chọn) vẫn ở tool vừa bị đóng.
+  const closeOtherTools = useCallback(
+    (toolId: string) => {
+      setState((s) => closeOtherToolsIn(s, toolId));
+      if (toolId !== activeToolIdRef.current) navigate(toolPath(toolId));
+    },
+    [navigate],
+  );
   const moveTool = useCallback(
     (toolId: string, toIndex: number) => setState((s) => moveToolIn(s, toolId, toIndex)),
     [],

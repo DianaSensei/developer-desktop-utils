@@ -63,6 +63,14 @@ describe('closeTool', () => {
     expect(activeWorkspace(r.state).activeToolId).toBe('b');
   });
 
+  it('hands focus to the nearest VISIBLE neighbour, skipping disabled tools', () => {
+    const s = visitTool(withTabs('a', 'hidden', 'c'), 'a');
+    const r = closeTool(s, 'a', (id) => id !== 'hidden');
+    expect(r.next).toBe('c');
+    const s2 = visitTool(withTabs('a', 'hidden', 'c'), 'c');
+    expect(closeTool(s2, 'c', (id) => id !== 'hidden').next).toBe('a');
+  });
+
   it('closeOtherTools leaves only the given tab', () => {
     const s = closeOtherTools(withTabs('a', 'b', 'c'), 'b');
     expect(activeWorkspace(s).toolIds).toEqual(['b']);

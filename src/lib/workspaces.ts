@@ -83,17 +83,24 @@ export function visitTool(state: WorkspaceState, toolId: string): WorkspaceState
 /**
  * Đóng một tab. Trả về cả trạng thái mới lẫn tool nên chuyển tới nếu tab vừa
  * đóng là tab đang mở — tab bên phải nó, hết thì bên trái, như trình duyệt.
+ *
+ * `isVisible`: tab nào thanh tab thực sự hiện (tool đã tắt vẫn nằm trong
+ * `toolIds` nhưng bị ẩn). Tab kế tiếp phải là tab hiện được — chuyển tới một
+ * tool đã tắt là rơi vào route "không khớp" và bị đẩy về trang mặc định.
  */
 export function closeTool(
   state: WorkspaceState,
   toolId: string,
+  isVisible: (toolId: string) => boolean = () => true,
 ): { state: WorkspaceState; next: string | null } {
   const ws = activeWorkspace(state);
   const idx = ws.toolIds.indexOf(toolId);
   if (idx === -1) return { state, next: null };
   const toolIds = ws.toolIds.filter((id) => id !== toolId);
   const wasActive = ws.activeToolId === toolId;
-  const next = wasActive ? (toolIds[idx] ?? toolIds[idx - 1] ?? null) : null;
+  const right = toolIds.slice(idx).find(isVisible);
+  const left = toolIds.slice(0, idx).reverse().find(isVisible);
+  const next = wasActive ? (right ?? left ?? null) : null;
   return {
     state: updateActive(state, (w) => ({
       ...w,

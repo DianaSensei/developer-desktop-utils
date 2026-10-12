@@ -44,4 +44,28 @@ describe('nextCronRuns', () => {
   it('reports W as unsupported instead of guessing', () => {
     expect(nextCronRuns('quartz', f({ dayOfMonth: '15W', dayOfWeek: '?' }), FROM)).toEqual({ unsupported: '15W' });
   });
+
+  // Góp ý review PR #173: chuẩn hoá 7→0 trước khi mở rộng phạm vi làm `5-7`
+  // thành lo=5, hi=0 (rỗng).
+  it('day-of-week ranges ending at 7 / SUN, and wrapping ranges', () => {
+    const days = (dow: string) =>
+      new Set(runs(nextCronRuns('linux', f({ minute: '0', hour: '0', dayOfWeek: dow }), FROM, 14)).map((d) => d.getDay()));
+    expect([...days('5-7')].sort()).toEqual([0, 5, 6]);
+    expect([...days('SAT-SUN')].sort()).toEqual([0, 6]);
+    expect(days('0-7').size).toBe(7);
+    expect([...days('FRI-MON')].sort()).toEqual([0, 1, 5, 6]);
+    expect([...days('1-5')].sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('year-pinned Quartz schedules beyond 8 years are found, not reported as never', () => {
+    const r = nextCronRuns('quartz', f({ minute: '0', hour: '0', dayOfMonth: '1', month: '1', dayOfWeek: '?', year: '2099' }), FROM, 5);
+    expect(runs(r)).toHaveLength(1);
+    expect(runs(r)[0].getFullYear()).toBe(2099);
+  });
+
+  it('reports how many years were searched so a short list is not mistaken for "never"', () => {
+    const r = nextCronRuns('linux', f({ minute: '0', hour: '0', dayOfMonth: '29', month: '2' }), FROM, 5);
+    expect('searchedYears' in r && r.searchedYears).toBe(8);
+    expect(runs(r).length).toBeLessThan(5);
+  });
 });
