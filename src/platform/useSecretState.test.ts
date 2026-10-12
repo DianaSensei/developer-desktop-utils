@@ -35,8 +35,8 @@ describe('useSecretState', () => {
 
     const { result } = renderHook(() => useSecretState<string[]>(sdk, 'accounts', []));
 
-    // Lần render đầu chưa có dữ liệu — đây chính là cửa sổ mà một effect ghi
-    // thiếu chốt `ready` sẽ đẩy `[]` đè lên dữ liệu thật.
+    // The first render has no data yet; without the `ready` gate a write
+    // effect would overwrite stored data with `[]`.
     expect(result.current[2]).toBe(false);
     expect(result.current[0]).toEqual([]);
 
