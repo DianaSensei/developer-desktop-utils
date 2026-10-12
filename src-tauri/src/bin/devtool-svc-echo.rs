@@ -1,25 +1,18 @@
-// Plugin dịch vụ tối giản (tier B) — chứng minh đường end-to-end THẬT của
-// `service_host.rs` với một binary được build và đóng gói thật, không phải mô
-// phỏng bằng `cat`/`sh` như các test trong service_host.rs.
+// Minimal tier-B sidecar used to test `service_host.rs` end to end with a
+// real built binary (the unit tests there use `cat`/`sh`). No user-facing
+// value; no plugin calls it.
 //
-// Không có giá trị người dùng: bốn method — `ping`, `echo` (một-lần) và
-// `tick-stream`/`unknown-stream-method` (nhiều dòng, xem dưới). Chưa có
-// plugin.ts nào khai `service` để gọi tới nó — nó tồn tại thuần để kiểm chứng
-// cơ chế trước khi một plugin thật cần tới tier B.
-//
-// Hợp đồng phải giữ (xem đầu service_host.rs): đọc từng dòng JSON ở stdin, trả
-// về ít nhất một dòng JSON mang đúng `id` đó cho mỗi dòng nhận được (nhiều dòng
-// kết bằng `done: true` cho method mà chính sidecar coi là stream), THOÁT khi
-// stdin đóng (EOF), không ghi gì khác lên stdout (log thì ghi stderr).
+// Methods: `ping` and `echo` (one-shot) and `tick-stream` (several events
+// ending with `done: true`). Follows the sidecar contract described at the
+// top of service_host.rs.
 
 use std::io::{self, BufRead, Write};
 
 use serde::{Deserialize, Serialize};
 
-/// Phải khớp `SERVICE_PROTOCOL` ở service_host.rs / service.ts. Bin này biên
-/// dịch tách biệt với module đó (không có crate `lib` dùng chung), nên hằng số
-/// bị LẶP LẠI có chủ ý thay vì import — lệch nhau thì phía host tự phát hiện
-/// và từ chối thay vì diễn giải sai payload.
+/// Must match `SERVICE_PROTOCOL` in service_host.rs and service.ts. This
+/// binary shares no crate with the host, so the value is duplicated; a
+/// mismatch is reported by the host.
 const SERVICE_PROTOCOL: u32 = 1;
 
 #[derive(Deserialize)]
@@ -74,8 +67,8 @@ fn main() {
     let mut out = stdout.lock();
 
     for line in stdin.lock().lines() {
-        // Lỗi đọc hoặc EOF đều dừng vòng lặp — main() kết thúc, tiến trình
-        // thoát. Đây chính là vế "thoát khi stdin đóng" của hợp đồng.
+        // A read error or EOF ends the loop and the process: the "exit when
+        // stdin closes" part of the contract.
         let Ok(line) = line else { break };
         if line.trim().is_empty() {
             continue;
@@ -85,11 +78,8 @@ fn main() {
         for response in handle_line(&line) {
             let Ok(json) = serde_json::to_string(&response) else { continue };
             if writeln!(out, "{json}").is_err() || out.flush().is_err() {
-                // Đầu đọc phía host đã đóng (ví dụ host bị kill) — không còn
-                // ai nhận phản hồi tiếp theo trong CÙNG dòng này (một stream
-                // có thể còn nhiều sự kiện dở dang); dừng viết cho dòng vào
-                // hiện tại, vòng lặp `for line in …` ở ngoài sẽ tự thoát ở
-                // lần đọc kế do stdin cũng đã đóng theo.
+                // The host closed its end; stop writing for this line. The next
+                // read will hit EOF and end the loop.
                 wrote_err = true;
                 break;
             }
@@ -100,15 +90,12 @@ fn main() {
     }
 }
 
-/// Trả một `Vec` thay vì một `Response` duy nhất: `tick-stream` phát nhiều
-/// dòng cho CÙNG một request, kết bằng `done: true` — đây chính là hành vi
-/// `service_host.rs` (và `tests/service_echo.rs`) cần một sidecar thật để
-/// kiểm, không mô phỏng được đầy đủ bằng `sh`/`cat`.
+/// Returns several responses because `tick-stream` emits multiple lines
+/// for one request.
 fn handle_line(line: &str) -> Vec<Response> {
     let req: Request = match serde_json::from_str(line) {
         Ok(r) => r,
-        // Không có `id` đáng tin để gắn vào phản hồi khi chính JSON đã hỏng —
-        // để rỗng còn hơn đoán bừa một id không khớp lời gọi nào.
+        // Malformed JSON has no trustworthy id; answer with an empty one.
         Err(e) => return vec![Response::err(String::new(), format!("JSON không hợp lệ: {e}"))],
     };
 
@@ -127,9 +114,7 @@ fn handle_line(line: &str) -> Vec<Response> {
     }
 }
 
-/// `{ "count": N }` → N sự kiện `{0, 1, …, N-1}` rồi một dòng `done: true`.
-/// `count` thiếu/không hợp lệ mặc định về 3 — đủ để một test gọi mà không cần
-/// truyền tham số vẫn thấy hành vi nhiều-dòng thật sự.
+/// `{ "count": N }` emits events 0..N-1, then `done`. `count` defaults to 3.
 fn tick_stream(id: String, params: &serde_json::Value) -> Vec<Response> {
     let count = params.get("count").and_then(serde_json::Value::as_u64).unwrap_or(3);
     let mut out: Vec<Response> = (0..count).map(|i| Response::event(id.clone(), serde_json::json!(i))).collect();

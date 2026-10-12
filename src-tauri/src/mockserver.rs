@@ -472,15 +472,8 @@ fn build_engine() -> Engine {
     engine
 }
 
-// Một Engine DÙNG CHUNG cho mọi request script-mode, dựng đúng một lần —
-// trước đây `run_script` tự gọi `build_engine()` mỗi lần được gọi, tức mỗi
-// HTTP request tới một stub script-mode phải trả phí cấu hình 6 giới hạn lại
-// từ đầu, đúng loại chi phí per-request mà comment ở đầu module này (`Arc`
-// rule-set clone, batched log flush, cached `REGEX_CACHE`) đã chủ ý tránh ở
-// mọi chỗ khác. `Engine` bản thân stateless/immutable sau khi cấu hình xong
-// (mọi state của một lần chạy nằm ở `Scope`, tạo mới cho mỗi request) nên
-// dùng chung an toàn — cần feature "sync" của rhai (Cargo.toml) để `Engine`
-// là `Send + Sync`, truy cập được từ nhiều task/thread của server async.
+// One engine shared by all script stubs. It holds no per-run state (that
+// lives in `Scope`), and rhai's "sync" feature makes it `Send + Sync`.
 static ENGINE: OnceLock<Engine> = OnceLock::new();
 
 fn req_to_rhai(ctx: &RequestCtx, params: &HashMap<String, String>) -> RhaiMap {
@@ -840,7 +833,6 @@ async fn handle(State(hs): State<HandlerState>, req: Request) -> Response {
         buf.push_back(entry);
     }
 
-    // Build the axum response.
     let mut builder = Response::builder()
         .status(StatusCode::from_u16(resolved.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR));
     let mut has_ct = false;
@@ -1266,7 +1258,7 @@ mod tests {
 
     #[test]
     fn base64_decode_roundtrips() {
-        // "Hello, mock!" base64-encoded, with embedded whitespace + data URL prefix.
+        // Whitespace, missing padding and a data URL prefix are tolerated.
         assert_eq!(base64_decode("aGVsbG8=").unwrap(), b"hello");
         assert_eq!(base64_decode("aGVs\nbG8").unwrap(), b"hello"); // no padding + newline
         assert_eq!(

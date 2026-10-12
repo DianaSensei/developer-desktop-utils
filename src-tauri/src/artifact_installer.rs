@@ -1,43 +1,24 @@
-// Cài đặt "artifact" từ bên ngoài — một URL người dùng cung cấp trỏ tới một
-// manifest JSON mô tả HOẶC một plugin JS/TS (kind: "plugin", chạy trong
-// webview), HOẶC một sidecar native (kind: "service", chạy như tiến trình
-// riêng — xem service_host.rs). Đổi tên/refactor từ `plugin_installer.rs`
-// (Phase 1, chỉ biết plugin) — xem docs/plans/native-sidecar-install.md cho
-// bối cảnh đầy đủ và lý do gộp chung thay vì tách hai module song song.
+// Installs external artifacts from a user-supplied manifest URL. A manifest
+// describes either a JS plugin (`kind: "plugin"`, runs in the webview) or a
+// native sidecar (`kind: "service"`, runs as a child process, see
+// service_host.rs).
 //
-// TẢI THẲNG BẰNG reqwest, không qua binding JS của `@tauri-apps/plugin-http`.
-// Một gói (plugin bundle hay service binary) có thể vài MB; đẩy nó qua invoke
-// dưới dạng JSON/base64 sẽ tốn thêm ~33% và giữ toàn bộ payload trong bộ nhớ ở
-// cả hai phía không cần thiết. Rust tải thẳng xuống đĩa, JS chỉ nhận lại kết
-// quả (bản ghi đã cài).
+// Downloads go through reqwest straight to disk rather than through the JS
+// HTTP plugin, so multi-megabyte payloads are not base64-encoded over IPC.
 //
-// RANH GIỚI TIN CẬY: mọi artifact hiện do chính người dùng phát hành (không mở
-// cho bên thứ ba), nhưng "tải qua mạng rồi chạy trong cùng tiến trình app
-// (plugin) hoặc như tiến trình con (service), không sandbox" vẫn là một lớp
-// rủi ro khác hẳn "compile sẵn vào app" — một MITM hay một server lưu trữ bị
-// chiếm có thể đổi nội dung mà người dùng không biết, dù chính họ đã tin tưởng
-// URL gốc. `integrity`/`sha256` vì vậy là BẮT BUỘC, không phải tuỳ chọn.
-// Nhánh plugin kiểm HAI LẦN (lúc cài, và lại một lần nữa mỗi khi đọc bundle để
-// chạy — phòng trường hợp file trên đĩa bị sửa sau khi cài mà index.json
-// không biết). Nhánh service chỉ kiểm một lần lúc cài — nó không được "đọc lại
-// qua webview" như bundle JS, và bù lại bằng việc ghi ATOMIC (xem `stage_
-// install_service`) để một app crash giữa chừng không bao giờ để lại một
-// binary dở dang mà `sidecar_path` có thể vô tình chọn.
+// Trust boundary: downloaded code runs unsandboxed, so a compromised host or
+// MITM could swap it. `integrity`/`sha256` are therefore mandatory. Plugin
+// bundles are verified at install time and again on every load; service
+// binaries are verified once at install and written atomically so a crash
+// never leaves a partial binary where `sidecar_path` would find it.
 //
-// `current_target_triple()` TÍNH Ở RUST — không nhận từ client/manifest, cùng
-// nguyên tắc với `ALLOWED_SERVICES` ở service_host.rs: quyết định "chạy binary
-// nào" luôn do host quyết, không phải webview hay server từ xa.
+// `current_target_triple()` is computed here, never taken from the client or
+// manifest: the host alone decides which binary runs.
 //
-// Chia làm hai lớp có chủ ý: các hàm `stage_*`/`read_index`/`write_index`/
-// `prepare_extensions_dir` nhận thẳng một `&Path` và không đụng gì tới Tauri —
-// nhờ vậy test được bằng một thư mục tạm thật trên đĩa, không cần dựng một
-// AppHandle giả (Tauri không cho dựng AppHandle độc lập ngoài một App thật, và
-// không module nào khác trong crate này cố làm việc đó — xem cách
-// secrets_vault.rs tách phần mật mã ra khỏi phần app_data_dir để giữ đúng quy
-// ước này). Các `#[tauri::command]` chỉ còn là lớp vỏ mỏng: lấy đúng thư mục
-// rồi gọi hàm pure. `installed_service_bin_path`/`installed_service_bin_path_at`
-// theo đúng quy ước này để `service_host::sidecar_path` (một HÀM BIÊN GIỚI TIN
-// CẬY khác) cũng test được phần "đọc index" của nó mà không cần AppHandle.
+// The `stage_*`, `read_index`, `write_index` and `prepare_extensions_dir`
+// functions take plain paths and do not touch Tauri, so they are tested
+// against real temp directories. The `#[tauri::command]` functions are thin
+// wrappers that resolve directories and call them.
 
 use digest::Digest;
 use serde::de::{self, Deserializer};
@@ -49,23 +30,16 @@ use tauri::{AppHandle, Manager};
 use crate::checksum::to_hex;
 
 // ---------------------------------------------------------------------------
-// Tải xuống có giới hạn kích thước
+// Size-capped download
 // ---------------------------------------------------------------------------
 
-/// Trần cho MỘT lần tải artifact (bundle JS hay binary service). Rộng rãi cho
-/// mọi sidecar thật (vài chục MB), nhưng vẫn hữu hạn: không có trần, một host
-/// bị chiếm/MITM (đúng rủi ro RANH GIỚI TIN CẬY ở đầu file) có thể trả về một
-/// body tuỳ ý lớn và làm app hết bộ nhớ TRƯỚC KHI checksum kịp từ chối nó —
-/// `files.rs`'s `read_file_data_url` đã áp cùng nguyên tắc (`MAX_BYTES`) cho
-/// input do người dùng chọn; artifact tải qua mạng xứng đáng cùng mức cảnh
-/// giác, có phần hơn vì nguồn ở xa chứ không phải đĩa cục bộ của chính máy.
+/// Upper bound for a single artifact download. Without a cap, a compromised
+/// host could exhaust memory before the checksum check runs.
 const MAX_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
 
-/// Tải `url`, từ chối sớm nếu `Content-Length` đã vượt `max_bytes`, và ĐẾM
-/// DẦN khi đọc từng chunk (một server có thể nói dối hoặc bỏ qua header đó) —
-/// không đợi buffer hết toàn bộ body rồi mới kiểm tra kích thước. Nhận
-/// `max_bytes` làm tham số (thay vì đọc thẳng hằng số) để test được với một
-/// trần nhỏ, không phải tải thật hàng trăm MB chỉ để kiểm logic từ chối.
+/// Downloads `url`, rejecting early when `Content-Length` exceeds `max_bytes`
+/// and counting bytes while streaming, since the header can be missing or
+/// wrong.
 async fn download_capped(url: &str, max_bytes: u64) -> Result<Vec<u8>, String> {
     let res = reqwest::get(url).await.map_err(|e| e.to_string())?;
     if !res.status().is_success() {
@@ -89,21 +63,17 @@ async fn download_capped(url: &str, max_bytes: u64) -> Result<Vec<u8>, String> {
 }
 
 // ---------------------------------------------------------------------------
-// Manifest thô lấy từ URL người dùng cung cấp
+// Remote manifests
 // ---------------------------------------------------------------------------
 
-/// Nhánh plugin — hình dạng giữ NGUYÊN từ Phase 1 (`RemotePluginManifest`
-/// cũ). Khác `PluginManifest` (định nghĩa ở TS, dùng cho plugin compile-time)
-/// ở hai chỗ bắt buộc vì giới hạn của JSON: `icon` là TÊN icon (tra trong bảng
-/// cố định ở `src/platform/installer.ts`), không phải component; và không có
-/// `load` — thay vào đó là `entry`, URL tới đúng MỘT file bundle JS đã build
-/// sẵn (xem lý do "một file duy nhất" ở installer.ts).
+/// Plugin manifest. Differs from the TS `PluginManifest` because it is JSON:
+/// `icon` is a name looked up in `src/platform/installer.ts`, and `entry` is
+/// the URL of a single prebuilt JS bundle instead of a `load` function.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RemotePluginManifest {
     pub id: String,
     pub version: String,
-    /// Dải version SDK, dạng "^M.m.p" — cùng cú pháp `satisfiesSdk` phía TS
-    /// đã kiểm cho plugin compile-time.
+    /// SDK version range, "^M.m.p", checked by `satisfiesSdk` on the TS side.
     pub sdk: String,
     pub entry: String,
     pub integrity: String,
@@ -119,13 +89,9 @@ pub struct RemotePluginManifest {
     pub commands: Vec<String>,
     #[serde(default)]
     pub hosts: Vec<String>,
-    /// Tier B — sidecar plugin này gọi tới, khi `permissions` khai `'service'`.
-    /// Bổ sung so với Phase 1 (nhánh plugin external-install từng chỉ hỗ trợ
-    /// Tier A) — thiếu trường này, phía TS (`validateManifest()`) từ chối mọi
-    /// plugin cài từ URL có khai `'service'` vì mismatch giữa `permissions` và
-    /// `service`. `bin` ở đây vẫn phải nằm trong `ALLOWED_SERVICES`
-    /// (service_host.rs) mới chạy được — trường này chỉ đi kèm allowlist
-    /// METHOD, không tự cấp quyền chạy một bin mới.
+    /// Sidecar this plugin calls when `permissions` includes `'service'`. Only
+    /// declares the method allowlist; `bin` must still be in `ALLOWED_SERVICES`
+    /// (service_host.rs) to run.
     #[serde(default)]
     pub service: Option<RemoteServiceDescriptor>,
 }
@@ -139,43 +105,31 @@ pub struct RemoteServiceDescriptor {
     pub timeout_ms: Option<u64>,
 }
 
-/// Một target khả dụng của một service — một địa chỉ tải kèm checksum riêng
-/// cho một target triple cụ thể (vd `x86_64-apple-darwin`).
+/// Download URL and checksum of a service build for one target triple.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ServiceTarget {
     pub url: String,
     pub sha256: String,
 }
 
-/// Nhánh service — mô tả một phiên bản của một sidecar native. `bin` là TÊN
-/// TRẦN, không đuôi mở rộng, không target triple (giống quy ước
-/// `service.bin` phía plugin manifest ở `src/platform/types.ts`) — đuôi
-/// `.exe` cho Windows do host tự thêm khi đặt tên file cuối cùng trên đĩa,
-/// không lấy tên file từ URL (một URL kiểu CDN/redirect có thể không mang tên
-/// file gốc nào đáng tin).
+/// One version of a native sidecar. `bin` is the bare name (no extension, no
+/// triple); the host adds `.exe` on Windows instead of trusting the URL's
+/// file name.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RemoteServiceManifest {
     pub bin: String,
     pub version: String,
-    /// Phải khớp `service_host::SERVICE_PROTOCOL` để sidecar mới nói đúng
-    /// khung JSONL host đang parse — không tự thi hành ở lớp cài đặt (đó là
-    /// việc của lần gọi `service_call` đầu tiên, nơi cả hai phía tự khai
-    /// protocol của mình), chỉ mang tính mô tả/tài liệu ở đây.
+    /// Must match `service_host::SERVICE_PROTOCOL`. Informational here; the
+    /// first `service_call` performs the actual check.
     pub protocol: u32,
-    /// Khoá là target triple TÍNH THEO CHUẨN RUST (`x86_64-apple-darwin`,
-    /// `aarch64-apple-darwin`, `x86_64-pc-windows-msvc`,
-    /// `aarch64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`,
-    /// `aarch64-unknown-linux-gnu`, …) — `current_target_triple()` bên dưới
-    /// tính đúng dạng này để tra thẳng vào map, không đoán/thử biến thể khác.
+    /// Keyed by Rust target triple (`x86_64-apple-darwin`,
+    /// `aarch64-unknown-linux-gnu`, ...), exactly as `current_target_triple()`
+    /// formats it.
     pub targets: HashMap<String, ServiceTarget>,
 }
 
-/// Manifest tổng quát — internally-tagged theo `kind`. KHÔNG cần tương thích
-/// ngược ở đây (khác `InstalledArtifactRecord` bên dưới): đây là nội dung một
-/// người TỰ XUẤT BẢN, tải mới mỗi lần fetch, không phải dữ liệu cũ đã nằm sẵn
-/// trên máy người dùng — người viết manifest thêm `"kind": "plugin"` vào
-/// manifest.json hiện có của họ là đủ để tiếp tục cài được sau bản nâng cấp
-/// này.
+/// Remote manifest, tagged by `kind`. Unlike `InstalledArtifactRecord`, no
+/// backward compatibility is needed: manifests are fetched fresh each time.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum RemoteArtifactManifest {
@@ -183,27 +137,19 @@ pub enum RemoteArtifactManifest {
     Service(RemoteServiceManifest),
 }
 
-// ---------------------------------------------------------------------------
-// Bản ghi đã cài — lưu trong extensions/index.json
-// ---------------------------------------------------------------------------
+// Installed records, stored in extensions/index.json
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct InstalledPluginRecord {
     pub manifest: RemotePluginManifest,
-    /// URL gốc đã cài từ — dùng để kiểm bản mới khi người dùng bấm "Update".
+    /// Manifest URL the plugin was installed from; used to check for updates.
     pub source_url: String,
     pub bundle_path: String,
     pub installed_at: i64,
-    /// Market (nguồn catalog.json) đã cài plugin này từ Marketplace, nếu có —
-    /// `None` cho một cài đặt qua URL dán tay hoặc một bản ghi từ trước khi
-    /// tính năng market tồn tại (`#[serde(default)]` đọc được index.json cũ
-    /// không có trường này). Đây là DANH TÍNH thật của một plugin cài từ bên
-    /// ngoài, không chỉ để hiển thị: hai market khác nhau hoàn toàn có thể
-    /// cùng phát hành một plugin trùng `manifest.id` (không có allowlist toàn
-    /// cục nào ép id duy nhất như `ALLOWED_SERVICES` của service_host.rs) —
-    /// mọi chỗ so khớp/dọn đĩa cho PLUGIN bên dưới vì vậy so cả
-    /// `(manifest.id, market_id)`, không chỉ `manifest.id`, để hai bản cài từ
-    /// hai market cùng tồn tại thay vì bản sau âm thầm ghi đè bản trước.
+    /// Marketplace the plugin was installed from, `None` for a pasted URL or a
+    /// record that predates markets. Part of the plugin's identity: two markets
+    /// may publish the same `manifest.id`, so plugin lookups match on
+    /// `(manifest.id, market_id)`.
     #[serde(default)]
     pub market_id: Option<String>,
 }
@@ -214,31 +160,19 @@ pub struct InstalledServiceRecord {
     pub source_url: String,
     pub bin_path: String,
     pub installed_at: i64,
-    /// Chỉ để HIỂN THỊ (market nào vừa cài bản đang chạy) — KHÔNG dùng để so
-    /// khớp/dedupe. `bin` của một service luôn phải nằm trong
-    /// `ALLOWED_SERVICES` (service_host.rs), một allowlist TOÀN CỤC cố định —
-    /// hai market cùng nhận cài một `bin` đã được cấp phép nghĩa là chúng
-    /// cùng nhắm một sidecar CHÍNH THỐNG duy nhất, không phải hai sidecar độc
-    /// lập cần chạy song song; giữ nguyên hành vi "cùng bin thì thay bản ghi
-    /// cũ" như trước.
+    /// Display only; services are matched by `bin` alone. `bin` must be in the
+    /// global `ALLOWED_SERVICES` allowlist, so two markets installing the same
+    /// `bin` refer to the same sidecar and the newer record replaces the older.
     #[serde(default)]
     pub market_id: Option<String>,
 }
 
-/// Bản ghi tổng quát, lưu chung trong MỘT `extensions/index.json` cho cả hai
-/// kind. **Reader tương thích ngược bắt buộc**: `index.json` của Phase 1
-/// (mảng phẳng `InstalledPluginRecord`, KHÔNG có trường `kind`) phải đọc được
-/// nguyên vẹn thành toàn bộ `Plugin(...)` — không mất một bản ghi plugin đã
-/// cài nào của người dùng thật khi nâng cấp app.
+/// Installed record. Both kinds share one `extensions/index.json`.
 ///
-/// `serde`'s derive cho enum có tag (`internally`/`adjacently tagged`) không
-/// tự hỗ trợ "thiếu tag thì mặc định biến thể X" — nó luôn báo lỗi "missing
-/// field kind" khi tag vắng mặt. Vì vậy `Deserialize` được viết TAY: peek qua
-/// `serde_json::Value` trước, quyết định biến thể (mặc định `"plugin"` khi
-/// không có trường `kind` — đúng thứ mọi bản ghi Phase 1 luôn là), rồi mới
-/// deserialize phần còn lại đúng kiểu. `Serialize` vẫn dùng derive
-/// (`#[serde(tag = "kind")]`) — chiều ghi luôn ghi tường minh cả `kind`, chỉ
-/// chiều đọc cần khoan dung với dữ liệu cũ.
+/// `Deserialize` is hand-written because records written before services
+/// existed have no `kind` field and must still load as `Plugin`. serde's
+/// tagged-enum derive cannot default a missing tag. `Serialize` always writes
+/// `kind`.
 #[derive(Debug, Serialize, Clone, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum InstalledArtifactRecord {
@@ -252,9 +186,7 @@ impl<'de> Deserialize<'de> for InstalledArtifactRecord {
         D: Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
-        // Vắng trường `kind` == một bản ghi Phase 1 == luôn là plugin. Đây
-        // CHÍNH là dòng migration — không có bước "chuyển đổi" tách riêng nào
-        // khác, đọc xong là đã ở đúng schema mới trong bộ nhớ.
+        // A missing `kind` means a legacy record, which is always a plugin.
         let kind = value
             .get("kind")
             .and_then(|k| k.as_str())
@@ -275,10 +207,8 @@ impl<'de> Deserialize<'de> for InstalledArtifactRecord {
 }
 
 impl InstalledArtifactRecord {
-    /// Khoá định danh trong index — id (plugin) hoặc bin (service). Chỉ hai
-    /// kind khác nhau mới có thể trùng chuỗi này một cách vô hại (một plugin
-    /// "redis" và một service "redis" không đụng nhau vì các hàm dùng khoá
-    /// này luôn lọc kèm theo kind của chính biến thể).
+    /// Index key: plugin id or service bin. Callers always filter by kind too,
+    /// so a plugin and a service with the same name do not collide.
     fn key(&self) -> &str {
         match self {
             InstalledArtifactRecord::Plugin(p) => &p.manifest.id,
@@ -286,9 +216,8 @@ impl InstalledArtifactRecord {
         }
     }
 
-    /// Market đã cài bản ghi này từ, nếu có — xem `market_id` trên từng struct
-    /// record cho ý nghĩa khác nhau giữa hai kind (danh tính thật với plugin,
-    /// chỉ hiển thị với service).
+    /// Market the record was installed from (identity for plugins, display only
+    /// for services).
     fn market_id(&self) -> Option<&str> {
         match self {
             InstalledArtifactRecord::Plugin(p) => p.market_id.as_deref(),
@@ -297,12 +226,9 @@ impl InstalledArtifactRecord {
     }
 }
 
-/// Thư mục trên đĩa cho MỘT plugin id — `plugins_dir/<id>/` cho một bản cài
-/// không thuộc market nào (URL dán tay, hoặc bản ghi từ trước tính năng
-/// market), `plugins_dir/by-market/<market_id>/<id>/` khi có market. Tách
-/// nhánh "không market" giữ NGUYÊN đường dẫn cũ — không cần di trú file nào
-/// trên đĩa của người dùng đã cài từ trước, chỉ nhánh có market mới ghi vào
-/// một cây con mới.
+/// On-disk directory for a plugin: `plugins_dir/<id>/` without a market
+/// (the original layout, so existing installs need no migration), or
+/// `plugins_dir/by-market/<market_id>/<id>/`.
 fn plugin_disk_dir(plugins_dir: &Path, market_id: Option<&str>, id: &str) -> PathBuf {
     match market_id {
         Some(m) => plugins_dir.join("by-market").join(m).join(id),
@@ -310,15 +236,11 @@ fn plugin_disk_dir(plugins_dir: &Path, market_id: Option<&str>, id: &str) -> Pat
     }
 }
 
-/// Khoá ghi tuần tự cho index.json — hai lệnh install/uninstall chạy đồng thời
-/// không được phép đọc-sửa-ghi chồng lên nhau. Dùng chung cho cả hai kind
-/// (Phase 1 đã có sẵn, mở rộng phạm vi bao cả nhánh service).
+/// Serializes index.json read-modify-write across install/uninstall/list.
 #[derive(Default)]
 pub struct InstalledIndex(tokio::sync::Mutex<()>);
 
-// ---------------------------------------------------------------------------
-// Thư mục trên đĩa
-// ---------------------------------------------------------------------------
+// Directories
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_data_dir().map_err(|e| e.to_string())
@@ -328,26 +250,13 @@ fn index_path(dir: &Path) -> PathBuf {
     dir.join("index.json")
 }
 
-/// `<app_data>/extensions/` — nguồn sự thật DUY NHẤT cho mọi thứ cài từ bên
-/// ngoài (cả hai kind), thay `<app_data>/plugins/index.json` của Phase 1.
+/// `<app_data>/extensions/`, the single index of external installs for both
+/// kinds. Plugin bundles stay under `plugins/` and service binaries under
+/// `services/`; only the index lives here.
 ///
-/// Quyết định về việc dời thư mục: CHỈ index.json dời sang chỗ mới; nội dung
-/// bundle của plugin (`<app_data>/plugins/<id>/<version>/bundle.mjs`) ở
-/// nguyên chỗ cũ — chỉ có metadata "cái gì đang được cài" là thứ cần một nơi
-/// chung cho cả hai kind, còn NƠI LƯU chính artifact thì mỗi kind vẫn có
-/// layout riêng (`plugins/` cho bundle JS, `services/` cho binary). Nhờ vậy
-/// việc dời chỉ chạm một file duy nhất, không phải di trú toàn bộ cây thư mục
-/// bundle đã cài (rủi ro I/O cao hơn hẳn cho lợi ích tương đương).
-///
-/// Di trú: nếu `extensions/index.json` CHƯA tồn tại nhưng
-/// `plugins/index.json` (đường cũ) CÓ tồn tại, copy nó sang vị trí mới qua một
-/// file `.tmp` cùng thư mục đích rồi `rename` — cùng khuôn atomic-write với
-/// nhánh service bên dưới, để một crash giữa chừng chỉ để lại một `.tmp` mồ
-/// côi (không phá index cũ, không phá index mới nếu index mới đã có). File cũ
-/// KHÔNG bị xoá sau khi copy — không phải vì cần backward-compat lâu dài, mà
-/// vì nó là một lưới an toàn miễn phí cho đúng lần nâng cấp đầu tiên: nếu
-/// version app này có lỗi ở đâu đó sau bước copy, file cũ vẫn còn nguyên để
-/// đọc lại thủ công.
+/// Migration: if `extensions/index.json` is missing but the legacy
+/// `plugins/index.json` exists, copy it via a temp file and rename. The
+/// legacy file is kept as a fallback.
 fn prepare_extensions_dir(app_data: &Path) -> Result<PathBuf, String> {
     let dir = app_data.join("extensions");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -363,9 +272,8 @@ fn prepare_extensions_dir(app_data: &Path) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-/// Thư mục index đã sẵn sàng (đã tạo + di trú nếu cần) — dùng bởi các
-/// `#[tauri::command]` bên dưới, và bởi `service_host::sidecar_path` (qua
-/// `installed_service_bin_path`) để đọc phần `kind=service`.
+/// Index directory, created and migrated if needed. Also used by
+/// `service_host::sidecar_path` via `installed_service_bin_path`.
 pub fn extensions_dir(app: &AppHandle) -> Result<PathBuf, String> {
     prepare_extensions_dir(&app_data_dir(app)?)
 }
@@ -382,24 +290,18 @@ fn services_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-// ---------------------------------------------------------------------------
-// index.json — đọc/ghi thuần, không đụng Tauri
-// ---------------------------------------------------------------------------
+// index.json (no Tauri dependency)
 
 fn read_index(dir: &Path) -> Result<Vec<InstalledArtifactRecord>, String> {
     match std::fs::read_to_string(index_path(dir)) {
         Ok(raw) => serde_json::from_str(&raw).map_err(|e| format!("index.json hỏng: {e}")),
-        // Chưa cài gì bao giờ — danh sách rỗng, không phải lỗi.
+        // Nothing installed yet.
         Err(_) => Ok(Vec::new()),
     }
 }
 
-/// Ghi ATOMIC (`.tmp` cùng thư mục đích rồi `rename`) — cùng khuôn với binary
-/// service bên dưới (`stage_install_service`). Trước đây dùng `std::fs::write`
-/// thẳng vào `index.json`: một crash/mất điện giữa lúc ghi (dữ liệu KHÔNG
-/// nhỏ — mọi plugin/service đã cài đều nằm chung một file) để lại file nửa
-/// vời mà `read_index` chỉ có thể báo "index.json hỏng", buộc người dùng tự
-/// sửa tay hoặc mất sạch danh sách đã cài.
+/// Writes atomically (temp file, then rename) so a crash never leaves a
+/// truncated index.
 fn write_index(dir: &Path, records: &[InstalledArtifactRecord]) -> Result<(), String> {
     let json = serde_json::to_string_pretty(records).map_err(|e| e.to_string())?;
     let final_path = index_path(dir);
@@ -420,15 +322,11 @@ fn is_sha256_hex(s: &str) -> bool {
     s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-// ---------------------------------------------------------------------------
-// Nhánh plugin — hành vi giữ NGUYÊN từ Phase 1
-// ---------------------------------------------------------------------------
+// Plugins
 
-/// Kiểm tối thiểu ở tầng Rust — đủ để không tải/lưu một manifest rõ ràng hỏng
-/// hoặc nguy hiểm (URL không mã hoá, integrity sai hình dạng). Kiểm ĐẦY ĐỦ
-/// (allowlist native/http đúng cú pháp, dải sdk, route không đụng plugin
-/// khác…) vẫn nằm ở `validateManifest` phía TS — nơi `PluginManifest` thật sự
-/// được định nghĩa — chạy lại trước khi đăng ký vào registry.
+/// Minimal Rust-side checks: https entry and well-formed integrity. Full
+/// validation (allowlists, SDK range, route conflicts) runs again in
+/// `validateManifest` on the TS side before registration.
 fn validate_remote_plugin_manifest(m: &RemotePluginManifest) -> Result<(), String> {
     if !is_kebab_ish(&m.id) {
         return Err(format!("id \"{}\" phải là kebab-case", m.id));
@@ -442,8 +340,7 @@ fn validate_remote_plugin_manifest(m: &RemotePluginManifest) -> Result<(), Strin
     Ok(())
 }
 
-/// Cùng tinh thần kiểm tối thiểu như nhánh plugin — đủ để chặn một manifest rõ
-/// ràng hỏng/nguy hiểm trước khi chạm mạng thêm lần nữa để tải binary.
+/// Minimal checks before downloading the binary.
 fn validate_remote_service_manifest(m: &RemoteServiceManifest) -> Result<(), String> {
     if !is_kebab_ish(&m.bin) {
         return Err(format!("bin \"{}\" phải là kebab-case, không đuôi mở rộng", m.bin));
@@ -465,9 +362,8 @@ fn validate_remote_service_manifest(m: &RemoteServiceManifest) -> Result<(), Str
     Ok(())
 }
 
-/// Phần disk của việc cài plugin: kiểm checksum, ghi bundle, cập nhật index.
-/// Nhận thẳng bytes đã tải — tách khỏi phần HTTP để test được bằng dữ liệu giả
-/// lập mà không cần một server thật cho MỌI ca.
+/// Verifies the checksum, writes the bundle, and updates the index. Takes the
+/// downloaded bytes so it can be tested without a server.
 fn stage_install_plugin(
     index_dir: &Path,
     plugins_dir: &Path,
@@ -488,13 +384,9 @@ fn stage_install_plugin(
     let plugin_dir = plugin_disk_dir(plugins_dir, market_id.as_deref(), &manifest.id).join(&manifest.version);
     std::fs::create_dir_all(&plugin_dir).map_err(|e| e.to_string())?;
     let bundle_path = plugin_dir.join("bundle.mjs");
-    // Atomic (tmp + rename) — cùng lý do khuôn này đã áp cho binary service:
-    // `artifact_installer_read_bundle` không giữ khoá `InstalledIndex` khi đọc
-    // (chỉ đọc, không sửa index.json), nên một lần cài đè (cùng id, khác
-    // version trung gian) đang ghi `bundle.mjs` có thể trùng lúc frontend gọi
-    // đọc lại bundle cũ. Checksum ở `stage_read_bundle` đã bắt được trường hợp
-    // đọc trúng file dở dang (trả lỗi thay vì nạp JS hỏng), nhưng ghi atomic
-    // loại bỏ hẳn khả năng đó thay vì chỉ phát hiện sau.
+    // Atomic write: `artifact_installer_read_bundle` reads without the index
+    // lock, so an in-place write could be observed half-done. The read-time
+    // checksum would catch that, but atomic writes avoid it altogether.
     let tmp_path = plugin_dir.join("bundle.mjs.tmp");
     std::fs::write(&tmp_path, bytes).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp_path, &bundle_path).map_err(|e| e.to_string())?;
@@ -509,12 +401,8 @@ fn stage_install_plugin(
         market_id: market_id.clone(),
     });
 
-    // Cài đè lên chính plugin đó CÙNG MARKET thì thay hẳn bản ghi cũ — không
-    // giữ lại hai bản ghi cho cùng một (id, market_id), kể cả khác version.
-    // Một market KHÁC cài cùng id là một plugin KHÁC theo đúng danh tính đã
-    // ghi ở `InstalledPluginRecord::market_id` — không lọc, bản ghi mới được
-    // PUSH thêm bên dưới, không thay bản cũ. Chỉ lọc trong các bản ghi PLUGIN
-    // — không đụng bản ghi service nào dù trùng chuỗi khoá.
+    // Reinstalling the same (id, market_id) replaces the old record, whatever
+    // the version. A different market's plugin with the same id is kept.
     let mut old_version: Option<String> = None;
     let mut records = read_index(index_dir)?;
     records.retain(|r| match r {
@@ -527,11 +415,9 @@ fn stage_install_plugin(
     records.push(record.clone());
     write_index(index_dir, &records)?;
 
-    // Dọn thư mục version CŨ sau khi index đã ghi thành công — một update
-    // (khác version) để lại `plugins/<id>/<old-version>/` không còn bản ghi
-    // nào trỏ tới, mồ côi vĩnh viễn nếu không dọn (khác uninstall, vốn đã xoá
-    // cả `plugins/<id>/` — ở đây `<id>/<new-version>/` vừa ghi phải giữ lại).
-    // Lỗi xoá (Windows khoá file, quyền đĩa…) không chặn việc cài — best-effort.
+    // Remove the previous version's directory once the index is written.
+    // Best effort: a failed delete (e.g. a locked file on Windows) does not
+    // fail the install.
     if let Some(old_version) = old_version {
         if old_version != new_version {
             let _ = std::fs::remove_dir_all(plugin_disk_dir(plugins_dir, market_id.as_deref(), &id).join(&old_version));
@@ -542,8 +428,7 @@ fn stage_install_plugin(
 }
 
 fn final_bin_name(bin: &str) -> String {
-    // Đuôi Windows do HOST quyết định, không lấy tên file từ URL — một URL
-    // CDN/redirect không đảm bảo mang tên file gốc đáng tin nào.
+    // The host picks the extension; a CDN URL may not carry a trustworthy name.
     if cfg!(windows) && !bin.to_ascii_lowercase().ends_with(".exe") {
         format!("{bin}.exe")
     } else {
@@ -551,20 +436,13 @@ fn final_bin_name(bin: &str) -> String {
     }
 }
 
-/// Phần disk của việc cài service: chọn target theo `target_triple` ĐÃ TÍNH
-/// SẴN (không đoán/thử biến thể khác — sai/thiếu thì từ chối rõ ràng), kiểm
-/// checksum, ghi ATOMIC (tải vào `.tmp` CÙNG thư mục đích rồi `rename`),
-/// `chmod +x` sau khi rename xong (Unix), cập nhật index.
+/// Selects the build for `target_triple` (no fallback to other triples),
+/// verifies its checksum, writes it atomically, marks it executable on Unix,
+/// and updates the index.
 ///
-/// Ghi atomic ở đây (khác nhánh plugin, ghi thẳng): file này sẽ được SPAWN
-/// như một tiến trình, một file dở dang do crash giữa chừng nguy hiểm hơn hẳn
-/// một bundle JS dở dang (bundle JS dở dang chỉ hỏng lúc `import()`, không tự
-/// ý chạy gì). `fs::rename` trong cùng thư mục đích là atomic trên cả ba OS
-/// (cùng filesystem/volume — `bin_dir` chỉ vừa được tạo ngay phía trên, không
-/// có khả năng nằm khác volume với chính nó); `sidecar_path()` chỉ bao giờ tìm
-/// đúng TÊN FILE CUỐI CÙNG đã rename, nên một `.tmp` mồ côi (app crash giữa
-/// `write` và `rename`) không bao giờ bị nó vô tình chọn — lần cài sau ghi đè
-/// tmp cũ, không cần dọn tay.
+/// Atomic writes matter more here than for bundles because the file is
+/// spawned. `sidecar_path()` only looks for the final file name, so a
+/// leftover `.tmp` from a crash is never executed.
 fn stage_install_service(
     index_dir: &Path,
     services_dir: &Path,
@@ -620,8 +498,8 @@ fn stage_install_service(
         market_id,
     });
 
-    // Cài đè cùng bin thì thay hẳn bản ghi cũ — theo quyết định đã chốt trong
-    // plan (không giữ song song hai version; rollback = xoá cài lại thủ công).
+    // Reinstalling the same bin replaces the old record; versions are not kept
+    // side by side.
     let mut old_version: Option<String> = None;
     let mut records = read_index(index_dir)?;
     records.retain(|r| match r {
@@ -634,9 +512,8 @@ fn stage_install_service(
     records.push(record.clone());
     write_index(index_dir, &records)?;
 
-    // Dọn thư mục version CŨ — cùng lý do nhánh plugin ở trên. Sidecar cũ đã bị
-    // `service_stop` ở lớp gọi (`artifact_installer_install`) trước khi hàm
-    // này chạy xong, nên tới đây binary cũ không còn tiến trình nào giữ file.
+    // Remove the previous version's directory. The caller has already stopped
+    // the running sidecar, so no process holds the old binary.
     if let Some(old_version) = old_version {
         if old_version != new_version {
             let _ = std::fs::remove_dir_all(services_dir.join(&bin).join(&old_version));
@@ -646,10 +523,8 @@ fn stage_install_service(
     Ok(record)
 }
 
-/// Xoá một bản ghi (bằng id hoặc bin, tuỳ kind tìm thấy) khỏi index + dọn thư
-/// mục trên đĩa tương ứng. Trả về `Some(bin)` khi bản ghi vừa gỡ là kind
-/// service — để lớp gọi tự quyết định có cần `service_stop` hay không (chỉ
-/// service mới có tiến trình đang chạy cần dừng).
+/// Removes a record from the index and deletes its files. Returns
+/// `Some(bin)` for a service so the caller can stop the running process.
 fn stage_uninstall(
     index_dir: &Path,
     plugins_dir: &Path,
@@ -661,10 +536,8 @@ fn stage_uninstall(
     let before = records.len();
     let mut removed: Option<InstalledArtifactRecord> = None;
     records.retain(|r| {
-        // Plugin: khớp CẢ id lẫn market_id — gỡ đúng bản của đúng market, để
-        // yên bản cùng id của market khác. Service: `market_id` chỉ để hiển
-        // thị (xem struct), nên chỉ khớp theo `bin` như trước — gỡ theo đúng
-        // `key()` là đủ, không kén market_id truyền vào.
+        // Plugins match on (id, market_id); services on bin only (see the record
+        // structs).
         let matches = match r {
             InstalledArtifactRecord::Plugin(_) => r.key() == key && r.market_id() == market_id,
             InstalledArtifactRecord::Service(_) => r.key() == key,
@@ -679,8 +552,8 @@ fn stage_uninstall(
     if records.len() == before {
         return Err(format!("Không có mục \"{key}\" đang cài"));
     }
-    // Index cập nhật xong mới là điều quan trọng — không xoá được thư mục
-    // trên đĩa (Windows khoá file đang mở chẳng hạn) không nên chặn việc gỡ.
+    // Update the index first; failing to delete files (e.g. locked on Windows)
+    // should not block the uninstall.
     write_index(index_dir, &records)?;
 
     match removed {
@@ -689,8 +562,7 @@ fn stage_uninstall(
             Ok(None)
         }
         Some(InstalledArtifactRecord::Service(s)) => {
-            // KHÔNG đụng `service-data/<bin>/` (dữ liệu runtime của sidecar) —
-            // theo quyết định đã chốt trong plan; chỉ xoá binary đã tải về.
+            // Only the binary is removed; `service-data/<bin>/` is left intact.
             let _ = std::fs::remove_dir_all(services_dir.join(&s.manifest.bin));
             Ok(Some(s.manifest.bin))
         }
@@ -698,11 +570,8 @@ fn stage_uninstall(
     }
 }
 
-/// Đọc lại nội dung bundle plugin đã cài, kiểm sha256 LẦN NỮA trước khi trả về
-/// cho webview thực thi — phòng thủ chiều sâu, không phải kiểm tra thừa: file
-/// trên đĩa có thể bị sửa sau khi cài (thủ công, hay bởi phần mềm khác) mà
-/// index.json không biết. Chỉ có nghĩa với kind=plugin — service không có khái
-/// niệm "đọc bundle để webview `import()`".
+/// Reads an installed bundle and re-verifies its sha256 before the webview
+/// executes it, in case the file changed on disk after install.
 fn stage_read_bundle(index_dir: &Path, id: &str, market_id: Option<&str>) -> Result<String, String> {
     let record = read_index(index_dir)?
         .into_iter()
@@ -724,15 +593,11 @@ fn stage_read_bundle(index_dir: &Path, id: &str, market_id: Option<&str>) -> Res
     String::from_utf8(bytes).map_err(|e| format!("Bundle không phải UTF-8 hợp lệ: {e}"))
 }
 
-/// Đường dẫn binary đã cài qua URL cho `bin`, THUẦN — nhận thẳng thư mục
-/// `extensions/` thay vì `AppHandle`, để `service_host.rs`'s test (không dựng
-/// được AppHandle giả — xem lời giải thích đầu file) kiểm được đúng thứ tự ưu
-/// tiên "tải-về-trước" mà không cần chạy trong một app Tauri thật.
+/// Path of the URL-installed binary for `bin`. Takes the index directory
+/// instead of an `AppHandle` so it can be tested.
 ///
-/// Trả `None` khi: không có bản ghi kind=service cho `bin`, HOẶC có bản ghi
-/// nhưng file trên đĩa không còn (bị xoá/hỏng đĩa ngoài luồng cài đặt) — cả
-/// hai ca đều phải rơi xuống fallback cạnh-exe ở lớp gọi, không phải panic hay
-/// trả một đường dẫn không tồn tại.
+/// Returns `None` when there is no service record for `bin` or its file is
+/// gone, so the caller falls back to the bundled sidecar.
 pub fn installed_service_bin_path_at(index_dir: &Path, bin: &str) -> Option<PathBuf> {
     let records = read_index(index_dir).ok()?;
     records.into_iter().find_map(|r| match r {
@@ -744,10 +609,9 @@ pub fn installed_service_bin_path_at(index_dir: &Path, bin: &str) -> Option<Path
     })
 }
 
-/// URL manifest mà bản ghi kind=service của `bin` được cài từ — chỉ để HIỂN THỊ
-/// trong hộp thoại xin phép. `index.json` nằm trong app_data nên webview ghi được,
-/// vì vậy đây là thông tin tham khảo, không phải căn cứ tin cậy: căn cứ thật là
-/// đường dẫn và SHA-256 của file sắp chạy.
+/// Manifest URL the service was installed from, shown in the consent dialog.
+/// index.json is writable by the webview, so this is informational only; the
+/// trust decision is based on the binary's path and SHA-256.
 pub fn installed_service_source_url_at(index_dir: &Path, bin: &str) -> Option<String> {
     read_index(index_dir).ok()?.into_iter().find_map(|r| match r {
         InstalledArtifactRecord::Service(s) if s.manifest.bin == bin => Some(s.source_url),
@@ -755,14 +619,11 @@ pub fn installed_service_source_url_at(index_dir: &Path, bin: &str) -> Option<St
     })
 }
 
-// ---------------------------------------------------------------------------
-// current_target_triple — TÍNH Ở RUST, không nhận từ client/manifest
-// ---------------------------------------------------------------------------
+// Target triple
 
-/// Target triple của máy đang chạy app, dạng chuẩn Rust — dùng để tra thẳng
-/// vào `RemoteServiceManifest.targets`. Không đoán/thử biến thể khác: một
-/// combo OS/ARCH không nằm trong bảng dưới đây là một nền tảng app này chưa
-/// hỗ trợ sidecar tải-về, và nên báo lỗi rõ ràng thay vì đoán bừa.
+/// Rust target triple of this machine, used as the key into
+/// `RemoteServiceManifest.targets`. Unsupported OS/arch combinations produce
+/// a triple no manifest lists, so installation fails with a clear error.
 pub fn current_target_triple() -> String {
     let arch = std::env::consts::ARCH;
     let os_suffix = match std::env::consts::OS {
@@ -774,13 +635,10 @@ pub fn current_target_triple() -> String {
     format!("{arch}-{os_suffix}")
 }
 
-// ---------------------------------------------------------------------------
 // HTTP
-// ---------------------------------------------------------------------------
 
-/// Phần HTTP của việc fetch, tách khỏi kiểm tra scheme ở lệnh công khai bên
-/// dưới — để test được bằng một server cục bộ thật (luôn là http, không có
-/// TLS) mà không phải nới lỏng chính điều kiện https đang được kiểm.
+/// Fetches and validates a manifest. The https check lives in the command
+/// below so this can be tested against a local http server.
 async fn fetch_manifest_from(url: &str) -> Result<RemoteArtifactManifest, String> {
     let res = reqwest::get(url)
         .await
@@ -799,15 +657,10 @@ async fn fetch_manifest_from(url: &str) -> Result<RemoteArtifactManifest, String
     Ok(manifest)
 }
 
-// ---------------------------------------------------------------------------
-// #[tauri::command] — lớp vỏ mỏng
-// ---------------------------------------------------------------------------
+// Tauri commands
 
-/// Lớp vỏ mỏng expose `current_target_triple()` cho TS đọc được — Settings UI
-/// (nhánh xem trước manifest `kind=service`) hiển thị nó để người dùng tự xác
-/// nhận có target khớp máy mình trước khi bấm cài, không đoán trước ở phía
-/// webview (nguyên tắc "quyết định luôn do host" áp dụng cả cho việc hiển thị,
-/// không chỉ việc thực thi).
+/// Exposes the computed triple so Settings can show which build will be
+/// installed.
 #[tauri::command]
 pub fn artifact_installer_current_target_triple() -> String {
     current_target_triple()
@@ -816,9 +669,8 @@ pub fn artifact_installer_current_target_triple() -> String {
 #[tauri::command]
 pub async fn artifact_installer_fetch_manifest(url: String) -> Result<RemoteArtifactManifest, String> {
     if !url.starts_with("https://") {
-        // Không chỉ để nhất quán: http không mã hoá thì kiểm checksum ở bước
-        // tải bundle/binary sau đó cũng vô nghĩa — kẻ đứng giữa đổi được cả
-        // hai.
+        // Over plain http an attacker could swap both the manifest and its
+        // checksums.
         return Err("Chỉ chấp nhận URL https".to_string());
     }
     fetch_manifest_from(&url).await
@@ -858,12 +710,9 @@ pub async fn artifact_installer_install(
                 .await
                 .map_err(|e| format!("Không tải được binary: {e}"))?;
             let bin = manifest.bin.clone();
-            // Dừng sidecar ĐANG CHẠY (nếu có) TRƯỚC khi ghi/dọn đĩa — hai lý
-            // do: (1) self-healing, lần `service_call` kế tiếp tự spawn lại
-            // đúng version mới; (2) trên Windows, xoá thư mục version cũ
-            // (bên trong `stage_install_service`) trong khi tiến trình cũ vẫn
-            // giữ file binary sẽ thất bại lặng lẽ (best-effort) — dừng trước
-            // đảm bảo cleanup thật sự dọn được, không chỉ udpate index.
+            // Stop the running sidecar before replacing files: the next
+            // `service_call` respawns the new version, and Windows cannot delete
+            // a binary that is still running.
             let _ = crate::service_host::service_stop(services.clone(), bin).await;
             stage_install_service(
                 &index_dir,
@@ -885,12 +734,8 @@ pub async fn artifact_installer_list(
     app: AppHandle,
     index_state: tauri::State<'_, InstalledIndex>,
 ) -> Result<Vec<InstalledArtifactRecord>, String> {
-    // Cùng khoá install/uninstall giữ — `write_index` giờ atomic (tmp+rename)
-    // nên `read_index` không bao giờ thấy file NỬA VỜI nữa, nhưng không khoá ở
-    // đây thì một `list` chạy giữa lúc install/uninstall đang xử lý (nhiều
-    // bước ghi đĩa khác ngoài index.json — copy bundle, dừng sidecar…) vẫn có
-    // thể đọc trúng index.json của bước TRUNG GIAN thay vì trạng thái cuối
-    // cùng nhất quán.
+    // Take the lock so `list` never observes an install or uninstall
+    // midway through its steps.
     let _guard = index_state.0.lock().await;
     read_index(&extensions_dir(&app)?)
 }
@@ -912,9 +757,8 @@ pub async fn artifact_installer_uninstall(
         market_id.as_deref(),
     )?;
     if let Some(bin) = stopped_bin {
-        // Sidecar đang chạy (nếu có) bị dừng ngay — xem AC8.
         let _ = crate::service_host::service_stop(services.clone(), bin.clone()).await;
-        // Gỡ cài đặt cũng thu hồi sự đồng ý: cài lại sau này phải được hỏi lại.
+        // Uninstalling also revokes consent; a reinstall asks again.
         services.trust.revoke(&bin);
     }
     Ok(())
@@ -958,8 +802,7 @@ mod tests {
         RemoteServiceManifest { bin: bin.into(), version: "1.0.0".into(), protocol: 1, targets }
     }
 
-    /// Thư mục tạm thật trên đĩa, riêng cho mỗi test — không cần AppHandle,
-    /// chỉ cần đúng cái mà `stage_*` thực sự nhận: một `&Path`.
+    /// Fresh temp directory per test.
     fn temp_dir(label: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("devtool-artifact-installer-test-{label}-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -979,13 +822,7 @@ mod tests {
         format!("http://{addr}/")
     }
 
-    // -- Task 1: migration reader --------------------------------------------
-
-    /// Hình dạng JSON ĐÚNG NHƯ `plugin_installer.rs` (Phase 1) từng ghi ra:
-    /// một mảng phẳng `InstalledPluginRecord`, không có trường `kind` nào cả.
-    /// Không dùng dữ liệu bịa: đi qua đúng `InstalledPluginRecord` +
-    /// `serde_json::to_string_pretty`, đúng những gì `write_index` bản cũ đã
-    /// làm.
+    // -- Index reader --------------------------------------------------------
     #[test]
     fn nguon_cai_dat_cua_sidecar_doc_tu_index() {
         let dir = temp_dir("source-url");
@@ -1017,8 +854,6 @@ mod tests {
             market_id: None,
         };
         let legacy_json = serde_json::to_string_pretty(&vec![old_record.clone()]).unwrap();
-        // Xác nhận trước hết rằng đây đúng là hình dạng KHÔNG có "kind" —
-        // nếu giả định này sai thì cả bài test mất ý nghĩa.
         assert!(!legacy_json.contains("\"kind\""), "{legacy_json}");
 
         let dir = temp_dir("legacy-index");
@@ -1067,7 +902,7 @@ mod tests {
         assert!(err.contains("index.json hỏng"), "{err}");
     }
 
-    // -- Nhánh plugin: không regress so với Phase 1 --------------------------
+    // -- Plugins ---------------------------------------------------------------
 
     #[test]
     fn tu_choi_id_khong_phai_kebab_case() {
@@ -1125,10 +960,8 @@ mod tests {
 
     #[tokio::test]
     async fn fetch_manifest_thieu_kind_bi_tu_choi() {
-        // Manifest KHÔNG có "kind" — khác `InstalledArtifactRecord` (index nội
-        // bộ, phải khoan dung với dữ liệu Phase 1), một manifest TỰ XUẤT BẢN
-        // qua mạng là nội dung MỚI mỗi lần fetch, nên bắt buộc "kind" tường
-        // minh kể từ bản này — không có gánh nặng tương thích ngược nào ở đây.
+        // Published manifests must declare `kind`; only the installed index
+        // tolerates its absence.
         let json = r#"{"id":"demo","version":"1.0.0","sdk":"^1.0.0","entry":"https://x/a.mjs","integrity":"aa","label":"Demo","description":"x","icon":"puzzle","route":"/demo"}"#;
         let url = serve_once(json.to_string(), "application/json").await;
         let err = fetch_manifest_from(&url).await.unwrap_err();
@@ -1192,13 +1025,8 @@ mod tests {
         );
     }
 
-    /// Hai market khác nhau cùng phát hành một plugin trùng `id` ("demo") KHÔNG
-    /// được đụng nhau: cả hai bản ghi phải cùng tồn tại trong index, mỗi bản
-    /// nằm một thư mục đĩa riêng (`by-market/<market_id>/demo/`), và gỡ một
-    /// bản không được xoá bản còn lại. Đây chính là hành vi
-    /// "phân biệt bằng marketId + id" người dùng yêu cầu — khác hẳn
-    /// `cai_de_cung_id_plugin_thi_thay_ban_ghi_cu_khong_cong_don` ở trên
-    /// (cùng id, KHÔNG market, vẫn phải dedupe như cũ).
+    /// Two markets publishing the same plugin id keep separate records and
+    /// directories, and uninstalling one leaves the other.
     #[test]
     fn hai_market_khac_nhau_cung_id_plugin_cung_ton_tai_khong_de_len_nhau() {
         let index_dir = temp_dir("plugin-multi-market-index");
@@ -1227,8 +1055,7 @@ mod tests {
         )
         .unwrap();
 
-        // Cài đè LẦN NỮA từ market "official" (cùng id, cùng market) vẫn phải
-        // dedupe như bình thường — không cộng dồn thành 3 bản ghi.
+        // Reinstalling from the same market still replaces its record.
         let mut official_v2 = plugin_manifest("https://official.example.com/demo-v2.mjs", &sha256_hex(b"official-v2"));
         official_v2.version = "2.0.0".into();
         stage_install_plugin(
@@ -1256,7 +1083,7 @@ mod tests {
         assert!(plugins_dir.join("by-market").join("official").join("demo").join("2.0.0").join("bundle.mjs").exists());
         assert!(plugins_dir.join("by-market").join("custom-fork").join("demo").join("1.0.0").join("bundle.mjs").exists());
 
-        // Gỡ bản "official" không được đụng bản "custom-fork".
+        // Uninstalling "official" leaves "custom-fork" alone.
         let services_dir = temp_dir("plugin-multi-market-services");
         stage_uninstall(&index_dir, &plugins_dir, &services_dir, "demo", Some("official")).unwrap();
         let remaining = read_index(&index_dir).unwrap();
@@ -1313,7 +1140,7 @@ mod tests {
         assert!(err.contains("Không có mục"));
     }
 
-    // -- Nhánh service --------------------------------------------------------
+    // -- Services --------------------------------------------------------------
 
     #[test]
     fn cai_service_dung_target_thi_tai_ghi_atomic_chmod_va_cap_nhat_index() {
@@ -1340,7 +1167,7 @@ mod tests {
         }
 
         assert_eq!(read_index(&index_dir).unwrap(), vec![record]);
-        // Không để lại .tmp mồ côi sau khi cài thành công.
+        // No leftover .tmp after a successful install.
         assert!(std::fs::read_dir(services_dir.join("devtool-svc-demo").join("1.0.0"))
             .unwrap()
             .all(|e| !e.unwrap().file_name().to_string_lossy().ends_with(".tmp")));
@@ -1351,7 +1178,7 @@ mod tests {
         let index_dir = temp_dir("svc-bad-triple-index");
         let services_dir = temp_dir("svc-bad-triple-bin");
         let bytes = b"binary";
-        // Manifest chỉ có target cho một triple KHÁC triple máy đang chạy.
+        // The manifest only has a build for a different triple.
         let m = service_manifest("devtool-svc-demo", "khong-phai-triple-that", "https://x/bin", &sha256_hex(bytes));
         let triple = current_target_triple();
 
@@ -1375,8 +1202,7 @@ mod tests {
         assert!(err.contains("không khớp checksum"), "{err}");
 
         assert!(read_index(&index_dir).unwrap().is_empty());
-        // Checksum được kiểm TRƯỚC khi ghi bất cứ gì xuống đĩa — thư mục bin
-        // không được tạo ra, không có .tmp mồ côi nào để "xoá" thêm bước nào.
+        // The checksum is verified before anything is written.
         assert!(!services_dir.join("devtool-svc-demo").exists());
     }
 
@@ -1442,14 +1268,13 @@ mod tests {
         let found = installed_service_bin_path_at(&index_dir, "devtool-svc-demo");
         assert!(found.is_some());
 
-        // File bị xoá ngoài luồng cài đặt (đĩa hỏng/thủ công) — index vẫn nói
-        // đã cài, nhưng lookup phải trả None để lớp gọi rơi xuống fallback,
-        // không trả một đường dẫn không tồn tại.
+        // The file was removed outside the installer: lookup must return None
+        // so the caller falls back.
         std::fs::remove_file(found.unwrap()).unwrap();
         assert!(installed_service_bin_path_at(&index_dir, "devtool-svc-demo").is_none());
     }
 
-    // -- Di trú extensions dir -------------------------------------------------
+    // -- Extensions directory migration ----------------------------------------
 
     #[test]
     fn di_tru_index_cu_tu_plugins_sang_extensions_khong_mat_du_lieu() {
@@ -1476,10 +1301,8 @@ mod tests {
         let records = read_index(&extensions).unwrap();
         assert_eq!(records, vec![InstalledArtifactRecord::Plugin(old_record)]);
 
-        // Chạy lại lần hai (khởi động app lần sau) không được ghi đè mất bản
-        // ghi MỚI đã có ở vị trí đích — idempotent. Cài thêm một plugin id
-        // KHÁC (không phải "demo") để phân biệt rõ "mất bản ghi migrate" với
-        // "dedupe đúng theo id" (đã có test riêng cho dedupe ở trên).
+        // Running the migration again must not overwrite the new index. A
+        // second plugin with a different id distinguishes this from dedupe.
         let mut second = plugin_manifest("https://x/v2.mjs", &sha256_hex(b"v2"));
         second.id = "second-plugin".into();
         stage_install_plugin(
@@ -1515,7 +1338,7 @@ mod tests {
         assert!(os_ok, "{triple}");
     }
 
-    // -- write_index: ghi atomic, không để lại .tmp mồ côi ----------------------
+    // -- write_index -----------------------------------------------------------
 
     #[test]
     fn write_index_khong_de_lai_tmp_mo_coi_sau_khi_ghi_xong() {
@@ -1534,10 +1357,9 @@ mod tests {
         assert_eq!(read_index(&dir).unwrap(), vec![plugin]);
     }
 
-    // -- download_capped: trần kích thước ----------------------------------------
+    // -- download_capped -------------------------------------------------------
 
-    /// Server trả `Content-Length` lớn hơn trần → từ chối NGAY, không tải một
-    /// byte thân bài nào.
+    /// `Content-Length` over the cap is rejected before reading the body.
     #[tokio::test]
     async fn download_capped_tu_choi_ngay_khi_content_length_vuot_tran() {
         let url = serve_once("x".repeat(1000), "text/plain").await;
@@ -1545,16 +1367,13 @@ mod tests {
         assert!(err.contains("quá lớn"), "{err}");
     }
 
-    /// Server không khai `Content-Length` đúng (hoặc client bỏ qua nó) — vẫn
-    /// phải bị chặn khi TỔNG byte đã đọc vượt trần, không đợi tải hết mới kiểm.
+    /// Without a trustworthy `Content-Length`, the streamed total is capped.
     #[tokio::test]
     async fn download_capped_tu_choi_giua_chung_khi_khong_co_content_length_dang_tin() {
         let app = Router::new().route(
             "/",
             get(|| async {
-                // `StreamBody` để axum không tự set Content-Length từ độ dài
-                // biết trước — mô phỏng đúng "server nói dối/không khai" mà
-                // comment của `download_capped` nhắc tới.
+                // A streamed body has no Content-Length.
                 let stream = futures_util::stream::iter(vec![Ok::<_, std::io::Error>(
                     axum::body::Bytes::from("x".repeat(1000)),
                 )]);

@@ -1,35 +1,20 @@
-// Kho bí mật có mã hoá — nơi cất seed TOTP, bearer token và mọi thứ tương tự.
+// Encrypted secret store for TOTP seeds, bearer tokens and similar values.
 //
-// Bối cảnh: bí mật đã được tách khỏi `app-settings.json` (mặt phẳng khoá mà mọi
-// module trong webview đọc được) từ trước, nhưng vẫn nằm TRẦN trên đĩa. Module
-// này đóng nốt lỗ hổng đó.
+// Key model: data lives in `<app_data>/secrets.enc`, encrypted with
+// AES-256-GCM. The 32-byte key is kept in the OS keychain (Keychain on
+// macOS, Credential Manager on Windows, Secret Service on Linux), not next
+// to the data.
 //
-// ── Mô hình khoá ─────────────────────────────────────────────────────────────
+// Fallback (fails open): when no keychain is available (e.g. Linux without
+// Secret Service), the key is stored in `<app_data>/secrets.key` with mode
+// 0600. Anyone who can read the app data directory can then read the
+// secrets; it only protects a copied `secrets.enc`. Failing closed would
+// break 2FA and JWT tools on those machines. The active mode is reported by
+// `secret_vault_status` and shown in Settings.
 //
-// Nội dung nằm trong `<app_data>/secrets.enc`, mã hoá AES-256-GCM. Khoá 32 byte
-// KHÔNG nằm cạnh dữ liệu — nó ở keychain của hệ điều hành (Keychain trên macOS,
-// Credential Manager trên Windows, Secret Service trên Linux). Đó là điểm mấu
-// chốt: mã hoá mà cất khoá ngay cạnh file là nghi thức, không phải bảo vệ.
-//
-// ── Đường dự phòng, và vì sao nó FAIL-OPEN ───────────────────────────────────
-//
-// Không phải máy Linux nào cũng có Secret Service đang chạy (máy chủ không màn
-// hình, phiên không có gnome-keyring). Khi đó khoá rơi về `<app_data>/secrets.key`
-// với quyền 0600. Chọn như vậy là CÓ ĐÁNH ĐỔI, nói thẳng ra: ở chế độ này, ai
-// đọc được thư mục app data thì đọc được cả khoá lẫn dữ liệu — nó chỉ chặn được
-// việc chép nguyên file `secrets.enc` đi nơi khác, không chặn được kẻ tấn công
-// tại chỗ. Lựa chọn còn lại là fail-closed, tức 2FA và JWT ngừng hoạt động hoàn
-// toàn trên những máy đó; với một công cụ dev chạy cục bộ, im lặng làm hỏng
-// tính năng là cái giá cao hơn. Đổi lại, chế độ đang dùng KHÔNG được giấu:
-// `secret_vault_status` trả ra để Settings hiển thị.
-//
-// ── Không tự xoá khi không giải mã được ──────────────────────────────────────
-//
-// Nếu người dùng xoá mục trong keychain, blob trở thành không đọc được. Khi đó
-// các lệnh ở đây báo lỗi rõ ràng chứ TUYỆT ĐỐI không tự khởi tạo lại kho: âm
-// thầm vứt dữ liệu người dùng để "trở lại hoạt động" là hỏng tệ hơn nhiều so
-// với một thông báo lỗi. `secret_vault_reset` tồn tại cho trường hợp người dùng
-// chủ động chọn bỏ.
+// The vault is never re-initialized automatically when it cannot be
+// decrypted (e.g. the keychain entry was deleted); commands return an error
+// instead. `secret_vault_reset` discards it on explicit user request.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -50,14 +35,14 @@ const KEY_LEN: usize = 32;
 const NONCE_LEN: usize = 12;
 const FORMAT_VERSION: u32 = 1;
 
-/// Khoá đến từ đâu. Hiện cho người dùng thấy, vì hai chế độ có mức bảo vệ khác
-/// hẳn nhau và họ có quyền biết máy mình đang ở chế độ nào.
+/// Where the key comes from. Shown to the user because the two modes
+/// protect very differently.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum KeyMode {
-    /// Khoá trong keychain của OS — chế độ mong muốn.
+    /// Key stored in the OS keychain (preferred).
     Keychain,
-    /// Khoá trong file 0600 cạnh dữ liệu. Chỉ chặn việc chép file đi nơi khác.
+    /// Key stored in a 0600 file next to the data.
     File,
 }
 
@@ -65,8 +50,8 @@ pub enum KeyMode {
 pub struct VaultStatus {
     pub encrypted: bool,
     pub key_mode: KeyMode,
-    /// `false` khi có blob trên đĩa nhưng khoá hiện tại không mở được nó —
-    /// dấu hiệu keychain đã bị xoá hoặc đổi.
+    /// `false` when a vault exists but the current key cannot open it, which
+    /// usually means the keychain entry was deleted or replaced.
     pub readable: bool,
 }
 
@@ -80,17 +65,9 @@ struct VaultFile {
 #[derive(Default)]
 pub struct VaultState {
     key: Mutex<Option<([u8; KEY_LEN], KeyMode)>>,
-    // Khoá RIÊNG cho TOÀN BỘ một lệnh — cả bước phân giải khoá mã hoá
-    // (`key_for`, có thể TẠO MỚI khoá lúc chưa từng chạm vault) lẫn chu trình
-    // đọc-sửa-ghi `secrets.enc` sau đó — không chỉ phần đọc-sửa-ghi. Lấy khoá
-    // này TRƯỚC `key_for()` ở mọi lệnh: nếu chỉ bọc phần đọc-sửa-ghi (như bản
-    // đầu), hai lệnh ghi ĐẦU TIÊN gọi gần như đồng thời (vd `Promise.all` lưu
-    // nhiều mục 2FA lúc app mới cài) có thể mỗi lệnh tự phân giải MỘT khoá
-    // khác nhau (đường keychain có thể ghi thất bại nửa chừng) trước khi vào
-    // đoạn có khoá, để lại `secrets.enc` mã hoá bằng một khoá không khớp cache/
-    // keychain nữa — cùng loại lỗi mất-cập-nhật-thầm-lặng mà việc bọc riêng
-    // đọc-sửa-ghi định phòng, chỉ là ở bước SỚM hơn. Cùng cách
-    // `artifact_installer::InstalledIndex` đã làm cho `extensions/index.json`.
+    // Held for the whole command, including key resolution: two first-time
+    // writes racing could otherwise each create a different key and leave
+    // `secrets.enc` encrypted with a key that no longer matches.
     write_lock: Mutex<()>,
 }
 
@@ -108,8 +85,7 @@ fn app_data(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn write_key_file(path: &PathBuf, key: &[u8]) -> Result<(), String> {
     std::fs::write(path, BASE64.encode(key)).map_err(|e| e.to_string())?;
-    // Cùng cách xử lý như file token của mcp_bridge: trên unix siết về chủ sở
-    // hữu; ACL mặc định của Windows đã giới hạn theo user.
+    // Restrict to the owner on Unix; Windows' default ACL is per-user.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -123,9 +99,8 @@ fn decode_key(raw: &str) -> Option<[u8; KEY_LEN]> {
     <[u8; KEY_LEN]>::try_from(bytes.as_slice()).ok()
 }
 
-/// Lấy khoá, tạo mới nếu chưa có. Kết quả được nhớ trong state: trên macOS mỗi
-/// lần chạm Keychain là một lần gọi hệ thống có thể chậm, và kho bị đọc/ghi ở
-/// mọi thao tác của tool.
+/// Returns the key, creating it if needed. Cached in state because keychain
+/// access can be slow and the vault is used on every tool operation.
 fn key_for(app: &AppHandle, state: &VaultState) -> Result<([u8; KEY_LEN], KeyMode), String> {
     if let Some(cached) = *state.key.lock().map_err(|e| e.to_string())? {
         return Ok(cached);
@@ -143,9 +118,8 @@ fn load_or_create_key(app: &AppHandle) -> Result<([u8; KEY_LEN], KeyMode), Strin
                 if let Some(key) = decode_key(&existing) {
                     return Ok((key, KeyMode::Keychain));
                 }
-                // Mục trong keychain hỏng/không đúng độ dài: ghi đè bằng khoá
-                // mới sẽ vứt mất dữ liệu đang có, nên báo lỗi để người dùng
-                // quyết định (giữ nguyên hay reset).
+                // A malformed keychain entry is reported rather than overwritten,
+                // which would make existing data unreadable.
                 return Err(
                     "Mục khoá trong keychain không hợp lệ. Xoá mục \"devtool / secret-vault-key\" \
                      rồi mở lại app để tạo kho mới (dữ liệu bí mật cũ sẽ không đọc lại được)."
@@ -157,10 +131,10 @@ fn load_or_create_key(app: &AppHandle) -> Result<([u8; KEY_LEN], KeyMode), Strin
                 if entry.set_password(&BASE64.encode(&key)).is_ok() {
                     return Ok((<[u8; KEY_LEN]>::try_from(key.as_slice()).unwrap(), KeyMode::Keychain));
                 }
-                // Ghi vào keychain hỏng → rơi xuống đường file bên dưới.
+                // Keychain write failed; fall back to the key file.
             }
             Err(_) => {
-                // Không có Secret Service / bị khoá / bị từ chối → đường file.
+                // No Secret Service, locked, or denied; fall back to the key file.
             }
         }
     }
@@ -212,8 +186,8 @@ fn read_entries(app: &AppHandle, key: &[u8; KEY_LEN]) -> Result<Entries, String>
 }
 
 fn write_entries(app: &AppHandle, key: &[u8; KEY_LEN], entries: &Entries) -> Result<(), String> {
-    // Nonce MỚI cho mỗi lần ghi. Dùng lại nonce với cùng một khoá trong GCM là
-    // hỏng hoàn toàn về mặt mật mã, không chỉ là yếu đi.
+    // Fresh nonce on every write; reusing a nonce with the same key breaks
+    // GCM entirely.
     let nonce = random_bytes(NONCE_LEN)?;
     let plain = serde_json::to_vec(entries).map_err(|e| e.to_string())?;
     let ciphertext = cipher(key)?
@@ -226,11 +200,8 @@ fn write_entries(app: &AppHandle, key: &[u8; KEY_LEN], entries: &Entries) -> Res
         ciphertext: BASE64.encode(&ciphertext),
     };
     let path = app_data(app)?.join(VAULT_FILE);
-    // Atomic (tmp + rename), cùng khuôn `artifact_installer.rs`'s `write_index`
-    // đã dùng: `write_lock` chỉ chặn hai LỆNH ghi chồng lên nhau, không chặn
-    // được một crash/mất điện giữa lúc `std::fs::write` đang chạy — trước đây
-    // ghi thẳng vào `secrets.enc`, một lần dở dang để lại blob nửa vời mà
-    // `read_entries` chỉ có thể báo "Kho bí mật hỏng", không khôi phục được.
+    // Atomic write (temp file, then rename) so a crash cannot leave a
+    // truncated vault.
     let tmp_path = app_data(app)?.join(format!("{VAULT_FILE}.tmp"));
     std::fs::write(&tmp_path, serde_json::to_string(&file).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
@@ -289,7 +260,7 @@ pub fn secret_vault_keys(app: AppHandle, state: tauri::State<'_, VaultState>) ->
     Ok(read_entries(&app, &k)?.into_keys().collect())
 }
 
-/// Xoá toàn bộ nội dung, GIỮ nguyên khoá. Dùng bởi nhánh DEV của frontend.
+/// Clears all entries but keeps the key. Used by the frontend's dev mode.
 #[tauri::command]
 pub fn secret_vault_clear(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<(), String> {
     let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
@@ -297,8 +268,8 @@ pub fn secret_vault_clear(app: AppHandle, state: tauri::State<'_, VaultState>) -
     write_entries(&app, &k, &Entries::new())
 }
 
-/// Bỏ cả kho lẫn khoá và bắt đầu lại. Chỉ dành cho trường hợp kho không còn
-/// giải mã được và người dùng CHỦ ĐỘNG chấp nhận mất dữ liệu cũ.
+/// Deletes the vault and its key. Only for when the vault can no longer be
+/// decrypted and the user accepts losing its contents.
 #[tauri::command]
 pub fn secret_vault_reset(app: AppHandle, state: tauri::State<'_, VaultState>) -> Result<(), String> {
     let _guard = state.write_lock.lock().map_err(|e| e.to_string())?;
@@ -331,8 +302,8 @@ mod tests {
         <[u8; KEY_LEN]>::try_from(random_bytes(KEY_LEN).unwrap().as_slice()).unwrap()
     }
 
-    /// Bản rút gọn của cặp write/read, không cần AppHandle — đủ để kiểm phần
-    /// mật mã, là phần duy nhất ở đây có thể sai một cách âm thầm.
+    /// Encrypts entries the same way `write_entries` does, without an
+    /// `AppHandle`.
     fn seal(k: &[u8; KEY_LEN], entries: &Entries) -> VaultFile {
         let nonce = random_bytes(NONCE_LEN).unwrap();
         let ciphertext = cipher(k)
@@ -373,8 +344,8 @@ mod tests {
         entries.insert("2fa/accounts".into(), "JBSWY3DPEHPK3PXP".into());
 
         let file = seal(&k, &entries);
-        // Cả giá trị lẫn TÊN khoá đều phải biến mất: tên khoá tiết lộ người dùng
-        // có bí mật của plugin nào.
+        // Key names must not leak either: they reveal which plugins hold
+        // secrets.
         assert!(!file.ciphertext.contains("JBSWY3DPEHPK3PXP"));
         assert!(!file.ciphertext.contains("2fa"));
     }
@@ -389,8 +360,7 @@ mod tests {
 
     #[test]
     fn moi_lan_ghi_dung_mot_nonce_khac() {
-        // Dùng lại nonce với cùng khoá trong GCM là hỏng hoàn toàn về mặt mật
-        // mã, nên đây là bất biến đáng khoá bằng test.
+        // Nonce reuse with the same key breaks GCM, so guard it with a test.
         let k = key();
         let entries = Entries::new();
         let a = seal(&k, &entries);
@@ -401,8 +371,7 @@ mod tests {
 
     #[test]
     fn ban_ma_bi_sua_thi_bi_tu_choi() {
-        // GCM có xác thực: sửa một byte phải làm hỏng cả lần giải mã, chứ không
-        // trả ra bản rõ méo mó.
+        // GCM is authenticated: a modified byte must fail decryption.
         let k = key();
         let mut entries = Entries::new();
         entries.insert("a".into(), "b".into());

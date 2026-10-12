@@ -1,45 +1,32 @@
-// Host cho plugin dịch vụ (tier B) — chạy sidecar như TIẾN TRÌNH RIÊNG.
+// Host for tier-B service plugins: each sidecar runs as its own process.
 //
-// Vì sao không thêm lệnh vào `main.rs` cho mỗi plugin cần native:
-// `tauri::generate_handler!` là macro lúc biên dịch, không đăng ký lệnh lúc
-// chạy được. Và `panic = "abort"` trong profile release nghĩa là một panic
-// trong code dịch vụ sẽ giết cả app, kéo theo mọi consumer Kafka và tab API
-// Client đang mở của người dùng. Tiến trình riêng thì chỉ dịch vụ đó chết, lần
-// gọi sau tự spawn lại.
+// Why a separate process instead of more Tauri commands: commands are
+// registered at compile time by `generate_handler!`, and the release profile
+// uses `panic = "abort"`, so a panic in service code would take down the whole
+// app. A crashed sidecar only loses itself and is respawned on the next call.
 //
-// Giao thức: JSON theo dòng (JSONL) qua stdin/stdout. Mỗi dòng ra mang một
-// `id` khớp với dòng vào đã sinh ra nó. Có HAI kiểu lời gọi:
-//   - MỘT-LẦN (`service_call`): sidecar trả đúng một dòng cho mỗi request.
-//   - STREAM (`service_stream_start`/`_stop`): sidecar trả NHIỀU dòng cho
-//     CÙNG một `id` (Pub/Sub, tail log…), cho tới khi tự gửi `done: true` hoặc
-//     bị `service_stream_stop` yêu cầu ngừng route (sidecar không nhất thiết
-//     biết việc dừng đó — dọn tài nguyên phía sidecar, nếu cần, là việc của
-//     phương thức riêng sidecar tự định nghĩa, host không áp đặt).
+// Protocol: JSON lines over stdin/stdout. Every response line carries the `id`
+// of the request it answers. Two call styles:
+//   - one-shot (`service_call`): exactly one response line per request;
+//   - stream (`service_stream_start`/`_stop`): many lines with the same `id`
+//     until the sidecar sends `done: true` or the host stops routing them.
 //
-// Một READER TASK riêng cho mỗi sidecar đọc liên tục và DEMUX theo `id` — đây
-// là điểm khác biệt lớn nhất so với bản v1 (một mutex khoá trọn một vòng
-// request/response): nó cho phép nhiều lời gọi đồng thời tới CÙNG một sidecar
-// (một one-shot không phải đợi một stream đang chạy nhường chỗ), và biến lớp
-// "phản hồi đến muộn bị đọc nhầm thành phản hồi của lời gọi kế tiếp" — vốn là
-// rủi ro cố hữu của mô hình v1 — thành vô hại: một phản hồi tới khi waiter của
-// nó đã bị dọn (do timeout) chỉ đơn giản không khớp `id` nào và bị bỏ qua.
+// One reader task per sidecar demultiplexes responses by `id`, so concurrent
+// calls to one sidecar do not block each other and a late response after a
+// timeout matches no waiter and is dropped.
 //
-// HỢP ĐỒNG mà một sidecar phải giữ:
-//   1. đọc từng dòng stdin, trả về ít nhất một dòng JSON mang đúng `id` đó
-//      (một dòng cho lời gọi thường; nhiều dòng, kết bằng `done: true`, cho
-//      một lời gọi mà chính sidecar coi là stream);
-//   2. THOÁT khi stdin đóng (EOF) — đây là cách tiến trình con được dọn khi app
-//      tắt, kể cả lúc app bị kill và không kịp chạy hàm dọn nào;
-//   3. không bao giờ ghi gì khác lên stdout (log thì ghi stderr).
+// Sidecar contract:
+//   1. answer every stdin line with at least one JSON line carrying its `id`;
+//   2. exit when stdin closes (this is how sidecars are cleaned up even if the
+//      app is killed);
+//   3. write nothing else to stdout (logs go to stderr).
 //
-// Ranh giới tin cậy: frontend nêu tên binary, nhưng quyền chạy KHÔNG do
-// frontend hay manifest quyết định (manifest do webview đọc — thứ ta đang muốn
-// giới hạn). Có hai nguồn quyền, cả hai sống ở Rust:
-//   - `ALLOWED_SERVICES` dưới đây: các sidecar của chính DevTool, quyết định lúc
-//     build, chạy không hỏi;
-//   - sự đồng ý của người dùng qua hộp thoại native (`service_trust.rs`): với
-//     mọi sidecar khác, lần đầu chạy app hiện đường dẫn + SHA-256 và hỏi. Nhờ
-//     vậy thêm một plugin kèm sidecar không đòi phát hành lại app.
+// Trust boundary: the webview names the binary, but permission to run it is
+// decided in Rust:
+//   - `ALLOWED_SERVICES`: DevTool's own sidecars, fixed at build time, run
+//     without asking;
+//   - any other valid name requires the user's consent through a native
+//     dialog showing the path and SHA-256 (`service_trust.rs`).
 
 use std::collections::HashMap;
 use std::process::Stdio;
@@ -54,50 +41,31 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::{oneshot, Mutex as AsyncMutex};
 use tokio::time::timeout;
 
-/// Phiên bản khung tin nhắn. Phải khớp `SERVICE_PROTOCOL` ở
-/// src/platform/service.ts — lệch thì cả hai phía từ chối tử tế thay vì diễn
-/// giải sai payload của nhau.
+/// Message framing version. Must match `SERVICE_PROTOCOL` in
+/// src/platform/service.ts.
 pub const SERVICE_PROTOCOL: u32 = 1;
 
-// Trùng giá trị với `mcp_bridge.rs`'s `CALL_TIMEOUT` (và với 30s, một phần của
-// phép tính 35s ở `devtool-mcp-server.rs`) một cách có chủ đích, không phải
-// hằng số dùng chung — mỗi module timeout một loại chờ khác nhau (gọi service
-// sidecar ở đây, chờ webview trả lời ở mcp_bridge.rs), tình cờ cùng độ dài.
-// Đổi một chỗ không cần kéo theo chỗ kia, nhưng nếu định nghĩa lại "độ dài
-// timeout hợp lý cho một lời gọi qua IPC cục bộ" thì nên soát cả ba.
+// Same value as `mcp_bridge.rs`'s `CALL_TIMEOUT` by coincidence; they time
+// out different things and can change independently.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Sidecar của chính DevTool, chạy KHÔNG hỏi — một trong hai nguồn quyền, cả hai ở
-/// Rust chứ không ở manifest (webview đọc được manifest, không đọc được hằng số
-/// này). Nguồn thứ hai là sự đồng ý của người dùng cho mọi tên khác, xem
-/// `service_trust.rs`; thêm plugin mới KHÔNG cần sửa danh sách này.
-/// KHÔNG phải mọi mục ở đây được ĐÓNG GÓI SẴN — xem `BUNDLED_SERVICES` dưới,
-/// tách riêng đúng vì lý do đó.
+/// DevTool's own sidecars, which run without a consent prompt. Any other
+/// name needs user consent (see `service_trust.rs`); adding a plugin does not
+/// require editing this list. Not every entry is bundled (see
+/// `BUNDLED_SERVICES`).
 ///
-/// `devtool-svc-echo` là plugin ví dụ tối giản (`ping`/`echo`/`tick-stream`,
-/// không có giá trị người dùng) — nó tồn tại thuần để chứng minh đường
-/// end-to-end thật của tier B, cả một-lần lẫn stream, trước khi có plugin thật
-/// cần tới cơ chế này, xem `tests/service_echo.rs`. Chưa có `plugin.ts` nào
-/// khai `service` để gọi tới nó, nên nó không xuất hiện ở bất cứ đâu trong UI.
+/// `devtool-svc-echo` is a minimal example sidecar used by
+/// `tests/service_echo.rs` to exercise one-shot and stream calls end to end.
 ///
-/// `devtool-svc-redis`/`-container`/`-rabbit`/`-kafka`: nguồn đã chuyển sang
-/// repo `developer-desktop-miniapp` (không phải ai cũng cần Redis/Docker/
-/// RabbitMQ/Kafka) — xem docs/decisions/architecture/optional-broker-plugins.md.
-/// Tên vẫn ở lại đây có chủ đích: người dùng của các plugin này đã quen việc
-/// chúng chạy không hỏi, và bỏ tên khỏi danh sách sẽ khiến họ bị hỏi đồng ý ở lần
-/// chạy kế tiếp sau khi nâng cấp app.
+/// The redis/container/rabbit/kafka sidecars now ship from the
+/// `developer-desktop-miniapp` repo (see
+/// docs/decisions/architecture/optional-broker-plugins.md). Their names stay
+/// here so existing users are not prompted for consent after upgrading.
 const ALLOWED_SERVICES: &[&str] = &["devtool-svc-echo", "devtool-svc-redis", "devtool-svc-container", "devtool-svc-rabbit", "devtool-svc-kafka"];
 
-/// Tập con của `ALLOWED_SERVICES` được đóng gói SẴN cùng app (có dòng tương
-/// ứng trong `bundle.externalBin` của tauri.conf.json và trong danh sách của
-/// `scripts/prepare-service-sidecars.mjs` — hai chỗ khai tay song song vì
-/// Rust và Node không chia sẻ được hằng số qua ranh giới ngôn ngữ).
-///
-/// Một mục nằm trong `ALLOWED_SERVICES` nhưng KHÔNG ở đây là sidecar chỉ cài
-/// được qua URL (Settings → Extensions, `kind: "service"`) — người dùng
-/// không cần nó thì không tải bytes của nó về máy. `allowlist_khop_voi_external_bin`
-/// dưới đây chỉ khoá phần TẬP CON này khớp `bundle.externalBin`, không khoá
-/// toàn bộ `ALLOWED_SERVICES` như trước.
+/// The subset of `ALLOWED_SERVICES` shipped with the app. Must match
+/// `bundle.externalBin` in tauri.conf.json and
+/// `scripts/prepare-service-sidecars.mjs`. The rest are installed by URL.
 #[cfg(test)]
 const BUNDLED_SERVICES: &[&str] = &["devtool-svc-echo"];
 
@@ -116,9 +84,8 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-// `Deserialize` cũng cần, không chỉ `Serialize`: host PHÂN TÍCH phản hồi của
-// sidecar thành đúng kiểu này trước khi chuyển tiếp cho webview — một sidecar
-// trả JSON lệch hình dạng phải bị chặn ở đây, không phải lọt lên frontend.
+// Responses are parsed into this type before being forwarded, so a sidecar
+// returning malformed JSON is rejected here rather than in the webview.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServiceResponse {
     pub protocol: u32,
@@ -127,14 +94,12 @@ pub struct ServiceResponse {
     pub result: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    /// Dòng này là MỘT TRONG NHIỀU sự kiện của một stream, không phải phản hồi
-    /// một-lần. Vắng mặt (hay `false`) tương thích ngược với mọi sidecar không
-    /// biết gì về trường này (chúng chỉ bao giờ trả một-lần).
+    /// One event of a stream rather than a one-shot response. Defaults to
+    /// false, so sidecars unaware of streams stay compatible.
     #[serde(default, skip_serializing_if = "is_false")]
     pub stream: bool,
-    /// Dòng CUỐI của một stream — sau dòng này sidecar sẽ không gửi thêm sự
-    /// kiện nào cho đúng `id` này nữa. Chỉ có nghĩa khi đi kèm một lời gọi
-    /// stream; host bỏ qua nó với lời gọi một-lần.
+    /// Last line of a stream; no more events follow for this `id`.
+    /// Ignored for one-shot calls.
     #[serde(default, skip_serializing_if = "is_false")]
     pub done: bool,
 }
@@ -152,8 +117,8 @@ impl ServiceResponse {
     }
 }
 
-/// Tên hợp lệ cho một sidecar NGOÀI `ALLOWED_SERVICES`: `devtool-svc-` + kebab-case,
-/// không có dấu phân cách đường dẫn hay thứ gì khác có thể thoát khỏi thư mục dịch vụ.
+/// Valid name for a sidecar outside `ALLOWED_SERVICES`: `devtool-svc-` plus
+/// kebab-case, with nothing that could escape the services directory.
 pub fn is_valid_service_name(bin: &str) -> bool {
     const PREFIX: &str = "devtool-svc-";
     let Some(rest) = bin.strip_prefix(PREFIX) else { return false };
@@ -165,12 +130,9 @@ pub fn is_valid_service_name(bin: &str) -> bool {
         && rest.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-/// Lý do một request bị từ chối TRƯỚC khi chạm tới tiến trình con. Tách khỏi
-/// phần I/O để kiểm thử được mà không cần spawn gì cả.
-///
-/// Chỉ lọc những gì có thể quyết định mà KHÔNG cần hỏi ai: sai protocol, hoặc
-/// một cái tên không thể là sidecar. Một tên hợp lệ ngoài `ALLOWED_SERVICES`
-/// KHÔNG bị từ chối ở đây — `ensure_trusted` hỏi người dùng khi sắp spawn.
+/// Why a request is rejected before reaching any process: protocol mismatch,
+/// or a name that cannot be a sidecar. Valid names outside
+/// `ALLOWED_SERVICES` pass here; `ensure_trusted` asks the user before spawn.
 pub fn reject_reason(request: &ServiceRequest) -> Option<String> {
     if request.protocol != SERVICE_PROTOCOL {
         return Some(format!(
@@ -188,19 +150,16 @@ pub fn reject_reason(request: &ServiceRequest) -> Option<String> {
     None
 }
 
-/// Nơi một dòng phản hồi (khớp `id`) được chuyển tới. `Once` giải quyết đúng
-/// một lần rồi bị gỡ; `Stream` sống tới khi gặp `done: true`, gặp `error`,
-/// hoặc bị `service_stream_stop` gỡ tay.
+/// Where a response with a matching `id` goes. `Once` resolves a single
+/// time; `Stream` lives until `done`, an `error`, or `service_stream_stop`.
 enum Waiter {
     Once(oneshot::Sender<ServiceResponse>),
     Stream(Box<dyn EventSink>),
 }
 
-/// Trừu tượng hoá "gửi một sự kiện ra ngoài" — tách khỏi `tauri::ipc::Channel`
-/// cụ thể để TEST ĐƯỢC bằng một tiến trình thật (`sh`) và một sink thu thập
-/// vào bộ nhớ, không cần dựng một `Channel` thật (chỉ construct được thông qua
-/// một lời gọi Tauri command thật đang chạy trong app — xem lý do tương tự ở
-/// `artifact_installer.rs` về việc không dựng `AppHandle` giả trong test).
+/// Destination for stream events. Abstracted from `tauri::ipc::Channel`,
+/// which can only be created inside a running app, so tests can collect
+/// events in memory.
 trait EventSink: Send {
     fn send(&self, value: serde_json::Value);
 }
@@ -227,11 +186,8 @@ pub struct ServiceRegistry {
     pub trust: Arc<crate::service_trust::ServiceTrust>,
 }
 
-/// Phần "tìm cạnh file thực thi" của `sidecar_path` — hành vi gốc, giữ
-/// NGUYÊN, chỉ tách `dir` ra làm tham số để test được (`current_exe()` trong
-/// một `cargo test` binary trỏ tới chính binary test, không phải nơi ta muốn
-/// kiểm). Vẫn là fallback SAU CÙNG khi không có bản tải-về nào — xem
-/// `sidecar_path` bên dưới.
+/// Looks for the sidecar next to the executable. `dir` is a parameter so
+/// tests do not depend on `current_exe()`.
 fn resolve_beside_dir(dir: &std::path::Path, bin: &str) -> Result<std::path::PathBuf, String> {
     let name = if cfg!(windows) { format!("{bin}.exe") } else { bin.to_string() };
     let path = dir.join(name);
@@ -246,17 +202,10 @@ fn resolve_beside_dir(dir: &std::path::Path, bin: &str) -> Result<std::path::Pat
     Ok(path)
 }
 
-/// Hợp cả hai nguồn, THUẦN (không đụng `AppHandle`/`current_exe()`) — dùng bởi
-/// cả `sidecar_path` thật (dưới đây) lẫn test của module này, không cần dựng
-/// một AppHandle giả (không thể — xem `artifact_installer.rs` đầu file đó về
-/// lý do).
-///
-/// **Thứ tự CỐ Ý, không được đảo ngược** (xem "Quyết định quan trọng nhất" ở
-/// `docs/plans/native-sidecar-install.md`): tải-về qua `extensions/index.json`
-/// (nếu có bản ghi VÀ file còn tồn tại trên đĩa) LUÔN được ưu tiên trước bản
-/// đóng gói sẵn cạnh exe. Điều này phục vụ trực tiếp mục tiêu đã chốt: một khi
-/// `bundle.externalBin` không còn liệt kê một bin nào đó, fallback tự nhiên
-/// biến mất — không cần sửa hàm này lần nữa.
+/// Resolves the binary to spawn for `bin`. A URL-installed copy recorded in
+/// `extensions/index.json` (whose file still exists) always wins over the
+/// copy bundled next to the executable. Do not reverse this order: it lets a
+/// sidecar be dropped from `bundle.externalBin` without changing this code.
 fn resolve_sidecar_path(
     index_dir: Option<&std::path::Path>,
     beside_dir: &std::path::Path,
@@ -270,16 +219,9 @@ fn resolve_sidecar_path(
     resolve_beside_dir(beside_dir, bin)
 }
 
-/// **HÀM BIÊN GIỚI TIN CẬY** — quyết định binary NÀO thực sự bị spawn cho một
-/// tên `bin` đã qua `ALLOWED_SERVICES`. Đọc phần `kind=service` của
-/// `extensions/index.json` (nhánh service của `artifact_installer.rs`, xem
-/// module đó) TRƯỚC; chỉ khi không có bản ghi hợp lệ (không có bản ghi, hoặc
-/// có bản ghi nhưng file đã mất khỏi đĩa — đĩa hỏng/xoá thủ công) mới rơi
-/// xuống hành vi CŨ (tìm cạnh `current_exe()`, đúng quy ước với
-/// `mcp_bridge::mcp_sidecar_path`, nên không cần thêm tauri-plugin-shell hay
-/// mở quyền chạy tiến trình ở tầng capability).
-/// Hai nơi một sidecar có thể nằm: index của bản tải-về (nếu đọc được) và thư
-/// mục cạnh file thực thi. Dùng chung cho `sidecar_path` và `ensure_trusted`.
+/// The two places a sidecar can live: the install index (if readable) and
+/// the directory of the executable. A failure to open the index is ignored
+/// so the bundled fallback still works.
 fn sidecar_dirs(app: &AppHandle) -> Result<(Option<std::path::PathBuf>, std::path::PathBuf), String> {
     let index_dir = crate::artifact_installer::extensions_dir(app).ok();
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -291,24 +233,18 @@ fn sidecar_dirs(app: &AppHandle) -> Result<(Option<std::path::PathBuf>, std::pat
 }
 
 fn sidecar_path(app: &AppHandle, bin: &str) -> Result<std::path::PathBuf, String> {
-    // `extensions_dir` tự tạo thư mục nếu chưa có — lỗi ở đây (app_data
-    // không đọc được) không nên chặn hẳn fallback cạnh-exe, nên `sidecar_dirs`
-    // chỉ bỏ qua (`.ok()`) thay vì `?`.
+    // Trust boundary: decides which binary is actually spawned for `bin`.
     let (index_dir, beside_dir) = sidecar_dirs(app)?;
     resolve_sidecar_path(index_dir.as_deref(), &beside_dir, bin)
 }
 
-/// Demux MỘT dòng đã phân tích vào đúng waiter của nó. Hàm THUẦN (không có gì
-/// async) — dễ kiểm bằng cách gọi trực tiếp, không cần spawn tiến trình nào.
+/// Routes one parsed response to its waiter.
 fn dispatch(waiters: &Waiters, response: ServiceResponse) {
     let mut w = waiters.lock().unwrap();
-    // Gỡ trước rồi mới quyết định có chèn lại không — giữ cả borrow đọc lẫn
-    // ghi cùng lúc trên cùng một entry sẽ không qua được borrow checker.
+    // Remove first and reinsert for streams; the borrow checker does not
+    // allow holding the entry across both.
     let Some(waiter) = w.remove(&response.id) else {
-        // Không ai còn chờ id này — đã timeout, hoặc rác. Bỏ qua có chủ ý:
-        // đây chính là điều làm một phản hồi tới muộn trở nên VÔ HẠI, khác
-        // hẳn bản v1 (một mutex khoá cả sidecar, phản hồi muộn ghép nhầm vào
-        // lời gọi kế tiếp).
+        // Nobody waits for this id (timed out, or garbage); drop it.
         return;
     };
     match waiter {
@@ -317,8 +253,7 @@ fn dispatch(waiters: &Waiters, response: ServiceResponse) {
         }
         Waiter::Stream(sink) => {
             if response.error.is_some() || response.done {
-                // Lỗi giữa chừng cũng coi như kết thúc — không lặng lẽ tiếp
-                // tục route rác cho một stream đã báo hỏng.
+                // An error ends the stream.
                 return;
             }
             sink.send(response.result.unwrap_or(serde_json::Value::Null));
@@ -327,12 +262,9 @@ fn dispatch(waiters: &Waiters, response: ServiceResponse) {
     }
 }
 
-/// Vòng đọc của một sidecar — chạy suốt vòng đời tiến trình con, một task cho
-/// mỗi sidecar. Kết thúc khi stdout đóng (tiến trình chết) hoặc sidecar nói
-/// sai giao thức (từ đó ống dẫn không còn tin được nữa — không có cách nào
-/// biết ranh giới dòng kế tiếp thật sự bắt đầu ở đâu). `on_ended` chạy đúng
-/// một lần khi vòng đọc dừng, để lớp gọi tự quyết định dọn gì tiếp (production:
-/// gỡ khỏi registry để lần sau spawn lại).
+/// Reads one sidecar's stdout for the life of the process. Stops when stdout
+/// closes or a line is not valid protocol JSON (after which line boundaries
+/// cannot be trusted). `on_ended` runs once when the loop stops.
 async fn reader_loop(
     mut lines: Lines<BufReader<ChildStdout>>,
     waiters: Waiters,
@@ -347,9 +279,8 @@ async fn reader_loop(
             _ => break,
         }
     }
-    // Mọi one-shot còn treo phải được giải quyết — nếu không, lời gọi phía
-    // trên đợi timeout thay vì biết ngay sidecar đã thoát. Stream thì lặng lẽ
-    // kết thúc: channel/sink không còn ai gửi thêm là tín hiệu đủ rõ.
+    // Fail pending one-shot calls now instead of letting them time out.
+    // Streams simply stop receiving events.
     let mut w = waiters.lock().unwrap();
     for (_, waiter) in w.drain() {
         if let Waiter::Once(tx) = waiter {
@@ -360,9 +291,8 @@ async fn reader_loop(
     on_ended();
 }
 
-/// Spawn một tiến trình VÀ vòng đọc của nó. Nhận thẳng `Command` (không phải
-/// tên bin) để test lái được bằng tiến trình sẵn có của OS (`cat`, `sh`) thay
-/// vì ship thêm một binary giả.
+/// Spawns a process and its reader loop. Takes a `Command` so tests can use
+/// `cat` or `sh` instead of a real sidecar.
 fn spawn_process(
     command: &mut Command,
     on_ended: impl FnOnce() + Send + 'static,
@@ -371,10 +301,9 @@ fn spawn_process(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
-        // Tiến trình con chết theo app kể cả khi không chạy được hàm dọn nào.
-        // Vẫn giữ luật "thoát khi stdin EOF" trong hợp đồng: kill_on_drop chỉ
-        // có tác dụng khi registry thật sự bị drop, điều không chắc xảy ra lúc
-        // tiến trình cha bị kill.
+        // Belt and braces: kill the child when the handle drops. The
+        // stdin-EOF rule still matters because a killed parent may never
+        // drop the registry.
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| e.to_string())?;
@@ -392,29 +321,14 @@ fn spawn_process(
     }))
 }
 
-/// Thư mục dữ liệu bền của MỘT sidecar — `<app_data>/service-data/<bin>`. Hàm
-/// THUẦN (chỉ ghép đường dẫn, không chạm đĩa) để test được không cần
-/// `AppHandle`; `get_or_spawn` là nơi thật sự `create_dir_all` nó.
-///
-/// Cách ly bằng cấu trúc thư mục, không phải bằng quy ước đặt tên file: một
-/// sidecar chỉ NHÌN THẤY thư mục của chính nó qua biến môi trường
-/// `DEVTOOL_SERVICE_DATA_DIR` — nó không có cách nào biết (nói gì tới đọc/ghi)
-/// thư mục app_data gốc hay thư mục của sidecar khác, kể cả nếu code của nó có
-/// lỗi hay cố tình đoán đường dẫn. Khác hẳn quy ước cũ của các
-/// `#[tauri::command]` biên dịch sẵn (`kafka-brokers.json`,
-/// `rabbit-connections.json`, `container-connections.json`, `redis_tool.rs`'s
-/// `redis-connections.json`) — các file đó vẫn nằm phẳng ngay dưới app_data
-/// gốc, chỉ "cách ly" bằng việc mỗi module tự giác chỉ đụng đúng tên file của
-/// mình, không có gì ở tầng hệ thống ngăn một lỗi gõ nhầm tên đọc/ghi nhầm file
-/// của tool khác. Sidecar mới port sang (bắt đầu từ Redis) sửa đúng khoảng
-/// trống này; các Tier A còn lại tự động được sửa khi tới lượt chúng port sang
-/// Tier B ở các bước sau của Phase 2 (xem docs/decisions/architecture/optional-broker-plugins.md).
+/// Private data directory for one sidecar: `<app_data>/service-data/<bin>`.
+/// The sidecar only learns this path through `DEVTOOL_SERVICE_DATA_DIR`, so
+/// it never sees the app data root or another sidecar's directory.
 fn service_data_dir(app_data_dir: &std::path::Path, bin: &str) -> std::path::PathBuf {
     app_data_dir.join("service-data").join(bin)
 }
 
-/// Hộp thoại native hỏi người dùng. Trả lời đi qua `oneshot`, nên không chặn luồng
-/// nào trong lúc chờ. Webview không có đường nào để trả lời thay.
+/// Shows the native consent dialog. The webview has no way to answer it.
 async fn ask_user(app: &AppHandle, dialog: crate::service_trust::ConsentDialog) -> bool {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
     let (tx, rx) = oneshot::channel();
@@ -429,8 +343,8 @@ async fn ask_user(app: &AppHandle, dialog: crate::service_trust::ConsentDialog) 
     rx.await.unwrap_or(false)
 }
 
-/// Ngôn ngữ người dùng đã chọn trong app, cho hộp thoại xin phép — đọc từ
-/// `app-settings.json` trong `app_data` (cùng khoá `LocaleContext.tsx` ghi).
+/// UI language for the consent dialog, read from `app-settings.json` (the
+/// key `LocaleContext.tsx` writes).
 fn ui_locale_at(app_data: Option<&std::path::Path>) -> crate::service_trust::Locale {
     app_data
         .and_then(|d| std::fs::read_to_string(d.join("app-settings.json")).ok())
@@ -438,9 +352,8 @@ fn ui_locale_at(app_data: Option<&std::path::Path>) -> crate::service_trust::Loc
         .unwrap_or(crate::service_trust::Locale::En)
 }
 
-/// Phần QUYẾT ĐỊNH của `ensure_trusted`, không cần `AppHandle`: mọi thứ lấy từ
-/// app (thư mục, home) và cách hỏi người dùng đều là tham số, nên test được trọn
-/// đường đi — sidecar có sẵn, hỏi đúng một lần, từ chối, thiếu file, ngôn ngữ.
+/// Decision logic of `ensure_trusted` with every app dependency passed in,
+/// so the whole flow is testable.
 async fn ensure_trusted_with<F, Fut>(
     trust: &crate::service_trust::ServiceTrust,
     bin: &str,
@@ -467,8 +380,8 @@ where
     trust.ensure(bin, &sha256, || ask(dialog)).await
 }
 
-/// Sidecar của DevTool chạy không hỏi; mọi sidecar khác cần người dùng đồng ý
-/// cho ĐÚNG file sắp chạy (mã băm lúc này, không phải lúc cài).
+/// DevTool's own sidecars run without asking; any other sidecar needs consent
+/// for the exact file about to run (hashed now, not at install time).
 async fn ensure_trusted(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<(), String> {
     let (index_dir, beside_dir) = sidecar_dirs(app)?;
     let app_data = app.path().app_data_dir().ok();
@@ -486,8 +399,8 @@ async fn ensure_trusted(app: &AppHandle, registry: &ServiceRegistry, bin: &str) 
 }
 
 async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<Arc<RunningSidecar>, String> {
-    // Đường nhanh: đang chạy rồi thì khỏi hỏi lại và KHÔNG giữ khoá trong lúc
-    // một hộp thoại có thể mở hàng phút — các sidecar khác vẫn phải gọi được.
+    // Fast path. Do not hold the registry lock while a consent dialog may be
+    // open; other sidecars must stay callable.
     if let Some(running) = registry.running.lock().await.get(bin) {
         return Ok(running.clone());
     }
@@ -499,10 +412,8 @@ async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) ->
     }
 
     let mut command = Command::new(sidecar_path(app, bin)?);
-    // Sidecar không có `AppHandle` — nó không phải một plugin JS chạy trong
-    // webview, nên không đi qua `sdk.storage`/`app.path()`. Một sidecar cần
-    // lưu gì đó bền (cấu hình kết nối, ví dụ) đọc thư mục NÀY, chỉ của riêng
-    // nó, qua biến môi trường — không phải toàn bộ app_data_dir.
+    // Sidecars have no `AppHandle`, so persistent data goes in their own
+    // directory passed through the environment.
     if let Ok(app_data) = app.path().app_data_dir() {
         let dir = service_data_dir(&app_data, bin);
         if std::fs::create_dir_all(&dir).is_ok() {
@@ -512,12 +423,9 @@ async fn get_or_spawn(app: &AppHandle, registry: &ServiceRegistry, bin: &str) ->
     let cleanup_registry = registry.clone();
     let cleanup_bin = bin.to_string();
     let running = spawn_process(&mut command, move || {
-        // Dọn KHÔNG ĐỒNG BỘ với việc vòng đọc kết thúc: `on_ended` phải là một
-        // closure THƯỜNG (reader_loop không muốn phụ thuộc kiểu future cụ thể
-        // nào), nên việc gỡ khỏi map — vốn cần `.await` để khoá — được giao
-        // cho một task riêng. Trong lúc đó, một lời gọi mới TỚI ĐÚNG sidecar
-        // này vẫn dùng được `Arc` cũ cho tới khi nó bị gỡ (ghi xuống stdin đã
-        // đóng sẽ tự báo lỗi cho người gọi đó — tự sửa, không cần đồng bộ chặt).
+        // `on_ended` is a plain closure, so removal (which needs the async
+        // lock) runs in its own task. A call that races it writes to a
+        // closed stdin and gets an error.
         tokio::spawn(async move {
             cleanup_registry.running.lock().await.remove(&cleanup_bin);
         });
@@ -549,9 +457,8 @@ fn encode(request: &ServiceRequest) -> Result<String, String> {
     .map_err(|e| e.to_string())
 }
 
-/// Một vòng request/response MỘT-LẦN thật sự (dùng bởi cả `service_call` và
-/// các test dưới): đăng ký waiter TRƯỚC khi ghi dòng ra — đăng ký sau khi ghi
-/// sẽ để lọt một khoảng hở lý thuyết nơi phản hồi tới trước khi có ai chờ nó.
+/// One-shot request/response. The waiter is registered before writing so a
+/// fast response cannot arrive before anyone is waiting.
 async fn call_once(running: &RunningSidecar, request: &ServiceRequest, limit: Duration) -> ServiceResponse {
     let line = match encode(request) {
         Ok(l) => l,
@@ -570,11 +477,8 @@ async fn call_once(running: &RunningSidecar, request: &ServiceRequest, limit: Du
         Ok(Ok(response)) => response,
         Ok(Err(_)) => ServiceResponse::err(&request.id, "Sidecar đã thoát trước khi trả lời"),
         Err(_) => {
-            // KHÔNG giết sidecar ở đây, khác bản v1: với việc route theo `id`,
-            // một phản hồi tới muộn cho ĐÚNG lời gọi này giờ vô hại — nó chỉ
-            // không tìm thấy waiter (đã gỡ ngay dưới) và bị bỏ qua. Lời gọi
-            // khác, đồng thời, tới cùng sidecar không phải trả giá cho một
-            // lời gọi chậm.
+            // The sidecar is not killed: a late response for this id finds no
+            // waiter and is dropped, and other calls are unaffected.
             running.waiters.lock().unwrap().remove(&request.id);
             ServiceResponse::err(&request.id, format!("Sidecar không trả lời trong {}s", limit.as_secs()))
         }
@@ -597,11 +501,9 @@ pub async fn service_call(
     Ok(call_once(&running, &request, CALL_TIMEOUT).await)
 }
 
-/// Bắt đầu một stream: ghi request, đăng ký `channel` để nhận MỌI sự kiện
-/// mang đúng `request.id` cho tới khi sidecar gửi `done: true` hoặc
-/// `service_stream_stop` được gọi. KHÔNG đợi sự kiện đầu tiên — trả về ngay
-/// sau khi ghi xong, vì một stream có thể không bao giờ có sự kiện nào cho
-/// tới khi có dữ liệu thật (một kênh Pub/Sub im lặng chẳng hạn).
+/// Starts a stream: writes the request and routes every event with
+/// `request.id` to `channel` until `done` or `service_stream_stop`. Returns
+/// right after writing; a stream may stay silent for a long time.
 #[tauri::command]
 pub async fn service_stream_start(
     app: AppHandle,
@@ -628,11 +530,9 @@ pub async fn service_stream_start(
     Ok(())
 }
 
-/// Ngừng route sự kiện cho MỘT stream — không đảm bảo sidecar biết việc này
-/// (host không áp đặt một quy ước "unsubscribe" chung cho mọi sidecar). Một
-/// sidecar muốn dọn tài nguyên khi khách ngừng nghe nên tự định nghĩa một
-/// phương thức riêng (ví dụ `unsubscribe`) mà client gọi qua `service_call`
-/// TRƯỚC khi gọi hàm này.
+/// Stops routing events for one stream. The sidecar is not notified; a
+/// sidecar that needs cleanup should expose its own method (e.g.
+/// `unsubscribe`) for the client to call first.
 #[tauri::command]
 pub async fn service_stream_stop(
     state: tauri::State<'_, ServiceRegistry>,
@@ -654,9 +554,7 @@ pub async fn service_stop(state: tauri::State<'_, ServiceRegistry>, bin: String)
 }
 
 async fn kill(running: Arc<RunningSidecar>) {
-    // Đóng stdin trước: sidecar đúng hợp đồng sẽ tự thoát, không cần SIGKILL.
-    // `stdin`/`child` nằm sau `AsyncMutex` vì `RunningSidecar` được chia sẻ
-    // (Arc) — một stream/one-shot khác có thể đang giữ nó đúng lúc này.
+    // Closing stdin lets a well-behaved sidecar exit on its own.
     drop(running.stdin.lock().await);
     let _ = running.child.lock().await.kill().await;
 }
@@ -680,7 +578,7 @@ mod tests {
     fn service_data_dir_cach_ly_theo_ten_bin_khong_phai_ten_file() {
         let root = std::path::Path::new("/app-data");
         assert_eq!(service_data_dir(root, "devtool-svc-redis"), root.join("service-data").join("devtool-svc-redis"));
-        // Hai sidecar khác nhau không bao giờ ra cùng một thư mục.
+        // Different sidecars never share a directory.
         assert_ne!(
             service_data_dir(root, "devtool-svc-redis"),
             service_data_dir(root, "devtool-svc-kafka"),
@@ -689,9 +587,8 @@ mod tests {
 
     #[test]
     fn tu_choi_ten_khong_the_la_sidecar() {
-        // Điểm mấu chốt của ranh giới tin cậy: frontend nêu tên nào cũng được,
-        // nhưng một cái tên có thể thoát khỏi thư mục dịch vụ thì không bao giờ tới
-        // được bước hỏi người dùng, chứ đừng nói tới bước chạy.
+        // A name that could escape the services directory never reaches the
+        // consent prompt.
         for bad in ["/bin/sh", "sh", "devtool-svc-", "devtool-svc-../x", "devtool-svc-a/b", "devtool-svc-A", "devtool-svc--x", "devtool-svc-x-"] {
             let reason = reject_reason(&request(bad, SERVICE_PROTOCOL)).unwrap_or_else(|| panic!("{bad} phải bị từ chối"));
             assert!(reason.contains("allowlist"), "{reason}");
@@ -700,7 +597,7 @@ mod tests {
 
     #[test]
     fn ten_hop_le_ngoai_allowlist_di_tiep_toi_buoc_hoi_nguoi_dung() {
-        // Không còn bị từ chối cứng: quyết định thuộc về người dùng (service_trust).
+        // Not rejected outright: the user decides (service_trust).
         assert!(reject_reason(&request("devtool-svc-service-list-automation", SERVICE_PROTOCOL)).is_none());
         assert!(!ALLOWED_SERVICES.contains(&"devtool-svc-service-list-automation"));
         assert!(is_valid_service_name("devtool-svc-redis"));
@@ -818,12 +715,9 @@ mod tests {
 
     #[test]
     fn allowlist_khop_voi_external_bin() {
-        // Một mục trong BUNDLED_SERVICES mà không được đóng gói thì mọi lời gọi
-        // tới nó báo "không tìm thấy" trên máy người dùng, còn ở máy dev thì
-        // chạy tốt — kiểu lệch chỉ lộ ra sau khi phát hành. Chỉ kiểm tập con
-        // ĐÓNG GÓI SẴN — một mục trong ALLOWED_SERVICES nhưng ngoài
-        // BUNDLED_SERVICES CỐ Ý không có mặt trong bundle.externalBin (cài qua
-        // URL), xem comment của cả hai hằng số ở trên.
+        // A bundled entry missing from bundle.externalBin works on a dev
+        // machine but fails for users. Only bundled services are checked;
+        // URL-installed ones are intentionally absent.
         let conf = include_str!("../tauri.conf.json");
         for bin in BUNDLED_SERVICES {
             assert!(
@@ -833,10 +727,8 @@ mod tests {
         }
     }
 
-    /// `cat` là một sidecar hợp lệ một cách tình cờ: nó dội lại đúng dòng
-    /// request, mà dòng đó đã mang `protocol` và `id` nên parse được thành một
-    /// `ServiceResponse` không lỗi. Đủ để kiểm đường I/O thật mà không phải
-    /// ship thêm binary nào.
+    /// `cat` echoes the request line, which already has `protocol` and `id`,
+    /// so it behaves as a valid sidecar.
     #[cfg(unix)]
     #[tokio::test]
     async fn round_trip_qua_ong_dan_that() {
@@ -855,10 +747,8 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn hai_loi_goi_dong_thoi_toi_cung_sidecar_khong_giam_len_nhau() {
-        // Trần cũ (một mutex khoá cả sidecar cho MỘT vòng round-trip) sẽ khiến
-        // lời gọi thứ hai đợi lời gọi thứ nhất xong xuôi. `cat` dội đúng dòng
-        // gửi vào, nên hai id khác nhau phải nhận đúng phản hồi của MÌNH dù
-        // gửi gần như cùng lúc.
+        // `cat` echoes each line, so each id must get its own response even
+        // when sent at the same time.
         let mut cmd = Command::new("cat");
         let running = spawn_process(&mut cmd, || {}).expect("spawn cat");
 
@@ -879,10 +769,8 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn timeout_khong_giet_sidecar_va_khong_anh_huong_loi_goi_khac() {
-        // sh: dòng đầu KHÔNG được trả lời (ngủ lâu hơn timeout của lời gọi đó),
-        // dòng thứ hai dội lại ngay — chứng minh một lời gọi timeout không đầu
-        // độc sidecar cho lời gọi tiếp theo, khác hẳn hành vi "giết cả tiến
-        // trình khi timeout" của bản v1.
+        // The first line is never answered and the second is echoed: a timed
+        // out call must not affect the next one.
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg("read -r first; sleep 5 & read -r second; echo \"$second\"");
         let running = spawn_process(&mut cmd, || {}).expect("spawn sh");
@@ -916,8 +804,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn json_hong_lam_reader_dung_va_bao_loi_cho_waiter_dang_treo() {
-        // `printf` in ra một dòng KHÔNG phải JSON hợp lệ — vòng đọc phải coi
-        // ống dẫn không còn tin được và dừng, chứ không cố đọc tiếp.
+        // A non-JSON line stops the reader.
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg("read -r _; printf 'khong-phai-json\\n'");
         let running = spawn_process(&mut cmd, || {}).expect("spawn sh");
@@ -927,8 +814,7 @@ mod tests {
         assert!(response.error.is_some());
     }
 
-    /// Sink thu thập vào bộ nhớ — thay cho `tauri::ipc::Channel` thật (chỉ
-    /// dựng được thông qua một lời gọi Tauri command đang chạy trong app).
+    /// In-memory replacement for `tauri::ipc::Channel`.
     struct CollectSink(Arc<StdMutex<Vec<serde_json::Value>>>);
     impl EventSink for CollectSink {
         fn send(&self, value: serde_json::Value) {
@@ -939,8 +825,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn stream_nhan_du_moi_su_kien_toi_khi_done() {
-        // Sidecar giả: đọc một dòng, rồi tự phát 3 sự kiện mang ĐÚNG id của
-        // request đó, kết bằng `done: true`.
+        // Fake sidecar: read one line, emit two events and `done` for its id.
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg(
             r#"read -r _; \
@@ -961,8 +846,7 @@ mod tests {
             .insert(req.id.clone(), Waiter::Stream(Box::new(CollectSink(collected.clone()))));
         write_line(&running, &line).await.unwrap();
 
-        // Đợi tới khi waiter tự gỡ (nghĩa là `done` đã tới) thay vì `sleep` cố
-        // định — tránh test chập chờn theo tốc độ máy chạy CI.
+        // Poll until the waiter is removed instead of a fixed sleep.
         for _ in 0..100 {
             if !running.waiters.lock().unwrap().contains_key("s") {
                 break;
@@ -983,7 +867,7 @@ mod tests {
             .unwrap()
             .insert("s".into(), Waiter::Stream(Box::new(CollectSink(collected.clone()))));
 
-        // Mô phỏng `service_stream_stop`: gỡ tay, không cần sidecar biết.
+        // Simulates `service_stream_stop`.
         waiters.lock().unwrap().remove("s");
 
         dispatch(
@@ -995,11 +879,9 @@ mod tests {
 
     #[test]
     fn phan_hoi_toi_muon_khong_khop_id_nao_thi_bi_bo_qua_khong_panic() {
-        // Đây chính là ca bản v1 sẽ ghép nhầm vào lời gọi kế tiếp — với demux
-        // theo id, nó chỉ đơn giản không khớp waiter nào.
+        // A late response matches no waiter.
         let waiters: Waiters = Arc::default();
         dispatch(&waiters, ServiceResponse::err("khong-ai-cho", "trễ"));
-        // Không panic, không còn gì trong waiters — đủ để coi là bỏ qua sạch.
         assert!(waiters.lock().unwrap().is_empty());
     }
 
@@ -1012,7 +894,7 @@ mod tests {
         assert!(!json.contains("done"));
     }
 
-    // -- Task 3: sidecar_path — thứ tự ưu tiên tải-về-trước, cạnh-exe sau -----
+    // -- sidecar_path: installed copy first, bundled copy second -------------
 
     fn temp_dir(label: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("devtool-sidecar-path-test-{label}-{}", uuid::Uuid::new_v4()));
@@ -1020,9 +902,7 @@ mod tests {
         dir
     }
 
-    /// Ghi thẳng một `extensions/index.json` giả với đúng hình dạng
-    /// `artifact_installer.rs` thật sự ghi ra — dùng type công khai của module
-    /// đó (`InstalledArtifactRecord::Service`), không bịa JSON tay.
+    /// Writes an `extensions/index.json` using artifact_installer's own types.
     fn write_fake_service_index(extensions_dir: &std::path::Path, bin: &str, bin_path: &std::path::Path) {
         let mut targets = HashMap::new();
         targets.insert(
@@ -1056,8 +936,7 @@ mod tests {
         let beside_dir = temp_dir("beside-exe");
         let installed_bin = temp_dir("installed-bin-dir").join("devtool-svc-demo");
         std::fs::write(&installed_bin, b"noi dung ban tai ve").unwrap();
-        // Cùng tên bin cũng tồn tại cạnh "exe" — nội dung khác hẳn, để một
-        // assertion sai (chọn nhầm bản) lộ rõ nếu có ai lỡ đảo thứ tự.
+        // Different contents beside the exe so picking the wrong copy shows.
         std::fs::write(beside_dir.join("devtool-svc-demo"), b"noi dung ban canh exe").unwrap();
         write_fake_service_index(&extensions_dir, "devtool-svc-demo", &installed_bin);
 
@@ -1086,13 +965,11 @@ mod tests {
 
     #[test]
     fn index_noi_da_cai_nhung_file_mat_tren_dia_thi_roi_xuong_canh_exe() {
-        // index.json nói đã cài nhưng file bị xoá/hỏng đĩa — edge case nêu
-        // trong plan: rơi xuống fallback cạnh-exe nếu có, không panic.
+        // The index points at a missing file: fall back to the bundled copy.
         let extensions_dir = temp_dir("extensions-dangling");
         let beside_dir = temp_dir("beside-fallback");
         let beside_bin = beside_dir.join("devtool-svc-demo");
         std::fs::write(&beside_bin, b"ban dong goi san").unwrap();
-        // Trỏ tới một file KHÔNG tồn tại — mô phỏng đĩa hỏng/bị xoá thủ công.
         let missing = temp_dir("missing-parent").join("devtool-svc-demo");
         write_fake_service_index(&extensions_dir, "devtool-svc-demo", &missing);
 
@@ -1100,12 +977,8 @@ mod tests {
         assert_eq!(resolved, beside_bin);
     }
 
-    /// Round-trip đầy đủ: "cài" một binary giả (một script `sh` dội lại dòng
-    /// vào, giống `cat` — cùng cách `plugin_installer.rs`/`artifact_installer.rs`'s
-    /// test cũ không cần ship thêm binary nào), resolve qua `resolve_sidecar_path`,
-    /// rồi thực sự spawn + gọi qua đúng đường request/response mà `service_call`
-    /// dùng (`spawn_process`/`call_once`) — chứng minh cả đường dây, không chỉ
-    /// phần chọn đường dẫn.
+    /// Installs a fake binary (an `sh` script running `cat`), resolves it, and
+    /// calls it through `spawn_process`/`call_once`.
     #[cfg(unix)]
     #[tokio::test]
     async fn round_trip_cai_gia_resolve_dung_va_goi_duoc_qua_no() {
