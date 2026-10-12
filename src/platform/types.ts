@@ -3,33 +3,24 @@ import type { LucideIcon } from 'lucide-react';
 import type { ServiceDescriptor } from './service';
 
 /**
- * Hợp đồng giữa Platform và Plugin.
+ * Contract between the platform and plugins.
  *
- * Mỗi tool trong app là một PLUGIN: một thư mục `src/plugins/<id>/` có đúng một
- * file `plugin.ts` export default một `PluginManifest`. Platform tự quét thư mục
- * đó (xem `registry.ts`) — không có bảng đăng ký tay nào nữa.
- *
- * Trước file này, thêm một tool phải sửa 5 chỗ rời rạc (`toolDefs.ts`,
- * `DEFAULT_TOOL_ORDER`, `toolRegistry.ts`, `DEFAULT_FEATURES`, và route trong
- * App.tsx) — bốn trong năm chỗ đó không có gì bắt buộc phải khớp nhau, nên một
- * tool thiếu route chỉ lặng lẽ mất `path`/`component` lúc chạy. Manifest gom cả
- * năm về một nơi, và `registry.test.ts` khoá lại tính toàn vẹn.
+ * Every tool is a plugin: a folder `src/plugins/<id>/` whose `plugin.ts`
+ * default-exports a `PluginManifest`. `registry.ts` discovers them; there is
+ * no hand-maintained list. `registry.test.ts` checks their integrity.
  */
 
-/** Version của Platform SDK. Plugin khai `sdk: '^1.0.0'` để chốt tương thích. */
+/** Platform SDK version. Plugins declare a range such as `sdk: '^1.0.0'`. */
 export const SDK_VERSION = '1.1.0';
 
 /**
- * Quyền một plugin phải khai báo trước khi dùng kênh tương ứng của SDK.
+ * Permissions a plugin must declare before using the matching SDK channel.
  *
- * Đây KHÔNG phải hàng rào bảo mật chống mã độc — mọi plugin hiện đều do chính
- * chúng ta phát hành và chạy chung realm với app, nên về kỹ thuật nó vẫn gọi
- * thẳng được `window.__TAURI_INTERNALS__`. Quyền ở đây phục vụ ba việc khác,
- * đều có giá trị thật: (1) khai báo tường minh để hiện cho người dùng thấy
- * plugin nào chạm vào cái gì, (2) bắt lỗi sớm khi một plugin dùng kênh nó chưa
- * khai, (3) cho `audit.ts` một nhãn để ghi nhật ký. Hàng rào thật chỉ xuất hiện
- * nếu sau này plugin chạy trong webview/tiến trình riêng — lúc đó danh sách này
- * chính là thứ ánh xạ sang capability của Tauri.
+ * Not a security boundary: plugins run in the app's JS realm and could call
+ * Tauri directly. Permissions make access visible to the user, catch use of
+ * undeclared channels early, and label entries in the audit log (audit.ts).
+ * They would map to Tauri capabilities if plugins ever ran in their own
+ * webview or process.
  */
 export type PluginPermission =
   | 'storage'
@@ -45,103 +36,82 @@ export type PluginPermission =
 
 export interface PluginManifest {
   /**
-   * kebab-case — chuỗi CHÍNH PLUGIN TỰ KHAI và tự dùng để gọi lại chính mình
-   * qua `usePluginSdkFor(id)`/`getPluginSdk(id)` (nó không biết, và không nên
-   * biết, mình thuộc `group` nào lúc build). Đồng thời là khoá bật/tắt và
-   * namespace storage — GIỮ NGUYÊN Ý NGHĨA CŨ, không đổi bởi `group`.
-   *
-   * Chỉ cần duy nhất TRONG `group` của nó theo MÔ HÌNH — nhưng trên thực tế,
-   * `installer.ts` chặn cài một plugin nếu `id` đã bị một `group` KHÁC chiếm
-   * (bắt người dùng gỡ bản cũ trước), nên tại một thời điểm chỉ có ĐÚNG MỘT
-   * bản ghi mang một `id` cho trước tồn tại — `id` vẫn nhất quán duy nhất
-   * toàn app trên thực tế. Lý do: `usePluginSdkFor`/`getPluginSdk` chỉ nhận
-   * được đúng chuỗi `id` này (không có `group`) khi plugin tự gọi mình ở
-   * module-scope (không qua React context, vd store nền của Kafka/RabbitMQ)
-   * — cho hai `group` cùng `id` coexist thật sẽ khiến lời gọi đó không thể
-   * biết nên trả bản ghi nào, âm thầm gán nhầm storage/audit/quyền.
+   * kebab-case id the plugin uses to look itself up (`usePluginSdkFor(id)`,
+   * `getPluginSdk(id)`). Also the enable/disable key and storage namespace.
+   * Unique app-wide in practice: installer.ts refuses an id already owned by
+   * another `group`, because module-scope SDK lookups only know the id.
    */
   id: string;
   /**
-   * Nguồn plugin được cài từ đâu — thuần METADATA, không tham gia tính khoá
-   * storage/audit (vẫn khoá theo `id` một mình, y hệt trước khi field này ra
-   * đời — không migrate gì). Dùng để: (1) sinh route cho plugin cài lúc chạy
-   * (`/installed/<group>/<id>`), (2) hiển thị nguồn cài trong Settings, và
-   * (3) phân biệt "cài lại/cập nhật CÙNG nguồn" (hợp lệ) với "một `group`
-   * KHÁC cùng khai trùng `id`" (conflict, chặn cài — xem `installer.ts`).
+   * Where the plugin was installed from. Metadata only; storage and audit
+   * are keyed by `id`. Used for installed-plugin routes
+   * (`/installed/<group>/<id>`), display in Settings, and conflict checks.
    *
-   * `"core"` cho 26 plugin compile-time (registry.ts TỰ GÁN khi thiếu — 26
-   * file `src/plugins/<id>/plugin.ts` không cần sửa để khai field này),
-   * `"url"` cho plugin cài qua URL manifest dán tay (không market), hoặc
-   * chính `marketId` cho plugin cài qua market — `installer.ts` luôn khai rõ
-   * cho cả hai loại này, không dựa vào mặc định.
+   * `"core"` for built-in plugins (filled in by registry.ts), `"url"` for a
+   * pasted manifest URL, otherwise the market id.
    */
   group?: string;
   label: string;
   icon: LucideIcon;
   description: string;
-  /** Từ khoá đồng nghĩa cho ô tìm kiếm sidebar (vd "epoch" → Date/Time). */
+  /** Search synonyms for the sidebar (e.g. "epoch" for Date/Time). */
   keywords?: string[];
   /**
-   * Gắn nhãn "Experimental" ở mọi nơi plugin được liệt kê VÀ hỏi lại người dùng
-   * mỗi lần mở (`ExperimentalGate`). Dành cho plugin còn đổi hành vi/backend,
-   * không phải cho plugin mới nhưng đã ổn định.
+   * Shows an "Experimental" label and asks for confirmation on every open
+   * (`ExperimentalGate`). For plugins whose behavior is still changing.
    */
   experimental?: boolean;
-  /** Route tuyệt đối, bắt đầu bằng "/". Duy nhất toàn app. */
+  /** Absolute route starting with "/". Unique app-wide. */
   route: string;
-  /** Vị trí mặc định trong sidebar khi cài mới. Nhỏ hơn = lên trước, duy nhất. */
+  /** Default sidebar position for new installs; lower first, unique. */
   order: number;
-  /** Trạng thái bật/tắt cho bản cài mới. Người dùng đổi được trong Settings. */
+  /** Initial enabled state for new installs; users can change it. */
   defaultEnabled: boolean;
   /**
-   * Bỏ lớp bọc cuộn sẵn của shell, plugin tự quản lý overflow. Mặc định `true`
-   * — gần như mọi tool đều cần, và các layout `tool-full-height` giả định vậy.
+   * The plugin manages its own overflow instead of the shell's scroll
+   * wrapper. Defaults to `true`.
    */
   fullHeight?: boolean;
-  /** Kênh SDK plugin được phép dùng. Không khai = không được gọi. */
+  /** SDK channels the plugin may use. Undeclared channels throw. */
   permissions?: PluginPermission[];
   /**
-   * Danh sách lệnh Tauri plugin được phép `invoke`, chỉ có nghĩa khi đã khai
-   * quyền 'native'. Khớp tiền tố: `'redis_'` cho phép mọi lệnh `redis_*`.
+   * Tauri commands the plugin may `invoke` (requires 'native'). Entries match
+   * by prefix: `'redis_'` allows every `redis_*` command.
    */
   commands?: string[];
   /**
-   * Host plugin được phép gọi tới, chỉ có nghĩa khi đã khai quyền 'http'.
-   * Dạng: `'dns.google'` (khớp đúng), `'*.example.com'` (chính nó và mọi
-   * subdomain), hoặc `'*'` cho plugin thật sự không giới hạn được.
-   *
-   * `'*'` phải khai TƯỜNG MINH: một HTTP workbench đúng là gọi được mọi nơi
-   * theo thiết kế, nhưng điều đó xứng đáng là một dòng nhìn thấy được trong
-   * manifest chứ không phải mặc định ngầm của mọi plugin có quyền http.
+   * Hosts the plugin may call (requires 'http'): `'dns.google'` (exact),
+   * `'*.example.com'` (domain and subdomains), or `'*'` (anything). `'*'` must
+   * be declared explicitly.
    */
   hosts?: string[];
   /**
-   * Tier B: sidecar plugin này cần. Khai `service` thì phải khai cả quyền
-   * 'service' — xem `service.ts` cho hợp đồng và lý do chọn tiến trình riêng.
+   * Tier-B sidecar this plugin needs; requires the 'service' permission.
+   * See service.ts.
    */
   service?: ServiceDescriptor;
-  /** Dải version SDK plugin chạy được, dạng `^M.m.p`. */
+  /** Supported SDK range, `^M.m.p`. */
   sdk: string;
-  /** Nạp component chính. Được gọi lazy ở lần điều hướng đầu tiên → code-split. */
+  /** Loads the main component lazily on first navigation (code-split). */
   load: () => Promise<ComponentType>;
 }
 
-/** Manifest đã qua kiểm tra + các giá trị mặc định đã điền. */
+/** Validated manifest with defaults filled in. */
 export interface PluginRecord extends PluginManifest {
-  /** Không còn optional — `registerManifest` đã điền `'core'` khi thiếu. */
+  /** Always set; `registerManifest` defaults it to `'core'`. */
   group: string;
   keywords: string[];
   experimental: boolean;
   fullHeight: boolean;
   permissions: PluginPermission[];
   commands: string[];
-  /** Component để router dựng: `load` đã bọc `lazy` + context của plugin. */
+  /** Component the router renders: `load` wrapped in `lazy` and the plugin's context. */
   component: ComponentType;
 }
 
-/** Một manifest hỏng bị loại khỏi registry, kèm lý do — `registry.test.ts` khoá rỗng. */
+/** A manifest rejected by the registry, with the reason. */
 export interface PluginLoadError {
-  /** Đường dẫn file manifest, để biết sửa ở đâu. */
+  /** Manifest file path, to know where to fix it. */
   source: string;
   id?: string;
   reason: string;

@@ -5,19 +5,16 @@ import baseline from './baseline.json';
 import { PLUGINS } from '@/platform';
 
 /**
- * Rào chắn RANH GIỚI PLATFORM — cùng cơ chế ngưỡng lùi dần như
- * `design-system/guard.test.ts`, áp cho một khối nợ khác.
+ * Platform boundary guard, using the same ratchet as
+ * `design-system/guard.test.ts`.
  *
- * Manifest plugin khai `permissions`, nhưng 26 tool hiện có vẫn gọi thẳng
- * `@tauri-apps/*` và store dùng chung, tức quyền mới chỉ là MÔ TẢ chứ chưa được
- * thực thi. Cấm tuyệt đối ngay bây giờ sẽ đỏ hàng chục chỗ trong một lần và
- * chỉ tạo thói quen phớt lờ; nên: đếm, đóng băng con số, và mỗi tool chuyển
- * sang SDK thì hạ ngưỡng. Khi một chỉ số về 0 thì quyền tương ứng chuyển từ mô
- * tả thành thực thi — không cần đổi gì trong code sản phẩm.
+ * Built-in tools still call `@tauri-apps/*` and the shared store directly,
+ * so manifest permissions are not yet enforced for them. Each count is
+ * frozen and lowered as tools move to the SDK; at zero, the permission is
+ * effectively enforced.
  *
- * Hai luật cuối KHÔNG lùi dần: chúng bảo vệ tính chất đã đúng ở hiện tại
- * (manifest phải khai báo thuần, bí mật không được quay lại store dùng chung),
- * nên ngưỡng của chúng là bất biến, không phải nợ.
+ * The last two rules are invariants, not debt: manifests stay declarative
+ * and secrets never return to the shared store.
  */
 
 const SRC = resolve(__dirname, '..');
@@ -36,9 +33,8 @@ function filesUnder(dirs: string[]): string[] {
   return out;
 }
 
-/** Bỏ comment trước khi đếm — xem lý do dài trong design-system/guard.test.ts:
- *  không có bước này, một dòng giải thích *vì sao* đã bỏ `@tauri-apps` lại bị
- *  tính là một lần dùng `@tauri-apps`. */
+/** Strips comments before counting, so a comment that mentions
+ *  `@tauri-apps` is not counted as a use. */
 function stripComments(source: string): string {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -71,9 +67,8 @@ function countPattern(files: string[], pattern: RegExp) {
   return { total, byFile };
 }
 
-/** Thứ manifest được phép nhập. Bất cứ gì khác kéo theo rủi ro thật: import
- *  thẳng component tool sẽ phá code-split (chunk tool chui vào bundle khởi
- *  động), import lib nặng biến file metadata thành phụ thuộc lúc chạy. */
+/** What a manifest may import. Importing a tool component would break code
+ *  splitting; importing a heavy library would make metadata a runtime dependency. */
 const MANIFEST_ALLOWED = new Set(['lucide-react', '@/platform']);
 
 const RULES: Rule[] = [
@@ -81,10 +76,8 @@ const RULES: Rule[] = [
     key: 'directTauriInPluginCode',
     label: 'code plugin gọi thẳng @tauri-apps',
     why: 'Đi qua sdk.native / sdk.files / sdk.clipboard / sdk.http để quyền trong manifest có hiệu lực và audit ghi được.',
-    // Đếm CẢ `import ... from '@tauri-apps/…'` lẫn `await import('@tauri-apps/…')`.
-    // Bản đầu chỉ bắt dạng tĩnh và vì thế bỏ sót phần lớn: repo này cố tình dùng
-    // dynamic import để giữ bundle gọn, nên dạng động mới là dạng phổ biến. Một
-    // rào chắn đo thiếu còn tệ hơn không có, vì con số của nó trông như đã sạch.
+    // Counts both static imports and `await import('@tauri-apps/…')`; the
+    // codebase mostly uses dynamic imports.
     count: () => countPattern(PLUGIN_FILES, /(?:from|import\()\s*'@tauri-apps\/[^']+'/g),
   },
   {
@@ -103,8 +96,8 @@ const RULES: Rule[] = [
       const byFile: Array<[string, number]> = [];
       for (const file of MANIFESTS) {
         const src = stripComments(readFileSync(file, 'utf-8'));
-        // Chỉ xét import ở đầu file; `load: () => import('…')` là closure lười,
-        // đúng thứ giữ được code-split, nên không tính.
+        // Only top-level imports count; `load: () => import('…')` is the lazy
+        // closure that keeps code splitting.
         const specs = [...src.matchAll(/^import\s[^;]*?from\s+'([^']+)'/gm)].map((m) => m[1]);
         const bad = specs.filter((s) => !MANIFEST_ALLOWED.has(s));
         if (bad.length > 0) {
@@ -119,8 +112,8 @@ const RULES: Rule[] = [
     key: 'anchorDownloadInPluginCode',
     label: 'code plugin tải file bằng <a download>',
     why: 'Trong webview Tauri thẻ đó không ghi ra file — dùng saveTextFile / saveBinaryFile của lib/fileio.ts (có nhánh hộp Save của OS).',
-    // Nhánh web có chủ đích (sau `if (isTauri) … return`) của QR Code và Time
-    // Tracker export vẫn dùng thẻ này — chỉ đếm file KHÔNG có nhánh Tauri.
+    // QR Code and Time Tracker use this tag only in their web fallback;
+    // count files without a Tauri branch.
     count: () => {
       let total = 0;
       const byFile: Array<[string, number]> = [];
@@ -148,9 +141,8 @@ const RULES: Rule[] = [
 ];
 
 describe('rào chắn ranh giới Platform — ngưỡng lùi dần', () => {
-  // Rào chắn của chính rào chắn: nếu đường dẫn đổi mà quét ra mảng rỗng thì mọi
-  // luật dưới đây "xanh" vì không có gì để đếm — kiểu hỏng tệ nhất của một
-  // guard, vì nó trông hệt như đã dọn sạch.
+  // Guard the guard: if the paths change and nothing is scanned, every rule
+  // would pass vacuously.
   it('quét ra đúng vùng code plugin, không phải mảng rỗng', () => {
     expect(PLUGIN_FILES.length).toBeGreaterThan(50);
     expect(MANIFESTS.length).toBe(PLUGINS.length);
@@ -170,7 +162,7 @@ describe('rào chắn ranh giới Platform — ngưỡng lùi dần', () => {
         );
       }
 
-      // Dọn xong mà quên hạ ngưỡng thì lần sau vi phạm lẻn về không ai biết.
+      // Lower the threshold after a cleanup so regressions are caught.
       if (total < limit) {
         expect.fail(
           `${rule.label}: còn ${total}, thấp hơn ngưỡng ${limit} — tốt!\n` +

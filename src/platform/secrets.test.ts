@@ -11,10 +11,8 @@ import {
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 
 /**
- * Trong jsdom `isTauri` là false, nên bộ test này chạy đường dự phòng của bản
- * web — cũng chính là đường dễ làm sai nhất: nếu nó lỡ dùng `localStorage`, bí
- * mật sẽ bị `initPersistentStore()` hút ngược vào cache dùng chung ở lần khởi
- * động sau, tức việc tách mặt phẳng khoá coi như không có tác dụng.
+ * In jsdom `isTauri` is false, so these tests cover the web fallback. It must
+ * use sessionStorage: localStorage would be pulled back into the shared cache.
  */
 
 beforeEach(async () => {
@@ -44,7 +42,7 @@ describe('kho bí mật', () => {
     await secretSet('2fa', 'accounts', 'JBSWY3DP');
     expect(localStorage.length).toBe(0);
     expect(JSON.stringify(Object.values(localStorage))).not.toContain('JBSWY3DP');
-    // …và cũng không đọc được qua cửa của store dùng chung.
+    // ...and is not readable through the shared store.
     expect(storageGet('devtool:2fa:accounts')).toBeNull();
     expect(storageGet('2fa/accounts')).toBeNull();
   });
@@ -60,10 +58,8 @@ describe('kho bí mật', () => {
 });
 
 /**
- * Đường di trú THẬT là đường desktop, nên phần dưới đây dựng lại nó: bật cờ
- * Tauri trước khi nạp module (giống mcpBridge.test.ts) và thay kho Rust bằng một
- * bản giả trong bộ nhớ. Kiểm nó ở đường web — nơi duy nhất chạy được nếu không
- * làm vậy — sẽ là kiểm đúng cái nhánh mà người dùng thật không bao giờ đi qua.
+ * The real migration runs on desktop, so these tests set the Tauri flag
+ * before loading the module and replace the Rust vault with an in-memory fake.
  */
 describe('di trú từ store dùng chung — đường desktop', () => {
   async function loadDesktopSecrets() {
@@ -88,9 +84,8 @@ describe('di trú từ store dùng chung — đường desktop', () => {
         save: async () => {},
       }),
     }));
-    // `vi.resetModules()` cũng dựng lại `persistentStore`, nên cache đồng bộ
-    // của nó là một instance KHÁC với instance các ca khác đang dùng. Trả về
-    // luôn bản mới để test gieo và đọc đúng cái mà module đang xét nhìn thấy.
+    // `vi.resetModules()` also recreates `persistentStore`; return the new
+    // instance so the test seeds and reads what the module sees.
     const store = await import('@/lib/persistentStore');
     return { mod: await import('@/platform/secrets'), store, vault };
   }
@@ -110,8 +105,7 @@ describe('di trú từ store dùng chung — đường desktop', () => {
     expect(await mod.migrateSecretsFromSharedStore()).toEqual(['devtool:2fa:accounts']);
 
     expect(vault.get('2fa/accounts')).toBe(payload);
-    // Điểm mấu chốt: bản cũ phải BIẾN MẤT khỏi mặt phẳng khoá dùng chung —
-    // chép mà không xoá thì không giải quyết được gì.
+    // The original must be removed from the shared store, not just copied.
     expect(store.storageGet('devtool:2fa:accounts')).toBeNull();
   });
 
@@ -148,14 +142,13 @@ describe('di trú từ store dùng chung — đường web', () => {
   });
 
   it('bản web KHÔNG di trú — chuyển vào kho chỉ sống một phiên là XOÁ, không phải chuyển', async () => {
-    // jsdom không có `__TAURI_INTERNALS__`, nên đây chính là đường của bản web.
+    // jsdom has no `__TAURI_INTERNALS__`: this is the web path.
     const payload = JSON.stringify([{ id: '1', secret: 'JBSWY3DPEHPK3PXP' }]);
     storageSet('devtool:2fa:accounts', payload);
 
     expect(await migrateSecretsFromSharedStore()).toEqual([]);
 
-    // Điểm mấu chốt: dữ liệu vẫn nằm nguyên chỗ cũ. Bản desktop sẽ di trú đúng
-    // cách; còn ở đây hiển thị rỗng thì phiền, nhưng xoá mất thì không sửa được.
+    // Data stays where it was; the desktop app migrates it later.
     expect(storageGet('devtool:2fa:accounts')).toBe(payload);
     expect(await secretGet('2fa', 'accounts')).toBeNull();
 

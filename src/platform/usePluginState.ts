@@ -4,46 +4,21 @@ import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
 import type { PluginSdk } from './sdk';
 
 interface Options {
-  /** Gộp các lần ghi liên tiếp lại, ms. Giống hệt `usePersistentState`. */
+  /** Write debounce in ms, as in `usePersistentState`. */
   debounceMs?: number;
   /**
-   * Khoá cũ, đầy đủ, mà tool này đang dùng trước khi chuyển sang SDK.
-   *
-   * Bắt buộc phải có ở gần như mọi lần chuyển đổi, vì tiền tố khoá lịch sử hiếm
-   * khi trùng id plugin: Redis Client lưu ở `devtool:redis:*` nhưng id của nó là
-   * `redis-client`, API Client lưu ở `devtool:apiclient:*` nhưng id là
-   * `api-client`. Chuyển thẳng mà không khai khoá cũ là im lặng vứt đi lựa chọn
-   * kết nối, lịch sử và cấu hình người dùng đang có — trông y như app tự reset.
-   *
-   * Di trú chạy MỘT LẦN lúc dựng và chỉ khi khoá mới còn trống: giá trị ở khoá
-   * mới luôn là bản mới hơn.
+   * Full key this tool used before moving to the SDK. Historical prefixes
+   * often differ from the plugin id (`devtool:apiclient:*` vs `api-client`),
+   * so without it users would lose their saved data. Migrated once, only if
+   * the new key is empty.
    */
   legacyKey?: string;
 }
 
 /**
- * `usePersistentState` của Platform: y hệt về hành vi (đọc đồng bộ lúc dựng,
- * ghi có debounce, xả khi cửa sổ ẩn/đóng), chỉ khác ở hai điểm — khoá được gắn
- * namespace theo plugin, và quyền `storage` được kiểm.
- *
- * Đây là mảnh còn thiếu để một tool chuyển hẳn sang SDK. 47 chỗ trong bốn tool
- * nặng đang gọi thẳng `usePersistentState`; không có hook này thì chúng KHÔNG có
- * đường nào để chuyển, vì `sdk.storage` là API mệnh lệnh còn cái chúng cần là
- * một `useState` có ghi nhớ.
- *
- * Audit ghi ĐÚNG MỘT dòng cho mỗi khoá lúc gắn, không ghi theo từng lần gõ
- * phím: một editor văn bản sẽ đẩy hàng nghìn dòng vào bộ đệm vòng 500 mục và
- * cuốn trôi mọi thứ khác — nhật ký khi đó vừa vô dụng vừa che mất đúng những
- * lời gọi đáng chú ý.
- */
-/**
- * Chuyển một khoá từ vị trí cũ sang khoá có namespace, đúng một lần.
- *
- * Tách ra khỏi hook vì các store ở phạm vi module cũng cần nó — chúng dùng
- * `sdk.storage` trực tiếp, không qua `usePluginState`, nhưng vẫn phải mang dữ
- * liệu cũ của người dùng theo.
- *
- * Chỉ chép khi khoá mới còn trống: giá trị ở khoá mới luôn là bản mới hơn.
+ * Moves a value from a legacy key to the plugin's namespaced key, once and
+ * only if the new key is empty. Exported for module-scope stores that use
+ * `sdk.storage` directly.
  */
 export function migrateLegacyKey(sdk: PluginSdk, key: string, legacyKey: string): void {
   const full = sdk.storage.key(key);
@@ -52,12 +27,19 @@ export function migrateLegacyKey(sdk: PluginSdk, key: string, legacyKey: string)
 
   const old = storageGet(legacyKey);
   if (old === null) return;
-  // Ghi thẳng qua store: giá trị ĐÃ ở đúng dạng chuỗi đã lưu, không cần đi qua
-  // một vòng parse/stringify chỉ để chuyển chỗ.
+  // Copy the stored string as is; no parse/stringify round trip.
   storageSet(full, old);
   storageRemove(legacyKey);
 }
 
+/**
+ * `usePersistentState` with a plugin-namespaced key and a `storage`
+ * permission check. Same behavior otherwise: synchronous initial read,
+ * debounced writes, flush on hide/close.
+ *
+ * Audits once per key at mount rather than per write, so typing does not
+ * flood the 500-entry audit buffer.
+ */
 export function usePluginState<T>(
   sdk: PluginSdk,
   key: string,
@@ -65,13 +47,12 @@ export function usePluginState<T>(
   options?: Options,
 ): [T, Dispatch<SetStateAction<T>>] {
   const namespaced = useMemo(() => {
-    // Lời gọi này vừa kiểm quyền (ném nếu manifest chưa khai `storage`) vừa để
-    // lại một dòng audit cho khoá — giá trị đọc ra được dùng tiếp ngay bên dưới.
+    // Checks the permission and records one audit entry for this key.
     sdk.storage.get(key);
     if (options?.legacyKey) migrateLegacyKey(sdk, key, options.legacyKey);
     return sdk.storage.key(key);
-    // `options.legacyKey` cố tình không nằm trong deps: di trú là việc một lần
-    // lúc dựng, và khoá cũ không đổi giữa các lần render.
+    // `options.legacyKey` is intentionally not a dependency: migration
+    // runs once at mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sdk, key]);
 

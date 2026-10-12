@@ -7,17 +7,14 @@ import { installedPluginManifests } from './installer';
 import type { PluginLoadError, PluginManifest, PluginRecord } from './types';
 
 /**
- * Registry của Platform: quét `src/plugins/<id>/plugin.ts` lúc BUILD (plugin
- * compile-time), rồi sau đó — lúc app khởi động, xem `initInstalledPlugins()`
- * — nạp thêm plugin đã CÀI TỪ BÊN NGOÀI (`src/platform/installer.ts`). Cả hai
- * loại đi qua đúng một hàm đăng ký (`registerManifest`) nên chịu chung một bộ
- * luật: hợp lệ, không đụng id/route/order của nhau, và có audit như nhau.
+ * Plugin registry. Built-in plugins are discovered from
+ * `src/plugins/<id>/plugin.ts` at build time; installed plugins are added at
+ * startup by `initInstalledPlugins()`. Both go through `registerManifest`,
+ * so they share the same validation and uniqueness rules.
  *
- * `eager: true` là cố ý và KHÔNG kéo tool vào bundle khởi động: file manifest
- * chỉ chứa metadata + một closure `load` chưa được gọi, nên code thật của tool
- * vẫn nằm ở chunk riêng, tách ra đúng lúc `lazy` chạm vào lần đầu. Quét lười
- * thì ngược lại sẽ biến mọi thứ đọc metadata (sidebar, Command Palette,
- * Settings) thành async — trả giá lớn để đổi lấy vài KB.
+ * `eager: true` only imports manifests (metadata plus an uncalled `load`),
+ * so tool code still lives in its own lazily loaded chunk while sidebar,
+ * command palette and settings can read metadata synchronously.
  */
 const modules = import.meta.glob<{ default: PluginManifest }>('../plugins/*/plugin.ts', {
   eager: true,
@@ -26,31 +23,19 @@ const modules = import.meta.glob<{ default: PluginManifest }>('../plugins/*/plug
 const errors: PluginLoadError[] = [];
 const records: PluginRecord[] = [];
 
-/** Khai TRƯỚC vòng lặp glob bên dưới, dù nó chỉ được export — `registerManifest`
- *  (gọi ngay trong vòng lặp đó) ghi vào đây, và một `const` được tham chiếu
- *  trước khi chính dòng khai báo của nó chạy thì ném lỗi "trước khi khởi tạo"
- *  bất kể tham chiếu đó nằm trong thân một hàm hay không — thứ tự văn bản ở
- *  đây là bắt buộc, không phải trang trí. */
+/** Declared before the glob loop below because `registerManifest`, called in
+ *  that loop, writes to it. */
 export const PLUGIN_MAP: Map<string, PluginRecord> = new Map();
 
-// `id` phải duy nhất TOÀN APP trên thực tế, không chỉ trong `group` của nó —
-// dù `PluginManifest.group` tồn tại để phân biệt NGUỒN CÀI, `installer.ts`
-// chặn cài một plugin nếu `id` đã bị một `group` khác chiếm (bắt gỡ bản cũ
-// trước khi cài bản mới), nên tại registry chỉ CẦN VÀ CHỈ CÓ một bảng
-// `seenIds` phẳng — y hệt trước khi khái niệm group ra đời. Xem
-// `PluginManifest.group`'s doc comment cho lý do (usePluginSdkFor/
-// getPluginSdk gọi module-scope chỉ nhận được `id`, không có `group`, nên
-// hai bản ghi cùng `id` coexist thật sẽ khiến lời gọi đó mập mờ).
+// Ids are unique app-wide (installer.ts rejects an id owned by another
+// group), so one flat map is enough.
 const seenIds = new Map<string, string>();
 const seenRoutes = new Map<string, string>();
 const seenOrders = new Map<number, string>();
 
 /**
- * Đăng ký một manifest — dùng chung cho cả plugin compile-time (glob ở dưới)
- * và plugin cài từ bên ngoài (`initInstalledPlugins`). `requireFolderMatch`
- * chỉ có nghĩa với loại đầu: "thư mục là danh tính" là luật cho file nằm
- * trong `src/plugins/`, không áp dụng cho một bản ghi tải về lúc chạy (không
- * có "thư mục nguồn" nào để so).
+ * Registers a manifest, built-in or installed. `requireFolderMatch` applies
+ * to built-in plugins only: the folder name must equal the id.
  */
 function registerManifest(
   manifest: unknown,
@@ -65,10 +50,8 @@ function registerManifest(
 
   const m = manifest as PluginManifest;
   if (options.requireFolderMatch) {
-    // Thư mục là danh tính: `src/plugins/json/plugin.ts` phải khai id 'json'.
-    // Nếu không, đường dẫn file không còn tra ngược được về plugin, và hai
-    // thư mục có thể cùng khai một id mà nhìn cây thư mục không thấy gì
-    // bất thường.
+    // The folder is the identity: `src/plugins/json/plugin.ts` must
+    // declare id 'json'.
     const folder = /\/plugins\/([^/]+)\/plugin\.ts$/.exec(source)?.[1];
     if (folder && folder !== m.id) {
       errors.push({ source, id: m.id, reason: `id "${m.id}" không khớp tên thư mục "${folder}"` });
@@ -91,9 +74,7 @@ function registerManifest(
   const sdk = createPluginSdk(m);
   const record: PluginRecord = {
     ...m,
-    // `'core'` cho mọi plugin compile-time (26 file `src/plugins/<id>/
-    // plugin.ts` không khai field này) — `installer.ts` luôn khai rõ `group`
-    // cho plugin cài lúc chạy, nên `?? 'core'` không bao giờ chạm nhánh đó.
+    // Built-in manifests omit `group`; installed ones always set it.
     group: m.group ?? 'core',
     keywords: m.keywords ?? [],
     experimental: m.experimental ?? false,
@@ -104,11 +85,8 @@ function registerManifest(
   };
   records.push(record);
   records.sort((a, b) => a.order - b.order);
-  // `PLUGIN_MAP` phải cập nhật CÙNG LÚC với `records`: nó được dựng một lần từ
-  // `records` ngay dưới đây cho 26 plugin compile-time, nhưng
-  // `initInstalledPlugins()` gọi lại `registerManifest` này SAU thời điểm đó —
-  // thiếu dòng này, `getPlugin()` sẽ không bao giờ thấy một plugin cài từ bên
-  // ngoài dù nó có mặt trong `PLUGINS`.
+  // Keep the map in sync: installed plugins are registered after the
+  // initial build of `records`.
   PLUGIN_MAP.set(record.id, record);
 }
 
@@ -116,26 +94,21 @@ for (const source of Object.keys(modules).sort()) {
   registerManifest(modules[source]?.default, source, { requireFolderMatch: true });
 }
 
-/** Mọi plugin hợp lệ, đã sắp theo `order`. Mảng CÙNG một tham chiếu trong
- *  suốt vòng đời app — `initInstalledPlugins()` nối thêm vào chính mảng này
- *  (`push`), không thay bằng mảng mới, vì `DEFAULT_PLUGIN_ORDER`/
- *  `DEFAULT_PLUGIN_FEATURES` bên dưới được suy ra một lần lúc app khởi động
- *  và phải nhìn thấy plugin cài từ bên ngoài trong đó. */
+/** Every valid plugin, sorted by `order`. Installed plugins are pushed into
+ *  this same array at startup, before anything reads it. */
 export const PLUGINS: readonly PluginRecord[] = records;
 
 /**
- * Manifest bị loại và lý do. Rỗng ở mọi build lành mạnh cho phần compile-time
- * — `registry.test.ts` khoá điều đó, nên một manifest hỏng làm đỏ CI thay vì
- * âm thầm mất một tool khỏi sidebar của người dùng. Một plugin cài từ bên
- * ngoài bị từ chối cũng vào đây, nhưng KHÔNG làm CI đỏ (nó không tồn tại lúc
- * build) — Settings → Extensions đọc mảng này để báo cho người dùng biết.
+ * Rejected manifests and why. Empty for built-in plugins in a healthy build
+ * (enforced by `registry.test.ts`); rejected installed plugins are listed
+ * here and shown in Settings → Extensions.
  */
 export const PLUGIN_ERRORS: PluginLoadError[] = errors;
 
-/** Thứ tự sidebar cho bản cài mới. */
+/** Sidebar order for new installs. */
 export const DEFAULT_PLUGIN_ORDER: readonly string[] = records.map((p) => p.id);
 
-/** Bật/tắt mặc định cho bản cài mới, khớp khoá của FeatureContext. */
+/** Default enabled state for new installs, keyed like FeatureContext. */
 export const DEFAULT_PLUGIN_FEATURES: Readonly<Record<string, boolean>> = Object.fromEntries(
   records.map((p) => [p.id, p.defaultEnabled]),
 );
@@ -145,22 +118,10 @@ export function getPlugin(id: string): PluginRecord | undefined {
 }
 
 /**
- * Nạp plugin đã cài từ bên ngoài vào registry — gọi MỘT LẦN lúc bootstrap
- * (`main.tsx`, trước khi render `<App/>`), đúng vị trí `initPersistentStore()`
- * đã chiếm giữ cho cùng một lý do: mọi thứ đọc `PLUGINS` (sidebar, Command
- * Palette, `FeatureContext`) giả định danh sách đã ĐẦY ĐỦ trước khung hình vẽ
- * đầu tiên, và một plugin cài từ bên ngoài không thể biết được tại thời điểm
- * `import.meta.glob` chạy (lúc build) — nó chỉ tồn tại trên đĩa của máy người
- * dùng, đọc được lúc app khởi động, không sớm hơn.
- *
- * Không làm gì trên bản web (`!isTauri`): không có kho cài đặt cục bộ nào để
- * đọc — giữ `PLUGINS` đúng 26 plugin compile-time, khớp `registry.test.ts`.
- *
- * KHÔNG phản ứng lại khi cài/gỡ plugin trong lúc app đang chạy: `PLUGINS` chỉ
- * được đọc lại một lần ở đây. Settings → Extensions nhắc người dùng khởi động lại
- * app sau khi cài/gỡ/cập nhật — cùng mô hình app đã dùng cho việc TỰ CẬP NHẬT
- * (`UpdateContext` cũng cài xong rồi `relaunch()`), không phải một quyết định
- * riêng cho plugin.
+ * Registers installed plugins. Called once in main.tsx before rendering, so
+ * every consumer of `PLUGINS` sees the full list on first paint. No-op on
+ * the web. Installing or removing a plugin takes effect after a restart,
+ * which Settings asks for.
  */
 export async function initInstalledPlugins(): Promise<void> {
   if (!isTauri) return;
