@@ -29,8 +29,12 @@ export interface CronFieldValues {
  * `searchedYears`: số năm đã quét. Ít hơn `count` lần chạy nghĩa là chỉ có
  * chừng đó lần TRONG khoảng đó — không phải "không bao giờ chạy" (lịch thưa
  * như 29/2 rơi vào thứ Hai cách nhau tới 28 năm).
+ *
+ * `null` khi biểu thức ghim năm (Quartz): khi đó đã quét HẾT mọi năm được phép,
+ * nên danh sách là đầy đủ — không có "cửa sổ N năm" nào để nói tới (năm ghim
+ * đã qua thì khoảng cách tới nó là 0 hoặc âm, vô nghĩa).
  */
-export type NextRunsResult = { runs: Date[]; searchedYears: number } | { unsupported: string };
+export type NextRunsResult = { runs: Date[]; searchedYears: number | null } | { unsupported: string };
 
 const MONTHS: Record<string, number> = {
   JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12,
@@ -161,7 +165,7 @@ export function nextCronRuns(
     // Ghim năm (Quartz) thì quét tới hết năm lớn nhất được phép — `… 2099` cách
     // xa hơn 8 năm từng bị báo "không chạy". Không ghim thì quét SEARCH_YEARS năm.
     const lastYear = years ? Math.max(...years) : from.getFullYear() + SEARCH_YEARS;
-    const searchedYears = lastYear - from.getFullYear();
+    const searchedYears = years ? null : SEARCH_YEARS;
     const end = years ? new Date(lastYear + 1, 0, 1) : new Date(from.getFullYear() + SEARCH_YEARS, from.getMonth(), from.getDate() + 1);
     const runs: Date[] = [];
     const day = new Date(from.getFullYear(), from.getMonth(), from.getDate());

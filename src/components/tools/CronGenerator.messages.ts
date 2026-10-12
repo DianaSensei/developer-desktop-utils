@@ -93,6 +93,8 @@ export default defineMessages({
   previewUnsupportedAfter: { vi: '— bản thân biểu thức vẫn hợp lệ.', en: '— the expression itself is still valid.' },
   neverFires: { vi: 'Không có lần chạy nào trong {{years}} năm tới.', en: 'No runs in the next {{years}} years.' },
   fewRuns: { vi: 'Chỉ có {{n}} lần chạy trong {{years}} năm tới.', en: 'Only {{n}} runs in the next {{years}} years.' },
+  noFutureRuns: { vi: 'Không còn lần chạy nào — các năm được phép đã qua hoặc không năm nào khớp.', en: 'No upcoming runs — the allowed years have passed or none of them match.' },
+  allRemainingRuns: { vi: 'Đây là tất cả các lần chạy còn lại.', en: 'These are all the remaining runs.' },
   inSeconds: { vi: 'sau {{n}} giây', en: 'in {{n}}s' },
   inMinutes: { vi: 'sau {{n}} phút', en: 'in {{n}} min' },
   inHours: { vi: 'sau {{n}} giờ', en: 'in {{n}} h' },

@@ -68,4 +68,13 @@ describe('nextCronRuns', () => {
     expect('searchedYears' in r && r.searchedYears).toBe(8);
     expect(runs(r).length).toBeLessThan(5);
   });
+
+  // Góp ý review PR #173 (lần 2): với năm ghim, khoảng cách tới năm đó không
+  // phải "cửa sổ quét" — năm đã qua cho ra 0 hoặc số âm.
+  it('year-pinned schedules report an exhaustive search, not a year count', () => {
+    const past = nextCronRuns('quartz', f({ minute: '0', hour: '0', dayOfMonth: '1', month: '1', dayOfWeek: '?', year: '2020' }), FROM, 5);
+    expect(past).toEqual({ runs: [], searchedYears: null });
+    const thisYear = nextCronRuns('quartz', f({ minute: '0', hour: '0', dayOfMonth: '1', month: '1', dayOfWeek: '?', year: '2026' }), FROM, 5);
+    expect(thisYear).toEqual({ runs: [], searchedYears: null });
+  });
 });
