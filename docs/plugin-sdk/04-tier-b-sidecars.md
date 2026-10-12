@@ -370,7 +370,7 @@ chạy được từ app thật:
 3. **`scripts/prepare-service-sidecars.mjs`** — thêm tên bin vào
    `SERVICE_SIDECARS` (build trước `tauri build`, chạy tay lúc dev).
 
-`service_host.rs`'s test `allowlist_khop_voi_external_bin` khoá chiều (1)
+`service_host.rs`'s test `bundled_services_are_listed_in_external_bin` khoá chiều (1)
 ↔ (2) khớp nhau — không khoá được (3) vì Rust/Node không chia sẻ hằng số
 qua ranh giới ngôn ngữ; thiếu (3) chỉ lộ ra lúc build release thật, không
 lộ lúc `cargo test`.

@@ -17,7 +17,7 @@
 // instead. `secret_vault_reset` discards it on explicit user request.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use aes_gcm::aead::{Aead, KeyInit, Nonce};
@@ -83,15 +83,8 @@ fn app_data(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-fn write_key_file(path: &PathBuf, key: &[u8]) -> Result<(), String> {
-    std::fs::write(path, BASE64.encode(key)).map_err(|e| e.to_string())?;
-    // Restrict to the owner on Unix; Windows' default ACL is per-user.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
-    }
-    Ok(())
+fn write_key_file(path: &Path, key: &[u8]) -> Result<(), String> {
+    crate::private_file::write(path, BASE64.encode(key)).map_err(|e| e.to_string())
 }
 
 fn decode_key(raw: &str) -> Option<[u8; KEY_LEN]> {
@@ -160,13 +153,23 @@ fn nonce_of(bytes: &[u8]) -> Result<Nonce<Aes256Gcm>, String> {
 
 type Entries = BTreeMap<String, String>;
 
-fn read_entries(app: &AppHandle, key: &[u8; KEY_LEN]) -> Result<Entries, String> {
-    let path = app_data(app)?.join(VAULT_FILE);
-    let raw = match std::fs::read_to_string(&path) {
-        Ok(raw) => raw,
-        Err(_) => return Ok(Entries::new()),
-    };
-    let file: VaultFile = serde_json::from_str(&raw).map_err(|e| format!("Kho bí mật hỏng: {e}"))?;
+/// Encrypts `entries` with a fresh nonce. Reusing a nonce with the same key
+/// breaks GCM entirely.
+fn seal(key: &[u8; KEY_LEN], entries: &Entries) -> Result<VaultFile, String> {
+    let nonce = random_bytes(NONCE_LEN)?;
+    let plain = serde_json::to_vec(entries).map_err(|e| e.to_string())?;
+    let ciphertext = cipher(key)?
+        .encrypt(&nonce_of(&nonce)?, plain.as_ref())
+        .map_err(|e| e.to_string())?;
+    Ok(VaultFile {
+        version: FORMAT_VERSION,
+        nonce: BASE64.encode(&nonce),
+        ciphertext: BASE64.encode(&ciphertext),
+    })
+}
+
+/// Decrypts a vault file. Fails if it was sealed with another key or modified.
+fn open(key: &[u8; KEY_LEN], file: &VaultFile) -> Result<Entries, String> {
     if file.version != FORMAT_VERSION {
         return Err(format!(
             "Kho bí mật ở định dạng v{} còn bản app này đọc v{FORMAT_VERSION}",
@@ -185,32 +188,24 @@ fn read_entries(app: &AppHandle, key: &[u8; KEY_LEN]) -> Result<Entries, String>
     serde_json::from_slice(&plain).map_err(|e| e.to_string())
 }
 
-fn write_entries(app: &AppHandle, key: &[u8; KEY_LEN], entries: &Entries) -> Result<(), String> {
-    // Fresh nonce on every write; reusing a nonce with the same key breaks
-    // GCM entirely.
-    let nonce = random_bytes(NONCE_LEN)?;
-    let plain = serde_json::to_vec(entries).map_err(|e| e.to_string())?;
-    let ciphertext = cipher(key)?
-        .encrypt(&nonce_of(&nonce)?, plain.as_ref())
-        .map_err(|e| e.to_string())?;
-
-    let file = VaultFile {
-        version: FORMAT_VERSION,
-        nonce: BASE64.encode(&nonce),
-        ciphertext: BASE64.encode(&ciphertext),
-    };
+fn read_entries(app: &AppHandle, key: &[u8; KEY_LEN]) -> Result<Entries, String> {
     let path = app_data(app)?.join(VAULT_FILE);
+    let raw = match std::fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(_) => return Ok(Entries::new()),
+    };
+    let file: VaultFile = serde_json::from_str(&raw).map_err(|e| format!("Kho bí mật hỏng: {e}"))?;
+    open(key, &file)
+}
+
+fn write_entries(app: &AppHandle, key: &[u8; KEY_LEN], entries: &Entries) -> Result<(), String> {
+    let json = serde_json::to_string(&seal(key, entries)?).map_err(|e| e.to_string())?;
+    let dir = app_data(app)?;
     // Atomic write (temp file, then rename) so a crash cannot leave a
     // truncated vault.
-    let tmp_path = app_data(app)?.join(format!("{VAULT_FILE}.tmp"));
-    std::fs::write(&tmp_path, serde_json::to_string(&file).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o600));
-    }
-    std::fs::rename(&tmp_path, &path).map_err(|e| e.to_string())
+    let tmp_path = dir.join(format!("{VAULT_FILE}.tmp"));
+    crate::private_file::write(&tmp_path, json).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp_path, dir.join(VAULT_FILE)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -302,48 +297,23 @@ mod tests {
         <[u8; KEY_LEN]>::try_from(random_bytes(KEY_LEN).unwrap().as_slice()).unwrap()
     }
 
-    /// Encrypts entries the same way `write_entries` does, without an
-    /// `AppHandle`.
-    fn seal(k: &[u8; KEY_LEN], entries: &Entries) -> VaultFile {
-        let nonce = random_bytes(NONCE_LEN).unwrap();
-        let ciphertext = cipher(k)
-            .unwrap()
-            .encrypt(&nonce_of(&nonce).unwrap(), serde_json::to_vec(entries).unwrap().as_ref())
-            .unwrap();
-        VaultFile {
-            version: FORMAT_VERSION,
-            nonce: BASE64.encode(&nonce),
-            ciphertext: BASE64.encode(&ciphertext),
-        }
-    }
-
-    fn open(k: &[u8; KEY_LEN], file: &VaultFile) -> Result<Entries, String> {
-        let nonce = BASE64.decode(&file.nonce).unwrap();
-        let ciphertext = BASE64.decode(&file.ciphertext).unwrap();
-        let plain = cipher(k)
-            .unwrap()
-            .decrypt(&nonce_of(&nonce).unwrap(), ciphertext.as_ref())
-            .map_err(|_| "không giải mã được".to_string())?;
-        Ok(serde_json::from_slice(&plain).unwrap())
-    }
-
     #[test]
-    fn ma_hoa_roi_giai_ma_lai_dung_nguyen_ven() {
+    fn encrypt_then_decrypt_round_trips() {
         let k = key();
         let mut entries = Entries::new();
         entries.insert("2fa/accounts".into(), "JBSWY3DPEHPK3PXP".into());
 
-        let restored = open(&k, &seal(&k, &entries)).unwrap();
+        let restored = open(&k, &seal(&k, &entries).unwrap()).unwrap();
         assert_eq!(restored, entries);
     }
 
     #[test]
-    fn ban_ma_khong_chua_ban_ro() {
+    fn ciphertext_does_not_contain_plaintext() {
         let k = key();
         let mut entries = Entries::new();
         entries.insert("2fa/accounts".into(), "JBSWY3DPEHPK3PXP".into());
 
-        let file = seal(&k, &entries);
+        let file = seal(&k, &entries).unwrap();
         // Key names must not leak either: they reveal which plugins hold
         // secrets.
         assert!(!file.ciphertext.contains("JBSWY3DPEHPK3PXP"));
@@ -351,31 +321,31 @@ mod tests {
     }
 
     #[test]
-    fn khoa_khac_thi_khong_mo_duoc() {
+    fn wrong_key_cannot_decrypt() {
         let mut entries = Entries::new();
         entries.insert("a".into(), "b".into());
-        let file = seal(&key(), &entries);
+        let file = seal(&key(), &entries).unwrap();
         assert!(open(&key(), &file).is_err());
     }
 
     #[test]
-    fn moi_lan_ghi_dung_mot_nonce_khac() {
+    fn every_write_uses_a_new_nonce() {
         // Nonce reuse with the same key breaks GCM, so guard it with a test.
         let k = key();
         let entries = Entries::new();
-        let a = seal(&k, &entries);
-        let b = seal(&k, &entries);
+        let a = seal(&k, &entries).unwrap();
+        let b = seal(&k, &entries).unwrap();
         assert_ne!(a.nonce, b.nonce);
         assert_ne!(a.ciphertext, b.ciphertext);
     }
 
     #[test]
-    fn ban_ma_bi_sua_thi_bi_tu_choi() {
+    fn tampered_ciphertext_is_rejected() {
         // GCM is authenticated: a modified byte must fail decryption.
         let k = key();
         let mut entries = Entries::new();
         entries.insert("a".into(), "b".into());
-        let mut file = seal(&k, &entries);
+        let mut file = seal(&k, &entries).unwrap();
 
         let mut raw = BASE64.decode(&file.ciphertext).unwrap();
         raw[0] ^= 0xff;
@@ -385,7 +355,15 @@ mod tests {
     }
 
     #[test]
-    fn khoa_sai_do_dai_bi_tu_choi_khi_giai_ma_base64() {
+    fn unknown_format_version_is_rejected() {
+        let k = key();
+        let mut file = seal(&k, &Entries::new()).unwrap();
+        file.version = FORMAT_VERSION + 1;
+        assert!(open(&k, &file).is_err());
+    }
+
+    #[test]
+    fn key_of_wrong_length_is_rejected() {
         assert!(decode_key(&BASE64.encode([0u8; 16])).is_none());
         assert!(decode_key("khong-phai-base64!!").is_none());
         assert!(decode_key(&BASE64.encode([0u8; KEY_LEN])).is_some());
