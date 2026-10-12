@@ -1,15 +1,9 @@
 /**
- * Vá các API trình duyệt mà jsdom không có.
+ * Polyfills browser APIs that jsdom lacks.
  *
- * `ResizeObserver` là API thật, có ở cả ba webview của Tauri (WKWebView,
- * WebView2, WebKitGTK) — chỉ jsdom là thiếu. Các component đo đạc bố cục
- * (`Segmented`, `Tabs`) dùng nó để giữ con trượt / gạch chân bám đúng nút khi
- * bề rộng đổi, nên vá ở tầng môi trường test đúng hơn là bắt component phải
- * mang theo một nhánh `typeof ResizeObserver === 'undefined'` chỉ để chiều
- * jsdom.
- *
- * Bản vá này KHÔNG gọi callback: test trong repo dựng cây trong jsdom, nơi mọi
- * phép đo đều trả về 0, nên không có thay đổi kích thước thật nào để báo.
+ * `ResizeObserver` exists in all three Tauri webviews; only jsdom is missing
+ * it, so it is stubbed here rather than guarded in components (`Segmented`,
+ * `Tabs`). The stub never fires: jsdom measures everything as 0.
  */
 if (!('ResizeObserver' in globalThis)) {
   globalThis.ResizeObserver = class {
