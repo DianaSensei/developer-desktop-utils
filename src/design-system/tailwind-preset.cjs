@@ -1,15 +1,13 @@
 /**
- * DevTool — preset Tailwind lớp app.
+ * DevTool — app Tailwind preset.
  *
- * Kế thừa preset của design kit (`design/tailwind-preset.cjs`). Từ vựng màu
- * (`acc`, `bg`, `fg`, `line`, `ok/warn/bad/info`…) đến thẳng từ preset kit —
- * lớp bắc cầu từ vựng cũ (`background`, `primary`, `muted`…) đã bị xoá ở G5,
- * sau khi toàn bộ ~2430 chỗ gọi trong `src/` đổi sang tên của kit.
+ * Extends the design kit preset (`design/tailwind-preset.cjs`), which
+ * provides the colour vocabulary (`acc`, `bg`, `fg`, `line`, `ok/warn/bad/info`…).
  *
  *   // tailwind.config.js
  *   presets: [require('./src/design-system/tailwind-preset.cjs')]
  *
- *   // global CSS, TRƯỚC các @tailwind
+ *   // global CSS, before the @tailwind directives
  *   @import "../design-system/tokens.css";
  *
  * @type {import('tailwindcss').Config}
@@ -19,10 +17,8 @@ module.exports = {
   presets: [require('../../design/tailwind-preset.cjs')],
   theme: {
     extend: {
-      /* Bí danh bóng cũ → 3 bậc thật của kit. Còn ~75 chỗ gọi
-         `shadow-sm/md/lg/xl/2xl` gốc của Tailwind (không phải `-premium`) —
-         giữ bí danh này để chúng không phải sửa; không thuộc phạm vi từ
-         vựng MÀU nên G5 không đụng tới. */
+      /* Aliases for Tailwind's stock `shadow-sm/md/lg/xl/2xl` mapped onto the
+         kit's three levels, so existing call sites keep working. */
       boxShadow: {
         sm: 'var(--sh-sm)',
         DEFAULT: 'var(--sh)',
