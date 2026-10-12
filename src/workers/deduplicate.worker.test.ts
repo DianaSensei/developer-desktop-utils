@@ -26,8 +26,8 @@ describe('deduplicate.worker', () => {
   });
 
   it('mỗi dòng bị trim(), và dòng rỗng sau khi trim KHÔNG được tính vào "original"', () => {
-    // '  ' (chỉ khoảng trắng) và dòng trống bị lọc trước khi đếm — nếu tính cả
-    // vào original thì "removed" sẽ báo sai số dòng trùng thực tế bị loại.
+    // Whitespace-only and empty lines are dropped before counting, or
+    // "removed" would overstate the duplicates.
     const r = run('a\n  \n\nb\n a ', 'preserve');
     expect(r.original).toBe(3); // 'a', 'b', 'a' (đã trim) — không tính 2 dòng rỗng
     expect(r.output).toBe('a\nb');

@@ -24,23 +24,17 @@ type Item =
 
 const OPEN_EVENT = 'devtool:open-command-palette';
 
-/** Mở ⌘K từ chỗ khác trong shell (nút "+" trên thanh workspace). */
+/** Opens ⌘K from elsewhere in the shell (the workspace bar's "+"). */
 export function requestCommandPalette() {
   window.dispatchEvent(new Event(OPEN_EVENT));
 }
 
 /**
- * ⌘K — trung tâm điều hướng của app.
+ * ⌘K command palette. Results on the left; a preview (description, keywords,
+ * enabled state) on the right so users can confirm before pressing Enter.
  *
- * Hai cột: danh sách khớp truy vấn bên trái, xem trước (mô tả + từ khoá + trạng
- * thái bật/tắt) bên phải. Đây là điểm khác Spotlight/Alfred — palette thường chỉ
- * có một cột, nhưng DevTool có 24 tool với mô tả dài, nên xem trước giúp người
- * dùng chắc chắn trước khi Enter thay vì đoán qua nhãn.
- *
- * Tự quản lý trạng thái mở/đóng qua listener bàn phím toàn cục — không cần App
- * truyền `open` xuống. Chỉ cần render `<CommandPalette />` một lần, ở đâu cũng
- * được miễn trong <Router> (cần useNavigate) và trong mọi provider (cần
- * useFeatures/useLocale).
+ * Manages its own open state with a global key listener. Render it once
+ * inside <Router> and the app providers.
  */
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false);
@@ -55,8 +49,7 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const { workspaces, active: activeWs, switchWorkspace, promptCreateWorkspace } = useWorkspaces();
 
-  // ⌘K / Ctrl+K mở-đóng, hoạt động bất kể đang focus ở đâu — đúng kỳ vọng của
-  // một command palette. Không chặn phím khác nên không đụng shortcut của tool.
+  // ⌘K / Ctrl+K toggles from anywhere; other keys pass through.
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -73,8 +66,7 @@ export function CommandPalette() {
     };
   }, []);
 
-  // Mỗi lần mở: xoá truy vấn cũ, đọc lại clipboard. Đọc MỘT LẦN lúc mở, không
-  // theo dõi liên tục — palette không cần biết clipboard đổi trong lúc đang mở.
+  // On open: clear the query and read the clipboard once.
   React.useEffect(() => {
     if (!open) return;
     setQuery('');
@@ -94,31 +86,28 @@ export function CommandPalette() {
     return (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
   }, [toolOrder]);
 
-  // Gõ gì đó → khớp truy vấn. Để trống → toàn bộ tool theo thứ tự sidebar, để
-  // palette dùng được cả lúc chỉ muốn NHẢY tới một tool đã biết vị trí quen.
+  // With a query: matches. Without: every tool in sidebar order.
   const results = React.useMemo(() => {
     if (query.trim()) return allTools.filter((tool) => toolMatchesQuery(tool, query));
     return [...allTools].sort((a, b) => rankOf(a.featureId) - rankOf(b.featureId));
   }, [query, rankOf]);
 
-  // Gợi ý clipboard chỉ hiện khi KHÔNG tìm kiếm — gõ gì đó nghĩa là người dùng
-  // đã biết mình cần gì, gợi ý lúc đó chỉ vướng chân.
+  // The clipboard suggestion only shows when not searching.
   const clipboardTool: Tool | null =
     !query.trim() && clipboardIntent
       ? allTools.find((tl) => tl.featureId === clipboardIntent.toolId) ?? null
       : null;
 
-  // Workspace khác workspace đang dùng — đứng đầu danh sách khi chưa gõ gì
-  // (chuyển bộ việc là thao tác hay làm nhất sau mở tool), và khớp theo tên
-  // khi đã gõ.
+  // Other workspaces: first when the query is empty, matched by name
+  // otherwise.
   const workspaceItems: Item[] = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     const list: Item[] = workspaces
       .map((ws, i) => ({ ws, name: workspaceLabel(ws, i, (n) => t('shell.workspace.defaultName', { n })) }))
       .filter(({ ws, name }) => ws.id !== activeWs.id && (!q || name.toLowerCase().includes(q)))
       .map(({ ws, name }) => ({ kind: 'workspace' as const, ws, name }));
-    // Lệnh tạo workspace: thanh tab (nơi có menu workspace) chỉ hiện khi đã có
-    // ≥2 tab — nên ⌘K phải là đường thứ hai, khớp theo "workspace"/"new"/tên lệnh.
+    // "New workspace" command: the workspace menu only appears with 2+
+    // tabs, so ⌘K is the other way in.
     const newLabel = t('shell.workspace.new');
     const wantsNew = !!q && (newLabel.toLowerCase().includes(q) || 'workspace'.includes(q) || q.includes('workspace'));
     return wantsNew ? [...list, { kind: 'newWorkspace' as const, name: newLabel }] : list;
@@ -433,7 +422,7 @@ function WorkspaceRow({
   refCb,
 }: {
   name: string;
-  /** null = dòng lệnh "Workspace mới…" chứ không phải một workspace có sẵn. */
+  /** `null` for the "New workspace…" command row. */
   count: number | null;
   active: boolean;
   onHover: () => void;

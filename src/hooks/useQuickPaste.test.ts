@@ -2,8 +2,8 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useQuickPaste, isMac, quickPasteHint } from '@/hooks/useQuickPaste';
 
-/** Chưa có test nào — đường ⌘V "dán nhanh" thay toàn bộ nội dung một ô, dùng
- *  bởi nhiều tool nhận input dạng dán-để-xử-lý (JSON, Base64, mã hoá…). */
+/** Quick paste: ⌘V outside an input replaces a field's whole content, used
+ *  by paste-to-process tools (JSON, Base64, encoding...). */
 
 function keydownV(target: EventTarget, init: Partial<KeyboardEventInit> = {}) {
   const evt = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'v', metaKey: true, ...init });

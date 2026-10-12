@@ -12,9 +12,9 @@ export interface WorkspaceNameDialogProps {
 }
 
 /**
- * Hộp đặt tên workspace — dùng chung cho tạo mới và đổi tên. Tên để trống vẫn
- * hợp lệ: workspace khi đó hiện tên mặc định theo số thứ tự, nên Enter ngay
- * lập tức là đường nhanh nhất để có một workspace mới.
+ * Workspace naming dialog for create and rename. An empty name is valid (a
+ * numbered default is shown), so pressing Enter right away is the fastest way
+ * to create a workspace.
  */
 export function WorkspaceNameDialog({ mode, initialName, onSubmit, onCancel }: WorkspaceNameDialogProps) {
   const { t } = useLocale();

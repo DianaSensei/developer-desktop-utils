@@ -19,12 +19,9 @@ export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEl
    */
   size?: 'xs' | 'sm' | 'md';
   /**
-   * Việc gắn với nút đang chạy. Xoay icon bên trong, khoá nút lại và báo
-   * `aria-busy` — thay cho cách cũ là đổi luôn icon sang `<Spinner>`, vốn làm
-   * nút nhấp một cái vì hai glyph không cùng bề rộng.
-   *
-   * Dùng cho nút Tải lại / Làm mới: 81 nút loại này trong app, trước đây chỉ
-   * 2 nút có bất kỳ dấu hiệu nào cho biết bấm rồi thì đang có việc chạy.
+   * The button's task is running: spins the icon, disables the button and
+   * sets `aria-busy`. The icon spins in place rather than being swapped for
+   * `<Spinner>`, so the width stays stable.
    */
   busy?: boolean;
 }
@@ -43,10 +40,8 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       disabled={disabled ?? busy}
       aria-busy={busy || undefined}
       className={cn(
-        // `transition-colors` một mình là lý do nút icon đọc ra tẻ: bấm vào
-        // không có gì xảy ra dưới ngón tay, chỉ có màu nền đổi — mà màu nền
-        // thì hover đã đổi rồi. Thêm cú lún 0.90 (mạnh hơn nút chữ vì hộp
-        // nhỏ hơn, 0.97 ở 24px là không thấy) trong `--dur-press`.
+        // Press scale 0.90 in `--dur-press` (stronger than text buttons'
+        // 0.97, which is invisible at 24px).
         'inline-flex shrink-0 items-center justify-center rounded-sm text-fg-mute',
         'transition-[color,background-color,transform] duration-fast ease-out-soft',
         'motion-safe:active:scale-90 motion-safe:active:duration-press',
@@ -55,7 +50,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         'disabled:pointer-events-none disabled:opacity-50',
         size === 'xs' ? 'h-6 w-6' : 'h-ctl w-ctl',
         active && 'bg-acc/10 text-acc hover:bg-acc/15',
-        // Xoay chính icon đang có, không tráo sang glyph khác.
+        // Spin the existing icon.
         busy && '[&>svg]:animate-spin',
         className,
       )}

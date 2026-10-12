@@ -1,20 +1,9 @@
-// A horizontal tab strip that progressively collapses trailing tabs into a »
-// overflow menu as it runs out of room — using measured widths so the active tab
-// is never clipped. An optional `right` node is pinned to the right edge and the
-// tabs yield space to it (e.g. a status readout or toolbar controls).
+// Horizontal tab strip that moves trailing tabs into a » overflow menu as it
+// runs out of room, using measured widths so the active tab is never
+// clipped. An optional `right` node is pinned to the right edge.
 //
-// Shared foundation: originally built for API Client's request/response panel
-// tabs; promoted here so any tool with a horizontal tab strip (Kafka topic
-// views, RabbitMQ queue/exchange views) gets the same collapse-to-overflow
-// behavior instead of a plain non-responsive tab row that clips at narrow
-// widths.
-//
-// Active tab is a rounded-md filled pill — the app's one semantic shape for
-// "this is selected" (see design/RULES.md's "Bo góc cho trạng thái đang chọn"
-// rule). This used to be an opt-in `variant` (a sliding-underline strip was
-// the default, kept for compatibility with the tools that hadn't been moved
-// over yet); every consumer has since moved to the pill, so the underline
-// path and the `variant` prop are gone — one shape, not two to keep in sync.
+// The active tab is a rounded-md filled pill, the app's shape for "selected"
+// (design/RULES.md).
 
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronsRight } from 'lucide-react';

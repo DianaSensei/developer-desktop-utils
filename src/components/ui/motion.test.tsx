@@ -14,31 +14,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 /**
- * Rào chắn cho lớp chuyển động/phản hồi thao tác.
- *
- * Không kiểm "có chạy animation không" — jsdom không chạy animation, và kiểm
- * tên class thì chỉ chép lại đúng cái mình vừa viết. Kiểm những HÀNH VI mà một
- * lần refactor rất dễ làm hỏng lặng lẽ, và đúng những chỗ ĐÃ TỪNG hỏng lặng lẽ
- * trong repo này:
- *
- *   - class không tồn tại (Tailwind bỏ qua lặng lẽ, `StatusMessage` mất màu
- *     nhiều tháng mà không ai thấy),
- *   - phần tử bị gỡ khỏi DOM trước khi kịp có animation ra,
- *   - nội dung đang thu lại vẫn Tab vào được.
+ * Guards for motion and interaction feedback. jsdom does not run animations,
+ * so these check behaviors that refactors break silently: class names that
+ * do not exist (Tailwind ignores them), elements removed before their exit
+ * animation, and collapsed content that is still focusable.
  */
 
 describe('Vòng focus — MỘT công thức cho toàn app', () => {
-  // Quét toàn bộ `src/**/*.tsx` thay vì một danh sách file cứng: sáu công thức
-  // vòng focus khác nhau (`ring-acc/35`, `/40`, `/50`, đặc, có/không offset)
-  // là đúng lỗi user report ở phiên trước — bị bắt lại một cách máy móc, không
-  // phải liệt kê từng file rồi quên cập nhật danh sách lần sau.
-  //
-  // KHÔNG dùng cách đếm này để cấm `ring-*` nói chung — chấm trạng thái, viền
-  // kéo-thả, khối màu trong Clockify… vẫn được dùng `ring-1`/`ring-2` với màu
-  // ngữ nghĩa riêng (`ring-ok/40`, `ring-line`) vì đó không phải vòng focus.
-  // Luật ở đây hẹp hơn: bất cứ đâu dùng ĐÚNG bề rộng `ring-[3px]` (bề rộng chỉ
-  // dành riêng cho vòng focus trong app này) thì bắt buộc phải đi kèm màu
-  // `ring-focus` trong CÙNG FILE.
+  // Scans every `src/**/*.tsx`: any use of `ring-[3px]` (the focus ring
+  // width) must come with `ring-focus` in the same file. Other `ring-*`
+  // uses (status dots, drag outlines) are not focus rings and are allowed.
   it('mọi `ring-[3px]` trong `src/**/*.tsx` đều có `ring-focus` đi kèm, trong cùng file', () => {
     const files = execSync(
       "git ls-files 'src/**/*.tsx' ':!:src/**/*.test.tsx'",
@@ -48,9 +33,7 @@ describe('Vòng focus — MỘT công thức cho toàn app', () => {
     const mismatches: string[] = [];
     for (const f of files) {
       const raw = readFileSync(resolve(process.cwd(), f), 'utf-8');
-      // Bỏ comment trước khi đếm — cùng lý do `design-system/guard.test.ts`
-      // làm việc này: một dòng giải thích *vì sao* nhắc tới `ring-[3px]` không
-      // được tính là một lần dùng thật.
+      // Strip comments first, so text explaining `ring-[3px]` is not counted.
       const stripped = raw
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/(^|[^:])\/\/.*$/gm, '$1');
@@ -63,10 +46,8 @@ describe('Vòng focus — MỘT công thức cho toàn app', () => {
 });
 
 describe('Vòng focus — không được dính lại sau khi bấm chuột', () => {
-  // `focus:` khớp với MỌI kiểu nhận tiêu điểm, kể cả click chuột — nên vòng
-  // sáng ở lại trên control cho tới khi bấm chỗ khác. `focus-visible:` chỉ khớp
-  // khi trình duyệt đánh giá là người dùng đang đi bằng bàn phím. Trước đây
-  // `SelectTrigger` (có mặt ở gần như mọi tool) và nút đóng Dialog dùng `focus:`.
+  // `focus:` also matches mouse focus, leaving the ring after a click;
+  // `focus-visible:` only applies to keyboard navigation.
   const files = [
     'src/components/ui/select.tsx',
     'src/components/ui/dialog.tsx',
@@ -78,21 +59,20 @@ describe('Vòng focus — không được dính lại sau khi bấm chuột', ()
   it('không control dùng chung nào còn dùng `focus:` cho vòng sáng', () => {
     for (const f of files) {
       const src = readFileSync(resolve(process.cwd(), f), 'utf-8');
-      // `focus:` đứng một mình (không phải `focus-visible:` / `focus-within:`)
-      // đi kèm ring/border/outline.
+      // Bare `focus:` (not `focus-visible:`/`focus-within:`) with ring,
+      // border or outline.
       expect(src, f).not.toMatch(/(?<!-)\bfocus:(ring|border|outline)/);
     }
   });
 
-  // Bao quát bởi rào chắn tổng quát ở khối 'Vòng focus — MỘT công thức
-  // cho toàn app' bên trên (Tailwind 4 không còn màu ring mặc định).
+  // Covered by the app-wide focus ring guard above.
 
   it('nút không còn quầng sáng ngả accent — design/RULES.md cấm glow', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/components/ui/button.tsx'), 'utf-8');
-    // Chỉ soi phần biến thể, không soi phần comment giải thích vì sao đã bỏ.
+    // Check the variants only, not the comments.
     const variants = src.slice(src.indexOf('variant: {'), src.indexOf('size: {'));
     expect(variants).not.toContain('shadow-primary');
-    // Bóng chỉ đi qua thang của kit, không có utility nào ghi thẳng box-shadow.
+    // Shadows only come from the kit scale; no arbitrary box-shadow.
     expect(variants).not.toMatch(/shadow-\[/);
   });
 });
@@ -115,8 +95,8 @@ describe('Checkbox', () => {
 
     rerender(<Checkbox checked />);
     const tick = container.querySelector('path')!;
-    // `stroke-dasharray` phải khớp `--tick-len` mà keyframe kéo về 0; lệch nhau
-    // thì nét vẽ hoặc bị cụt hoặc đứng im một đoạn đầu.
+    // `stroke-dasharray` must match `--tick-len`, which the keyframe
+    // animates to 0.
     expect(tick.getAttribute('stroke-dasharray')).toBe('16');
 
     rerender(<Checkbox checked={false} indeterminate />);
@@ -159,9 +139,9 @@ describe('CollapsibleSection', () => {
         <button>Bên trong</button>
       </CollapsibleSection>,
     );
-    // Còn trong DOM — nếu không thì không có gì để animate chiều cao.
+    // Still in the DOM, so its height can animate...
     const inner = screen.getByText('Bên trong');
-    // …nhưng `inert` để bàn phím và trình đọc màn hình bỏ qua phần đang cuộn lại.
+    // ...but `inert`, so keyboard and screen readers skip it.
     expect(inner.closest('[inert]')).not.toBeNull();
 
     fireEvent.click(screen.getByText('Advanced'));
@@ -171,9 +151,7 @@ describe('CollapsibleSection', () => {
 
 describe('StatusMessage', () => {
   it('mỗi trạng thái mang màu RIÊNG của nó', () => {
-    // Đây chính là lỗi đã có thật: `success-state` / `error-state` /
-    // `warning-state` không tồn tại ở đâu cả, nên Tailwind bỏ qua và báo lỗi
-    // trông y hệt báo thành công. Test này khoá lại để không tái diễn.
+    // These class names once did not exist, so every state looked the same.
     const tones = { success: 'text-ok', error: 'text-bad', warning: 'text-warn', info: 'text-info' } as const;
     for (const [status, expected] of Object.entries(tones)) {
       const { container, unmount } = render(
@@ -195,7 +173,7 @@ describe('ContextMenu', () => {
       expect(screen.getByRole('menu')).toBeTruthy();
 
       fireEvent.click(screen.getByText('Xoá'));
-      // Vẫn còn trong DOM ngay sau click — chưa gọi onClose thật.
+      // Still in the DOM right after the click; onClose has not run yet.
       const menu = screen.getByRole('menu');
       expect(menu.className).toContain('pointer-events-none');
       expect(onClose).not.toHaveBeenCalled();
@@ -224,8 +202,7 @@ describe('DropdownMenu', () => {
       expect(screen.getByRole('menu')).toBeTruthy();
 
       fireEvent.click(screen.getByText('Mở'));
-      // Vẫn còn đó — nhưng đã ngừng nhận chuột, để cú click kế tiếp của người
-      // dùng không rơi vào một panel đang biến mất.
+      // Still present but no longer receives clicks while it disappears.
       const menu = screen.getByRole('menu');
       expect(menu.className).toContain('pointer-events-none');
 

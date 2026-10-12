@@ -2,13 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_APP_CONFIG, mergeConfig, CONFIG_FIELDS, SECTION_LABELS, type AppConfig } from '@/config/appConfig';
 
 /**
- * `mergeConfig` là hàng phòng thủ giữa localStorage (dữ liệu người dùng cũ,
- * có thể thiếu field mới thêm sau này, hoặc hỏng hoàn toàn) và phần còn lại
- * của app luôn giả định `AppConfig` đầy đủ. Sai ở đây → Settings render field
- * `undefined` hoặc toàn app throw khi đọc `config.editor.copyFeedbackMs`.
- * `CONFIG_FIELDS`/`SECTION_LABELS` là bảng khai báo tay riêng biệt với
- * `AppConfig` — test coi đây là bảng dữ liệu để đối chiếu tính toàn vẹn, một
- * việc TypeScript không tự kiểm được (chuỗi `key` không gõ kiểu theo AppConfig).
+ * `mergeConfig` guards the app against stored config that lacks newer fields
+ * or is corrupt. `CONFIG_FIELDS`/`SECTION_LABELS` are hand-written tables
+ * keyed by strings, so their consistency with `AppConfig` is checked here.
  */
 
 describe('mergeConfig', () => {
@@ -65,8 +61,7 @@ describe('mergeConfig', () => {
 
 describe('CONFIG_FIELDS / SECTION_LABELS — toàn vẹn dữ liệu với AppConfig', () => {
   it('mỗi field khai báo section/key đều thật sự tồn tại trong DEFAULT_APP_CONFIG', () => {
-    // Bảng này gõ tay, tách rời khỏi type `AppConfig` (key là string thô) —
-    // TypeScript không bắt được lỗi đánh máy ở đây, chỉ runtime mới thấy.
+    // Keys are plain strings, so TypeScript cannot catch typos here.
     for (const f of CONFIG_FIELDS) {
       const section = DEFAULT_APP_CONFIG[f.section] as Record<string, unknown>;
       expect(section, `section "${f.section}"`).toBeDefined();

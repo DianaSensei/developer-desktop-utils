@@ -19,34 +19,15 @@ export interface SegmentedProps<T extends string> {
 }
 
 /**
- * Pill / segmented toggle — the canonical mode-switch control for tools.
+ * Pill / segmented toggle, the standard mode switch for tools.
  *
- * ── Vì sao mục đang chọn là NỀN ĐẶC màu accent ──────────────────────────────
- * Bản trước dùng thẻ trắng (`bg-card`) trên nền xám nhạt (`bg-bg-2`). Trong
- * bảng màu mới hai màu đó gần nhau, nên tương phản gần bằng không — nhìn không
- * ra đang chọn cái nào. Nền đặc + chữ nghịch đảo thì không thể nhầm được, ở cả
- * light lẫn dark, ở cả bốn tone accent.
- *
- * ── Máng lõm ────────────────────────────────────────────────────────────────
- * Máng dùng `bg-sunk` + bóng inset để đọc ra là một RÃNH mà con trượt chạy
- * trong đó. Nếu máng phẳng ngang mặt nền, mục đang chọn trông như một nút rời
- * bay lơ lửng chứ không phải một lựa chọn trong nhóm.
- *
- * ── Con trượt CÓ THẬT, và nó TRƯỢT ──────────────────────────────────────────
- * Bản trước gọi cái rãnh là "máng mà con trượt chạy trong đó" nhưng lại không
- * có con trượt nào: nền accent chỉ TẮT ở mục cũ và BẬT ở mục mới, cách nhau cả
- * chiều rộng control. Cái tên hứa một thứ mà mắt không thấy, và người dùng mất
- * luôn thông tin "vừa đi từ đâu sang đâu" — thứ duy nhất mà chuyển động ở một
- * bộ chọn cần nói.
- *
- * Giờ có đúng MỘT ô nền accent nằm dưới các nút, được đo theo nút đang chọn và
- * dịch bằng `transform` (không phải `left`, để không gây reflow mỗi khung
- * hình). Chữ vẫn đổi màu trong `--dur-fast`, con trượt đi trong `--dur-base`
- * bằng `--ease-spring`.
- *
- * Lần render đầu con trượt được đặt KHÔNG có transition (`ready`), nếu không
- * nó sẽ bay từ mép trái sang mục đang chọn ngay khi mở trang — một chuyển động
- * chẳng kể chuyện gì vì người dùng chưa làm gì cả.
+ * - The selected item is a solid accent thumb with inverted text, which is
+ *   unambiguous in both themes and every accent tone.
+ * - The track is sunk (`bg-sunk` plus an inset shadow) so the thumb reads
+ *   as moving inside a groove.
+ * - One thumb sits under the buttons, measured from the selected button and
+ *   moved with `transform` (no reflow) in `--dur-base` with `--ease-spring`.
+ *   The first placement has no transition (`ready`).
  */
 export function Segmented<T extends string>({
   value,
@@ -60,8 +41,8 @@ export function Segmented<T extends string>({
   const trackRef = React.useRef<HTMLDivElement | null>(null);
   const activeIndex = Math.max(0, options.findIndex((o) => o.value === value));
 
-  // Vị trí + bề rộng con trượt, đo từ nút đang chọn. `ready` phân biệt lần đặt
-  // đầu tiên (nhảy thẳng vào chỗ) với các lần đổi sau (trượt).
+  // Thumb position and width, measured from the selected button. `ready`
+  // separates the first placement (no animation) from later moves.
   const [thumb, setThumb] = React.useState<{ x: number; w: number } | null>(null);
   const ready = React.useRef(false);
 
@@ -70,13 +51,12 @@ export function Segmented<T extends string>({
     const el = refs.current[activeIndex];
     if (!track || !el) return;
     const measure = () => {
-      // `offsetLeft` là toạ độ so với máng (máng có `position: relative`), nên
-      // không phải gọi getBoundingClientRect hai lần và trừ cho nhau.
+      // `offsetLeft` is relative to the track (position: relative).
       setThumb({ x: el.offsetLeft, w: el.offsetWidth });
     };
     measure();
-    // Nhãn đổi (đổi ngôn ngữ, badge hiện ra) hoặc panel co lại thì bề rộng nút
-    // đổi theo — con trượt phải đo lại, nếu không nó lệch khỏi nút.
+    // Re-measure when button widths change (language switch, badge,
+    // container resize).
     const ro = new ResizeObserver(measure);
     ro.observe(track);
     for (const b of refs.current) if (b) ro.observe(b);
@@ -91,10 +71,8 @@ export function Segmented<T extends string>({
   }, [thumb]);
 
   /**
-   * `role="tablist"` HỨA điều hướng bằng mũi tên; trước đây component không cài
-   * gì cả nên mỗi segment là một tab-stop riêng — trái hẳn với kỳ vọng của
-   * trình đọc màn hình. Giờ chỉ mục đang chọn nhận Tab (roving tabindex), còn
-   * mũi tên/Home/End di chuyển giữa các mục.
+   * `role="tablist"` keyboard model: only the selected item is a tab stop
+   * (roving tabindex); arrows, Home and End move between items.
    */
   function onKeyDown(e: React.KeyboardEvent<HTMLButtonElement>) {
     const last = options.length - 1;
@@ -128,9 +106,7 @@ export function Segmented<T extends string>({
         <span
           aria-hidden="true"
           className={cn(
-            // rounded-md: the app's one semantic shape for "this is
-            // selected" (design/RULES.md's "Bo góc cho 'đang chọn'" rule) —
-            // matches Tabs' active pill, App-shell's selected nav row, etc.
+            // rounded-md: the app's shape for "selected" (design/RULES.md).
             'pointer-events-none absolute inset-y-0.5 left-0 rounded-md bg-acc shadow-btn',
             ready.current && 'motion-safe:transition-transform motion-safe:duration-base motion-safe:ease-spring',
           )}
@@ -152,13 +128,10 @@ export function Segmented<T extends string>({
             onClick={() => onValueChange(opt.value)}
             onKeyDown={onKeyDown}
             className={cn(
-              // `relative` + `z-10`: chữ nằm TRÊN con trượt, không bị nó phủ.
-              // rounded-md to match the thumb sliding beneath it.
+              // Text above the thumb; rounded-md to match it.
               'relative z-10 inline-flex h-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3',
               'transition-colors duration-fast ease-out-soft',
-              // Vòng focus vẽ VÀO TRONG (offset âm) để không bị máng cắt mất —
-              // trước đây component không có focus-visible nào, người dùng bàn
-              // phím không thấy mình đang ở đâu.
+              // Focus ring drawn inward so the track does not clip it.
               'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
               textSize,
               active

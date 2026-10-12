@@ -5,10 +5,10 @@ import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
 
 export { isMac };
-/** Bản tiếng Anh cố định — giữ cho chỗ nằm ngoài React. Trong component dùng `useQuickPasteHint()`. */
+/** Fixed English hint for code outside React; components use `useQuickPasteHint()`. */
 export const quickPasteHint = isMac ? 'Press ⌘V to paste' : 'Press Ctrl+V to paste';
 
-/** Gợi ý "⌘V để dán" theo ngôn ngữ đang chọn. */
+/** Localized "⌘V to paste" hint. */
 export function useQuickPasteHint(): string {
   const m = useMessages(COMMON);
   return m(isMac ? 'quickPasteMac' : 'quickPasteOther');

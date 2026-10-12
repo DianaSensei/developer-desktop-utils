@@ -14,16 +14,13 @@ const TONE_CLASS: Record<StatusDotTone, string> = {
   paused: 'bg-warn',
   idle: 'bg-fg-mute/40',
   error: 'bg-bad',
-  // `recording` KHÔNG dùng --bad: một đồng hồ đang chạy và một lỗi thật không
-  // được cùng màu, nếu không đỏ mất nghĩa "có gì đó sai". --live là hệ quy ước
-  // riêng cho trạng thái đang-ghi (xem design-system/tokens.css).
+  // `recording` uses --live, not --bad: a running timer must not look
+  // like an error (see design-system/tokens.css).
   recording: 'bg-[var(--live)]',
 };
 
-// Soft ring shadow for the `glow` prop, one per tone that actually gets glowed
-// in practice (idle/error dots don't need the emphasis).
-// Quầng sáng lấy màu từ chính token của tông, thay cho rgba() viết cứng — nên
-// nó theo được theme thay vì giữ nguyên một màu cho cả sáng lẫn tối.
+// Halo for the `glow` prop, for tones that are glowed in practice. Uses
+// the tone's own token so it follows the theme.
 const TONE_GLOW: Partial<Record<StatusDotTone, string>> = {
   live: 'shadow-[0_0_0_3px_hsl(var(--ok-c)/0.22)]',
   recording: 'shadow-[0_0_0_3px_hsl(var(--live-c)/0.22)]',
@@ -43,12 +40,7 @@ export interface StatusDotProps {
 }
 
 /**
- * Small colored dot for connection/live/recording state — the pattern every
- * tool with a connect/disconnect flow or a live consumer (Kafka, RabbitMQ,
- * API Client environments, Time Tracker) used to hand-roll as a raw
- * `<span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />` with its own
- * slightly different color logic. Centralizing it here means a palette or
- * sizing change is one edit instead of an app-wide grep.
+ * Dot sizes. StatusDot is the shared connection/live/recording indicator.
  */
 const SIZE_CLASS: Record<NonNullable<StatusDotProps['size']>, string> = {
   xs: 'h-1.5 w-1.5',

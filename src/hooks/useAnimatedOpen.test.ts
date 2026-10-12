@@ -3,11 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useAnimatedOpen } from '@/hooks/useAnimatedOpen';
 
 /**
- * `ColorPicker` / `DatePicker` / `TimePicker` popover từng render kiểu
- * `{open && <div>}` với KHÔNG animation nào — không vào, không ra. Hook này
- * là bản sửa dùng chung; test khoá đúng phần dễ hỏng nhất: `visible` phải
- * còn `true` suốt lúc `closing`, để panel có thời gian chạy animation ra
- * trước khi thật sự biến mất khỏi DOM.
+ * `visible` must stay true while `closing`, so the panel can play its exit
+ * animation before leaving the DOM.
  */
 describe('useAnimatedOpen', () => {
   it('visible ở lại true trong lúc closing, rồi tắt sau --dur-exit', () => {
@@ -18,8 +15,8 @@ describe('useAnimatedOpen', () => {
     expect(result.current).toMatchObject({ open: true, closing: false, visible: true });
 
     act(() => result.current.close());
-    // Đóng xong: `open` đã tắt (dismiss/focus logic dừng ngay), nhưng
-    // `visible` còn true để panel còn render và chạy animation ra.
+    // `open` is off (dismiss and focus logic stop), but `visible` stays true
+    // for the exit animation.
     expect(result.current).toMatchObject({ open: false, closing: true, visible: true });
 
     act(() => { vi.advanceTimersByTime(130); });
@@ -37,7 +34,7 @@ describe('useAnimatedOpen', () => {
     act(() => result.current.show());
     expect(result.current).toMatchObject({ open: true, closing: false, visible: true });
 
-    // Timer cũ không được bắn ra và tắt state của lượt mở mới.
+    // The old timer must not close the new open.
     act(() => { vi.advanceTimersByTime(130); });
     expect(result.current).toMatchObject({ open: true, closing: false, visible: true });
     vi.useRealTimers();

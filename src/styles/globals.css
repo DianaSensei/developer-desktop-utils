@@ -2,7 +2,7 @@
 @import "../design-system/tokens.css";
 
 @import "tailwindcss";
-/* Thang utility bảo đảm cho plugin cài lúc chạy — xem file đó. */
+/* Guaranteed utilities for installed plugins (see that file). */
 @import "./plugin-utilities.css";
 /* Keep the JS config as the source of truth for now: it carries the portable
    design-kit preset chain (design/tailwind-preset.cjs), the colour vocabulary
@@ -25,8 +25,8 @@
   body {
     @apply bg-bg text-fg;
     overflow: hidden;
-    /* Mặt chữ đến từ token, không viết cứng ở đây — nhờ vậy trang so sánh font
-       (/type-specimen) đổi được --sans lúc chạy. Fonts tự host, xem main.tsx. */
+    /* The font comes from the token so it can change at runtime. Fonts are
+       self-hosted (see main.tsx). */
     font-family: var(--sans);
     font-feature-settings: "kern", "liga";
     font-kerning: normal;
@@ -51,18 +51,14 @@
   }
 
   /* ── @codemirror/merge chrome (Diff tool) ──────────────────────────────
-     `.cm-mergeView` sizes itself via natural flow + its own overflow-y:auto
-     (not the flex .cm-editor pattern documented above), so give it flex
-     sizing directly rather than the usual height:100% trap. The color rules
-     below replace the package's hardcoded hex defaults with the app's own
-     red/green scale (matching Badge's success/danger tones) so the diff reads
-     as part of DevTool rather than an embedded third-party widget. `!important`
-     is needed because CodeMirror injects its own theme as a runtime <style>
-     that lands after this stylesheet, at equal selector specificity. */
+     `.cm-mergeView` sizes itself by normal flow and its own overflow, so it
+     gets flex sizing directly. The colors below replace the package's hex
+     defaults with the app's status colors. `!important` because CodeMirror
+     injects its theme at runtime after this stylesheet, with equal
+     specificity. */
   .diff-merge-view {
-    /* "Dòng thêm" là một TRẠNG THÁI, nên nó lấy màu từ hệ trạng thái của design
-       kit chứ không phải một emerald thô — nhờ vậy nó tự đúng ở cả sáng lẫn tối
-       và không đổi khi đổi tone accent. (Trước đây: `160 84% 39%`.) */
+    /* Added lines are a status, so they use the kit's status color, which
+       works in both themes and ignores the accent. */
     --diff-added: var(--ok-c);
   }
   .diff-merge-view .cm-mergeView {
@@ -115,17 +111,9 @@
     font-feature-settings: inherit;
   }
 
-  /* Browsers only give `<a>` a pointer cursor by default — a `<button>` (and
-     Radix primitives built on one: Select trigger, Switch, Dialog close, …)
-     gets the plain arrow unless something says otherwise, so hovering a
-     clickable control looked identical to hovering static text. One rule
-     here fixes every button in every tool instead of a `cursor-pointer` class
-     hand-added per call site (and per future one). Covers `role="button"`
-     too, for the handful of div/span-based custom controls that predate this
-     rule. Disabled buttons are excluded — most already pair `disabled` with
-     `pointer-events-none` (no hover reaches them at all), and forcing
-     `not-allowed` on the few that don't would be a separate, deliberate
-     decision, not a side effect of this fix. */
+  /* Pointer cursor for every enabled button (including Radix triggers) and
+     `role="button"`, instead of a `cursor-pointer` class at each call site.
+     Disabled buttons are excluded. */
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
@@ -176,7 +164,4 @@
     @apply flex gap-4 h-full;
   }
 
-  /* Các utility `.input-premium` / `.textarea-premium` / `.btn-*-premium` đã bị
-     xoá ở G1 — không chỗ nào trong code dùng chúng, và chúng là bản sao song song
-     của <Input> / <Textarea> / <Button>. Dùng component, đừng dựng lại bằng CSS. */
 }

@@ -1,19 +1,14 @@
-// Dòng cấu hình — MỘT hình dạng, NHIỀU loại điều khiển.
+// Settings row: a fixed shape (icon · title · description) with a control on
+// the right that varies by purpose:
 //
-// Học từ màn hình "Cài đặt tài khoản" của MoMo: hình dạng dòng cố định (icon ·
-// tiêu đề · mô tả), còn phần bên phải đổi theo việc dòng đó làm:
+//   chevron ›        opens another screen or panel
+//   toggle           on/off in place (always green when on, not the accent)
+//   status chip      read-only
+//   small outline    one-off action ("Re-import", "Update")
+//   dropdown chip    picks a compact value
 //
-//   chevron ›       mở màn/panel khác
-//   toggle          bật/tắt tại chỗ — LUÔN xanh lá khi bật, không theo accent
-//   chip trạng thái chỉ đọc
-//   nút viền nhỏ    hành động một lần ("Nhập lại", "Cập nhật")
-//   chip đổ xuống   chọn một giá trị gọn
-//
-// Năm loại, không loại nào cần component mới. Đây là pattern chính cho trang
-// Settings và mọi bảng cấu hình của tool.
-//
-// Component chỉ dựng khung; điều khiển truyền vào qua `control`. Trường hợp
-// chevron dùng nhiều nhất nên có sẵn `onOpen` để khỏi phải tự dựng.
+// The control is passed through `control`; `onOpen` covers the common
+// chevron case.
 
 import * as React from 'react';
 import { ChevronRight, type LucideIcon } from 'lucide-react';
@@ -23,21 +18,17 @@ export interface SettingRowProps {
   icon?: LucideIcon;
   title: React.ReactNode;
   description?: React.ReactNode;
-  /** Điều khiển bên phải — Switch, StatusChip, Button, Select… */
+  /** Control on the right: Switch, StatusChip, Button, Select... */
   control?: React.ReactNode;
   /**
-   * Dải xem trước SỐNG, nằm dưới dòng, full-width, ngăn bằng một đường mảnh.
-   *
-   * Học từ trang Settings của DBX: đổi cỡ chữ / font editor thì một ô code
-   * mẫu render lại NGAY bên dưới — không phải tưởng tượng qua tên font, hay
-   * phải rời Settings đi tìm một ô nhập nào đó để so sánh. Chỉ dùng khi lựa
-   * chọn khó hình dung từ tên (font có ligature hay không, cỡ chữ bao nhiêu
-   * là đủ) — một dropdown "Ngôn ngữ: VI/EN" thì không cần, tự đọc tên đã rõ.
+   * Live preview strip below the row, full width. For choices that are hard
+   * to judge from a name (e.g. code font ligatures).
    */
   preview?: React.ReactNode;
   /**
-   * Biến cả dòng thành nút mở màn khác và hiện chevron. Loại trừ với `control`:
-   * một dòng bấm được mà bên trong lại có điều khiển bấm được nữa là bẫy chuột.
+   * Makes the whole row a button that opens something and shows a chevron.
+   * Mutually exclusive with `control`: no clickable control inside a
+   * clickable row.
    */
   onOpen?: () => void;
   disabled?: boolean;
@@ -83,10 +74,8 @@ export function SettingRow({
     </>
   );
 
-  // Hàng chính (icon · tiêu đề · control) tách khỏi khung ngoài, để dải
-  // preview có chỗ đứng DƯỚI hàng mà không phá layout flex-row của nó.
-  // Không có `preview`, cấu trúc render ra y hệt bản cũ — chỉ thêm một div
-  // bọc không mang style riêng.
+  // The main row is separate from the outer frame so the preview can sit
+  // below it without breaking the row's flex layout.
   const row = cn(
     'flex w-full items-center gap-3 px-3.5 py-3 text-left',
     disabled && 'pointer-events-none opacity-50',
@@ -105,7 +94,7 @@ export function SettingRow({
           className={cn(
             row,
             'w-full',
-            // Rê chuột đổi NỀN, không đổi vị trí — design/RULES.md.
+            // Hover changes background, not position (design/RULES.md).
             'transition-colors hover:bg-bg-2/40',
             'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
           )}
@@ -126,9 +115,8 @@ export function SettingRow({
 }
 
 /**
- * Khung bao quanh một nhóm SettingRow. Đây là TẦNG NỔI duy nhất — các dòng bên
- * trong chỉ ngăn nhau bằng đường mảnh, không thẻ nào đổ bóng thêm.
- * Xem "chỉ một tầng được đổ bóng" trong design/RULES.md.
+ * Frame around a group of SettingRows. The only raised layer; rows inside
+ * are separated by hairlines (design/RULES.md: one shadowed layer).
  */
 export function SettingGroup({
   title,

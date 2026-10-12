@@ -29,13 +29,8 @@ export interface CopyButtonProps extends Omit<ButtonProps, 'onClick' | 'children
 }
 
 /**
- * Single source of truth for "copy to clipboard" buttons across the app.
- *
- * Gives every copy action the same affordance: a smooth cross-fade from the
- * Copy icon to a green Check (no hard icon swap), with the confirmation held
- * for the user-configurable `editor.copyFeedbackMs` duration. Previously each
- * tool either re-implemented this (with differing timings) or — more often —
- * gave no feedback at all, leaving users unsure the copy had happened.
+ * The app's copy-to-clipboard button: the Copy icon cross-fades to a green
+ * Check, held for the configurable `editor.copyFeedbackMs`.
  */
 export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
   (
@@ -94,19 +89,12 @@ export const CopyButton = React.forwardRef<HTMLButtonElement, CopyButtonProps>(
         className={className}
         {...props}
       >
-        {/* Hai icon chung một hộp và mờ chéo nhau, nên cú tráo là trượt chứ
-            không phải nhấp.
-
-            Hai đường cong KHÁC NHAU, cố ý: icon Copy đi ra bằng `ease-in-soft`
-            (dứt khoát, nó đã xong việc), cái Check đi vào bằng `ease-spring`
-            (vọt qua một chút rồi lắc về, đọc ra là "xong rồi!"). Bản trước
-            dùng chung `duration-200 ease-out` cho cả hai chiều, nên khoảnh khắc
-            DUY NHẤT mà app xác nhận với người dùng rằng thao tác đã thành công
-            lại là khoảnh khắc phẳng nhất trong toàn bộ giao diện. */}
+        {/* Both icons share one box and cross-fade. Copy leaves with
+            `ease-in-soft`; Check enters with `ease-spring` so success reads
+            clearly. */}
         <span className={cn('relative inline-flex items-center justify-center', iconClassName)}>
-          {/* Vòng sáng lan ra một lần ngay lúc copy xong. Nó không thay thế cái
-              Check — nó bắt lấy ánh mắt đang ở CHỖ KHÁC (người dùng vừa bấm
-              copy thì thường đang nhìn vùng văn bản, không nhìn cái nút). */}
+          {/* A one-time ring at the moment of copy, to catch eyes that are on
+              the text rather than the button. */}
           {copied && (
             <span
               aria-hidden="true"

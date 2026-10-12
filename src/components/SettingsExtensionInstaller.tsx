@@ -16,22 +16,13 @@ import {
 } from '@/platform';
 
 /**
- * Cài một "tiện ích" (plugin JS hoặc sidecar service native) từ một URL
- * manifest bên ngoài — thay `SettingsPluginInstaller.tsx` (chỉ biết plugin
- * JS). Xem docs/plans/native-sidecar-install.md cho bối cảnh đầy đủ và lý do
- * gộp chung một UI cho cả hai `kind` thay vì hai component song song.
+ * Installs an extension (JS plugin or native sidecar) from a pasted manifest
+ * URL. The installed list (update/uninstall) lives in
+ * SettingsInstalledExtensions.tsx.
  *
- * Danh sách "đã cài" (cập nhật/gỡ) không còn ở đây nữa — xem
- * `SettingsInstalledExtensions.tsx`, tab riêng của `SettingsExtensions.tsx`:
- * trước đây nó bị chôn dưới tab này, nên một người chỉ dùng Chợ tiện ích để
- * cài sẽ không bao giờ tìm ra chỗ để gỡ.
- *
- * KHÔNG áp dụng ngay lập tức: cả registry plugin (`initInstalledPlugins()`,
- * chạy đúng một lần lúc app khởi động) LẪN sidecar service (được
- * `service_host::get_or_spawn` tự spawn khi có lệnh gọi đầu tiên, không phải
- * tự khởi động lại phiên đang chạy) chỉ nhận thay đổi rõ ràng sau một lần
- * khởi động lại/gọi lại — cài xong vì vậy chỉ bật cờ "cần khởi động lại"
- * (hiện ở tab Đã cài, nơi người dùng sẽ thấy ngay sau khi chuyển qua đó).
+ * Changes apply after a restart: installed plugins are registered once at
+ * startup, and sidecars are spawned on first call. Installing therefore only
+ * sets the "restart needed" flag.
  */
 export function SettingsExtensionInstaller() {
   const { t } = useLocale();
@@ -40,21 +31,16 @@ export function SettingsExtensionInstaller() {
   const [previewTriple, setPreviewTriple] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
-  // Market đã cung cấp `url`/`preview` hiện tại — `undefined` cho một URL dán
-  // tay hoặc một deep link (không gắn market nào). Đi kèm khi bấm "Cài đặt"
-  // để hai market khác nhau cùng phát hành một plugin trùng id không đè lên
-  // nhau (xem `installArtifact`).
+  // Market that supplied the URL being previewed; `undefined` for a pasted
+  // URL or a deep link. Passed to `installArtifact` on install.
   const [previewMarketId, setPreviewMarketId] = useState<string | undefined>(undefined);
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState<string | null>(null);
   const [needsRestart, setNeedsRestart] = useState(false);
-  // `bin` của sidecar mà manifest đang xem trước khai cần (permissions có
-  // 'service') NHƯNG chưa thấy trong danh sách đã cài — `null` khi manifest
-  // không cần service nào, hoặc sidecar đó đã có sẵn. Chỉ mang tính THÔNG
-  // BÁO: URL của manifest plugin không mang theo URL của service đi kèm
-  // (hai tài nguyên tách biệt), nên không thể tự tải/cài hộ — khác lượt cài
-  // từ Chợ tiện ích/deep link, nơi cả hai URL đã có sẵn trong tay
-  // (ExtensionInstallDialog cài cả hai cùng lúc).
+  // Sidecar `bin` the previewed plugin needs but that is not installed yet.
+  // Informational only: a plugin manifest does not carry its service's URL,
+  // so it cannot be installed from here (the marketplace and deep links
+  // install both together).
   const [missingServiceBin, setMissingServiceBin] = useState<string | null>(null);
 
   const runPreview = useCallback(async (targetUrl: string, marketId?: string) => {
@@ -70,13 +56,11 @@ export function SettingsExtensionInstaller() {
       const manifest = await fetchArtifactManifestPreview(targetUrl.trim());
       setPreview(manifest);
       if (manifest.kind === 'service') {
-        // Hiển thị cho người dùng — TÍNH Ở RUST, không đoán ở phía webview
-        // (cùng nguyên tắc "quyết định luôn do host" của `sidecar_path`).
+        // Computed by the host, not guessed in the webview.
         setPreviewTriple(await currentTargetTriple());
       } else if (manifest.service) {
-        // Plugin này KHAI cần một sidecar — kiểm xem sidecar đó đã cài chưa,
-        // để cảnh báo NGAY ở bước xem trước thay vì để người dùng tự phát
-        // hiện qua lỗi "service call" mơ hồ sau khi đã cài xong.
+        // The plugin needs a sidecar: warn now if it is missing rather than
+        // after install with an obscure service error.
         const installed = await listInstalledArtifacts();
         const hasService = installed.some((r) => r.kind === 'service' && r.manifest.bin === manifest.service!.bin);
         if (!hasService) setMissingServiceBin(manifest.service.bin);
@@ -92,11 +76,8 @@ export function SettingsExtensionInstaller() {
     return <Callout tone="info" size="sm">{t('settings.extensions.install.webWarning')}</Callout>;
   }
 
-  // Giữ nguyên `previewMarketId` khi bấm lại Preview cho ĐÚNG url đang có sẵn
-  // (vd sau khi hàng đợi tự điền + xem trước, người dùng bấm Preview lần nữa
-  // để tải lại) — chỉ có ô nhập URL tự gõ tay (`onChange` bên dưới) mới thật
-  // sự đổi sang URL khác và cần xoá market cũ. Bấm Preview không phải là một
-  // URL mới, nên không được âm thầm làm rớt market của URL đang xem trước.
+  // Re-previewing the same URL keeps its market; only typing a new URL
+  // (onChange below) clears it.
   const handlePreview = () => runPreview(url, previewMarketId);
 
   const handleInstall = async () => {
@@ -141,13 +122,11 @@ export function SettingsExtensionInstaller() {
             setPreview(null);
             setPreviewTriple(null);
             setPreviewError(null);
-            // Gõ tay lại nghĩa là URL này không còn gắn với market vừa xem
-            // trước trước đó (nếu có) — không giữ lại `previewMarketId` cũ.
+            // A typed URL no longer belongs to the previously previewed market.
             setPreviewMarketId(undefined);
           }}
-          // Ví dụ URL, không phải câu chữ cần dịch — một chuỗi giống hệt nhau
-          // ở cả hai ngôn ngữ trong bảng dịch bị `i18n.test.ts` coi là dấu
-          // hiệu quên dịch, nên nó không thuộc về DICTIONARY.
+          // An example URL, identical in both languages, so it is not in
+          // DICTIONARY (i18n.test.ts flags identical translations).
           placeholder="https://example.com/extension.json"
           className="flex-1 font-mono text-xs"
         />

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 interface EmptyStateProps {
   icon: LucideIcon;
-  /** Bỏ trống khi một câu `description` đã đủ nói (VD: gợi ý việc cần làm). */
+  /** Omit when the `description` says enough (e.g. a hint of what to do). */
   title?: string;
   description?: React.ReactNode;
   action?: {

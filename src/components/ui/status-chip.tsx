@@ -1,16 +1,10 @@
-// Chip trạng thái — bậc NHẸ NHẤT trong ba bậc của hệ (chip → viền → dải nhuộm).
+// Status chip: the lightest of the three status levels (chip → outline →
+// band). Sits in panel headers for at-a-glance state, with no explanation
+// (use <ExplainBand> for that). Separate from <Badge>, which is a general
+// label; a status chip always has a dot.
 //
-// Chỗ đứng của nó là thanh tiêu đề panel: liếc một cái là biết panel đang ở
-// trạng thái nào, không cần đọc. Không giải thích gì — cần giải thích thì dùng
-// <ExplainBand>.
-//
-// Vì sao không dùng <Badge tone="success">: Badge là nhãn đa dụng (phương thức
-// HTTP, số đếm, "beta"). Chip trạng thái có một việc duy nhất và luôn kèm chấm
-// tròn, nên nó là component riêng — đọc code thấy StatusChip là biết ngay đang
-// nói về trạng thái, không phải phân loại.
-//
-// Màu lấy từ hệ trạng thái cố định, KHÔNG theo accent: đổi tone chủ đạo của app
-// không được làm "Hợp lệ" đổi màu. Xem design/RULES.md.
+// Colors come from the fixed status palette, never the accent
+// (design/RULES.md).
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
@@ -30,7 +24,7 @@ const TONE: Record<StatusChipTone, { chip: string; pip: string }> = {
 
 export interface StatusChipProps extends React.HTMLAttributes<HTMLSpanElement> {
   tone: StatusChipTone;
-  /** Ẩn chấm tròn khi đã có icon riêng ở bên trái. */
+  /** Hides the dot when there is a leading icon. */
   hidePip?: boolean;
   children: React.ReactNode;
 }

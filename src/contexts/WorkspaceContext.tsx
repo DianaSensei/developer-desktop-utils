@@ -28,7 +28,7 @@ type Tool = (typeof allTools)[number];
 interface WorkspaceContextValue {
   workspaces: Workspace[];
   active: Workspace;
-  /** Tab của workspace đang dùng, đã bỏ tool bị tắt/không còn tồn tại. */
+  /** Active workspace tabs, without disabled or missing tools. */
   tabs: Tool[];
   activeToolId: string;
   openTool: (toolId: string) => void;
@@ -39,7 +39,7 @@ interface WorkspaceContextValue {
   createWorkspace: (name: string) => void;
   renameWorkspace: (id: string, name: string) => void;
   deleteWorkspace: (id: string) => void;
-  /** Mở hộp đặt tên rồi tạo workspace mới (mang theo tool đang mở). */
+  /** Opens the naming dialog, then creates a workspace with the current tool. */
   promptCreateWorkspace: () => void;
   promptRenameWorkspace: (id: string) => void;
 }
@@ -47,12 +47,10 @@ interface WorkspaceContextValue {
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
 
 /**
- * Nối model thuần ở `lib/workspaces.ts` với router và storage.
- *
- * Phải nằm TRONG <Router> (đọc/ghi URL) và trong FeatureProvider (lọc tool đã
- * tắt). Mỗi lần URL đổi sang một tool, tool đó được ghi vào workspace đang
- * dùng — nên mọi đường mở tool (sidebar, ⌘K, deep link, tab nhóm) đều tự động
- * vào đúng chỗ mà không đường nào phải nhớ gọi gì thêm.
+ * Connects the pure model in lib/workspaces.ts to the router and storage.
+ * Must be inside <Router> and FeatureProvider. Every navigation to a tool
+ * records it in the active workspace, so every way of opening a tool
+ * (sidebar, ⌘K, deep link, group tabs) works without extra calls.
  */
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -73,14 +71,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const activeToolIdRef = useRef(activeToolId);
   activeToolIdRef.current = activeToolId;
 
-  // Chỉ phụ thuộc vào URL, KHÔNG vào activeId: khi chuyển workspace, đổi
-  // activeId và navigate xảy ra liền nhau — nếu effect này cũng chạy theo
-  // activeId thì ở nhịp giữa nó sẽ ghi tool CŨ vào workspace MỚI.
-  //
-  // Theo `location.key`, không chỉ theo pathname: đóng tab cuối rồi chọn lại
-  // ĐÚNG tool đó (sidebar, ⌘K) là điều hướng tới cùng pathname — pathname không
-  // đổi nên effect cũ không chạy và tab không bao giờ quay lại. Mỗi lần điều
-  // hướng có key mới, kể cả tới cùng một đường dẫn.
+  // Depends on the URL only, not activeId: switching workspaces changes
+  // activeId and navigates in quick succession, and reacting to activeId
+  // would record the old tool in the new workspace. Keyed on
+  // `location.key` so re-opening the same path (after closing its tab)
+  // still runs.
   useEffect(() => {
     if (!activeToolId) return;
     setState((s) => visitTool(s, activeToolId));
@@ -107,8 +102,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [navigate, isFeatureEnabled],
   );
 
-  // Tab giữ lại thành tab đang mở — phải điều hướng tới nó, nếu không URL (thứ
-  // quyết định tool trên màn hình và tab được chọn) vẫn ở tool vừa bị đóng.
+  // Navigate to the kept tab; the URL decides what is shown.
   const closeOtherTools = useCallback(
     (toolId: string) => {
       setState((s) => closeOtherToolsIn(s, toolId));
@@ -129,8 +123,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         navigate(toolPath(target));
         return;
       }
-      // Workspace rỗng (vừa đóng hết tab): URL không đổi nên effect theo dõi URL
-      // không chạy — tự ghi tool đang mở vào để thanh tab không trống trơn.
+      // The URL did not change, so record the current tool here or the
+      // tab bar would be empty.
       setState(activeToolIdRef.current ? visitTool(next, activeToolIdRef.current) : next);
     },
     [navigate, isFeatureEnabled],
@@ -156,19 +150,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [goToWorkspace],
   );
 
-  // Hộp đặt tên sống ở ĐÂY chứ không ở thanh tab: ⌘K cũng mở được nó, và
-  // thanh tab có lúc không render (dưới hai tab, chỉ một workspace).
+  // The naming dialog lives here because ⌘K opens it too and the tab bar
+  // is not always rendered.
   const [naming, setNaming] = useState<{ mode: 'create' } | { mode: 'rename'; id: string } | null>(null);
   const promptCreateWorkspace = useCallback(() => setNaming({ mode: 'create' }), []);
   const promptRenameWorkspace = useCallback((id: string) => setNaming({ mode: 'rename', id }), []);
 
-  // ── Phím tắt ──────────────────────────────────────────────────────────
-  //   ⌘1…⌘8        tab thứ N        (Ctrl trên Windows/Linux)
-  //   ⌘9           tab cuối         — như mọi trình duyệt
-  //   ⌘⇧[ / ⌘⇧]    tab trước / sau  (thêm Ctrl+PageUp/PageDown)
-  //   ⌘⌥1…⌘⌥9      workspace thứ N
-  // Ctrl+Tab cố ý KHÔNG dùng: API Client đã lấy nó cho tab request của nó.
-  // So theo `e.code` vì ⌥ trên macOS biến `e.key` thành ký tự khác (⌥1 → ¡).
+  // ── Shortcuts ─────────────────────────────────────────────────────────
+  //   ⌘1…⌘8        Nth tab          (Ctrl on Windows/Linux)
+  //   ⌘9           last tab
+  //   ⌘⇧[ / ⌘⇧]    previous / next  (also Ctrl+PageUp/PageDown)
+  //   ⌘⌥1…⌘⌥9      Nth workspace
+  // Ctrl+Tab is left to the API Client's request tabs. Matched on `e.code`
+  // because ⌥ changes `e.key` on macOS (⌥1 → ¡).
   const latest = useRef({ tabs, activeToolId, workspaces: state.workspaces, openTool, switchWorkspace });
   latest.current = { tabs, activeToolId, workspaces: state.workspaces, openTool, switchWorkspace };
 
@@ -262,7 +256,7 @@ export function useWorkspaces(): WorkspaceContextValue {
   return ctx;
 }
 
-/** Tên hiển thị — workspace mặc định chưa đặt tên thì lấy tên theo ngôn ngữ. */
+/** Display name; an unnamed default workspace gets a localized name. */
 export function workspaceLabel(ws: Workspace, index: number, fallback: (n: number) => string): string {
   return ws.name || fallback(index + 1);
 }

@@ -7,30 +7,20 @@ import { useMessages } from '@/contexts/LocaleContext';
 import UI from '@/components/ui/ui.messages';
 
 /**
- * Markdown đã render, style bằng token của design system.
+ * Rendered Markdown styled with design-system tokens (the app does not ship
+ * `@tailwindcss/typography`, so `prose` has no CSS).
  *
- * Vì sao không dùng `prose` như trước: class `prose` đến từ plugin
- * `@tailwindcss/typography`, mà app KHÔNG cài plugin đó — trong CSS build ra
- * không có một rule `.prose` nào. Preview của Markdown tool và Meeting Notes
- * vì thế hiện ra như văn bản trơn: heading cùng cỡ chữ thân, list mất dấu
- * đầu dòng (preflight của Tailwind xoá), code block không nền. Gắn style ngay
- * trên từng phần tử thì không phụ thuộc plugin nào, và màu đi theo token nên
- * sáng/tối/accent đều đúng.
- *
- * Hai hành vi bắt buộc trong webview của app desktop:
- *   • LINK không được điều hướng chính cửa sổ app — `<a href>` bấm vào sẽ thay
- *     cả giao diện bằng trang web đích, và app không có nút Back (⌘[ và
- *     Backspace đã bị chặn trong useDesktopChrome). Mọi link đi qua
- *     `onOpenLink` (thường là `sdk.openExternal`) để mở bằng trình duyệt.
- *   • ẢNH REMOTE bị CSP chặn (`img-src 'self' data: blob:`) — để mặc định là một
- *     icon ảnh vỡ không giải thích gì. Thay bằng một chip ghi rõ là ảnh từ xa,
- *     bấm để mở ở trình duyệt.
+ * Two webview-specific behaviors:
+ *   • Links never navigate the app window (there is no Back button); they go
+ *     through `onOpenLink`, usually `sdk.openExternal`.
+ *   • Remote images are blocked by the CSP (`img-src 'self' data: blob:`),
+ *     so they render as a chip that opens the image in the browser.
  */
 export interface MarkdownViewProps {
   children: string;
-  /** Mở một URL http(s)/mailto ra ngoài app. Bỏ trống = link chỉ hiển thị. */
+  /** Opens an http(s)/mailto URL outside the app. Without it, links are inert. */
   onOpenLink?: (url: string) => void;
-  /** Nhãn chip thay cho ảnh remote không có alt (đã dịch). */
+  /** Translated chip label for remote images without alt text. */
   remoteImageLabel?: string;
   className?: string;
 }
@@ -57,7 +47,7 @@ export function MarkdownView({ children, onOpenLink, remoteImageLabel, className
     ul: (p) => <ul className="my-2.5 list-disc space-y-1 pl-6 marker:text-fg-mute" {...strip(p)} />,
     ol: (p) => <ol className="my-2.5 list-decimal space-y-1 pl-6 marker:text-fg-mute" {...strip(p)} />,
     li: ({ className: c, ...p }) => (
-      // GFM task list: `- [ ] việc` — bỏ dấu đầu dòng, checkbox thay chỗ nó.
+      // GFM task list item: the checkbox replaces the bullet.
       <li className={cn('leading-relaxed', c?.includes('task-list-item') && '-ml-6 list-none')} {...strip(p)} />
     ),
     input: (p) => (
@@ -91,7 +81,7 @@ export function MarkdownView({ children, onOpenLink, remoteImageLabel, className
       );
     },
     code: ({ className: c, children: code, ...p }) => {
-      // Khối code (```lang) có `language-*`; code nội dòng thì không.
+      // Fenced blocks have a `language-*` class; inline code does not.
       const block = /language-/.test(c ?? '') || String(code).includes('\n');
       return block ? (
         <code className={cn('font-mono text-xs', c)} {...strip(p)}>{code}</code>
@@ -119,7 +109,7 @@ export function MarkdownView({ children, onOpenLink, remoteImageLabel, className
   );
 }
 
-/** react-markdown đưa `node` (cây AST) vào props — không được rơi xuống DOM. */
+/** react-markdown passes the AST `node`; keep it off the DOM. */
 function strip<T extends { node?: unknown }>(props: T): Omit<T, 'node'> {
   const { node: _node, ...rest } = props;
   void _node;

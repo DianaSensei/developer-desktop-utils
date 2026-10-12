@@ -8,7 +8,7 @@ interface OnboardingContextValue {
   show: boolean;
   /** True once onboarding has been completed/skipped at least once — lets a reopen skip the welcome pitch. */
   completed: boolean;
-  /** Re-open the flow on demand (e.g. "Xem lại hướng dẫn" in Settings). */
+  /** Re-open the flow on demand (e.g. "Show guide again" in Settings). */
   open: () => void;
   /** Close the flow and permanently mark onboarding as completed (skip or finish — same effect). */
   close: () => void;

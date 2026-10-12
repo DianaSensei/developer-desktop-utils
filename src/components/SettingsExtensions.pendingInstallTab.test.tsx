@@ -3,21 +3,10 @@ import { render, screen, cleanup, act, waitFor } from '@testing-library/react';
 import { storageRemove } from '@/lib/persistentStore';
 
 /**
- * Trước đây một URL xếp hàng đợi (deep link/market) ép tab "Cài từ URL" làm
- * tab hiện hành để lộ ra màn xem trước — giờ `ExtensionInstallDialog` tự mở
- * đè lên BẤT KỲ tab nào đang hiện, không cần ép chuyển tab nữa (xem
- * `SettingsExtensions.tsx`). File RIÊNG (dynamic import sau
- * `vi.resetModules()`) — cùng quy ước đã dùng ở
- * `SettingsExtensionInstaller.test.tsx`/`SettingsMarketplace.test.tsx`.
- *
- * Mock thẳng `@/platform` (không phải `@tauri-apps/api/core`'s `invoke`):
- * `SettingsMarketplace` (tab mặc định) và `ExtensionInstallDialog` cùng gọi
- * vài hàm của `@/platform` độc lập với nhau trong cùng một lần render —
- * chạm tới `invoke` qua `import('@tauri-apps/api/core')` ĐỘNG ở hai chỗ gần
- * như cùng lúc từng gây ra một cuộc đua module thật (một trong hai đi qua
- * bản Tauri THẬT thay vì bản giả), y hệt lý do `SettingsMarketplace.tsx`'s
- * comment đã ghi. Mock ở tầng `@/platform` tránh hẳn đường `invoke`/dynamic
- * import đó — không còn gì để đua.
+ * A queued install (deep link or market) opens `ExtensionInstallDialog` over
+ * whichever tab is showing. Modules are re-imported after `vi.resetModules()`
+ * like the other Settings tests. `@/platform` is mocked directly because
+ * concurrent dynamic imports of `@tauri-apps/api/core` raced the mock.
  */
 
 function pluginManifest(overrides: Partial<Record<string, unknown>> = {}) {
@@ -37,16 +26,13 @@ vi.mock('@/platform', async (importOriginal) => {
     currentTargetTriple: () => Promise.resolve('x86_64-unknown-linux-gnu'),
     fetchArtifactManifestPreview: () => Promise.resolve(pluginManifest()),
     installArtifact: vi.fn().mockResolvedValue(pluginManifest()),
-    // Gọi TRƯỚC installArtifact ở ExtensionInstallDialog — thật (không mock)
-    // sẽ đi qua listInstalledPlugins() nội bộ của installer.ts (KHÔNG đi qua
-    // barrel này, nên mock listInstalledArtifacts ở trên không chặn được),
-    // rồi invoke() thật một lệnh Tauri không tồn tại trong jsdom.
+    // Called before installArtifact. The real one calls installer.ts's
+    // internal listInstalledPlugins(), which this mock cannot intercept.
     assertNoConflictingInstall: () => Promise.resolve(),
   };
 });
-// `market.ts` đi qua tauri-plugin-http (không phải `invoke`) khi `isTauri` —
-// mock nó gọi thẳng `fetch` toàn cục để `vi.stubGlobal('fetch', ...)` áp
-// dụng cho cả hai môi trường trong cùng test.
+// In Tauri, market.ts uses tauri-plugin-http; route it to the global
+// `fetch` so one `vi.stubGlobal('fetch', ...)` covers both paths.
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args) }));
 
 async function renderPanel() {
@@ -91,22 +77,18 @@ describe('Settings — Extensions — dialog cài đặt tự mở theo pendingI
 
   it('deep link đã xếp URL TRƯỚC khi mount (mở app nguội) thì tự mở dialog xác nhận, không im lặng bỏ lỡ', async () => {
     vi.resetModules();
-    // Cùng một epoch module: enqueue TRƯỚC, rồi mới `import()` các
-    // provider/component đọc `pendingInstall` — mô phỏng đúng thứ tự thật
-    // (deepLink.ts enqueue rồi mới navigate tới Settings, nơi component này
-    // mới mount).
+    // Enqueue before importing the components, matching the real order
+    // (deepLink.ts enqueues, then navigates to Settings).
     const { pendingInstall: earlyQueue } = await import('@/lib/pendingInstall');
     earlyQueue.enqueue(['https://example.com/plugin.json']);
     await renderPanel();
 
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
     await waitFor(() => expect(screen.getByText(/demo@1\.0\.0/)).toBeTruthy());
-    // Tab vẫn ở mặc định Chợ tiện ích — dialog chỉ đè lên trên, không ép
-    // chuyển tab như hành vi cũ. `hidden: true` vì Radix Dialog tự đặt
-    // `aria-hidden` lên phần còn lại của trang khi mở (đúng hành vi a11y),
-    // nên `getByRole` mặc định sẽ không thấy nó nữa. `Tabs` cũng render một
-    // bản đo-kích-thước ẩn song song (không có `aria-selected`) — lọc lấy
-    // đúng nút thật.
+    // The default Marketplace tab stays selected; the dialog sits on top.
+    // `hidden: true` because Radix Dialog sets aria-hidden on the rest of
+    // the page. Tabs also renders a hidden measuring copy without
+    // aria-selected; pick the real button.
     const marketplaceTabs = screen.getAllByRole('button', { name: /Marketplace|Chợ tiện ích/, hidden: true });
     const realTab = marketplaceTabs.find((el) => el.hasAttribute('aria-selected'))!;
     expect(realTab.getAttribute('aria-selected')).toBe('true');

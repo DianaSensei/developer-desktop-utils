@@ -3,17 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
- * Tauri merge config theo JSON Merge Patch (RFC 7386) — khoá `windows` là một
- * MẢNG nên bị THAY THẾ TOÀN BỘ bởi file platform-specific, không merge từng
- * field. Kết quả: `tauri.windows.conf.json` / `tauri.linux.conf.json` phải
- * chép lại NGUYÊN VẸN mọi field chung (fullscreen/resizable/title/width/
- * height/minWidth/minHeight) từ `tauri.conf.json`, không chỉ phần khác biệt
- * (decorations). Không có gì trong hệ thống config của Tauri ép ba file này
- * đồng bộ — sửa `width` ở file gốc mà quên sửa hai file platform thì
- * Windows/Linux âm thầm dùng kích thước cũ, không lỗi build, không cảnh báo.
- *
- * Test này thay cho việc "nhớ" — đổi field chung ở một file mà quên hai file
- * kia thì CI đỏ ngay, với đúng tên field + platform bị lệch.
+ * Tauri merges configs with JSON Merge Patch (RFC 7386); `windows` is an
+ * array, so the platform files replace it entirely. tauri.windows.conf.json
+ * and tauri.linux.conf.json must therefore repeat every shared window field
+ * from tauri.conf.json. This test fails when they drift.
  */
 
 const ROOT = resolve(__dirname, '../../src-tauri');
@@ -23,10 +16,8 @@ function readWindowConfig(file: string): Record<string, unknown> {
   return json.app.windows[0];
 }
 
-// Field nào mang tính "cửa sổ nói chung" (không phải chrome/titlebar) thì phải
-// giống hệt nhau ở mọi platform. Field platform-specific thật sự (titleBarStyle,
-// hiddenTitle, trafficLightPosition — macOS; decorations — Windows/Linux)
-// KHÔNG nằm trong danh sách này, chúng được PHÉP khác nhau.
+// General window fields that must match on every platform. Chrome fields
+// (titleBarStyle, hiddenTitle, trafficLightPosition, decorations) may differ.
 const SHARED_FIELDS = ['fullscreen', 'resizable', 'title', 'width', 'height', 'minWidth', 'minHeight'] as const;
 
 describe('tauri.conf.json — field chung khớp giữa các platform', () => {

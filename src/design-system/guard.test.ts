@@ -4,25 +4,18 @@ import { join, relative, resolve } from 'node:path';
 import baseline from '../../design/baseline.json';
 
 /**
- * Rào chắn hồi quy có NGƯỠNG LÙI DẦN.
+ * Regression guard with ratcheting thresholds.
  *
- * Repo mang một khối nợ thiết kế lớn: hàng trăm màu Tailwind thô, chữ dưới 11px,
- * ba chiều cao control trộn lẫn. Không thể sửa hết trong một giai đoạn, và một
- * rule bật lên rồi kêu 500 lần thì chỉ tạo ra thói quen phớt lờ.
- *
- * Nên thay vì cấm tuyệt đối, test này ĐẾM và so với ngưỡng trong
- * design/baseline.json. Thêm vi phạm mới → đỏ. Dọn bớt → test nhắc hạ ngưỡng,
- * khoá lại thành tiến độ không lùi được.
- *
- * Mỗi giai đoạn di cư (G2–G5) hạ ngưỡng; đích cuối là 0 cho phần lớn chỉ số.
- *
- * Vì sao không phải ESLint: repo chưa có ESLint. Dựng cả toolchain chỉ để chạy
- * mấy rule chuỗi là quá nặng, trong khi vitest đã sẵn trong `npm test` và CI.
+ * Existing design debt (raw Tailwind colors, text under 11px, mixed control
+ * heights) cannot be fixed at once, so violations are counted and compared
+ * with design/baseline.json: new violations fail, and cleanups must lower
+ * the threshold so progress cannot regress. (No ESLint in the repo; vitest
+ * already runs in CI.)
  */
 
 const SRC = resolve(__dirname, '..');
 
-/** Mọi file nguồn TS/TSX/CSS dưới src/, trừ chính bộ test guard. */
+/** Every TS/TSX/CSS source under src/, except the guard tests themselves. */
 function sourceFiles(dir = SRC, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
@@ -38,20 +31,14 @@ function sourceFiles(dir = SRC, out: string[] = []): string[] {
 const FILES = sourceFiles();
 
 /**
- * Bỏ comment trước khi đếm.
- *
- * Không có bước này, guard đếm cả chữ nghĩa: một dòng giải thích *vì sao* đã bỏ
- * `text-green-500` bị tính là một lần dùng `text-green-500`. Nó đã bắt nhầm hai
- * lần trong đợt di cư và bắt phải viết vòng vo để né chính công cụ của mình —
- * dấu hiệu rõ ràng là công cụ sai, không phải câu chữ sai.
- *
- * Đủ dùng cho TS/TSX/CSS ở repo này: chuỗi có chứa `//` (URL trong import) rất
- * hiếm và không chứa mẫu vi phạm nào, nên bỏ sót ở đó là vô hại.
+ * Strips comments before counting, so text explaining a removed class is
+ * not counted as a use. Good enough here: strings containing `//` are rare
+ * and never contain the patterns.
  */
 function stripComments(source: string): string {
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')  // khối /* … */ và JSX {/* … */}
-    .replace(/(^|[^:])\/\/.*$/gm, '$1'); // dòng // …, chừa lại "https://"
+    .replace(/\/\*[\s\S]*?\*\//g, '')  // /* … */ blocks and JSX {/* … */}
+    .replace(/(^|[^:])\/\/.*$/gm, '$1'); // // lines, keeping "https://"
 }
 
 interface Rule {
@@ -65,7 +52,7 @@ const RULES: Rule[] = [
   {
     key: 'rawColors',
     label: 'màu Tailwind thô',
-    // `text-red-500`, `bg-emerald-50`… — không theo theme, không đổi được tone.
+    // `text-red-500`, `bg-emerald-50`...: not themeable.
     pattern:
       /\b(?:text|bg|border|ring|from|to|via|fill|stroke|divide|outline|shadow|decoration|accent|caret)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d{2,3}\b/g,
     why: 'Dùng token (ok/warn/bad/info, acc, fg, line) thay cho bảng màu Tailwind.',
@@ -91,8 +78,7 @@ const RULES: Rule[] = [
   {
     key: 'hardcodedRadius',
     label: 'bo góc viết cứng',
-    // `rounded-[12px]` không đọc token nên đứng ngoài preset [data-corner]:
-    // đổi kiểu bo góc trong Settings thì chỗ đó ở lại, lệch với hàng xóm.
+    // `rounded-[12px]` ignores the [data-corner] presets.
     pattern: /rounded(?:-[a-z]+)?-\[[0-9.]+(?:px|rem)\]/g,
     why: 'Dùng bậc có tên: rounded-xs / -sm / -md / -lg / -xl / -full.',
   },
@@ -105,8 +91,8 @@ const RULES: Rule[] = [
   {
     key: 'offScaleText',
     label: 'cỡ chữ ngoài thang',
-    // Thang: text-[11px] (gợi ý) · text-xs (12) · text-dense (13) · text-sm (14)…
-    // `text-[12.5px]`, `text-[13px]` viết tay là bậc thứ N+1 không ai đặt tên.
+    // Scale: text-[11px] (hint) · text-xs (12) · text-dense (13) · text-sm (14)...
+    // Other arbitrary sizes add unnamed steps.
     pattern: /text-\[(?!11px\])[0-9.]+px\]/g,
     why: 'Dùng bậc có tên: text-[11px] / text-xs / text-dense / text-sm / text-base…',
   },
@@ -118,7 +104,7 @@ const RULES: Rule[] = [
   },
 ];
 
-/** Đếm vi phạm, kèm nơi nhiều nhất để biết chỗ nào đáng dọn trước. */
+/** Counts violations and the files with the most. */
 function count(rule: Rule) {
   let total = 0;
   const byFile: Array<[string, number]> = [];
@@ -148,7 +134,7 @@ describe('rào chắn thiết kế — ngưỡng lùi dần', () => {
         );
       }
 
-      // Dọn xong mà quên hạ ngưỡng thì lần sau vi phạm lẻn về không ai biết.
+      // Lower the threshold after a cleanup so regressions are caught.
       if (total < limit) {
         expect.fail(
           `${rule.label}: còn ${total}, thấp hơn ngưỡng ${limit} — tốt!\n` +
