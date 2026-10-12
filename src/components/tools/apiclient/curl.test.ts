@@ -110,8 +110,7 @@ describe('hasSessionCredentials', () => {
 
 describe('parseCurl — flags that used to swallow the URL', () => {
   it('-G puts the data in the query string and sends a GET', () => {
-    // Previously `-G` fell through to "unknown flag, assume it takes an
-    // argument" and ate the URL, leaving the request with none at all.
+    // `-G` takes no argument, so it must not consume the URL.
     const r = parseCurl("curl -G https://api.test/x -d 'a=1' -d 'b=2'");
     expect(r.url).toBe('https://api.test/x?a=1&b=2');
     expect(r.method).toBe('GET');

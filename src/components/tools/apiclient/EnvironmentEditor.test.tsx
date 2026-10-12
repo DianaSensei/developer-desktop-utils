@@ -1,8 +1,5 @@
-// Regression coverage for the Environments dialog's precedence explainer:
-// it used to always render its full ~3-line paragraph, permanently pushing
-// the actual environment list/table down even for a returning user who'd
-// already read it. It's now collapsed to a one-line summary by default, with
-// a "Learn more" toggle to expand the full text on demand.
+// The precedence explainer is collapsed to one line by default, with a
+// "Learn more" toggle for the full text.
 
 import { act, renderHook, render, fireEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

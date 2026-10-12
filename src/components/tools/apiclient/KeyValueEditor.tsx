@@ -44,12 +44,10 @@ interface Props {
   // explains that only the last one wins (a plain object assignment) — real
   // HTTP semantics, not a bug, so this only makes the divergence visible.
   duplicateKeyHint?: 'params' | 'headers';
-  // Hides rows whose key/value don't match (case-insensitive substring) —
-  // for a large table (an environment with dozens of variables). This only
-  // narrows what's *rendered*: `onChange` still always receives every row,
-  // filtered or not, so editing while filtered can never silently drop the
-  // rows currently hidden from view. The trailing ghost row is never hidden,
-  // so a new row can still be added while filtered.
+  // Hides rows whose key/value do not match (case-insensitive substring)
+  // for large tables. Only affects rendering: `onChange` always receives
+  // every row, so hidden rows are never dropped. The trailing ghost row
+  // stays visible.
   filterQuery?: string;
 }
 
@@ -63,15 +61,10 @@ const duplicateKeyText = (kind: 'params' | 'headers') =>
   kind === 'params' ? t('kv.dupParams') : t('kv.dupHeaders');
 
 /**
- * Whether two enabled rows collide on name, by the rules of the thing being
- * edited — exported for its own test.
- *
- * Header names are case-insensitive (RFC 7230) and request.ts's `buildHeaders`
- * folds them that way: `Accept` and `accept` are one header and only the last
- * survives. A case-only difference is precisely the collision hardest to spot
- * by eye, and the exact-match check this used to do stayed silent for it.
- * Query parameters are the opposite — `id` and `ID` really are two different
- * params — so those keep comparing exactly.
+ * Whether two enabled rows collide on name. Header names are
+ * case-insensitive (RFC 7230), and `buildHeaders` in request.ts folds them,
+ * so `Accept` and `accept` collide; query parameter names are compared
+ * exactly. Exported for its own test.
  */
 export function hasDuplicateNames(rows: KeyValue[], kind: 'params' | 'headers'): boolean {
   const seen = new Set<string>();
@@ -85,9 +78,8 @@ export function hasDuplicateNames(rows: KeyValue[], kind: 'params' | 'headers'):
 }
 
 /**
- * Rows → the `key: value` text shown in bulk mode. Disabled rows round-trip
- * with a leading `//` (Postman's convention), so toggling a row off and then
- * editing in bulk doesn't silently re-enable it.
+ * Rows → the `key: value` text of bulk mode. Disabled rows keep a leading
+ * `//` (Postman's convention), so bulk editing does not re-enable them.
  */
 export function toBulkText(rows: KeyValue[]): string {
   return rows.map((r) => `${r.enabled ? '' : '//'}${r.key}:${r.value}`).join('\n');
@@ -213,18 +205,8 @@ export function KeyValueEditor({
 
   if (bulk) {
     return (
-      // The mode toggle keeps the same corner and the same weight in both
-      // modes. It used to sit *below* the table and *above* the textarea, and
-      // switch from a muted label to an accent link — so the one control you
-      // need to get back moved ~200px and changed appearance the moment you
-      // used it.
-      //
-      // `h-full` + `flex-1` on the editor, and a viewport-fraction floor
-      // rather than CodeSurface's fixed `min-h-[180px]`: bulk edit is where
-      // someone pastes or reworks a whole set of params at once, and 180px
-      // (about 9 lines) stayed 180px no matter how large the window got. Now
-      // it fills whatever height the pane gives it, and never less than a
-      // third of the viewport.
+      // The mode toggle stays in the same place and style in both modes.
+      // The bulk editor fills the pane, with at least a third of the viewport.
       <div className="flex h-full min-h-0 flex-col gap-1.5">
         <TextEditor
           value={bulkText}
@@ -250,27 +232,13 @@ export function KeyValueEditor({
     );
   }
 
-  // Never a bare `1fr` — every row here is its OWN grid container, so track
-  // sizes are computed per row, and `1fr` is shorthand for `minmax(auto, 1fr)`,
-  // whose `auto` floor is the cell's min-content width. A row holding
-  // something that can't shrink (a JWT in the CodeMirror value cell) would
-  // otherwise resize that row alone: its Name column collapsed to 21px while
-  // Value ballooned to 1149px in a 438px table, so the columns stopped lining
-  // up with every other row. Pinning the floor to 0 on every column below
-  // makes all rows agree whatever they contain.
-  //
-  // The max side is bounded too (16rem for Name, 40rem for Value/Resolved),
-  // not left as `1fr`: this table is used inside panes that can span the
-  // whole window width (the stacked/no-split layout has no per-section
-  // max-width any more — see RequestPanel.tsx), and an unbounded `1fr` there
-  // used to hand a 7-character value like `profile` a 600px-wide input. The
-  // floor of 0 means both columns still shrink together at a narrow pane
-  // exactly as before; only a genuinely wide pane sees the caps kick in,
-  // leaving a small unused strip beside the table instead of one covering
-  // the whole thing.
-  // The leading column is 2rem, not 1rem: the whole cell is the enable/disable
-  // target (see the row below), so this width is the target's width. The dot
-  // inside stays 8px — the affordance grew, the visual didn't.
+  // Every row is its own grid container, so columns use `minmax(0, …)`
+  // rather than `1fr` (whose `auto` floor is the min-content width):
+  // otherwise a row holding unshrinkable content would size its columns
+  // differently from the others. Max widths (16rem Name, 40rem
+  // Value/Resolved) keep short values from getting huge inputs in wide
+  // panes. The leading 2rem column is the enable/disable target; the dot
+  // inside stays 8px.
   const gridCols = [
     'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_2rem]',
     'grid-cols-[2rem_minmax(0,16rem)_minmax(0,40rem)_2rem_2rem]',
@@ -295,11 +263,8 @@ export function KeyValueEditor({
           </span>
         </div>
       )}
-      {/* Bảng này cố ý sao đúng hình học của `DataTable` (xem ghi chú ở hàng
-          bên dưới) — nên khi `DataTable` đổi thì chỗ này phải đổi theo, nếu
-          không hai bảng cạnh nhau trong cùng một app lại lệch nhau: `--r-sm`
-          thay `rounded-md`, viền đủ độ đục, hàng tiêu đề là `--chrome` đặc
-          thay vì 40% của một tông vốn đã nhạt. */}
+      {/* Mirrors DataTable's geometry (`--r-sm`, opaque border, `--chrome`
+          header); keep the two in sync. */}
       <div className="overflow-hidden rounded-sm border border-line text-xs">
         {/* Header row */}
         <div className={cn('grid border-b border-line bg-chrome text-[11px] font-semibold uppercase tracking-wider text-fg-mute', gridCols)}>
@@ -510,10 +475,8 @@ interface ValueCellProps {
 }
 
 /**
- * The value editor, which is one of three things depending on the table:
- * {{var}}-aware (requests), masked (Vault / secret env vars), or plain text.
- * An if-chain rather than the nested ternary this used to be in JSX — the
- * three branches are unrelated components, not variations of one.
+ * The value editor: {{var}}-aware (requests), masked (Vault / secret env
+ * vars), or plain text.
  */
 function ValueCell({
   row, isGhost, disabled, vars, masked, valuePlaceholder, revealed, copied,

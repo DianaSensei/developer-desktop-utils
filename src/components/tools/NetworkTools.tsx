@@ -141,8 +141,8 @@ function ErrorBox({ message }: { message: string }) {
   return <Callout tone="error" size="sm">{message}</Callout>;
 }
 
-// Nhãn nhỏ cho danh sách kết quả (loại bản ghi DNS, họ địa chỉ, giao thức
-// cổng) — dùng `Badge` của kit thay cho bản tự viết trước đây.
+// Small result labels (DNS record type, address family, port protocol)
+// using the kit's `Badge`.
 const PILL_TONE = { primary: 'accent', muted: 'neutral', amber: 'warning' } as const;
 function Pill({ children, tone = 'primary', className }: {
   children: React.ReactNode;
@@ -188,13 +188,10 @@ function StatCard({ icon: Icon, label, value }: { icon: typeof Globe; label: str
 // ─── DNS lookup view ────────────────────────────────────────────────────────
 
 /**
- * `fetch` của Platform cho tool này.
- *
- * Đi qua đây thay vì gọi thẳng `@tauri-apps/plugin-http` để lời gọi chạm đúng
- * một điểm thắt: kiểm host với allowlist khai trong `src/plugins/network/plugin.ts`
- * rồi ghi audit. Tầng capability của Tauri không thay thế được việc này — nó
- * gắn theo webview, mà mọi plugin dùng chung một webview, nên nó buộc phải mở
- * `https://**` cho API Client và vì thế không nói được gì về riêng tool này.
+ * The platform's `fetch` for this tool, so calls are checked against the
+ * host allowlist in `src/plugins/network/plugin.ts` and audited. Tauri's
+ * capability layer cannot do this per tool: it applies per webview, which
+ * all plugins share.
  */
 function usePlatformFetch(): FetchLike {
   const sdk = usePluginSdk();
@@ -680,7 +677,7 @@ interface ProcGroup {
 // Classify the addresses a port is bound to into a short reachability scope.
 type ScopeLabel = 'local' | 'LAN' | 'all';
 
-// Mô tả từng phạm vi nằm trong NetworkTools.messages.ts (`scope.local`…).
+// Scope descriptions live in NetworkTools.messages.ts (`scope.local`...).
 
 function bindScope(addresses: string[]): { label: ScopeLabel; exposed: boolean } {
   const isWild = (a: string) => a === '0.0.0.0' || a === '::';
@@ -966,11 +963,8 @@ function PortsView() {
     (e.command ?? '').toLowerCase().includes(q) ||
     (e.pid != null && String(e.pid).includes(q));
 
-  // Filtering/grouping/sorting below used to run inline in the render body —
-  // recomputed on EVERY render, including ones triggered by unrelated state
-  // (typing in the "add favorite" input, e.g.) even though `entries`/`filter`/
-  // `favorites`/`sortCol`/`sortDir` hadn't changed. Memoized so each stage only
-  // redoes work when its own inputs actually change.
+  // Memoized stages so unrelated state changes (e.g. typing in the
+  // favorite input) do not refilter and resort.
   const scanned = useMemo(() => (entries ?? []).filter(matchesFilter), [entries, q]);
 
   // Favourites mode is a port-centric watchlist: list every favourite port with
@@ -1209,7 +1203,7 @@ function PortsView() {
                 {/* Indent past the in-cell favourite star (w-3 + gap-1.5) so the
                     label sits above the port numbers, not the star. */}
                 {sortHeader('port', m('port'), false, 'pl-[18px]')}
-                {/* Tooltip của kit thay cho `title` — `title` không mở được bằng bàn phím. */}
+                {/* Kit Tooltip instead of `title`, which keyboards cannot open. */}
                 <Tooltip
                   label={m('scopeHelp')}
                   description={<>• local — {m('scope.local')}<br />• LAN — {m('scope.LAN')}<br />• all — {m('scope.all')}</>}

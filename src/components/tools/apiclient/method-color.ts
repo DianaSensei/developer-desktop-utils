@@ -4,11 +4,8 @@
 //   methodBg         — subtle background tint for the method selector area
 //   methodBadgeStyle — full pill: bg + text, for sidebar tree badges
 //
-// Màu lấy từ token --method-* (xem src/design-system/tokens.css), không phải
-// bảng màu Tailwind. Đó là hệ "quy ước ngành" cùng loại với màu cú pháp SQL:
-// xanh-GET / cam-POST / đỏ-DELETE là thứ người dùng Postman đã thuộc, đổi đi
-// là bắt họ học lại. Nhờ đi qua token, cả ba thang tự đúng ở light/dark trong
-// MỘT chỗ thay vì 21 cặp `dark:` viết tay như trước.
+// Colours come from the --method-* tokens (src/design-system/tokens.css): the
+// GET/POST/DELETE convention users know from Postman, correct in light and dark.
 
 import type { HttpMethod } from './types';
 

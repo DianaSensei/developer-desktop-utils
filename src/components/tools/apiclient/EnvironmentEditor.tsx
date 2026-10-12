@@ -59,10 +59,9 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   // else. The one-line precedence summary below is the fact people actually
   // come back for; "Learn more" expands to the full paragraph on demand.
   const [explainerOpen, setExplainerOpen] = useState(false);
-  // Filters the *rows* of whichever environment/collection-vars is open on
-  // the right — separate from `query` above, which filters the left list of
-  // environments. Reset on every selection change so a filter left over from
-  // one environment doesn't silently hide rows when you switch to another.
+  // Filters the rows of the environment/collection vars open on the right
+  // (separate from `query`, which filters the list). Reset on selection
+  // change so a leftover filter does not hide rows.
   const [varFilter, setVarFilter] = useState('');
   useEffect(() => { setVarFilter(''); }, [selectedEnvId, tab]);
 
@@ -72,9 +71,7 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
     setSelectedEnvId(environments[0]?.id ?? null);
   }, [environments, selectedEnvId]);
 
-  // Reset the filter each time the dialog is reopened, so a search left over
-  // from a previous visit doesn't silently hide environments the user expects
-  // to see.
+  // Reset the list filter when the dialog reopens.
   useEffect(() => { if (open) setQuery(''); }, [open]);
 
   const activeCollection = store.collections.find((c) => c.id === store.activeCollectionId) ?? null;
@@ -157,14 +154,8 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
         </DialogHeader>
         {error && <Callout tone="error" size="sm" className="mx-4 mt-3">{error}</Callout>}
 
-        {/* The one thing every confused-user report about this dialog comes
-            back to: which of these three wins. Stated once, up front, instead
-            of split across two tooltips and a footnote paragraph each editor
-            used to carry on its own. Collapsed to the precedence summary
-            alone by default — a returning user who's already read the full
-            explanation once shouldn't have it permanently push the actual
-            environment list/table down every time the dialog opens; "Learn
-            more" expands the full paragraph on demand. */}
+        {/* States which of the three sources wins, up front. Collapsed to
+            the precedence summary by default; "Learn more" expands it. */}
         <Callout
           tone="info"
           size="sm"
@@ -366,16 +357,10 @@ export function EnvironmentEditor({ store, open, onClose }: Props) {
   );
 }
 
-// Every line in the left list — section captions and each environment row —
-// is laid out on these two classes, so their labels share one left edge. The
-// 12px slot always exists, holding the active dot or nothing; before this the
-// rows with a dot started 20px right of the captions and the column read as
-// ragged.
-//
-// Hover is a neutral tint (bg-bg-2), not accent — hover:bg-acc/60 read as a
-// second, near-identical "selected" state next to the actual selected row's
-// solid bg-acc, and at that opacity over default text it also cleared AA by
-// less margin than either state should. Same fix as Sidebar's row selection.
+// Every line in the left list (captions and environment rows) uses these
+// two classes so labels share one left edge; the 12px slot holds the
+// active dot or nothing. Hover is a neutral tint, distinct from the
+// solid selected row.
 const LIST_ROW = 'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-bg-2/60';
 const LIST_SLOT = 'flex w-3 shrink-0 items-center justify-center';
 
@@ -394,8 +379,7 @@ function Section({ title, onAdd, disabled, empty, emptyText, children }: {
           <Plus className="h-3.5 w-3.5" />
         </IconButton>
       </div>
-      {/* An empty section used to render a caption, a +, and then nothing —
-          which reads as broken rather than as "there is nothing here yet". */}
+      {/* An empty section says so instead of rendering nothing. */}
       {empty
         ? <p className="py-1 pl-8 pr-3 text-[11px] text-fg-mute/70">{emptyText ?? t('env.noEnvs')}</p>
         : children}

@@ -40,7 +40,7 @@ const badgeClass = (method: string) =>
 
 export function MockServer() {
   const m = useMessages(MESSAGES);
-  // Xoá stub = mất cả matcher, response và script — hỏi lại trước.
+  // Deleting a stub loses its matcher, response and script, so confirm first.
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const mockServer = useMockServerRuntime();
   const {
@@ -56,10 +56,8 @@ export function MockServer() {
   // Also skipped outright when the per-tool MCP toggle is off for Mock Server.
   useMcpBridge(mockServer, mcpBridgeActive);
 
-  // Sidebar/header chấm xanh khi server đang chạy — cùng cơ chế Kafka/RabbitMQ
-  // dùng cho "đang kết nối". Trước đây Mock Server không đăng ký gì vào đây,
-  // nên server chạy nền mà không có chỗ nào ngoài panel của chính nó nói điều
-  // đó — thoát trang thì mất dấu hoàn toàn.
+  // Shows the "live" dot in the sidebar/header while the server runs (same
+  // mechanism as Kafka/RabbitMQ connections).
   useLiveConnection(sdk, status.running);
 
   const [selectedId, setSelectedId] = useState<string | null>(config.stubs[0]?.id ?? null);

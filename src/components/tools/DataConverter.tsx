@@ -103,7 +103,7 @@ async function serializeOutput(fmt: Format, value: unknown, opts: Options): Prom
   }
 }
 
-/** Lỗi của chính tool (không phải của parser) — dịch lúc hiển thị. */
+/** The tool's own error (not the parser's); translated at render time. */
 const TOML_NEEDS_TABLE = '\u0000tomlNeedsTable';
 
 function errMessage(e: unknown): string {

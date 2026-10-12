@@ -1,11 +1,10 @@
-// Response viewer: tabs (Response / Headers / Timeline / Tests / Console) plus a
-// status·time·size readout, a format dropdown (Bruno-style: Preview toggle +
-// JSON/HTML/XML/JavaScript and Raw/Hex/Base64), and copy / download / clear
-// actions. JSON bodies are pretty-printed; every view is copyable.
+// Response viewer: tabs (Response / Headers / Timeline / Tests / Console), a
+// status · time · size readout, a format dropdown (Preview toggle plus
+// JSON/HTML/XML/JavaScript and Raw/Hex/Base64), and copy / download / clear.
+// JSON bodies are pretty-printed; every view is copyable.
 //
-// While a request is in flight the previously-rendered response stays on screen
-// behind a progress bar rather than being replaced by a spinner — swapping the
-// whole pane out and back was the single biggest source of flicker in the tool.
+// While a request is in flight the previous response stays on screen behind
+// a progress bar instead of being replaced by a spinner, to avoid flicker.
 
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback, type Ref } from 'react';
 import {
@@ -30,7 +29,7 @@ import { usePluginSdkFor } from '@/platform';
 import { queryJson } from './jsonpath';
 import { CodeViewer, type CodeViewerHandle } from '@/design-system';
 import type { RequestPanelTab } from './RequestPanel';
-// `tr`, không phải `t`: file này đã có biến `t` (timing của response).
+// `tr`, not `t`: this file already has a `t` (response timing).
 import { t as tr } from './i18n';
 
 // Labels scriptPhases.ts attaches to a request's *own* scripts (as opposed to
@@ -171,9 +170,8 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   );
   const kind = useMemo(() => (response ? detectKind(response) : 'text'), [response]);
 
-  // Reset the view only when the *shape* of the payload changes. Re-sending the
-  // same endpoint used to snap the format back to the default on every response,
-  // discarding a format the user had deliberately picked.
+  // Reset the view only when the payload's shape changes, so re-sending
+  // keeps the format the user picked.
   const lastShape = useRef<string | null>(null);
   useEffect(() => {
     if (!response) return;
@@ -308,12 +306,9 @@ export function ResponsePanel({ response, sending, error, tests, logs, onClear, 
   // Timeline only exist alongside one) — fall back rather than render nothing.
   const activeTab: Tab = tabDefs.some((t) => t.id === tab) ? tab : 'body';
 
-  // The tab row's right side carries the status readout and nothing else.
-  // The format picker and the body actions used to sit here too, and at a
-  // 50/50 split on a laptop the cluster left the tabs ~170px — the first
-  // tab clipped to "Re »" while every other one hid in the overflow menu.
-  // They now live on their own toolbar row under the tabs (Postman's
-  // layout), which only appears once there is a response to act on.
+  // The tab row's right side holds only the status readout; the format
+  // picker and body actions sit on their own row under the tabs (as in
+  // Postman), shown once there is a response.
   const headerRight = sending ? (
     <span className="flex items-center gap-1.5 font-medium text-fg-mute">
       <Spinner size="sm" /> Sending…

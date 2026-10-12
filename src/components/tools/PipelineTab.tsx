@@ -224,7 +224,7 @@ function mergeJsonFields(existing: FieldConfig[], flatMap: Record<string, string
 
 // ─── Step execution ────────────────────────────────────────────────────────────
 
-/** Lỗi do chính pipeline sinh ra — dịch lúc hiển thị (`errorText`). */
+/** Error produced by the pipeline itself; translated for display (`errorText`). */
 const KEY_REQUIRED = '\u0000secretKeyRequired';
 const STEP_FAILED = '\u0000stepFailed';
 function errorText(error: string, t: (k: 'secretKeyRequired' | 'stepFailed') => string) {
@@ -291,10 +291,8 @@ function executePipeline(steps: PipelineStep[]): StepResult[] {
 
 // ─── ID helper ─────────────────────────────────────────────────────────────────
 
-// `crypto.getRandomValues` thay vì `Math.random()`: chỉ để tránh trùng id
-// giữa các bước pipeline, không có ý nghĩa bảo mật nào ở đây, nhưng
-// `Math.random()` là PRNG không an toàn mà các máy quét tĩnh như SonarCloud
-// luôn gắn cờ bất kể ngữ cảnh dùng.
+// Web Crypto rather than Math.random(): only for unique step ids, but
+// static analyzers flag Math.random().
 function makeId() {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return Array.from(bytes, (b) => b.toString(36)).join('').slice(0, 7);

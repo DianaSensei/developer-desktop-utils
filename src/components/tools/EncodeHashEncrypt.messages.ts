@@ -1,6 +1,6 @@
 import { defineMessages } from '@/lib/i18n';
 
-/** Dùng chung cho cả nhóm Encode·Hash·Encrypt: khung tab, Checksum, Password, Image, Pipeline. */
+/** Shared by the Encode·Hash·Encrypt group: tab frame, Checksum, Password, Image, Pipeline. */
 export default defineMessages({
   // Tab
   'tab.encode': { vi: 'Mã hoá', en: 'Encode' },

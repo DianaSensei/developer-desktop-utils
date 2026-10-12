@@ -1,7 +1,7 @@
 import { defineMessages } from '@/lib/i18n';
 
 export default defineMessages({
-  // Tên trường
+  // Field names
   'field.seconds': { vi: 'Giây', en: 'Seconds' },
   'field.minute': { vi: 'Phút', en: 'Minute' },
   'field.hour': { vi: 'Giờ', en: 'Hour' },
@@ -9,7 +9,7 @@ export default defineMessages({
   'field.month': { vi: 'Tháng', en: 'Month' },
   'field.dayOfWeek': { vi: 'Thứ trong tuần', en: 'Day of Week' },
   'field.year': { vi: 'Năm', en: 'Year' },
-  // Đơn vị trong câu giải thích (chữ thường)
+  // Units in the explanation (lower case)
   'unit.second': { vi: 'giây', en: 'second' },
   'unit.minute': { vi: 'phút', en: 'minute' },
   'unit.hour': { vi: 'giờ', en: 'hour' },
@@ -19,7 +19,7 @@ export default defineMessages({
   'unit.year': { vi: 'năm', en: 'year' },
   or: { vi: 'hoặc', en: 'or' },
   optional: { vi: 'tuỳ chọn', en: 'optional' },
-  // Kiểm tra hợp lệ
+  // Validation
   weekdayOutside: { vi: '{{field}}: giá trị W nằm ngoài {{range}}.', en: '{{field}} weekday value is outside {{range}}.' },
   lastOutside: { vi: '{{field}}: giá trị L nằm ngoài {{range}}.', en: '{{field}} last value is outside {{range}}.' },
   nthOutside: { vi: '{{field}}: giá trị # nằm ngoài {{range}}.', en: '{{field}} nth value is outside {{range}}.' },
@@ -47,7 +47,7 @@ export default defineMessages({
     vi: '{{flavor}} thường dùng ? ở ngày-trong-tháng hoặc thứ-trong-tuần để tránh lịch chồng chéo.',
     en: '{{flavor}} usually uses ? in either day-of-month or day-of-week to avoid conflicting schedules.',
   },
-  // Gợi ý quy tắc
+  // Rule hints
   linuxRule: {
     vi: 'Cron Linux có 5 trường: phút, giờ, ngày trong tháng, tháng, thứ trong tuần. Dùng *, giá trị, khoảng, danh sách và bước như */5.',
     en: 'Linux cron uses 5 fields: minute, hour, day of month, month, day of week. Use *, values, ranges, lists, and steps like */5.',
@@ -60,7 +60,7 @@ export default defineMessages({
     vi: 'Cron Quartz có 6 trường và năm (tuỳ chọn): giây, phút, giờ, ngày trong tháng, tháng, thứ trong tuần, năm. Dùng ? ở một trong hai trường ngày, cùng L, W và # nếu được hỗ trợ.',
     en: 'Quartz cron uses 6 fields plus optional year: second, minute, hour, day of month, month, day of week, year. Use ? in either day field, plus L, W, and # where supported.',
   },
-  // Câu giải thích
+  // Explanation sentences
   fixFirst: { vi: 'Sửa lỗi để xem giải thích lịch chạy.', en: 'Fix validation issues to see the schedule explanation.' },
   everyNMinutes: { vi: 'Mỗi {{n}} phút.', en: 'Every {{n}} minutes.' },
   everyMinute: { vi: 'Mỗi phút.', en: 'Every minute.' },
@@ -99,7 +99,7 @@ export default defineMessages({
   inMinutes: { vi: 'sau {{n}} phút', en: 'in {{n}} min' },
   inHours: { vi: 'sau {{n}} giờ', en: 'in {{n}} h' },
   inDays: { vi: 'sau {{n}} ngày', en: 'in {{n}} days' },
-  // Nhãn gợi ý / preset (khoá = nhãn tiếng Anh gốc)
+  // Hint/preset labels (key = original English label)
   'label.Every minute': { vi: 'Mỗi phút', en: 'Every minute' },
   'label.Every 5 minutes': { vi: 'Mỗi 5 phút', en: 'Every 5 minutes' },
   'label.No specific day': { vi: 'Không chỉ định ngày', en: 'No specific day' },

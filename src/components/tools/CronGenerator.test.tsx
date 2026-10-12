@@ -4,10 +4,7 @@ import { CronGenerator } from '@/components/tools/CronGenerator';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { storageRemove } from '@/lib/persistentStore';
 
-/**
- * Quartz có năm là trường TUỲ CHỌN ở cuối. Bản trước đòi đủ 7 trường, nên chính
- * biểu thức mặc định của chế độ Quartz (6 trường) bị báo "Invalid expression".
- */
+/** Quartz's trailing year field is optional, so the default 6-field Quartz expression must validate. */
 
 function setup() {
   const view = render(<AppConfigProvider><CronGenerator /></AppConfigProvider>);

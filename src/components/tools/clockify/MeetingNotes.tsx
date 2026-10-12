@@ -94,7 +94,7 @@ export function MeetingNotes() {
                       {whenLabel(m)} · {formatDuration(meetingDurationMs(m))}
                     </p>
                   </div>
-                  {/* Xoá ghi chú họp = mất nội dung — bấm hai lần (ConfirmButton). */}
+                  {/* Deleting meeting notes loses content, so it takes two clicks (ConfirmButton). */}
                   <ConfirmButton
                     onConfirm={() => remove(m.id)}
                     title={tr('deleteNote')}

@@ -324,9 +324,8 @@ function expressionFromFields(mode: CronMode, fields: CronFields) {
 }
 
 /**
- * Số trường hợp lệ: từ số trường BẮT BUỘC tới tổng số trường. Quartz có năm là
- * trường tuỳ chọn ở cuối — bản trước đòi đủ 7, nên chính biểu thức mặc định và
- * mọi preset 6 trường của chế độ Quartz đều bị báo "Invalid expression".
+ * Valid field counts run from the required count to the total; Quartz's
+ * trailing year field is optional.
  */
 function acceptsFieldCount(mode: CronMode, count: number) {
   const rules = getRules(mode);
@@ -361,13 +360,13 @@ function inferMode(expression: string, fallback: CronMode): CronMode {
   return fallback;
 }
 
-/** Hàm dịch truyền vào các hàm thuần (kiểm tra, giải thích) — chúng không gọi được hook. */
+/** Translator passed to pure helpers (validation, explanation), which can't call hooks. */
 type T = (key: keyof typeof MESSAGES, params?: Record<string, string | number>) => string;
 
 const fieldName = (rule: FieldRule, t: T) => t(`field.${rule.key}`);
 const rangeText = (rule: FieldRule, t: T) =>
   rule.range === 'optional' ? t('optional') : rule.range.replace(/ or /g, ` ${t('or')} `);
-/** Nhãn gợi ý/preset — khoá từ điển là nhãn tiếng Anh gốc; thiếu thì giữ nguyên. */
+/** Translates a hint/preset label; the dictionary key is the English label, used as fallback. */
 const labelText = (label: string, t: T) =>
   `label.${label}` in MESSAGES ? t(`label.${label}` as keyof typeof MESSAGES) : label;
 
@@ -591,7 +590,7 @@ export function CronGenerator() {
     () => explainExpression(mode, analysis.fields, analysis.errors, m),
     [analysis.errors, analysis.fields, mode, m]
   );
-  // Năm mốc chạy kế tiếp — cách chắc nhất để biết biểu thức đúng ý hay không.
+  // The next five runs: the quickest check that the expression means what you intended.
   const nextRuns = useMemo(
     () => (analysis.fields && analysis.errors.length === 0 ? nextCronRuns(mode, analysis.fields) : null),
     [analysis.fields, analysis.errors.length, mode]
@@ -782,13 +781,7 @@ export function CronGenerator() {
           </div>
         </div>
 
-        {/*
-          Bản cũ: viền/nền dùng border-acc/bg-acc (tức là ACCENT, đổi
-          theo tone chủ đạo) trong khi icon lại cứng text-green-500 — đúng lỗi
-          trộn hai hệ màu mà design/RULES.md cảnh báo. Đổi tone chủ đạo sang đỏ
-          thì cả khối "hợp lệ" sẽ nhuộm đỏ trong khi icon vẫn xanh lá. ExplainBand
-          lấy màu từ hệ trạng thái cố định nên không còn lệch được nữa.
-        */}
+        {/* ExplainBand uses the fixed status palette, so "valid" never follows the accent tone. */}
         <ExplainBand
           tone={analysis.errors.length > 0 ? 'bad' : 'ok'}
           title={
@@ -831,8 +824,8 @@ export function CronGenerator() {
                     <span className="text-xs text-fg-mute">{relativeFromNow(run, m)}</span>
                   </li>
                 ))}
-                {/* Lịch thưa (29/2, năm ghim): ít hơn 5 lần trong khoảng quét —
-                    nói rõ thay vì để danh sách ngắn trông như bị cắt. */}
+                {/* Sparse schedules (Feb 29, pinned year) can have fewer than 5 runs in the
+                    scan window; say so instead of looking truncated. */}
                 {nextRuns.runs.length < 5 && (
                   <li className="px-3 py-1.5 text-[11px] text-fg-mute">
                     {nextRuns.searchedYears === null

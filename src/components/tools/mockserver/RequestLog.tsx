@@ -9,9 +9,7 @@ import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/mockserver/MockServer.messages';
 
 function statusColor(status: number): string {
-  // 5xx/4xx là lỗi, 2xx thành công — hệ trạng thái. 3xx (redirect) không
-  // tốt cũng không xấu nhưng vẫn phải tách khỏi hai nhóm kia, nên lấy một
-  // hue từ bảng phân loại thay vì ép vào warn.
+  // 5xx/4xx are errors and 2xx success (status palette); 3xx gets its own hue.
   if (status >= 500) return 'text-bad';
   if (status >= 400) return 'text-warn';
   if (status >= 300) return 'text-[var(--cat-3)]';

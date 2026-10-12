@@ -191,12 +191,8 @@ describe('bulk text round trip', () => {
 });
 
 describe('KeyValueEditor — Name/Value column widths', () => {
-  // The table used to give Name and Value a bare `minmax(0,1fr)` each, so in a
-  // pane with no section-level max-width (the stacked/no-split API Client
-  // layout — see RequestPanel.tsx) a short value like "profile" got handed a
-  // 600px+ input. Name/Value must stay bounded (not a bare 1fr) so the table
-  // can fill a wide pane without ballooning either column — see the `gridCols`
-  // comment in KeyValueEditor.tsx for the full reasoning.
+  // Name/Value must stay bounded (not a bare 1fr) so a wide pane doesn't hand a
+  // short value a 600px input. See `gridCols` in KeyValueEditor.tsx.
   it('caps the Name and Value columns instead of an unbounded 1fr', () => {
     render(<KeyValueEditor rows={[row('page', '1')]} onChange={() => {}} />);
     const grid = document.querySelector('[class*="grid-cols-"]');

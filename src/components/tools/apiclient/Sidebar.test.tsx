@@ -1,14 +1,6 @@
-// Regression coverage for drag/drop reorder in the Sidebar tree.
-//
-// This used to be built on native HTML5 draggable/dragstart/dragover/drop.
-// That never actually fired in the real desktop app: Tauri's window has
-// `dragDropEnabled` on (its default, needed for OS-level file drops — see
-// useTauriFileDrop.ts, used by ChecksumTool/QRCodeTool/ImageBase64Tool) and
-// intercepts every native drag gesture before the webview sees it. It only
-// ever worked in a plain browser tab, which is why earlier tests here (and
-// manual verification in a browser) reported success while the real app
-// stayed broken. Sidebar.tsx now drives reordering off plain pointer events
-// instead — this file exercises that.
+// Drag-and-drop reordering in the Sidebar tree. Sidebar.tsx uses pointer
+// events because Tauri intercepts native HTML5 drag events (needed for OS
+// file drops), so these tests drive pointer events.
 
 import { act, renderHook, render, fireEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,10 +41,8 @@ function stubElementFromPoint(row: Element) {
   document.elementFromPoint = vi.fn(() => row);
 }
 
-// jsdom's PointerEvent constructor doesn't carry clientX/clientY/altKey
-// through its init dict the way a real browser's does — assign them
-// directly on the constructed event, same workaround as the old DragEvent
-// tests needed.
+// jsdom's PointerEvent does not copy clientX/clientY/altKey from its init
+// dict, so they are assigned on the event directly.
 function firePointer(
   name: 'pointerdown' | 'pointermove' | 'pointerup',
   node: HTMLElement,

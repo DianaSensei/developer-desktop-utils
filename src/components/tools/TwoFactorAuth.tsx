@@ -44,10 +44,9 @@ interface Account {
 
 // ─── Avatar helpers ───────────────────────────────────────────────────────────
 
-// Màu avatar suy từ HASH CỦA TÊN, không phải bảng 12 class cố định: cùng một
-// tài khoản luôn ra cùng màu, và số màu phân biệt được là 360 thay vì 12.
-// Đây là màu ĐỊNH DANH (như avatar GitHub) — không mang nghĩa tốt/xấu, nên
-// xoay hue tự do là đúng. Độ bão hoà/sáng cố định để chữ trắng luôn đọc được.
+// Avatar color from a hash of the name: stable per account and 360 hues
+// instead of 12 classes. An identity color (like GitHub avatars), with
+// fixed saturation/lightness so white text stays readable.
 function avatarStyle(name: string): { backgroundColor: string } {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
@@ -88,9 +87,8 @@ function timeRemaining(period: number): number {
   return period - (Math.floor(Date.now() / 1000) % period);
 }
 
-/** Số thứ tự của cửa sổ TOTP hiện tại — cùng công thức `computeTOTP` dùng làm
- *  counter. Đổi số này ⇔ mã đã hết hạn, nên nó là tín hiệu đáng tin để làm mới,
- *  thay cho việc rình đúng một giây ranh giới. */
+/** Index of the current TOTP window (the counter `computeTOTP` uses). A
+ *  change means the code expired, which is a reliable refresh signal. */
 function totpWindow(period: number): number {
   return Math.floor(Date.now() / 1000 / period);
 }
@@ -189,13 +187,9 @@ function OTPCard({ account, onDelete, onCounterIncrement }: OTPCardProps) {
     generate();
     if (account.type === 'totp') {
       setRemaining(timeRemaining(account.period));
-      // Làm mới khi CỬA SỔ TOTP đổi, không phải khi đồng hồ đếm ngược chạm đúng
-      // `period`. `setInterval(…, 1000)` không đảm bảo rơi vào mọi giây: webview
-      // bị hãm nhịp lúc ẩn cửa sổ, máy ngủ dậy, hay chỉ là trôi nhịp thông
-      // thường đều có thể nhảy cóc qua đúng giây ranh giới — và khi đó điều
-      // kiện cũ `r === period` không bao giờ đúng, thẻ tiếp tục hiển thị một mã
-      // ĐÃ HẾT HẠN cho tới tận chu kỳ sau ngẫu nhiên nào đó khớp lại. So sánh
-      // số cửa sổ thì bỏ lỡ bao nhiêu nhịp cũng vẫn phát hiện được.
+      // Refresh when the TOTP window changes rather than when the countdown
+      // hits `period`: a 1s interval can skip seconds (throttled hidden
+      // webview, sleep, drift), which would leave an expired code on screen.
       let lastWindow = totpWindow(account.period);
       timerRef.current = setInterval(() => {
         setRemaining(timeRemaining(account.period));
@@ -624,10 +618,9 @@ function buildOtpauthUri(a: Account): string {
   return `otpauth://${a.type}/${label}?${params.toString()}`;
 }
 
-// Lưu qua `saveTextFile` (hộp thoại Save của OS trên desktop) chứ không phải
-// `<a download>`: trong webview Tauri, thẻ `download` không ghi ra file nào —
-// đúng lý do `lib/fileio.ts` rẽ nhánh `isTauri`. Với 2FA đây là đường SAO LƯU
-// DUY NHẤT của secret, nên "bấm mà không có gì xảy ra" là lỗi nặng nhất có thể.
+// Saved with `saveTextFile` (the OS Save dialog on desktop), because
+// `<a download>` writes nothing in the Tauri webview (see lib/fileio.ts).
+// This export is the only backup of the secrets.
 function exportAccounts(sdk: Parameters<typeof saveTextFile>[0], accounts: Account[]) {
   const body = accounts.map(buildOtpauthUri).join('\n') + '\n';
   return saveTextFile(sdk, `2fa-export-${new Date().toISOString().slice(0, 10)}.txt`, body);
@@ -840,10 +833,9 @@ function ImportDialog({ open, onOpenChange, onImport }: ImportDialogProps) {
 
 export function TwoFactorAuth() {
   const m = useMessages(MESSAGES);
-  // Seed TOTP/HOTP sống trong kho bí mật riêng, không phải mặt phẳng khoá dùng
-  // chung mà `storageGet()` đọc được từ bất cứ đâu trong webview. Kho là bất
-  // đồng bộ nên có `ready`: trước khi đọc xong, tuyệt đối không render "chưa có
-  // tài khoản nào" — người dùng sẽ tưởng mất hết dữ liệu.
+  // TOTP/HOTP seeds live in the secret vault, not the shared store. The
+  // vault is async: until `ready`, never render "no accounts", which
+  // would look like data loss.
   const sdk = usePluginSdk();
   const [accounts, setAccounts, accountsReady] = useSecretState<Account[]>(sdk, 'accounts', []);
   const [showForm, setShowForm] = useState(false);
@@ -867,8 +859,8 @@ export function TwoFactorAuth() {
     setShowForm(false);
   };
 
-  // Xoá một tài khoản = mất secret TOTP vĩnh viễn (không có thùng rác, không
-  // undo) — có thể khoá người dùng khỏi tài khoản thật. Luôn hỏi lại trước.
+  // Deleting an account loses its secret for good (no undo) and can lock
+  // the user out of the real account, so always confirm.
   const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
   const handleDelete = (id: string) => {
     setPendingDelete(accounts.find((a) => a.id === id) ?? null);

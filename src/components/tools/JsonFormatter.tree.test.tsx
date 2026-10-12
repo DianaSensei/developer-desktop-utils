@@ -4,10 +4,7 @@ import { JsonFormatter } from '@/components/tools/JsonFormatter';
 import { AppConfigProvider } from '@/contexts/AppConfigContext';
 import { storageRemove, storageSet } from '@/lib/persistentStore';
 
-/**
- * Cây JSON: windowing (file lớn không vẽ hết), điều hướng bằng bàn phím theo
- * mẫu tree của ARIA, và đếm/nhảy kết quả tìm kiếm.
- */
+/** JSON tree: windowing, ARIA tree keyboard navigation, and search match counting/jumping. */
 
 const INPUT_KEY = 'devtool:json:json:input';
 const big = JSON.stringify(Object.fromEntries(Array.from({ length: 5000 }, (_, i) => [`key${i}`, i])));

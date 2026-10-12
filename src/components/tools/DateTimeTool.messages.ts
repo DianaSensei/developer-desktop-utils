@@ -1,7 +1,7 @@
 import { defineMessages } from '@/lib/i18n';
 
 export default defineMessages({
-  // Đơn vị trong thời lượng — tiếng Việt không chia số nhiều.
+  // Duration units (Vietnamese has no plural forms).
   'dur.year': { vi: '{{n}} năm', en: '{{n}} year' },
   'dur.years': { vi: '{{n}} năm', en: '{{n}} years' },
   'dur.month': { vi: '{{n}} tháng', en: '{{n}} month' },
@@ -15,7 +15,7 @@ export default defineMessages({
   'dur.second': { vi: '{{n}} giây', en: '{{n}} second' },
   'dur.seconds': { vi: '{{n}} giây', en: '{{n}} seconds' },
   zeroSeconds: { vi: '0 giây', en: '0 seconds' },
-  // Bảng định dạng
+  // Format table
   'fmt.Unix (s)': { vi: 'Unix (giây)', en: 'Unix (s)' },
   'fmt.Unix (ms)': { vi: 'Unix (ms)', en: 'Unix (ms)' },
   'fmt.ISO 8601': { vi: 'ISO 8601', en: 'ISO 8601' },
@@ -119,7 +119,7 @@ export default defineMessages({
   from: { vi: 'Từ', en: 'From' },
   to: { vi: 'Đến', en: 'To' },
   now: { vi: 'bây giờ', en: 'now' },
-  // {{dur}} / {{rel}} được thay bằng phần tử in đậm — thứ tự từ khác nhau giữa hai ngôn ngữ.
+  // {{dur}} / {{rel}} become bold elements; word order differs between languages.
   diffSentence: { vi: 'Ngày thứ nhất {{rel}} ngày thứ hai {{dur}}.', en: 'The first date is {{dur}} {{rel}} than the second.' },
   earlier: { vi: 'sớm hơn', en: 'earlier' },
   later: { vi: 'muộn hơn', en: 'later' },

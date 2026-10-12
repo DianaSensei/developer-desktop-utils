@@ -160,10 +160,8 @@ describe('exportPostman — folder/collection auth', () => {
 
 describe('importPostman — auth inheritance', () => {
   it('a request with no auth block imports as Inherit, not No Auth', () => {
-    // This is the ordinary way a Postman collection sets auth: once at the
-    // folder or collection level, with every request's own `auth` key simply
-    // absent so it inherits. Collapsing that to "No Auth" (the old behavior)
-    // silently unauthenticated every request in a collection built this way.
+    // Postman usually sets auth at folder/collection level and omits it on each
+    // request; that must be inherited, not collapsed to "No Auth".
     const json = pmCollection([{ name: 'Get', request: { method: 'GET', url: 'https://api.test/x' } }]);
     const { collection } = importPostman(json);
     const item = collection.items[0];

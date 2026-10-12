@@ -1,26 +1,13 @@
-// Runner result exports. Kept out of RunnerDialog so the row/column shape can
-// be tested directly — the CSV is the format someone actually opens after a
-// data-driven run over a large file, so a silently mis-escaped cell (a comma
-// in an error message, a quote in a response) would corrupt the one artifact
-// the run produced.
-//
-// Both formats are produced as **generators of chunks**, never as one string.
-// A 100k-row data file run yields one record per request per row: serialising
-// that into a single `JSON.stringify` (or one `lines.join('\n')`) means
-// holding the entire report — hundreds of MB for a run that kept responses —
-// in one contiguous JS string before a single byte reaches disk, which is how
-// an export of exactly the run you most wanted to keep ends up being the one
-// that runs out of memory. Chunking also lets the writer flush and let the UI
-// breathe between batches (see saveStreamedTextFile in fileio.ts).
+// Runner result exports (CSV/JSON), kept out of RunnerDialog so they can be
+// tested directly. Both are produced as generators of chunks rather than one
+// string, so exporting a large data-driven run doesn't hold the whole report
+// in memory (see saveStreamedTextFile in fileio.ts).
 
 import { type RunRecord, isHttp2xx, isOk, statusKey } from './runnerStats';
 
-// RFC 4180: quote a cell that contains the delimiter, a quote, or a newline,
-// and double any quote inside it. `\r` counts too — left bare it would end
-// the record early in Excel.
-// `string | number` rather than `unknown`: a cell is text or a count, and an
-// object reaching here would silently become "[object Object]" in the file
-// instead of failing at the call site.
+// RFC 4180: quote a cell containing the delimiter, a quote, `\r` or `\n`, and
+// double any inner quote. Objects are excluded from the type so they can't
+// silently become "[object Object]".
 export type CsvValue = string | number | null | undefined;
 
 export function csvCell(v: CsvValue): string {

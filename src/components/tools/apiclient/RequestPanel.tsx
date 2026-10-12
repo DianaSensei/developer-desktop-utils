@@ -52,10 +52,8 @@ interface Props {
   onTabChange: (tab: Tab) => void;
 }
 
-// A count (muted number) and/or a "has content" dot (green, à la the
-// Postman-style reference) — replaces the old plain-text " (n)"/" •" suffixes
-// baked into the label string itself, which read as part of the tab's name
-// rather than as a status indicator.
+// A count (muted number) and/or a "has content" dot shown after a tab
+// label.
 function tabBadge(count: number | undefined, hasContent: boolean | undefined): ReactNode {
   if (!count && !hasContent) return undefined;
   return (
@@ -73,9 +71,8 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
   const hasScript = !!(request.script.req.trim() || request.script.res.trim());
   const enabledAsserts = request.assertions.filter((a) => a.enabled && a.expr).length;
 
-  // Số đếm chỉ tính Query — Path chưa từng tính vào đây (số path param đã lộ
-  // rõ ngay trên URL), và giờ Headers cũng theo cùng lý đó: đếm riêng ngay
-  // tại nhãn "Headers" bên trong, không gộp vào một con số duy nhất mơ hồ.
+  // The count covers Query only: path params are visible in the URL, and
+  // Headers shows its own count next to its label.
   const tabs: { id: Tab; label: string; badge?: ReactNode }[] = [
     { id: 'params', label: t('req.tab.params'), badge: tabBadge(enabledParams, false) },
     { id: 'body', label: t('req.tab.body'), badge: tabBadge(undefined, request.body.mode !== 'none') },
@@ -121,18 +118,9 @@ export function RequestPanel({ request, onChange, vars, tab, onTabChange }: Prop
 
       {/* tab body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {/* Headers từng là tab riêng — di chuyển vào đây làm phần thứ ba, cùng
-            hình dạng với Query/Path (nhãn nhỏ + bảng), thay vì buộc người dùng
-            nhảy tab để thấy trọn bộ những gì gắn liền với request này. */}
-        {/* No section-level max-w here (there used to be one, `max-w-5xl`):
-            in the stacked layout the request pane spans the whole window, and
-            capping the whole section left a dead block of empty space beside
-            a table that could otherwise have used that width — worse than the
-            problem it was solving. The actual fix is on the table's own
-            columns (see KeyValueEditor's `gridCols`, capped at the Name/Value
-            level), so the table still fills whatever width the pane has, it
-            just doesn't hand a 7-character value like `profile` a 600px-wide
-            input. */}
+        {/* Query, Path and Headers share one tab, each as a small label plus
+            a table. No section-level max width: the table's own column caps
+            (KeyValueEditor `gridCols`) handle wide panes. */}
         {tab === 'params' && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
             <div className="space-y-2">
@@ -215,13 +203,8 @@ function McpScriptingHint() {
 
 type ScriptPhase = 'req' | 'res';
 
-// Pre-request và post-response từng đứng CHỒNG NHAU, mỗi bên full-height (chia
-// đôi khung dọc) — hai Label, hai đoạn giải thích, hai VarsSection, hai editor
-// đều hiện cùng lúc dù người dùng chỉ nhìn một bên tại một thời điểm. Giờ dùng
-// Segmented để chuyển pha (đúng công cụ chuyển-chế-độ của kit, xem
-// ui/segmented.tsx), một khung nội dung duy nhất được TOÀN BỘ chiều cao — và
-// hàng tiêu đề gọn lại giống "Path" ở tab Params: một nhãn nhỏ, không đoạn văn
-// luôn hiện.
+// Pre-request and post-response scripts share one full-height editor,
+// switched with a Segmented control, instead of stacking both.
 function ScriptEditor({ request, onChange }: { request: ApiRequest; onChange: (p: Partial<ApiRequest>) => void }) {
   const { script } = request;
   const [phase, setPhase] = useState<ScriptPhase>('req');
@@ -429,10 +412,9 @@ function PathParamsEditor({ request, onChange, vars }: { request: ApiRequest; on
     return found;
   }, [request.url]);
 
-  // Drop pathParams rows whose :name no longer appears in the URL — otherwise
-  // a renamed/removed placeholder leaves a stale row behind forever (it just
-  // stops rendering, unlike query params, which paramsFromUrl already
-  // reconciles the same way on every URL edit).
+  // Drop pathParams rows whose :name is no longer in the URL, so renamed
+  // placeholders leave no stale rows (query params are reconciled the
+  // same way by paramsFromUrl).
   useEffect(() => {
     if (request.pathParams.every((p) => names.includes(p.key))) return;
     onChange({ pathParams: request.pathParams.filter((p) => names.includes(p.key)) });
@@ -559,12 +541,8 @@ function SettingsEditor({ request, onChange }: { request: ApiRequest; onChange: 
   };
 
   return (
-    // SettingGroup + SettingRow, the app's own shape for a panel of
-    // configuration, instead of the hand-rolled label/hint/Switch row this
-    // pane used to repeat. The rows now sit on one surface separated by
-    // hairlines rather than floating free in a column, and they read the
-    // same as the app's Settings page — which is what this pane is, scoped
-    // to one request.
+    // SettingGroup + SettingRow: the app's standard settings panel shape,
+    // as on the Settings page, scoped to this request.
     <div className="max-w-xl space-y-5">
       <div className="space-y-2">
         <Label className="flex items-center gap-1.5 text-xs"><Tag className="h-3.5 w-3.5" /> {t('req.tags')}</Label>
@@ -660,7 +638,7 @@ function NumberField({ value, onChange, label, clearable }: {
 
 // ─── body ───────────────────────────────────────────────────────────────────
 
-// Hàm chứ không phải hằng: đọc ngôn ngữ lúc render (xem apiclient/i18n.ts).
+// A function, not a constant: reads the locale at render (see apiclient/i18n.ts).
 const bodyLabel = (mode: BodyMode): string => ({
   none: t('req.noBody'),
   json: 'JSON', xml: 'XML', text: 'TEXT', sparql: 'SPARQL',

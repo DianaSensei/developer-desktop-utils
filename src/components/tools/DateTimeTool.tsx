@@ -146,7 +146,7 @@ type T = (key: keyof typeof MESSAGES, params?: Record<string, string | number>) 
 
 const DURATION_UNITS = ['year', 'month', 'day', 'hour', 'minute', 'second'] as const;
 
-/** Các phần "3 năm", "2 giờ"… theo ngôn ngữ đang chọn. */
+/** Localized parts such as "3 years", "2 hours". */
 function durationParts(a: Date, b: Date, t: T): string[] {
   const [earlier, later] = a <= b ? [a, b] : [b, a];
   const dur = intervalToDuration({ start: earlier, end: later });
@@ -161,7 +161,7 @@ function humanReadableDuration(a: Date, b: Date, t: T): string {
   return parts.length ? parts.join(', ') : t('zeroSeconds');
 }
 
-/** Ghép câu có chỗ trống `{{x}}` với phần tử React — để thứ tự từ theo đúng từng ngôn ngữ. */
+/** Fills `{{x}}` slots in a template with React nodes, keeping each locale's word order. */
 function richText(template: string, slots: Record<string, React.ReactNode>) {
   return template.split(/(\{\{\w+\}\})/).map((part, i) => {
     const key = /^\{\{(\w+)\}\}$/.exec(part)?.[1];
@@ -169,10 +169,8 @@ function richText(template: string, slots: Record<string, React.ReactNode>) {
   });
 }
 
-// Bản cũ tô mỗi đơn vị một màu cầu vồng (years=tím, months=xanh dương,
-// days=sky…) dù chữ "years"/"months" đã tự nói lên đơn vị, và dấu `·` đã ngăn
-// cách rõ ràng. Màu không thêm thông tin nào — chỉ trọng lượng (bold+mono) +
-// dấu ngăn là đủ, đúng nguyên tắc "hierarchy qua weight/size, không phải màu".
+// Units are distinguished by weight and separators, not color: the words
+// already name the unit.
 function DurationParts({ a, b, t }: { a: Date; b: Date; t: T }) {
   const parts = durationParts(a, b, t);
 
@@ -284,9 +282,7 @@ const BOUNDARY_PAIRS: [string, (d: Date) => Date, (d: Date) => Date][] = [
 
 // ─── sub-components ────────────────────────────────────────────────────────
 
-// Tooltip của kit — bản tự chế trước đây (`group-hover/tip:block`) không mở
-// được bằng bàn phím và bị cắt khi sát mép (lọt qua guard handRolledTooltip vì
-// có hậu tố `/tip`).
+// Kit Tooltip: opens on keyboard focus and is not clipped at edges.
 function InfoTip({ text, label }: { text: string; label: string }) {
   return (
     <Tooltip label={label} description={text} side="top" width={240}>
@@ -604,11 +600,9 @@ export function DateTimeTool() {
           )}
         </div>
 
-        {/* Timezone selectors — nhãn "input tz" dùng text-info, "output tz" dùng
-            text-warn TRONG SUỐT component này. Không phải thông báo lỗi/cảnh báo —
-            tái dùng hai hue sẵn có (gần đúng sky/amber của bản gốc) làm cặp phân
-            biệt input/output nhất quán qua toàn bộ bảng Formats bên dưới, thay vì
-            thêm hai token --tz-in/--tz-out gần trùng hue với info/warn. */}
+        {/* Timezone selectors. Input labels use text-info and output labels
+            text-warn throughout, as a consistent input/output pair (not a
+            warning). */}
         <div className="flex items-start gap-3">
           <div className="flex-1 space-y-0.5">
             <TzSelect label={m('inputTz')} value={inputTz} onChange={setInputTz} availableTzs={availableTzs} />

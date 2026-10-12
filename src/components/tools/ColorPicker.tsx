@@ -141,8 +141,8 @@ const LOUPE = 132;   // loupe canvas size (px)
 const LOUPE_CELLS = 11; // source pixels shown across the loupe
 const PALETTE_SIZE = 16; // number of colors extracted from the image (strip scrolls)
 
-// Small hover "?" — dùng <Tooltip> dùng chung thay vì bản group-hover tự chế
-// (bản cũ không tới được bằng bàn phím và bị cắt trong khung overflow).
+// Small "?" help using the shared <Tooltip> (keyboard accessible, not
+// clipped by overflow).
 function Help({ text }: { text: string }) {
   return (
     <Tooltip label={text} side="bottom" width={224}>
@@ -358,8 +358,8 @@ export function ColorPicker() {
     c.width = w * palette.length; c.height = h;
     const ctx = c.getContext('2d')!;
     palette.forEach((hex, i) => { ctx.fillStyle = hex; ctx.fillRect(i * w, 0, w, h); });
-    // `saveBinaryFile`, không phải `<a download>` — thẻ đó không ghi ra file
-    // nào trong webview Tauri (xem lib/fileio.ts).
+    // `saveBinaryFile`, not `<a download>`, which writes nothing in the
+    // Tauri webview (see lib/fileio.ts).
     void saveBinaryFile(sdk, 'palette.png', c.toDataURL('image/png').split(',')[1]);
   };
 
