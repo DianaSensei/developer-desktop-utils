@@ -8,11 +8,11 @@ mod files;
 mod mcp_bridge;
 mod mockserver;
 mod ports;
+mod private_file;
 mod secrets_vault;
 mod service_host;
 mod service_trust;
 mod artifact_installer;
-mod plugin_data;
 
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -75,14 +75,11 @@ fn main() {
         // files the user dropped. `Enter` is recorded as well as `Drop` because
         // Tauri notifies the webview before these listeners run. See dropped.rs.
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::DragDrop(drag) = event {
-                match drag {
-                    tauri::DragDropEvent::Enter { paths, .. }
-                    | tauri::DragDropEvent::Drop { paths, .. } => {
-                        window.state::<dropped::DroppedPaths>().remember(paths);
-                    }
-                    _ => {}
-                }
+            if let tauri::WindowEvent::DragDrop(
+                tauri::DragDropEvent::Enter { paths, .. } | tauri::DragDropEvent::Drop { paths, .. },
+            ) = event
+            {
+                window.state::<dropped::DroppedPaths>().remember(paths);
             }
         })
         .manage(mockserver::MockState::default())

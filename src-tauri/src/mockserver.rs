@@ -1072,6 +1072,24 @@ mod tests {
         }
     }
 
+    fn stub(id: &str, method: &str, path: &str) -> Stub {
+        Stub {
+            id: id.into(),
+            enabled: true,
+            method: method.into(),
+            path: path.into(),
+            matchers: vec![],
+            mode: "static".into(),
+            status: 200,
+            headers: vec![],
+            body: String::new(),
+            body_type: "text".into(),
+            file_name: String::new(),
+            script: String::new(),
+            delay_ms: 0,
+        }
+    }
+
     #[test]
     fn path_literal_and_params() {
         assert!(match_path("/health", "/health").is_some());
@@ -1099,21 +1117,7 @@ mod tests {
 
     #[test]
     fn method_matching() {
-        let stub = Stub {
-            id: "1".into(),
-            enabled: true,
-            method: "ANY".into(),
-            path: "/".into(),
-            matchers: vec![],
-            mode: "static".into(),
-            status: 200,
-            headers: vec![],
-            body: String::new(),
-            body_type: "text".into(),
-            file_name: String::new(),
-            script: String::new(),
-            delay_ms: 0,
-        };
+        let stub = stub("1", "ANY", "/");
         assert!(method_matches(&stub, "DELETE"));
         let mut s2 = stub.clone();
         s2.method = "post".into();
@@ -1164,21 +1168,7 @@ mod tests {
 
     #[test]
     fn first_match_wins() {
-        let mk = |id: &str, path: &str| Stub {
-            id: id.into(),
-            enabled: true,
-            method: "GET".into(),
-            path: path.into(),
-            matchers: vec![],
-            mode: "static".into(),
-            status: 200,
-            headers: vec![],
-            body: String::new(),
-            body_type: "text".into(),
-            file_name: String::new(),
-            script: String::new(),
-            delay_ms: 0,
-        };
+        let mk = |id: &str, path: &str| stub(id, "GET", path);
         let cfg = MockConfig {
             stubs: vec![mk("a", "/users/:id"), mk("b", "/users/42")],
             ..Default::default()
@@ -1191,19 +1181,8 @@ mod tests {
     #[test]
     fn disabled_stub_is_skipped() {
         let mut s = Stub {
-            id: "a".into(),
             enabled: false,
-            method: "GET".into(),
-            path: "/users/:id".into(),
-            matchers: vec![],
-            mode: "static".into(),
-            status: 200,
-            headers: vec![],
-            body: String::new(),
-            body_type: "text".into(),
-            file_name: String::new(),
-            script: String::new(),
-            delay_ms: 0,
+            ..stub("a", "GET", "/users/:id")
         };
         let cfg = MockConfig {
             stubs: vec![s.clone()],
@@ -1271,19 +1250,10 @@ mod tests {
     #[test]
     fn base64_body_resolves_to_bytes_with_disposition() {
         let mut s = Stub {
-            id: "f".into(),
-            enabled: true,
-            method: "GET".into(),
-            path: "/file".into(),
-            matchers: vec![],
-            mode: "static".into(),
-            status: 200,
-            headers: vec![],
             body: "aGVsbG8=".into(),
             body_type: "base64".into(),
             file_name: "greeting.txt".into(),
-            script: String::new(),
-            delay_ms: 0,
+            ..stub("f", "GET", "/file")
         };
         let r = resolve(&s, &ctx(), &HashMap::new());
         assert_eq!(r.body, b"hello");

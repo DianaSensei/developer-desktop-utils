@@ -41,7 +41,7 @@ fn spawn() -> std::process::Child {
 }
 
 #[test]
-fn ping_tra_ve_pong() {
+fn ping_returns_pong() {
     let mut child = spawn();
     let res = round_trip(
         &mut child,
@@ -58,7 +58,7 @@ fn ping_tra_ve_pong() {
 }
 
 #[test]
-fn echo_tra_ve_dung_params_da_gui() {
+fn echo_returns_params() {
     let mut child = spawn();
     let payload = json!({ "so": 7, "chu": "xin chào" });
     let res = round_trip(
@@ -73,7 +73,7 @@ fn echo_tra_ve_dung_params_da_gui() {
 }
 
 #[test]
-fn method_khong_ho_tro_tra_loi_bang_error_khong_phai_panic() {
+fn unknown_method_returns_error() {
     let mut child = spawn();
     let res = round_trip(
         &mut child,
@@ -88,7 +88,7 @@ fn method_khong_ho_tro_tra_loi_bang_error_khong_phai_panic() {
 }
 
 #[test]
-fn lech_protocol_thi_tu_choi() {
+fn protocol_mismatch_is_rejected() {
     let mut child = spawn();
     let res = round_trip(
         &mut child,
@@ -105,7 +105,7 @@ fn lech_protocol_thi_tu_choi() {
 }
 
 #[test]
-fn json_hong_khong_lam_sidecar_chet_va_khong_ghi_gi_khac_len_stdout() {
+fn malformed_json_gets_error_and_sidecar_keeps_running() {
     let mut child = spawn();
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, "{{khong-phai-json").unwrap();
@@ -132,7 +132,7 @@ fn json_hong_khong_lam_sidecar_chet_va_khong_ghi_gi_khac_len_stdout() {
 /// The "exit when stdin closes" part of the contract, which is how the host
 /// cleans up sidecars (`kill()` closes stdin before killing).
 #[test]
-fn dong_stdin_thi_sidecar_tu_thoat() {
+fn sidecar_exits_when_stdin_closes() {
     let mut child = spawn();
     drop(child.stdin.take().unwrap());
 
@@ -143,7 +143,7 @@ fn dong_stdin_thi_sidecar_tu_thoat() {
 
 /// `tick-stream` emits several lines for one request.
 #[test]
-fn tick_stream_phat_dung_so_su_kien_roi_ket_bang_done() {
+fn tick_stream_emits_count_events_then_done() {
     let mut child = spawn();
     let mut stdin = child.stdin.take().unwrap();
     writeln!(
@@ -177,7 +177,7 @@ fn tick_stream_phat_dung_so_su_kien_roi_ket_bang_done() {
 }
 
 #[test]
-fn tick_stream_khong_truyen_count_thi_dung_mac_dinh_ba_su_kien() {
+fn tick_stream_defaults_to_three_events() {
     let mut child = spawn();
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, r#"{{"protocol":1,"id":"t2","plugin":"demo","method":"tick-stream","params":null}}"#).unwrap();
@@ -201,7 +201,7 @@ fn tick_stream_khong_truyen_count_thi_dung_mac_dinh_ba_su_kien() {
 
 /// After a stream completes, the sidecar must still answer the next request.
 #[test]
-fn sau_khi_stream_xong_sidecar_van_tra_loi_binh_thuong_cho_request_ke_tiep() {
+fn sidecar_answers_after_a_stream_completes() {
     let mut child = spawn();
     let mut stdin = child.stdin.take().unwrap();
     writeln!(stdin, r#"{{"protocol":1,"id":"t3","plugin":"demo","method":"tick-stream","params":{{"count":1}}}}"#).unwrap();

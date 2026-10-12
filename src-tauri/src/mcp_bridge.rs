@@ -17,7 +17,7 @@
 // → "Background MCP bridge" is on. Otherwise it times out with an error.
 
 use std::collections::HashMap;
-use std::io::{Error as IoError, ErrorKind};
+use std::io::Error as IoError;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -222,18 +222,11 @@ fn write_discovery_file(app: &AppHandle, port: u16, token: &str) -> std::io::Res
     let dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| IoError::new(ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| IoError::other(e.to_string()))?;
     std::fs::create_dir_all(&dir)?;
     let path = dir.join("mcp-bridge.json");
     let json = serde_json::to_string_pretty(&DiscoveryFile { port, token: token.to_string() })?;
-    std::fs::write(&path, json)?;
-    // Owner-only on Unix; Windows ACLs already default to the owning user.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
-    }
-    Ok(())
+    crate::private_file::write(&path, json)
 }
 
 // Starts the bridge and writes its discovery file. Called once from
@@ -281,7 +274,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn constant_time_eq_dung_nhu_so_sanh_thuong() {
+    fn constant_time_eq_matches_plain_equality() {
         assert!(constant_time_eq("abc", "abc"));
         assert!(constant_time_eq("", ""));
         assert!(!constant_time_eq("abc", "abd"));

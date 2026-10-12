@@ -427,6 +427,19 @@ fn stage_install_plugin(
     Ok(record)
 }
 
+/// The manifest's build for `triple`. Other triples are never tried.
+fn target_for<'a>(manifest: &'a RemoteServiceManifest, triple: &str) -> Result<&'a ServiceTarget, String> {
+    manifest.targets.get(triple).ok_or_else(|| {
+        let mut available: Vec<&str> = manifest.targets.keys().map(String::as_str).collect();
+        available.sort_unstable();
+        format!(
+            "Manifest không có bản cho nền tảng hiện tại (target đã tính: \"{triple}\"). \
+             Các target manifest có: [{}]",
+            available.join(", ")
+        )
+    })
+}
+
 fn final_bin_name(bin: &str) -> String {
     // The host picks the extension; a CDN URL may not carry a trustworthy name.
     if cfg!(windows) && !bin.to_ascii_lowercase().ends_with(".exe") {
@@ -452,14 +465,7 @@ fn stage_install_service(
     target_triple: &str,
     bytes: &[u8],
 ) -> Result<InstalledArtifactRecord, String> {
-    let target = manifest.targets.get(target_triple).ok_or_else(|| {
-        let available: Vec<&str> = manifest.targets.keys().map(String::as_str).collect();
-        format!(
-            "Manifest không có bản cho nền tảng hiện tại (target đã tính: \"{target_triple}\"). \
-             Các target manifest có: [{}]",
-            available.join(", ")
-        )
-    })?;
+    let target = target_for(&manifest, target_triple)?;
 
     let actual = sha256_hex(bytes);
     if actual != target.sha256.to_lowercase() {
@@ -698,14 +704,7 @@ pub async fn artifact_installer_install(
         }
         RemoteArtifactManifest::Service(manifest) => {
             let triple = current_target_triple();
-            let target = manifest.targets.get(&triple).cloned().ok_or_else(|| {
-                let available: Vec<&str> = manifest.targets.keys().map(String::as_str).collect();
-                format!(
-                    "Manifest không có bản cho nền tảng hiện tại (target đã tính: \"{triple}\"). \
-                     Các target manifest có: [{}]",
-                    available.join(", ")
-                )
-            })?;
+            let target = target_for(&manifest, &triple)?.clone();
             let bytes = download_capped(&target.url, MAX_DOWNLOAD_BYTES)
                 .await
                 .map_err(|e| format!("Không tải được binary: {e}"))?;
@@ -824,7 +823,7 @@ mod tests {
 
     // -- Index reader --------------------------------------------------------
     #[test]
-    fn nguon_cai_dat_cua_sidecar_doc_tu_index() {
+    fn service_source_url_is_read_from_index() {
         let dir = temp_dir("source-url");
         assert_eq!(installed_service_source_url_at(&dir, "devtool-svc-x"), None, "no index yet");
         let record = InstalledArtifactRecord::Service(InstalledServiceRecord {
@@ -845,7 +844,7 @@ mod tests {
     }
 
     #[test]
-    fn doc_index_json_cu_khong_co_kind_tu_dong_thanh_toan_bo_plugin() {
+    fn legacy_index_without_kind_loads_as_plugins() {
         let old_record = InstalledPluginRecord {
             manifest: plugin_manifest("https://x/bundle.mjs", &"a".repeat(64)),
             source_url: "https://x/plugin.json".into(),
@@ -868,7 +867,7 @@ mod tests {
     }
 
     #[test]
-    fn doc_index_json_moi_co_kind_o_moi_ban_ghi() {
+    fn index_writes_kind_on_every_record() {
         let dir = temp_dir("mixed-index");
         let plugin = InstalledArtifactRecord::Plugin(InstalledPluginRecord {
             manifest: plugin_manifest("https://x/a.mjs", &sha256_hex(b"a")),
@@ -895,7 +894,7 @@ mod tests {
     }
 
     #[test]
-    fn kind_la_bi_tu_choi_ro_rang_khong_panic() {
+    fn unknown_kind_is_rejected() {
         let dir = temp_dir("bad-kind");
         std::fs::write(index_path(&dir), r#"[{"kind":"khong-ro","x":1}]"#).unwrap();
         let err = read_index(&dir).unwrap_err();
@@ -905,20 +904,20 @@ mod tests {
     // -- Plugins ---------------------------------------------------------------
 
     #[test]
-    fn tu_choi_id_khong_phai_kebab_case() {
+    fn rejects_non_kebab_case_id() {
         let mut m = plugin_manifest("https://x/a", &"a".repeat(64));
         m.id = "Demo_App".into();
         assert!(validate_remote_plugin_manifest(&m).is_err());
     }
 
     #[test]
-    fn tu_choi_entry_khong_phai_https() {
+    fn rejects_non_https_entry() {
         let m = plugin_manifest("http://x/a", &"a".repeat(64));
         assert!(validate_remote_plugin_manifest(&m).unwrap_err().contains("https"));
     }
 
     #[test]
-    fn tu_choi_integrity_sai_hinh_dang() {
+    fn rejects_malformed_integrity() {
         for bad in ["", "khong-phai-hex", &"a".repeat(63), &"g".repeat(64)] {
             let m = plugin_manifest("https://x/a", bad);
             assert!(validate_remote_plugin_manifest(&m).is_err(), "{bad}");
@@ -926,13 +925,13 @@ mod tests {
     }
 
     #[test]
-    fn plugin_manifest_hop_le_qua_duoc_kiem() {
+    fn valid_plugin_manifest_passes() {
         let m = plugin_manifest("https://x/bundle.mjs", &"a".repeat(64));
         assert!(validate_remote_plugin_manifest(&m).is_ok());
     }
 
     #[tokio::test]
-    async fn fetch_manifest_tu_choi_http() {
+    async fn fetch_manifest_rejects_http() {
         let err = artifact_installer_fetch_manifest("http://example.com".into())
             .await
             .unwrap_err();
@@ -940,7 +939,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fetch_manifest_plugin_that_qua_server_that() {
+    async fn fetch_manifest_reads_plugin_from_server() {
         let m = RemoteArtifactManifest::Plugin(plugin_manifest("https://x/bundle.mjs", &"b".repeat(64)));
         let url = serve_once(serde_json::to_string(&m).unwrap(), "application/json").await;
 
@@ -952,14 +951,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fetch_manifest_tu_choi_json_hong() {
+    async fn fetch_manifest_rejects_malformed_json() {
         let url = serve_once("{khong-phai-json".into(), "application/json").await;
         let err = fetch_manifest_from(&url).await.unwrap_err();
         assert!(err.contains("Manifest không đúng định dạng"));
     }
 
     #[tokio::test]
-    async fn fetch_manifest_thieu_kind_bi_tu_choi() {
+    async fn fetch_manifest_requires_kind() {
         // Published manifests must declare `kind`; only the installed index
         // tolerates its absence.
         let json = r#"{"id":"demo","version":"1.0.0","sdk":"^1.0.0","entry":"https://x/a.mjs","integrity":"aa","label":"Demo","description":"x","icon":"puzzle","route":"/demo"}"#;
@@ -969,7 +968,7 @@ mod tests {
     }
 
     #[test]
-    fn cai_plugin_dung_checksum_thi_ghi_bundle_va_cap_nhat_index() {
+    fn plugin_with_matching_checksum_is_installed() {
         let index_dir = temp_dir("plugin-ok-index");
         let plugins_dir = temp_dir("plugin-ok-bundles");
         let bytes = b"export default 1;";
@@ -985,7 +984,7 @@ mod tests {
     }
 
     #[test]
-    fn cai_plugin_sai_checksum_thi_tu_choi_va_khong_ghi_gi_xuong_dia() {
+    fn plugin_with_wrong_checksum_is_rejected_without_writing() {
         let index_dir = temp_dir("plugin-bad-index");
         let plugins_dir = temp_dir("plugin-bad-bundles");
         let bytes = b"export default 1;";
@@ -999,7 +998,7 @@ mod tests {
     }
 
     #[test]
-    fn cai_de_cung_id_plugin_thi_thay_ban_ghi_cu_khong_cong_don() {
+    fn reinstalling_a_plugin_replaces_its_record() {
         let index_dir = temp_dir("plugin-overwrite-index");
         let plugins_dir = temp_dir("plugin-overwrite-bundles");
         let v1 = plugin_manifest("https://x/v1.mjs", &sha256_hex(b"v1"));
@@ -1028,7 +1027,7 @@ mod tests {
     /// Two markets publishing the same plugin id keep separate records and
     /// directories, and uninstalling one leaves the other.
     #[test]
-    fn hai_market_khac_nhau_cung_id_plugin_cung_ton_tai_khong_de_len_nhau() {
+    fn same_plugin_id_from_two_markets_coexists() {
         let index_dir = temp_dir("plugin-multi-market-index");
         let plugins_dir = temp_dir("plugin-multi-market-bundles");
 
@@ -1097,7 +1096,7 @@ mod tests {
     }
 
     #[test]
-    fn doc_bundle_kiem_lai_checksum_bat_duoc_file_bi_sua_sau_khi_cai() {
+    fn reading_a_modified_bundle_fails_checksum() {
         let index_dir = temp_dir("plugin-reread-index");
         let plugins_dir = temp_dir("plugin-reread-bundles");
         let bytes = b"export default 1;";
@@ -1116,7 +1115,7 @@ mod tests {
     }
 
     #[test]
-    fn go_plugin_xoa_ca_index_lan_thu_muc() {
+    fn uninstalling_plugin_removes_record_and_files() {
         let index_dir = temp_dir("plugin-uninstall-index");
         let plugins_dir = temp_dir("plugin-uninstall-bundles");
         let services_dir = temp_dir("plugin-uninstall-services");
@@ -1132,7 +1131,7 @@ mod tests {
     }
 
     #[test]
-    fn go_muc_khong_ton_tai_thi_bao_loi_ro_rang() {
+    fn uninstalling_unknown_key_fails() {
         let index_dir = temp_dir("uninstall-missing-index");
         let plugins_dir = temp_dir("uninstall-missing-plugins");
         let services_dir = temp_dir("uninstall-missing-services");
@@ -1143,7 +1142,7 @@ mod tests {
     // -- Services --------------------------------------------------------------
 
     #[test]
-    fn cai_service_dung_target_thi_tai_ghi_atomic_chmod_va_cap_nhat_index() {
+    fn service_is_written_atomically_and_made_executable() {
         let index_dir = temp_dir("svc-ok-index");
         let services_dir = temp_dir("svc-ok-bin");
         let triple = current_target_triple();
@@ -1174,7 +1173,7 @@ mod tests {
     }
 
     #[test]
-    fn cai_service_sai_target_triple_thi_tu_choi_neu_ro_va_khong_ghi_gi() {
+    fn service_without_build_for_this_triple_is_rejected() {
         let index_dir = temp_dir("svc-bad-triple-index");
         let services_dir = temp_dir("svc-bad-triple-bin");
         let bytes = b"binary";
@@ -1191,7 +1190,7 @@ mod tests {
     }
 
     #[test]
-    fn cai_service_sai_checksum_thi_tu_choi_xoa_tmp_khong_co_ban_ghi_moi() {
+    fn service_with_wrong_checksum_is_rejected_without_writing() {
         let index_dir = temp_dir("svc-bad-checksum-index");
         let services_dir = temp_dir("svc-bad-checksum-bin");
         let triple = current_target_triple();
@@ -1207,7 +1206,7 @@ mod tests {
     }
 
     #[test]
-    fn cai_de_cung_bin_thi_thay_han_ban_ghi_cu_khong_giu_song_song() {
+    fn reinstalling_a_service_replaces_its_record() {
         let index_dir = temp_dir("svc-overwrite-index");
         let services_dir = temp_dir("svc-overwrite-bin");
         let triple = current_target_triple();
@@ -1239,7 +1238,7 @@ mod tests {
     }
 
     #[test]
-    fn go_service_xoa_index_va_thu_muc_nhung_khong_dung_service_data() {
+    fn uninstalling_service_removes_record_and_binary() {
         let index_dir = temp_dir("svc-uninstall-index");
         let plugins_dir = temp_dir("svc-uninstall-plugins");
         let services_dir = temp_dir("svc-uninstall-bin");
@@ -1256,7 +1255,7 @@ mod tests {
     }
 
     #[test]
-    fn installed_service_bin_path_at_tra_none_khi_khong_co_ban_ghi_hoac_file_mat() {
+    fn installed_service_bin_path_at_is_none_without_record_or_file() {
         let index_dir = temp_dir("svc-lookup-index");
         assert!(installed_service_bin_path_at(&index_dir, "devtool-svc-demo").is_none());
 
@@ -1277,7 +1276,7 @@ mod tests {
     // -- Extensions directory migration ----------------------------------------
 
     #[test]
-    fn di_tru_index_cu_tu_plugins_sang_extensions_khong_mat_du_lieu() {
+    fn legacy_index_is_migrated_without_loss() {
         let app_data = temp_dir("migrate-app-data");
         let old_record = InstalledPluginRecord {
             manifest: plugin_manifest("https://x/bundle.mjs", &sha256_hex(b"legacy")),
@@ -1319,7 +1318,7 @@ mod tests {
     }
 
     #[test]
-    fn khong_co_index_cu_thi_extensions_dir_rong_khong_loi() {
+    fn no_legacy_index_gives_empty_extensions_dir() {
         let app_data = temp_dir("no-legacy-app-data");
         let extensions = prepare_extensions_dir(&app_data).unwrap();
         assert!(!index_path(&extensions).exists());
@@ -1329,7 +1328,7 @@ mod tests {
     // -- current_target_triple --------------------------------------------------
 
     #[test]
-    fn current_target_triple_dung_dinh_dang_chuan_rust() {
+    fn current_target_triple_has_rust_format() {
         let triple = current_target_triple();
         assert!(triple.contains('-'), "{triple}");
         let os_ok = triple.ends_with("apple-darwin")
@@ -1341,7 +1340,7 @@ mod tests {
     // -- write_index -----------------------------------------------------------
 
     #[test]
-    fn write_index_khong_de_lai_tmp_mo_coi_sau_khi_ghi_xong() {
+    fn write_index_leaves_no_temp_file() {
         let dir = temp_dir("write-index-atomic");
         let plugin = InstalledArtifactRecord::Plugin(InstalledPluginRecord {
             manifest: plugin_manifest("https://x/a.mjs", &sha256_hex(b"a")),
@@ -1350,7 +1349,7 @@ mod tests {
             installed_at: 1,
             market_id: None,
         });
-        write_index(&dir, &[plugin.clone()]).unwrap();
+        write_index(&dir, std::slice::from_ref(&plugin)).unwrap();
 
         assert!(index_path(&dir).exists());
         assert!(!dir.join("index.json.tmp").exists());
@@ -1361,7 +1360,7 @@ mod tests {
 
     /// `Content-Length` over the cap is rejected before reading the body.
     #[tokio::test]
-    async fn download_capped_tu_choi_ngay_khi_content_length_vuot_tran() {
+    async fn download_capped_rejects_large_content_length() {
         let url = serve_once("x".repeat(1000), "text/plain").await;
         let err = download_capped(&url, 100).await.unwrap_err();
         assert!(err.contains("quá lớn"), "{err}");
@@ -1369,7 +1368,7 @@ mod tests {
 
     /// Without a trustworthy `Content-Length`, the streamed total is capped.
     #[tokio::test]
-    async fn download_capped_tu_choi_giua_chung_khi_khong_co_content_length_dang_tin() {
+    async fn download_capped_rejects_stream_over_cap() {
         let app = Router::new().route(
             "/",
             get(|| async {
@@ -1391,7 +1390,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn download_capped_nhan_body_trong_tran() {
+    async fn download_capped_accepts_body_within_cap() {
         let url = serve_once("hello".into(), "text/plain").await;
         let bytes = download_capped(&url, 100).await.unwrap();
         assert_eq!(bytes, b"hello");

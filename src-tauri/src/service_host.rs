@@ -270,13 +270,10 @@ async fn reader_loop(
     waiters: Waiters,
     on_ended: impl FnOnce() + Send + 'static,
 ) {
-    loop {
-        match lines.next_line().await {
-            Ok(Some(line)) => match serde_json::from_str::<ServiceResponse>(&line) {
-                Ok(response) => dispatch(&waiters, response),
-                Err(_) => break,
-            },
-            _ => break,
+    while let Ok(Some(line)) = lines.next_line().await {
+        match serde_json::from_str::<ServiceResponse>(&line) {
+            Ok(response) => dispatch(&waiters, response),
+            Err(_) => break,
         }
     }
     // Fail pending one-shot calls now instead of letting them time out.
@@ -575,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    fn service_data_dir_cach_ly_theo_ten_bin_khong_phai_ten_file() {
+    fn service_data_dir_is_per_bin() {
         let root = std::path::Path::new("/app-data");
         assert_eq!(service_data_dir(root, "devtool-svc-redis"), root.join("service-data").join("devtool-svc-redis"));
         // Different sidecars never share a directory.
@@ -586,7 +583,7 @@ mod tests {
     }
 
     #[test]
-    fn tu_choi_ten_khong_the_la_sidecar() {
+    fn rejects_names_that_cannot_be_sidecars() {
         // A name that could escape the services directory never reaches the
         // consent prompt.
         for bad in ["/bin/sh", "sh", "devtool-svc-", "devtool-svc-../x", "devtool-svc-a/b", "devtool-svc-A", "devtool-svc--x", "devtool-svc-x-"] {
@@ -596,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    fn ten_hop_le_ngoai_allowlist_di_tiep_toi_buoc_hoi_nguoi_dung() {
+    fn valid_name_outside_allowlist_goes_to_consent() {
         // Not rejected outright: the user decides (service_trust).
         assert!(reject_reason(&request("devtool-svc-service-list-automation", SERVICE_PROTOCOL)).is_none());
         assert!(!ALLOWED_SERVICES.contains(&"devtool-svc-service-list-automation"));
@@ -620,7 +617,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sidecar_dong_goi_san_khong_bao_gio_hoi() {
+    async fn bundled_sidecar_never_asks() {
         let trust = memory_trust();
         // Not even a file is needed: a bundled name never reaches the question.
         let nowhere = std::path::Path::new("/nonexistent");
@@ -632,7 +629,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sidecar_cai_them_hoi_mot_lan_voi_hop_thoai_du_thong_tin() {
+    async fn installed_sidecar_asks_once_with_full_dialog() {
         let bin = "devtool-svc-trusttest";
         let (root, extensions) = fake_installed_sidecar(bin, b"binary v1");
         let trust = memory_trust();
@@ -656,7 +653,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tu_choi_thi_khong_chay_va_doi_file_thi_hoi_lai() {
+    async fn denied_sidecar_does_not_run_and_changed_file_asks_again() {
         let bin = "devtool-svc-trusttest2";
         let (root, extensions) = fake_installed_sidecar(bin, b"v1");
         let trust = memory_trust();
@@ -678,7 +675,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn khong_tim_thay_sidecar_thi_bao_loi_khong_hoi() {
+    async fn missing_sidecar_fails_without_prompt() {
         let trust = memory_trust();
         let empty = temp_dir("trust-missing");
         let r = ensure_trusted_with(&trust, "devtool-svc-khong-co", None, &empty, None, None, |_| async {
@@ -689,7 +686,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hop_thoai_theo_ngon_ngu_trong_app() {
+    async fn consent_dialog_follows_app_language() {
         let bin = "devtool-svc-trusttest3";
         let (root, extensions) = fake_installed_sidecar(bin, b"x");
         std::fs::write(root.join("app-settings.json"), r#"{"devtool-locale":"vi"}"#).unwrap();
@@ -708,13 +705,13 @@ mod tests {
     }
 
     #[test]
-    fn tu_choi_lech_protocol_truoc_ca_allowlist() {
+    fn protocol_is_checked_before_allowlist() {
         let reason = reject_reason(&request("/bin/sh", 99)).expect("phải bị từ chối");
         assert!(reason.contains("protocol"), "{reason}");
     }
 
     #[test]
-    fn allowlist_khop_voi_external_bin() {
+    fn bundled_services_are_listed_in_external_bin() {
         // A bundled entry missing from bundle.externalBin works on a dev
         // machine but fails for users. Only bundled services are checked;
         // URL-installed ones are intentionally absent.
@@ -731,7 +728,7 @@ mod tests {
     /// so it behaves as a valid sidecar.
     #[cfg(unix)]
     #[tokio::test]
-    async fn round_trip_qua_ong_dan_that() {
+    async fn round_trip_through_real_pipe() {
         let mut cmd = Command::new("cat");
         let running = spawn_process(&mut cmd, || {}).expect("spawn cat");
 
@@ -746,7 +743,7 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn hai_loi_goi_dong_thoi_toi_cung_sidecar_khong_giam_len_nhau() {
+    async fn concurrent_calls_get_their_own_responses() {
         // `cat` echoes each line, so each id must get its own response even
         // when sent at the same time.
         let mut cmd = Command::new("cat");
@@ -768,7 +765,7 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn timeout_khong_giet_sidecar_va_khong_anh_huong_loi_goi_khac() {
+    async fn timeout_does_not_affect_other_calls() {
         // The first line is never answered and the second is echoed: a timed
         // out call must not affect the next one.
         let mut cmd = Command::new("sh");
@@ -791,7 +788,7 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn sidecar_chet_thi_bao_loi_ro_rang_khong_treo() {
+    async fn exited_sidecar_fails_call_without_hanging() {
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg("exit 0");
         let running = spawn_process(&mut cmd, || {}).expect("spawn sh");
@@ -803,7 +800,7 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn json_hong_lam_reader_dung_va_bao_loi_cho_waiter_dang_treo() {
+    async fn malformed_json_stops_reader_and_fails_pending_call() {
         // A non-JSON line stops the reader.
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg("read -r _; printf 'khong-phai-json\\n'");
@@ -824,7 +821,7 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn stream_nhan_du_moi_su_kien_toi_khi_done() {
+    async fn stream_receives_events_until_done() {
         // Fake sidecar: read one line, emit two events and `done` for its id.
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg(
@@ -859,7 +856,7 @@ mod tests {
     }
 
     #[test]
-    fn stream_dung_tay_qua_dispatch_ngung_route_ngay_du_chua_done() {
+    fn stopped_stream_receives_no_events() {
         let waiters: Waiters = Arc::default();
         let collected = Arc::new(StdMutex::new(Vec::new()));
         waiters
@@ -878,7 +875,7 @@ mod tests {
     }
 
     #[test]
-    fn phan_hoi_toi_muon_khong_khop_id_nao_thi_bi_bo_qua_khong_panic() {
+    fn late_response_without_waiter_is_dropped() {
         // A late response matches no waiter.
         let waiters: Waiters = Arc::default();
         dispatch(&waiters, ServiceResponse::err("khong-ai-cho", "trễ"));
@@ -886,7 +883,7 @@ mod tests {
     }
 
     #[test]
-    fn response_bo_qua_truong_rong_khi_serialize() {
+    fn response_omits_empty_fields() {
         let json = serde_json::to_string(&ServiceResponse::err("7", "hỏng")).unwrap();
         assert!(json.contains("\"error\":\"hỏng\""), "{json}");
         assert!(!json.contains("result"));
@@ -931,7 +928,7 @@ mod tests {
     }
 
     #[test]
-    fn dat_cung_ten_bin_o_ca_hai_vi_tri_thi_ban_tai_ve_luon_duoc_chon() {
+    fn installed_copy_wins_over_bundled_copy() {
         let extensions_dir = temp_dir("extensions");
         let beside_dir = temp_dir("beside-exe");
         let installed_bin = temp_dir("installed-bin-dir").join("devtool-svc-demo");
@@ -945,7 +942,7 @@ mod tests {
     }
 
     #[test]
-    fn khong_co_ban_tai_ve_thi_roi_xuong_canh_exe_khong_doi_hanh_vi_cu() {
+    fn without_installed_copy_uses_bundled_copy() {
         let extensions_dir = temp_dir("extensions-empty");
         let beside_dir = temp_dir("beside-exe-only");
         let beside_bin = beside_dir.join("devtool-svc-demo");
@@ -956,7 +953,7 @@ mod tests {
     }
 
     #[test]
-    fn khong_co_gi_o_ca_hai_noi_thi_bao_loi_ro_rang_khong_panic() {
+    fn missing_everywhere_returns_error() {
         let extensions_dir = temp_dir("extensions-empty-2");
         let beside_dir = temp_dir("beside-empty");
         let err = resolve_sidecar_path(Some(&extensions_dir), &beside_dir, "devtool-svc-khong-ton-tai").unwrap_err();
@@ -964,7 +961,7 @@ mod tests {
     }
 
     #[test]
-    fn index_noi_da_cai_nhung_file_mat_tren_dia_thi_roi_xuong_canh_exe() {
+    fn missing_installed_file_falls_back_to_bundled_copy() {
         // The index points at a missing file: fall back to the bundled copy.
         let extensions_dir = temp_dir("extensions-dangling");
         let beside_dir = temp_dir("beside-fallback");
@@ -981,7 +978,7 @@ mod tests {
     /// calls it through `spawn_process`/`call_once`.
     #[cfg(unix)]
     #[tokio::test]
-    async fn round_trip_cai_gia_resolve_dung_va_goi_duoc_qua_no() {
+    async fn installed_fake_sidecar_resolves_and_answers() {
         use std::os::unix::fs::PermissionsExt;
 
         let extensions_dir = temp_dir("rt-extensions");

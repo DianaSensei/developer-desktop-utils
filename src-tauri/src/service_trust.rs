@@ -327,7 +327,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hoi_mot_lan_roi_nho_ca_qua_lan_khoi_dong_lai() {
+    async fn consent_is_asked_once_and_persists() {
         let backend = Mem::default();
         let asked = Arc::new(AtomicUsize::new(0));
 
@@ -356,7 +356,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tu_choi_thi_loi_va_khong_ghi_nho() {
+    async fn denial_is_an_error_and_not_remembered() {
         let trust = ServiceTrust::new(Box::new(Mem::default()));
         let err = trust
             .ensure("devtool-svc-x", "aa", || async { false })
@@ -367,7 +367,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn doi_noi_dung_binary_thi_hoi_lai() {
+    async fn changed_binary_requires_new_consent() {
         let trust = ServiceTrust::new(Box::new(Mem::default()));
         trust
             .ensure("devtool-svc-x", "aa", || async { true })
@@ -389,7 +389,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn khong_co_keychain_thi_van_chay_trong_phien_va_hoi_lai_lan_sau() {
+    async fn without_keychain_consent_lasts_one_session() {
         let trust = ServiceTrust::new(Box::new(Broken));
         trust
             .ensure("devtool-svc-x", "aa", || async { true })
@@ -402,7 +402,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hai_loi_goi_dong_thoi_chi_bat_mot_hop_thoai() {
+    async fn concurrent_calls_show_one_dialog() {
         let trust = Arc::new(ServiceTrust::new(Box::new(Mem::default())));
         let asked = Arc::new(AtomicUsize::new(0));
         let mut tasks = Vec::new();
@@ -424,7 +424,7 @@ mod tests {
     }
 
     #[test]
-    fn thu_hoi_xoa_quyen() {
+    fn revoke_removes_trust() {
         let backend = Mem::default();
         let trust = ServiceTrust::new(Box::new(backend.clone()));
         trust.grant("devtool-svc-x", "aa");
@@ -434,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn hop_thoai_gon_va_du_thong_tin_de_quyet_dinh() {
+    fn consent_dialog_shows_location_hash_and_source() {
         let path = std::path::Path::new(
             "/Users/an/Library/Application Support/com.x/services/devtool-svc-service-list-automation/0.1.0/devtool-svc-service-list-automation",
         );
@@ -480,7 +480,7 @@ mod tests {
     }
 
     #[test]
-    fn duong_dan_rut_gon_dung_cho_ca_ba_he_dieu_hanh() {
+    fn short_location_works_on_every_os() {
         let bin = "devtool-svc-x";
         // macOS
         assert_eq!(
@@ -521,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn ngon_ngu_theo_lua_chon_trong_app() {
+    fn locale_is_read_from_app_settings() {
         assert_eq!(
             locale_from_settings(r#"{"devtool-locale":"vi"}"#),
             Locale::Vi
@@ -535,7 +535,7 @@ mod tests {
     }
 
     #[test]
-    fn rut_gon_khong_lam_hong_gia_tri_ngan() {
+    fn shortening_keeps_short_values() {
         assert_eq!(short_hash("abc"), "abc");
         assert_eq!(short_source("https://h/m.json"), "h/m.json");
         assert_eq!(shorten_home("/opt/x", Some("/Users/a"), "~"), "/opt/x");
