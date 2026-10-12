@@ -6,6 +6,46 @@ the app.
 
 ## Unreleased
 
+### Workspaces: keep the tools you're working with one keystroke away
+
+The tools you open now become tabs in the titlebar, and those tabs survive restarting
+the app. Group them into named workspaces (up to 9 — e.g. "Backend debugging" with
+API Client, JSON and JWT; "Daily" with Time Tracker and Date / Time) and switch between
+them from the workspace menu, ⌘K, or ⌘⌥1–9. ⌘1–9 jumps to a tab, ⌘⇧[ / ⌘⇧] cycles
+(Ctrl on Windows/Linux). The previous "open tools" strip only ever appeared in the web
+build — on the desktop app it never showed. See `docs/decisions/ui/workspaces.md`.
+
+### Every tool in Vietnamese and English
+
+Choosing Tiếng Việt in Settings now translates every built-in tool, not just the
+sidebar and Settings. Technical terms developers use as-is (token, header, payload…)
+stay in English, as do raw engine errors (JSON parser, Web Crypto) so they can be
+searched verbatim.
+
+### Fixes from a UI/UX audit of every built-in tool
+
+- **2FA:** removing an account now asks first — a deleted TOTP secret can't be
+  recovered. **Export** opens the system Save dialog; on the desktop app it previously
+  produced no file. Color Picker's **Download palette** had the same problem.
+- **Markdown** and **Meeting Notes:** the preview is styled again (headings, lists,
+  code, tables, task lists), and clicking a link opens it in your browser instead of
+  replacing the whole app window with the web page.
+- **Text Transformer:** camelCase / snake_case / … convert each line on its own (a
+  list of identifiers used to be merged into one), plus PascalCase, CONSTANT_CASE,
+  kebab-case, Title Case and an "all cases at once" view.
+- **Cron Generator:** shows the next five run times; Quartz mode no longer flags its
+  own 6-field default and presets as invalid.
+- **JSON Formatter:** large documents stay fast, the tree works from the keyboard, and
+  search shows a match count with Enter / ⇧Enter to jump between matches.
+- **Mock Server** stubs, **meeting notes** and **calendar entries** ask before deleting.
+- **Lucky Wheel** draws with a cryptographically secure random source.
+
+### For plugin authors: the app's UI kit (SDK 1.1.0)
+
+URL-installed plugins can use DevTool's own components, UX hooks (⌘V quick paste, ⌘Z
+history) and translation helpers via `window.__DEVTOOL_VENDOR__.ui` instead of bundling
+their own copies. Declare `sdk: '^1.1.0'`. See `docs/plugin-sdk/05-external-install.md`.
+
 ### Plugins with a native helper no longer need a new app release
 
 A plugin that ships a native helper program (a "sidecar") used to work only if its
