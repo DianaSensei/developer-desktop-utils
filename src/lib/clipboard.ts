@@ -10,12 +10,9 @@ export async function copyToClipboard(text: string): Promise<void> {
 }
 
 /**
- * Đọc văn bản trên clipboard hệ thống, hoặc `null` nếu trống/không có quyền.
- *
- * Dùng bởi ⌘K để đoán ý người dùng (xem `lib/clipboardIntent.ts`) — đọc clipboard
- * lúc mở palette, không phải liên tục, nên không cần theo dõi thay đổi.
- * Không bao giờ ném lỗi: quyền đọc clipboard có thể bị từ chối và đó không phải
- * lý do để chặn cả command palette.
+ * Reads clipboard text, or `null` when empty or denied. Used by ⌘K when it
+ * opens (see lib/clipboardIntent.ts). Never throws: a denied read must not
+ * break the command palette.
  */
 export async function readTextFromClipboard(): Promise<string | null> {
   try {

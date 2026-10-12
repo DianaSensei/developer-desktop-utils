@@ -1,19 +1,12 @@
 import { storageGet, storageSet } from '@/lib/persistentStore';
 
 /**
- * Mặt chữ đơn cách cho vùng code/số liệu (`--mono`) — tách riêng khỏi
- * `FontPreference` (`--sans`, xem `fontPreference.ts`) vì đây là lựa chọn có
- * chủ đích cho việc ĐỌC MÃ (ligature `=>`/`!=`/`>=`…, độ rộng ký tự đều),
- * người dùng có gu khác nhau về ligature — không còn là "một chuẩn cố định,
- * không phải gu đọc chung" như comment cũ ở tokens.css.
+ * Monospace face for code and data (`--mono`), separate from the UI font
+ * (`--sans`, fontPreference.ts) because ligature taste varies. Both options
+ * are bundled fonts (imported in main.tsx), so they look the same everywhere.
  *
- * Cả hai lựa chọn đều là font THẬT tự host (bundle sẵn, không phải stack hệ
- * thống như bốn preset --sans) nên hiện giống hệt nhau trên mọi nền — xem
- * import trong main.tsx.
- *
- * Danh sách này PHẢI khớp đúng các khối `[data-mono-font="…"]` trong
- * `design/tokens.css` — `monoFontPreference.test.ts` đối chiếu cả hai để
- * không lệch nhau, cùng rủi ro như FONT_PREFERENCES/ACCENT_TONES.
+ * Must match the `[data-mono-font="…"]` blocks in design/tokens.css
+ * (checked by monoFontPreference.test.ts).
  */
 export type MonoFontPreference = 'ibm-plex-mono' | 'fira-code';
 
@@ -35,7 +28,7 @@ export function setMonoFontPreference(pref: MonoFontPreference): void {
   storageSet(MONO_FONT_KEY, pref);
 }
 
-/** Ghi lựa chọn lên `<html data-mono-font>` — nguồn CSS mà `--mono` đọc. */
+/** Sets `<html data-mono-font>`, which `--mono` reads. */
 export function applyMonoFontToDocument(pref: MonoFontPreference): void {
   document.documentElement.dataset.monoFont = pref;
 }

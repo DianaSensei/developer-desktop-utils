@@ -1,16 +1,11 @@
 /**
- * Tính các lần chạy tiếp theo của một biểu thức cron — cho phần "Next runs"
- * của Cron Generator. Mô tả bằng lời ("every 5 minutes") không đủ để chắc một
- * biểu thức đúng ý; nhìn thấy năm mốc thời gian cụ thể thì đủ. Đây cũng là thứ
- * người ta mở crontab.guru để xem.
+ * Next run times of a cron expression, for the Cron Generator's "Next runs"
+ * list.
  *
- * Phạm vi hỗ trợ: `*`, `?`, danh sách `a,b`, khoảng `a-b`, bước `x/n`, tên
- * tháng/thứ, và các ký hiệu Quartz/Spring hay gặp nhất — `L` ở ngày-trong-
- * tháng (ngày cuối tháng), `xL` (thứ x cuối cùng của tháng) và `x#k` (thứ x
- * lần thứ k) ở ngày-trong-tuần. Ký hiệu hiếm (`W`, `LW`, `L-n`) trả về
- * `unsupported` để UI nói thẳng là không xem trước được, thay vì đoán sai.
- *
- * Giờ địa phương của máy — đúng giờ mà người dùng đang nhìn đồng hồ.
+ * Supports `*`, `?`, lists, ranges, steps, month/day names, and Quartz/Spring
+ * `L` (last day of month), `xL` (last weekday x) and `x#k` (k-th weekday x).
+ * Rarer forms (`W`, `LW`, `L-n`) return `unsupported` rather than a wrong
+ * guess. Uses the machine's local time.
  */
 
 export type CronFlavor = 'linux' | 'quartz' | 'spring';
@@ -26,13 +21,12 @@ export interface CronFieldValues {
 }
 
 /**
- * `searchedYears`: số năm đã quét. Ít hơn `count` lần chạy nghĩa là chỉ có
- * chừng đó lần TRONG khoảng đó — không phải "không bao giờ chạy" (lịch thưa
- * như 29/2 rơi vào thứ Hai cách nhau tới 28 năm).
+ * `searchedYears`: how many years were searched. Fewer than `count` runs
+ * means only that many fall in the window, not "never" (Feb 29 on a Monday
+ * can be 28 years apart).
  *
- * `null` khi biểu thức ghim năm (Quartz): khi đó đã quét HẾT mọi năm được phép,
- * nên danh sách là đầy đủ — không có "cửa sổ N năm" nào để nói tới (năm ghim
- * đã qua thì khoảng cách tới nó là 0 hoặc âm, vô nghĩa).
+ * `null` when the expression pins years (Quartz): every allowed year was
+ * searched, so the list is complete.
  */
 export type NextRunsResult = { runs: Date[]; searchedYears: number | null } | { unsupported: string };
 
@@ -41,16 +35,15 @@ const MONTHS: Record<string, number> = {
 };
 const DAYS: Record<string, number> = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 };
 
-/** Số năm quét khi không ghim năm — đủ cho lịch "29/2" (≤ 8 năm giữa hai lần). */
+/** Years searched without a year field; enough for Feb 29 (≤ 8 years apart). */
 const SEARCH_YEARS = 8;
 
 class Unsupported extends Error {}
 
-/** Tập giá trị của một trường số (không có ký hiệu đặc biệt). */
 /**
- * `wrap`: chu kỳ của trường vòng (thứ trong tuần = 7). Khi đầu mút cuối nhỏ hơn
- * đầu mút đầu (`SAT-SUN` = 6-0, `FRI-MON` = 5-1) thì khoảng đi vòng qua cuối
- * tuần thay vì thành tập rỗng; người gọi lấy `% wrap` trên kết quả.
+ * Values of a numeric field. `wrap` is the cycle length of a circular field
+ * (days of week = 7): a range whose end is below its start (`SAT-SUN` = 6-0)
+ * wraps around instead of being empty; callers take `% wrap`.
  */
 function parseSet(field: string, min: number, max: number, alias: (s: string) => number, wrap?: number): Set<number> {
   const out = new Set<number>();
@@ -104,10 +97,9 @@ function domMatcher(field: string): { any: boolean; match: DayMatcher } {
 
 function dowMatcher(field: string, flavor: CronFlavor): { any: boolean; match: DayMatcher } {
   if (field === '*' || field === '?') return { any: true, match: () => true };
-  // Quartz đánh số 1–7 (1 = CN) → trừ 1. Linux/Spring 0–7 (0 và 7 = CN): giữ
-  // NGUYÊN 7 ở bước này — quy 7→0 trước khi mở rộng phạm vi biến `5-7` thành
-  // lo=5, hi=0 (tập rỗng), nên `5-7`, `SAT-SUN`, `0-7` từng ra "không chạy".
-  // Việc quy 7→0 làm SAU, trên từng giá trị đã mở rộng.
+  // Quartz numbers days 1–7 (1 = Sunday), so subtract 1. Linux/Spring use
+  // 0–7 (0 and 7 = Sunday): keep 7 while expanding ranges so `5-7` does
+  // not become 5..0 (empty), then map 7 to 0 per value.
   const rawDow = (s: string) => {
     const v = num(DAYS)(s);
     if (Number.isNaN(v)) return v;
@@ -128,7 +120,7 @@ function dowMatcher(field: string, flavor: CronFlavor): { any: boolean; match: D
       const dow = toDow(lastOf[1]);
       checks.push((d) => d.getDay() === dow && d.getDate() + 7 > daysInMonth(d.getFullYear(), d.getMonth()));
     } else if (part.toUpperCase() === 'L') {
-      // `L` một mình ở ngày-trong-tuần = thứ Bảy (ngày cuối tuần theo Quartz).
+      // `L` alone in day-of-week means Saturday in Quartz.
       checks.push((d) => d.getDay() === 6);
     } else {
       plain.push(part);
@@ -155,15 +147,15 @@ export function nextCronRuns(
     const years = flavor === 'quartz' && fields.year.trim() ? parseSet(fields.year, 1970, 2099, num()) : null;
     const dom = domMatcher(fields.dayOfMonth);
     const dow = dowMatcher(fields.dayOfWeek, flavor);
-    // Linux (Vixie cron): khi CẢ HAI trường ngày đều bị giới hạn thì khớp MỘT
-    // trong hai là đủ. Quartz/Spring: phải khớp cả hai (thường một bên là `?`).
+    // Linux (Vixie cron): when both day fields are restricted, matching
+    // either is enough. Quartz/Spring require both (one is usually `?`).
     const dayOk: DayMatcher =
       flavor === 'linux' && !dom.any && !dow.any
         ? (d) => dom.match(d) || dow.match(d)
         : (d) => dom.match(d) && dow.match(d);
 
-    // Ghim năm (Quartz) thì quét tới hết năm lớn nhất được phép — `… 2099` cách
-    // xa hơn 8 năm từng bị báo "không chạy". Không ghim thì quét SEARCH_YEARS năm.
+    // With pinned years (Quartz), search through the last allowed year;
+    // otherwise SEARCH_YEARS.
     const lastYear = years ? Math.max(...years) : from.getFullYear() + SEARCH_YEARS;
     const searchedYears = years ? null : SEARCH_YEARS;
     const end = years ? new Date(lastYear + 1, 0, 1) : new Date(from.getFullYear() + SEARCH_YEARS, from.getMonth(), from.getDate() + 1);

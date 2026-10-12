@@ -13,8 +13,7 @@ describe('DICTIONARY', () => {
 
   it('VI và EN không được trùng nhau y hệt (dấu hiệu quên dịch)', () => {
     const untranslated = Object.entries(DICTIONARY).filter(([, e]) => e.vi === e.en);
-    // Ký hiệu ngắn (viết tắt, tên riêng) có thể trùng hợp lệ; nếu danh sách này
-    // phình ra, kiểm tra lại xem có khoá nào bị copy-paste nhầm không.
+    // Identical VI/EN text is suspicious (likely a copy-paste).
     expect(untranslated).toEqual([]);
   });
 });
@@ -35,7 +34,7 @@ describe('translate', () => {
   });
 
   it('khoá không tồn tại trả về chính khoá đó, không ném lỗi', () => {
-    // @ts-expect-error — cố tình truyền khoá sai để kiểm tra đường lỗi lúc chạy
+    // @ts-expect-error — an invalid key, to exercise the runtime fallback
     expect(translate('shell.does.not.exist', 'vi')).toBe('shell.does.not.exist');
   });
 });

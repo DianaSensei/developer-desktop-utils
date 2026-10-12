@@ -10,37 +10,25 @@ import type { LucideIcon } from 'lucide-react';
 import { TOOL_DEFS, TOOL_DEF_MAP, DEFAULT_TOOL_ORDER, type ToolDef } from '@/lib/toolDefs';
 
 /**
- * Gộp 24 tool thành 15 mục sidebar.
+ * Groups related tools into single sidebar entries.
  *
- * Vì sao: danh sách phẳng 24 mục buộc người dùng phải quét cả danh sách mỗi lần,
- * và nó che mất việc nhiều tool là biến thể của cùng một việc (đếm chữ và biến
- * đổi chữ đều là "làm gì đó với text").
+ * - A group needs at least two tools; large tools (API Client, Mock Server,
+ *   Time Tracker...) stand alone and render as before.
+ * - Search results list tools, not groups: typing "cron" shows Cron itself.
  *
- * ── Hai quyết định định hình cả file này ──────────────────────────────────
- *
- * 1. NHÓM MỘT TOOL KHÔNG PHẢI LÀ NHÓM. Tám tool lớn (API Client, Mock Server,
- *    Time Tracker…) đứng riêng và render y như trước — không tiêu đề nhóm, không
- *    tab con, không mũi tên mở rộng. Bọc chúng vào khung nhóm chỉ thêm một lớp
- *    chrome cho zero lợi ích.
- *
- * 2. KHI TÌM KIẾM THÌ HIỆN TOOL, KHÔNG HIỆN NHÓM. Gõ "cron" phải ra thẳng Cron,
- *    chứ không phải nhóm "Thời gian" rồi bắt người dùng đoán cron nằm trong đó.
- *    Nhóm chỉ là cách sắp xếp lúc KHÔNG tìm kiếm.
- *
- * Việc gộp ở đây thuần tuý là ĐIỀU HƯỚNG — không tool nào bị xoá, không route
- * nào đổi. Việc gộp component thật (nếu có) là chuyện của giai đoạn sau.
+ * Navigation only: no tool is removed and no route changes.
  */
 
 export interface ToolGroup {
   id: string;
-  /** Nhãn hiện ở sidebar. Ngắn hơn nhãn tool vì nó phải bao được nhiều tool. */
+  /** Sidebar label; shorter than tool labels since it covers several tools. */
   label: string;
   icon: LucideIcon;
-  /** Theo thứ tự tab con. Phần tử đầu là đích khi bấm vào nhóm. */
+  /** In sub-tab order; the first is the target when the group is clicked. */
   toolIds: string[];
 }
 
-/** Chỉ các nhóm THẬT (≥2 tool). Tool không có tên ở đây thì đứng riêng. */
+/** Real groups only (2+ tools). Tools not listed here stand alone. */
 export const TOOL_GROUPS: ToolGroup[] = [
   {
     id: 'g-text',
@@ -80,45 +68,40 @@ export const TOOL_GROUPS: ToolGroup[] = [
   },
 ];
 
-/** id tool → nhóm chứa nó. Tool đứng riêng không có mặt ở đây. */
+/** Tool id → its group. Standalone tools are absent. */
 export const GROUP_OF_TOOL = new Map<string, ToolGroup>(
   TOOL_GROUPS.flatMap((g) => g.toolIds.map((id) => [id, g] as const)),
 );
 
 /**
- * Mục sidebar: hoặc một tool đứng riêng, hoặc một nhóm nhiều tool.
- * `tools` luôn có ít nhất một phần tử và chỉ chứa tool đang BẬT.
+ * A sidebar entry: a standalone tool or a group. `tools` is never empty and
+ * holds enabled tools only.
  */
 export interface NavEntry {
   key: string;
   label: string;
   icon: LucideIcon;
-  /** Nhóm thật (≥2 tool đang bật) hay tool đứng riêng. */
+  /** A real group (2+ enabled tools) or a standalone tool. */
   isGroup: boolean;
   tools: ToolDef[];
 }
 
 export interface BuildNavOptions {
-  /** id tool đang bật. Tool tắt không xuất hiện ở đâu cả. */
+  /** Enabled tool ids. Disabled tools appear nowhere. */
   enabledIds: Set<string>;
-  /** Thứ tự người dùng đã kéo-thả; rỗng thì dùng DEFAULT_TOOL_ORDER. */
+  /** User's drag-and-drop order; DEFAULT_TOOL_ORDER when empty. */
   order?: string[];
-  /** id tool được đánh dấu yêu thích, theo thứ tự đánh dấu. */
+  /** Favorite tool ids, in the order they were marked. */
   favorites?: string[];
 }
 
 /**
- * Dựng danh sách mục sidebar khi KHÔNG tìm kiếm.
+ * Builds the sidebar entries when not searching. Rules, applied in order:
  *
- * Quy tắc thứ tự, theo đúng thứ tự áp dụng:
- *
- *   1. Nhóm lấy vị trí của THÀNH VIÊN ĐỨNG SỚM NHẤT trong thứ tự người dùng.
- *      Nhờ vậy kéo-thả cũ vẫn có ý nghĩa mà không cần di trú dữ liệu.
- *   2. Yêu thích nổi lên đầu. Một nhóm là "yêu thích" nếu BẤT KỲ thành viên nào
- *      được yêu thích — cũng để khỏi phải di trú: dữ liệu yêu thích vẫn là id
- *      tool như cũ.
- *   3. Nhóm chỉ còn một tool đang bật sẽ TỰ THOÁI thành mục đơn, mang nhãn của
- *      chính tool đó. Hiện "JSON & Data" mà bên trong chỉ có JSON là nói dối.
+ *   1. A group takes the position of its earliest member in the user's
+ *      order, so existing orders keep working without migration.
+ *   2. Favorites come first; a group is a favorite if any member is.
+ *   3. A group with one enabled tool collapses into that tool's own entry.
  */
 export function buildNavEntries({
   enabledIds,
@@ -127,7 +110,7 @@ export function buildNavEntries({
 }: BuildNavOptions): NavEntry[] {
   const effectiveOrder = order.length ? order : DEFAULT_TOOL_ORDER;
   const rank = new Map(effectiveOrder.map((id, i) => [id, i]));
-  // Tool chưa có trong thứ tự (mới thêm sau khi người dùng đã sắp xếp) xuống cuối.
+  // Tools missing from the saved order (added later) go last.
   const rankOf = (id: string) => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
 
   const seen = new Set<string>();
@@ -148,7 +131,7 @@ export function buildNavEntries({
       .filter((t): t is ToolDef => Boolean(t));
     if (!tools.length) continue;
 
-    // Nhóm còn đúng một tool thì thoái thành mục đơn — xem quy tắc 3.
+    // A group with one tool collapses to a single entry (rule 3).
     const isGroup = Boolean(group) && tools.length > 1;
 
     const favIdx = members
@@ -177,17 +160,15 @@ export function buildNavEntries({
   return entries.map(({ sort: _sort, fav: _fav, ...entry }) => entry);
 }
 
-/** Số mục yêu thích ở đầu danh sách — để đặt vạch ngăn "Yêu thích / Tất cả". */
+/** Number of favorite entries at the top, for the divider. */
 export function countFavoriteEntries(entries: NavEntry[], favorites: string[]): number {
   return entries.filter((e) => e.tools.some((t) => favorites.includes(t.id))).length;
 }
 
 /**
- * Sắp lại một danh sách id tool PHẲNG sao cho các tool cùng nhóm luôn đứng
- * liền nhau, tại vị trí của thành viên đứng sớm nhất — cùng quy tắc 1 của
- * `buildNavEntries`, tách riêng vì Settings cần áp nó lên danh sách Bật/Tắt
- * (có cả tool đang tắt, không có khái niệm "yêu thích nổi lên đầu" như
- * sidebar) chứ không dựng ra `NavEntry`.
+ * Reorders a flat list of tool ids so group members are adjacent, at the
+ * earliest member's position (rule 1 of `buildNavEntries`). Used by the
+ * Settings tool list, which includes disabled tools and no favorites.
  */
 export function clusterToolOrder(ids: string[]): string[] {
   const present = new Set(ids);

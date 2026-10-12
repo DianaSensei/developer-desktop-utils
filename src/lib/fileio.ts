@@ -1,14 +1,10 @@
-// Nhập/xuất file, chạy được cả trong app Tauri lẫn bản web: desktop dùng hộp
-// thoại của hệ điều hành qua `sdk.files`, bản web rơi về `<input type=file>` và
-// tải Blob xuống.
+// File import and export that works in Tauri and on the web: desktop uses
+// the OS dialogs through `sdk.files`; the web falls back to
+// `<input type=file>` and Blob downloads.
 //
-// Sống ở `lib/` chứ không nằm trong thư mục của một tool: bốn plugin khác nhau
-// dùng nó (API Client, Data Converter, Generator, Containers), nên để nó trong
-// `tools/apiclient/` như trước là một quan hệ phụ thuộc chéo giữa các plugin mà
-// nhìn cây thư mục không thấy.
-//
-// Mọi hàm nhận `sdk` của plugin gọi nó, không tự lấy: quyền file phải được quy
-// về ĐÚNG plugin đang yêu cầu, và nhật ký cũng phải ghi tên plugin đó.
+// Shared by several plugins (API Client, Data Converter, Generator), so it
+// lives in lib/. Every function takes the calling plugin's `sdk` so file
+// access is checked and audited against that plugin.
 
 import { isTauri } from '@/lib/platform';
 import type { PluginSdk } from '@/platform';
@@ -39,10 +35,9 @@ export async function pickJsonFile(sdk: PluginSdk): Promise<string | null> {
   });
 }
 
-// Open a picker for a collection file — a Postman export (JSON), an OpenAPI /
-// Swagger spec (just as often YAML), or a single Bruno request (.bru). Returns
-// the file's text contents and its name (the extension is a hint the importer
-// uses), or null if cancelled.
+// Picks a collection file: a Postman export (JSON), an OpenAPI/Swagger spec
+// (often YAML), or a Bruno request (.bru). Returns its name and text, or
+// null if cancelled.
 export async function pickCollectionFile(sdk: PluginSdk): Promise<{ name: string; text: string } | null> {
   if (isTauri) {
     const picked = await sdk.files.pickOpen({
@@ -88,8 +83,7 @@ export function pickDataFile(): Promise<{ name: string; text: string } | null> {
       reader.onerror = () => { cleanup(); reject(new Error(`Could not read ${file.name}`)); };
       reader.readAsText(file);
     };
-    // If the user cancels the dialog, there's no reliable event; the picker is
-    // simply abandoned (the element is cleaned up on the next successful pick).
+    // A cancelled dialog fires no reliable event; the picker is just abandoned.
     input.click();
   });
 }
@@ -134,15 +128,12 @@ export async function saveTextFile(sdk: PluginSdk, suggestedName: string, text: 
   URL.revokeObjectURL(url);
 }
 
-// Write a file the caller produces in pieces, without ever holding the whole
-// thing as one string. A Runner export over a 100k-row data file is hundreds
-// of MB; `saveTextFile(name, chunks.join(''))` would need that entire result
-// contiguous in memory (plus the pieces it was built from) before writing a
-// single byte. Here the pieces are buffered only up to FLUSH_BYTES and then
-// appended, so peak memory stays flat regardless of run size.
+// Writes a file produced in chunks without holding it as one string (a
+// Runner export can be hundreds of MB). Chunks are buffered up to
+// FLUSH_BYTES and appended, so memory stays flat.
 //
-// Returns false when the user cancelled the picker, true once written.
-// `onProgress` reports bytes written so a long export can show progress.
+// Returns false if the picker was cancelled. `onProgress` reports bytes
+// written.
 const FLUSH_BYTES = 4 * 1024 * 1024;
 
 export async function saveStreamedTextFile(
@@ -164,9 +155,8 @@ export async function saveStreamedTextFile(
     let buffered = 0;
     let written = 0;
     let started = false;
-    // The first write truncates; every later one appends. Batched at
-    // FLUSH_BYTES rather than per chunk because each write is a Tauri IPC
-    // round-trip — a few dozen large writes, not thousands of small ones.
+    // The first write truncates and later ones append. Batched because
+    // each write is an IPC round trip.
     const flush = async () => {
       if (!buffered) return;
       const text = buffer.join('');
@@ -189,15 +179,13 @@ export async function saveStreamedTextFile(
     return true;
   }
 
-  // Web: a Blob takes the array of pieces directly, so the browser
-  // concatenates them itself instead of us building one giant JS string.
+  // Web: a Blob accepts the pieces directly, so no giant string is built.
   const parts: string[] = [];
   let written = 0;
   for (const chunk of chunks) {
     parts.push(chunk);
     written += chunk.length;
-    // Yield to the event loop periodically so building a very large export
-    // doesn't lock the UI for its whole duration.
+    // Yield periodically so a large export does not freeze the UI.
     if (parts.length % 500 === 0) {
       onProgress?.(written);
       await new Promise((r) => setTimeout(r, 0));
@@ -214,8 +202,8 @@ export async function saveStreamedTextFile(
   return true;
 }
 
-// Save raw bytes (given as base64) to a file the user picks. Used for binary
-// responses — images, PDFs, archives — where the text path would corrupt them.
+// Saves bytes (given as base64) for binary responses such as images, PDFs
+// and archives.
 export async function saveBinaryFile(sdk: PluginSdk, suggestedName: string, base64: string): Promise<void> {
   const bin = atob(base64);
   const bytes = new Uint8Array(bin.length);

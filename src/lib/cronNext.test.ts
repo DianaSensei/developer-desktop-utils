@@ -4,7 +4,7 @@ import { nextCronRuns, type CronFieldValues } from '@/lib/cronNext';
 const f = (o: Partial<CronFieldValues>): CronFieldValues => ({
   seconds: '0', minute: '*', hour: '*', dayOfMonth: '*', month: '*', dayOfWeek: '*', year: '', ...o,
 });
-// Thứ Tư 2026-01-07 10:02:30 giờ địa phương.
+// Wednesday 2026-01-07 10:02:30 local time.
 const FROM = new Date(2026, 0, 7, 10, 2, 30);
 const runs = (r: ReturnType<typeof nextCronRuns>) => ('runs' in r ? r.runs : []);
 const hm = (d: Date) => `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -20,7 +20,7 @@ describe('nextCronRuns', () => {
   });
 
   it('linux ORs day-of-month with day-of-week when both are set', () => {
-    // ngày 10 HOẶC Chủ nhật
+    // The 10th OR Sunday.
     const r = runs(nextCronRuns('linux', f({ minute: '0', hour: '0', dayOfMonth: '10', dayOfWeek: '0' }), FROM, 3)).map(hm);
     expect(r).toEqual(['1/10 0:00', '1/11 0:00', '1/18 0:00']);
   });
@@ -45,8 +45,7 @@ describe('nextCronRuns', () => {
     expect(nextCronRuns('quartz', f({ dayOfMonth: '15W', dayOfWeek: '?' }), FROM)).toEqual({ unsupported: '15W' });
   });
 
-  // Góp ý review PR #173: chuẩn hoá 7→0 trước khi mở rộng phạm vi làm `5-7`
-  // thành lo=5, hi=0 (rỗng).
+  // Normalizing 7→0 before expanding ranges turned `5-7` into 5..0 (empty).
   it('day-of-week ranges ending at 7 / SUN, and wrapping ranges', () => {
     const days = (dow: string) =>
       new Set(runs(nextCronRuns('linux', f({ minute: '0', hour: '0', dayOfWeek: dow }), FROM, 14)).map((d) => d.getDay()));
@@ -69,8 +68,7 @@ describe('nextCronRuns', () => {
     expect(runs(r).length).toBeLessThan(5);
   });
 
-  // Góp ý review PR #173 (lần 2): với năm ghim, khoảng cách tới năm đó không
-  // phải "cửa sổ quét" — năm đã qua cho ra 0 hoặc số âm.
+  // With pinned years, the distance to that year is not a search window.
   it('year-pinned schedules report an exhaustive search, not a year count', () => {
     const past = nextCronRuns('quartz', f({ minute: '0', hour: '0', dayOfMonth: '1', month: '1', dayOfWeek: '?', year: '2020' }), FROM, 5);
     expect(past).toEqual({ runs: [], searchedYears: null });

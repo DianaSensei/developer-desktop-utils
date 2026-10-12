@@ -6,11 +6,8 @@ import {
 } from '@/lib/network';
 
 /**
- * `network.ts` chưa có test nào — mọi request đi qua `fetch` tới dịch vụ DoH/IP
- * công khai, nên phần đáng test không phải "request có gửi đi không" mà là
- * LOGIC XỬ LÝ KẾT QUẢ: gộp nhiều bản ghi, sắp xếp ổn định, chuỗi fallback khi
- * một provider lỗi, và khi nào coi là "tất cả đều fail". Đây đúng loại lỗi im
- * lặng nhất — provider trả JSON hơi khác dạng, code vẫn chạy nhưng gộp sai.
+ * Tests result handling rather than the requests: merging records, stable
+ * ordering, provider fallback, and when everything counts as failed.
  */
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
@@ -72,7 +69,7 @@ describe('queryDns', () => {
     await queryDns('Example.com ', 'TXT', DOH_PROVIDERS[0], true);
     const url = fetchMock.mock.calls[0][0] as string;
     expect(url).toContain('cloudflare-dns.com');
-    // Tên bị trim + encode trước khi ráp vào query string.
+    // The name is trimmed and encoded into the query string.
     expect(url).toContain('name=Example.com');
     expect(url).toContain('type=TXT');
     expect(url).toContain('do=1');
@@ -97,9 +94,7 @@ describe('queryAllRecords', () => {
     });
     const result = await queryAllRecords('example.com');
     expect(result.status).toBe(0);
-    // A đứng trước MX theo alphabet — đúng thứ tự sort đã khai báo (theo
-    // typeName), không phải thứ tự Promise.allSettled trả về (đăng ký MX
-    // trước A trong mock ở trên, nhưng kết quả vẫn phải theo alphabet).
+    // Sorted by type name, regardless of the order the mocks resolve in.
     expect(result.answers.map((a) => a.typeName)).toEqual(['A', 'MX']);
   });
 
@@ -204,11 +199,7 @@ describe('lookupIp', () => {
   });
 
   it('lỗi ứng dụng nằm TRONG JSON (không phải HTTP lỗi) cũng phải rơi xuống provider kế tiếp', async () => {
-    // So khớp theo HOSTNAME, không phải `.includes('ipapi.co')` trên chuỗi URL
-    // đầy đủ — "freeipapi.com" tình cờ CHỨA substring "ipapi.co" ("free-IPAPI.CO-m"),
-    // nên một match kiểu substring thô sẽ tự bắt nhầm provider thứ ba vào
-    // nhánh của provider thứ nhất. Đúng loại lỗi mà `network.ts` không dính
-    // (nó so bằng URL cố định của từng provider), nhưng test giả lập dễ dính.
+    // Match by hostname: "freeipapi.com" contains the substring "ipapi.co".
     fetchMock.mockImplementation(async (url: string) => {
       const host = new URL(url).hostname;
       if (host === 'ipapi.co') return jsonResponse({ error: true, reason: 'rate limited' });
@@ -228,7 +219,7 @@ describe('lookupIp', () => {
     abortError.name = 'AbortError';
     fetchMock.mockRejectedValue(abortError);
     await expect(lookupIp()).rejects.toThrow('aborted');
-    // Chỉ provider đầu tiên được gọi — dừng lại ngay, không thử ba provider.
+    // Only the first provider is called before aborting.
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -239,9 +230,8 @@ describe('lookupIp', () => {
 });
 
 describe('Chỉ khả dụng trong desktop app (Tauri)', () => {
-  // Môi trường test là jsdom thuần, không có `window.__TAURI_INTERNALS__`, nên
-  // `isTauri` luôn false ở đây — đúng nhánh "web build" mà ba hàm này phải chặn
-  // lại thay vì lặng lẽ gọi `invoke` vào một cầu nối không tồn tại.
+  // jsdom has no `__TAURI_INTERNALS__`, so `isTauri` is false: these
+  // functions must refuse rather than call a missing `invoke`.
   it('getLocalNetworkInfo báo lỗi rõ ràng thay vì gọi invoke trên nền web', async () => {
     await expect(getLocalNetworkInfo()).rejects.toThrow('desktop app');
   });
