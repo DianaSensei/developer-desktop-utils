@@ -37,11 +37,33 @@ use crate::checksum::to_hex;
 /// host could exhaust memory before the checksum check runs.
 const MAX_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
 
+/// Client for manifest and artifact downloads. Follows at most 10 redirects
+/// and never from https to another scheme: the manifest carries the
+/// checksums, so a plain-http hop would let a network attacker swap both.
+fn http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if is_scheme_downgrade(attempt.previous(), attempt.url()) {
+                attempt.error("refusing redirect from https to a non-https URL")
+            } else if attempt.previous().len() > 10 {
+                attempt.error("too many redirects")
+            } else {
+                attempt.follow()
+            }
+        }))
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+fn is_scheme_downgrade(previous: &[reqwest::Url], next: &reqwest::Url) -> bool {
+    next.scheme() != "https" && previous.iter().any(|u| u.scheme() == "https")
+}
+
 /// Downloads `url`, rejecting early when `Content-Length` exceeds `max_bytes`
 /// and counting bytes while streaming, since the header can be missing or
 /// wrong.
 async fn download_capped(url: &str, max_bytes: u64) -> Result<Vec<u8>, String> {
-    let res = reqwest::get(url).await.map_err(|e| e.to_string())?;
+    let res = http_client()?.get(url).send().await.map_err(|e| e.to_string())?;
     if !res.status().is_success() {
         return Err(format!("Server trả về {}", res.status()));
     }
@@ -646,7 +668,9 @@ pub fn current_target_triple() -> String {
 /// Fetches and validates a manifest. The https check lives in the command
 /// below so this can be tested against a local http server.
 async fn fetch_manifest_from(url: &str) -> Result<RemoteArtifactManifest, String> {
-    let res = reqwest::get(url)
+    let res = http_client()?
+        .get(url)
+        .send()
         .await
         .map_err(|e| format!("Không tải được manifest: {e}"))?;
     if !res.status().is_success() {
@@ -775,6 +799,16 @@ mod tests {
     use axum::Router;
     use tokio::net::TcpListener;
     use uuid::Uuid;
+
+    #[test]
+    fn redirect_from_https_to_http_is_a_downgrade() {
+        let url = |s: &str| reqwest::Url::parse(s).unwrap();
+        let https = [url("https://example.com/a.json")];
+        assert!(is_scheme_downgrade(&https, &url("http://example.com/a.json")));
+        assert!(!is_scheme_downgrade(&https, &url("https://cdn.example.com/a.json")));
+        // Local http test servers never started on https.
+        assert!(!is_scheme_downgrade(&[url("http://127.0.0.1:1/a.json")], &url("http://127.0.0.1:1/b.json")));
+    }
 
     fn plugin_manifest(entry: &str, integrity: &str) -> RemotePluginManifest {
         RemotePluginManifest {
