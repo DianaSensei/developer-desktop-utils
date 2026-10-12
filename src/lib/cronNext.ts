@@ -25,20 +25,30 @@ export interface CronFieldValues {
   year: string;
 }
 
-export type NextRunsResult = { runs: Date[] } | { unsupported: string };
+/**
+ * `searchedYears`: số năm đã quét. Ít hơn `count` lần chạy nghĩa là chỉ có
+ * chừng đó lần TRONG khoảng đó — không phải "không bao giờ chạy" (lịch thưa
+ * như 29/2 rơi vào thứ Hai cách nhau tới 28 năm).
+ */
+export type NextRunsResult = { runs: Date[]; searchedYears: number } | { unsupported: string };
 
 const MONTHS: Record<string, number> = {
   JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12,
 };
 const DAYS: Record<string, number> = { SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6 };
 
-/** Sau bao nhiêu ngày thì bỏ cuộc — đủ cho lịch "29/2" (≤ 8 năm giữa hai lần). */
-const SEARCH_DAYS = 366 * 8;
+/** Số năm quét khi không ghim năm — đủ cho lịch "29/2" (≤ 8 năm giữa hai lần). */
+const SEARCH_YEARS = 8;
 
 class Unsupported extends Error {}
 
 /** Tập giá trị của một trường số (không có ký hiệu đặc biệt). */
-function parseSet(field: string, min: number, max: number, alias: (s: string) => number): Set<number> {
+/**
+ * `wrap`: chu kỳ của trường vòng (thứ trong tuần = 7). Khi đầu mút cuối nhỏ hơn
+ * đầu mút đầu (`SAT-SUN` = 6-0, `FRI-MON` = 5-1) thì khoảng đi vòng qua cuối
+ * tuần thay vì thành tập rỗng; người gọi lấy `% wrap` trên kết quả.
+ */
+function parseSet(field: string, min: number, max: number, alias: (s: string) => number, wrap?: number): Set<number> {
   const out = new Set<number>();
   for (const part of field.split(',')) {
     const [base, stepStr] = part.split('/');
@@ -58,6 +68,7 @@ function parseSet(field: string, min: number, max: number, alias: (s: string) =>
       hi = stepStr === undefined ? lo : max;
     }
     if (Number.isNaN(lo) || Number.isNaN(hi)) throw new Unsupported(part);
+    if (wrap && hi < lo) hi += wrap;
     for (let v = lo; v <= hi; v += step) out.add(v);
   }
   return out;
@@ -89,13 +100,17 @@ function domMatcher(field: string): { any: boolean; match: DayMatcher } {
 
 function dowMatcher(field: string, flavor: CronFlavor): { any: boolean; match: DayMatcher } {
   if (field === '*' || field === '?') return { any: true, match: () => true };
-  // Quartz đánh số 1–7 (1 = CN); Linux/Spring 0–7 (0 và 7 = CN). Quy hết về 0–6.
-  const toDow = (s: string) => {
+  // Quartz đánh số 1–7 (1 = CN) → trừ 1. Linux/Spring 0–7 (0 và 7 = CN): giữ
+  // NGUYÊN 7 ở bước này — quy 7→0 trước khi mở rộng phạm vi biến `5-7` thành
+  // lo=5, hi=0 (tập rỗng), nên `5-7`, `SAT-SUN`, `0-7` từng ra "không chạy".
+  // Việc quy 7→0 làm SAU, trên từng giá trị đã mở rộng.
+  const rawDow = (s: string) => {
     const v = num(DAYS)(s);
     if (Number.isNaN(v)) return v;
     if (flavor === 'quartz' && /^\d+$/.test(s)) return v - 1;
-    return v === 7 ? 0 : v;
+    return v;
   };
+  const toDow = (s: string) => rawDow(s) % 7;
   const checks: DayMatcher[] = [];
   const plain: string[] = [];
   for (const part of field.split(',')) {
@@ -116,7 +131,7 @@ function dowMatcher(field: string, flavor: CronFlavor): { any: boolean; match: D
     }
   }
   if (plain.length) {
-    const set = new Set([...parseSet(plain.join(','), 0, 7, toDow)].map((v) => (v === 7 ? 0 : v)));
+    const set = new Set([...parseSet(plain.join(','), 0, flavor === 'quartz' ? 6 : 7, rawDow, 7)].map((v) => v % 7));
     checks.push((d) => set.has(d.getDay()));
   }
   return { any: false, match: (d) => checks.some((c) => c(d)) };
@@ -143,9 +158,14 @@ export function nextCronRuns(
         ? (d) => dom.match(d) || dow.match(d)
         : (d) => dom.match(d) && dow.match(d);
 
+    // Ghim năm (Quartz) thì quét tới hết năm lớn nhất được phép — `… 2099` cách
+    // xa hơn 8 năm từng bị báo "không chạy". Không ghim thì quét SEARCH_YEARS năm.
+    const lastYear = years ? Math.max(...years) : from.getFullYear() + SEARCH_YEARS;
+    const searchedYears = lastYear - from.getFullYear();
+    const end = years ? new Date(lastYear + 1, 0, 1) : new Date(from.getFullYear() + SEARCH_YEARS, from.getMonth(), from.getDate() + 1);
     const runs: Date[] = [];
     const day = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-    for (let i = 0; i < SEARCH_DAYS && runs.length < count; i++, day.setDate(day.getDate() + 1)) {
+    for (; day < end && runs.length < count; day.setDate(day.getDate() + 1)) {
       if (years && !years.has(day.getFullYear())) continue;
       if (!months.has(day.getMonth() + 1) || !dayOk(day)) continue;
       for (const h of hours) {
@@ -154,13 +174,13 @@ export function nextCronRuns(
             const t = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m, s);
             if (t > from) {
               runs.push(t);
-              if (runs.length >= count) return { runs };
+              if (runs.length >= count) return { runs, searchedYears };
             }
           }
         }
       }
     }
-    return { runs };
+    return { runs, searchedYears };
   } catch (e) {
     if (e instanceof Unsupported) return { unsupported: e.message };
     throw e;

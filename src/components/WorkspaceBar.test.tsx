@@ -99,6 +99,32 @@ describe('WorkspaceBar', () => {
     expect(tabs[0].getAttribute('aria-selected')).toBe('true');
   });
 
+  // Góp ý review PR #173.
+  it('"Close other tabs" on a background tab navigates to the kept tab', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText('To Date')); // đang ở Date
+    const jsonTab = within(screen.getByRole('tablist')).getAllByRole('tab').find((t) => t.textContent?.includes('JSON'))!;
+    fireEvent.contextMenu(jsonTab);
+    fireEvent.click(screen.getByText(/Close other tabs|Đóng các tab khác/));
+    expect(screen.getByTestId('path').textContent).toBe('/json');
+  });
+
+  it('re-selecting the same tool after closing its last tab brings the tab back', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText('To Date'));
+    // Workspace thứ hai (được gieo tool đang mở) — 2 workspace thì thanh luôn hiện.
+    fireEvent.click(screen.getByRole('button', { name: /workspace/i }));
+    fireEvent.click(screen.getByText(/New workspace|Workspace mới/));
+    fireEvent.submit(screen.getByRole('textbox').closest('form')!);
+    const only = within(screen.getByRole('tablist')).getByRole('tab');
+    fireEvent.click(within(only).getByRole('button'));
+    expect(within(screen.getByRole('tablist')).queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.getByTestId('path').textContent).toBe('/unix-time');
+    // Chọn lại ĐÚNG tool đang ở trên màn hình — cùng pathname.
+    fireEvent.click(screen.getByText('To Date'));
+    expect(within(screen.getByRole('tablist')).getAllByRole('tab')).toHaveLength(1);
+  });
+
   it('tabs survive a remount (persisted, not session-only)', () => {
     const first = render(<Harness />);
     fireEvent.click(screen.getByText('To Date'));

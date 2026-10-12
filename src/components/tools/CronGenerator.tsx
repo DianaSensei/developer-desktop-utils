@@ -820,7 +820,7 @@ export function CronGenerator() {
                 {m('previewUnsupported')} <code className="font-mono">{nextRuns.unsupported}</code> {m('previewUnsupportedAfter')}
               </p>
             ) : nextRuns.runs.length === 0 ? (
-              <p className="text-xs text-fg-mute">{m('neverFires')}</p>
+              <p className="text-xs text-fg-mute">{m('neverFires', { years: nextRuns.searchedYears })}</p>
             ) : (
               <ol className="divide-y divide-line rounded-sm border border-line bg-card">
                 {nextRuns.runs.map((run) => (
@@ -829,6 +829,13 @@ export function CronGenerator() {
                     <span className="text-xs text-fg-mute">{relativeFromNow(run, m)}</span>
                   </li>
                 ))}
+                {/* Lịch thưa (29/2, năm ghim): ít hơn 5 lần trong khoảng quét —
+                    nói rõ thay vì để danh sách ngắn trông như bị cắt. */}
+                {nextRuns.runs.length < 5 && (
+                  <li className="px-3 py-1.5 text-[11px] text-fg-mute">
+                    {m('fewRuns', { n: nextRuns.runs.length, years: nextRuns.searchedYears })}
+                  </li>
+                )}
               </ol>
             )}
           </div>
