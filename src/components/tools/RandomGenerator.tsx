@@ -11,6 +11,7 @@ import MESSAGES from '@/components/tools/Generator.messages';
 import COMMON from '@/components/tools/common.messages';
 import { ToggleChip } from '@/components/ui/toggle-chip';
 import { Button } from '@/components/ui/button';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 type Mode = 'uuid' | 'number' | 'text';
 
@@ -119,7 +120,7 @@ export function RandomGenerator() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      <ToolToolbar className="flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={setMode}
@@ -185,7 +186,7 @@ export function RandomGenerator() {
         <Button size="sm" onClick={handleGenerate} className="ml-auto h-ctl shrink-0 gap-1.5 rounded-sm text-xs">
           <RefreshCw className="h-3 w-3" />{c('generate')}
         </Button>
-      </div>
+      </ToolToolbar>
 
       {/* Results */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">

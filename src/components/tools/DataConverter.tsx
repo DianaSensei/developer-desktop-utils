@@ -20,6 +20,7 @@ import { parseProperties, stringifyProperties } from '@/lib/properties';
 import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
 import MESSAGES from '@/components/tools/DataConverter.messages';
+import { ToolToolbar, PaneHeader } from '@/components/ui/tool-layout';
 
 type Format = 'json' | 'yaml' | 'toml' | 'xml' | 'properties';
 
@@ -176,7 +177,7 @@ export function DataConverter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5">
+      <ToolToolbar>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* From → To */}
           <div className="flex items-center gap-2">
@@ -224,16 +225,14 @@ export function DataConverter() {
             </ToggleChip>
           )}
         </div>
-      </div>
+      </ToolToolbar>
 
       {/* Editors — source | result */}
       <div className="flex flex-1 min-h-0 divide-x divide-line">
         {/* Source */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
-            <span>{m('source', { format: FORMATS.find((f) => f.value === from)?.label ?? '' })}</span>
-          </div>
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
+          <PaneHeader label={m('source', { format: FORMATS.find((f) => f.value === from)?.label ?? '' })} />
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden p-2">
             <SourceEditor
               value={input}
               onChange={setInput}
@@ -244,8 +243,9 @@ export function DataConverter() {
 
         {/* Result */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
-            <span>{m('result', { format: FORMATS.find((f) => f.value === to)?.label ?? '' })}</span>
+          <PaneHeader
+            label={m('result', { format: FORMATS.find((f) => f.value === to)?.label ?? '' })}
+            action={
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -260,8 +260,9 @@ export function DataConverter() {
               </Button>
               <CopyButton value={() => output} iconClassName="h-3.5 w-3.5" disabled={!output} />
             </div>
-          </div>
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
+            }
+          />
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden p-2">
             {error ? (
               <div className="flex-1 overflow-auto">
                 <ExplainBand tone="bad" title={m('conversionError')} className="font-mono">

@@ -12,7 +12,7 @@ import { PasswordHash } from './PasswordHash';
 import { ToolSection, ToolLabel, ToolHint } from '@/components/ui/tool-section';
 import { Segmented } from '@/components/ui/segmented';
 import { Callout } from '@/components/ui/callout';
-import { ToolPanes, ToolPane, PaneHeader } from '@/components/ui/tool-layout';
+import { ToolPanes, ToolPane, PaneHeader, ToolToolbar } from '@/components/ui/tool-layout';
 import CryptoJS from 'crypto-js';
 import { EnvelopeFormatError, decryptAesGcm, encryptAesGcm, isAesGcmEnvelope } from '@/lib/aesGcm';
 import { cn } from '@/lib/utils';
@@ -695,7 +695,7 @@ export function EncodeHashEncrypt() {
           Giờ cả hai nằm trong cùng một `header-chrome`: một nền, một đường
           viền dưới, hai dòng bên trong. Hàng tuỳ chọn chỉ hiện ở tab nào có,
           nên sáu tab còn lại vẫn là một dòng như cũ. */}
-      <div className="shrink-0 header-chrome px-4 py-1.5 flex flex-col gap-1.5">
+      <ToolToolbar className="px-4 py-1.5 flex flex-col gap-1.5">
       <div className="flex items-center gap-3">
         <Segmented
           value={tab}
@@ -733,7 +733,7 @@ export function EncodeHashEncrypt() {
             <span className="text-xs text-fg-mute truncate hidden sm:block">{m(`codec.${codec.id}` as 'codec.base64')}</span>
           </div>
         )}
-      </div>
+      </ToolToolbar>
 
       {/* ── Encode tab ───────────────────────────────────────────────────────── */}
       {tab === 'encode' && (

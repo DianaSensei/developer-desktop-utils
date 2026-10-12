@@ -16,6 +16,7 @@ import { nextCronRuns } from '@/lib/cronNext';
 import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
 import MESSAGES from '@/components/tools/CronGenerator.messages';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 type CronMode = 'linux' | 'quartz' | 'spring';
 type FieldKey = 'seconds' | 'minute' | 'hour' | 'dayOfMonth' | 'month' | 'dayOfWeek' | 'year';
@@ -322,16 +323,27 @@ function expressionFromFields(mode: CronMode, fields: CronFields) {
     .join(' ');
 }
 
+/**
+ * Số trường hợp lệ: từ số trường BẮT BUỘC tới tổng số trường. Quartz có năm là
+ * trường tuỳ chọn ở cuối — bản trước đòi đủ 7, nên chính biểu thức mặc định và
+ * mọi preset 6 trường của chế độ Quartz đều bị báo "Invalid expression".
+ */
+function acceptsFieldCount(mode: CronMode, count: number) {
+  const rules = getRules(mode);
+  const required = rules.filter((r) => !r.optional).length;
+  return count >= required && count <= rules.length;
+}
+
 function fieldsFromExpression(mode: CronMode, expression: string) {
   const parts = normalizeExpression(expression).split(' ').filter(Boolean);
   const rules = getRules(mode);
 
-  if (parts.length !== rules.length) return null;
+  if (!acceptsFieldCount(mode, parts.length)) return null;
 
   return rules.reduce<CronFields>(
     (nextFields, rule, index) => ({
       ...nextFields,
-      [rule.key]: parts[index],
+      [rule.key]: parts[index] ?? '',
     }),
     { ...DEFAULT_FIELDS, year: '' }
   );
@@ -446,7 +458,7 @@ function validateExpression(mode: CronMode, expression: string, t: T) {
     return { normalized, fields: null, errors: [t('enterExpression')], warnings };
   }
 
-  if (parts.length !== rules.length) {
+  if (!acceptsFieldCount(mode, parts.length)) {
     const fieldCountMsg = mode === 'linux'
       ? t('linuxFields')
       : mode === 'spring'
@@ -650,7 +662,7 @@ export function CronGenerator() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      <ToolToolbar className="flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={changeMode}
@@ -669,7 +681,7 @@ export function CronGenerator() {
             <HelpCircle className="h-4 w-4" />
           </button>
         </Tooltip>
-      </div>
+      </ToolToolbar>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="p-4 space-y-4">

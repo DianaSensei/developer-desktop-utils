@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/EncodeHashEncrypt.messages';
 import COMMON from '@/components/tools/common.messages';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 type Mode = 'hash' | 'verify';
 type Algo = 'bcrypt' | 'argon2id' | 'argon2i' | 'argon2d';
@@ -112,7 +113,7 @@ export function PasswordHash() {
   return (
     <div className="tool-full-height">
       {/* Mode switcher */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      <ToolToolbar className="flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={(v) => { setMode(v); setError(null); }}
@@ -125,7 +126,7 @@ export function PasswordHash() {
         <span className="hidden text-xs text-fg-mute sm:block">
           {mode === 'hash' ? m('hashHint') : m('verifyHint')}
         </span>
-      </div>
+      </ToolToolbar>
 
       <div className="tool-scrollable tool-padding tool-spacer">
         {mode === 'hash' && (

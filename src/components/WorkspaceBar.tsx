@@ -111,7 +111,9 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
               }}
               onDrop={(e) => {
                 e.preventDefault();
-                if (dragId) moveTool(dragId, i);
+                // Vị trí trong danh sách ĐẦY ĐỦ của workspace, không phải trong
+                // dãy đang hiện (đã lọc tool bị tắt) — hai chỉ số lệch nhau.
+                if (dragId) moveTool(dragId, active.toolIds.indexOf(tool.featureId));
                 setDragId(null);
               }}
               onDragEnd={() => setDragId(null)}

@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEv
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Segmented } from '@/components/ui/segmented';
-import { PaneHeader } from '@/components/ui/tool-layout';
+import { PaneHeader, ToolToolbar } from '@/components/ui/tool-layout';
 import { CodeViewer, JsonSyntaxEditor } from '@/design-system';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -854,7 +854,7 @@ export function JsonFormatter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5">
+      <ToolToolbar>
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
             value={mode}
@@ -895,7 +895,7 @@ export function JsonFormatter() {
             {showInput ? m('hideInput') : m('showInput')}
           </Button>
         </div>
-      </div>
+      </ToolToolbar>
 
       {/* Input panel (collapsible, resizable) + result view */}
       <div className="flex-1 min-h-0 flex flex-col">

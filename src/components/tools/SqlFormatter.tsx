@@ -23,6 +23,7 @@ import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
 import MESSAGES from '@/components/tools/SqlFormatter.messages';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 // ─── SQL formatter ───────────────────────────────────────────────────────────
 
@@ -484,7 +485,7 @@ export function SqlFormatter() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5">
+      <ToolToolbar>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* Mode switcher */}
           <Segmented
@@ -529,7 +530,7 @@ export function SqlFormatter() {
             </>
           )}
         </div>
-      </div>
+      </ToolToolbar>
 
       {/* Editor — fills remaining height. overflow-hidden on the mount container
           is required for CodeMirror's flex layout to resolve on WebKitGTK (Linux)
