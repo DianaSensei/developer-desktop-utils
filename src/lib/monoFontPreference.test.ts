@@ -6,10 +6,7 @@ import { MONO_FONT_PREFERENCES, getMonoFontPreference, setMonoFontPreference } f
 
 describe('MONO_FONT_PREFERENCES khớp đúng preset trong design/tokens.css', () => {
   it('mọi lựa chọn khai báo trong TS đều có khối [data-mono-font] tương ứng', () => {
-    // Cùng rủi ro trôi lệch như FONT_PREFERENCES/fontPreference.test.ts: sửa
-    // preset trong tokens.css mà quên sửa danh sách TS (hoặc ngược lại) thì
-    // bộ chọn trong Settings sẽ hiện một lựa chọn không có hiệu lực, hoặc
-    // thiếu một lựa chọn đã có sẵn.
+    // TS list and tokens.css must stay in sync.
     const tokens = readFileSync(resolve(__dirname, '../../design/tokens.css'), 'utf-8');
     const declared = [...tokens.matchAll(/\[data-mono-font="([\w-]+)"\]/g)].map((m) => m[1]);
     expect([...MONO_FONT_PREFERENCES].sort()).toEqual([...declared].sort());

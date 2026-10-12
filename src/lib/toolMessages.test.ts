@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Messages } from '@/lib/i18n';
 
 /**
- * Mọi từ điển tool (`*.messages.ts`) phải có đủ VI và EN, không rỗng, và mọi
- * `{{param}}` có mặt ở cả hai bản — thiếu param ở một bên là câu hiện ra với
- * chỗ trống hoặc `{{n}}` thô.
+ * Every tool dictionary (`*.messages.ts`) must have non-empty VI and EN text
+ * with the same `{{param}}`s in both.
  */
 const modules = import.meta.glob<{ default: Messages }>('../components/**/*.messages.ts', { eager: true });
 

@@ -13,8 +13,7 @@ const idsOf = (entries: ReturnType<typeof buildNavEntries>) => entries.map((e) =
 
 describe('bản đồ nhóm', () => {
   it('mọi id trong nhóm đều là tool có thật', () => {
-    // Đổi tên một tool mà quên sửa nhóm sẽ làm nó biến mất khỏi sidebar mà
-    // không báo lỗi ở đâu cả.
+    // A renamed tool missing from its group would vanish from the sidebar.
     for (const g of TOOL_GROUPS) {
       for (const id of g.toolIds) {
         expect(ALL.has(id), `nhóm "${g.id}" trỏ tới tool không tồn tại: ${id}`).toBe(true);
@@ -33,7 +32,7 @@ describe('bản đồ nhóm', () => {
   });
 
   it('không nhóm nào chỉ có một tool', () => {
-    // Nhóm một tool là chrome thừa. Nếu còn một, hãy bỏ nó khỏi TOOL_GROUPS.
+    // A one-tool group is pointless; remove it from TOOL_GROUPS.
     for (const g of TOOL_GROUPS) {
       expect(g.toolIds.length, `nhóm "${g.id}" chỉ có một tool`).toBeGreaterThan(1);
     }
@@ -55,7 +54,7 @@ describe('buildNavEntries', () => {
     enabled.delete('markdown');
     const entries = buildNavEntries({ enabledIds: enabled });
     const format = entries.find((e) => e.key === 'sql-formatter' || e.key === 'g-format');
-    // Format còn mỗi SQL → thoái thành mục đơn, mang nhãn của SQL.
+    // Only SQL is left in Format, so it collapses to SQL's own entry.
     expect(format?.isGroup).toBe(false);
     expect(format?.label).toBe('SQL Formatter');
   });
@@ -68,14 +67,12 @@ describe('buildNavEntries', () => {
   });
 
   it('nhóm lấy vị trí của thành viên đứng sớm nhất', () => {
-    // qrcode đứng gần cuối thứ tự mặc định, generator đứng sớm hơn nhiều — nhóm
-    // Generate phải nhận vị trí của generator.
+    // The group takes its earliest member's position.
     const entries = buildNavEntries({
       enabledIds: ALL,
       order: ['qrcode', 'regex', 'generator', 'json'],
     });
-    // generator xếp trước regex trong `order`? Không — regex đứng trước. Nhưng
-    // nhóm Generate chứa qrcode (vị trí 0), nên nó phải lên đầu.
+    // qrcode (in Generate) is first in `order`, so Generate leads.
     expect(idsOf(entries)[0]).toBe('g-generate');
   });
 
@@ -88,7 +85,7 @@ describe('buildNavEntries', () => {
   });
 
   it('yêu thích một tool trong nhóm thì nổi cả nhóm', () => {
-    // Dữ liệu yêu thích vẫn là id TOOL như cũ — không cần di trú.
+    // Favorites are still tool ids; no migration needed.
     const entries = buildNavEntries({ enabledIds: ALL, favorites: ['text-counter'] });
     expect(idsOf(entries)[0]).toBe('g-text');
   });
@@ -106,8 +103,7 @@ describe('buildNavEntries', () => {
   });
 
   it('thứ tự tab con theo đúng bản đồ, không theo thứ tự sidebar', () => {
-    // Tab con là cấu trúc cố định của nhóm; kéo-thả sidebar không được xáo nó,
-    // nếu không vị trí tab sẽ nhảy giữa các lần mở.
+    // Sub-tab order is fixed by the group, not by sidebar reordering.
     const entries = buildNavEntries({ enabledIds: ALL, order: ['deduplicate', 'text-counter'] });
     const text = entries.find((e) => e.key === 'g-text');
     expect(text?.tools.map((t) => t.id)).toEqual([
@@ -141,9 +137,8 @@ describe('GROUP_OF_TOOL', () => {
 
 describe('clusterToolOrder', () => {
   it('kéo các tool cùng nhóm đứng liền nhau, tại vị trí thành viên sớm nhất', () => {
-    // qrcode (nhóm g-generate: generator, qrcode, lucky-wheel) đứng ngay sau
-    // api-client — cả nhóm phải trồi lên đứng liền sau api-client, theo đúng
-    // thứ tự toolIds của nhóm, không phải thứ tự xuất hiện trong input.
+    // qrcode's group (generator, qrcode, lucky-wheel) moves up right after
+    // api-client, in the group's own toolIds order.
     const order = ['api-client', 'qrcode', 'text-counter', 'generator', 'lucky-wheel'];
     expect(clusterToolOrder(order)).toEqual([
       'api-client', 'generator', 'qrcode', 'lucky-wheel', 'text-counter',
@@ -160,8 +155,7 @@ describe('clusterToolOrder', () => {
   });
 
   it('nhóm chỉ còn một thành viên trong input thì đứng y nguyên vị trí đó', () => {
-    // Mô phỏng tìm kiếm lọc còn đúng một tool của nhóm — không kéo thành
-    // viên vắng mặt vào (nó không có trong input để mà kéo).
+    // As when search leaves one member: absent members are not pulled in.
     const order = ['api-client', 'qrcode', 'text-counter'];
     expect(clusterToolOrder(order)).toEqual(order);
   });

@@ -1,15 +1,10 @@
-// "Market" = một nguồn catalog.json liệt kê nhiều plugin cài-được-ngay, khác
-// với ô "Cài tiện ích từ bên ngoài" (SettingsExtensionInstaller) vốn chỉ nhận
-// ĐÚNG MỘT URL manifest mỗi lần dán. Một market không tự cài gì — nó chỉ hiển
-// thị danh sách rồi giao URL manifest đã chọn cho đúng luồng
-// preview/xác nhận/cài sẵn có (qua `pendingInstall`, xem
-// `SettingsMarketplace.tsx`), cùng nguyên tắc "không có URL nào tự đủ để tin"
-// đã áp dụng cho deep link.
+// A market is a catalog.json listing installable plugins, unlike the
+// single-URL install field. A market installs nothing itself: the chosen
+// manifest URL goes through the usual preview and confirmation.
 //
-// Có SẴN một market chính thức (catalog.json của developer-desktop-miniapp)
-// và cho phép người dùng thêm market tuỳ ý (nội bộ công ty, một fork,…) — ai
-// cũng generate được đúng format `MarketCatalog` này, kể cả không phải
-// developer-desktop-miniapp.
+// The official market (developer-desktop-miniapp's catalog.json) is built
+// in; users can add others (internal, forks) in the same `MarketCatalog`
+// format.
 
 import { isTauri } from '@/lib/platform';
 import { storageGet, storageSet } from '@/lib/persistentStore';
@@ -18,8 +13,7 @@ export interface Market {
   id: string;
   label: string;
   catalogUrl: string;
-  /** `true` cho market cài sẵn — không cho xoá, phân biệt với market người
-   *  dùng tự thêm (`removeCustomMarket` chỉ tác động market không builtin). */
+  /** `true` for built-in markets, which cannot be removed. */
   builtin: boolean;
 }
 
@@ -31,8 +25,8 @@ export interface MarketPlugin {
   keywords: string[];
   pluginManifestUrl: string;
   serviceManifestUrl?: string;
-  /** Target triple mà sidecar (nếu có) hỗ trợ — thiếu/rỗng nghĩa là không rõ,
-   *  không nên dùng để TỪ CHỐI cài, chỉ để cảnh báo. */
+  /** Target triples the sidecar supports, if known. Used for a warning,
+   *  never to block an install. */
   targets?: string[];
 }
 
@@ -75,30 +69,21 @@ function saveCustomMarkets(markets: Market[]): void {
   storageSet(CUSTOM_MARKETS_KEY, JSON.stringify(markets));
 }
 
-/** Builtin trước, rồi market tự thêm theo thứ tự đã thêm. */
+/** Built-in markets first, then custom ones in the order added. */
 export function listMarkets(): Market[] {
   return [...BUILTIN_MARKETS, ...loadCustomMarkets()];
 }
 
-// `Date.now()` một mình không đủ duy nhất khi hai lần thêm xảy ra trong cùng
-// millisecond (đã bắt được ngay bằng test) — kèm một chuỗi ngẫu nhiên. Dùng
-// `crypto.getRandomValues` thay vì `Math.random()`: chỉ để tránh trùng id,
-// không có ý nghĩa bảo mật nào ở đây, nhưng `Math.random()` là PRNG không an
-// toàn mà SonarCloud (và nhiều máy quét tĩnh khác) luôn gắn cờ bất kể ngữ
-// cảnh dùng — dùng Web Crypto sẵn có (webview lẫn trình duyệt) tránh hẳn cảnh
-// báo mà không tốn thêm dependency nào.
+// `Date.now()` alone collides within a millisecond, so add a random
+// suffix (Web Crypto, which static analyzers accept, unlike Math.random).
 function randomSuffix(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(4));
   return Array.from(bytes, (b) => b.toString(36)).join('').slice(0, 6);
 }
 
-// Kebab-case (chữ thường, số, dấu gạch nối) — CHỦ ĐÍCH, không chỉ để đẹp:
-// `installedPluginManifests()` (installer.ts) dùng market id này làm `group`
-// của mọi plugin cài từ market đó, lộ ra trực tiếp trong route
-// (`/installed/<group>/<id>`) và trong `by-market/<market_id>/` phía đĩa
-// (`artifact_installer.rs`) — một market id chứa `:`, khoảng trắng hay ký tự
-// hoa sẽ làm hỏng route/đường dẫn file của MỌI plugin cài từ market đó.
-
+// Market ids are kebab-case because they become the `group` of installed
+// plugins, appearing in routes (`/installed/<group>/<id>`) and on-disk
+// paths (`by-market/<market_id>/`).
 export function addCustomMarket(label: string, catalogUrl: string): Market {
   const market: Market = {
     id: `custom-${Date.now()}-${randomSuffix()}`,
@@ -114,9 +99,8 @@ export function removeCustomMarket(id: string): void {
   saveCustomMarkets(loadCustomMarkets().filter((m) => m.id !== id));
 }
 
-/** Market đang chọn — tự rơi về market builtin đầu tiên nếu chưa chọn gì
- *  hoặc giá trị đã lưu không còn tồn tại (market tuỳ ý bị xoá ở máy khác, rồi
- *  đồng bộ store lại). */
+/** Selected market, falling back to the first built-in one when nothing is
+ *  selected or the saved market no longer exists. */
 export function getSelectedMarketId(): string {
   const saved = storageGet(SELECTED_MARKET_KEY);
   if (saved && listMarkets().some((m) => m.id === saved)) return saved;
@@ -127,10 +111,9 @@ export function setSelectedMarketId(id: string): void {
   storageSet(SELECTED_MARKET_KEY, id);
 }
 
-// Cùng cách né CORS/Origin đã dùng ở `src/lib/network.ts`: trong app desktop
-// đi qua tauri-plugin-http (chạy từ phía Rust, không có Origin của webview),
-// bản web dùng `fetch` chuẩn. Không cần audit/permission ở đây — đây là mã
-// SHELL (Settings), không phải lời gọi network của một plugin.
+// Like network.ts: the HTTP plugin in the desktop app avoids CORS/Origin
+// problems; the web build uses `fetch`. This is shell code, so the plugin
+// SDK checks do not apply.
 async function marketFetch(url: string): Promise<Response> {
   if (isTauri) {
     const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http');
@@ -163,11 +146,8 @@ function toMarketPlugin(raw: unknown): MarketPlugin | null {
   };
 }
 
-/** Tải + kiểm hình dạng một catalog.json. Ném lỗi rõ ràng (thông điệp tiếng
- *  Anh — UI tự bọc qua i18n) khi HTTP lỗi hoặc JSON sai hình dạng; một mục
- *  đơn lẻ sai hình dạng trong mảng `plugins` chỉ bị BỎ QUA (dữ liệu bên ngoài,
- *  không đáng để hỏng cả danh sách vì một mục), không ném lỗi cho cả catalog.
- */
+/** Fetches and validates a catalog.json. Throws on HTTP or format errors;
+ *  individual malformed entries are skipped. */
 export async function fetchMarketCatalog(url: string): Promise<MarketPlugin[]> {
   const res = await marketFetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);

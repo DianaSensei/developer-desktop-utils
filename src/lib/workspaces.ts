@@ -1,26 +1,20 @@
 /**
- * Workspace — một bộ tab tool có tên, lưu bền qua các lần mở app.
+ * Workspaces: named sets of tool tabs that persist across launches, so the
+ * set of tools used together (e.g. API Client, JSON, JWT) is one keystroke
+ * away.
  *
- * Thay cho "Open tools" chỉ-trong-phiên trước đây (useOpenTools): dải đó mất
- * sạch mỗi lần khởi động lại, và trên app desktop nó còn không bao giờ được
- * render (chỉ nằm trong header dạng web). Người dùng làm việc liên tục trên
- * vài tool cùng lúc — API Client + JSON + JWT + Base64 khi debug backend, Task
- * Tracker + Unix Time cho việc hằng ngày — và phải tìm lại từng tool qua
- * sidebar/⌘K mỗi lần chuyển qua lại. Workspace giữ đúng bộ đó, mỗi bộ một
- * tên, chuyển qua lại bằng một phím.
- *
- * File này THUẦN: chỉ có kiểu dữ liệu và các phép biến đổi trạng thái, không
- * React, không router, không storage — để test được từng quy tắc một cách
- * trực tiếp. `WorkspaceContext` lo phần nối với điều hướng và lưu trữ.
+ * Pure data and state transitions only (no React, router or storage), so
+ * each rule is tested directly. `WorkspaceContext` wires it to navigation
+ * and storage.
  */
 
 export interface Workspace {
   id: string;
-  /** Rỗng nghĩa là workspace mặc định chưa đặt tên — hiển thị tên theo ngôn ngữ. */
+  /** Empty for an unnamed default workspace; the UI shows a localized name. */
   name: string;
-  /** Thứ tự tab, trái sang phải. */
+  /** Tab order, left to right. */
   toolIds: string[];
-  /** Tool đang mở lần cuối trong workspace này — đích khi chuyển về. */
+  /** Last active tool here; restored when switching back. */
   activeToolId: string | null;
 }
 
@@ -30,15 +24,14 @@ export interface WorkspaceState {
 }
 
 /**
- * Trần số tab mỗi workspace. Mở thêm tool khi đã đầy sẽ đẩy tab cũ nhất ra —
- * đủ cho một bộ làm việc thật, không biến thành sidebar thứ hai.
+ * Maximum tabs per workspace. Opening another tool evicts the oldest tab.
  */
 export const MAX_TABS = 12;
 
-/** Số workspace tối đa — ⌘⌥1…9 phủ đúng chừng này. */
+/** Maximum workspaces; ⌘⌥1…9 covers them all. */
 export const MAX_WORKSPACES = 9;
 
-/** Màn hình của shell, không phải "việc" — không chiếm tab. */
+/** Shell screens, not tools; they never get a tab. */
 const NON_TAB_TOOLS = new Set(['settings']);
 
 let seq = 0;
@@ -64,7 +57,7 @@ function updateActive(state: WorkspaceState, fn: (w: Workspace) => Workspace): W
   };
 }
 
-/** Mở một tool: thêm tab vào workspace đang dùng (nếu chưa có) và đánh dấu nó đang mở. */
+/** Opens a tool: adds a tab to the active workspace if needed and activates it. */
 export function visitTool(state: WorkspaceState, toolId: string): WorkspaceState {
   if (NON_TAB_TOOLS.has(toolId)) return state;
   const ws = activeWorkspace(state);
@@ -72,7 +65,7 @@ export function visitTool(state: WorkspaceState, toolId: string): WorkspaceState
   return updateActive(state, (w) => {
     let toolIds = w.toolIds.includes(toolId) ? w.toolIds : [...w.toolIds, toolId];
     if (toolIds.length > MAX_TABS) {
-      // Đẩy tab cũ nhất ra, nhưng không bao giờ là tab vừa mở.
+      // Evict the oldest tab, never the one just opened.
       const victim = toolIds.find((id) => id !== toolId)!;
       toolIds = toolIds.filter((id) => id !== victim);
     }
@@ -81,12 +74,11 @@ export function visitTool(state: WorkspaceState, toolId: string): WorkspaceState
 }
 
 /**
- * Đóng một tab. Trả về cả trạng thái mới lẫn tool nên chuyển tới nếu tab vừa
- * đóng là tab đang mở — tab bên phải nó, hết thì bên trái, như trình duyệt.
+ * Closes a tab. Also returns the tool to switch to when the closed tab was
+ * active: the tab to its right, else to its left, like a browser.
  *
- * `isVisible`: tab nào thanh tab thực sự hiện (tool đã tắt vẫn nằm trong
- * `toolIds` nhưng bị ẩn). Tab kế tiếp phải là tab hiện được — chuyển tới một
- * tool đã tắt là rơi vào route "không khớp" và bị đẩy về trang mặc định.
+ * `isVisible` tells which tabs are shown (disabled tools stay in `toolIds`
+ * but are hidden); the next tab must be a visible one.
  */
 export function closeTool(
   state: WorkspaceState,
@@ -119,7 +111,7 @@ export function closeOtherTools(state: WorkspaceState, keepId: string): Workspac
   }));
 }
 
-/** Kéo-thả: đưa `toolId` tới vị trí `toIndex` trong dãy tab. */
+/** Drag and drop: moves `toolId` to `toIndex`. */
 export function moveTool(state: WorkspaceState, toolId: string, toIndex: number): WorkspaceState {
   return updateActive(state, (w) => {
     if (!w.toolIds.includes(toolId)) return w;
@@ -130,9 +122,8 @@ export function moveTool(state: WorkspaceState, toolId: string, toIndex: number)
 }
 
 /**
- * Tạo workspace mới và chuyển sang nó. Mang theo tool đang mở làm tab đầu
- * tiên: một workspace trống trơn không có gì để hiện, và người dùng thường tạo
- * workspace ngay lúc đang đứng ở tool đầu tiên của bộ mới.
+ * Creates a workspace and switches to it, starting with the current tool as
+ * its first tab.
  */
 export function createWorkspace(
   state: WorkspaceState,
@@ -158,7 +149,7 @@ export function renameWorkspace(state: WorkspaceState, id: string, name: string)
   };
 }
 
-/** Xoá một workspace. Workspace cuối cùng không xoá được — luôn phải có chỗ để tab rơi vào. */
+/** Deletes a workspace. The last one cannot be deleted. */
 export function deleteWorkspace(state: WorkspaceState, id: string): WorkspaceState {
   if (state.workspaces.length <= 1) return state;
   const idx = state.workspaces.findIndex((w) => w.id === id);
@@ -175,8 +166,8 @@ export function switchWorkspace(state: WorkspaceState, id: string): WorkspaceSta
 }
 
 /**
- * Đọc trạng thái đã lưu, chịu được dữ liệu hỏng/cũ: bất cứ thứ gì không đúng
- * hình thì bỏ, không bao giờ để app khởi động vào một workspace không tồn tại.
+ * Parses saved state, dropping anything malformed so the app never starts in
+ * a workspace that does not exist.
  */
 export function parseWorkspaceState(raw: string | null): WorkspaceState | null {
   if (!raw) return null;

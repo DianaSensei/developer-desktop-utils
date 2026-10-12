@@ -54,18 +54,14 @@ export interface DohProvider {
 const q = (s: string) => encodeURIComponent(s.trim());
 
 
-/** Hàm fetch mà các hàm dưới đây dùng. Network tool truyền `sdk.http.fetch` vào
- *  để lời gọi đi qua điểm thắt của Platform: kiểm allowlist host khai trong
- *  manifest, rồi ghi audit. */
+/** Fetch function used below. The Network tool passes `sdk.http.fetch` so
+ *  calls go through the platform's host allowlist and audit. */
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-// Fetch wrapper: in the Tauri desktop app, route through the HTTP plugin so the
-// request is made from Rust (no browser `Origin` header, no CORS). Some public
-// services (e.g. ipwho.is) reject the WebView's Origin with HTTP 403 — this
-// bypasses that. On the web build, fall back to the standard `fetch`.
-//
-// `impl` có thì dùng luôn: đó là đường đã qua kiểm quyền. Đường mặc định bên
-// dưới giữ nguyên cho test và cho những chỗ gọi chưa chuyển.
+// In the desktop app, route through the HTTP plugin so the request is made
+// from Rust without the webview's Origin header (some services, e.g.
+// ipwho.is, return 403 for it). The web build uses `fetch`. A provided
+// `impl` (the SDK fetch) is used as is.
 async function netFetch(input: string, init?: RequestInit, impl?: FetchLike): Promise<Response> {
   if (impl) return impl(input, init);
   if (isTauri) {

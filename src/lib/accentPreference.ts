@@ -1,13 +1,11 @@
 import { storageGet, storageSet } from '@/lib/persistentStore';
 
 /**
- * Tone chủ đạo — bốn preset khai báo trong `design/tokens.css` dưới dạng
- * `[data-accent="…"]`. Áp dụng bằng cách gán `document.documentElement.dataset.accent`;
- * biến `--a-h/--a-s/--a-l` (và mọi thứ dẫn xuất từ chúng) tự đổi theo qua CSS,
- * không cần JS tính toán màu.
+ * Accent tone: four presets in design/tokens.css (`[data-accent="…"]`),
+ * applied through `document.documentElement.dataset.accent`; `--a-h/-s/-l`
+ * and everything derived from them follow via CSS.
  *
- * Danh sách này PHẢI khớp đúng các khối `[data-accent="…"]` trong tokens.css —
- * `accentPreference.test.ts` đối chiếu cả hai để không lệch nhau.
+ * Must match tokens.css (checked by accentPreference.test.ts).
  */
 export type AccentTone = 'azure' | 'teal' | 'iris' | 'amber';
 
@@ -29,7 +27,7 @@ export function setAccentPreference(tone: AccentTone): void {
   storageSet(ACCENT_KEY, tone);
 }
 
-/** Ghi tone lên `<html data-accent>` — nguồn CSS mà mọi màu accent trong app đọc. */
+/** Sets `<html data-accent>`, which every accent color reads. */
 export function applyAccentToDocument(tone: AccentTone): void {
   document.documentElement.dataset.accent = tone;
 }

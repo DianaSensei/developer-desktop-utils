@@ -1,17 +1,13 @@
 /**
- * Hạ tầng song ngữ — VI/EN, chuyển được lúc chạy.
+ * VI/EN localization, switchable at runtime.
  *
- * Từ điển phẳng bên dưới là của SHELL (sidebar, ⌘K, Settings, workspace). Mỗi
- * tool có từ điển riêng `<Tool>.messages.ts` nằm cạnh nó (xem `defineMessages`
- * ở cuối file), component của kit dùng `components/ui/ui.messages.ts`.
+ * The flat dictionary below is the shell's (sidebar, ⌘K, Settings,
+ * workspaces). Each tool keeps its own `<Tool>.messages.ts` next to it
+ * (`defineMessages`), and kit components use `components/ui/ui.messages.ts`.
  *
- * Từ điển PHẲNG, không lồng namespace: `{ vi, en }` theo từng khoá, để:
- *   - thiếu bản dịch lộ ra ngay ở kiểu TypeScript (cả hai field bắt buộc)
- *   - test đối chiếu được: mọi khoá dùng trong code phải có mặt ở đây, và
- *     ngược lại (xem i18n.test.ts)
- *
- * Nội suy tham số kiểu `{{name}}`, đủ dùng cho các câu ngắn của shell — không
- * cần các dạng số nhiều/ngữ pháp phức tạp mà một thư viện i18n đầy đủ mới cần.
+ * Flat `{ vi, en }` entries make a missing translation a type error and let
+ * i18n.test.ts check that used keys and defined keys match. `{{name}}`
+ * interpolation is enough for short shell strings.
  */
 
 export type Locale = 'vi' | 'en';
@@ -37,7 +33,7 @@ export const DICTIONARY = {
   'palette.footer.select': { vi: 'chọn', en: 'select' },
   'palette.footer.close': { vi: 'đóng', en: 'close' },
 
-  // ── Lý do đoán clipboard — dùng bởi lib/clipboardIntent.ts ─────────────
+  // ── Clipboard detection reasons (lib/clipboardIntent.ts) ───────────────
   'clipboard.reason.jwt': {
     vi: 'Trông giống JWT — ba đoạn base64url ngăn bằng dấu chấm',
     en: 'Looks like a JWT — three base64url segments separated by dots',
@@ -108,7 +104,7 @@ export const DICTIONARY = {
   'settings.monoFont.firaCode': { vi: 'Fira Code (có ligature)', en: 'Fira Code (with ligatures)' },
   'settings.monoFont.previewLabel': { vi: 'Xem trước', en: 'Preview' },
 
-  // ── Sidebar — trạng thái, tooltip, nút ──────────────────────────────────
+  // ── Sidebar: status, tooltips, buttons ─────────────────────────────────
   'shell.sidebar.connected': { vi: 'Đang kết nối', en: 'Connected' },
   'shell.sidebar.connectedLabel': { vi: '{{label}} — đang kết nối', en: '{{label}} — connected' },
   'shell.sidebar.disabledLabel': { vi: '{{label}} — đã tắt', en: '{{label}} — turned off' },
@@ -126,7 +122,7 @@ export const DICTIONARY = {
   'shell.sidebar.settings': { vi: 'Cài đặt', en: 'Settings' },
   'shell.sidebar.moreScrollHint': { vi: 'thêm', en: 'more' },
 
-  // ── Experimental tools — badge + mỗi-lần-mở consent gate ────────────────
+  // ── Experimental tools: badge and per-open consent ─────────────────────
   'shell.experimental.badge': { vi: 'Thử nghiệm', en: 'Experimental' },
   'shell.experimental.sidebarLabel': { vi: '{{label}} — thử nghiệm', en: '{{label}} — experimental' },
   'shell.experimental.consentTitle': { vi: '{{label}} là tính năng thử nghiệm', en: '{{label}} is an experimental feature' },
@@ -137,12 +133,12 @@ export const DICTIONARY = {
   'shell.experimental.continue': { vi: 'Tiếp tục', en: 'Continue' },
   'shell.experimental.cancel': { vi: 'Quay lại', en: 'Go back' },
 
-  // ── Theme options — dùng chung cho sidebar + toggle mobile ──────────────
+  // ── Theme options (sidebar and mobile toggle) ──────────────────────────
   'shell.theme.light': { vi: 'Chế độ sáng', en: 'Light mode' },
   'shell.theme.dark': { vi: 'Chế độ tối', en: 'Dark mode' },
   'shell.theme.system': { vi: 'Theo hệ thống', en: 'Match system' },
 
-  // ── Titlebar tự vẽ (macOS overlay + Windows/Linux custom chrome) ────────
+  // ── Custom titlebar (macOS overlay, Windows/Linux chrome) ──────────────
   'shell.titlebar.openMenu': { vi: 'Mở menu', en: 'Open menu' },
   'shell.titlebar.running': { vi: 'Đang chạy', en: 'Running' },
   'shell.titlebar.howToUse': { vi: 'Cách dùng {{label}}', en: 'How to use {{label}}' },
@@ -152,7 +148,7 @@ export const DICTIONARY = {
   'shell.titlebar.close': { vi: 'Đóng', en: 'Close' },
   'shell.titlebar.themeCycleTap': { vi: 'Giao diện: {{theme}} (chạm để đổi)', en: 'Theme: {{theme}} (tap to cycle)' },
 
-  // ── Workspace — bộ tab tool có tên, lưu qua các lần mở app ─────────────
+  // ── Workspaces: named, persisted sets of tool tabs ─────────────────────
   'shell.workspace.tabsLabel': { vi: 'Tab của workspace {{name}}', en: 'Tabs in workspace {{name}}' },
   'shell.workspace.defaultName': { vi: 'Workspace số {{n}}', en: 'Workspace {{n}}' },
   'shell.workspace.switcher': { vi: 'Đổi workspace — đang ở {{name}}', en: 'Switch workspace — current: {{name}}' },
@@ -178,10 +174,10 @@ export const DICTIONARY = {
   'palette.workspace.switch': { vi: 'Chuyển sang', en: 'Switch to' },
   'palette.workspace.empty': { vi: 'Chưa có tab nào', en: 'No tabs yet' },
 
-  // ── ⌘K command palette — a11y-only title ────────────────────────────────
+  // ── ⌘K command palette: accessible title ───────────────────────────────
   'palette.title': { vi: 'Bảng lệnh', en: 'Command palette' },
 
-  // ── Dùng chung nhiều nơi (sidebar + Settings tool list) ─────────────────
+  // ── Shared (sidebar and Settings tool list) ─────────────────────────────
   'common.favorite': { vi: 'Thêm vào mục yêu thích', en: 'Add to favorites' },
   'common.unfavorite': { vi: 'Bỏ khỏi mục yêu thích', en: 'Remove from favorites' },
   'common.favoriteAria': { vi: 'Yêu thích {{label}}', en: 'Favorite {{label}}' },
@@ -220,7 +216,7 @@ export const DICTIONARY = {
     en: 'Running in browser — permissions listed below apply to the desktop app only.',
   },
 
-  // ── Settings — Plugins (biên dịch sẵn trong app, dùng SDK nội bộ) ────────
+  // ── Settings — Plugins (built in) ────────────────────────────────────────
   'settings.plugins.description': {
     vi: 'Mỗi tool BIÊN DỊCH SẴN trong app là một plugin tự khai báo trong src/plugins/<id>/plugin.ts. Bảng dưới đọc thẳng từ các manifest đó: kênh Platform mà plugin được phép dùng, và lệnh native nằm trong allowlist của nó. Muốn cài thêm plugin/service KHÁC không có sẵn ở đây, xem mục Tiện ích.',
     en: 'Every tool already COMPILED INTO the app is a plugin that declares itself in src/plugins/<id>/plugin.ts. The table below is read straight from those manifests: which Platform channels the plugin may use, and which native commands are in its allowlist. To install extra plugins/services not already here, see the Extensions section.',
@@ -269,8 +265,7 @@ export const DICTIONARY = {
     en: 'No calls match "{{query}}".',
   },
 
-  // ── Settings — Extensions (cài plugin/sidecar KHÁC ngoài bản biên dịch sẵn,
-  //     qua Marketplace hoặc dán URL manifest tay) ──────────────────────────
+  // ── Settings — Extensions (installed from a marketplace or URL) ───────────
   'settings.extensions.title': { vi: 'Tiện ích', en: 'Extensions' },
   'settings.extensions.description': {
     vi: 'Cài thêm plugin hoặc sidecar KHÔNG có sẵn trong bản biên dịch của app — từ Chợ tiện ích hoặc dán URL manifest tay. Đây là tiện ích do chính bạn phát hành, không phải một kho mở cho bên thứ ba. Xem mục Plugin nếu muốn xem quyền của các tool đã có sẵn.',
@@ -336,7 +331,7 @@ export const DICTIONARY = {
   'settings.extensions.installed.confirm': { vi: 'Xác nhận', en: 'Confirm' },
   'settings.extensions.installed.cancel': { vi: 'Huỷ', en: 'Cancel' },
 
-  // ── Settings — Extensions — Marketplace (chọn market, cài trực tiếp) ─────
+  // ── Settings — Extensions — Marketplace ──────────────────────────────────
   'settings.extensions.marketplace.description': {
     vi: 'Chọn một market để xem những tiện ích có sẵn ở đó — bấm Cài để tự chuyển sang bước xem trước/xác nhận, không cài thẳng.',
     en: 'Pick a market to see what it offers — clicking Install jumps you to the same preview/confirm step, nothing installs directly.',
@@ -416,7 +411,7 @@ export const DICTIONARY = {
     en: 'Everything runs on your device. Network access only happens when you ask for it, plus the daily check for app updates — no telemetry, analytics, or other data leaves your machine.',
   },
 
-  // ── Settings — Data & Storage (gộp vào About, không còn mục riêng) ────────
+  // ── Settings — Data & Storage (shown under About) ────────────────────────
   'settings.storage.location': { vi: 'Nơi lưu dữ liệu của bạn', en: 'Where your data is stored' },
   'settings.storage.resolving': { vi: 'Đang xác định…', en: 'Resolving…' },
   'settings.storage.webOnly': { vi: 'Thư mục dữ liệu app (chỉ có ở bản desktop).', en: 'App data folder (available in the desktop app).' },
@@ -462,9 +457,8 @@ export const DICTIONARY = {
 export type TranslationKey = keyof typeof DICTIONARY;
 
 /**
- * Dịch một khoá sang locale đã cho, nội suy `{{param}}` nếu có.
- * Khoá không tồn tại thì trả lại chính khoá đó — dễ nhận ra khi thiếu bản dịch
- * hơn là hiện chuỗi rỗng, và không bao giờ ném lỗi giữa lúc render.
+ * Translates a key and interpolates `{{param}}`. An unknown key returns the
+ * key itself, which is easy to spot and never throws during render.
  */
 export function translate(
   key: TranslationKey,
@@ -476,35 +470,33 @@ export function translate(
   let text = entry[locale];
   if (params) {
     for (const [k, v] of Object.entries(params)) {
-      // split/join thay cho replaceAll — mục tiêu build là ES2020.
+      // split/join instead of replaceAll: the build targets ES2020.
       text = text.split(`{{${k}}}`).join(String(v));
     }
   }
   return text;
 }
 
-/** `navigator.language` bắt đầu bằng "vi" → mặc định tiếng Việt; còn lại → tiếng Anh. */
+/** Vietnamese when `navigator.language` starts with "vi", otherwise English. */
 export function detectDefaultLocale(): Locale {
   if (typeof navigator === 'undefined') return 'en';
   return navigator.language?.toLowerCase().startsWith('vi') ? 'vi' : 'en';
 }
 
-// ── Từ điển theo tool ────────────────────────────────────────────────────
+// ── Per-tool dictionaries ────────────────────────────────────────────────
 //
-// Từ điển phẳng ở trên là của SHELL. Mỗi tool giữ từ điển riêng trong file
-// `<Tool>.messages.ts` nằm cạnh nó: dồn hàng trăm câu của 22 tool vào một file
-// chung thì không ai review nổi, và một tool bị xoá/tách ra plugin ngoài sẽ để
-// lại khoá mồ côi. `toolMessages.test.ts` quét mọi file `*.messages.ts` để bắt
-// bản dịch rỗng.
+// Each tool keeps its strings in `<Tool>.messages.ts` next to it, so they
+// stay reviewable and leave with the tool. `toolMessages.test.ts` checks
+// every `*.messages.ts` for empty translations.
 
 export type Messages = Record<string, Entry>;
 
-/** Khai một từ điển tool — chỉ để TypeScript suy ra đúng tập khoá. */
+/** Declares a tool dictionary so TypeScript infers its keys. */
 export function defineMessages<M extends Messages>(messages: M): M {
   return messages;
 }
 
-/** Nội suy `{{param}}` — dùng chung cho từ điển shell và từ điển tool. */
+/** Interpolates `{{param}}`; shared by shell and tool dictionaries. */
 export function interpolate(text: string, params?: Record<string, string | number>): string {
   if (!params) return text;
   let out = text;
