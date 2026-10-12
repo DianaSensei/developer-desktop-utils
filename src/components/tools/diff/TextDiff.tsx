@@ -9,6 +9,7 @@ import { DiffMergeView, type DiffStats, type DiffSide } from './DiffMergeView';
 import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/diff/TextDiff.messages';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 type Mode = 'text' | 'json';
 
@@ -143,7 +144,7 @@ export function TextDiff() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      <ToolToolbar className="flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={setMode}
@@ -188,7 +189,7 @@ export function TextDiff() {
             <FoldVertical className="h-4 w-4" />
           </IconButton>
         </div>
-      </div>
+      </ToolToolbar>
 
       {/* Pane header — labels + copy actions, aligned with the merge view's
           50/50 columns (the middle spacer matches its revert-arrow gutter). */}

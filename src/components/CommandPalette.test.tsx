@@ -150,3 +150,16 @@ describe('CommandPalette — gợi ý clipboard', () => {
     });
   });
 });
+
+describe('CommandPalette — workspace', () => {
+  it('gõ "workspace" hiện lệnh tạo workspace mới, Enter mở hộp đặt tên', async () => {
+    renderPalette();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = await screen.findByPlaceholderText(/tool|lệnh|command/i);
+    fireEvent.change(input, { target: { value: 'workspace' } });
+    expect(screen.getByText(/New workspace|Workspace mới/)).toBeTruthy();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    // Palette đóng, hộp đặt tên mở (ô nhập tên workspace).
+    await waitFor(() => expect(screen.getByRole('dialog', { name: /New workspace|Workspace mới/ })).toBeTruthy());
+  });
+});

@@ -70,6 +70,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const activeToolId = allTools.find((t) => t.path === location.pathname)?.featureId ?? '';
+  const activeToolIdRef = useRef(activeToolId);
+  activeToolIdRef.current = activeToolId;
 
   // Chỉ phụ thuộc vào URL, KHÔNG vào activeId: khi chuyển workspace, đổi
   // activeId và navigate xảy ra liền nhau — nếu effect này cũng chạy theo
@@ -108,9 +110,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const goToWorkspace = useCallback(
     (next: WorkspaceState) => {
-      setState(next);
       const target = activeWorkspace(next).activeToolId;
-      if (target && isFeatureEnabled(target)) navigate(toolPath(target));
+      if (target && isFeatureEnabled(target)) {
+        setState(next);
+        navigate(toolPath(target));
+        return;
+      }
+      // Workspace rỗng (vừa đóng hết tab): URL không đổi nên effect theo dõi URL
+      // không chạy — tự ghi tool đang mở vào để thanh tab không trống trơn.
+      setState(activeToolIdRef.current ? visitTool(next, activeToolIdRef.current) : next);
     },
     [navigate, isFeatureEnabled],
   );

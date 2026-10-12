@@ -19,7 +19,8 @@ type Tool = (typeof allTools)[number];
 
 type Item =
   | { kind: 'tool'; tool: Tool; clipboard?: boolean }
-  | { kind: 'workspace'; ws: Workspace; name: string };
+  | { kind: 'workspace'; ws: Workspace; name: string }
+  | { kind: 'newWorkspace'; name: string };
 
 const OPEN_EVENT = 'devtool:open-command-palette';
 
@@ -52,7 +53,7 @@ export function CommandPalette() {
   const { isFeatureEnabled, toggleFeature, toolOrder } = useFeatures();
   const { t } = useLocale();
   const navigate = useNavigate();
-  const { workspaces, active: activeWs, switchWorkspace } = useWorkspaces();
+  const { workspaces, active: activeWs, switchWorkspace, promptCreateWorkspace } = useWorkspaces();
 
   // ⌘K / Ctrl+K mở-đóng, hoạt động bất kể đang focus ở đâu — đúng kỳ vọng của
   // một command palette. Không chặn phím khác nên không đụng shortcut của tool.
@@ -112,10 +113,15 @@ export function CommandPalette() {
   // khi đã gõ.
   const workspaceItems: Item[] = React.useMemo(() => {
     const q = query.trim().toLowerCase();
-    return workspaces
+    const list: Item[] = workspaces
       .map((ws, i) => ({ ws, name: workspaceLabel(ws, i, (n) => t('shell.workspace.defaultName', { n })) }))
       .filter(({ ws, name }) => ws.id !== activeWs.id && (!q || name.toLowerCase().includes(q)))
       .map(({ ws, name }) => ({ kind: 'workspace' as const, ws, name }));
+    // Lệnh tạo workspace: thanh tab (nơi có menu workspace) chỉ hiện khi đã có
+    // ≥2 tab — nên ⌘K phải là đường thứ hai, khớp theo "workspace"/"new"/tên lệnh.
+    const newLabel = t('shell.workspace.new');
+    const wantsNew = !!q && (newLabel.toLowerCase().includes(q) || 'workspace'.includes(q) || q.includes('workspace'));
+    return wantsNew ? [...list, { kind: 'newWorkspace' as const, name: newLabel }] : list;
   }, [workspaces, activeWs.id, query, t]);
 
   const items: Item[] = [
@@ -141,9 +147,12 @@ export function CommandPalette() {
   const pick = (item: Item) => {
     if (item.kind === 'tool') {
       select(item.tool);
-    } else {
+    } else if (item.kind === 'workspace') {
       switchWorkspace(item.ws.id);
       setOpen(false);
+    } else {
+      setOpen(false);
+      promptCreateWorkspace();
     }
   };
 
@@ -208,11 +217,12 @@ export function CommandPalette() {
                 const refCb = (el: HTMLButtonElement | null) => {
                   itemRefs.current[index] = el;
                 };
-                if (item.kind === 'workspace') {
-                  const first = index === 0 || items[index - 1].kind !== 'workspace';
-                  const last = items[index + 1]?.kind !== 'workspace';
+                if (item.kind === 'workspace' || item.kind === 'newWorkspace') {
+                  const isWs = (it?: Item) => it?.kind === 'workspace' || it?.kind === 'newWorkspace';
+                  const first = index === 0 || !isWs(items[index - 1]);
+                  const last = !isWs(items[index + 1]);
                   return (
-                    <div key={item.ws.id} className={cn(last && 'mb-1.5 border-b border-line-soft pb-1.5')}>
+                    <div key={item.kind === 'workspace' ? item.ws.id : 'new-workspace'} className={cn(last && 'mb-1.5 border-b border-line-soft pb-1.5')}>
                       {first && (
                         <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-mute">
                           {t('palette.section.workspaces')}
@@ -220,7 +230,7 @@ export function CommandPalette() {
                       )}
                       <WorkspaceRow
                         name={item.name}
-                        count={item.ws.toolIds.length}
+                        count={item.kind === 'workspace' ? item.ws.toolIds.length : null}
                         active={selected === index}
                         onHover={() => setSelected(index)}
                         onPick={() => pick(item)}
@@ -423,7 +433,8 @@ function WorkspaceRow({
   refCb,
 }: {
   name: string;
-  count: number;
+  /** null = dòng lệnh "Workspace mới…" chứ không phải một workspace có sẵn. */
+  count: number | null;
   active: boolean;
   onHover: () => void;
   onPick: () => void;
@@ -443,10 +454,10 @@ function WorkspaceRow({
     >
       <Layers className={cn('h-4 w-4 shrink-0', active ? 'text-acc-ink' : 'text-fg-mute')} />
       <span className="min-w-0 flex-1 truncate">
-        <span className="text-fg-mute">{t('palette.workspace.switch')} </span>
+        {count !== null && <span className="text-fg-mute">{t('palette.workspace.switch')} </span>}
         {name}
       </span>
-      <span className="shrink-0 text-[11px] text-fg-mute">{t('shell.workspace.tabCount', { n: count })}</span>
+      {count !== null && <span className="shrink-0 text-[11px] text-fg-mute">{t('shell.workspace.tabCount', { n: count })}</span>}
     </button>
   );
 }

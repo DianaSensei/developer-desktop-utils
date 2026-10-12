@@ -27,7 +27,11 @@ Workspace = một bộ tab tool có tên. Có thể có tối đa 9 workspace; m
   Ẩn (hiện danh tính tool như cũ) khi < 2 tab và chỉ 1 workspace.
 - Tab: bấm để chuyển, × / chuột giữa để đóng, chuột phải → Đóng / Đóng các tab khác, kéo-thả
   để sắp xếp, ←/→ khi focus trong dãy tab. Nút `+` mở ⌘K.
-- ⌘K liệt kê các workspace khác ở đầu danh sách (và khớp theo tên khi gõ).
+- ⌘K liệt kê các workspace khác ở đầu danh sách (và khớp theo tên khi gõ); gõ "workspace"
+  hiện lệnh **Workspace mới…** — đường tạo workspace thứ hai, vì thanh tab (nơi có menu
+  workspace) chỉ hiện khi đã có ≥2 tab.
+- Chuyển sang một workspace rỗng (đã đóng hết tab) ghi luôn tool đang mở vào làm tab đầu —
+  URL không đổi nên effect theo dõi URL không tự làm việc này.
 
 ### Phím tắt (Ctrl thay ⌘ trên Windows/Linux)
 

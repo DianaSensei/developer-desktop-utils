@@ -29,7 +29,7 @@ tính năng điều hướng giữa các tool bị hỏng trên desktop, convent
 | 7 | P2 | Hai bản JSX song song cho header (titlebar vs web) | ✅ `ToolIdentity` |
 | 8 | P2 | Cỡ chữ ngoài thang (`12px`, `12.5px`, `13px`) | ✅ token `text-dense` + guard |
 | 9 | P2 | `shadow-soft` trên pill accent đặc (RULES: `shadow-btn`) | ✅ |
-| 10 | P2 | Bố cục tool trôi khỏi Pattern A/B | ⏳ Chưa — chuyển dần khi đụng từng tool |
+| 10 | P2 | Bố cục tool trôi khỏi Pattern A/B | ✅ 11 toolbar → `ToolToolbar` (codemod, không đổi hình); 6 header pane tự dựng → `PaneHeader` (Deduplicate, Data Converter, Fake Data) |
 | 11 | P2 | Trạng thái rỗng (empty state) hiếm | ◐ Thêm ở 2FA, Network; các tool khác dùng placeholder có hướng dẫn |
 
 ---

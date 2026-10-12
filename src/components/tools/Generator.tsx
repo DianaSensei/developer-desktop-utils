@@ -8,6 +8,7 @@ import { RandomGenerator } from './RandomGenerator';
 import { FakeDataGenerator } from './FakeDataGenerator';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/Generator.messages';
+import { ToolToolbar } from '@/components/ui/tool-layout';
 
 type Mode = 'random' | 'fake';
 
@@ -19,7 +20,7 @@ export function Generator() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex items-center gap-3">
+      <ToolToolbar className="flex items-center gap-3">
         <Segmented
           value={mode}
           onValueChange={setMode}
@@ -29,7 +30,7 @@ export function Generator() {
           ]}
           aria-label={m('typeLabel')}
         />
-      </div>
+      </ToolToolbar>
       <div className="flex-1 min-h-0">
         {mode === 'random' ? <RandomGenerator /> : <FakeDataGenerator />}
       </div>

@@ -1,7 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { Input } from '@/components/ui/input';
-import { PaneHeader } from '@/components/ui/tool-layout';
+import { PaneHeader, ToolToolbar } from '@/components/ui/tool-layout';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -283,7 +283,7 @@ export function RegexTester() {
   return (
     <div className="flex flex-col h-full">
       {/* Pattern + Flags row */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 space-y-2">
+      <ToolToolbar className="space-y-2">
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm text-fg-mute select-none">/</span>
           <Input
@@ -341,7 +341,7 @@ export function RegexTester() {
             {m(`preset.${activePreset.label}` as 'preset.Email')} · {m('presetReload')}
           </p>
         )}
-      </div>
+      </ToolToolbar>
 
       {/* Test string — fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col">

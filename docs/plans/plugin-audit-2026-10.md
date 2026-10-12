@@ -62,6 +62,11 @@ Ký hiệu: ✅ ổn · ⚠️ nên sửa · 🔧 đã sửa trong đợt này.
 
 ### Đã làm thêm sau đợt đầu
 
+- **Cron (lỗi có từ trước):** chế độ Quartz báo chính biểu thức mặc định và mọi preset 6 trường
+  là "Invalid expression" — code đòi đủ 7 trường dù năm là tuỳ chọn. Sửa + `CronGenerator.test.tsx`.
+- **Workspace:** chuyển sang workspace rỗng giờ ghi tool đang mở làm tab; kéo-thả dùng vị trí
+  trong danh sách đầy đủ (trước lệch khi workspace có tool đã tắt); ⌘K có lệnh "Workspace mới…".
+
 - **JSON Formatter:** cây ảo hoá (chỉ vẽ phần nhìn thấy, ~50 dòng thay vì toàn bộ); bàn phím theo mẫu ARIA tree (↑↓ → ← Enter Home End, `role="tree"/"treeitem"`); tìm kiếm có số kết quả `k/n` và nhảy ↵ / ⇧↵.
 - **Cron Generator:** danh sách 5 lần chạy tiếp theo (`lib/cronNext.ts`, hỗ trợ `L`, `xL`, `x#k`; `W` báo "không xem trước được").
 - **Lucky Wheel:** bốc thăm bằng `crypto` (`randomBelow`).

@@ -11,6 +11,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
 import MESSAGES from '@/components/tools/ArrayDeduplicator.messages';
+import { PaneHeader } from '@/components/ui/tool-layout';
 
 type DedupeMode = 'preserve' | 'sort';
 
@@ -452,8 +453,9 @@ export function ArrayDeduplicator() {
 
         {/* Input pane */}
         <div className={cn('flex-1 min-w-0 flex flex-col', mode === 'sort' && 'border-r border-line')}>
-          <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-line bg-bg-2/30">
-            <span className="text-xs font-medium text-fg-mute">{m('inputHint')}</span>
+          <PaneHeader
+            label={m('inputHint')}
+            action={
             <div className="flex items-center gap-0.5">
               <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title={m('jumpTop')} aria-label={m('jumpTop')} disabled={!hasInput} onClick={handleScrollTop}>
                 <ChevronsUp className="h-3.5 w-3.5" />
@@ -465,7 +467,8 @@ export function ArrayDeduplicator() {
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
-          </div>
+            }
+          />
           <div className="flex-1 min-h-0 flex">
             <LineNumbers textareaRef={inputRef} lineCount={inputLineCount} />
             <textarea
@@ -502,8 +505,9 @@ export function ArrayDeduplicator() {
           className="flex-1 min-w-0 flex flex-col transition-opacity duration-150"
           style={{ opacity: isProcessing ? 0.55 : 1 }}
         >
-          <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-line bg-bg-2/30">
-            <span className="text-xs font-medium text-fg-mute">{c('output')}</span>
+          <PaneHeader
+            label={c('output')}
+            action={
             <CopyButton
               value={() => result?.output ?? ''}
               label={c('copy')}
@@ -513,7 +517,8 @@ export function ArrayDeduplicator() {
               className="h-6 px-2 text-xs -mr-1"
               iconClassName="h-3.5 w-3.5"
             />
-          </div>
+            }
+          />
           <div className="flex-1 min-h-0 flex">
             <LineNumbers textareaRef={outputRef} lineCount={result?.unique ?? 0} />
             <textarea

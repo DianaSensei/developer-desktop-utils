@@ -78,6 +78,27 @@ describe('WorkspaceBar', () => {
     expect(screen.getByTestId('path').textContent).toBe('/json');
   });
 
+  it('switching to an emptied workspace seeds it with the tool on screen', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText('To Date'));
+    // Workspace 2 qua menu → hộp đặt tên → Enter (tên trống vẫn hợp lệ).
+    fireEvent.click(screen.getByRole('button', { name: /workspace/i }));
+    fireEvent.click(screen.getByText(/New workspace|Workspace mới/));
+    fireEvent.submit(screen.getByRole('textbox').closest('form')!);
+    // Đóng tab duy nhất của workspace 2 → rỗng.
+    const only = within(screen.getByRole('tablist')).getByRole('tab');
+    fireEvent.click(within(only).getByRole('button'));
+    expect(within(screen.getByRole('tablist')).queryAllByRole('tab')).toHaveLength(0);
+    // Sang workspace 1 rồi quay lại workspace 2 bằng ⌘/Ctrl+⌥+số.
+    for (const n of ['1', '2']) {
+      fireEvent.keyDown(window, { key: n, code: `Digit${n}`, ctrlKey: true, altKey: true });
+      fireEvent.keyDown(window, { key: n, code: `Digit${n}`, metaKey: true, altKey: true });
+    }
+    const tabs = within(screen.getByRole('tablist')).getAllByRole('tab');
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+  });
+
   it('tabs survive a remount (persisted, not session-only)', () => {
     const first = render(<Harness />);
     fireEvent.click(screen.getByText('To Date'));

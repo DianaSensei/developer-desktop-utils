@@ -15,6 +15,7 @@ import { generateRows, serializeRows, ROW_FORMATS, DATE_FORMATS, FAKER_TYPE_GROU
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/Generator.messages';
 import COMMON from '@/components/tools/common.messages';
+import { ToolToolbar, PaneHeader } from '@/components/ui/tool-layout';
 
 const DEFAULT_FIELDS: FieldDef[] = [
   { id: 'f1', name: 'id', type: 'uuid' },
@@ -68,7 +69,7 @@ export function FakeDataGenerator() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="shrink-0 header-chrome px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+      <ToolToolbar className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-fg-mute">{m('rows')}</span>
           <Input
@@ -131,19 +132,21 @@ export function FakeDataGenerator() {
             />
           </div>
         )}
-      </div>
+      </ToolToolbar>
 
       {/* Body: schema | output */}
       <div className="flex flex-1 min-h-0 divide-x divide-line">
         {/* Schema builder */}
         <div className="flex w-[360px] shrink-0 flex-col min-h-0">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
-            <span>{m('fields')}</span>
-            <Button variant="ghost" size="sm" onClick={addField} className="h-6 gap-1 px-1.5 text-xs">
-              <Plus className="h-3.5 w-3.5" /> {m('add')}
-            </Button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 space-y-2">
+          <PaneHeader
+            label={m('fields')}
+            action={
+              <Button variant="ghost" size="sm" onClick={addField} className="h-6 gap-1 px-1.5 text-xs">
+                <Plus className="h-3.5 w-3.5" /> {m('add')}
+              </Button>
+            }
+          />
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2">
             {fields.map((f) => (
               <div key={f.id} className="rounded-lg border border-line bg-bg-2/20 p-2 space-y-2">
                 <div className="flex items-center gap-1.5">
@@ -217,16 +220,18 @@ export function FakeDataGenerator() {
 
         {/* Output */}
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between px-3 py-1.5 text-[11px] text-fg-mute">
-            <span>{m(safeCount === 1 ? 'rowCountOne' : 'rowCount', { n: safeCount.toLocaleString() })}</span>
+          <PaneHeader
+            label={m(safeCount === 1 ? 'rowCountOne' : 'rowCount', { n: safeCount.toLocaleString() })}
+            action={
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" onClick={handleDownload} disabled={!output} title={c('download')} aria-label={c('download')} className="h-6 w-6 rounded text-fg-mute hover:text-fg">
                 <Download className="h-3.5 w-3.5" />
               </Button>
               <CopyButton value={() => output} iconClassName="h-3.5 w-3.5" disabled={!output} />
             </div>
-          </div>
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-3 pb-3">
+            }
+          />
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden p-2">
             <CodeViewer
               value={output}
               language={format === 'json' ? 'json' : format === 'sql' ? 'sql' : 'text'}
