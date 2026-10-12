@@ -1,27 +1,18 @@
-// Sự đồng ý của người dùng để chạy một sidecar KHÔNG nằm trong
-// `ALLOWED_SERVICES` (xem service_host.rs).
+// User consent for running a sidecar that is not in `ALLOWED_SERVICES`
+// (see service_host.rs).
 //
-// Vì sao không chỉ thêm tên vào danh sách khi build app: mỗi plugin mới kèm
-// sidecar sẽ buộc phải phát hành lại app. Vì sao cũng không để manifest tự khai
-// được chạy: manifest do webview đọc — thứ ta đang muốn giới hạn. Nên quyết
-// định được trao cho NGƯỜI DÙNG, qua một hộp thoại native do Rust bật; webview
-// chỉ kích hoạt được câu hỏi, không trả lời thay được.
+// A build-time allowlist would require an app release for every new
+// sidecar, and the manifest cannot grant itself permission because the
+// webview controls it. So the user decides, through a native dialog raised
+// by Rust; the webview can trigger the question but cannot answer it.
 //
-// ── Lưu ở đâu, và vì sao KHÔNG phải một file trong app_data ──────────────────
+// Storage: decisions live in the OS keychain, not in app_data. The webview
+// has write access to app_data (`fs:scope-appdata-recursive`), so any file
+// there could be edited to grant trust. Without a keychain, decisions last
+// for the session only and the user is asked again next time (fails safe).
 //
-// Capability mặc định cấp cho webview `fs:allow-write-file` trên
-// `fs:scope-appdata-recursive`, nên MỌI thứ nằm trong app_data — kể cả một file
-// "đã tin cậy" hay `extensions/index.json` — webview tự ghi được, tức là tự cấp
-// quyền được. Quyết định vì thế nằm trong keychain của hệ điều hành, chỗ webview
-// không với tới (cùng nơi `secrets_vault.rs` cất khoá). Nơi nào không có
-// keychain thì quyết định chỉ sống trong phiên chạy và app hỏi lại lần sau —
-// thất bại theo hướng AN TOÀN (hỏi thừa), khác với vault ghi khoá ra file.
-//
-// ── Gắn với NỘI DUNG, không chỉ với tên ──────────────────────────────────────
-//
-// Mỗi mục là (bin, sha256 của file sẽ chạy). Binary bị thay hoặc cập nhật sang
-// bản khác thì mã băm đổi và app hỏi lại; tên cũ không mang quyền sang nội dung
-// mới.
+// Each entry is (bin, sha256 of the file that runs). A replaced or updated
+// binary has a different hash and triggers a new prompt.
 
 use std::future::Future;
 use std::sync::Mutex;
@@ -38,8 +29,7 @@ pub struct TrustEntry {
     pub sha256: String,
 }
 
-/// Nơi bền vững giữ các quyết định. Tách thành trait để test không đụng
-/// keychain thật.
+/// Persistent store for decisions; a trait so tests avoid the real keychain.
 pub trait TrustBackend: Send + Sync {
     fn load(&self) -> Result<Vec<TrustEntry>, String>;
     fn save(&self, entries: &[TrustEntry]) -> Result<(), String>;
@@ -84,11 +74,11 @@ impl TrustBackend for MemoryBackend {
 
 pub struct ServiceTrust {
     backend: Box<dyn TrustBackend>,
-    /// `None` cho tới lần đọc đầu tiên. Luôn là nguồn sự thật trong phiên, kể cả
-    /// khi `backend.save` thất bại.
+    /// `None` until first loaded. The in-memory copy is authoritative for the
+    /// session, even if `backend.save` fails.
     entries: Mutex<Option<Vec<TrustEntry>>>,
-    /// Chỉ cho MỘT câu hỏi chạy tại một thời điểm — hai lời gọi đồng thời tới
-    /// cùng sidecar chưa tin cậy không được bật hai hộp thoại.
+    /// Serializes prompts so concurrent calls for the same sidecar show a
+    /// single dialog.
     gate: AsyncMutex<()>,
 }
 
@@ -109,7 +99,7 @@ impl ServiceTrust {
 
     fn with_entries<R>(&self, f: impl FnOnce(&mut Vec<TrustEntry>) -> R) -> R {
         let mut guard = self.entries.lock().unwrap();
-        // Không đọc được keychain → coi như chưa tin ai (an toàn), không lỗi.
+        // An unreadable keychain means nothing is trusted yet.
         let entries = guard.get_or_insert_with(|| self.backend.load().unwrap_or_default());
         f(entries)
     }
@@ -118,9 +108,8 @@ impl ServiceTrust {
         self.with_entries(|e| e.iter().any(|t| t.bin == bin && t.sha256 == sha256))
     }
 
-    /// Ghi nhận một quyết định cho phép. Mỗi `bin` giữ đúng một mã băm (bản mới
-    /// thay bản cũ). Ghi keychain là cố gắng tối đa: thất bại thì quyết định vẫn
-    /// có hiệu lực trong phiên này.
+    /// Records an allow decision; one hash per `bin`. Saving to the keychain
+    /// is best effort; the decision holds for this session regardless.
     fn grant(&self, bin: &str, sha256: &str) {
         let snapshot = self.with_entries(|e| {
             e.retain(|t| t.bin != bin);
@@ -135,7 +124,7 @@ impl ServiceTrust {
         }
     }
 
-    /// Thu hồi — gọi khi gỡ cài đặt. Chỉ GIẢM quyền nên an toàn để mọi nơi gọi.
+    /// Revokes trust (on uninstall). Only removes permission.
     pub fn revoke(&self, bin: &str) {
         let snapshot = self.with_entries(|e| {
             e.retain(|t| t.bin != bin);
@@ -144,8 +133,8 @@ impl ServiceTrust {
         let _ = self.backend.save(&snapshot);
     }
 
-    /// Đảm bảo `(bin, sha256)` đã được tin cậy, hỏi người dùng nếu chưa. `ask`
-    /// chỉ chạy khi thật sự cần hỏi.
+    /// Ensures `(bin, sha256)` is trusted, asking the user if not. `ask` only
+    /// runs when a prompt is needed.
     pub async fn ensure<F, Fut>(&self, bin: &str, sha256: &str, ask: F) -> Result<(), String>
     where
         F: FnOnce() -> Fut,
@@ -155,7 +144,7 @@ impl ServiceTrust {
             return Ok(());
         }
         let _gate = self.gate.lock().await;
-        // Người đến trước có thể đã được cho phép trong lúc ta chờ cổng.
+        // Another caller may have been granted while we waited.
         if self.is_trusted(bin, sha256) {
             return Ok(());
         }
@@ -168,10 +157,9 @@ impl ServiceTrust {
     }
 }
 
-/// Ngôn ngữ của hộp thoại — theo ngôn ngữ người dùng chọn trong app (khoá
-/// `devtool-locale` của `app-settings.json`, cùng khoá `LocaleContext.tsx` ghi).
-/// Thiếu hoặc lạ thì tiếng Anh. File nằm trong app_data nên webview ghi được,
-/// nhưng nó chỉ đổi được NGÔN NGỮ của câu hỏi, không đổi được câu trả lời.
+/// Dialog language, from the `devtool-locale` key of `app-settings.json`
+/// (written by `LocaleContext.tsx`); English when missing or unknown. The
+/// webview can edit that file, but it only changes the wording.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Locale {
     Vi,
@@ -186,7 +174,7 @@ pub fn locale_from_settings(app_settings_json: &str) -> Locale {
     }
 }
 
-/// Hộp thoại native: tiêu đề, nội dung, nút đồng ý, nút từ chối.
+/// Native dialog text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsentDialog {
     pub title: String,
@@ -195,15 +183,15 @@ pub struct ConsentDialog {
     pub deny: String,
 }
 
-/// Cách gọi thư mục home theo quy ước của từng hệ điều hành.
+/// How each OS writes the home directory.
 const HOME_MARK: &str = if cfg!(windows) { "%USERPROFILE%" } else { "~" };
 
-/// Thư mục home thay bằng `~` (macOS, Linux) hoặc `%USERPROFILE%` (Windows) —
-/// ngắn hơn, và không lộ tên tài khoản khi người dùng chụp màn hình gửi đi.
+/// Replaces the home directory with `~` or `%USERPROFILE%`: shorter, and
+/// keeps the account name out of screenshots.
 fn shorten_home(path: &str, home: Option<&str>, mark: &str) -> String {
     match home.filter(|h| !h.is_empty()) {
-        // `get` rather than slicing: a non-ASCII account name ("Thông") must not panic
-        // when the cut falls inside a character of a path that does not match.
+        // `get` instead of slicing so a non-ASCII account name cannot panic
+        // on a char boundary.
         Some(h)
             if path
                 .get(..h.len())
@@ -215,9 +203,9 @@ fn shorten_home(path: &str, home: Option<&str>, mark: &str) -> String {
     }
 }
 
-/// Thư mục chứa file, rút gọn: với bản cài qua URL là `~/…/services/<bin>/<version>`.
-/// Làm việc trên chuỗi, chấp nhận cả `/` lẫn `\`, và giữ đúng dấu phân cách của
-/// đường dẫn — để kết quả giống nhau dù đường dẫn đến từ macOS, Linux hay Windows.
+/// Containing folder, shortened (`~/…/services/<bin>/<version>` for URL
+/// installs). Works on strings with either separator so the output is the
+/// same whichever OS produced the path.
 fn short_location(path: &str, home: Option<&str>, mark: &str) -> String {
     let sep = if path.contains('\\') && !path.contains('/') {
         '\\'
@@ -236,7 +224,7 @@ fn short_location(path: &str, home: Option<&str>, mark: &str) -> String {
     }
 }
 
-/// Đủ để đối chiếu bằng mắt mà không phải đọc 64 ký tự.
+/// Enough to compare by eye without reading all 64 characters.
 fn short_hash(sha256: &str) -> String {
     if sha256.len() <= 20 {
         return sha256.to_string();
@@ -244,7 +232,7 @@ fn short_hash(sha256: &str) -> String {
     format!("{}…{}", &sha256[..12], &sha256[sha256.len() - 6..])
 }
 
-/// Nguồn không có `https://` và query; dài thì giữ host và tên file cuối.
+/// Source without scheme or query; long URLs keep the host and last segment.
 fn short_source(url: &str) -> String {
     let bare = url.split(['?', '#']).next().unwrap_or(url);
     let bare = bare
@@ -259,9 +247,9 @@ fn short_source(url: &str) -> String {
     format!("{host}/…/{last}")
 }
 
-/// Nội dung hộp thoại xin phép. Theo quy ước hộp thoại quyền của macOS: tiêu đề
-/// là một câu hỏi có tên chương trình; thân là một câu giải thích, ba dòng nhận
-/// diện (ở đâu, mã băm, từ đâu) và một câu nhắc; nút nói rõ hành động.
+/// Consent dialog text, following macOS permission dialogs: the title asks a
+/// question naming the program, the body explains and lists location, hash
+/// and source, and the buttons name the action.
 pub fn consent_dialog(
     locale: Locale,
     bin: &str,
@@ -362,7 +350,7 @@ mod tests {
             .unwrap();
         assert_eq!(asked.load(Ordering::SeqCst), 1);
 
-        // "Khởi động lại": một ServiceTrust mới đọc lại từ backend.
+        // A new instance simulates a restart.
         let restarted = ServiceTrust::new(Box::new(backend));
         assert!(restarted.is_trusted("devtool-svc-x", "aa"));
     }
@@ -385,14 +373,14 @@ mod tests {
             .ensure("devtool-svc-x", "aa", || async { true })
             .await
             .unwrap();
-        // Cùng tên, mã băm khác → quyền cũ không áp dụng.
+        // Same name, different hash: earlier consent does not apply.
         assert!(!trust.is_trusted("devtool-svc-x", "bb"));
         let err = trust
             .ensure("devtool-svc-x", "bb", || async { false })
             .await
             .unwrap_err();
         assert!(err.contains("từ chối"));
-        // Và cho phép bản mới thì bản cũ không còn được tin.
+        // Allowing the new hash drops the old one.
         trust
             .ensure("devtool-svc-x", "bb", || async { true })
             .await
@@ -408,7 +396,7 @@ mod tests {
             .await
             .unwrap();
         assert!(trust.is_trusted("devtool-svc-x", "aa"));
-        // Phiên mới (không đọc được gì từ backend hỏng) → chưa tin ai.
+        // A new session with a broken backend trusts nothing.
         let next = ServiceTrust::new(Box::new(Broken));
         assert!(!next.is_trusted("devtool-svc-x", "aa"));
     }

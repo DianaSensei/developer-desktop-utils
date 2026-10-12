@@ -1,38 +1,15 @@
-// devtool-mcp-server — MCP stdio server bundled with the DevTool app as a
-// Tauri sidecar (see tauri.conf.json's bundle.externalBin), so someone who
-// installed DevTool from a binary (dmg/msi/deb/AppImage) can point their MCP
-// client straight at it — no Node.js / npm install needed.
+// devtool-mcp-server: MCP stdio server shipped as a Tauri sidecar
+// (`bundle.externalBin`), so MCP clients can use DevTool without Node.js.
 //
-// It never runs inside the app itself. The app's Tauri backend
-// (mcp_bridge.rs) starts a small loopback HTTP control server on launch and
-// writes its port + auth token to `<app_data_dir>/mcp-bridge.json` for this
-// process to read.
+// It runs as a separate process launched by the MCP client. It finds the
+// running app through `<app_data_dir>/mcp-bridge.json` (port and token
+// written by mcp_bridge.rs) and has no compiled-in tool list: tools come
+// from the bridge's `GET /tools` on every `list_tools`, and calls are
+// forwarded to `POST /call`. `get_scripting_reference` is the one tool
+// answered locally. See mcp_bridge.rs for the design.
 //
-// This process has NO compiled-in tool catalogue — every tool it advertises
-// is fetched at query time from `GET /tools` on that bridge (see
-// `fetch_registered_tools()` below), which is whatever tools' own frontend
-// bridges have registered themselves (`mcp_register_tools`) since the app
-// last launched: API Client and Mock Server register from inside the main
-// app, Kafka Explorer from its own plugin, and any Tier-B plugin installed
-// from developer-desktop-miniapp (Redis/RabbitMQ/Container Manager, or
-// a future one) registers the same way once its own bridge mounts. A tool
-// call is forwarded as a `POST /call`, which the app hands to the running
-// webview to answer — so it only succeeds while DevTool is open and, by
-// default, with that specific tool's screen open, unless the user has
-// turned on Settings → MCP → Background MCP bridge, which drops that
-// "on screen" requirement entirely (get_scripting_reference is the one
-// exception either way — answered locally, see its own comment below). See
-// src-tauri/src/mcp_bridge.rs for the full design, and any tool's own
-// `mcpBridge.ts` for what it actually does and which tool schemas it
-// registers.
-//
-// Built on rmcp (the official Rust MCP SDK) for the protocol itself —
-// JSON-RPC framing, capability negotiation, tool routing all come from the
-// crate rather than being hand-rolled. What IS hand-rolled: talking to
-// mcp_bridge.rs. That's a single localhost POST, so a minimal async
-// HTTP/1.1 client over a raw `tokio::net::TcpStream` (tokio is already a
-// dependency of rmcp itself, and of the main app) is less risk than pulling
-// in a full HTTP client crate for one call shape.
+// The MCP protocol comes from rmcp. The bridge client is a minimal HTTP/1.1
+// client over `TcpStream`, since only two request shapes are needed.
 
 use std::future::Future;
 use std::path::PathBuf;
@@ -51,19 +28,16 @@ use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-// Must match `identifier` in tauri.conf.json — Tauri's app_data_dir is keyed
-// off it, and mcp_bridge.rs writes its discovery file there.
+// Must match `identifier` in tauri.conf.json; app_data_dir is derived
+// from it.
 const APP_IDENTIFIER: &str = "com.desktop-devtool-app";
-// How long to wait for a reply from the bridge — matches CALL_TIMEOUT in
-// mcp_bridge.rs (30s) plus slack for the local round-trip.
+// The bridge's own 30s timeout plus slack for the local round trip.
 const CALL_TIMEOUT: Duration = Duration::from_secs(35);
 
 // ── locating the running app ─────────────────────────────────────────────
 
-// Tauri's app_data_dir() resolution, per platform — mirrors what
-// mcp_bridge.rs's write_discovery_file() actually resolves to at runtime
-// (this binary has no AppHandle of its own to ask, since it's a separate
-// process the MCP client spawns directly).
+// Mirrors Tauri's app_data_dir() per platform; this process has no
+// AppHandle to ask.
 fn app_data_dir() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
@@ -103,10 +77,8 @@ fn read_bridge_info() -> Result<BridgeInfo, String> {
         .map_err(|_| "DevTool's MCP bridge file is malformed — restart the app.".to_string())
 }
 
-// Decodes an HTTP/1.1 chunked body: repeated `<hex size>\r\n<data>\r\n`,
-// terminated by a zero-size chunk. Malformed input just stops decoding at
-// whatever chunk it can't parse, rather than panicking — the caller's JSON
-// parse of the (possibly incomplete) result surfaces that as an error.
+// Decodes an HTTP/1.1 chunked body. Malformed input stops decoding; the
+// caller's JSON parse then reports the error.
 fn dechunk(input: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(input.len());
     let mut pos = 0;
@@ -140,10 +112,8 @@ async fn http_post_json(port: u16, token: &str, body: &Value) -> Result<Value, S
     Ok(json.get("result").cloned().unwrap_or(Value::Null))
 }
 
-// GET counterpart of `http_post_json` — no request body, and the response is
-// the plain JSON value itself rather than a `{result}`/`{error}` envelope
-// (used by `fetch_registered_tools()` to read the dynamic tool catalogue from
-// `GET /tools`, which returns a bare JSON array).
+// GET request whose response is a bare JSON value (no {result}/{error}
+// envelope); used for `GET /tools`.
 async fn http_get_json(port: u16, token: &str, path: &str) -> Result<Value, String> {
     let request = format!(
         "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n",
@@ -183,9 +153,7 @@ async fn http_request(port: u16, head: &[u8], body: Option<&[u8]>) -> Result<Val
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
-    // axum's `Json` responses always send Content-Length (verified against a
-    // real axum server, not chunked), but decode chunked too just in case —
-    // cheap insurance for a binary that ships to every install of the app.
+    // axum sends Content-Length for JSON, but accept chunked bodies too.
     let is_chunked = head_str
         .lines()
         .any(|l| l.to_ascii_lowercase().starts_with("transfer-encoding") && l.to_ascii_lowercase().contains("chunked"));
@@ -210,17 +178,11 @@ async fn call_bridge(tool: &str, args: Value) -> Result<Value, String> {
     http_post_json(info.port, &info.token, &json!({ "tool": tool, "args": args })).await
 }
 
-// Static reference for BOTH tools' scripting engines and the field shapes
-// their patch-style tools expect — see `src/components/tools/apiclient/
-// runtime.ts` (dt/req/res/pm/expect/assert) and `types.ts` (Auth/
-// RequestBody/RequestSettings/KeyValue) for the API Client half, and
-// `src-tauri/src/mockserver.rs` (`req_to_rhai`/`run_script`) and
-// `src/components/tools/mockserver/types.ts` (Stub/Matcher/MockConfig) for
-// the Mock Server half, as the source of truth. Answered locally (no bridge
-// round-trip, no running app required) since it's static content, not live
-// app state — and served on demand as its own tool rather than folded into
-// every other tool's description, so its size is only spent when a caller
-// actually needs it instead of on every tool listing.
+// Static reference for the API Client (JS) and Mock Server (Rhai) script
+// APIs and the field shapes their patch-style tools take. Sources of
+// truth: apiclient/runtime.ts and types.ts; mockserver.rs (`req_to_rhai`,
+// `run_script`) and mockserver/types.ts. Served as its own tool, locally,
+// so its size is only spent when a caller asks for it.
 const SCRIPTING_REFERENCE: &str = r#"# DevTool API Client — scripting & field-shape reference
 
 Pre/post-request scripts are plain JS (Bruno-shaped API, own naming — see
@@ -422,9 +384,7 @@ when no stub matches — mock_set_fallback).
 
 async fn call_tool(name: &str, args: Value) -> CallToolResult {
     match call_bridge(name, args).await {
-        // Compact, not pretty-printed: indentation whitespace is pure token
-        // overhead once this lands in Claude's context, and the JSON reads
-        // fine compact for a model.
+        // Compact JSON: indentation only costs tokens.
         Ok(v) => {
             let text = serde_json::to_string(&v).unwrap_or_else(|_| v.to_string());
             CallToolResult::success(vec![ContentBlock::text(text)])
@@ -434,18 +394,8 @@ async fn call_tool(name: &str, args: Value) -> CallToolResult {
 }
 
 // ── dynamic tool catalogue ───────────────────────────────────────────────
-// This process has NO compiled-in knowledge of what tools exist. Every tool
-// other than `get_scripting_reference` (below, answered locally since it's
-// static reference content) is contributed at RUNTIME by whichever plugin
-// bundles it: each tool's own frontend bridge (e.g.
-// src/components/tools/apiclient/mcpBridge.ts,
-// src/components/tools/kafka/mcpBridge.ts, or a plugin installed from
-// developer-desktop-miniapp) registers its own name/description/
-// inputSchema with the running app's `mcp_bridge.rs` registry
-// (`mcp_register_tools`) once on mount. `list_tools()` fetches the CURRENT
-// registered set on every call — not once at process startup — so a plugin
-// installed (or a tool whose bridge just mounted) after this process
-// started still shows up without restarting it.
+// Fetched on every `list_tools()` call so tools registered after this
+// process started still appear.
 async fn fetch_registered_tools() -> Result<Vec<Tool>, String> {
     let info = read_bridge_info()?;
     let json = http_get_json(info.port, &info.token, "/tools").await?;
@@ -464,10 +414,7 @@ async fn fetch_registered_tools() -> Result<Vec<Tool>, String> {
         .collect())
 }
 
-// `get_scripting_reference`'s own catalogue entry — the one tool this
-// process still answers locally (see `SCRIPTING_REFERENCE` above for why),
-// so it must still show up in `list_tools()` even when the bridge is
-// unreachable (app closed).
+// Listed even when the bridge is unreachable, since it is answered locally.
 fn scripting_reference_tool() -> Tool {
     Tool::new(
         "get_scripting_reference",
@@ -512,10 +459,7 @@ impl ServerHandler for DevToolServer {
         _context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<ListToolsResult, McpError>> + Send + '_ {
         async move {
-            // A registration fetch failure (app not open) means "no tools
-            // registered right now" — get_scripting_reference alone, not an
-            // error surfaced to the MCP client. `call_tool` on a stale/missing
-            // tool name still gets a clear per-call error from `call_bridge`.
+            // No bridge (app closed) means no registered tools, not an error.
             let mut tools = fetch_registered_tools().await.unwrap_or_default();
             tools.push(scripting_reference_tool());
             Ok(ListToolsResult { tools, ..Default::default() })
