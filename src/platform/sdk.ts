@@ -1,10 +1,22 @@
+/**
+ * Platform SDK: the only surface plugins use to reach outside themselves.
+ *
+ * Every call goes through one checkpoint: check the declared permission,
+ * record an audit entry, then execute. An SDK is created per plugin
+ * (`createPluginSdk(manifest)`), so storage namespaces and command
+ * allowlists are bound to the plugin's identity.
+ */
+
 import {
   copyImageToClipboard,
   copyToClipboard,
   readImageFromClipboard,
   readTextFromClipboard,
 } from '@/lib/clipboard';
+import { IS_MAC, MOD_KEY, isTauri } from '@/lib/platform';
 import { storageGet, storageRemove, storageSet } from '@/lib/persistentStore';
+import * as audit from './audit';
+import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
 import { secretDelete, secretGet, secretKeys, secretSet } from './secrets';
 import { createPluginService, type PluginService } from './service';
 import { hostAllowed } from './manifest';
@@ -20,18 +32,6 @@ export type PluginFetchInit = RequestInit & {
   maxRedirections?: number;
   danger?: DangerousSettings;
 };
-import { IS_MAC, MOD_KEY, isTauri } from '@/lib/platform';
-import * as audit from './audit';
-import { SDK_VERSION, type PluginManifest, type PluginPermission } from './types';
-
-/**
- * Platform SDK: the only surface plugins use to reach outside themselves.
- *
- * Every call goes through one checkpoint: check the declared permission,
- * record an audit entry, then execute. An SDK is created per plugin
- * (`createPluginSdk(manifest)`), so storage namespaces and command
- * allowlists are bound to the plugin's identity.
- */
 
 export class PluginPermissionError extends Error {
   constructor(

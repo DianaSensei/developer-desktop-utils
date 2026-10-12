@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   typeName, rcodeName, queryDns, queryAllRecords, checkPropagation, checkDnssec,
-  lookupIp, getLocalNetworkInfo, listListeningPorts, localNetworkInfo,
+  lookupIp, getLocalNetworkInfo, listListeningPorts,
   DOH_PROVIDERS, ALL_RECORD_TYPES,
 } from '@/lib/network';
 
@@ -238,10 +238,6 @@ describe('Chỉ khả dụng trong desktop app (Tauri)', () => {
 
   it('listListeningPorts báo lỗi rõ ràng thay vì gọi invoke trên nền web', async () => {
     await expect(listListeningPorts()).rejects.toThrow('desktop app');
-  });
-
-  it('localNetworkInfo trả null (không throw) trên nền web — API "mềm" hơn getLocalNetworkInfo', async () => {
-    await expect(localNetworkInfo()).resolves.toBeNull();
   });
 });
 

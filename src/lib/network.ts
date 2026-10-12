@@ -257,7 +257,7 @@ export interface NetInterface {
   name: string;
   ip: string;
   family: string; // "IPv4" | "IPv6"
-  internal: boolean; // loopback / link-local — not a routable LAN address
+  internal: boolean; // loopback / link-local, not a routable LAN address
 }
 
 export interface LocalNetworkInfo {
@@ -377,32 +377,6 @@ const IP_PROVIDERS: IpProvider[] = [
     },
   },
 ];
-
-// ─── Local network info (desktop only) ──────────────────────────────────────
-
-// The machine's own LAN-side view: hostname, primary local addresses, and
-// per-interface IPs. Read locally by the Rust backend — nothing is sent out.
-// Only available in the Tauri desktop build; the web build can't read the LAN.
-
-export interface NetInterface {
-  name: string;
-  ip: string;
-  family: string; // IPv4 / IPv6
-  internal: boolean; // loopback / link-local
-}
-
-export interface LocalNetworkInfo {
-  hostname: string;
-  primaryIpv4: string | null;
-  primaryIpv6: string | null;
-  interfaces: NetInterface[];
-}
-
-export async function localNetworkInfo(): Promise<LocalNetworkInfo | null> {
-  if (!isTauri) return null; // web build can't enumerate local interfaces
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<LocalNetworkInfo>('local_network_info');
-}
 
 // `ip` empty → returns the caller's own public IP and geo. Falls back across
 // providers so a single service being down or rate-limiting (e.g. HTTP 403/429)
