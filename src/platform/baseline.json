@@ -1,10 +1,10 @@
 {
   "notes": {
-    "directTauriInPluginCode": "ĐÃ VỀ 0. Không code plugin nào còn gọi thẳng @tauri-apps — mọi lời gọi đi qua sdk.native/files/clipboard/http, nên quyền 'native' + allowlist `commands` giờ được THỰC THI chứ không còn là mô tả. Giữ ở 0: một chỗ mới xuất hiện là một tool lách ra khỏi lớp quyền/audit.",
-    "sharedStoreInPluginCode": "Còn đúng 2, và cả hai là NGOẠI LỆ ĐÚNG chứ không phải nợ: code di trú một lần đọc những khoá có TRƯỚC khi có namespace (apiclient/store.ts đọc 'devtool:apiclient:activeEnv' để suy ra mô hình mới; clockify/store.tsx đọc cờ migrated/purged và quét khoá cũ để dọn). Đưa chúng qua sdk.storage sẽ sai vì khoá sẽ thành 'devtool:<id>:devtool:...'. Chúng biến mất khi những migration đó được xoá, không sớm hơn. Mọi khoá MỚI phải dùng usePluginState kèm legacyKey.",
-    "manifestForeignImports": "BẤT BIẾN, không phải nợ: manifest chỉ được nhập lucide-react và @/platform. Nhập thứ khác phá code-split.",
-    "secretishKeyInSharedStore": "BẤT BIẾN, không phải nợ: không credential nào được quay lại store dùng chung. Đây là tripwire theo TÊN khoá — nó bắt các trường hợp hiển nhiên, KHÔNG phải bằng chứng đã sạch: 'devtool:apiclient:environments' từng chứa token mà tên khoá không hề lộ ra (đã xử lý riêng bằng envSecrets.ts). Thêm một khoá mới mang credential thì đừng trông chờ luật này bắt được.",
-    "anchorDownloadInPluginCode": "Về 0 ở đợt audit 2026-10 (2FA export, Color Picker palette). `<a download>` không ghi ra file nào trong webview Tauri — lưu file đi qua lib/fileio.ts (saveTextFile/saveBinaryFile), nơi duy nhất được rẽ nhánh web dùng thẻ đó."
+    "directTauriInPluginCode": "Must stay 0. Plugin code never imports @tauri-apps directly; everything goes through sdk.native/files/clipboard/http, so the 'native' permission and its `commands` allowlist are enforced. A new hit is a tool bypassing the permission/audit layer.",
+    "sharedStoreInPluginCode": "2 known exceptions: one-time migrations that read keys predating plugin namespaces (apiclient/store.ts reads 'devtool:apiclient:activeEnv'; clockify/store.tsx reads migration flags and sweeps legacy keys). sdk.storage would namespace them to 'devtool:<id>:devtool:...'. They go away with those migrations. New keys must use usePluginState with legacyKey.",
+    "manifestForeignImports": "Invariant: manifests may import only lucide-react and @/platform; anything else breaks code splitting.",
+    "secretishKeyInSharedStore": "Invariant: no credentials in the shared store. This is a key-NAME tripwire, not proof of absence: 'devtool:apiclient:environments' once held tokens under an innocuous name (now handled by envSecrets.ts).",
+    "anchorDownloadInPluginCode": "Must stay 0. `<a download>` writes nothing in the Tauri webview; saving goes through lib/fileio.ts (saveTextFile/saveBinaryFile), the only place allowed to use it for the web fallback."
   },
   "limits": {
     "directTauriInPluginCode": 0,
