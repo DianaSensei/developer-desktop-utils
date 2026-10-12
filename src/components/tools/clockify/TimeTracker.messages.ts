@@ -1,6 +1,6 @@
 import { defineMessages } from '@/lib/i18n';
 
-/** Dùng chung cho cả bộ Time Tracker: tracker, timesheet, calendar, meeting notes, cài đặt. */
+/** Shared by the whole Time Tracker: tracker, timesheet, calendar, meeting notes, settings. */
 export default defineMessages({
   // Suite
   'tab.tracker': { vi: 'Bấm giờ', en: 'Time Tracker' },

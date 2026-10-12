@@ -1,16 +1,8 @@
-// Which {{variables}} a request actually references.
+// Which {{variables}} a request references, so the Runner can flag data-file
+// columns nothing uses and variables the file doesn't provide.
 //
-// Used by the Runner to show how a data file's columns map onto the run: a
-// column nothing references is almost always a typo or a stale file, and a
-// variable the requests need but the file doesn't provide will silently send
-// the literal `{{token}}` to the server. Both are worth pointing out before the
-// run rather than after.
-//
-// The fields scanned here are exactly the ones request.ts substitutes into, so
-// "used" means used — not merely "the word appears somewhere in the request".
-// Scripts are deliberately excluded: they read data through dt.getEnvVar()/
-// getCollectionVar(), not
-// {{token}} substitution, so scanning their text would report false positives.
+// Scans exactly the fields request.ts substitutes into. Scripts are excluded:
+// they read data through dt.getEnvVar()/getCollectionVar(), not {{}} syntax.
 
 import type { ApiRequest } from './types';
 

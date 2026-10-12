@@ -1,6 +1,6 @@
 import { defineMessages } from '@/lib/i18n';
 
-/** Từ điển API Client — chia theo khu vực (tiền tố khoá = component). */
+/** API Client dictionary, grouped by area (key prefix = component). */
 export default defineMessages({
   // ── Chung ──────────────────────────────────────────────────────────────
   cancel: { vi: 'Huỷ', en: 'Cancel' },
@@ -95,7 +95,7 @@ export default defineMessages({
   'runner.left': { vi: ' · còn ~{{t}}', en: ' · ~{{t}} left' },
   'runner.grouping': { vi: 'Cách nhóm kết quả', en: 'Results grouping' },
   'runner.byRequest': { vi: 'Theo request', en: 'By request' },
-  // Chữ thường: nút lọc viết hoa chữ đầu bằng CSS (`first-letter:uppercase`).
+  // Lower case: the filter button capitalises the first letter via CSS.
   'runner.filter.all': { vi: 'tất cả', en: 'all' },
   'runner.filter.passed': { vi: 'đạt', en: 'passed' },
   'runner.filter.failed': { vi: 'trượt', en: 'failed' },

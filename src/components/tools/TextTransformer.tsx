@@ -123,10 +123,8 @@ function splitWords(text: string) {
 const capitalize = (w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 
 /**
- * Đổi kiểu chữ THEO TỪNG DÒNG. Bản trước chạy trên cả khối văn bản, mà
- * `splitWords` tách theo mọi khoảng trắng kể cả xuống dòng — nên một danh sách
- * định danh (`user_id⏎first_name`, đúng thứ hay dán vào đây nhất) bị gộp thành
- * MỘT định danh `userIdFirstName`. Dòng trống được giữ nguyên.
+ * Changes case line by line, so a list of identifiers (`user_id⏎first_name`)
+ * stays a list instead of becoming one identifier. Empty lines are kept.
  */
 function perLine(text: string, fn: (words: string[]) => string) {
   return text
@@ -147,7 +145,7 @@ export const CASE_TRANSFORMS = {
   titlecase: (t: string) => perLine(t, (w) => w.map(capitalize).join(' ')),
 } as const;
 
-/** Thứ tự hiện trong chế độ "All cases" — nhãn chính là ví dụ của kiểu đó. */
+/** Order in "All cases" mode; each label is an example of its case. */
 const ALL_CASES: Array<[keyof typeof CASE_TRANSFORMS, string]> = [
   ['camelcase', 'camelCase'],
   ['pascalcase', 'PascalCase'],
@@ -227,10 +225,8 @@ export function TextTransformer() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Options toolbar — chiều cao 32px trên MỌI control ở đây (không phải
-          mức nghỉ 34px mặc định) là chủ ý: đây là toolbar dày đặc (xem lời chú
-          trong button.tsx size="sm"), một hàng nhiều control ngang nhau cần
-          cùng một chiều cao nhỏ hơn mức nghỉ, không phải bỏ sót. */}
+      {/* Options toolbar: 32px controls throughout (dense toolbar size,
+          see button.tsx size="sm"). */}
       <ToolToolbar>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={mode} onValueChange={(v) => setMode(v as TransformMode)}>
@@ -287,8 +283,8 @@ export function TextTransformer() {
         </ToolPane>
 
         {mode === 'all-cases' ? (
-          // Đổi kiểu chữ là việc "thử xem kiểu nào hợp" — hiện mọi kiểu cùng
-          // lúc, mỗi kiểu một nút Copy, thay vì mở dropdown từng lần một.
+          // Show every case at once, each with its own Copy button, so trying them
+          // out doesn't mean reopening a dropdown each time.
           <ToolPane>
             <PaneHeader label={m('allCases')} />
             <div className="flex-1 min-h-0 divide-y divide-line overflow-y-auto">

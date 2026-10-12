@@ -128,12 +128,9 @@ interface NodeCtx {
 // collections) when held. See Row's onPointerDown below.
 type DropTarget = { id: string; where: 'before' | 'after' | 'inside'; copy: boolean };
 
-// Hit-tests the pointer position during a drag against whichever row's DOM
-// node is actually under it — the pointer-drag replacement for what a
-// native `dragover` target used to give for free. Reads plain data
-// attributes off the DOM rather than closing over React props, since this
-// runs from a `window` pointermove listener that can outlive any particular
-// render.
+// Hit-tests the pointer during a drag against the row under it. Reads
+// data attributes from the DOM rather than React props because it runs
+// from a window pointermove listener that outlives renders.
 function findDropTarget(clientX: number, clientY: number, sourceId: string, copy: boolean): DropTarget | null {
   const el = document.elementFromPoint(clientX, clientY);
   const row = el?.closest<HTMLElement>('[data-tree-row]');
@@ -200,15 +197,9 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
   const storeRef = useRef(store);
   storeRef.current = store;
 
-  // Read through refs (not `dragId`/`dropTarget` directly) so this callback's
-  // identity never has to change — see the pointer-drag note on `NodeCtx`
-  // below for why that matters: a Row's pointer listeners are plain
-  // `window.addEventListener` callbacks created once at pointerdown, not
-  // React callbacks re-created on every render, so whatever they capture
-  // must stay correct however long the drag runs. An empty-deps useCallback
-  // closing over `dragId`/`dropTarget` directly would freeze those at
-  // whatever they were at pointerdown (`null`/`null`, before the drag even
-  // started) and silently no-op every drop.
+  // Read through refs so the callback identity never changes: row pointer
+  // listeners are created once at pointerdown and must see current
+  // values for the whole drag.
   const dragIdRef = useRef(dragId);
   dragIdRef.current = dragId;
   const dropTargetRef = useRef(dropTarget);
@@ -237,9 +228,9 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.activeRequestId, revealTick]);
 
-  // Importing a collection that carries scripts is a decision to run someone
-  // else's code on the next Send, so it goes through a review step instead of
-  // landing silently. Script-free collections import as before.
+  // Importing a collection with scripts means running someone else's code
+  // on the next Send, so it goes through a review step. Script-free
+  // collections import directly.
   const handleImport = async () => {
     setError(null);
     setNotices([]);
@@ -302,11 +293,8 @@ export function Sidebar({ store, searchInputRef, onRun, revealTick }: Props) {
   const visible = store.collections.filter((c) => !q || collectionMatches(c, q));
 
   return (
-    // Cột điều hướng là CHROME, không phải mặt làm việc: nó chứa cây thư mục và
-    // ô tìm — thứ người dùng bấm để đi tới chỗ khác, không phải thứ người dùng
-    // đọc hoặc gõ. Trước đây nó trắng y hệt vùng request bên phải, nên hai cột
-    // dính vào nhau thành một mảng trắng và đường chia duy nhất là 1px mờ.
-    // Xem thang tông trong design/RULES.md.
+    // The navigation column is chrome (`--chrome`), darker than the request
+    // area, so the two columns read as separate (design/RULES.md).
     <div className="flex h-full w-full flex-col bg-chrome">
       {/* header */}
       {/* size="xs" (24px), not the 34px control height: these sit beside an 11px
@@ -506,10 +494,8 @@ const FolderNode = memo(function FolderNode({ folder, depth, collectionId, ctx }
     { icon: <Trash2 className="h-3.5 w-3.5" />, label: t('remove'), danger: true, sep: true, onClick: removeFolder },
   ];
 
-  // Open/closed folder icon (VS Code convention) — folders previously had no
-  // icon at all, making them visually indistinguishable from an empty row at
-  // a glance; the icon doubles as a second, always-visible cue for collapsed
-  // state next to the chevron.
+  // Open/closed folder icon (VS Code convention), a second visible cue for
+  // collapsed state next to the chevron.
   const FolderIcon = collapsed ? FolderIconClosed : FolderIconOpen;
   const containsActive = collapsed && !!ctx.activeRequestId && containsRequestId(folder.items, ctx.activeRequestId);
 
@@ -649,23 +635,13 @@ function Row({
     <div
       ref={rowRef}
       title={title}
-      // Collections (depth 0) aren't draggable: moveItem/copyItem only relocate
-      // tree items within collections.items, so a collection id is never found
-      // there — picking one up and dropping it anywhere was a silent no-op that
-      // looked broken rather than doing nothing on purpose. Folders/requests
-      // (depth > 0) keep the real drag-to-reorder/move behavior.
+      // Collections (depth 0) are not draggable: moveItem/copyItem only move
+      // items within collections. Folders and requests can be reordered.
       //
-      // Pointer events, not native HTML5 draggable/dragstart/dragover/drop:
-      // the desktop app runs inside a Tauri webview with `dragDropEnabled`
-      // (its default) for OS-level file drops (see useTauriFileDrop.ts, used
-      // by ChecksumTool/QRCodeTool/ImageBase64Tool) — Tauri intercepts every
-      // native drag gesture before the webview ever sees it, so the HTML5
-      // events this used to be built on NEVER fired in the real app, only in
-      // a plain browser tab. Reordering looked "fixed" against jsdom/browser
-      // tests but was still completely broken for every actual user. Data
-      // attributes below (`data-tree-row`/`data-row-id`/…) let
-      // `findDropTarget` hit-test via `document.elementFromPoint` during the
-      // drag instead of relying on a dragover target.
+      // Pointer events, not HTML5 drag and drop: Tauri intercepts native drag
+      // gestures for OS file drops (`dragDropEnabled`), so HTML5 drag events
+      // never reach the webview. The data attributes below let
+      // `findDropTarget` hit-test with `document.elementFromPoint`.
       data-tree-row
       data-row-id={id}
       data-container={container ? 'true' : undefined}

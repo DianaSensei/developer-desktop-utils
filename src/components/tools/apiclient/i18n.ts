@@ -5,8 +5,8 @@ import MESSAGES from './ApiClient.messages';
 export type ApiMessageKey = keyof typeof MESSAGES;
 
 /**
- * Dịch một khoá của API Client. Không phải hook — gọi được trong component
- * lồng sâu lẫn hàm thuần. Xem `currentLocale()` để biết vì sao an toàn.
+ * Translates an API Client key. Not a hook, so it works in nested components
+ * and pure functions; see `currentLocale()` for why that is safe.
  */
 export function t(key: ApiMessageKey, params?: Record<string, string | number>): string {
   const entry = MESSAGES[key];

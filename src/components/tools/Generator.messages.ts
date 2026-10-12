@@ -1,7 +1,7 @@
 import { defineMessages } from '@/lib/i18n';
 
 export default defineMessages({
-  // Generator (khung ngoài)
+  // Generator (outer frame)
   random: { vi: 'Ngẫu nhiên', en: 'Random' },
   testData: { vi: 'Dữ liệu thử', en: 'Test Data' },
   typeLabel: { vi: 'Loại generator', en: 'Generator type' },

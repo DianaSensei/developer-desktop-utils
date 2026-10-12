@@ -342,8 +342,7 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
       if (cancelledRef.current) return null;
       const error = (e as Error).message;
       // A request that threw before any response still ran, so it still gets
-      // the built-in check — otherwise the assertion totals would silently
-      // exclude exactly the executions that failed hardest.
+      // the built-in check; otherwise totals would exclude the worst failures.
       const tests = requireHttpOk ? [httpOkTest(0, '', error)] : [];
       record = {
         key: `${iter}:${step}`,
@@ -849,9 +848,8 @@ export function RunnerDialog({ title, requests, runRequest, knownVars = [], envi
                         className={cn('group flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs hover:bg-acc/50', !checked && 'opacity-50')}
                       >
                         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-fg-mute/30 group-hover:text-fg-mute/60" />
-                        {/* Hàng bao ngoài đã bắt click (`onClick={() => toggle(req.id)}`),
-                            nên ô tick chỉ VẼ trạng thái — `tabIndex={-1}` để nó
-                            không thành một tab-stop thứ hai cho cùng một việc. */}
+                        {/* The row handles the click; the checkbox only shows state and is
+                            not a second tab stop. */}
                         <Checkbox checked={checked} tabIndex={-1} aria-hidden="true" />
                         <span className={cn('w-12 shrink-0 font-bold uppercase', methodColor(req.method))}>{req.method}</span>
                         <span className="min-w-0 flex-1 truncate" title={req.url}>{req.name}</span>
@@ -1151,8 +1149,7 @@ function ByRequestView({ stats, onJumpToStatus }: Readonly<{
             <Th align="right" sub="assertions" subTone="number">{t('runner.passed')}</Th>
             <Th align="right" sub="assertions" subTone="number">{t('runner.failed')}</Th>
             <Th sub="status" subTone="number">{t('runner.responseCodes')}</Th>
-            {/* Ba cột này trước đây chỉ ghi Avg/Min/Max — không có đơn vị thì
-                `1240` là mili-giây hay micro-giây là phải đoán. */}
+            {/* Units under Avg/Min/Max. */}
             <Th align="right" sub="ms" subTone="number">{t('runner.avg')}</Th>
             <Th align="right" sub="ms" subTone="number">Min</Th>
             <Th align="right" sub="ms" subTone="number">Max</Th>

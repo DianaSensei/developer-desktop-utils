@@ -1,12 +1,8 @@
 // Request call history: a searchable list of past sends on the left, and the
-// selected entry's full request *and* response on the right.
+// selected entry's request and response on the right.
 //
-// Layout rule that shapes this file: the request detail and the response are
-// two exclusive tabs, never stacked. They used to share one column — the
-// request sat in a `<details>` above the response with no height cap, so
-// expanding it on a request with a dozen headers and a long Cookie pushed the
-// response out of the pane entirely. Tabs give each side the whole column and
-// its own scroll, so neither can crowd the other out however big it gets.
+// Request detail and response are two exclusive tabs, never stacked, so a
+// request with many headers cannot push the response out of the pane.
 
 import { useMemo, useState } from 'react';
 import { ArrowUpRight, Clock, Eraser, Link2 } from 'lucide-react';
@@ -238,8 +234,7 @@ function HistoryDetail({ entry, store, onExit }: {
 }) {
   const [tab, setTab] = useState<DetailTab>('response');
 
-  // Restoring a past send into an editable tab — the one thing you always want
-  // from a history entry and previously had to rebuild by hand.
+  // Restore a past send into an editable tab.
   const targetCollectionId = store.activeCollectionId ?? store.collections[0]?.id ?? null;
   const restore = () => {
     if (!entry.request || !targetCollectionId) return;
@@ -320,8 +315,7 @@ function HistoryDetail({ entry, store, onExit }: {
   );
 }
 
-// Everything that was sent, laid out the same way in every section instead of
-// the old ad-hoc label/value dump.
+// Everything that was sent, in consistent sections.
 function RequestDetail({ entry }: { entry: HistoryEntry }) {
   const req = entry.request;
 

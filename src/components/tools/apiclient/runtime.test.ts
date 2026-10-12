@@ -379,7 +379,7 @@ describe('Assert expression containment', () => {
   });
 
   it('never turns an expression into code', () => {
-    // The old evaluator built a Function; nothing here compiles a string.
+    // Nothing in the evaluator compiles a string into a Function.
     (globalThis as Record<string, unknown>).leaked = undefined;
     for (const expr of [
       "res.body.constructor.constructor('globalThis.leaked = 1')()",

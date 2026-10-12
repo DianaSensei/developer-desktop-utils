@@ -76,10 +76,7 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
         />
 
         {tab === 'scripts' ? (
-          // One editor at full height behind a phase switch, the same shape
-          // the request's own Script tab settled on — the two editors used to
-          // stand stacked, each capped at h-44, so both were too short to
-          // read a real script in while only one was ever being edited.
+          // One full-height editor with a phase switch, like the request's Script tab.
           <ScriptPane
             kind={target.kind}
             phase={phase}
@@ -113,9 +110,8 @@ export function NodeSettingsDialog({ target, onSave, onSaveAuth, onSaveHeaders, 
   );
 }
 
-// Hoisted out of NodeSettingsDialog for the same reason the old TabBtn was: a
-// component declared inside render gets a new identity on every keystroke, so
-// React tears down and rebuilds the CodeMirror instance on each character.
+// Declared outside the dialog: a component defined during render gets a new
+// identity on each keystroke, rebuilding CodeMirror on every character.
 function ScriptPane({ kind, phase, onPhaseChange, script, onScriptChange }: {
   kind: NodeSettingsTarget['kind'];
   phase: ScriptPhase;

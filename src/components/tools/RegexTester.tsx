@@ -16,7 +16,7 @@ import MESSAGES from '@/components/tools/RegexTester.messages';
 
 type ResultView = 'matches' | 'highlight' | 'extract' | 'replace';
 
-/** Lỗi do chính tool sinh ra — dịch lúc hiển thị. */
+/** Error produced by the tool itself; translated for display. */
 const TOO_SLOW = '\u0000tooSlow';
 
 interface Preset {
@@ -98,10 +98,9 @@ const PRESETS: Preset[] = [
   },
 ];
 
-// Xoay vòng để hai match LIỀN KỀ không cùng màu — nếu cùng, không nhìn ra
-// ranh giới giữa chúng. Đây là mã hoá phân loại, dùng bảng --cat-* của kit
-// (xem design/tokens.css); chữ luôn là text-fg nên tương phản không
-// phụ thuộc vào hue đang xoay tới đâu.
+// Rotate colors so adjacent matches differ and their boundary shows.
+// Categorical encoding from the kit's --cat-* palette; text stays
+// text-fg so contrast does not depend on the hue.
 const MATCH_COLORS = [
   'bg-[hsl(var(--cat-1-c)/0.30)] text-fg',
   'bg-[hsl(var(--cat-2-c)/0.30)] text-fg',
@@ -422,33 +421,16 @@ export function RegexTester() {
                   <p className="text-sm text-fg-mute">{c('noMatches')}</p>
                 </div>
               ) : (
-                /* ── Vì sao THẺ đổi thành LƯỚI ───────────────────────────────
-                   Mỗi match trước đây là một thẻ cao ~108px: hàng chip `#1`,
-                   hàng `pos 0–19 · 19 chars`, hàng giá trị, nút copy. Năm match
-                   là hết màn hình. Nhưng dữ liệu ở đây là BẢNG thuần tuý — mọi
-                   match có đúng cùng một bộ trường — nên thẻ chỉ làm mỗi việc
-                   là thổi phồng nó lên gấp ba.
-
-                   Lưới: một match một dòng ~26px, ~20 match trên cùng khoảng
-                   không đó, cột thẳng hàng nên so `pos`/`len` giữa các match
-                   chỉ cần đưa mắt xuống thay vì đọc lại từng thẻ. Cột được tô
-                   theo KIỂU (số xanh dương, chuỗi xanh lá) và tiêu đề cột ghi
-                   rõ đơn vị — `index`, `chars` — nên không phải đoán `19` là
-                   thứ tự hay độ dài. Group rỗng hiện `NULL` in nghiêng, khác
-                   hẳn chuỗi rỗng.
-
-                   Nhóm bắt (capture group) trở thành CỘT, không phải khối lồng
-                   trong thẻ: `<domain>` của match này nằm thẳng cột với
-                   `<domain>` của match kia — đó mới là thứ người ta mở Regex
-                   Tester ra để nhìn. */
+                /* Matches as a grid, one ~26px row each, so `pos`/`len` compare down a
+                   column. Columns are colored by type and headers name the unit
+                   (`index`, `chars`); empty groups show an italic `NULL`. Capture
+                   groups are columns, so the same group lines up across matches. */
                 <div className="overflow-hidden rounded-sm border border-line">
                   <DataTable density="compact" className="font-mono">
                     <Thead sticky>
                       <Tr>
                         <Th className="w-10 whitespace-nowrap">#</Th>
-                        {/* Cột số giữ bề rộng CỐ ĐỊNH, cột giá trị ăn hết phần
-                            còn lại. Không ràng buộc thì hai cột số dãn ra bằng
-                            cột nội dung và bảng đọc ra rỗng tuếch ở giữa. */}
+                        {/* Fixed-width numeric columns; the value column takes the rest. */}
                         <Th className="w-20 whitespace-nowrap" align="right" sub="index" subTone="number">{m('pos')}</Th>
                         <Th className="w-20 whitespace-nowrap" align="right" sub="chars" subTone="number">{m('len')}</Th>
                         <Th className="w-full whitespace-nowrap" sub="string" subTone="string">{m('match')}</Th>

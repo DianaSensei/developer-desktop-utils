@@ -333,12 +333,11 @@ export function Popover({
 }
 
 // ---------------------------------------------------------------------------
-// Toggle — kit Switch + nhãn cùng dòng
+// Toggle — kit Switch with an inline label
 // ---------------------------------------------------------------------------
 
 export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
-  // Switch của kit (bật = xanh lá cố định, RULES.md) — bản tự vẽ trước đây
-  // bật màu accent, lệch với mọi switch khác trong app.
+  // Kit Switch (green when on, RULES.md), like every other switch.
   const btn = <Switch checked={checked} onCheckedChange={onChange} aria-label={label} />;
   if (!label) return btn;
   return (
@@ -387,8 +386,8 @@ export function ConfirmButton({
   return (
     <button
       type="button"
-      // Bấm lần đầu chỉ "lên cò" — nói rõ bấm lần nữa mới xoá, kể cả với trình
-      // đọc màn hình (trước đây chỉ đổi icon thành dấu ✓, không có chữ nào).
+      // The first click arms; the title says a second click deletes, for
+      // screen readers too.
       title={armed ? tr('clickAgainToConfirm') : title}
       aria-label={armed ? tr('clickAgainToConfirm') : title}
       onClick={(e) => {

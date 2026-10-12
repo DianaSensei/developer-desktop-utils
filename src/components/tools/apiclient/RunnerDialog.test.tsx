@@ -25,8 +25,7 @@ vi.mock('@/lib/fileio', () => ({
 }));
 
 /** The text a streamed export would have written, joined from its chunks.
- *  Đối số đầu giờ là SDK của plugin (quyền file quy về đúng plugin gọi), nên
- *  tên file và các khối dữ liệu lùi xuống vị trí 2 và 3. */
+ *  The first argument is the plugin SDK, so name and chunks are args 2 and 3. */
 function writtenExport(call = 0): { name: string; text: string } {
   const [, name, chunks] = vi.mocked(saveStreamedTextFile).mock.calls[call];
   return { name, text: [...chunks].join('') };

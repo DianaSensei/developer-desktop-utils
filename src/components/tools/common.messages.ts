@@ -1,15 +1,10 @@
 import { defineMessages } from '@/lib/i18n';
 
 /**
- * Từ dùng lại ở nhiều tool — nhãn pane, nút chung. Thuật ngữ kỹ thuật mà dân
- * dev Việt vẫn nói bằng tiếng Anh (JSON, token, header, payload, regex…) được
- * GIỮ NGUYÊN trong bản VI ở mọi từ điển tool: dịch "token" thành "mã thông
- * báo" làm người đọc phải dịch ngược lại trong đầu.
- *
- * Phạm vi: dịch CHỮ CỦA GIAO DIỆN. Chẩn đoán sinh ra từ engine (lỗi parser
- * JSON, lỗi Web Crypto của JWT kèm lệnh openssl…) giữ tiếng Anh — cùng chuỗi
- * đó còn đi qua MCP bridge tới AI agent và được test khoá nguyên văn, và người
- * đọc sẽ dán nguyên văn đó đi tìm kiếm.
+ * Strings shared across tools (pane labels, common buttons). Technical terms
+ * (JSON, token, header, regex…) stay in English in the VI dictionaries. Only
+ * UI text is translated; engine diagnostics stay in English because they also
+ * reach MCP clients and tests match them verbatim.
  */
 export default defineMessages({
   input: { vi: 'Đầu vào', en: 'Input' },

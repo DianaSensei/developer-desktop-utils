@@ -9,8 +9,8 @@ import { useInputHistory } from '@/hooks/useInputHistory';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/TextCounter.messages';
 
-// 200 từ/phút. Làm tròn LÊN như trước khiến 1 từ cũng thành "1 min" — dưới
-// một phút thì nói đúng là dưới một phút.
+// 200 words per minute. Anything under a minute is reported as such rather
+// than rounded up to "1 min".
 function formatReadingTime(minutes: number, m: (k: 'minutes' | 'underMinute', p?: { n: number }) => string) {
   if (minutes === 0) return m('minutes', { n: 0 });
   if (minutes < 1) return m('underMinute');
@@ -153,12 +153,7 @@ export function TextCounter() {
 
       {/* Right: stats scrollable */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
-        {/*
-          Bản cũ tô mỗi ô một màu cầu vồng (xanh dương/tím/xanh lá/cam/hồng…) dù
-          không ô nào mang NGHĨA khác ô nào — "Characters" không "đúng" hơn
-          "Words". Màu trang trí kiểu đó là đúng thứ design/RULES.md cấm: màu
-          phải mang nghĩa trạng thái/tương tác. Tất cả về `tone="default"`.
-        */}
+        {/* All stats use the default tone: colour is reserved for status (design/RULES.md). */}
         <StatGrid columns={4}>
           <Stat variant="compact" label={m('characters')} value={stats.characters} />
           <Stat variant="compact" label={m('noSpaces')} value={stats.charactersNoSpaces} />

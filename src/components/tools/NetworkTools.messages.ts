@@ -1,7 +1,7 @@
 import { defineMessages } from '@/lib/i18n';
 
 export default defineMessages({
-  // Điều hướng
+  // Navigation
   'view.dns': { vi: 'Tra DNS', en: 'DNS Lookup' },
   'view.propagation': { vi: 'Lan truyền', en: 'Propagation' },
   'view.dnssec': { vi: 'DNSSEC', en: 'DNSSEC' },

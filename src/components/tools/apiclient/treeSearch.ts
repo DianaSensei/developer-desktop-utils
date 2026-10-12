@@ -1,9 +1,5 @@
-// Sidebar search matching. A request matches on its name, its URL, or its
-// method — not name alone. Searching "users" for the request that hits
-// `/api/users` but is called "List all" used to come up empty, and typing
-// "post" or "delete" is the quickest way to narrow a big collection down to
-// the writes. `q` is expected already trimmed + lower-cased (the Sidebar does
-// that once per keystroke, not once per node).
+// Sidebar search: a request matches on its name, URL or method. `q` arrives
+// already trimmed and lower-cased (once per keystroke, by the Sidebar).
 
 import type { ApiRequest, Collection, TreeItem } from './types';
 

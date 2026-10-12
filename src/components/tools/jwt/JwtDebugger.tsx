@@ -255,7 +255,7 @@ export function JwtDebugger() {
   );
 }
 
-// `Field` của kit lo nhãn + liên kết `htmlFor`; ở đây chỉ còn phần ô nhập.
+// The kit's `Field` handles the label and `htmlFor`; this is just the input.
 function LabelledInput({ label, value, onChange, placeholder }: {
   label: string; value: string; onChange: (v: string) => void; placeholder?: string;
 }) {
@@ -292,9 +292,7 @@ function DecodeBody({ decoded, tokenReady }: { decoded: Decoded; tokenReady: boo
         </div>
       </div>
       <ClaimTable rows={decoded.claims.rows} />
-      {/* The old copy said "this tool does not verify the signature", which is
-          no longer true of the tool — only of this pane. Point at the mode
-          that does it rather than leaving a dead end. */}
+      {/* This pane doesn't verify the signature; point to the mode that does. */}
       <Callout tone="warning" size="sm" title={m('decodedNotVerified')}>
         {m('decodedBodyBefore')} <strong>{m('verify')}</strong> {m('decodedBodyAfter')}
       </Callout>

@@ -498,7 +498,7 @@ function EntryEditor({
           <TagPicker value={entry.tagIds} onChange={(ids) => onChange({ tagIds: ids })} />
         </div>
         <div className="flex justify-between border-t pt-3">
-          {/* Xoá bản ghi giờ: bấm lần đầu chỉ lên cò, lần hai mới xoá. */}
+          {/* Delete time entry: the first click arms, the second deletes. */}
           <Button
             variant="ghost"
             size="sm"

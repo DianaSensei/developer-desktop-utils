@@ -110,13 +110,9 @@ export function buildCodecHandlers(): Record<string, ToolHandler> {
       if (algo === 'aes-gcm') {
         return { algorithm: algo, output: await decryptAesGcm(ciphertext, key) };
       }
-      // crypto-js usually fails a wrong key/malformed ciphertext silently
-      // (empty string) for these modes, but not always: when the garbage
-      // bytes a wrong key produces happen to fail its OWN UTF-8 decode step,
-      // it throws its own "Malformed UTF-8 data" instead — same underlying
-      // cause, different symptom. Normalize both to the one message, exactly
-      // like EncodeHashEncrypt.tsx's own Decrypt tab already does (its
-      // `catch` a few lines away from its `doDecrypt` call).
+      // crypto-js usually returns an empty string for a wrong key or bad
+      // ciphertext, but sometimes throws "Malformed UTF-8 data" instead.
+      // Both get the same message, as in EncodeHashEncrypt's Decrypt tab.
       let output: string;
       try {
         output = doDecrypt(algo as CryptoJsAlgo, ciphertext, key);

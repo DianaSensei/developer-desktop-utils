@@ -281,7 +281,7 @@ export interface ClaimRow {
   value: string;
   /** Absolute time plus "in 3 minutes" / "12 days ago" for the time claims. */
   detail?: string;
-  /** Thời điểm claim trừ "bây giờ" (ms) — để UI tự viết `detail` theo ngôn ngữ đang chọn. */
+  /** Claim time minus now (ms), so the UI can phrase `detail` in the current locale. */
   deltaMs?: number;
   tone: ClaimTone;
 }

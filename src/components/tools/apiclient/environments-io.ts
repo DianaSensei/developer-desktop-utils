@@ -28,19 +28,11 @@ function isNativeFormat(json: unknown): json is NativeEnvironmentFile {
   return !!json && typeof json === 'object' && (json as Record<string, unknown>).__devtoolEnvironment === true;
 }
 
-// Fresh ids for every row and a defaulted `enabled`, regardless of which
-// format (or a hand-edited file) supplied them.
-//
-// `secret` is read from either format's own way of marking one: this app's
-// native export writes it as `secret: true` (see exportEnvironmentNative,
-// which serializes the row as-is); Postman's environment.json marks the same
-// thing as `"type": "secret"` on the value (its UI's own masking). Missing
-// this dropped the lock on every secret-flagged variable on the way back in
-// — silently, since nothing here threw or warned — which meant a value the
-// user had explicitly protected (masked in the UI, excluded from generated
-// code and from History's redaction list; see KeyValueEditor's lock toggle)
-// came back in fully exposed after nothing more than an export/import
-// round-trip, or an ordinary Postman environment import.
+// Fresh ids and a defaulted `enabled` for every row, whichever format (or
+// hand-edited file) supplied them. `secret` is read from either format:
+// this app's export writes `secret: true`, Postman's environment.json uses
+// `"type": "secret"`. Dropping it would unmask protected values after an
+// export/import round trip.
 function sanitizeVariables(rows: unknown): KeyValue[] {
   if (!Array.isArray(rows)) return [];
   const out: KeyValue[] = [];

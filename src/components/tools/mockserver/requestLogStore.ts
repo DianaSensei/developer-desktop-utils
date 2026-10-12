@@ -26,11 +26,9 @@ function notify() {
 function ensureListening() {
   if (listening || !isTauri) return;
   listening = true;
-  // Store ở phạm vi module: listener phải sống suốt đời app để bắt được request
-  // dù người dùng đang mở tool nào — nên SDK lấy qua `getPluginSdk`, không hook.
-  //
-  // The backend batches requests (~1 event/250ms) so the UI never faces a
-  // per-request event storm under load.
+  // Module-scope store: the listener lives for the whole app so requests are
+  // captured whichever tool is open, hence `getPluginSdk` rather than a hook.
+  // The backend batches requests (~1 event/250ms) to avoid event storms.
   getPluginSdk('mock-server').native
     .listen<RequestLogEntry[]>('mock:request-batch', (batch) => {
       if (!batch || batch.length === 0) return;

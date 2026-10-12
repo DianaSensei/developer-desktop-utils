@@ -77,19 +77,11 @@ export function AddressBar({ request, onChange, onRename, onSend, onCancel, send
         aria-label={t('addr.requestName')}
         className="mb-1 h-6 w-full truncate rounded-sm border-0 bg-transparent px-1.5 text-sm font-semibold text-fg shadow-none transition-colors hover:bg-bg-2/50 focus-visible:bg-bg-2/70 focus-visible:ring-[3px] focus-visible:ring-focus"
       />
-      {/* h-ctl, not h-ctl-lg: this bar used to be the one control in the app
-          taller than the 34px standard (--h) — 40px around 12-13px text read
-          as noticeably oversized next to every other input/select/button. */}
+      {/* Standard control height (h-ctl, 34px). */}
       <div className="flex items-center overflow-hidden rounded-lg border border-line bg-bg shadow-sm transition-shadow focus-within:shadow-none focus-within:ring-[3px] focus-within:ring-focus">
-        {/* Method selector — tinted to match the active HTTP method (Bruno-style) */}
-        {/* text-xs, not the Select default text-sm: every other place this app
-            prints a method — tab strip, sidebar badge, history, runner — uses
-            an 11-12px bold uppercase label, and at 14px this one read a size
-            larger than everything around it while eating the bar's width.
-            w-[5.5rem]: fixed, not auto — an auto width would shift the URL field
-            sideways on every method change. 88px is what the longest label
-            (OPTIONS) needs at this size, so nothing truncates and GET no longer
-            sits in a 6rem box with a 30px hole before the chevron. */}
+        {/* Method selector, tinted by method. text-xs like method labels
+            elsewhere; fixed w-[5.5rem] (enough for OPTIONS) so the URL field
+            does not shift when the method changes. */}
         <Select value={request.method} onValueChange={(v) => onChange({ method: v as ApiRequest['method'] })}>
           <SelectTrigger
             className={cn(

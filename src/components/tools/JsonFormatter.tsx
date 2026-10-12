@@ -358,8 +358,8 @@ function collectContainerPaths(value: JsonValue, path = '$', acc: string[] = [])
   return acc;
 }
 
-// Cú pháp JSON — tái dùng đúng hue của SQL cho cùng khái niệm (chuỗi/số/kiểu),
-// nên "chuỗi" luôn cùng một xanh lá dù đang ở JSON hay SQL. Xem tokens.css.
+// JSON syntax colors reuse the SQL hues for the same concepts
+// (strings, numbers, types); see tokens.css.
 const TYPE_CLASS: Record<string, string> = {
   string: 'text-[var(--sql-string)]',
   number: 'text-[var(--sql-number)]',
@@ -434,13 +434,12 @@ function flattenJson(root: JsonValue, quote: string, collapsed: Set<string>, for
   return lines;
 }
 
-/** Chiều cao cố định của một dòng cây (px) — khớp `h-5 leading-5`. Dòng JSON
- *  là `whitespace-pre` (không bao giờ xuống dòng) nên mọi dòng cao bằng nhau,
- *  và nhờ vậy windowing chỉ cần một phép chia thay vì đo từng dòng. */
+/** Fixed tree row height (px), matching `h-5 leading-5`. Rows never wrap
+ *  (`whitespace-pre`), so windowing is a single division. */
 const ROW_H = 20;
-/** Lỗi không phải `Error` (hiếm) — dịch lúc hiển thị. */
+/** Non-`Error` failure (rare); translated for display. */
 const INVALID = '\u0000invalid';
-/** Số dòng vẽ thêm trên/dưới vùng nhìn thấy để cuộn nhanh không lộ khoảng trắng. */
+/** Extra rows rendered above and below the viewport for fast scrolling. */
 const OVERSCAN = 30;
 
 function lineMatches(line: FlatLine, lowerQuery: string) {
@@ -509,9 +508,7 @@ export function JsonFormatter() {
     [parsed.value, quote]
   );
 
-  // ── Windowing ─────────────────────────────────────────────────────────
-  // Bản trước vẽ MỌI dòng — một file vài chục nghìn dòng là vài chục nghìn DOM
-  // node, mỗi node một onMouseEnter. Giờ chỉ vẽ phần đang nhìn thấy.
+  // ── Windowing: only visible rows (plus overscan) are rendered ─────────
   const treeRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportH, setViewportH] = useState(600);
@@ -534,7 +531,7 @@ export function JsonFormatter() {
     else if (top + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_H - el.clientHeight;
   };
 
-  // ── Tìm kiếm: đếm + nhảy tới kết quả ──────────────────────────────────
+  // ── Search: count and jump to matches ──────────────────────────────────
   const matchIndexes = useMemo(
     () => (lowerQuery ? lines.flatMap((line, i) => (line.kind !== 'close' && lineMatches(line, lowerQuery) ? [i] : [])) : []),
     [lines, lowerQuery],
@@ -550,8 +547,8 @@ export function JsonFormatter() {
     scrollToIndex(i);
   };
 
-  // ── Bàn phím (mẫu tree của ARIA) ──────────────────────────────────────
-  //   ↑/↓ đi dòng · → mở / xuống con · ← gập / lên cha · Enter bật tắt
+  // ── Keyboard (ARIA tree pattern) ──────────────────────────────────────
+  //   ↑/↓ move · → expand / to child · ← collapse / to parent · Enter toggles
   const selectable = (i: number) => lines[i] && lines[i].kind !== 'close';
   const onTreeKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const cur = lines.findIndex((l) => l.kind !== 'close' && l.path === selectedPath);
@@ -770,15 +767,8 @@ export function JsonFormatter() {
                   </span>
                   <div className="flex min-w-0 flex-1 items-start pr-3" style={{ paddingLeft: `${line.depth * indent.size}ch` }}>
                     <span className="mr-0.5 mt-[3px] w-3.5 shrink-0 text-fg-mute" aria-hidden>
-                      {/* MỘT icon xoay 90°, không phải tráo giữa hai icon khác nhau.
-                          Bản trước tráo ChevronDown ↔ ChevronRight — hai component
-                          Lucide khác nhau, nên React coi đó là hai node khác nhau
-                          và không có gì để animate: mở/gập BẬT TẮT trong một khung
-                          hình. Đây là hàng dày đặc nhất trong toàn app xét theo tần
-                          suất bấm (mọi node object/array trong cây JSON), nên đúng
-                          chỗ đáng animate nhất lại là chỗ trơ nhất. Cùng công thức
-                          `CollapsibleSection` đã dùng: một ChevronRight, xoay bằng
-                          `--ease-spring` khi mở. */}
+                      {/* One chevron rotated 90° with `--ease-spring` (as in
+                          CollapsibleSection), not two swapped icons, so it can animate. */}
                       {isToggle && (
                         <ChevronRight
                           className={cn(

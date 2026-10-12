@@ -609,10 +609,9 @@ export function EncodeHashEncrypt() {
     [encryptAlgo]
   );
 
-  // AES-GCM is async (WebCrypto) and deliberately slow — 600k PBKDF2 rounds is
-  // the point of it — so the encrypt tab can no longer resolve in a `useMemo`.
-  // The crypto-js modes stay synchronous and land on the very first tick, so
-  // only the GCM path ever shows the busy state.
+  // AES-GCM is async (Web Crypto) and deliberately slow (600k PBKDF2
+  // rounds), so the encrypt tab resolves in state rather than `useMemo`.
+  // The crypto-js modes finish on the first tick; only GCM shows busy.
   const [cryptoResult, setCryptoResult] = useState<{ output: string; error: string }>({ output: '', error: '' });
   const [cryptoBusy, setCryptoBusy] = useState(false);
 
@@ -685,16 +684,8 @@ export function EncodeHashEncrypt() {
   return (
     <div className="tool-full-height">
 
-      {/* ── MỘT vùng công cụ, hai dòng — không phải hai dải ──────────────────
-          Trước đây hàng tab và hàng tuỳ chọn của tab Encode là hai khối riêng,
-          mỗi khối một nền và một đường viền dưới. Cộng với titlebar và dải tab
-          tool ở khung app, đỉnh cửa sổ có BỐN dải xám chồng nhau, mỗi dải một
-          chiều cao — đó là thứ đọc ra "cẩu thả": mắt phải vượt qua bốn đường
-          kẻ ngang trước khi tới nội dung, và không đường nào nói lên điều gì.
-
-          Giờ cả hai nằm trong cùng một `header-chrome`: một nền, một đường
-          viền dưới, hai dòng bên trong. Hàng tuỳ chọn chỉ hiện ở tab nào có,
-          nên sáu tab còn lại vẫn là một dòng như cũ. */}
+      {/* One toolbar with two rows (tabs, then the active tab's options)
+          under a single background and border, instead of stacked bands. */}
       <ToolToolbar className="px-4 py-1.5 flex flex-col gap-1.5">
       <div className="flex items-center gap-3">
         <Segmented
