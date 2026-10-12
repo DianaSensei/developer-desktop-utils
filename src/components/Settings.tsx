@@ -72,12 +72,10 @@ function applySavedOrder<T extends { id: string }>(tools: T[], savedOrder: strin
   return ordered;
 }
 
-/** Kéo các tool cùng nhóm (Generate = Generator + QR Code + Lucky Wheel…) đứng
- *  liền nhau trong danh sách Bật/Tắt, để render được dưới một mục cha chung —
- *  xem `clusterToolOrder`. Áp lại sau MỌI thay đổi thứ tự (kéo-thả, đổi
- *  toolOrder từ nơi khác, reset) nên `displayTools` luôn ở trạng thái đã gom
- *  nhóm; nhờ vậy chỉ số kéo-thả (tính từ `displayTools`) và thứ tự render
- *  (cũng từ `displayTools`) không bao giờ lệch nhau. */
+/** Puts tools of the same group next to each other in the enable/disable
+ *  list so they render under one parent row (see `clusterToolOrder`).
+ *  Reapplied after every order change, so drag indices and render order
+ *  both come from the same clustered list. */
 function withGroupClustering(tools: ToolDef[]): ToolDef[] {
   const map = new Map(tools.map((t) => [t.id, t]));
   return clusterToolOrder(tools.map((t) => t.id)).map((id) => map.get(id)!);
@@ -92,14 +90,10 @@ interface LogicalRow {
 }
 
 /**
- * Gộp một danh sách tool ĐÃ GOM NHÓM (xem `withGroupClustering`) thành các
- * "hàng logic" — đơn vị mà kéo-thả thao tác lên. Một nhóm với ≥2 thành viên
- * LIỀN NHAU trong `tools` gộp thành một hàng; tool đứng riêng (hoặc nhóm chỉ
- * còn một thành viên, ví dụ đang lọc tìm kiếm) là một hàng của chính nó.
- *
- * Kéo một hàng nhóm di chuyển CẢ NHÓM cùng lúc — thứ tự các tool CON bên
- * trong không sắp xếp được ở đây, nó theo đúng thứ tự tab con đã định nghĩa
- * trong `TOOL_GROUPS`, chỉ đổi được ở nơi định nghĩa nhóm.
+ * Turns a clustered tool list into "logical rows", the unit of drag and
+ * drop: adjacent members of a group (2+) form one row; standalone tools, or
+ * a group filtered down to one member, are their own row. Dragging a group
+ * row moves the whole group; child order comes from `TOOL_GROUPS`.
  */
 function toLogicalRows(tools: ToolDef[]): LogicalRow[] {
   const rows: LogicalRow[] = [];
@@ -123,10 +117,8 @@ function toLogicalRows(tools: ToolDef[]): LogicalRow[] {
   return rows;
 }
 
-/** `label` là BẮT BUỘC: công tắc này chỉ có hình tròn trượt, không có chữ nào
- *  bên trong, nên thiếu nhãn thì trình đọc màn hình đọc ra một "switch" trống
- *  trơn — người dùng không biết mình đang bật/tắt cái gì. Nhãn hiển thị nằm ở
- *  hàng bên cạnh chứ không bọc lấy nút, nên phải nối bằng aria-label. */
+/** `label` is required: the switch has no visible text of its own, and
+ *  the visible label sits beside it, so it needs an aria-label. */
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
   return (
     <button
@@ -195,9 +187,9 @@ function Kbd({ children }: { children: string }) {
 }
 
 /**
- * Bốn swatch tròn cho tone chủ đạo — bản gọn của bộ chọn trong `design/preview/index.html`.
- * Chỉ đổi `--a-h/--a-s/--a-l`; mọi biến thể accent (nhuộm, viền, mực đậm) tự
- * tính lại qua CSS. Xem `design/tokens.css`.
+ * Four accent swatches (a compact version of design/preview/index.html's
+ * picker). Only `--a-h/--a-s/--a-l` change; derived accent colors follow via
+ * CSS (design/tokens.css).
  */
 function AccentSwatches({ value, onChange, ariaLabel }: { value: AccentTone; onChange: (tone: AccentTone) => void; ariaLabel: string }) {
   return (
@@ -222,9 +214,8 @@ function AccentSwatches({ value, onChange, ariaLabel }: { value: AccentTone; onC
   );
 }
 
-// Bản xem trước cần MÀU THẬT của từng tone, không phải biến --a-h hiện tại —
-// nếu không cả bốn nút sẽ cùng một màu (màu của tone đang chọn). Giá trị lấy
-// đúng từ các khối [data-accent] trong design/tokens.css.
+// Each swatch needs its tone's real color, not the current `--a-h`.
+// Values match the [data-accent] blocks in design/tokens.css.
 const ACCENT_PREVIEW: Record<AccentTone, CSSProperties> = {
   azure: { background: 'hsl(218 76% 48%)' },
   teal: { background: 'hsl(196 65% 32%)' },
@@ -278,27 +269,13 @@ const PERMISSION_NAMESPACE_ICONS: Record<string, typeof Clipboard> = {
 const APP_PERMISSION_GROUPS = getAppPermissionGroups();
 const SHORTCUT_GROUPS = getShortcutGroups();
 
-// ── Nav trái, giống trang Settings của DBX ────────────────────────────────
-// Trước đây tám mục này xếp CHỒNG trong một trang cuộn dài — bốn mục còn có
-// accordion riêng bên trong (Tools/Shortcuts/Permissions/Configuration), nên
-// một trang Settings đơn giản cũng cuộn qua hàng nghìn pixel để tới mục cuối.
-//
-// DBX xử lý đúng bài toán này: một danh sách mục cố định bên trái (chữ thuần,
-// KHÔNG icon — khác hẳn sidebar chính của app, để hai tầng điều hướng không
-// lẫn vào nhau), bên phải chỉ hiện ĐÚNG MỘT mục, cuộn riêng. Bấm vào mục TỰ
-// LÀ hành động "mở" — không cần thêm accordion bên trong nữa.
-//
-// `label` lấy lại đúng các khoá dịch đã có sẵn của từng mục (không phát sinh
-// khoá i18n mới) — tiêu đề trong SETTINGS_SECTIONS và tiêu đề nội dung mục đó
-// hiển thị PHẢI khớp nhau, đây là nguồn duy nhất cho cả hai.
-// Nhóm theo mức độ dùng: tuỳ biến hằng ngày trước (Appearance/Tools/
-// Shortcuts) → quản lý plugin/tiện ích/tích hợp (Plugins/Extensions/MCP) →
-// thông tin/thiết lập ít đụng tới nhất (Permissions/About/Storage/Config).
-// "Plugin" (SettingsPlugins — quyền + nhật ký của tool biên dịch sẵn) và
-// "Storage" (vị trí thư mục dữ liệu) không còn là mục riêng: gộp Plugin vào
-// Tools (cùng nói về TOOL, chỉ khác góc nhìn — bật/tắt so với quyền/nhật ký)
-// và Storage vào About (một dòng thông tin đơn lẻ không đáng một mục riêng
-// trong nav trái).
+// ── Settings sections, listed in a left nav ──────────────────────────────
+// One section is shown at a time and scrolls on its own; the nav is plain
+// text without icons so it does not compete with the main sidebar. Labels
+// reuse each section's title key, so nav and heading always match.
+// Ordered by frequency of use: everyday customization, then plugins,
+// extensions and integrations, then rarely used information. Built-in plugin
+// permissions live under Tools, and storage location under About.
 const SETTINGS_SECTIONS = [
   { id: 'appearance', label: 'settings.section.appearance' },
   { id: 'tools', label: 'settings.section.tools' },
@@ -325,22 +302,14 @@ export function Settings() {
   const { locale, setLocale, t } = useLocale();
   const { enabled: mcpBackgroundEnabled, setEnabled: setMcpBackgroundEnabled } = useMcpBackgroundBridge();
   const { isEnabled: isMcpToolEnabled, setToolEnabled: setMcpToolEnabled } = useMcpToolEnabledMap();
-  // Redis/Kafka/RabbitMQ/Containers là plugin cài thêm (không còn biên dịch
-  // sẵn) — `MCP_TOOL_IDS` là danh sách TĨNH, không tự biết plugin nào ĐANG
-  // thật sự có mặt. Không lọc thì dòng bật/tắt MCP của một tool CHƯA cài vẫn
-  // hiện ra (đổi công tắc không có tác dụng gì, vì không có gì để bật/tắt) —
-  // lọc theo `TOOL_DEFS` (nguồn từ registry, chỉ chứa plugin ĐÃ đăng ký) để
-  // danh sách này luôn khớp đúng những gì người dùng thật sự có trong app.
+  // MCP_TOOL_IDS is static and includes tools that may not be installed;
+  // only list tools present in the registry.
   const availableMcpToolIds = MCP_TOOL_IDS.filter((id) => TOOL_DEFS.some((td) => td.id === id));
-  // Một mục đang mở, không phải bốn cờ accordion rời — điều hướng ở nav trái
-  // TỰ LÀ sự "mở/đóng" rồi, nên bỏ hẳn kiểu accordion lồng bên trong từng mục.
-  // Xem SETTINGS_SECTIONS + nav trái ở cuối file cho danh sách đầy đủ.
+  // The left nav selects one open section; sections have no accordions.
   const location = useLocation();
-  // `desktop-devtool-app://install?...` (deepLink.ts) điều hướng tới đây với
-  // `{ state: { section: 'extensions' } }` để mở thẳng màn cài đặt tiện ích
-  // thay vì rơi vào mục mặc định (Appearance). Đọc cả lúc khởi tạo (mở lạnh)
-  // lẫn qua effect bên dưới (app đã đứng sẵn ở Settings, một link thứ hai
-  // chỉ đổi `location.state` chứ không mount lại component này).
+  // Deep links (deepLink.ts) navigate here with
+  // `{ state: { section: 'extensions' } }`. Read on init (cold start) and
+  // in the effect below (already on Settings, where only the state changes).
   const [activeSection, setActiveSection] = useState<SettingsSectionId>(() =>
     isSettingsSectionId((location.state as { section?: unknown } | null)?.section)
       ? (location.state as { section: SettingsSectionId }).section
@@ -352,8 +321,7 @@ export function Settings() {
   }, [location.state]);
   const [currentVersion, setCurrentVersion] = useState('');
   const [dataDir, setDataDir] = useState('');
-  // Khởi tạo từ storage — main.tsx đã áp tone này lên <html> trước khi React
-  // vẽ khung hình đầu tiên, nên state ở đây chỉ cần khớp lại, không cần áp lại.
+  // main.tsx applied this tone before first paint; just mirror it here.
   const [accent, setAccent] = useState<AccentTone>(() => getAccentPreference());
   const changeAccent = (tone: AccentTone) => {
     setAccent(tone);
@@ -397,7 +365,7 @@ export function Settings() {
 
   const [displayTools, setDisplayTools] = useState(() => withGroupClustering(applySavedOrder(TOOL_DEFS, toolOrder)));
 
-  // keep in sync when toolOrder changes externally (e.g. reset)
+  // Keep in sync when toolOrder changes externally (e.g. reset).
   const prevOrderKey = useRef(toolOrder.join());
   const nextKey = toolOrder.join();
   if (prevOrderKey.current !== nextKey) {
@@ -442,10 +410,8 @@ export function Settings() {
   const [drag, setDrag] = useState<{ id: string; dy: number; dropIndex: number } | null>(null);
   const dragMeta = useRef<{ id: string; startY: number; order: string[] } | null>(null);
 
-  // `id` here is a LOGICAL ROW key (toLogicalRows) — a group id when dragging
-  // a group's header, a tool id for a standalone row. Group children are
-  // never draggable (see render below): their order is fixed by TOOL_GROUPS,
-  // only the group as a whole can move.
+  // `id` is a logical row key (toLogicalRows): a group id or a tool id.
+  // Group children are not draggable; their order is fixed by TOOL_GROUPS.
   const startDrag = useCallback((id: string, e: React.PointerEvent) => {
     const order = toLogicalRows(displayTools).map((r) => r.key);
     const fromIndex = order.indexOf(id);
@@ -479,8 +445,7 @@ export function Settings() {
             const nextRows = [...rows];
             const [moved] = nextRows.splice(from, 1);
             nextRows.splice(d.dropIndex, 0, moved);
-            // Mỗi hàng đã là một khối liền — không cần cluster lại, chỉ trải
-            // phẳng theo đúng thứ tự hàng mới.
+            // Each row is already contiguous; just flatten in the new row order.
             const flat = nextRows.flatMap((r) => r.tools);
             reorderTools(flat.map((t) => t.id));
             return flat;
@@ -496,11 +461,8 @@ export function Settings() {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Nav trái — chữ thuần, KHÔNG icon (khác sidebar chính của app, để hai
-          tầng điều hướng không lẫn vào nhau). Học từ trang Settings của DBX:
-          một danh sách mục cố định bên trái, bên phải chỉ hiện ĐÚNG một mục,
-          cuộn riêng — bấm vào mục tự là hành động "mở", không cần accordion
-          lồng bên trong từng mục như bản cũ nữa. */}
+      {/* Left nav: plain text, no icons, so it does not compete with the
+          main sidebar. One section is shown at a time. */}
       <nav className="w-48 shrink-0 overflow-y-auto border-r border-line bg-chrome px-2 py-4">
         <ul className="space-y-0.5">
           {SETTINGS_SECTIONS.map((s) => (
@@ -526,15 +488,10 @@ export function Settings() {
         </ul>
       </nav>
 
-      {/* Nội dung mục đang chọn — cuộn riêng khỏi nav. sr-only heading để
-          trình đọc màn hình vẫn biết đang ở mục nào dù không có tiêu đề hiện
-          ra (nav bên trái đã hiện, lặp lại là dư — khớp phần lớn trang của
-          DBX; chỉ Appearance giữ tiêu đề nhìn thấy, xem SettingGroup dưới). */}
+      {/* Selected section, scrolling independently of the nav. The sr-only
+          heading tells screen readers which section is open. */}
       <div className="min-w-0 flex-1 overflow-y-auto">
-        {/* max-w-2xl (672px) từng để lại quá nhiều khoảng trống 2 bên trên
-            cửa sổ rộng — nới lên 60rem (960px), vẫn cố định (không co giãn
-            theo %, giữ dòng chữ mô tả không quá dài để đọc, đúng tinh thần
-            DBX ban đầu) nhưng đỡ trống hơn ở độ rộng thường gặp. */}
+        {/* Fixed max width keeps description lines readable on wide windows. */}
         <div className="mx-auto max-w-[60rem] space-y-4 px-6 py-6">
           <h2 className="sr-only">{t(SETTINGS_SECTIONS.find((s) => s.id === activeSection)!.label)}</h2>
 
@@ -611,16 +568,9 @@ export function Settings() {
               </SelectContent>
             </Select>
           }
-          // Không thêm preview cho hàng "Font" phía trên: đổi --sans áp NGAY
-          // lên toàn app (sidebar, tiêu đề, mọi chữ khác đang hiện), nên bản
-          // thân màn Settings đã LÀ bản xem trước — thêm dải nữa là lặp.
-          //
-          // "Code font" thì khác: hai lựa chọn chỉ khác nhau ở LIGATURE
-          // (=>, !=, >=…), thứ không đọc ra được từ mỗi cái tên "IBM Plex
-          // Mono" / "Fira Code" — phải NHÌN. Không có dải này, người dùng
-          // phải rời Settings đi mở JSON Formatter hay ô nào đó có
-          // font-mono để so sánh. Học từ trang Editor của DBX: đổi Font
-          // Family thì một khối code mẫu render lại ngay bên dưới.
+          // No preview for the UI font above: it applies to the whole app, so
+          // Settings itself is the preview. Code fonts differ only in ligatures
+          // (=>, !=, >=), which have to be seen, so a sample block follows.
           preview={
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-fg-mute">
@@ -699,11 +649,8 @@ export function Settings() {
             const line = (key: string) => (
               <div key={key} className="pointer-events-none mx-3 h-0.5 rounded-full bg-acc" />
             );
-            // Hàng LOGIC là đơn vị kéo-thả: một nhóm (≥2 thành viên liền nhau,
-            // tìm kiếm lọc còn 1 thì thoái thành hàng đơn — cùng quy tắc
-            // sidebar dùng ở buildNavEntries) là MỘT hàng có thể kéo; tool con
-            // bên trong không kéo được riêng, thứ tự của chúng theo đúng
-            // TOOL_GROUPS, chỉ nhóm mới di chuyển được trong danh sách này.
+            // Logical rows are the drag unit: a group (2+ adjacent members) is one
+            // row; its children follow TOOL_GROUPS and cannot be dragged alone.
             const rows = toLogicalRows(visibleTools);
             rows.forEach((row) => {
               const isDragging = drag?.id === row.key;
@@ -729,8 +676,7 @@ export function Settings() {
                         isDragging && 'relative z-20 rounded-lg bg-bg-2 shadow-lg ring-1 ring-acc/50'
                       )}
                     >
-                      {/* Kéo cả nhóm — con bên trong không có tay cầm riêng,
-                          thứ tự của chúng cố định theo TOOL_GROUPS. */}
+                      {/* Drags the whole group; children have no handle of their own. */}
                       <button
                         type="button"
                         aria-label={t('settings.tools.dragReorderGroup', { label: group.label })}
@@ -814,10 +760,7 @@ export function Settings() {
           })()}
         </div>
 
-        {/* Quyền + nhật ký hoạt động của mọi tool biên dịch sẵn — trước đây
-            là mục "Plugin" riêng, gộp về đây vì cùng nói về TOOL, chỉ khác
-            góc nhìn (bật/tắt ở trên, quyền được phép làm gì/đã làm gì ở
-            dưới) so với việc tách thành hai mục cạnh nhau trong nav. */}
+        {/* Permissions and activity of built-in tools. */}
         <div className="pt-2 border-t border-line">
           <SettingsPlugins />
         </div>
@@ -1131,9 +1074,7 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Vị trí thư mục dữ liệu — trước đây là mục "Data & Storage" riêng,
-            gộp về About vì chỉ có một dòng thông tin, không đáng một mục
-            riêng trong nav trái. */}
+        {/* Data directory location. */}
         <div className="rounded-lg border divide-y">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="min-w-0">

@@ -43,13 +43,9 @@ const ToolPanes = React.forwardRef<
 ));
 ToolPanes.displayName = 'ToolPanes';
 
-// A single pane within ToolPanes — a column that owns its header + scroll body.
-// Mặt nền `--card` là chủ ý: vùng LÀM VIỆC phải là bề mặt sáng nhất màn hình,
-// còn mọi thứ bao quanh nó (toolbar, đầu pane, sidebar) tối hơn một bậc. Đây là
-// mô hình của IDE và của DBX (`--dbx-content` trắng, `--dbx-chrome` xám). Trước
-// đây pane không đặt nền nên nó rơi thẳng xuống `--bg` xám — vùng làm việc và
-// vùng điều khiển cùng một tông, và màn hình đọc ra là một mảng phẳng không có
-// chỗ nào bắt đầu.
+// A single pane within ToolPanes: a column with its own header and scroll
+// body. Uses `--card`, the brightest surface, with the surrounding chrome a
+// step darker, as in IDEs.
 const ToolPane = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div ref={ref} className={cn('flex flex-col min-h-0 bg-card', className)} {...props} />
@@ -69,20 +65,15 @@ const PaneHeader = React.forwardRef<HTMLDivElement, PaneHeaderProps>(
     <div
       ref={ref}
       className={cn(
-        // `bg-bg-2/10` cũ là 10% độ đục của một tông vốn đã nhạt — trên thực tế
-        // là trong suốt, nên thanh nhãn không đọc ra là một thanh. Giờ nó là
-        // `--chrome` đặc: một dải điều khiển thật, tối hơn mặt làm việc bên
-        // dưới, ngăn bằng một đường `--line` đủ đậm.
+        // Solid `--chrome` bar separated by a `--line` border.
         'shrink-0 px-4 py-1.5 border-b border-line bg-chrome flex items-center justify-between gap-2',
         className
       )}
       {...props}
     >
       <div className="flex min-w-0 items-center gap-2">
-        {/* Nhãn phân mục kiểu `eyebrow` (chữ nhỏ, viết hoa, giãn chữ rộng) —
-            rút từ nguồn Larme trong `reference/ANALYSIS.md`. Nhãn 14px thường
-            có cùng trọng lượng thị giác với nội dung bên dưới, nên mắt không
-            phân được đâu là nhãn đâu là dữ liệu. */}
+        {/* Eyebrow label (small caps, wide tracking) so it reads as a label,
+            not data. */}
         <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-mute">{label}</span>
         {hint && <span className="truncate text-[11px] text-fg-mute/70">{hint}</span>}
       </div>

@@ -24,13 +24,9 @@ const FAVORITES_KEY = 'devtool-favorites';
 const FeatureContext = createContext<FeatureContextType | undefined>(undefined);
 
 /**
- * Bật/tắt mặc định cho bản cài mới, đọc từ `defaultEnabled` của từng manifest
- * plugin. `settings` được nối thêm vì nó là màn hình của shell, không phải
- * plugin, và không bao giờ tắt được.
- *
- * `FeatureProvider` trộn giá trị đã lưu LÊN TRÊN bảng này, nên một plugin mới
- * xuất hiện sẽ nhận đúng mặc định của nó thay vì thừa hưởng lựa chọn cũ của
- * người dùng cho một tool khác.
+ * Default enabled state for new installs, from each manifest's
+ * `defaultEnabled`, plus `settings` (shell screen, always on). Stored values
+ * are merged over this, so a new plugin gets its own default.
  */
 const DEFAULT_FEATURES: FeatureSettings = {
   ...DEFAULT_PLUGIN_FEATURES,
@@ -42,7 +38,7 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
     try {
       const saved = storageGet('devtool-features');
       if (!saved) return DEFAULT_FEATURES;
-      // Merge: new tools get their DEFAULT value; existing user overrides are preserved
+      // New tools get their default; existing user choices are kept.
       return { ...DEFAULT_FEATURES, ...JSON.parse(saved) };
     } catch {
       return DEFAULT_FEATURES;
@@ -92,8 +88,7 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
     storageSet(TOOL_ORDER_KEY, JSON.stringify(order));
   }, []);
 
-  // Most-recently-favorited goes first, so the top of the sidebar reflects the
-  // order the user starred things.
+  // Most recently favorited first.
   const toggleFavorite = useCallback((featureId: string) => {
     setFavorites((prev) =>
       prev.includes(featureId) ? prev.filter((id) => id !== featureId) : [featureId, ...prev]
@@ -102,14 +97,8 @@ export function FeatureProvider({ children }: { children: ReactNode }) {
 
   const isFavorite = useCallback((featureId: string) => favorites.includes(featureId), [favorites]);
 
-  // `FeatureProvider` sits near the top of the provider tree and is read by
-  // every sidebar row and route guard. A real `features`/`favorites` change
-  // (toggling a tool, reordering) still re-renders every consumer — React
-  // context has no per-field subscription, and this memo doesn't add one.
-  // What it DOES fix: without it, the value was a brand-new object on every
-  // render of THIS provider, including ones triggered by something entirely
-  // unrelated re-rendering its parent — every consumer re-rendered then too,
-  // with nothing in features/favorites/etc. having actually changed.
+  // Memoized so unrelated re-renders of this provider do not hand every
+  // consumer a new value. Real changes still re-render all consumers.
   const value = useMemo<FeatureContextType>(
     () => ({
       features,

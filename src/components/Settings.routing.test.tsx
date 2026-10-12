@@ -3,11 +3,9 @@ import { screen, cleanup } from '@testing-library/react';
 import { renderSettings } from '@/testSupport/renderSettings';
 
 /**
- * `desktop-devtool-app://install?...` (src/lib/deepLink.ts) điều hướng tới `/settings`
- * với `{ state: { section: 'extensions' } }` để mở thẳng màn cài đặt tiện ích —
- * xác nhận Settings thực sự đọc `location.state.section` này, chứ không rơi
- * về mục mặc định (Appearance). Bug này chính là finding pullfrog nêu trên
- * PR #126: điều hướng tới `/settings` không tự chọn mục nào cả.
+ * Install deep links navigate to `/settings` with
+ * `{ state: { section: 'extensions' } }`; Settings must open that section
+ * instead of the default (Appearance).
  */
 
 afterEach(() => {

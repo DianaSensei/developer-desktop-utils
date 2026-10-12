@@ -1,18 +1,14 @@
-// Dòng tham số — công thức BỐN TẦNG, học từ Sony Color Lab.
+// Parameter row in four parts:
 //
-//   Poll interval  ?      500ms     [mặc định]    Bao lâu client hỏi broker một lần
-//   └─ nhãn + help        └─ giá trị └─ tag       └─ câu giải thích
+//   Poll interval  ?      500ms     [default]     How often the client polls
+//   └─ label + help       └─ value  └─ tag        └─ explanation
 //
-// Ba điều làm nên công thức này, và cả ba đều dễ bị bỏ:
-//
-//   1. GIÁ TRỊ canh phải, chữ đơn cách, tabular-nums → người dùng quét được cột
-//      số. Nhãn canh trái, giá trị canh phải, không trộn.
-//   2. TAG phân loại tối đa HAI loại trong một danh sách (mặc định / đã đổi).
-//      Ba loại trở lên thì tag hết phân loại được gì — đó là lý do `tag` chỉ
-//      nhận một chuỗi ngắn, không nhận mảng.
-//   3. CÂU GIẢI THÍCH luôn hiện, không giấu sau tooltip. Đây là thứ DevTool
-//      thiếu nhất: 24 tool đầy tham số mà không nói tham số đó làm gì. `help`
-//      chỉ dành cho phần sâu hơn câu giải thích một tầng.
+//   1. The value is right-aligned, monospace and tabular so values scan as a
+//      column.
+//   2. A tag classifies at most two kinds per list (default / changed), so
+//      `tag` takes one short string.
+//   3. The explanation is always visible, not hidden in a tooltip; `help`
+//      is only for detail beyond it.
 
 import * as React from 'react';
 import { HelpCircle } from 'lucide-react';
@@ -23,15 +19,15 @@ import UI from '@/components/ui/ui.messages';
 
 export interface ParamRowProps {
   label: React.ReactNode;
-  /** Nội dung cho dấu `?` — chỉ dùng cho phần SÂU HƠN `children`, không lặp lại nó. */
+  /** `?` tooltip content, only for detail beyond `children`. */
   help?: string;
-  /** Giá trị hiện tại. Canh phải, chữ đơn cách, có trọng lượng. */
+  /** Current value; right-aligned, monospace. */
   value: React.ReactNode;
-  /** Một tag phân loại ngắn: "mặc định", "đã đổi", "bắt buộc". Tối đa hai loại/danh sách. */
+  /** Short tag: "default", "changed", "required". At most two kinds per list. */
   tag?: string;
-  /** Tag nhấn mạnh (đã đổi khỏi mặc định) thay vì tag im lặng. */
+  /** Emphasized tag (changed from default) instead of a quiet one. */
   tagActive?: boolean;
-  /** Câu giải thích — LUÔN hiện. Đây là lý do component này tồn tại. */
+  /** Explanation, always shown. */
   children?: React.ReactNode;
   className?: string;
 }
@@ -52,8 +48,8 @@ export function ParamRow({
         <span className="flex min-w-0 items-center gap-1 text-dense font-medium">
           <span className="truncate">{label}</span>
           {help && (
-            // Icon chứ không phải chữ "?" trong vòng tròn: một glyph cỡ 9–10px
-            // là chữ không đọc được, mà luật cấm chữ dưới 11px.
+            // An icon, not a "?" glyph: at 9–10px a character is unreadable and
+            // text under 11px is not allowed.
             <Tooltip label={help} side="top">
               <span
                 tabIndex={0}

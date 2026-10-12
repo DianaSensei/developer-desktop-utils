@@ -1,8 +1,4 @@
-// Covers the active tab's rounded-md pill — the app's one semantic shape for
-// "this is selected" (design/RULES.md's "Bo góc cho 'đang chọn'" rule). This
-// used to be an opt-in `variant` prop (a sliding-underline strip was the
-// default); every consumer has since moved to the pill and the underline
-// path was removed entirely, so there's only one shape to cover now.
+// The active tab renders as the rounded-md "selected" pill (design/RULES.md).
 
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';

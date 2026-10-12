@@ -1,8 +1,4 @@
-// Icon-in-input search box — the `<Search className="absolute left-2.5 ..." />`
-// + `<Input className="pl-8" />` pair that was hand-rolled nearly identically in
-// ~14 places (API Client's sidebar, every Kafka/RabbitMQ list view, Clockify,
-// JSON Formatter, 2FA...). Use this instead of repositioning the icon by hand
-// again.
+// Search input with a leading icon.
 
 import * as React from 'react';
 import { Search, X, type LucideIcon } from 'lucide-react';
@@ -17,7 +13,7 @@ export interface SearchInputProps extends Omit<InputProps, 'onChange' | 'value' 
   /** Shows a × button to clear the value when non-empty. Default true. */
   clearable?: boolean;
   containerClassName?: string;
-  /** Icon đầu ô — mặc định kính lúp; đổi khi ô nhập không phải "tìm" (VD: ô nhập domain). */
+  /** Leading icon; a magnifier by default. Change it for non-search fields (e.g. a domain). */
   icon?: LucideIcon;
 }
 
@@ -34,11 +30,8 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        // None of the ~20 call sites pairs this with a visible <Label> — the
-        // magnifier and the placeholder are the whole affordance — so without a
-        // fallback name a screen reader reaches an unlabelled text field. The
-        // placeholder is the name the sighted user gets; use it, and let a call
-        // site pass its own `aria-label` to win.
+        // Callers rarely add a visible label, so fall back to the placeholder
+        // as the accessible name; an explicit `aria-label` wins.
         aria-label={props['aria-label'] ?? (typeof placeholder === 'string' ? placeholder : undefined)}
         className={cn('pl-8', clearable && value && 'pr-7', className)}
         {...props}

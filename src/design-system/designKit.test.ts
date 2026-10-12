@@ -3,33 +3,28 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
- * Rào chắn cho `design/` — bộ design kit.
- *
- * Kit chỉ giữ được giá trị nếu ba điều luôn đúng:
- *   1. `design/tokens.css` là CSS THUẦN (không có cú pháp Tailwind), nếu không
- *      trang mẫu tĩnh sẽ vỡ.
- *   2. Trang mẫu không dùng biến nào chưa được định nghĩa.
- *   3. Màu trạng thái KHÔNG dẫn xuất từ accent — nếu không, đổi tone sẽ làm
- *      thẻ "thành công" đổi màu. Đây là luật gốc của cả hệ.
- *
- * Cả ba đều là thứ dễ bị phá trong một PR vô tình. Test này bắt được ngay.
+ * Guards for the design kit in `design/`:
+ *   1. design/tokens.css is plain CSS (no Tailwind syntax), or the static
+ *      preview page breaks;
+ *   2. the preview page uses no undefined variables;
+ *   3. status colors never derive from the accent, so changing the tone
+ *      cannot recolor a "success" chip.
  */
 
 const root = resolve(__dirname, '../..');
 const tokens = readFileSync(resolve(root, 'design/tokens.css'), 'utf-8');
 const preview = readFileSync(resolve(root, 'design/preview/index.html'), 'utf-8');
 
-/** Biến khai báo — chúng có thể nằm chung dòng, nên không neo vào đầu dòng. */
+/** Declared variables; several may share a line. */
 const declared = (css: string) =>
   new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
 
-/** Bỏ comment — tài liệu trong file có nhắc tên các at-rule bị cấm. */
+/** Comments stripped: the docs mention the forbidden at-rules. */
 const code = tokens.replace(/\/\*[\s\S]*?\*\//g, '');
 
 describe('design kit — tokens.css', () => {
   it('là CSS thuần: không có cú pháp cần Tailwind xử lý', () => {
-    // @layer / @apply bắt buộc phải qua Tailwind. Nếu lọt vào đây, trang mẫu
-    // tĩnh (chỉ <link> thẳng file này) sẽ hiện sai mà không báo lỗi gì.
+    // @layer/@apply need Tailwind; the static preview links this file directly.
     expect(code).not.toMatch(/@apply\b/);
     expect(code).not.toMatch(/@layer\b/);
     expect(code).not.toMatch(/@tailwind\b/);
@@ -46,7 +41,7 @@ describe('design kit — tokens.css', () => {
 
   it('bản tối định nghĩa lại kênh, không định nghĩa lại màu đã bọc hsl()', () => {
     const dark = tokens.slice(tokens.indexOf('.dark {'), tokens.indexOf('[data-accent='));
-    // Nếu bản tối gán thẳng `--acc: ...` thì bản `-c` và bản bọc sẽ lệch nhau.
+    // A dark override assigning `--acc: ...` directly would desync the `-c` variant.
     const rewrapped = [...dark.matchAll(/(--[a-z0-9-]+):\s*hsl\(var\(--\1-c\)\)/g)];
     expect(rewrapped).toHaveLength(0);
   });
@@ -61,8 +56,7 @@ describe('design kit — luật màu trạng thái', () => {
   ];
 
   it('không màu trạng thái nào tham chiếu kênh accent', () => {
-    // Đây là luật giữ cho việc đổi tone không phá vỡ ngữ nghĩa: đổi accent sang
-    // đỏ mà chip "hợp lệ" vẫn xanh lá. Xem design/RULES.md.
+    // Changing the accent must not change status meaning (design/RULES.md).
     for (const name of statusChannels) {
       const decls = [...tokens.matchAll(new RegExp(`--${name}-c:\\s*([^;]+);`, 'g'))];
       expect(decls.length, `--${name}-c phải được khai báo cho cả sáng và tối`).toBe(2);
@@ -73,7 +67,7 @@ describe('design kit — luật màu trạng thái', () => {
   });
 
   it('giữ đúng hue nghĩa ở cả hai theme', () => {
-    // ok phải xanh lá (~90–170°), bad phải đỏ (~0–20° hoặc ~340–360°).
+    // ok must be green (~90–170°), bad red (~0–20° or ~340–360°).
     const hueOf = (name: string) =>
       [...tokens.matchAll(new RegExp(`--${name}-c:\\s*([\\d.]+)`, 'g'))].map((m) => Number(m[1]));
 
@@ -84,7 +78,7 @@ describe('design kit — luật màu trạng thái', () => {
 });
 
 describe('design kit — tone chủ đạo phải phân biệt được với màu trạng thái', () => {
-  /** HSL → RGB, để đo khoảng cách màu thật thay vì so từng kênh HSL. */
+  /** HSL → RGB, to measure real color distance. */
   const toRgb = (h: number, s: number, l: number): [number, number, number] => {
     const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
     const f = (n: number) => {
@@ -96,7 +90,7 @@ describe('design kit — tone chủ đạo phải phân biệt được với m�
   const dist = (a: number[], b: number[]) =>
     Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
-  /** Màu trạng thái ở theme sáng — accent phải tránh xa các màu này. */
+  /** Light-theme status colors the accent must stay away from. */
   const statusHsl = (name: string) => {
     const m = tokens.match(new RegExp(`--${name}-c:\\s*([\\d.]+)\\s+([\\d.]+)%\\s+([\\d.]+)%`));
     if (!m) throw new Error(`không tìm thấy --${name}-c`);
@@ -111,9 +105,7 @@ describe('design kit — tone chủ đạo phải phân biệt được với m�
     expect(presets.length).toBeGreaterThan(0);
   });
 
-  // Một tone accent trùng màu với --bad nghĩa là người dùng không phân biệt được
-  // nút chính với báo lỗi. Bản oxblood đầu tiên vướng đúng lỗi này (cách --bad
-  // chỉ 10 đơn vị RGB), phát hiện khi đo bằng trình duyệt thật ở G1.
+  // An accent too close to --bad makes primary buttons look like errors.
   for (const [, name, h, s, l] of presets) {
     it(`tone "${name}" đủ xa --bad và --ok`, () => {
       const acc = toRgb(Number(h), Number(s), Number(l));
@@ -131,9 +123,7 @@ describe('design kit — trang mẫu', () => {
   });
 
   it('swatch tone khớp đúng preset trong tokens.css', () => {
-    // Trang mẫu phải chào bán đúng bộ tone mà app có. Trước G1 hai bên đã lệch
-    // (trang mẫu có "Forest h152 s56 l30", kit có "forest h152 s52 l32") — đúng
-    // kiểu trôi lệch mà cả bộ kit sinh ra để ngăn.
+    // The preview must offer exactly the app's tones.
     const presets = [...tokens.matchAll(
       /\[data-accent="(\w+)"\]\s*\{\s*--a-h:\s*([\d.]+);\s*--a-s:\s*([\d.]+)%;\s*--a-l:\s*([\d.]+)%/g
     )].map(([, , h, s, l]) => `${h} ${s}% ${l}%`);
@@ -146,7 +136,7 @@ describe('design kit — trang mẫu', () => {
   });
 
   it('link tới token dùng chung thay vì tự khai báo lại', () => {
-    // Nếu ai đó dán một khối :root vào trang mẫu, nó sẽ trôi lệch khỏi app.
+    // A pasted :root block in the preview would drift from the app.
     expect(preview).toContain('href="../tokens.css"');
     expect(preview).not.toMatch(/:root\s*\{/);
   });

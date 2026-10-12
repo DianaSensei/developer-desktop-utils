@@ -8,9 +8,9 @@ import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import { storageRemove } from '@/lib/persistentStore';
 
 /**
- * Quy tắc thuần (thêm/đóng/đẩy tab, tạo/xoá workspace) nằm ở
- * lib/workspaces.test.ts. File này phủ phần chỉ component mới có: ẩn mình khi
- * không có gì để chuyển, điều hướng khi bấm tab, nút × và phím tắt ⌘/Ctrl+số.
+ * Pure tab/workspace rules are tested in lib/workspaces.test.ts. These cover
+ * the component: hiding when there is nothing to switch, navigation on tab
+ * click, the close button, and ⌘/Ctrl+number shortcuts.
  */
 
 function Where() {
@@ -72,7 +72,7 @@ describe('WorkspaceBar', () => {
     render(<Harness />);
     fireEvent.click(screen.getByText('To Date'));
     expect(screen.getByTestId('path').textContent).toBe('/unix-time');
-    // Phím mod thật phụ thuộc nền tảng — bắn cả hai, chỉ một khớp.
+    // The real modifier depends on the platform; fire both, one matches.
     fireEvent.keyDown(window, { key: '1', code: 'Digit1', ctrlKey: true });
     fireEvent.keyDown(window, { key: '1', code: 'Digit1', metaKey: true });
     expect(screen.getByTestId('path').textContent).toBe('/json');
@@ -81,15 +81,15 @@ describe('WorkspaceBar', () => {
   it('switching to an emptied workspace seeds it with the tool on screen', () => {
     render(<Harness />);
     fireEvent.click(screen.getByText('To Date'));
-    // Workspace 2 qua menu → hộp đặt tên → Enter (tên trống vẫn hợp lệ).
+    // Workspace 2 via the menu → naming dialog → Enter (empty name is valid).
     fireEvent.click(screen.getByRole('button', { name: /workspace/i }));
     fireEvent.click(screen.getByText(/New workspace|Workspace mới/));
     fireEvent.submit(screen.getByRole('textbox').closest('form')!);
-    // Đóng tab duy nhất của workspace 2 → rỗng.
+    // Close workspace 2's only tab → empty.
     const only = within(screen.getByRole('tablist')).getByRole('tab');
     fireEvent.click(within(only).getByRole('button'));
     expect(within(screen.getByRole('tablist')).queryAllByRole('tab')).toHaveLength(0);
-    // Sang workspace 1 rồi quay lại workspace 2 bằng ⌘/Ctrl+⌥+số.
+    // Switch to workspace 1 and back to 2 with ⌘/Ctrl+⌥+number.
     for (const n of ['1', '2']) {
       fireEvent.keyDown(window, { key: n, code: `Digit${n}`, ctrlKey: true, altKey: true });
       fireEvent.keyDown(window, { key: n, code: `Digit${n}`, metaKey: true, altKey: true });
@@ -99,7 +99,6 @@ describe('WorkspaceBar', () => {
     expect(tabs[0].getAttribute('aria-selected')).toBe('true');
   });
 
-  // Góp ý review PR #173.
   it('"Close other tabs" on a background tab navigates to the kept tab', () => {
     render(<Harness />);
     fireEvent.click(screen.getByText('To Date')); // đang ở Date
@@ -112,7 +111,7 @@ describe('WorkspaceBar', () => {
   it('re-selecting the same tool after closing its last tab brings the tab back', () => {
     render(<Harness />);
     fireEvent.click(screen.getByText('To Date'));
-    // Workspace thứ hai (được gieo tool đang mở) — 2 workspace thì thanh luôn hiện.
+    // A second workspace (seeded with the current tool) keeps the bar visible.
     fireEvent.click(screen.getByRole('button', { name: /workspace/i }));
     fireEvent.click(screen.getByText(/New workspace|Workspace mới/));
     fireEvent.submit(screen.getByRole('textbox').closest('form')!);
@@ -120,7 +119,7 @@ describe('WorkspaceBar', () => {
     fireEvent.click(within(only).getByRole('button'));
     expect(within(screen.getByRole('tablist')).queryAllByRole('tab')).toHaveLength(0);
     expect(screen.getByTestId('path').textContent).toBe('/unix-time');
-    // Chọn lại ĐÚNG tool đang ở trên màn hình — cùng pathname.
+    // Pick the tool already on screen again: same pathname.
     fireEvent.click(screen.getByText('To Date'));
     expect(within(screen.getByRole('tablist')).getAllByRole('tab')).toHaveLength(1);
   });

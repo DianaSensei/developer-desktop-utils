@@ -1,15 +1,12 @@
-// Small inline label — connection state, HTTP method, message count, "beta",
-// queue type. Every complex tool had grown its own: RabbitMQ's `StateBadge`,
-// the node running/down chip, the API Client sidebar's method badge, Kafka's
-// info-modal badge, Time Tracker's count pills, TextDiff's result chip. Each
-// picked slightly different padding, radius and dark-mode text colors.
+// Small inline label: connection state, HTTP method, message count, "beta",
+// queue type.
 //
-// Two axes, both closed-ended:
-//   tone    — what it means (neutral / success / warning / danger / info / accent)
-//   variant — how loud it is (soft fill / solid fill / outline)
+// Two closed axes:
+//   tone    — meaning (neutral / success / warning / danger / info / accent)
+//   variant — loudness (soft fill / solid fill / outline)
 //
-// `uppercase` switches to the state-chip look (semibold + tracking); leave it
-// off for counts and free text.
+// `uppercase` gives the state-chip look (semibold, tracking); leave it off
+// for counts and free text.
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
@@ -17,9 +14,8 @@ import { cn } from '@/lib/utils';
 export type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info' | 'accent';
 export type BadgeVariant = 'soft' | 'solid' | 'outline';
 
-// Mỗi tông lấy từ hệ trạng thái của design kit, không phải bảng màu Tailwind.
-// Nhờ vậy chúng tự đúng ở cả sáng lẫn tối (không cần cặp `dark:` thủ công) và
-// KHÔNG đổi khi đổi tone accent — xem design/RULES.md.
+// Tones come from the kit's status palette, so they work in both themes and
+// do not change with the accent (design/RULES.md).
 const SOFT: Record<BadgeTone, string> = {
   neutral: 'bg-bg-2 text-fg-mute',
   success: 'bg-ok-tint text-ok',
@@ -31,9 +27,8 @@ const SOFT: Record<BadgeTone, string> = {
 
 const SOLID: Record<BadgeTone, string> = {
   neutral: 'bg-fg-mute text-bg',
-  // `text-bg` chứ không phải `text-white`: ở theme tối các tông trạng
-  // thái là bản SÁNG, nên chữ trắng sẽ chìm. Nền của app đảo theo theme nên chữ
-  // luôn tương phản ở cả hai.
+  // `text-bg`, not white: dark-theme status colors are light, and the
+  // background flips with the theme.
   success: 'bg-ok text-bg',
   warning: 'bg-warn text-bg',
   danger: 'bg-bad text-bg',
@@ -56,7 +51,7 @@ const VARIANT: Record<BadgeVariant, Record<BadgeTone, string>> = {
   outline: OUTLINE,
 };
 
-// 11px là cỡ nhỏ nhất được phép — dưới mức đó không đọc được ở HiDPI.
+// 11px is the smallest allowed size.
 const SIZE_CLASS = {
   xs: 'px-1.5 py-0.5 text-[11px]',
   sm: 'px-2 py-[3px] text-[11px]',

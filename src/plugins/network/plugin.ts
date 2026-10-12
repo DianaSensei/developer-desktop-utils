@@ -14,7 +14,7 @@ export default definePlugin({
   permissions: ['storage', 'clipboard:read', 'clipboard:write', 'native', 'http'],
   commands: ['list_listening_ports', 'local_network_info'],
   hosts: [
-    // DoH resolvers + dịch vụ tra IP, đúng danh sách tool này gọi tới.
+    // DoH resolvers and IP lookup services this tool calls.
     'cloudflare-dns.com', 'dns.google', 'dns.quad9.net', 'dns.adguard-dns.com',
     'ipapi.co', 'ipwho.is', 'freeipapi.com',
   ],

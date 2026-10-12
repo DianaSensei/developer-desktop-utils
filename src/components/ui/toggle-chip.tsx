@@ -8,15 +8,9 @@ export interface ToggleChipProps extends Omit<ButtonProps, 'onClick' | 'variant'
 }
 
 /**
- * Tuỳ chọn bật/tắt trên toolbar ("Uppercase keywords", "Pretty XML",
- * "Remove whitespace"…). Trước đây SQL Formatter, Data Converter, Text
- * Transformer và Encode Pipeline mỗi nơi tự vẽ một kiểu (rounded-lg, viền
- * acc/50, nền acc/10…), có chỗ thiếu `aria-pressed` nên trình đọc màn hình
- * không biết nó đang bật.
- *
- * Bật = nhuộm accent (`acc-tint`): theo RULES.md accent nghĩa là "đang được
- * chọn". Khác `Switch` của dòng cấu hình (xanh lá cố định) — đây là lựa chọn
- * trong toolbar, không phải trạng thái hệ thống.
+ * Toolbar on/off option ("Uppercase keywords", "Pretty XML"...), with
+ * `aria-pressed`. On uses the accent tint, since accent means "selected"
+ * (RULES.md); settings switches use the fixed green instead.
  */
 export const ToggleChip = React.forwardRef<HTMLButtonElement, ToggleChipProps>(
   ({ pressed, onPressedChange, className, ...props }, ref) => (

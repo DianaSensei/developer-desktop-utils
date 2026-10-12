@@ -3,15 +3,8 @@ import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
- * `Tooltip` là nguồn duy nhất cho mọi gợi ý rê chuột trong app, và ở sidebar thu
- * gọn nó là thứ DUY NHẤT nói cho biết mỗi icon là tool gì. Hai điều bộ test này
- * khoá lại:
- *
- *  1. Mở được bằng BÀN PHÍM (focus), không chỉ bằng chuột — bản đầu chỉ nghe
- *     mouseenter/mouseleave, nên với người dùng bàn phím sidebar thu gọn là một
- *     cột icon không nhãn.
- *  2. Bong bóng nằm TRONG viewport — neo thô theo rect của trigger làm nó tràn
- *     ra ngoài mép và bị cắt với các mục sát đáy/sát phải.
+ * Tooltips are the only labels in the collapsed sidebar. They must open on
+ * keyboard focus, not just hover, and stay inside the viewport.
  */
 
 function stubRect(el: Element, rect: Partial<DOMRect>) {
@@ -53,7 +46,7 @@ describe('Tooltip', () => {
     const { container } = render(
       <Tooltip label="Redis" side="right" delay={0}><button>open</button></Tooltip>,
     );
-    // Trigger sát mép phải + sát đáy: neo thô sẽ ra left≈1000, top≈695.
+    // Trigger at the bottom-right corner; unclamped it would sit at ≈1000/695.
     stubRect(container.firstElementChild!, { top: 690, bottom: 700, left: 980, right: 995, width: 15, height: 10 });
 
     act(() => { fireEvent.focus(screen.getByRole('button', { name: 'open' })); });

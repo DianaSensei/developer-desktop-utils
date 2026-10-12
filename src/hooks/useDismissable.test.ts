@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useDismissable } from '@/hooks/useDismissable';
 
-/** Chưa có test nào — nền tảng dismiss-on-outside-click/Escape dùng chung bởi
- *  ColorPicker/DatePicker/TimePicker (qua `useAnimatedOpen`) và các popover khác. */
+/** Outside-click/Escape dismissal shared by ColorPicker, DatePicker,
+ *  TimePicker (through `useAnimatedOpen`) and other popovers. */
 
 function firePointerDown(target: Node) {
   const el = target as HTMLElement;

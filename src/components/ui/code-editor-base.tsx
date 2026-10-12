@@ -1,12 +1,8 @@
-// Internal engine shared by every editable code surface (JsonEditor,
-// JavaScriptEditor, SqlEditor, TextEditor). Not exported from the design
-// system — tool code should never import this directly or reach into
-// CodeMirror itself. Each language-specific wrapper picks its own `lang` and
-// `extraExtensions` (e.g. JSON's linter) and otherwise gets an identical,
-// consistently-themed editing surface for free: Tab/Shift-Tab indent, smart
-// bracket skip-over, {{variable}} support, read-only handling, blur/change
-// wiring. Adding a feature here (or swapping the underlying engine entirely)
-// changes every tool at once instead of a dozen copies.
+// Internal engine behind every editable code surface (JsonEditor,
+// JavaScriptEditor, SqlEditor, TextEditor); not exported from the design
+// system. Wrappers pick `lang` and `extraExtensions` (e.g. JSON's linter) and
+// share the rest: Tab indent, bracket skip-over, {{variable}} support,
+// read-only handling, blur/change wiring.
 
 import { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
@@ -63,28 +59,19 @@ export function CodeSurface({
       state: EditorState.create({
         doc: value,
         extensions: [
-          // Tab/Shift-Tab indent and dedent instead of leaving the editor to
-          // move focus to the next element — must precede `basicSetup` to
-          // take precedence over its keymaps. Read-only editors fall through
-          // to the browser default (indentMore/Less no-op when readOnly), so
-          // Tab still moves focus away from an output-only viewer.
+          // Tab/Shift-Tab indent instead of moving focus; must precede
+          // `basicSetup`. In read-only editors Tab still moves focus.
           keymap.of([indentWithTab]),
           basicSetup,
           smartBracketSkip,
-          // Stop macOS/WebKit from substituting smart quotes / autocorrecting
-          // code — a typed " must stay a straight ASCII quote (curly quotes
-          // break JSON). No-op on Windows/Linux WebViews.
+          // No smart quotes or autocorrect (curly quotes break JSON). No-op
+          // outside macOS/WebKit.
           EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
           ...(lang ? [lang] : []),
           ...extraExtensions,
           ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
-          // Fixed at mount, same as `lang`/`extraExtensions` — no call site needs
-          // this to change without also remounting (e.g. RawEditor swaps
-          // component identity when body.mode changes). CodeMirror's own
-          // placeholder decoration (not a hand-rolled overlay) is what
-          // InlineCodeField already uses — it renders inline in the real
-          // document flow, so multi-line text wraps correctly and it's never
-          // out of step with the actual caret position.
+          // Fixed at mount like `lang`. CodeMirror's own placeholder renders
+          // in the document flow, so it wraps and tracks the caret.
           ...(placeholder ? [cmPlaceholder(placeholder)] : []),
           theme.extension,
           EditorView.lineWrapping,
@@ -123,12 +110,8 @@ export function CodeSurface({
   return (
     <div
       className={cn(
-        // Công thức vòng focus đã gom về một chỗ trong app: `ring-[3px]` màu
-        // `--acc-ring` (bí danh `ring-focus`), không offset. Trước là
-        // `ring-2 ring-acc/40` riêng của mỗi editor — không dính lỗi "dính lại
-        // sau khi bấm chuột" (đây là `focus-within`, đúng ngữ nghĩa vì
-        // CodeMirror không phải input gốc), nhưng khác công thức với input,
-        // textarea, select, button trong cùng app.
+        // The app's focus ring (`ring-[3px]` `ring-focus`), via
+        // `focus-within` because CodeMirror is not a native input.
         'flex flex-col flex-1 min-h-[180px] overflow-hidden rounded-md border border-line bg-bg shadow-sm transition-shadow duration-fast ease-out-soft hover:border-line focus-within:shadow-none focus-within:ring-[3px] focus-within:ring-focus',
         className,
       )}

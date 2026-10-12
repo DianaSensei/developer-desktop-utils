@@ -5,27 +5,19 @@ import { storageSet, storageRemove } from '@/lib/persistentStore';
 import { TOOL_DEFS } from '@/lib/toolDefs';
 
 /**
- * Route `/` KHÔNG phải một trang riêng — nó thuộc về Cron Generator (xem
- * `TOOL_ROUTES` trong lib/toolRegistry.ts). Mà Cron Generator lại tắt được như
- * mọi tool khác trong Settings. Trước khi có `<Route path="*">`, tắt nó xong mở
- * lại app là rơi vào đúng `/`, không route nào khớp, và vùng nội dung trống
- * trơn — trong khi header vẫn vẽ tên tool đã tắt, nên trông y như app hỏng chứ
- * không phải như một lựa chọn của người dùng.
- *
- * Cùng cái bẫy đó áp cho mọi URL không khớp (deep link cũ, tool bị tắt sau khi
- * đã điều hướng tới). Bộ test này khoá lại: luôn có một tool hiện ra.
+ * Unmatched URLs (including '/', which belongs to a tool the user can
+ * disable) must land on an enabled tool rather than a blank content area.
  */
 
-/** Bật đúng những tool được liệt kê, tắt phần còn lại — `FeatureProvider` trộn
- *  giá trị lưu lên trên mặc định, nên chỉ ghi một phần sẽ để lại cả tá tool
- *  mặc-định-bật và làm đích rơi về không đoán trước được. */
+/** Enables exactly these tools. FeatureProvider merges stored values over
+ *  defaults, so every other tool is written as disabled. */
 function enableOnly(...ids: string[]) {
   const features = Object.fromEntries(TOOL_DEFS.map((d) => [d.id, ids.includes(d.id)]));
   storageSet('devtool-features', JSON.stringify({ ...features, settings: true }));
 }
 
-// jsdom không cài `matchMedia` lẫn `ResizeObserver`; App gọi cả hai ngay lúc
-// dựng (useThemeSync và fade tràn của danh sách nav trong sidebar).
+// jsdom lacks `matchMedia` and `ResizeObserver`, both used by App on
+// mount (useThemeSync, sidebar overflow fade).
 beforeAll(() => {
   window.ResizeObserver = class {
     observe() {}
@@ -65,7 +57,7 @@ describe('App — route dự phòng', () => {
   it('mở "/" khi Cron Generator đã TẮT thì chuyển sang tool đang bật, không để trống', async () => {
     enableOnly('json');
     render(<App />);
-    // Rời khỏi '/' là điểm mấu chốt — đó chính là chỗ bản cũ đứng lại và trắng.
+    // Leaving '/' is the point: that is where the blank page used to be.
     await waitFor(() => {
       expect(window.location.pathname).toBe('/json');
     });

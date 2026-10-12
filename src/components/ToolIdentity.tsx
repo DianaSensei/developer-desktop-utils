@@ -9,13 +9,9 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useLiveConnections } from '@/lib/liveConnections';
 
 /**
- * Danh tính tool đang mở: icon + (tab các tool cùng nhóm | tên tool).
- *
- * Trước đây khối này được viết HAI LẦN gần nguyên văn trong App.tsx — một bản
- * cho titlebar hợp nhất (desktop), một bản cho header bản web — chỉ khác kích
- * thước, và đã bắt đầu trôi lệch. Giờ một component, `size` chọn kích thước.
- * Hiện làm `fallback` của WorkspaceBar: lúc chưa có gì để chuyển qua lại thì
- * hàng header vẫn nói đang ở đâu.
+ * Identity of the open tool: icon plus group tabs or the tool name. `size`
+ * picks the titlebar or web header variant. Used as WorkspaceBar's
+ * `fallback`.
  */
 export function ToolIdentity({ size }: { size: 'titlebar' | 'header' }) {
   const location = useLocation();
@@ -25,8 +21,7 @@ export function ToolIdentity({ size }: { size: 'titlebar' | 'header' }) {
 
   const activeTool = allTools.find((tool) => tool.path === location.pathname) ?? allTools[0];
   const ActiveIcon = activeTool.icon;
-  // Tool đang mở có nằm trong nhóm nhiều tool không? Nếu có, hiện tab con thay
-  // vì tên tool — để thấy được các tool anh em mà không phải quay lại sidebar.
+  // In a multi-tool group, show the sibling tabs instead of the name.
   const activeGroup = GROUP_OF_TOOL.get(activeTool.featureId);
   const groupTabs = (activeGroup?.toolIds ?? [])
     .filter((id) => isFeatureEnabled(id))
@@ -37,9 +32,7 @@ export function ToolIdentity({ size }: { size: 'titlebar' | 'header' }) {
 
   return (
     <div className={cn('flex min-w-0 items-center', compact ? 'gap-3' : 'gap-2.5')}>
-      {/* Không chấm live ở đây: icon này nằm ngoài tablist bên cạnh (badge cố
-          định, không phải tab bấm được), và tab đang chọn đã tự có chấm live —
-          hai chấm cho cùng một tool là thừa. */}
+      {/* No live dot here: the active tab already shows one. */}
       <div
         key={activeTool.path}
         className={cn(
@@ -72,18 +65,16 @@ export function ToolIdentity({ size }: { size: 'titlebar' | 'header' }) {
                 role="tab"
                 aria-selected={on}
                 className={cn(
-                  // rounded-md: cùng hình "đang chọn" dùng ở mọi nơi khác.
+                  // rounded-md: the app's "selected" shape.
                   'inline-flex h-full items-center gap-1.5 whitespace-nowrap rounded-md leading-none transition-colors',
                   'focus-visible:outline-hidden focus-visible:ring-[3px] focus-visible:ring-focus',
                   compact ? 'px-2 text-xs' : 'px-3.5 text-sm',
-                  // Pill accent đặc → `shadow-btn` (RULES.md), không `shadow-soft`.
+                  // Solid accent pill uses `shadow-btn` (RULES.md).
                   on ? 'bg-acc font-semibold text-acc-fg shadow-btn' : 'text-fg-mute hover:text-fg',
                 )}
               >
-                {/* Tab anh em có thể đang live độc lập với tab đang mở — thiếu
-                    chấm này thì chuyển khỏi một tool đang kết nối là mất dấu
-                    nó. Viền `ring-acc-fg` chỉ ở tab ĐANG CHỌN: trên nền `bg-acc`
-                    một accent ngả xanh lá có thể nuốt mất chấm `--ok`. */}
+                {/* Siblings may be live independently. The selected tab gets a
+                    `ring-acc-fg` so a green-leaning accent does not hide `--ok`. */}
                 {live && (
                   <span
                     className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-ok', on && 'ring-2 ring-acc-fg/70')}
@@ -96,10 +87,8 @@ export function ToolIdentity({ size }: { size: 'titlebar' | 'header' }) {
           })}
         </div>
       ) : (
-        /* Tên tool là CHỮ, không phải viên thuốc accent: `--acc` nghĩa là "tương
-           tác được" hoặc "đang được chọn" (RULES.md). Tên tool đang mở không
-           phải một lựa chọn — tô accent vào đây là thứ ồn nhất màn hình lại là
-           thứ bấm vào không có gì xảy ra. */
+        /* The tool name is text, not an accent pill: accent means interactive
+           or selected (RULES.md), and the name is neither. */
         <h2
           key={`${activeTool.path}-label`}
           className={cn(

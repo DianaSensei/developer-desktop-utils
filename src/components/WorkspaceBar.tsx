@@ -1,13 +1,10 @@
-// Workspace bar — bộ chọn workspace + dãy tab tool của workspace đang dùng.
+// Workspace bar: workspace picker plus the active workspace's tool tabs.
+// Rendered in the custom titlebar and in the web header; `size` sets the
+// height.
 //
-// Thay cho OpenToolsStrip (tab "trong phiên", mất khi khởi động lại, và không
-// bao giờ render trên app desktop vì chỉ nằm trong header dạng web). Giờ dựng
-// được ở cả hai chỗ: dải titlebar hợp nhất (macOS overlay / Windows-Linux
-// custom chrome) và header thường (bản web) — `size` chọn chiều cao cho khớp.
-//
-// Tab TÀI LIỆU, không phải nút chọn chế độ — nên tab đang mở lấy đúng màu của
-// mặt làm việc (`--card`), không phải accent. Accent để dành cho "đang chọn
-// chế độ" (tab nhóm, Segmented) — hai nghĩa khác nhau, hai cách thể hiện.
+// Tabs are documents, not mode switches, so the active tab uses the surface
+// color (`--card`); the accent is reserved for mode selection (group tabs,
+// Segmented).
 
 import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Check, ChevronDown, Layers, Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -24,11 +21,11 @@ import { ContextMenu, useContextMenu } from '@/components/ui/context-menu';
 import { requestCommandPalette } from '@/components/CommandPalette';
 
 export interface WorkspaceBarProps {
-  /** `titlebar` = dải 38px của chrome tự vẽ; `header` = header 50px bản web. */
+  /** `titlebar`: the 38px custom titlebar; `header`: the 50px web header. */
   size?: 'titlebar' | 'header';
   /**
-   * Hiện khi chưa có gì để chuyển qua lại — ít hơn hai tab VÀ chỉ một
-   * workspace. Đó là danh tính tool đang mở; không có nó hàng header trống trơn.
+   * Shown when there is nothing to switch between (fewer than two tabs and
+   * one workspace): the active tool's identity.
    */
   fallback?: ReactNode;
 }
@@ -45,7 +42,7 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
   const listRef = useRef<HTMLDivElement>(null);
   const [dragId, setDragId] = useState<string | null>(null);
 
-  // Tab đang mở luôn nằm trong tầm nhìn khi dãy tab tràn ngang.
+  // Keep the active tab in view when the tabs overflow.
   useEffect(() => {
     listRef.current
       ?.querySelector<HTMLElement>('[aria-selected="true"]')
@@ -57,7 +54,7 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
   const compact = size === 'titlebar';
   const h = compact ? 'h-6' : 'h-ctl';
 
-  // Mũi tên trái/phải đi giữa các tab — mẫu tablist chuẩn của ARIA.
+  // Left/right arrows move between tabs (ARIA tablist pattern).
   function onTabKeyDown(e: ReactKeyboardEvent<HTMLDivElement>, index: number) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -73,10 +70,8 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
   }
 
   return (
-    // `data-tauri-drag-region="false"`: titlebar cha là vùng kéo cửa sổ
-    // ("deep"). Tab là <div role="tab"> chứ không phải <button>/<a>, nên phải
-    // nói rõ nó không phải vùng kéo — nếu không, nhấn chuột lên tab là kéo
-    // cả cửa sổ thay vì chuyển tab.
+    // The titlebar is a "deep" drag region; tabs are divs, so they must
+    // opt out explicitly or pressing a tab would drag the window.
     <div className="flex min-w-0 items-center gap-1" data-tauri-drag-region="false">
       <WorkspaceSwitcher compact={compact} />
       <span className="mx-0.5 h-4 w-px shrink-0 bg-line" aria-hidden />
@@ -89,8 +84,7 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
         {tabs.map((tool, i) => {
           const Icon = tool.icon;
           const on = tool.featureId === activeToolId;
-          // Đang ở màn không phải tab (Settings) thì tab đầu nhận focus Tab-key,
-          // để bàn phím vẫn vào được dãy tab.
+          // On a non-tab screen (Settings), the first tab takes Tab focus.
           const focusable = on || (i === 0 && !tabs.some((x) => x.featureId === activeToolId));
           const live = liveIds.includes(tool.featureId);
           const hint = i < 8 ? ` (${shortcut(String(i + 1))})` : '';
@@ -111,14 +105,14 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
               }}
               onDrop={(e) => {
                 e.preventDefault();
-                // Vị trí trong danh sách ĐẦY ĐỦ của workspace, không phải trong
-                // dãy đang hiện (đã lọc tool bị tắt) — hai chỉ số lệch nhau.
+                // Index in the workspace's full list, which includes hidden
+                // (disabled) tools, not in the visible tabs.
                 if (dragId) moveTool(dragId, active.toolIds.indexOf(tool.featureId));
                 setDragId(null);
               }}
               onDragEnd={() => setDragId(null)}
               onClick={() => openTool(tool.featureId)}
-              // Chuột giữa đóng tab — như mọi trình duyệt/IDE.
+              // Middle click closes the tab, as in browsers.
               onAuxClick={(e) => {
                 if (e.button === 1) {
                   e.preventDefault();
@@ -157,7 +151,7 @@ export function WorkspaceBar({ size = 'header', fallback = null }: WorkspaceBarP
                 title={t('shell.workspace.closeTab', { label: tool.label })}
                 className={cn(
                   '-mr-1 grid h-4 w-4 shrink-0 place-items-center rounded-xs text-fg-mute transition-opacity hover:bg-fg/10 hover:text-fg',
-                  // Tab đang mở luôn hiện nút đóng — không phải đi rê chuột tìm.
+                  // The active tab always shows its close button.
                   on ? 'opacity-60 hover:opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
                 )}
               >

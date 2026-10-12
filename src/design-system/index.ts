@@ -55,26 +55,25 @@ export { SectionLabel, type SectionLabelProps } from '@/components/ui/section-la
 export { CollapsibleSection, type CollapsibleSectionProps } from '@/components/ui/collapsible-section';
 export { Stat, StatGrid, type StatProps, type StatGridProps, type StatTone, type StatVariant } from '@/components/ui/stat';
 
-// Hệ trạng thái ba bậc — chọn bậc theo mức độ cần nói, xem design/COMPONENTS.md:
-//   StatusChip     liếc là thấy, không giải thích        (thanh tiêu đề panel)
-//   OutlineNotice  việc đang chờ, kèm một hành động      (chỉ viền, không nền)
-//   ExplainBand    cần giải thích + ví dụ sửa được       (trong thân panel)
-// Cả ba nằm TRONG panel, nên chuyển hợp lệ ↔ lỗi không làm layout nhảy — đó là
-// lý do chúng tồn tại thay vì một thẻ cảnh báo rời.
+// Three status levels; pick by how much needs saying (design/COMPONENTS.md):
+//   StatusChip     glanceable, no explanation        (panel header)
+//   OutlineNotice  pending item with one action      (border only)
+//   ExplainBand    explanation plus fixable examples (panel body)
+// All three sit inside the panel, so valid ↔ error does not shift layout.
 export { StatusChip, type StatusChipProps, type StatusChipTone } from '@/components/ui/status-chip';
 export { OutlineNotice, type OutlineNoticeProps, type OutlineNoticeTone } from '@/components/ui/outline-notice';
 export { ExplainBand, type ExplainBandProps, type ExplainBandTone, type ExplainBandExample } from '@/components/ui/explain-band';
 
-// Dòng — hai công thức, hai mục đích khác nhau:
-//   ParamRow    hiển thị tham số (nhãn · giá trị · tag · giải thích)
-//   SettingRow  cấu hình sửa được (icon · tiêu đề · mô tả · điều khiển)
+// Rows:
+//   ParamRow    displays a parameter (label · value · tag · explanation)
+//   SettingRow  editable setting (icon · title · description · control)
 export { ParamRow, type ParamRowProps } from '@/components/ui/param-row';
 export { SettingRow, SettingGroup, type SettingRowProps } from '@/components/ui/setting-row';
 
-// Khung ô nhập — ép quy tắc tối đa hai phụ kiện trong ô.
+// Input frame with at most two accessories inside the field.
 export { FieldShell, type FieldShellProps } from '@/components/ui/field-shell';
 
-// Phím tắt. <Button sc="⏎"> dùng bản nội tuyến của chính component này.
+// Keyboard shortcuts; <Button sc="⏎"> uses the inline variant.
 export { Keycap, MOD_KEY, IS_MAC, type KeycapProps } from '@/components/ui/keycap';
 
 // Data display
@@ -84,15 +83,11 @@ export {
   type TrProps, type ThProps, type TdProps,
 } from '@/components/ui/data-table';
 
-// Code editors — one purpose-built component per language, each with only
-// the features that make sense for it (JSON gets `jsonParseLinter`'s precise
-// whole-document check; JS/SQL get the cheaper syntax-error-node linter, since
-// neither has a real linter package). Pick the one matching your content
-// instead of a `language` prop — see code-editor.tsx for why. CodeViewer is
-// the one read-only surface (display-only, so no per-language behavior to
-// gate). InlineCodeField is the single-line {{variable}}-aware field (URL
-// bars, key/value rows) — not a "code editor" in this sense, no grammar, no
-// multi-line.
+// Code editors: one component per language, each with only the features
+// that fit (JSON uses `jsonParseLinter`; JS/SQL use a syntax-error-node
+// linter). Pick by content rather than a `language` prop (see
+// code-editor.tsx). CodeViewer is the read-only surface; InlineCodeField is
+// the single-line {{variable}}-aware field for URL bars and key/value rows.
 export {
   JsonEditor, JsonSyntaxEditor, JavaScriptEditor, SqlEditor, TextEditor,
   type CodeEditorProps, type JavaScriptEditorProps,
@@ -100,11 +95,9 @@ export {
 export { CodeViewer, type CodeViewerProps, type CodeViewerHandle } from '@/components/ui/code-viewer';
 export { InlineCodeField, type InlineCodeFieldProps, type InlineCodeFieldHandle } from '@/components/ui/inline-code-field';
 
-// Code theme — the shared CodeMirror 6 look (theme, syntax palette, and the
-// hook that keeps a live editor in step with the app's light/dark switch).
-// Low-level: only reach for this building a bespoke editor (see
-// SqlFormatter's runtime SQL↔Mongo language switch) — everything else should
-// use the components above instead.
+// Shared CodeMirror 6 theme, syntax palette, and the hook that follows the
+// app's light/dark switch. Only for bespoke editors (e.g. SqlFormatter's
+// SQL/Mongo switch); prefer the components above.
 export {
   codeTheme, codeThemeWithHighlight, codeHighlight, useCodeTheme, smartBracketSkip, CODE_FONT,
   type CodeThemeOptions,

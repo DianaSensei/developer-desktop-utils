@@ -17,8 +17,8 @@ import UI from '@/components/ui/ui.messages';
 // Value is an ISO date string (yyyy-MM-dd); identical on every OS.
 // ---------------------------------------------------------------------------
 
-// Tên thứ/tháng lấy từ Intl theo ngôn ngữ đang chọn, không viết cứng tiếng Anh.
-// 2023-01-01 là Chủ nhật — dựng 7 ngày liên tiếp từ đó cho đúng thứ tự Su…Sa.
+// Localized weekday names from Intl. 2023-01-01 was a Sunday, so seven
+// days from it give Su…Sa order.
 function weekdayNames(locale: string): string[] {
   const fmt = new Intl.DateTimeFormat(locale, { weekday: 'narrow' });
   return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2023, 0, 1 + i)));

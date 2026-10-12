@@ -65,9 +65,8 @@ describe('regex.worker', () => {
   });
 
   it('khớp RỖNG (zero-width) không làm worker treo vô hạn — lastIndex tự tăng khi index đứng yên', () => {
-    // `x*` khớp chuỗi rỗng ở MỌI vị trí của một input không có 'x' nào — nếu
-    // không có bước tự tăng `lastIndex`, `re.exec` sẽ lặp lại cùng vị trí mãi
-    // mãi. Input dài 5 ký tự thì có 6 vị trí (đầu, giữa từng ký tự, cuối).
+    // `x*` matches the empty string at every position (6 for a
+    // 5-character input); without advancing `lastIndex` exec would loop.
     const r = run({ pattern: 'x*', flags: 'g', input: 'abcde' });
     expect(r.matches).toHaveLength(6);
     expect(r.matches.every((m) => m.groups[0] === '')).toBe(true);

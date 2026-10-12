@@ -1,6 +1,6 @@
 import { defineMessages } from '@/lib/i18n';
 
-/** Chữ bên trong component của kit — dùng `useMessages` nên đổi ngôn ngữ là đổi ngay. */
+/** Strings inside kit components, via `useMessages` so they follow the locale. */
 export default defineMessages({
   confirm: { vi: 'Xác nhận', en: 'Confirm' },
   cancel: { vi: 'Huỷ', en: 'Cancel' },
