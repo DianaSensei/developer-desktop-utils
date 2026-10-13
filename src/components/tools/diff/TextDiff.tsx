@@ -10,6 +10,7 @@ import { useQuickPaste, useQuickPasteHint } from '@/hooks/useQuickPaste';
 import { useMessages } from '@/contexts/LocaleContext';
 import MESSAGES from '@/components/tools/diff/TextDiff.messages';
 import { ToolToolbar } from '@/components/ui/tool-layout';
+import { JsonNumberText, parseInput as parseJsonLossless, serialize, type JsonValue } from '@/components/tools/JsonFormatter';
 
 type Mode = 'text' | 'json';
 
@@ -23,10 +24,19 @@ type ChangeKind = 'added' | 'removed' | 'changed';
 interface Change { path: string; kind: ChangeKind; before?: unknown; after?: unknown }
 
 function kindOf(v: unknown): 'array' | 'object' | 'null' | 'primitive' {
+  if (v instanceof JsonNumberText) return 'primitive';
   if (Array.isArray(v)) return 'array';
   if (v === null) return 'null';
   if (typeof v === 'object') return 'object';
   return 'primitive';
+}
+
+// Numbers compare by value, and big ones (kept as text by the parser) by
+// their exact digits, so 9007199254740993 and …992 differ.
+function scalarKey(v: unknown): string {
+  if (v instanceof JsonNumberText) return `n:${v.text}`;
+  if (typeof v === 'number') return `n:${String(v)}`;
+  return JSON.stringify(v) ?? 'undefined';
 }
 
 function diffJson(a: unknown, b: unknown, path: string, out: Change[]): void {
@@ -34,7 +44,7 @@ function diffJson(a: unknown, b: unknown, path: string, out: Change[]): void {
   const kb = kindOf(b);
 
   if (ka !== kb || (ka !== 'array' && ka !== 'object')) {
-    if (JSON.stringify(a) !== JSON.stringify(b)) {
+    if (scalarKey(a) !== scalarKey(b)) {
       out.push({ path: path || '(root)', kind: 'changed', before: a, after: b });
     }
     return;
@@ -57,15 +67,15 @@ function diffJson(a: unknown, b: unknown, path: string, out: Change[]): void {
   const objB = b as Record<string, unknown>;
   for (const k of new Set([...Object.keys(objA), ...Object.keys(objB)])) {
     const p = path ? `${path}.${k}` : k;
-    if (!(k in objA)) out.push({ path: p, kind: 'added', after: objB[k] });
-    else if (!(k in objB)) out.push({ path: p, kind: 'removed', before: objA[k] });
+    if (!Object.hasOwn(objA, k)) out.push({ path: p, kind: 'added', after: objB[k] });
+    else if (!Object.hasOwn(objB, k)) out.push({ path: p, kind: 'removed', before: objA[k] });
     else diffJson(objA[k], objB[k], p, out);
   }
 }
 
 function preview(v: unknown): string {
-  const s = JSON.stringify(v);
-  if (s === undefined) return 'undefined';
+  if (v === undefined) return 'undefined';
+  const s = serialize(v as JsonValue, '', '"');
   return s.length > 200 ? s.slice(0, 200) + '…' : s;
 }
 
@@ -76,18 +86,59 @@ interface JsonDiffResult { changes: Change[] | null; error: { side: 'original' |
 // need this: CodeMirror's own diff algorithm already bounds itself.
 const STRUCTURAL_DIFF_CHAR_LIMIT = 300_000;
 
-function computeJsonDiff(a: string, b: string): JsonDiffResult {
+export function computeJsonDiff(a: string, b: string): JsonDiffResult {
   if (!a.trim() || !b.trim()) return { changes: null, error: null };
   if (a.length + b.length > STRUCTURAL_DIFF_CHAR_LIMIT) {
     return { changes: null, error: null };
   }
-  let pa: unknown;
-  let pb: unknown;
-  try { pa = JSON.parse(a); } catch (e) { return { changes: null, error: { side: 'original', message: (e as Error).message } }; }
-  try { pb = JSON.parse(b); } catch (e) { return { changes: null, error: { side: 'modified', message: (e as Error).message } }; }
+  // Strict JSON.parse decides validity; the values come from the lossless
+  // parser so numbers beyond 2^53 are not rounded together.
+  try { JSON.parse(a); } catch (e) { return { changes: null, error: { side: 'original', message: (e as Error).message } }; }
+  try { JSON.parse(b); } catch (e) { return { changes: null, error: { side: 'modified', message: (e as Error).message } }; }
+  const pa = parseJsonLossless(a);
+  const pb = parseJsonLossless(b);
   const out: Change[] = [];
   diffJson(pa, pb, '', out);
   return { changes: out, error: null };
+}
+
+/**
+ * Re-indents valid JSON without parsing values: strings and numbers are copied
+ * exactly as written, so `1.10`, `9007199254740993` or `"\u00e9"` stay what
+ * the user typed. Anything that isn't valid JSON is returned unchanged.
+ */
+export function reindentJson(s: string): string {
+  const t = s.trim();
+  if (!t) return s;
+  try { JSON.parse(t); } catch { return s; }
+  const unit = '  ';
+  let out = '';
+  let depth = 0;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < t.length && t[j] !== '"') j += t[j] === '\\' ? 2 : 1;
+      out += t.slice(i, j + 1);
+      i = j;
+    } else if (c === '{' || c === '[') {
+      let j = i + 1;
+      while (/\s/.test(t[j] ?? '')) j++;
+      if (t[j] === (c === '{' ? '}' : ']')) { out += c + t[j]; i = j; continue; }
+      depth++;
+      out += c + '\n' + unit.repeat(depth);
+    } else if (c === '}' || c === ']') {
+      depth--;
+      out += '\n' + unit.repeat(depth) + c;
+    } else if (c === ',') {
+      out += ',\n' + unit.repeat(depth);
+    } else if (c === ':') {
+      out += ': ';
+    } else if (!/\s/.test(c)) {
+      out += c;
+    }
+  }
+  return out;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -102,12 +153,7 @@ export function TextDiff() {
   const [collapseUnchanged, setCollapseUnchanged] = useState(false);
   const [stats, setStats] = useState<DiffStats | null>(null);
 
-  // Pretty-print JSON; returns the input unchanged if it isn't valid JSON yet.
-  const fmtJson = (s: string) => {
-    const t = s.trim();
-    if (!t) return s;
-    try { return JSON.stringify(JSON.parse(t), null, 2); } catch { return s; }
-  };
+  const fmtJson = reindentJson;
   const modeRef = useRef(mode);
   modeRef.current = mode;
 

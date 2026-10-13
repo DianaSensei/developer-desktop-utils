@@ -16,7 +16,7 @@ import { saveTextFile } from '@/lib/fileio';
 import { usePluginSdkFor, usePluginState } from '@/platform';
 import { useQuickPaste } from '@/hooks/useQuickPaste';
 import { useInputHistory } from '@/hooks/useInputHistory';
-import { parseProperties, stringifyProperties } from '@/lib/properties';
+import { inferScalar, parseProperties, stringifyProperties } from '@/lib/properties';
 import { useMessages } from '@/contexts/LocaleContext';
 import COMMON from '@/components/tools/common.messages';
 import MESSAGES from '@/components/tools/DataConverter.messages';
@@ -47,13 +47,14 @@ interface Options {
 
 // ─── Parsers: format → plain JS value ────────────────────────────────────────
 
-async function parseInput(fmt: Format, text: string): Promise<unknown> {
+export async function parseInput(fmt: Format, text: string): Promise<unknown> {
   switch (fmt) {
     case 'json':
       return JSON.parse(text);
     case 'yaml': {
-      const { load } = await import('js-yaml');
-      return load(text);
+      // js-yaml 5's default schema leaves `<<: *anchor` as a literal key.
+      const { load, CORE_SCHEMA, mergeTag } = await import('js-yaml');
+      return load(text, { schema: CORE_SCHEMA.withTags(mergeTag) });
     }
     case 'toml': {
       const { parse } = await import('smol-toml');
@@ -61,11 +62,34 @@ async function parseInput(fmt: Format, text: string): Promise<unknown> {
     }
     case 'xml': {
       const { XMLParser } = await import('fast-xml-parser');
-      return new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', parseAttributeValue: true }).parse(text);
+      // The parser's own number parsing rewrites values (`01234` → 1234,
+      // `1.10` → 1.1, `0x1F` → 31, `version="1.0"` → 1). Read everything as
+      // text and infer only values that print back exactly as written.
+      const parsed: unknown = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+        parseTagValue: false,
+        parseAttributeValue: false,
+      }).parse(text);
+      return inferXmlScalars(parsed);
     }
     case 'properties':
       return parseProperties(text);
   }
+}
+
+function inferXmlScalars(value: unknown): unknown {
+  if (typeof value === 'string') return inferScalar(value);
+  if (Array.isArray(value)) return value.map(inferXmlScalars);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      // The XML declaration describes the document, not its data.
+      Object.defineProperty(out, k, { value: k === '?xml' ? v : inferXmlScalars(v), writable: true, enumerable: true, configurable: true });
+    }
+    return out;
+  }
+  return value;
 }
 
 // ─── Serializers: plain JS value → format ────────────────────────────────────
