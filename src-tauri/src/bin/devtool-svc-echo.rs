@@ -11,8 +11,8 @@ use std::io::{self, BufRead, Write};
 use serde::{Deserialize, Serialize};
 
 /// Must match `SERVICE_PROTOCOL` in service_host.rs and service.ts. This
-/// binary shares no crate with the host, so the value is duplicated; a
-/// mismatch is reported by the host.
+/// binary shares no crate with the host, so the value is duplicated. A
+/// request with another protocol is rejected here.
 const SERVICE_PROTOCOL: u32 = 1;
 
 #[derive(Deserialize)]

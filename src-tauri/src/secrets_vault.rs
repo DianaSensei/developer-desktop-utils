@@ -8,7 +8,8 @@
 // Fallback (fails open): when no keychain is available (e.g. Linux without
 // Secret Service), the key is stored in `<app_data>/secrets.key` with mode
 // 0600. Anyone who can read the app data directory can then read the
-// secrets; it only protects a copied `secrets.enc`. Failing closed would
+// secrets, including code in the webview (its fs scope covers app data); it
+// only protects a copied `secrets.enc`. Failing closed would
 // break 2FA and JWT tools on those machines. The active mode is reported by
 // `secret_vault_status` and shown in Settings.
 //

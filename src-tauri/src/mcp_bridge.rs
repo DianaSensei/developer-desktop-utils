@@ -8,9 +8,9 @@
 //   - `POST /call` emits an `mcp:call` event; the bridge that owns the tool
 //     answers through `mcp_respond`, using the same code path as the UI.
 //
-// Bound to 127.0.0.1 on an OS-assigned port. Every request needs the random
-// bearer token that is written with the port to
-// `<app_data_dir>/mcp-bridge.json` for the sidecar to read.
+// Bound to 127.0.0.1 on an OS-assigned port. `/call` and `/tools` need the
+// random bearer token that is written with the port to
+// `<app_data_dir>/mcp-bridge.json` for the sidecar to read; `/health` does not.
 //
 // A call only succeeds while some bridge for the tool is registered: by
 // default that is while the tool is on screen, or always when Settings → MCP
@@ -32,7 +32,9 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
-// Same value as `service_host.rs`'s `CALL_TIMEOUT` by coincidence.
+// Must stay below `CALL_TIMEOUT` in bin/devtool-mcp-server.rs (35s), so the
+// client sees this error instead of its own timeout. Equal to
+// `service_host.rs`'s `CALL_TIMEOUT` only by coincidence.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Default)]

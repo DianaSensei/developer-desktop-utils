@@ -1,7 +1,8 @@
 // Sandbox worker for API Client user scripts. A script that never returns is
-// stopped by terminating the worker, and scripts can't reach `window`,
-// `document` or app storage: only `dt`/`req`/`res`/`pm` and the bundled
-// `require()` modules.
+// stopped by terminating the worker. Scripts get `dt`/`req`/`res`/`pm` and the
+// bundled `require()` modules and can't reach `window`, `document` or app
+// storage, but worker globals (`fetch`, `WebSocket`, `importScripts`,
+// `postMessage`, …) remain reachable, subject to the CSP.
 
 import { runPhase, type PhaseInput, type PhaseOutput } from './scriptPhases';
 

@@ -2,7 +2,10 @@
  * Platform SDK: the only surface plugins use to reach outside themselves.
  *
  * Every call goes through one checkpoint: check the declared permission,
- * record an audit entry, then execute. An SDK is created per plugin
+ * record an audit entry, then execute. Exceptions: `storage.key()` (a
+ * namespaced key for `usePersistentState`) and `env` are unchecked. This
+ * guards against mistakes, not hostile code: plugins share the webview's JS
+ * realm (see docs/AUDIT.md). An SDK is created per plugin
  * (`createPluginSdk(manifest)`), so storage namespaces and command
  * allowlists are bound to the plugin's identity.
  */

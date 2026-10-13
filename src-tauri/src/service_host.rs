@@ -21,10 +21,10 @@
 //      app is killed);
 //   3. write nothing else to stdout (logs go to stderr).
 //
-// Trust boundary: the webview names the binary, but permission to run it is
-// decided in Rust:
-//   - `ALLOWED_SERVICES`: DevTool's own sidecars, fixed at build time, run
-//     without asking;
+// Trust boundary: the webview names the binary, Rust decides whether it runs:
+//   - names in `ALLOWED_SERVICES` run without asking, whatever binary
+//     resolves for them (a URL-installed copy wins over a bundled one, see
+//     `resolve_sidecar_path`);
 //   - any other valid name requires the user's consent through a native
 //     dialog showing the path and SHA-256 (`service_trust.rs`).
 
@@ -49,10 +49,12 @@ pub const SERVICE_PROTOCOL: u32 = 1;
 // out different things and can change independently.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// DevTool's own sidecars, which run without a consent prompt. Any other
-/// name needs user consent (see `service_trust.rs`); adding a plugin does not
-/// require editing this list. Not every entry is bundled (see
-/// `BUNDLED_SERVICES`).
+/// Names that run without a consent prompt. Trust is by name: whatever
+/// binary resolves for the name runs, including a URL-installed copy from
+/// any manifest, which takes precedence over a bundled one (see
+/// `resolve_sidecar_path`). Only `devtool-svc-echo` is bundled
+/// (`BUNDLED_SERVICES`). Any other name needs user consent
+/// (`service_trust.rs`); adding a plugin does not require editing this list.
 ///
 /// `devtool-svc-echo` is a minimal example sidecar used by
 /// `tests/service_echo.rs` to exercise one-shot and stream calls end to end.
@@ -318,9 +320,10 @@ fn spawn_process(
     }))
 }
 
-/// Private data directory for one sidecar: `<app_data>/service-data/<bin>`.
-/// The sidecar only learns this path through `DEVTOOL_SERVICE_DATA_DIR`, so
-/// it never sees the app data root or another sidecar's directory.
+/// Data directory for one sidecar: `<app_data>/service-data/<bin>`, passed
+/// as `DEVTOOL_SERVICE_DATA_DIR`. Separation is by convention only: sidecars
+/// are unsandboxed and can read any file the user can, including the rest of
+/// app data.
 fn service_data_dir(app_data_dir: &std::path::Path, bin: &str) -> std::path::PathBuf {
     app_data_dir.join("service-data").join(bin)
 }
@@ -377,8 +380,10 @@ where
     trust.ensure(bin, &sha256, || ask(dialog)).await
 }
 
-/// DevTool's own sidecars run without asking; any other sidecar needs consent
-/// for the exact file about to run (hashed now, not at install time).
+/// Names in `ALLOWED_SERVICES` run without asking; any other sidecar needs
+/// consent for the file its path resolves to now (hashed at check time, not
+/// at install time). `get_or_spawn` resolves the path again before spawning,
+/// so a file swapped in between is not re-checked.
 async fn ensure_trusted(app: &AppHandle, registry: &ServiceRegistry, bin: &str) -> Result<(), String> {
     let (index_dir, beside_dir) = sidecar_dirs(app)?;
     let app_data = app.path().app_data_dir().ok();
@@ -551,7 +556,8 @@ pub async fn service_stop(state: tauri::State<'_, ServiceRegistry>, bin: String)
 }
 
 async fn kill(running: Arc<RunningSidecar>) {
-    // Closing stdin lets a well-behaved sidecar exit on its own.
+    // Waits for any in-flight write to finish; this does not close stdin (the
+    // pipe closes when the last `Arc<RunningSidecar>` is dropped).
     drop(running.stdin.lock().await);
     let _ = running.child.lock().await.kill().await;
 }

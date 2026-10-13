@@ -2,9 +2,11 @@
 // the OS dialogs through `sdk.files`; the web falls back to
 // `<input type=file>` and Blob downloads.
 //
-// Shared by several plugins (API Client, Data Converter, Generator), so it
-// lives in lib/. Every function takes the calling plugin's `sdk` so file
-// access is checked and audited against that plugin.
+// Shared by several plugins (API Client, Data Converter, Generator, Color
+// Picker, 2FA), so it lives in lib/. Every function takes the calling
+// plugin's `sdk` so file access is checked and audited against that plugin,
+// except `pickDataFile`, which uses the webview file input in every build
+// and is neither permission-checked nor audited.
 
 import { isTauri } from '@/lib/platform';
 import type { PluginSdk } from '@/platform';

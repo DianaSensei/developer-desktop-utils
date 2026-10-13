@@ -5,12 +5,14 @@ import { storageGet, storageRemove } from '@/lib/persistentStore';
  * Secret storage, separate from the app's shared settings store.
  *
  * `persistentStore` loads all of `app-settings.json` into an in-memory cache
- * readable by any code in the webview, so TOTP seeds, tokens and passwords
+ * and writes it to disk in plaintext, so TOTP seeds, tokens and passwords
  * must not live there.
  *
  * - In Tauri: the encrypted Rust vault (`src-tauri/src/secrets_vault.rs`),
- *   AES-256-GCM with the key in the OS keychain. The webview never sees the
- *   key.
+ *   AES-256-GCM with the key in the OS keychain. Per-plugin separation is
+ *   enforced only by sdk.ts: any webview code can call `secret_vault_*`
+ *   directly. Without a keychain the key file lives in app data, which the
+ *   webview's fs scope can read.
  * - On the web (`npm run dev`): `sessionStorage`, not `localStorage`, because
  *   the web build mirrors `localStorage` into the shared cache. Secrets last
  *   for the session only; the web build is for development.

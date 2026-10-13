@@ -9,9 +9,9 @@
 import { isTauri } from '@/lib/platform';
 import { pendingInstall } from '@/lib/pendingInstall';
 
-/** Must match `plugins.deep-link.desktop.schemes` in tauri.conf.json and
- *  tauri.canary.conf.json. Both builds share this JS bundle, so both
- *  schemes are accepted. */
+/** Must match `plugins.deep-link.desktop.schemes` in tauri.conf.json.
+ *  `desktop-devtool-app-canary` is a leftover from the retired canary
+ *  channel and is still accepted. */
 export const INSTALL_LINK_SCHEMES = ['desktop-devtool-app', 'desktop-devtool-app-canary'] as const;
 
 /** Parses a URL into manifest URLs to install (plugin first, then service).
@@ -23,7 +23,7 @@ export function parseInstallUrls(raw: string): string[] {
   } catch {
     return [];
   }
-  const scheme = parsed.protocol.slice(0, -1); // bỏ dấu ':' cuối của URL.protocol
+  const scheme = parsed.protocol.slice(0, -1); // drop the trailing ':'
   if (!INSTALL_LINK_SCHEMES.includes(scheme as (typeof INSTALL_LINK_SCHEMES)[number]) || parsed.hostname !== 'install')
     return [];
   const urls: string[] = [];
