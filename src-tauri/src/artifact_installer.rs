@@ -51,6 +51,8 @@ fn http_client() -> Result<reqwest::Client, String> {
                 attempt.follow()
             }
         }))
+        // Tests talk to a local http server; real builds only ever speak https.
+        .https_only(!cfg!(test))
         .build()
         .map_err(|e| e.to_string())
 }
